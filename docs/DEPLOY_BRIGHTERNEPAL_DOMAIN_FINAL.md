@@ -114,7 +114,9 @@ Copy cert files to server:
 
 ## 3. Prepare ASchool for brighternepal.com
 
-The current ASchool nginx config uses aschool.com.np, so update domain references before deployment.
+The nginx config in this repo is already prepared for brighternepal.com.
+
+If your local copy is older, update domain references before deployment:
 
 On your local machine:
 
@@ -227,10 +229,10 @@ Current docker compose mounts:
 So place cert files on server:
 
     mkdir -p /opt/aschool/nginx/ssl
-    cp /etc/ssl/cloudflare/brighternepal.com.pem /opt/aschool/nginx/ssl/aschool.com.np.crt
-    cp /etc/ssl/cloudflare/brighternepal.com.key /opt/aschool/nginx/ssl/aschool.com.np.key
+    cp /etc/ssl/cloudflare/brighternepal.com.pem /opt/aschool/nginx/ssl/brighternepal.com.crt
+    cp /etc/ssl/cloudflare/brighternepal.com.key /opt/aschool/nginx/ssl/brighternepal.com.key
 
-Note: names above match current nginx config filenames. You may also rename nginx config certificate paths to brighternepal.com.* if preferred.
+Note: names above match the current nginx config filenames.
 
 ### 5.4 Build and start production services
 
