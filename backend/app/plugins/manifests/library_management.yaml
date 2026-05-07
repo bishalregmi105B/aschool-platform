@@ -1,0 +1,31 @@
+slug: library_management
+name: "Library Management"
+name_nepali: "पुस्तकालय व्यवस्थापन"
+category: starter
+price_monthly: 199
+price_yearly: 1999
+emoji: "📚"
+icon: "Library"
+description: "Book catalog, issue/return, overdue tracking"
+
+api_blueprint: "app.api.v1.library"
+models_module: "app.models.library"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/library"
+  sidebar:
+    label: "Library"
+    label_nepali: "पुस्तकालय"
+    icon: "Library"
+    subitems:
+      - { label: "Catalog", route: "/library/catalog" }
+      - { label: "Issue/Return", route: "/library/transactions" }
+      - { label: "Overdue", route: "/library/overdue" }
+    visible_to: ["school_admin", "teacher", "staff"]
+
+flutter:
+  admin_app: { feature_folder: "library", tabs: ["Catalog", "Transactions", "Overdue"] }
+  student_app: { feature_folder: "library", tabs: ["Browse", "My Books"] }

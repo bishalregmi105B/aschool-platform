@@ -1,0 +1,93 @@
+slug: iemis_importer
+name: "IEMIS Data Importer"
+name_nepali: "IEMIS डेटा आयातकर्ता"
+category: add_on
+price_monthly: 0
+price_yearly: 0
+is_free: true
+trial_days: 0
+emoji: "📥"
+icon: "FileSpreadsheet"
+description: "Import Nepal Ministry of Education IEMIS data exports directly into ASchool. Supports School-Level Reports and Student Name-wise Reports. Automatically maps students, parent info, classes, and school metadata."
+version: "1.0.0"
+author: "ASchool"
+
+api_blueprint: "app.api.v1.iemis_importer"
+blueprint_var: "iemis_importer_bp"
+url_prefix: "/api/v1/iemis"
+models_module: null
+services: []
+tasks: []
+
+depends_on:
+  - students
+conflicts_with: []
+
+# IEMIS report formats supported
+supported_formats:
+  - name: "Student Name-wise Report"
+    code: "student_namewise"
+    description: "Per-student record with parent/guardian info — from IEMIS portal"
+    columns:
+      - { iemis: "Student Id", aschool: "iemis_student_id" }
+      - { iemis: "Full Name", aschool: "full_name" }
+      - { iemis: "Gender", aschool: "gender" }
+      - { iemis: "Class", aschool: "grade" }
+      - { iemis: "DOB", aschool: "dob" }
+      - { iemis: "Father Name", aschool: "father_name" }
+      - { iemis: "Mother Name", aschool: "mother_name" }
+      - { iemis: "Guardian Name", aschool: "guardian_name" }
+      - { iemis: "Guardian Contact Number", aschool: "guardian_phone" }
+      - { iemis: "Section", aschool: "section" }
+      - { iemis: "Permanent Address", aschool: "permanent_address" }
+      - { iemis: "Temporary Address", aschool: "temporary_address" }
+      - { iemis: "IEMIS Code", aschool: "iemis_school_code" }
+      - { iemis: "Current School", aschool: "school_name_iemis" }
+
+  - name: "School Level Report"
+    code: "school_level"
+    description: "School-level metadata from IEMIS including establishment dates and codes"
+    columns:
+      - { iemis: "Iemis Code", aschool: "iemis_code" }
+      - { iemis: "School Name", aschool: "name" }
+      - { iemis: "School Type", aschool: "school_type" }
+      - { iemis: "School Sub Type", aschool: "school_sub_type" }
+      - { iemis: "Province", aschool: "province" }
+      - { iemis: "District", aschool: "district" }
+      - { iemis: "Municipality", aschool: "municipality" }
+      - { iemis: "Ward", aschool: "ward" }
+      - { iemis: "Head Teacher Name", aschool: "head_teacher_name" }
+      - { iemis: "Head Teacher Contact Number", aschool: "head_teacher_phone" }
+      - { iemis: "School Email", aschool: "email" }
+      - { iemis: "SEE Code", aschool: "see_code" }
+      - { iemis: "HSEB Code", aschool: "hseb_code" }
+      - { iemis: "Class Registered Upto", aschool: "max_class" }
+      - { iemis: "School Level", aschool: "school_level" }
+
+frontend:
+  route: "/dashboard/iemis-import"
+  sidebar:
+    section: "bottom_nav"
+    label: "IEMIS Import"
+    label_nepali: "IEMIS आयात"
+    icon: "FileSpreadsheet"
+    subitems:
+      - {
+          label: "Import Students",
+          route: "/dashboard/iemis-import?format=student_namewise",
+        }
+      - {
+          label: "Import School Data",
+          route: "/dashboard/iemis-import?format=school_level",
+        }
+      - { label: "Import History", route: "/dashboard/iemis-import/history" }
+    visible_to: ["school_admin", "data_entry"]
+
+flutter:
+  admin_app: { feature_folder: "iemis_import", tabs: ["Import", "History"] }
+
+events:
+  emits:
+    - "iemis.import_completed"
+    - "iemis.students_imported"
+  listens: []

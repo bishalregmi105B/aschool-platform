@@ -1,0 +1,59 @@
+name: aschool_student
+description: ASchool Student App — Timetable, homework, results, AI tutor, portfolio
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  aschool_shared:
+    path: ../flutter_shared
+
+  # State & Routing
+  flutter_riverpod: ^2.5.1
+  go_router: ^13.2.0
+
+  # Network
+  dio: ^5.4.3
+
+  # Local storage
+  flutter_secure_storage: ^9.0.0
+
+  # Firebase
+  firebase_core: ^2.31.1
+  firebase_messaging: ^14.9.4
+
+  # Real-time
+  socket_io_client: ^2.0.3+1
+
+  # UI
+  fl_chart: ^0.68.0
+  flutter_animate: ^4.5.0
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  table_calendar: ^3.1.2
+  flutter_markdown: ^0.7.4+3
+  lottie: ^3.1.2
+
+  # Utils
+  intl: ^0.19.0
+  url_launcher: ^6.3.0
+  share_plus: ^9.0.0
+  connectivity_plus: ^6.0.3
+  flutter_local_notifications: ^17.2.2
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/lottie/

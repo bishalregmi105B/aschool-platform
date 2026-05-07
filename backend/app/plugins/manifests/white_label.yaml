@@ -1,0 +1,30 @@
+slug: white_label
+name: "White-Label Branding"
+name_nepali: "ह्वाइट-लेबल ब्राण्डिङ"
+category: premium
+price_monthly: 2999
+price_yearly: 29999
+emoji: "🏷️"
+icon: "Tag"
+description: "Custom branding, own domain, remove ASchool branding"
+
+api_blueprint: "app.api.v1.schools"
+models_module: "app.models.school"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/white-label"
+  sidebar:
+    label: "White Label"
+    label_nepali: "ह्वाइट-लेबल"
+    icon: "Tag"
+    subitems:
+      - { label: "Branding", route: "/white-label/branding" }
+      - { label: "Custom Domain", route: "/white-label/domain" }
+      - { label: "Theme", route: "/white-label/theme" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "white_label", tabs: ["Branding", "Domain", "Theme"] }

@@ -1,0 +1,51 @@
+slug: exams
+name: "Examination Management"
+name_nepali: "परीक्षा व्यवस्थापन"
+category: starter
+price_monthly: 299
+price_yearly: 2999
+emoji: "📝"
+icon: "ClipboardList"
+description: "Exam scheduling, marks entry, result publishing, report cards, grade sheets, AI question paper generator"
+
+api_blueprint: "app.api.v1.exams"
+models_module: "app.models.exam"
+services:
+  - "app.services.ai.question_paper"
+tasks:
+  - "app.tasks.report_card_generator"
+
+depends_on:
+  - academics
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/exams"
+  sidebar:
+    section: "Exam & Performance"
+    label: "Exams"
+    label_nepali: "परीक्षा"
+    icon: "FileText"
+    subitems:
+      - { label: "Schedule", route: "/dashboard/exams/schedule" }
+      - { label: "Enter Marks", route: "/dashboard/exams/marks" }
+      - { label: "Results", route: "/dashboard/exams/results" }
+      - { label: "Report Cards", route: "/dashboard/exams/report-cards" }
+      - { label: "AI Paper Generator", route: "/dashboard/exams/ai-paper" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  admin_app:
+    { feature_folder: "exams", tabs: ["Schedule", "Results", "Report Cards"] }
+  teacher_app: { feature_folder: "exams", tabs: ["Enter Marks", "My Exams"] }
+  parent_app: { feature_folder: "results", tabs: ["Results", "Report Cards"] }
+  student_app:
+    { feature_folder: "results", tabs: ["My Results", "AI Study Tips"] }
+
+events:
+  emits:
+    - "exams.scheduled"
+    - "exams.marks_entered"
+    - "exams.result_published"
+  listens:
+    - "attendance.marked"

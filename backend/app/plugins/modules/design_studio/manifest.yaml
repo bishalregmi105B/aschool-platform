@@ -1,0 +1,38 @@
+slug: design_studio
+name: "Design Studio"
+name_nepali: "डिजाइन स्टुडियो"
+category: growth
+price_monthly: 499
+price_yearly: 4999
+emoji: "🎨"
+icon: "Palette"
+description: "Canva-like designer — certificates, ID cards, flyers"
+
+api_blueprint: "app.api.v1.design_studio"
+models_module: "app.models.website"
+services:
+  - "app.services.designer.template_engine"
+  - "app.services.designer.pdf_generator"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/designer"
+  sidebar:
+    section: "Digital & Design"
+    label: "Design Studio"
+    label_nepali: "डिजाइन स्टुडियो"
+    icon: "Palette"
+    subitems:
+      - { label: "Templates", route: "/dashboard/designer/templates" }
+      - { label: "My Designs", route: "/dashboard/designer/my-designs" }
+      - { label: "ID Cards", route: "/dashboard/designer/id-cards" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "design_studio",
+      tabs: ["Templates", "Designs", "ID Cards"],
+    }

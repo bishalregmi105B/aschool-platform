@@ -1,0 +1,35 @@
+slug: ai_grading
+name: "AI Auto-Grading"
+name_nepali: "AI स्वचालित ग्रेडिङ"
+category: growth
+price_monthly: 599
+price_yearly: 5999
+emoji: "✅"
+icon: "CheckCircle"
+description: "AI grades homework, rubric analysis, plagiarism check"
+
+api_blueprint: "app.api.v1.assignments"
+models_module: "app.models.assignment"
+services:
+  - "app.services.ai.grading_engine"
+tasks:
+  - "app.tasks.ai_insights_weekly"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/ai-tools"
+  sidebar:
+    section: "AI & Analytics"
+    label: "AI Grading"
+    label_nepali: "AI ग्रेडिङ"
+    icon: "Sparkles"
+    subitems:
+      - { label: "Grade Queue", route: "/dashboard/ai-tools/grade-queue" }
+      - { label: "Plagiarism Check", route: "/dashboard/ai-tools/plagiarism" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  teacher_app:
+    { feature_folder: "ai_grading", tabs: ["Queue", "Results", "Plagiarism"] }

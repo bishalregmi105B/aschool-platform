@@ -1,0 +1,45 @@
+slug: timetable
+name: "Timetable Management"
+name_nepali: "समय तालिका"
+category: starter
+price_monthly: 199
+price_yearly: 1999
+emoji: "🕐"
+icon: "Clock"
+description: "Class scheduling, teacher allocation, room management, AI timetable generator, substitution management"
+
+api_blueprint: "app.api.v1.timetable"
+models_module: "app.models.timetable"
+services:
+  - "app.services.ai.timetable_generator"
+
+depends_on:
+  - academics
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/timetable"
+  sidebar:
+    section: "Academic Management"
+    label: "Timetable"
+    label_nepali: "समय तालिका"
+    icon: "Calendar"
+    subitems:
+      - { label: "View", route: "/dashboard/timetable" }
+      - { label: "AI Generate", route: "/dashboard/timetable/generate" }
+      - { label: "Substitution", route: "/dashboard/timetable/substitution" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app:
+    { feature_folder: "timetable", tabs: ["View", "Generate", "Substitution"] }
+  teacher_app: { feature_folder: "timetable", tabs: ["My Schedule"] }
+  parent_app: null
+  student_app: { feature_folder: "timetable", tabs: ["My Timetable"] }
+
+events:
+  emits:
+    - "timetable.generated"
+    - "timetable.substitution"
+  listens:
+    - "academics.class_created"

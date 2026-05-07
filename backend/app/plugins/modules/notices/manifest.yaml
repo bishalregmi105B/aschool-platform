@@ -1,0 +1,40 @@
+slug: notices
+name: "Notice Board"
+name_nepali: "सूचना पाटी"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "📢"
+icon: "Megaphone"
+description: "School announcements, noticeboard, events calendar, push notifications"
+
+api_blueprint: "app.api.v1.notices"
+models_module: "app.models.notice"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/notices"
+  sidebar:
+    section: "Communication & Media"
+    label: "Notices"
+    label_nepali: "सूचना"
+    icon: "Bell"
+    subitems:
+      - { label: "All Notices", route: "/dashboard/notices" }
+      - { label: "Create Notice", route: "/dashboard/notices/create" }
+      - { label: "Events", route: "/dashboard/notices/events" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  admin_app: { feature_folder: "notices", tabs: ["All", "Create", "Events"] }
+  teacher_app: { feature_folder: "notices", tabs: ["View", "Create"] }
+  parent_app: { feature_folder: "notices", tabs: ["Notices", "Events"] }
+  student_app: { feature_folder: "notices", tabs: ["Notices", "Events"] }
+
+events:
+  emits:
+    - "notice.published"
+  listens: []

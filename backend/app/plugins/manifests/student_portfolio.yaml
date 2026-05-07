@@ -1,0 +1,31 @@
+slug: student_portfolio
+name: "Student Portfolio"
+name_nepali: "विद्यार्थी पोर्टफोलियो"
+category: growth
+price_monthly: 299
+price_yearly: 2999
+emoji: "🎒"
+icon: "Backpack"
+description: "Digital achievement portfolio, badges, PDF export"
+
+api_blueprint: "app.api.v1.portfolio"
+models_module: "app.models.portfolio"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/portfolio"
+  sidebar:
+    label: "Portfolio"
+    label_nepali: "पोर्टफोलियो"
+    icon: "Backpack"
+    subitems:
+      - { label: "Student Portfolios", route: "/portfolio/list" }
+      - { label: "Badges", route: "/portfolio/badges" }
+    visible_to: ["school_admin", "teacher", "student"]
+
+flutter:
+  teacher_app: { feature_folder: "portfolio", tabs: ["Students", "Badges"] }
+  student_app: { feature_folder: "portfolio", tabs: ["My Portfolio", "Achievements", "Export"] }
+  parent_app: { feature_folder: "portfolio", tabs: ["Child Portfolio"] }

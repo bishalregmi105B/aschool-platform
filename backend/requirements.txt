@@ -1,0 +1,64 @@
+# Flask
+Flask==3.1.*
+Flask-RESTful==0.3.*
+Flask-SQLAlchemy==3.1.*
+Flask-Migrate==4.0.*
+Flask-JWT-Extended==4.7.*
+Flask-CORS==5.0.*
+Flask-Limiter==3.8.*
+Flask-Caching==2.3.*
+Flask-SocketIO==5.4.*
+
+# Database
+psycopg2-binary==2.9.*
+SQLAlchemy==2.0.*
+alembic==1.14.*
+pgvector==0.3.*
+
+# Async / Queue
+celery[redis]==5.4.*
+redis==5.2.*
+eventlet==0.37.*
+
+# AI
+anthropic==0.42.*
+groq>=0.9.0                   # optional: used when GROQ_API_KEY is set
+
+# Auth
+PyJWT==2.9.*
+bcrypt==4.2.*
+
+# Nepal
+nepali-datetime==1.0.*
+
+# Payments
+requests==2.32.*
+
+# PDF
+WeasyPrint==63.*
+Pillow==11.*
+
+# Storage (R2/S3)
+boto3==1.35.*
+
+# Config
+PyYAML==6.0.*
+python-dotenv==1.0.*
+
+# Monitoring
+sentry-sdk[flask]==2.19.*
+
+# Validation
+marshmallow==3.23.*
+email-validator==2.2.*
+
+# Server
+gunicorn==23.*
+
+# Testing
+pytest==8.3.*
+pytest-cov==6.0.*
+factory-boy==3.3.*
+
+# IEMIS Import
+openpyxl==3.1.*

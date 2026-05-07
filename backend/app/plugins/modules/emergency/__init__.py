@@ -1,0 +1,1 @@
+"""ASchool Module: emergency"""

@@ -1,0 +1,41 @@
+slug: portfolio
+name: "Student Portfolio"
+name_nepali: "विद्यार्थी पोर्टफोलियो"
+category: growth
+price_monthly: 399
+price_yearly: 3999
+emoji: "🎨"
+icon: "Palette"
+description: "Digital student portfolios, achievement tracking, micro-credentials, project showcases"
+
+api_blueprint: "app.api.v1.portfolio"
+models_module: "app.models.portfolio"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/portfolio"
+  sidebar:
+    section: null
+    label: "Portfolio"
+    label_nepali: "पोर्टफोलियो"
+    icon: "Palette"
+    subitems:
+      - { label: "Students", route: "/portfolio" }
+      - { label: "Achievements", route: "/portfolio/achievements" }
+      - { label: "Credentials", route: "/portfolio/credentials" }
+    visible_to: []
+
+flutter:
+  admin_app: { feature_folder: "portfolio", tabs: ["Browse", "Credentials"] }
+  teacher_app: { feature_folder: "portfolio", tabs: ["Review", "Award"] }
+  parent_app: { feature_folder: "portfolio", tabs: ["Child's Portfolio"] }
+  student_app: { feature_folder: "portfolio", tabs: ["My Portfolio", "Build"] }
+
+events:
+  emits:
+    - "portfolio.achievement_added"
+    - "portfolio.credential_issued"
+  listens:
+    - "gamification.badge_earned"

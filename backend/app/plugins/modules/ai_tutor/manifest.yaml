@@ -1,0 +1,46 @@
+slug: ai_tutor
+name: "AI Tutor"
+name_nepali: "एआई ट्युटर"
+category: premium
+price_monthly: 1499
+price_yearly: 14999
+emoji: "🤖"
+icon: "Bot"
+description: "AI homework helper, personalized study plans, adaptive learning paths, question answering in Nepali/English"
+
+api_blueprint: "app.api.v1.design_studio"
+models_module: "app.models.ai_tutor"
+services:
+  - "app.services.ai.tutor"
+  - "app.services.ai.adaptive_learning"
+
+depends_on:
+  - academics
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/ai-tools"
+  sidebar:
+    section: "AI & Analytics"
+    label: "AI Tutor"
+    label_nepali: "एआई ट्युटर"
+    icon: "Sparkles"
+    subitems:
+      - { label: "Dashboard", route: "/dashboard/ai-tools" }
+      - { label: "Usage", route: "/dashboard/ai-tools/usage" }
+      - { label: "Settings", route: "/dashboard/ai-tools/settings" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app:
+    { feature_folder: "ai_tutor", tabs: ["Usage Analytics", "Settings"] }
+  teacher_app: null
+  parent_app: null
+  student_app:
+    { feature_folder: "ai_tutor", tabs: ["Ask AI", "Study Plan", "Practice"] }
+
+events:
+  emits:
+    - "ai_tutor.session_completed"
+  listens:
+    - "exams.result_published"

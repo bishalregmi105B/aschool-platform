@@ -1,0 +1,12 @@
+export 'repository_providers.dart';
+export 'current_student_provider.dart';
+export 'dashboard_provider.dart';
+export 'academic_provider.dart';
+export 'attendance_provider.dart';
+export 'assignments_provider.dart';
+export 'exams_provider.dart';
+export 'fees_provider.dart';
+export 'timetable_provider.dart';
+export 'lessons_provider.dart';
+export 'notices_provider.dart';
+export 'chat_provider.dart';

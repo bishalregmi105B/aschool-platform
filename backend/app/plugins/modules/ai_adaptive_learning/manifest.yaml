@@ -1,0 +1,40 @@
+slug: ai_adaptive_learning
+name: "AI Adaptive Learning"
+name_nepali: "AI अनुकूली शिक्षा"
+category: premium
+price_monthly: 1499
+price_yearly: 14999
+emoji: "🧠"
+icon: "Brain"
+description: "Personalized learning paths per student"
+
+api_blueprint: "app.api.v1.lms"
+models_module: "app.models.lms"
+services:
+  - "app.services.ai.adaptive_learning"
+tasks: []
+
+depends_on:
+  - lms
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/ai-tools"
+  sidebar:
+    section: "AI & Analytics"
+    label: "Adaptive Learning"
+    label_nepali: "अनुकूली शिक्षा"
+    icon: "Sparkles"
+    subitems:
+      - { label: "Learning Paths", route: "/dashboard/ai-tools/learning-paths" }
+      - { label: "Student Progress", route: "/dashboard/ai-tools/progress" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  teacher_app:
+    { feature_folder: "adaptive_learning", tabs: ["Paths", "Progress"] }
+  student_app:
+    {
+      feature_folder: "adaptive_learning",
+      tabs: ["My Path", "Recommendations"],
+    }

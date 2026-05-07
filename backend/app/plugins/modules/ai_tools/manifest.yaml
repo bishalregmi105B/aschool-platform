@@ -1,0 +1,43 @@
+slug: ai_tools
+name: "AI Tools Suite"
+name_nepali: "AI उपकरण सूट"
+category: premium
+price_monthly: 1499
+price_yearly: 14999
+emoji: "🤖"
+icon: "Sparkles"
+description: "AI question paper, lesson plan, timetable, remarks generator"
+
+api_blueprint: "app.api.v1.ai_tools"
+models_module: "app.models.ai_insight"
+services:
+  - "app.services.ai.question_paper"
+  - "app.services.ai.lesson_planner"
+  - "app.services.ai.remark_generator"
+tasks:
+  - "app.tasks.ai_insights_weekly"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/ai-tools"
+  sidebar:
+    section: "AI & Analytics"
+    label: "AI Tools"
+    label_nepali: "AI उपकरण"
+    icon: "Sparkles"
+    subitems:
+      - { label: "Question Paper", route: "/dashboard/ai-tools/question-paper" }
+      - { label: "Lesson Planner", route: "/dashboard/ai-tools/lesson-plan" }
+      - { label: "Timetable Gen", route: "/dashboard/ai-tools/timetable" }
+      - { label: "Remarks Writer", route: "/dashboard/ai-tools/remarks" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  admin_app: { feature_folder: "ai_tools", tabs: ["All Tools"] }
+  teacher_app:
+    {
+      feature_folder: "ai_tools",
+      tabs: ["Question Paper", "Lesson Plan", "Remarks"],
+    }

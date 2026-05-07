@@ -1,0 +1,39 @@
+slug: basic_website
+name: "School Website"
+name_nepali: "विद्यालय वेबसाइट"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "🌐"
+icon: "Globe"
+description: "Basic school public website with info pages, contact form, and responsive design"
+
+api_blueprint: "app.api.v1.website"
+models_module: "app.models.website"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/website"
+  sidebar:
+    label: "Website"
+    label_nepali: "वेबसाइट"
+    icon: "Globe"
+    subitems:
+      - { label: "Theme", route: "/website/theme" }
+      - { label: "Pages", route: "/website/pages" }
+      - { label: "Settings", route: "/website/settings" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "website", tabs: ["Preview", "Settings"] }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "website.published"
+  listens: []

@@ -1,0 +1,47 @@
+slug: gps_tracking
+name: "GPS Bus Tracking"
+name_nepali: "जीपीएस बस ट्र्याकिङ"
+category: premium
+price_monthly: 1999
+price_yearly: 19999
+emoji: "🚌"
+icon: "Bus"
+description: "Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route management, stop notifications, speed alerts"
+
+api_blueprint: "app.api.v1.transport"
+models_module: "app.models.transport"
+services:
+  - "app.services.emergency.gps_processor"
+tasks:
+  - "app.tasks.gps_processor"
+  - "app.tasks.bus_eta_alerts"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/transport"
+  sidebar:
+    label: "Bus Tracking"
+    label_nepali: "बस ट्र्याकिङ"
+    icon: "Bus"
+    subitems:
+      - { label: "Live Map", route: "/transport/map" }
+      - { label: "Routes", route: "/transport/routes" }
+      - { label: "Buses", route: "/transport/buses" }
+      - { label: "Stops", route: "/transport/stops" }
+      - { label: "GPS Logs", route: "/transport/logs" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "transport", tabs: ["Live Map", "Routes", "Buses"] }
+  teacher_app: null
+  parent_app: { feature_folder: "bus_tracker", tabs: ["Track Bus", "ETA", "Stops"] }
+  student_app: null
+
+events:
+  emits:
+    - "transport.bus_departed"
+    - "transport.bus_arrived"
+    - "transport.speed_alert"
+  listens: []

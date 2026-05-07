@@ -1,0 +1,38 @@
+slug: incident_management
+name: "Full Incident Management"
+name_nepali: "पूर्ण घटना व्यवस्थापन"
+category: growth
+price_monthly: 399
+price_yearly: 3999
+emoji: "📋"
+icon: "ShieldAlert"
+description: "Full behavior management — witnesses, escalation, parent conferences"
+
+api_blueprint: "app.api.v1.incidents"
+models_module: "app.models.incident"
+
+depends_on:
+  - incidents
+conflicts_with: []
+
+frontend:
+  route: "/incident-management"
+  sidebar:
+    section: null
+    label: "Incident Mgmt"
+    label_nepali: "घटना व्यवस्थापन"
+    icon: "ShieldAlert"
+    subitems:
+      - { label: "Active Cases", route: "/incident-management/active" }
+      - { label: "Escalations", route: "/incident-management/escalations" }
+      - { label: "Reports", route: "/incident-management/reports" }
+    visible_to: []
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "incident_management",
+      tabs: ["Cases", "Escalations", "Reports"],
+    }
+  teacher_app:
+    { feature_folder: "incident_management", tabs: ["Report", "My Cases"] }
