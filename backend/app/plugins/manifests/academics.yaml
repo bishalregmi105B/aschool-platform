@@ -1,0 +1,43 @@
+slug: academics
+name: "Academic Setup"
+name_nepali: "शैक्षिक संरचना"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "🏫"
+icon: "GraduationCap"
+description: "Classes, sections, subjects, academic years, timetable structure"
+
+api_blueprint: "app.api.v1.academics"
+models_module: "app.models.academic"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/academics"
+  sidebar:
+    label: "Academics"
+    label_nepali: "शैक्षिक"
+    icon: "GraduationCap"
+    subitems:
+      - { label: "Classes", route: "/academics/classes" }
+      - { label: "Sections", route: "/academics/sections" }
+      - { label: "Subjects", route: "/academics/subjects" }
+      - { label: "Academic Year", route: "/academics/year" }
+    # Handled by CORE_SECTIONS in frontend sidebar — always visible without plugin gate
+    visible_to: []
+
+flutter:
+  admin_app:
+    { feature_folder: "academics", tabs: ["Classes", "Sections", "Subjects"] }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "academics.year_started"
+    - "academics.class_created"
+  listens: []

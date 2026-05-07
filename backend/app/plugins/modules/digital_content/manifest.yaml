@@ -1,0 +1,41 @@
+slug: digital_content
+name: "E-Library & Digital Content"
+name_nepali: "ई-पुस्तकालय"
+category: growth
+price_monthly: 499
+price_yearly: 4999
+emoji: "📖"
+icon: "BookOpen"
+description: "E-books, past papers, OER resources, digital library, AI-curated reading lists"
+
+api_blueprint: "app.api.v1.design_studio"
+models_module: "app.models.digital_content"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/elibrary"
+  sidebar:
+    section: "Library & Learning"
+    label: "Digital Content"
+    label_nepali: "डिजिटल सामग्री"
+    icon: "BookOpenCheck"
+    subitems:
+      - { label: "Browse", route: "/dashboard/elibrary" }
+      - { label: "Past Papers", route: "/dashboard/elibrary/past-papers" }
+      - { label: "Upload Resources", route: "/dashboard/elibrary/upload" }
+    # Merged with elibrary plugin to avoid duplicate — hide from sidebar
+    visible_to: []
+
+flutter:
+  admin_app: { feature_folder: "digital_content", tabs: ["Manage", "Upload"] }
+  teacher_app: { feature_folder: "digital_content", tabs: ["Browse", "Share"] }
+  parent_app: { feature_folder: "elibrary", tabs: ["Browse", "Past Papers"] }
+  student_app:
+    { feature_folder: "elibrary", tabs: ["Browse", "Past Papers", "Saved"] }
+
+events:
+  emits:
+    - "digital_content.uploaded"
+  listens: []

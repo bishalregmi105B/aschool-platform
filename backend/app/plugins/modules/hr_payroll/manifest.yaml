@@ -1,0 +1,39 @@
+slug: hr_payroll
+name: "HR & Payroll"
+name_nepali: "कर्मचारी तथा तलब"
+category: growth
+price_monthly: 699
+price_yearly: 6999
+emoji: "👔"
+icon: "Briefcase"
+description: "Staff payroll, leave management, appraisal, PF/SSF"
+
+api_blueprint: "app.api.v1.hr_payroll"
+models_module: "app.models.hr_payroll"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/hr"
+  sidebar:
+    section: "Personnel Management"
+    label: "HR & Payroll"
+    label_nepali: "कर्मचारी तलब"
+    icon: "Briefcase"
+    subitems:
+      - { label: "Overview", route: "/dashboard/hr" }
+      - { label: "Payroll", route: "/dashboard/hr/payroll" }
+      - { label: "Payroll Settings", route: "/dashboard/hr/payroll/settings" }
+      - { label: "Leave Management", route: "/dashboard/hr/leaves" }
+      - { label: "Staff Attendance", route: "/dashboard/hr/staff-attendance" }
+      - { label: "Appraisals", route: "/dashboard/hr/appraisal" }
+      - { label: "Expenses", route: "/dashboard/hr/expenses" }
+    visible_to: ["school_admin", "accountant"]
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "hr_payroll",
+      tabs: ["Staff", "Payroll", "Leave", "Appraisals"],
+    }

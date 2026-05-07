@@ -1,0 +1,183 @@
+version: '3.9'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - flask
+      - nextjs
+    restart: always
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nextjs:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  flask:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: gunicorn --worker-class eventlet -w 4 -b 0.0.0.0:5000 --timeout 120 --keep-alive 5 wsgi:app
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${REDIS_URL}
+      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_DEFAULT_DAILY_LIMIT=${AI_DEFAULT_DAILY_LIMIT:-10000}
+      - AI_DEFAULT_MONTHLY_LIMIT=${AI_DEFAULT_MONTHLY_LIMIT:-100000}
+      - AI_QUOTA_ENFORCEMENT=${AI_QUOTA_ENFORCEMENT:-true}
+      - SPARROW_SMS_TOKEN=${SPARROW_SMS_TOKEN}
+      - ESEWA_MERCHANT_ID=${ESEWA_MERCHANT_ID}
+      - ESEWA_SECRET_KEY=${ESEWA_SECRET_KEY}
+      - KHALTI_SECRET_KEY=${KHALTI_SECRET_KEY}
+      - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - CLOUDFLARE_R2_ACCESS_KEY=${CLOUDFLARE_R2_ACCESS_KEY}
+      - CLOUDFLARE_R2_SECRET_KEY=${CLOUDFLARE_R2_SECRET_KEY}
+      - CLOUDFLARE_R2_BUCKET=${CLOUDFLARE_R2_BUCKET}
+      - FILE_STORAGE_BACKEND=${FILE_STORAGE_BACKEND:-r2}
+      - LOCAL_UPLOAD_DIR=/app/uploads
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-aschool}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-aschool}
+      - POSTGRES_USER=${POSTGRES_USER:-aschool}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aschool}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.celery worker -Q default,ai,notifications,gps -l info --concurrency=4
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${REDIS_URL}
+      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SPARROW_SMS_TOKEN=${SPARROW_SMS_TOKEN}
+      - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}
+      - SENTRY_DSN=${SENTRY_DSN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.celery beat --scheduler redbeat.RedBeatScheduler -l info
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${REDIS_URL}
+      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - SENTRY_DSN=${SENTRY_DSN}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  flower:
+    image: mher/flower:2.0
+    command: celery --broker=${REDIS_URL} flower --port=5555 --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=${REDIS_URL}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_cache:
+    driver: local
+  uploads_data:
+    driver: local

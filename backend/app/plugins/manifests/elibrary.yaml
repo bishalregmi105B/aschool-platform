@@ -1,0 +1,31 @@
+slug: elibrary
+name: "E-Library & Digital Content"
+name_nepali: "ई-पुस्तकालय"
+category: starter
+price_monthly: 299
+price_yearly: 2999
+emoji: "📖"
+icon: "Tablet"
+description: "Digital books, past papers, educational resources"
+
+api_blueprint: "app.api.v1.library"
+models_module: "app.models.digital_content"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/elibrary"
+  sidebar:
+    label: "E-Library"
+    label_nepali: "ई-पुस्तकालय"
+    icon: "Tablet"
+    subitems:
+      - { label: "Digital Books", route: "/elibrary/books" }
+      - { label: "Past Papers", route: "/elibrary/papers" }
+      - { label: "Resources", route: "/elibrary/resources" }
+    visible_to: ["school_admin", "teacher", "student"]
+
+flutter:
+  teacher_app: { feature_folder: "elibrary", tabs: ["Upload", "Browse"] }
+  student_app: { feature_folder: "elibrary", tabs: ["Browse", "Downloads"] }

@@ -1,0 +1,64 @@
+slug: file_management
+name: "File Management"
+name_nepali: "फाइल व्यवस्थापन"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+trial_days: 0
+emoji: "📁"
+icon: "FolderOpen"
+description: "Centralized school file storage — upload, organize, and manage documents, images, videos, and other assets for all school modules."
+version: "1.0.0"
+author: "ASchool"
+
+api_blueprint: "app.api.v1.files"
+blueprint_var: "files_bp"
+url_prefix: "/api/v1/files"
+models_module: "app.models.file"
+services: []
+tasks: []
+
+depends_on: []
+conflicts_with: []
+
+storage:
+  provider: "r2" # Cloudflare R2 (boto3-compatible)
+  bucket_env: "R2_BUCKET_NAME"
+  public_url_env: "R2_PUBLIC_URL"
+  max_file_size_mb: 50
+  allowed_mime_types:
+    - "image/*"
+    - "application/pdf"
+    - "application/vnd.ms-excel"
+    - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    - "application/msword"
+    - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    - "video/mp4"
+    - "audio/mpeg"
+    - "text/plain"
+    - "text/csv"
+
+frontend:
+  route: "/dashboard/files"
+  sidebar:
+    section: "Operations"
+    label: "File Manager"
+    label_nepali: "फाइल व्यवस्थापन"
+    icon: "FolderOpen"
+    subitems:
+      - { label: "All Files", route: "/dashboard/files" }
+      - { label: "Images", route: "/dashboard/files?type=image" }
+      - { label: "Documents", route: "/dashboard/files?type=document" }
+      - { label: "Videos", route: "/dashboard/files?type=video" }
+    visible_to: ["school_admin", "teacher", "accountant"]
+
+flutter:
+  admin_app:
+    { feature_folder: "files", tabs: ["All", "Images", "Documents", "Videos"] }
+
+events:
+  emits:
+    - "file.uploaded"
+    - "file.deleted"
+  listens: []

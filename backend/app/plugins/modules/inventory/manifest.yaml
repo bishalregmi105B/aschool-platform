@@ -1,0 +1,32 @@
+slug: inventory
+name: "Inventory & Assets"
+name_nepali: "सामग्री व्यवस्थापन"
+category: growth
+price_monthly: 299
+price_yearly: 2999
+emoji: "📦"
+icon: "Package"
+description: "QR asset tracking, procurement, depreciation"
+
+api_blueprint: "app.api.v1.inventory"
+models_module: "app.models.inventory"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/inventory"
+  sidebar:
+    section: "Operations"
+    label: "Inventory"
+    label_nepali: "सामग्री"
+    icon: "Package"
+    subitems:
+      - { label: "Assets", route: "/dashboard/inventory/assets" }
+      - { label: "Procurement", route: "/dashboard/inventory/procurement" }
+      - { label: "QR Scanner", route: "/dashboard/inventory/scan" }
+    visible_to: ["school_admin", "staff"]
+
+flutter:
+  admin_app:
+    { feature_folder: "inventory", tabs: ["Assets", "Procurement", "Scan"] }

@@ -1,0 +1,59 @@
+slug: social_hub
+name: "Social Media Hub"
+name_nepali: "सामाजिक सञ्जाल केन्द्र"
+category: growth
+price_monthly: 699
+price_yearly: 6999
+emoji: "📣"
+icon: "Share2"
+description: "Manage Facebook, Instagram, TikTok, YouTube from one dashboard. AI content generation, scheduling, analytics, ad boosting"
+
+api_blueprint: "app.api.v1.social_hub"
+models_module: "app.models.social"
+services:
+  - "app.services.social.facebook"
+  - "app.services.social.instagram"
+  - "app.services.social.tiktok"
+  - "app.services.social.youtube"
+  - "app.services.ai.content_generator"
+tasks:
+  - "app.tasks.social_publisher"
+  - "app.tasks.social_analytics"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/social-hub"
+  sidebar:
+    section: "Growth"
+    label: "Social Hub"
+    label_nepali: "सामाजिक सञ्जाल"
+    icon: "Share2"
+    subitems:
+      - { label: "Dashboard", route: "/dashboard/social-hub" }
+      - { label: "Create Post", route: "/dashboard/social-hub/create" }
+      - { label: "Scheduled", route: "/dashboard/social-hub/scheduled" }
+      - { label: "Messages", route: "/dashboard/social-hub/messages" }
+      - { label: "AI Content", route: "/dashboard/social-hub/ai-content" }
+      - { label: "Analytics", route: "/dashboard/social-hub/analytics" }
+      - { label: "Ad Campaigns", route: "/dashboard/social-hub/ads" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "social",
+      tabs: ["Dashboard", "Create", "Messages", "Analytics"],
+    }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "social.post_published"
+    - "social.message_received"
+    - "social.admission_lead"
+  listens:
+    - "notice.published"

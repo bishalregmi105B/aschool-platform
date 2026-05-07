@@ -1,0 +1,33 @@
+slug: social_ads
+name: "Social Ad Boosting"
+name_nepali: "विज्ञापन बुस्टिङ"
+category: growth
+price_monthly: 499
+price_yearly: 4999
+emoji: "📢"
+icon: "Megaphone"
+description: "Meta Ads API post boosting for admission campaigns"
+
+api_blueprint: "app.api.v1.social_hub"
+models_module: "app.models.social"
+services:
+  - "app.services.social.meta_ads"
+
+depends_on:
+  - social_hub
+conflicts_with: []
+
+frontend:
+  route: "/social-ads"
+  sidebar:
+    label: "Ad Boosting"
+    label_nepali: "विज्ञापन बुस्ट"
+    icon: "Megaphone"
+    subitems:
+      - { label: "Campaigns", route: "/social-ads/campaigns" }
+      - { label: "Create Ad", route: "/social-ads/create" }
+      - { label: "Analytics", route: "/social-ads/analytics" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "social_ads", tabs: ["Campaigns", "Create", "Analytics"] }

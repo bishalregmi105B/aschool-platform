@@ -1,0 +1,47 @@
+slug: website_builder
+name: "Advanced Website Builder"
+name_nepali: "उन्नत वेबसाइट निर्माता"
+category: premium
+price_monthly: 1499
+price_yearly: 14999
+emoji: "🎨"
+icon: "PaintBucket"
+description: "20 premium themes, drag-drop Craft.js editor, custom CSS, AI content generation, SEO tools, contact forms"
+
+api_blueprint: "app.api.v1.website_builder"
+models_module: "app.models.website"
+services:
+  - "app.services.website.theme_engine"
+  - "app.services.ai.website_content"
+
+depends_on:
+  - basic_website
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/website-builder"
+  sidebar:
+    section: "Digital & Design"
+    label: "Website Builder"
+    label_nepali: "वेबसाइट निर्माता"
+    icon: "Globe"
+    subitems:
+      - { label: "Editor", route: "/dashboard/website-builder/editor" }
+      - { label: "Themes", route: "/dashboard/website-builder/themes" }
+      - { label: "Pages", route: "/dashboard/website-builder/pages" }
+      - { label: "SEO", route: "/dashboard/website-builder/seo" }
+      - { label: "AI Content", route: "/dashboard/website-builder/ai-content" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app:
+    { feature_folder: "website_builder", tabs: ["Preview", "Quick Edit"] }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "website.page_published"
+  listens:
+    - "notice.published"

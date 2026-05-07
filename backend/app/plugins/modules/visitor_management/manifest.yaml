@@ -1,0 +1,32 @@
+slug: visitor_management
+name: "Visitor Management"
+name_nepali: "आगन्तुक व्यवस्थापन"
+category: growth
+price_monthly: 199
+price_yearly: 1999
+emoji: "👥"
+icon: "UserCheck2"
+description: "Visitor log, appointments, ID verification"
+
+api_blueprint: "app.api.v1.visitor"
+models_module: "app.models.visitor"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/visitors"
+  sidebar:
+    section: "Operations"
+    label: "Visitors"
+    label_nepali: "आगन्तुक"
+    icon: "UserPlus"
+    subitems:
+      - { label: "Check-In", route: "/dashboard/visitors/checkin" }
+      - { label: "Log", route: "/dashboard/visitors/log" }
+      - { label: "Appointments", route: "/dashboard/visitors/appointments" }
+    visible_to: ["school_admin", "staff"]
+
+flutter:
+  admin_app:
+    { feature_folder: "visitors", tabs: ["Check-In", "Log", "Appointments"] }

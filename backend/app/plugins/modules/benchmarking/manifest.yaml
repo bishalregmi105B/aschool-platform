@@ -1,0 +1,30 @@
+slug: benchmarking
+name: "School Benchmarking"
+name_nepali: "विद्यालय बेन्चमार्किङ"
+category: premium
+price_monthly: 1499
+price_yearly: 14999
+emoji: "📈"
+icon: "TrendingUp"
+description: "Anonymous school-to-school comparison, national rankings"
+
+api_blueprint: "app.api.v1.reports"
+models_module: "app.models.ai_insight"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/benchmarking"
+  sidebar:
+    section: "Reports"
+    label: "Benchmarking"
+    label_nepali: "बेन्चमार्किङ"
+    icon: "TrendingUp"
+    subitems:
+      - { label: "Rankings", route: "/dashboard/benchmarking/rankings" }
+      - { label: "Compare", route: "/dashboard/benchmarking/compare" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "benchmarking", tabs: ["Rankings", "Compare"] }

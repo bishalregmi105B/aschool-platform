@@ -1,0 +1,48 @@
+slug: admission
+name: "Admission Management"
+name_nepali: "भर्ना व्यवस्थापन"
+category: growth
+price_monthly: 599
+price_yearly: 5999
+emoji: "🎓"
+icon: "UserPlus"
+description: "Online admission forms, document collection, admission tests, merit lists, AI lead scoring from social inquiries"
+
+api_blueprint: "app.api.v1.admission"
+models_module: "app.models.admission"
+services:
+  - "app.services.ai.lead_scoring"
+tasks:
+  - "app.tasks.admission_followup"
+
+depends_on:
+  - academics
+conflicts_with: []
+
+frontend:
+  route: "/admission"
+  sidebar:
+    label: "Admission"
+    label_nepali: "भर्ना"
+    icon: "UserPlus"
+    subitems:
+      - { label: "Dashboard", route: "/admission" }
+      - { label: "Applications", route: "/admission/applications" }
+      - { label: "Leads", route: "/admission/leads" }
+      - { label: "Form Builder", route: "/admission/forms" }
+      - { label: "Merit List", route: "/admission/merit" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "admission", tabs: ["Dashboard", "Applications", "Leads"] }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "admission.application_received"
+    - "admission.accepted"
+    - "admission.lead_created"
+  listens:
+    - "social.admission_lead"

@@ -1,0 +1,42 @@
+slug: emergency
+name: "Emergency Management"
+name_nepali: "आपतकालीन व्यवस्थापन"
+category: premium
+price_monthly: 999
+price_yearly: 9999
+emoji: "🆘"
+icon: "Siren"
+description: "Emergency alerts, evacuation plans, headcount tracking, safe status confirmation, drill management"
+
+api_blueprint: "app.api.v1.emergency"
+models_module: "app.models.emergency"
+services:
+  - "app.services.emergency.alert_system"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/emergency"
+  sidebar:
+    label: "Emergency"
+    label_nepali: "आपतकालीन"
+    icon: "Siren"
+    subitems:
+      - { label: "Dashboard", route: "/emergency" }
+      - { label: "Alert", route: "/emergency/alert" }
+      - { label: "Evacuation Plans", route: "/emergency/plans" }
+      - { label: "Drills", route: "/emergency/drills" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "emergency", tabs: ["Dashboard", "Trigger Alert", "Plans"] }
+  teacher_app: { feature_folder: "emergency", tabs: ["Headcount", "Safe Status"] }
+  parent_app: { feature_folder: "emergency", tabs: ["Alerts", "Child Status"] }
+  student_app: null
+
+events:
+  emits:
+    - "emergency.alert_triggered"
+    - "emergency.all_clear"
+  listens: []

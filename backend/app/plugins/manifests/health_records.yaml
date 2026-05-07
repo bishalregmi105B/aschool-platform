@@ -1,0 +1,38 @@
+slug: health_records
+name: "Student Health Records"
+name_nepali: "विद्यार्थी स्वास्थ्य अभिलेख"
+category: growth
+price_monthly: 299
+price_yearly: 2999
+emoji: "🏥"
+icon: "Heart"
+description: "Medical records, vaccination tracking, allergy alerts, health checkup logs, BMI tracking"
+
+api_blueprint: "app.api.v1.health_records"
+models_module: "app.models.health"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/health"
+  sidebar:
+    label: "Health Records"
+    label_nepali: "स्वास्थ्य अभिलेख"
+    icon: "Heart"
+    subitems:
+      - { label: "Records", route: "/health/records" }
+      - { label: "Vaccinations", route: "/health/vaccinations" }
+      - { label: "Allergies", route: "/health/allergies" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "health", tabs: ["Records", "Vaccinations"] }
+  teacher_app: null
+  parent_app: { feature_folder: "health", tabs: ["Child Health Records"] }
+  student_app: null
+
+events:
+  emits:
+    - "health.record_updated"
+  listens: []

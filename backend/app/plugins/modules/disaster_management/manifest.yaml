@@ -1,0 +1,33 @@
+slug: disaster_management
+name: "Disaster Management"
+name_nepali: "विपद व्यवस्थापन"
+category: premium
+price_monthly: 999
+price_yearly: 9999
+emoji: "🆘"
+icon: "Shield"
+description: "Earthquake API, evacuation plans, drill scheduling"
+
+api_blueprint: "app.api.v1.emergency"
+models_module: "app.models.emergency"
+services:
+  - "app.services.emergency.earthquake_api"
+
+depends_on:
+  - emergency
+conflicts_with: []
+
+frontend:
+  route: "/disaster"
+  sidebar:
+    label: "Disaster Mgmt"
+    label_nepali: "विपद व्यवस्थापन"
+    icon: "Shield"
+    subitems:
+      - { label: "Evacuation Plans", route: "/disaster/plans" }
+      - { label: "Drill Schedule", route: "/disaster/drills" }
+      - { label: "Seismic Alerts", route: "/disaster/alerts" }
+    visible_to: []
+
+flutter:
+  admin_app: { feature_folder: "disaster", tabs: ["Plans", "Drills", "Alerts"] }

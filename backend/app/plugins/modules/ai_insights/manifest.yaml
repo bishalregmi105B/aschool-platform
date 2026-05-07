@@ -1,0 +1,55 @@
+slug: ai_insights
+name: "AI School Intelligence"
+name_nepali: "एआई विद्यालय विश्लेषण"
+category: growth
+price_monthly: 999
+price_yearly: 9999
+emoji: "🧠"
+icon: "Brain"
+description: "Weekly AI intelligence reports, at-risk student detection, fee defaulter prediction, principal morning brief"
+
+api_blueprint: "app.api.v1.design_studio"
+models_module: "app.models.ai_insight"
+services:
+  - "app.services.ai.school_insights"
+  - "app.services.ai.risk_detection"
+tasks:
+  - "app.tasks.weekly_insights"
+  - "app.tasks.daily_brief"
+
+depends_on:
+  - attendance
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/analytics"
+  sidebar:
+    section: "AI & Analytics"
+    label: "AI Insights"
+    label_nepali: "एआई विश्लेषण"
+    icon: "Sparkles"
+    subitems:
+      - { label: "Dashboard", route: "/dashboard/analytics" }
+      - { label: "Weekly Report", route: "/dashboard/analytics/weekly" }
+      - { label: "Risk Students", route: "/dashboard/analytics/risk" }
+      - { label: "Predictions", route: "/dashboard/analytics/predictions" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "ai_insights",
+      tabs: ["Dashboard", "Risk Alerts", "Weekly"],
+    }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "ai.risk_alert"
+    - "ai.weekly_report"
+  listens:
+    - "attendance.marked"
+    - "exams.result_published"
+    - "fees.collected"

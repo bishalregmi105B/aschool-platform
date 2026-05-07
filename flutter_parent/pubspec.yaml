@@ -1,0 +1,29 @@
+name: aschool_parent
+description: ASchool Parent App — Child tracking, fees, communication
+publish_to: 'none'
+version: 2.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  aschool_shared:
+    path: ../flutter_shared
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  go_router: ^13.2.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  url_launcher: ^6.2.4
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true

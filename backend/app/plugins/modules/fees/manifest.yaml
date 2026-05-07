@@ -1,0 +1,58 @@
+slug: fees
+name: "Fee Collection & Management"
+name_nepali: "शुल्क संकलन"
+category: starter
+price_monthly: 399
+price_yearly: 3999
+emoji: "💰"
+icon: "CreditCard"
+description: "Digital fee structure, collection, receipts, eSewa/Khalti payment, defaulter tracking, automatic reminders"
+
+api_blueprint: "app.api.v1.fees"
+models_module: "app.models.fee"
+services:
+  - "app.services.payments.esewa"
+  - "app.services.payments.khalti"
+  - "app.services.payments.fonepay"
+tasks:
+  - "app.tasks.fee_reminders"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/fees"
+  sidebar:
+    section: "Institutional Finance"
+    label: "Fee Collection"
+    label_nepali: "शुल्क संकलन"
+    icon: "CreditCard"
+    subitems:
+      - { label: "Overview", route: "/dashboard/fees" }
+      - { label: "Fee Types", route: "/dashboard/fees/types" }
+      - { label: "Fee Structure", route: "/dashboard/fees/structure" }
+      - { label: "Collect Fees", route: "/dashboard/fees/collect" }
+      - { label: "Defaulters", route: "/dashboard/fees/defaulters" }
+      - { label: "Reports", route: "/dashboard/fees/reports" }
+    visible_to: ["school_admin", "accountant"]
+
+flutter:
+  admin_app:
+    {
+      feature_folder: "fees",
+      tabs: ["POS Collection", "Fee Reports", "Defaulters"],
+    }
+  teacher_app: null
+  parent_app:
+    {
+      feature_folder: "fees",
+      tabs: ["Pay Fees", "Payment History", "Receipts"],
+    }
+  student_app: null
+
+events:
+  emits:
+    - "fees.collected"
+    - "fees.overdue"
+    - "fees.reminder_sent"
+  listens: []

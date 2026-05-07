@@ -1,0 +1,40 @@
+slug: attendance
+name: "Attendance Management"
+name_nepali: "उपस्थिति व्यवस्थापन"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "✅"
+icon: "UserCheck"
+description: "Daily student & teacher attendance, bulk marking, QR check-in, monthly/yearly reports"
+
+api_blueprint: "app.api.v1.attendance"
+models_module: "app.models.attendance"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/attendance"
+  sidebar:
+    label: "Attendance"
+    label_nepali: "उपस्थिति"
+    icon: "UserCheck"
+    subitems:
+      - { label: "Mark Attendance", route: "/attendance/mark" }
+      - { label: "View Records", route: "/attendance/records" }
+      - { label: "Reports", route: "/attendance/reports" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  admin_app: { feature_folder: "attendance", tabs: ["Overview", "Reports"] }
+  teacher_app: { feature_folder: "attendance", tabs: ["Mark", "My Classes", "History"] }
+  parent_app: { feature_folder: "attendance", tabs: ["Child Attendance", "History"] }
+  student_app: { feature_folder: "attendance", tabs: ["My Attendance"] }
+
+events:
+  emits:
+    - "attendance.marked"
+    - "attendance.absent_alert"
+  listens: []

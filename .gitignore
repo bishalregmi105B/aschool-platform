@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+.next/
+out/
+.swc/
+
+# Flutter
+flutter_*/build/
+flutter_*/.dart_tool/
+flutter_*/.packages
+flutter_*/.pub-cache/
+flutter_*/.pub/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+postgres_data/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+htmlcov/
+.coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.bak
+*.tmp
+
+# Runtime uploads/artifacts
+uploads/
+backend/uploads/
+backend/celerybeat-schedule
+
+# External vendor/source dumps (exclude from ASchool platform repo)
+eSchool SaaS v1.8.0 Nulled/
+Mighty School Pro v1.6/

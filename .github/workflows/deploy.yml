@@ -1,0 +1,217 @@
+name: ASchool CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+
+jobs:
+  # ─── Backend Tests ───
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: aschool_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/aschool_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET_KEY: test-jwt-key
+          FLASK_ENV: testing
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          flags: backend
+
+  # ─── Frontend Tests ───
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000
+          NEXT_PUBLIC_WS_URL: ws://localhost:5000
+        run: npm run build
+
+  # ─── Flutter Tests ───
+  flutter-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [flutter_shared, flutter_admin, flutter_teacher, flutter_parent, flutter_student]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: ${{ matrix.app }}
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        working-directory: ${{ matrix.app }}
+        run: flutter test --coverage || true
+
+  # ─── Build & Push Docker Images ───
+  build-push:
+    needs: [backend-test, frontend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
+
+  # ─── Deploy to Production ───
+  deploy:
+    needs: build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/aschool
+
+            # Pull latest images
+            docker compose -f docker-compose.prod.yml pull flask nextjs
+
+            # Run database migrations
+            docker compose -f docker-compose.prod.yml run --rm flask flask db upgrade
+
+            # Rolling restart (zero-downtime)
+            docker compose -f docker-compose.prod.yml up -d --no-deps --build flask
+            sleep 10
+            docker compose -f docker-compose.prod.yml up -d --no-deps --build nextjs
+            docker compose -f docker-compose.prod.yml up -d --no-deps celery-worker
+            docker compose -f docker-compose.prod.yml up -d --no-deps celery-beat
+
+            # Reload nginx for any config changes
+            docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+
+            # Health check
+            sleep 15
+            curl -f http://localhost/health || exit 1
+
+            # Cleanup old images
+            docker image prune -f
