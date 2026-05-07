@@ -70,6 +70,29 @@ def get_public_website(slug):
     })
 
 
+@website_bp.route("/public-domain", methods=["GET"])
+def get_public_website_by_domain():
+    """Resolve custom domain to school slug for public website routing."""
+    host = (request.args.get("host") or "").strip().lower()
+    if not host:
+        return error_response("Domain is required", 400)
+
+    host = host.split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+
+    school = School.query.filter_by(
+        custom_domain=host,
+        domain_verified=True,
+        is_active=True,
+        is_deleted=False,
+    ).first()
+    if not school:
+        return error_response("School not found", 404)
+
+    return success_response({"slug": school.slug})
+
+
 @website_bp.route("/config", methods=["GET"])
 @jwt_required()
 @school_required
