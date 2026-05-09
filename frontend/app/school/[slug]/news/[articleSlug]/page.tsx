@@ -1,5 +1,5 @@
 /** Public News Article Detail Page */
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getArticle(schoolSlug: string, articleSlug: string) {
   try {

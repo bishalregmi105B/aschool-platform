@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function ContactForm({ slug }: { slug: string }) {
   const [sending, setSending] = useState(false);

@@ -2,7 +2,7 @@
 import { Metadata } from "next";
 import { generateThemeCSS, getThemeById, THEMES } from "@/themes/registry";
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || "aschool.com.np";
 const FONT_NAMES = Array.from(
   new Set(THEMES.flatMap((theme) => [theme.fonts.heading, theme.fonts.body])),

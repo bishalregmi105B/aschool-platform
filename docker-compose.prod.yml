@@ -23,10 +23,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        - API_URL=${API_URL:-http://flask:5000}
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
     environment:
       - NODE_ENV=production
+      - API_URL=${API_URL:-http://flask:5000}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
       - NEXT_PUBLIC_BASE_DOMAIN=${NEXT_PUBLIC_BASE_DOMAIN}
