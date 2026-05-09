@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/register", "/_next", "/favicon.ico", "/api"];
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "http://localhost:5000";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 /**
  * Main domains — requests on these go through normal dashboard routing.

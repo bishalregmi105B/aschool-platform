@@ -1,5 +1,5 @@
 /** Public Events Page — auto-synced from school management system */
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
   const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, { next: { revalidate: 300 } });
