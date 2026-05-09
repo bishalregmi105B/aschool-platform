@@ -1,5 +1,6 @@
 """Flask application factory."""
 import os
+import re as _re
 from uuid import UUID
 
 from celery.schedules import crontab
@@ -21,11 +22,43 @@ def create_app(config_name: str | None = None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    cors.init_app(app, resources={r"/*": {"origins": "*"}})
+
+    # Build allowed CORS origins from environment so the Authorization header
+    # is permitted and wildcard '*' is not used (required for credentialed requests).
+    _base = app.config.get("BASE_DOMAIN", "aschool.com.np")
+    _frontend = os.getenv("FRONTEND_URL", f"https://{_base}")
+    _cors_origins = [
+        _frontend,
+        f"https://{_base}",
+        f"https://www.{_base}",
+        _re.compile(rf"https://[^./]+\.{_re.escape(_base)}"),  # *.base_domain
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+    cors.init_app(app, resources={r"/*": {
+        "origins": _cors_origins,
+        "supports_credentials": True,
+        "allow_headers": [
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Accept",
+        ],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        "max_age": 600,
+    }})
+
     limiter.init_app(app)
     cache.init_app(app)
     init_redis(app)
-    socketio.init_app(app, cors_allowed_origins="*", async_mode="eventlet")
+    socketio.init_app(
+        app,
+        cors_allowed_origins=[_frontend, f"https://{_base}",
+                               f"https://www.{_base}", f"https://api.{_base}",
+                               "http://localhost:3000", "http://localhost:3001"],
+        async_mode="eventlet",
+    )
 
     # Celery
     celery.conf.update(
