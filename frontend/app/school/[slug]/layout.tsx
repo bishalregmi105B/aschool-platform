@@ -1,6 +1,7 @@
 /** Public school website layout — applies theme CSS variables */
 import { Metadata } from "next";
 import { generateThemeCSS, getThemeById, THEMES } from "@/themes/registry";
+import { SchoolNavbar } from "@/components/website/SchoolNavbar";
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || "aschool.com.np";
@@ -89,6 +90,17 @@ export default async function SchoolLayout({
   const themeCss = activeTheme ? generateThemeCSS(activeTheme) : "";
   const customCss = website?.customizations?.custom_css || "";
 
+  const navLinks = [
+    { label: "Home", path: "" },
+    { label: "About", path: "/about" },
+    { label: "Academics", path: "/academics" },
+    { label: "Teachers", path: "/teachers" },
+    { label: "Notices", path: "/notices" },
+    { label: "Gallery", path: "/gallery" },
+    { label: "Results", path: "/results" },
+    { label: "Contact", path: "/contact" },
+  ];
+
   return (
     <html lang="en">
       <head>
@@ -98,79 +110,115 @@ export default async function SchoolLayout({
         />
         <style
           dangerouslySetInnerHTML={{
-            __html: `${themeCss}\n${customCss}`,
+            __html: `
+              ${themeCss}
+              ${customCss}
+              * { box-sizing: border-box; }
+              html { scroll-behavior: smooth; }
+            `,
           }}
         />
       </head>
       <body
-        className="min-h-screen"
+        className="min-h-screen flex flex-col"
         style={{ fontFamily: "var(--font-body)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
         data-theme={themeSlug}
       >
-        {/* School Header */}
-        <header
-          className="border-b"
-          style={{ background: `linear-gradient(135deg, var(--color-primary), var(--color-secondary))` }}
-        >
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {school.logo_url && (
-                <img src={school.logo_url} alt={school.name} className="h-12 w-12 rounded-full object-cover" />
-              )}
-              <div className="text-white">
-                <h1 className="text-xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>
-                  {school.name}
-                </h1>
-                {school.name_nepali && <p className="text-sm opacity-80">{school.name_nepali}</p>}
-              </div>
-            </div>
-            <nav className="hidden md:flex gap-6 text-white text-sm">
-              <a href={`/school/${params.slug}`} className="hover:opacity-80">Home</a>
-              <a href={`/school/${params.slug}/about`} className="hover:opacity-80">About</a>
-              <a href={`/school/${params.slug}/academics`} className="hover:opacity-80">Academics</a>
-              <a href={`/school/${params.slug}/teachers`} className="hover:opacity-80">Teachers</a>
-              <a href={`/school/${params.slug}/notices`} className="hover:opacity-80">Notices</a>
-              <a href={`/school/${params.slug}/gallery`} className="hover:opacity-80">Gallery</a>
-              <a href={`/school/${params.slug}/results`} className="hover:opacity-80">Results</a>
-              <a href={`/school/${params.slug}/contact`} className="hover:opacity-80">Contact</a>
-              <a href={`/school/${params.slug}/admission`} className="hover:opacity-80 font-semibold">Admission</a>
-            </nav>
-          </div>
-        </header>
+        <SchoolNavbar
+          slug={params.slug}
+          schoolName={school.name}
+          schoolNameNepali={school.name_nepali}
+          logo={school.logo_url}
+          phone={school.phone}
+          email={school.email}
+          address={school.address || `${school.municipality}, ${school.district}`}
+          primaryColor="var(--color-primary)"
+          accentColor="var(--color-accent)"
+        />
 
-        <main>{children}</main>
+        <main className="flex-1">{children}</main>
 
         {/* Footer */}
-        <footer style={{ backgroundColor: "var(--color-primary)" }} className="text-white mt-auto">
-          <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="font-bold text-lg mb-2">{school.name}</h3>
-              <p className="text-sm opacity-80">
-                {school.municipality}, {school.district}
+        <footer style={{ backgroundColor: "var(--color-primary)" }} className="text-white">
+          <div className="max-w-7xl mx-auto px-4 pt-12 pb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* School Info */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                {school.logo_url ? (
+                  <img src={school.logo_url} alt={school.name} className="h-12 w-12 rounded-full object-cover border-2 border-white/30" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center font-bold text-xl">
+                    {school.name.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-bold text-base leading-tight">{school.name}</h3>
+                  {school.name_nepali && <p className="text-xs opacity-70">{school.name_nepali}</p>}
+                </div>
+              </div>
+              <p className="text-sm opacity-70 leading-relaxed">
+                {school.municipality}, {school.district}, Nepal
               </p>
-              {school.phone && <p className="text-sm opacity-80 mt-1">📞 {school.phone}</p>}
-              {school.email && <p className="text-sm opacity-80">📧 {school.email}</p>}
+              {school.established_year_bs && (
+                <p className="text-xs opacity-60 mt-1">Est. {school.established_year_bs} BS</p>
+              )}
             </div>
+
+            {/* Quick Links */}
             <div>
-              <h3 className="font-bold mb-2">Quick Links</h3>
-              <ul className="text-sm opacity-80 space-y-1">
-                <li><a href={`/school/${params.slug}/about`}>About Us</a></li>
-                <li><a href={`/school/${params.slug}/academics`}>Academics</a></li>
-                <li><a href={`/school/${params.slug}/admission`}>Admission</a></li>
-                <li><a href={`/school/${params.slug}/contact`}>Contact</a></li>
+              <h3 className="font-bold text-base mb-4 pb-2 border-b border-white/20">Quick Links</h3>
+              <ul className="space-y-2 text-sm opacity-80">
+                {navLinks.map((link) => (
+                  <li key={link.path}>
+                    <a href={`/school/${params.slug}${link.path}`} className="hover:opacity-100 hover:underline">
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
+
+            {/* Programs */}
             <div>
-              <h3 className="font-bold mb-2">Information</h3>
-              <p className="text-sm opacity-80">
-                Est. {school.established_year_bs || "N/A"} BS
-              </p>
-              <p className="text-sm opacity-80">Type: {school.type}</p>
-              <p className="text-sm opacity-80">Level: {school.level}</p>
+              <h3 className="font-bold text-base mb-4 pb-2 border-b border-white/20">Programs</h3>
+              <ul className="space-y-2 text-sm opacity-80">
+                <li><a href={`/school/${params.slug}/academics`} className="hover:underline">Academics</a></li>
+                <li><a href={`/school/${params.slug}/results`} className="hover:underline">Results</a></li>
+                <li><a href={`/school/${params.slug}/admission`} className="hover:underline">Admission</a></li>
+                <li><a href={`/school/${params.slug}/notices`} className="hover:underline">Notice Board</a></li>
+                <li><a href={`/school/${params.slug}/events`} className="hover:underline">Events</a></li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h3 className="font-bold text-base mb-4 pb-2 border-b border-white/20">Contact Us</h3>
+              <ul className="space-y-3 text-sm opacity-80">
+                <li className="flex gap-2 items-start">
+                  <span className="mt-0.5 flex-shrink-0">📍</span>
+                  <span>{school.municipality}, {school.district}, Nepal</span>
+                </li>
+                {school.phone && (
+                  <li>
+                    <a href={`tel:${school.phone}`} className="flex gap-2 hover:opacity-100">
+                      <span>📞</span><span>{school.phone}</span>
+                    </a>
+                  </li>
+                )}
+                {school.email && (
+                  <li>
+                    <a href={`mailto:${school.email}`} className="flex gap-2 hover:opacity-100 break-all">
+                      <span className="flex-shrink-0">✉️</span><span>{school.email}</span>
+                    </a>
+                  </li>
+                )}
+              </ul>
             </div>
           </div>
-          <div className="border-t border-white/20 text-center py-4 text-sm opacity-60">
-            © {new Date().getFullYear()} {school.name}. Powered by ASchool
+
+          <div className="border-t border-white/20 text-center py-4 text-xs opacity-50">
+            © {new Date().getFullYear()} {school.name}. Powered by{" "}
+            <a href="/" className="underline hover:opacity-100">ASchool</a>
           </div>
         </footer>
       </body>

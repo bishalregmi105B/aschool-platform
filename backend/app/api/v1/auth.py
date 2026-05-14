@@ -142,6 +142,107 @@ def change_password():
     return success_response({"message": "Password changed successfully"})
 
 
+@auth_bp.route("/register", methods=["POST"])
+def register_school():
+    """Public school self-registration — creates school + admin user, then sends OTP."""
+    import re
+    from extensions import db
+    from app.models.school import School
+    from app.utils.validators import validate_nepal_phone
+
+    data = request.get_json(silent=True) or {}
+
+    # ── Required fields ──────────────────────────────────────────────────────
+    required = ["school_name", "full_name", "phone", "password"]
+    missing = [f for f in required if not data.get(f)]
+    if missing:
+        return error_response(f"Missing required fields: {', '.join(missing)}", 400)
+
+    phone = data["phone"].strip()
+    if not validate_nepal_phone(phone):
+        return error_response("Invalid Nepali phone number", 400)
+
+    # ── Duplicate checks ──────────────────────────────────────────────────────
+    if User.query.filter_by(phone=phone, is_deleted=False).first():
+        return error_response("An account with this phone number already exists", 409)
+
+    email = (data.get("email") or "").strip() or None
+    if email and User.query.filter_by(email=email, is_deleted=False).first():
+        return error_response("An account with this email already exists", 409)
+
+    # ── Generate unique slug from school name ─────────────────────────────────
+    base_slug = re.sub(r"[^a-z0-9]+", "-", data["school_name"].lower()).strip("-")[:60]
+    slug = base_slug
+    counter = 1
+    while School.query.filter_by(slug=slug).first():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    # ── Plan mapping (frontend "pro" → DB "growth") ───────────────────────────
+    plan_map = {"free": "free", "starter": "starter", "pro": "growth", "growth": "growth", "enterprise": "enterprise"}
+    plan = plan_map.get(data.get("plan", "free"), "free")
+
+    # ── Create School ─────────────────────────────────────────────────────────
+    school = School(
+        name=data["school_name"].strip(),
+        slug=slug,
+        district=(data.get("district") or "").strip() or None,
+        municipality=(data.get("municipality") or "").strip() or None,
+        plan=plan,
+        status="trial",
+    )
+    # Optional fields
+    if data.get("type") in ("public", "private", "community", "boarding", "international", "technical", "college"):
+        school.type = data["type"]
+    if data.get("level") in ("primary", "lower_secondary", "secondary", "higher_secondary"):
+        school.level = data["level"]
+    if email:
+        school.email = email
+
+    db.session.add(school)
+    db.session.flush()  # get school.id before creating user
+
+    # ── Create school admin user ──────────────────────────────────────────────
+    user = User(
+        school_id=school.id,
+        role="school_admin",
+        full_name=data["full_name"].strip(),
+        phone=phone,
+        email=email,
+        is_active=True,
+    )
+    user.set_password(data["password"])
+    db.session.add(user)
+    db.session.flush()  # get user.id
+
+    # Link owner
+    school.owner_id = user.id
+
+    db.session.commit()
+
+    # ── Auto-install core plugins ─────────────────────────────────────────────
+    try:
+        from app.plugins.billing import install_plugin
+        for plugin_slug in ["attendance", "notices", "academics", "basic_reports", "basic_website"]:
+            install_plugin(str(school.id), plugin_slug)
+    except Exception:
+        pass  # Non-fatal — plugins can be installed later
+
+    # ── Send OTP for phone verification ──────────────────────────────────────
+    otp_result = AuthService.send_otp(phone)
+
+    payload = {
+        "message": "School registered successfully. Please verify your phone.",
+        "school": {"id": str(school.id), "name": school.name, "slug": school.slug, "plan": school.plan},
+        "otp_sent": "error" not in otp_result,
+    }
+    # In DEBUG mode, surface the OTP so devs can verify without real SMS
+    if otp_result.get("otp"):
+        payload["dev_otp"] = otp_result["otp"]
+
+    return success_response(payload, status_code=201)
+
+
 @auth_bp.route("/register-fcm", methods=["POST"])
 @jwt_required()
 def register_fcm():

@@ -439,6 +439,83 @@ def get_fees_summary():
     )
 
 
+@fees_bp.route("/recent", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def list_recent_fees():
+    """Return the most recent fee payment receipts for the school."""
+    limit = min(int(request.args.get("limit", 20)), 100)
+    recent_receipts = (
+        FeeReceipt.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .order_by(FeeReceipt.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for r in recent_receipts:
+        collection = FeeCollection.query.get(r.collection_id) if r.collection_id else None
+        student = Student.query.get(r.student_id) if r.student_id else None
+        result.append({
+            "id": str(r.id),
+            "student_name": (
+                f"{student.first_name} {student.last_name}" if student else "Student"
+            ),
+            "student_id": str(r.student_id) if r.student_id else None,
+            "fee_type": collection.fee_item_name if collection else "Fee",
+            "amount": float(r.amount or 0),
+            "paid_at": r.created_at.isoformat() if r.created_at else None,
+            "receipt_number": r.receipt_number,
+        })
+    return success_response(result)
+
+
+@fees_bp.route("/outstanding", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def list_outstanding_fees():
+    """Return unpaid / partially-paid fee collections (defaulters)."""
+    from app.models.academic import Class
+
+    limit = min(int(request.args.get("limit", 50)), 200)
+    class_id = request.args.get("class_id")
+
+    query = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(["pending", "partial"]),
+    )
+    if class_id:
+        query = query.filter_by(class_id=class_id)
+    query = query.order_by(FeeCollection.created_at.asc()).limit(limit)
+    collections = query.all()
+
+    result = []
+    for c in collections:
+        payable = _collection_payable_total(c)
+        paid = min(_extract_partial_paid(c), payable)
+        due = max(payable - paid, 0.0)
+        if due <= 0:
+            continue
+        student = Student.query.get(c.student_id) if c.student_id else None
+        klass = Class.query.get(c.class_id) if c.class_id else None
+        result.append({
+            "id": str(c.id),
+            "student_id": str(c.student_id) if c.student_id else None,
+            "student_name": (
+                f"{student.first_name} {student.last_name}" if student else "Student"
+            ),
+            "class_name": klass.name if klass else "",
+            "fee_type": c.fee_item_name or "Fee",
+            "amount": due,
+            "payment_status": c.payment_status,
+        })
+    return success_response(result)
+
+
 @fees_bp.route("/structures", methods=["GET"])
 @jwt_required()
 @school_required

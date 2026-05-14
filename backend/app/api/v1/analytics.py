@@ -19,7 +19,7 @@ from app.models.timetable import TimetableSlot
 from app.models.user import User
 from app.utils.decorators import role_required, school_required, superadmin_required
 from app.utils.response import success_response
-from extensions import db
+from extensions import cache, db
 
 analytics_bp = Blueprint("analytics", __name__, url_prefix="/analytics")
 
@@ -274,7 +274,13 @@ def _overview_payload(school_id):
 @school_required
 @role_required("school_admin", "teacher", "accountant")
 def overview():
-    return success_response(_overview_payload(g.school_id))
+    cache_key = f"analytics_overview:{g.school_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return success_response(cached)
+    payload = _overview_payload(g.school_id)
+    cache.set(cache_key, payload, timeout=300)
+    return success_response(payload)
 
 
 @analytics_bp.route("/academic", methods=["GET"])

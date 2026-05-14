@@ -46,8 +46,8 @@ api.interceptors.response.use(
 
           if (res.data.success) {
             const { access_token, refresh_token } = res.data.data;
-            Cookies.set("access_token", access_token, { sameSite: "lax" });
-            Cookies.set("refresh_token", refresh_token, { sameSite: "lax" });
+            Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+            Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
             originalRequest.headers.Authorization = `Bearer ${access_token}`;
             return api(originalRequest);
           }

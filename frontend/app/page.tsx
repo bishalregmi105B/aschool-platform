@@ -111,6 +111,7 @@ export default function Home() {
               <a href="#platform" className="hover:text-black">Platform</a>
               <a href="#modules" className="hover:text-black">Modules</a>
               <a href="#website" className="hover:text-black">Websites</a>
+              <a href="#pricing" className="hover:text-black">Pricing</a>
               <a href="#onboarding" className="hover:text-black">Onboarding</a>
             </nav>
             <div className="flex items-center gap-3">
@@ -124,7 +125,7 @@ export default function Home() {
                 href="/register"
                 className="rounded-full bg-[color:var(--ink)] px-4 py-2 text-xs font-semibold text-white"
               >
-                Start onboarding
+                Start any plan
               </Link>
             </div>
           </div>
@@ -331,6 +332,128 @@ export default function Home() {
                   <p className="mt-2 text-sm text-black/70">{step.description}</p>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* ─── PRICING / PLANS ─── */}
+          <section id="pricing" className="border-y border-black/10 bg-white/60">
+            <div className="mx-auto max-w-6xl px-5 py-16">
+              <div className="text-center mb-10">
+                <p className="text-xs uppercase tracking-[0.2em] text-black/40 mb-2">Pricing</p>
+                <h2 className="text-2xl font-semibold mb-3" style={{ fontFamily: "var(--font-sora)" }}>
+                  Simple, transparent plans — start free
+                </h2>
+                <p className="text-sm text-black/60 max-w-xl mx-auto">
+                  Every plan comes with a school website, mobile apps, and core modules. Upgrade as you grow.
+                </p>
+              </div>
+              <div className="grid gap-6 md:grid-cols-3">
+                {[
+                  {
+                    name: "Free",
+                    price: "NPR 0",
+                    period: "forever",
+                    badge: null,
+                    description: "Perfect for getting started and exploring the platform.",
+                    features: [
+                      "Up to 100 students",
+                      "Basic attendance & exams",
+                      "School website (subdomain)",
+                      "Notice board",
+                      "1 admin user",
+                      "Community support",
+                    ],
+                    cta: "Start Free",
+                    href: "/register?plan=free",
+                    highlight: false,
+                  },
+                  {
+                    name: "Starter",
+                    price: "NPR 2,999",
+                    period: "per month",
+                    badge: "Most Popular",
+                    description: "For growing schools that need full operations management.",
+                    features: [
+                      "Up to 500 students",
+                      "Full academics + fees + HR",
+                      "School website + custom domain",
+                      "Parent & student mobile apps",
+                      "5 admin users",
+                      "Admission forms + inquiries",
+                      "Priority support",
+                    ],
+                    cta: "Start Starter",
+                    href: "/register?plan=starter",
+                    highlight: true,
+                  },
+                  {
+                    name: "Pro",
+                    price: "NPR 7,999",
+                    period: "per month",
+                    badge: null,
+                    description: "For large schools and multi-branch institutions.",
+                    features: [
+                      "Unlimited students",
+                      "All modules included",
+                      "Multi-branch support",
+                      "Custom domain + SSL",
+                      "Advanced analytics",
+                      "API access",
+                      "Dedicated onboarding manager",
+                      "24/7 priority support",
+                    ],
+                    cta: "Start Pro",
+                    href: "/register?plan=pro",
+                    highlight: false,
+                  },
+                ].map((plan) => (
+                  <div
+                    key={plan.name}
+                    className={`rounded-3xl border p-7 flex flex-col gap-5 relative ${
+                      plan.highlight
+                        ? "border-[color:var(--ocean)] bg-[color:var(--ocean)] text-white shadow-xl shadow-green-900/20"
+                        : "border-black/10 bg-white"
+                    }`}
+                  >
+                    {plan.badge && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[color:var(--sun)] text-[color:var(--ink)] text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                        {plan.badge}
+                      </span>
+                    )}
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${plan.highlight ? "text-white/60" : "text-black/50"}`}>
+                        {plan.name}
+                      </p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-3xl font-bold" style={{ fontFamily: "var(--font-sora)" }}>{plan.price}</span>
+                        <span className={`text-sm pb-1 ${plan.highlight ? "text-white/60" : "text-black/50"}`}>/{plan.period}</span>
+                      </div>
+                      <p className={`text-sm mt-2 ${plan.highlight ? "text-white/80" : "text-black/60"}`}>{plan.description}</p>
+                    </div>
+                    <ul className="flex-1 space-y-2">
+                      {plan.features.map((f) => (
+                        <li key={f} className={`flex items-start gap-2 text-sm ${plan.highlight ? "text-white/90" : "text-black/70"}`}>
+                          <span className={`mt-0.5 text-xs ${plan.highlight ? "text-[color:var(--mint)]" : "text-[color:var(--ocean)]"}`}>✓</span>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href={plan.href}
+                      className={`rounded-full py-3 text-sm font-semibold text-center transition-all ${
+                        plan.highlight
+                          ? "bg-white text-[color:var(--ocean)] hover:bg-white/90"
+                          : "bg-[color:var(--ink)] text-white hover:bg-[color:var(--ocean)]"
+                      }`}
+                    >
+                      {plan.cta}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+              <p className="text-center text-xs text-black/40 mt-6">
+                All plans include a 14-day free trial. No credit card required. Cancel anytime.
+              </p>
             </div>
           </section>
 

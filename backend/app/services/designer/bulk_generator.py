@@ -1,5 +1,19 @@
 """Bulk Document Generator — Mass generate ID cards, certificates, report cards."""
 
+def _absolute_url(path: str) -> str:
+    """Return an absolute URL for an upload path using the current Flask request."""
+    if not path:
+        return ""
+    if path.startswith(("http://", "https://", "data:")):
+        return path
+    try:
+        from flask import request as _req
+        base = _req.host_url.rstrip("/")
+        return base + (path if path.startswith("/") else "/" + path)
+    except RuntimeError:
+        return path
+
+
 class BulkGeneratorService:
     """Generate documents in bulk for entire classes or schools."""
 
@@ -90,8 +104,8 @@ class BulkGeneratorService:
                 "address": student.address.get("permanent", "") if isinstance(student.address, dict) else (student.address or ""),
                 "blood_group": student.blood_group or "",
                 "phone": phone,
-                "photo": student.photo_url or "",
-                "photo_url": student.photo_url or "",
+                "photo": _absolute_url(student.photo_url or ""),
+                "photo_url": _absolute_url(student.photo_url or ""),
                 **school_fields,
             }
             html = TemplateEngineService.render_html(resolved_template_id, data, school_config, school_id=school_id)
@@ -99,6 +113,7 @@ class BulkGeneratorService:
             cards.append({
                 "student_id": str(student.id),
                 "student_name": data["name"],
+                "student_roll": roll_no,
                 "template_id": resolved_template_id,
                 "template_width": template_meta.get("width"),
                 "template_height": template_meta.get("height"),

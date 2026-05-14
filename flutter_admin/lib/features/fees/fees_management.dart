@@ -91,13 +91,13 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _headerStat('Collected',
-              'Rs ${_formatAmount(_summary?['collected'] ?? 0)}'),
+              'Rs ${_formatAmount(_summary?['total_collected'] ?? 0)}'),
           Container(width: 1, height: 40, color: Colors.white24),
           _headerStat('Pending',
-              'Rs ${_formatAmount(_summary?['pending'] ?? 0)}'),
+              'Rs ${_formatAmount(_summary?['total_outstanding'] ?? 0)}'),
           Container(width: 1, height: 40, color: Colors.white24),
           _headerStat('This Month',
-              'Rs ${_formatAmount(_summary?['this_month'] ?? 0)}'),
+              'Rs ${_formatAmount(_summary?['this_month_collected'] ?? 0)}'),
         ],
       ),
     );
@@ -126,7 +126,7 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
 
   Widget _buildOverview() {
     final classes = List<Map<String, dynamic>>.from(
-        _summary?['class_wise'] ?? []);
+        _summary?['by_class'] ?? []);
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -135,7 +135,7 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
         itemBuilder: (_, i) {
           final c = classes[i];
           final collected = (c['collected'] ?? 0).toDouble();
-          final total = (c['total'] ?? 1).toDouble();
+          final total = (c['expected'] ?? 1).toDouble();
           return Card(
             child: ListTile(
               title: Text(c['class_name'] ?? ''),

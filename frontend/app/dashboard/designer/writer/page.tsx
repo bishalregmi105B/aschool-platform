@@ -4,7 +4,7 @@
  * Features: headings, formatting, lists, tables, font size/family, colors,
  *           page settings, headers/footers, columns, PDF export, save
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -27,7 +27,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Minus, Plus, Table, FileJson, Type,
   Subscript, Superscript, RemoveFormatting, Indent, Outdent,
-  Palette, Link2, Image as ImageIcon,
+  Palette, Link2, Image as ImageIcon, Scissors,
 } from "lucide-react";
 
 // ── Google Fonts ───────────────────────────────────────────────────────────
@@ -222,9 +222,27 @@ export default function WriterPage() {
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
   const [linkUrl, setLinkUrl]     = useState("");
+  const [numPages, setNumPages]   = useState(1);
 
   // ── Load Google Font whenever config.font changes ─────────────────
   useEffect(() => { loadGoogleFont(config.font); }, [config.font]);
+
+  // ── ResizeObserver: recompute numPages as content grows ───────────
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const d = PAGE_SIZES[config.size] ?? PAGE_SIZES.A4;
+    const ph = config.orientation === "landscape" ? d.width : d.height;
+    const ro = new ResizeObserver(() => {
+      const h = el.scrollHeight;
+      setNumPages(n => {
+        const next = Math.max(1, Math.ceil(h / ph));
+        return next !== n ? next : n;
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [config.size, config.orientation]);
 
   // ── Load saved document ───────────────────────────────────────────
   useQuery({
@@ -315,7 +333,7 @@ export default function WriterPage() {
     cmd("fontName", f);
   }, [cmd]);
 
-  // ── Export PDF ────────────────────────────────────────────────────
+  // ── Export PDF (multi-page aware) ────────────────────────────────
   const exportPDF = useCallback(async () => {
     const el = pageRef.current;
     if (!el) return;
@@ -323,12 +341,32 @@ export default function WriterPage() {
     if (editorRef.current) editorRef.current.contentEditable = "false";
     try {
       toast.info("Generating PDF…");
+      // Capture full content at 2× scale
       const cv = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: config.bg });
-      const imgData = cv.toDataURL("image/png");
+      const imgEl = new window.Image();
+      imgEl.src = cv.toDataURL("image/png");
+      await new Promise<void>(r => { imgEl.onload = () => r(); });
+
+      const d  = PAGE_SIZES[config.size] ?? PAGE_SIZES.A4;
+      const pw = config.orientation === "landscape" ? d.height : d.width;
+      const ph = config.orientation === "landscape" ? d.width  : d.height;
+
       const pdf = new jsPDF({ orientation: config.orientation, unit: "pt", format: config.size.toLowerCase() as any });
-      const w = pdf.internal.pageSize.getWidth();
-      const h = (cv.height / cv.width) * w;
-      pdf.addImage(imgData, "PNG", 0, 0, w, h);
+      const pdfW   = pdf.internal.pageSize.getWidth();
+      const pdfH   = pdf.internal.pageSize.getHeight();
+      const sliceH = Math.round(cv.width / pw * ph);
+      const pages  = Math.max(1, Math.ceil(cv.height / sliceH));
+
+      for (let i = 0; i < pages; i++) {
+        if (i > 0) pdf.addPage();
+        const slice = document.createElement("canvas");
+        slice.width  = cv.width;
+        slice.height = sliceH;
+        const sctx = slice.getContext("2d")!;
+        sctx.drawImage(imgEl, 0, i * sliceH, slice.width, sliceH,
+                               0, 0,          slice.width, sliceH);
+        pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pdfW, pdfH);
+      }
       pdf.save(`${docName.replace(/\s+/g,"_").toLowerCase()}.pdf`);
       toast.success("PDF exported");
     } finally {
@@ -566,6 +604,17 @@ export default function WriterPage() {
               onClick={() => setShowPagePane(!showPagePane)}>
               Layout
             </Button>
+
+            <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+            {/* Page Break */}
+            <TB title="Insert Page Break"
+              onClick={() => {
+                editorRef.current?.focus();
+                cmd("insertHTML", '<div class="wb-page-break" contenteditable="false"></div><p><br></p>');
+              }}>
+              <Scissors className="h-3.5 w-3.5" />
+            </TB>
           </div>
 
           {/* Page settings bar */}
@@ -606,63 +655,118 @@ export default function WriterPage() {
                 <input type="checkbox" checked={config.showFooter} onChange={(e) => setConfig(c => ({ ...c, showFooter: e.target.checked }))} />
                 Footer
               </label>
+              {config.showHeader && (
+                <label className="flex items-center gap-1.5 whitespace-nowrap">
+                  Header text
+                  <input className="border rounded px-1 py-0.5 text-xs bg-background w-48" value={config.headerText}
+                    onChange={(e) => setConfig(c => ({ ...c, headerText: e.target.value }))} placeholder="Header…" />
+                </label>
+              )}
+              {config.showFooter && (
+                <label className="flex items-center gap-1.5 whitespace-nowrap">
+                  Footer text
+                  <input className="border rounded px-1 py-0.5 text-xs bg-background w-48" value={config.footerText}
+                    onChange={(e) => setConfig(c => ({ ...c, footerText: e.target.value }))} placeholder="Footer…" />
+                </label>
+              )}
             </div>
           )}
         </div>
 
         {/* ── Document Area ──────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto py-8 flex justify-center">
-          <div ref={pageRef} className="shadow-xl"
-            style={{ width: pageW, minHeight: pageH, background: config.bg, position: "relative" }}>
+        <div className="flex-1 overflow-auto bg-neutral-500 dark:bg-zinc-700 py-8">
+          <div className="flex justify-center">
+            {/* Outer wrapper: provides the page stack width and acts as PDF capture root */}
+            <div ref={pageRef} style={{ width: pageW, position: "relative" }}>
 
-            {/* Header */}
-            {config.showHeader && (
-              <div className="border-b border-dashed border-blue-300 px-4 pb-1"
-                style={{ paddingLeft: config.ml, paddingRight: config.mr }}>
-                <input
-                  value={config.headerText}
-                  onChange={(e) => setConfig(c => ({ ...c, headerText: e.target.value }))}
-                  placeholder="Header text…"
-                  className="w-full text-xs text-muted-foreground bg-transparent outline-none border-0"
-                  style={{ fontFamily: config.font }}
-                />
-              </div>
-            )}
+              {/* ── Page background cards (one per logical page) ── */}
+              {Array.from({ length: numPages }).map((_, i) => (
+                <Fragment key={i}>
+                  {/* Page card */}
+                  <div
+                    className="shadow-xl"
+                    style={{
+                      width: pageW,
+                      height: pageH,
+                      backgroundColor: config.bg,
+                      position: "relative",
+                      marginBottom: i < numPages - 1 ? 12 : 0,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Header strip (inside top margin) */}
+                    {config.showHeader && (
+                      <div style={{
+                        position: "absolute", top: 0, left: config.ml, right: config.mr,
+                        height: config.mt - 8,
+                        borderBottom: "1px dashed #93c5fd",
+                        display: "flex", alignItems: "flex-end", paddingBottom: 3,
+                        pointerEvents: "none",
+                      }}>
+                        <span style={{ fontSize: "9pt", color: "#64748b", fontFamily: config.font }}>
+                          {config.headerText || "\u00a0"}
+                        </span>
+                        {numPages > 1 && (
+                          <span style={{ fontSize: "8pt", color: "#94a3b8", marginLeft: "auto" }}>p.{i + 1}</span>
+                        )}
+                      </div>
+                    )}
 
-            {/* Editable content */}
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              spellCheck
-              className="outline-none min-h-[800px] focus:outline-none"
-              style={{
-                fontFamily: config.font,
-                fontSize: `${config.fontSize}pt`,
-                color: "#000000",
-                lineHeight: 1.6,
-                padding: `${config.mt}px ${config.mr}px ${config.mb}px ${config.ml}px`,
-              }}
-              data-placeholder="Start typing…"
-              onKeyDown={(e) => {
-                if (e.key === "Tab") { e.preventDefault(); cmd("insertHTML", "&nbsp;&nbsp;&nbsp;&nbsp;"); }
-              }}
-              suppressHydrationWarning
-            />
+                    {/* Footer strip (inside bottom margin) */}
+                    {config.showFooter && (
+                      <div style={{
+                        position: "absolute", bottom: 0, left: config.ml, right: config.mr,
+                        height: config.mb - 8,
+                        borderTop: "1px dashed #93c5fd",
+                        display: "flex", alignItems: "flex-start", paddingTop: 3,
+                        pointerEvents: "none",
+                      }}>
+                        <span style={{ fontSize: "9pt", color: "#64748b", fontFamily: config.font }}>
+                          {config.footerText || "\u00a0"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-            {/* Footer */}
-            {config.showFooter && (
-              <div className="border-t border-dashed border-blue-300 px-4 pt-1 absolute bottom-0 left-0 right-0"
-                style={{ paddingLeft: config.ml, paddingRight: config.mr }}>
-                <input
-                  value={config.footerText}
-                  onChange={(e) => setConfig(c => ({ ...c, footerText: e.target.value }))}
-                  placeholder="Footer text… (e.g. page number)"
-                  className="w-full text-xs text-muted-foreground bg-transparent outline-none border-0"
-                  style={{ fontFamily: config.font }}
-                />
-              </div>
-            )}
+                  {/* Gap between pages (print-excluded) */}
+                  {i < numPages - 1 && (
+                    <div className="wb-page-gap" style={{ height: 12, backgroundColor: "transparent" }} />
+                  )}
+                </Fragment>
+              ))}
+
+              {/* ── Content editable: floats over all page cards ── */}
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck
+                className="outline-none focus:outline-none"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  // Span all page cards + gaps
+                  minHeight: numPages * pageH + Math.max(0, numPages - 1) * 12,
+                  // Margins applied as padding so content stays in the safe zone
+                  padding: `${config.mt}px ${config.mr}px ${config.mb}px ${config.ml}px`,
+                  fontFamily: config.font,
+                  fontSize: `${config.fontSize}pt`,
+                  color: "#000000",
+                  lineHeight: 1.6,
+                  background: "transparent",
+                  zIndex: 1,
+                  // Extra top padding on every subsequent page is approximated by
+                  // the repeating page-gap value so text doesn't fall inside gap bands
+                }}
+                data-placeholder="Start typing\u2026"
+                onKeyDown={(e) => {
+                  if (e.key === "Tab") { e.preventDefault(); cmd("insertHTML", "&nbsp;&nbsp;&nbsp;&nbsp;"); }
+                }}
+                suppressHydrationWarning
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -681,6 +785,28 @@ export default function WriterPage() {
         [contenteditable] table { border-collapse: collapse; width: 100%; margin: 8px 0; }
         [contenteditable] td, [contenteditable] th { border: 1px solid #cbd5e1; padding: 6px 10px; min-width: 40px; }
         [contenteditable] th { background: #f8fafc; font-weight: 600; }
+        /* Page break element */
+        .wb-page-break {
+          display: block; height: 0;
+          border-top: 2px dashed #94a3b8;
+          margin: 12px 0;
+          position: relative;
+          user-select: none;
+        }
+        .wb-page-break::after {
+          content: "— Page Break —";
+          position: absolute; top: -9px; left: 50%;
+          transform: translateX(-50%);
+          background: #fff; padding: 0 8px;
+          font-size: 9px; color: #94a3b8; white-space: nowrap;
+          font-family: sans-serif;
+        }
+        /* Hide gap divs and page-break markers in print */
+        @media print {
+          .wb-page-gap { display: none; }
+          .wb-page-break { page-break-after: always; break-after: page; border: none; }
+          .wb-page-break::after { display: none; }
+        }
       `}</style>
     </TooltipProvider>
   );

@@ -3,10 +3,14 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'ASchool';
-  // Production URL (uncomment for release builds):
-  // static const String baseUrl = 'https://api.aschool.com.np';
-  // Development URL (WiFi LAN access):
-  static const String baseUrl = 'http://192.168.1.73:5001';
+
+  /// Resolved at build time via --dart-define=API_BASE_URL=https://...
+  /// Release builds: flutter build apk --dart-define=API_BASE_URL=https://api.aschool.com.np
+  /// Dev builds fall back to the LAN address.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://192.168.1.73:5001',
+  );
   static const String apiVersion = '/api/v1';
 
   // Token keys

@@ -56,6 +56,24 @@ def _canvas(objects, bg="#ffffff"):
     return {"version": "6.0.0", "background": bg, "objects": objects}
 
 
+def _image(left, top, width, height, src="", **kw):
+    """Fabric v6 Image object for canvas JSON. src accepts a URL or {token}."""
+    base = {
+        "type": "Image",
+        "version": "6.0.0",
+        "originX": "left", "originY": "top",
+        "left": left, "top": top,
+        "width": width, "height": height,
+        "scaleX": 1, "scaleY": 1,
+        "angle": 0, "opacity": 1,
+        "src": src,
+        "crossOrigin": "anonymous",
+        "selectable": True, "evented": True,
+    }
+    base.update(kw)
+    return base
+
+
 # ── Template functions ─────────────────────────────────────────────────────────
 
 def _id_card_standard():
@@ -65,7 +83,7 @@ def _id_card_standard():
         _text(6, 7, W - 12, "{school_name}", 13, bold=True, color="#ffffff"),
         _text(6, 23, W - 12, "Est. 2001  •  Affiliated to CBSE | BSE", 7, color="#93c5fd"),
         _rect(10, 52, 68, 90, "#e2e8f0", stroke="#94a3b8", strokeWidth=1, rx=4, ry=4),
-        _text(12, 124, 64, "PHOTO", 8, color="#94a3b8", editable=True),
+        _image(10, 52, 68, 90, "{photo_url}"),
         _text(86, 52, W - 96, "{name}", 13, bold=True, color="#1e293b", align="left"),
         _text(86, 72, W - 96, "Class: {class}  Sec: {section}  Roll: {roll_no}", 9, color="#334155", align="left"),
         _text(86, 88, W - 96, "DOB: {dob}  Blood: {blood_group}", 9, color="#334155", align="left"),
@@ -83,7 +101,7 @@ def _id_card_staff():
         _text(6, 6, W - 12, "{school_name}", 13, bold=True, color="#ffffff"),
         _text(6, 24, W - 12, "STAFF IDENTIFICATION CARD", 8, color="#6ee7b7"),
         _rect(W - 78, 68, 68, 90, "#e2e8f0", stroke="#94a3b8", strokeWidth=1, rx=4, ry=4),
-        _text(W - 76, 149, 64, "PHOTO", 8, color="#94a3b8", editable=True),
+        _image(W - 78, 68, 68, 90, "{photo_url}"),
         _text(10, 68, W - 90, "{name}", 13, bold=True, color="#1e293b", align="left"),
         _text(10, 88, W - 90, "Designation: {designation}", 9, color="#334155", align="left"),
         _text(10, 104, W - 90, "Department: {department}", 9, color="#334155", align="left"),

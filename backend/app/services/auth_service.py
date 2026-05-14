@@ -69,7 +69,11 @@ class AuthService:
         msg = f"Your ASchool verification code is: {otp}. Valid for 10 minutes."
         send_sms.delay(phone, msg)
 
-        return {"message": "OTP sent successfully", "expires_in": AuthService.OTP_EXPIRY_SECONDS}
+        result = {"message": "OTP sent successfully", "expires_in": AuthService.OTP_EXPIRY_SECONDS}
+        # In console/dev mode expose OTP in response so devs don't need to check logs
+        if current_app.config.get("SMS_CONSOLE_MODE") or current_app.config.get("DEBUG"):
+            result["otp"] = otp
+        return result
 
     @staticmethod
     def verify_otp(phone: str, otp: str) -> dict:
