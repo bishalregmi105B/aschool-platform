@@ -85,17 +85,19 @@ export default function CanvasEditor() {
   const docLoadedRef      = useRef(false);
   const importFileRef     = useRef<HTMLInputElement>(null);
 
-  useQuery({
+  const { data: docData } = useQuery({
     queryKey: ["designer-doc", docId],
     queryFn: async () => { const r = await api.get(`/design-studio/documents/${docId}`); return r.data?.data; },
     enabled: !!docId,
-    onSuccess: (data: any) => {
-      if (!data || docLoadedRef.current) return;
-      docLoadedRef.current = true;
-      setDocName(data.name || "Untitled Design");
-      if (data.canvas_state) setTimeout(() => canvas.loadJSON(data.canvas_state), 250);
-    },
   } as any);
+
+  useEffect(() => {
+    if (!docData || docLoadedRef.current || !canvas.isReady) return;
+    docLoadedRef.current = true;
+    const doc = docData as any;
+    setDocName(doc.name || "Untitled Design");
+    if (doc.canvas_state) canvas.loadJSON(doc.canvas_state);
+  }, [docData, canvas, canvas.isReady]);
 
   const { data: allTemplates = [] } = useQuery({
     queryKey: ["design-templates"],
@@ -106,25 +108,22 @@ export default function CanvasEditor() {
   });
 
   useEffect(() => {
-    if (!templateId || docId || templateLoadedRef.current || !allTemplates?.length) return;
+    if (!templateId || docId || templateLoadedRef.current || !allTemplates?.length || !canvas.isReady) return;
     const tpl = allTemplates.find((t: any) => t.id === templateId);
     if (!tpl) return;
     templateLoadedRef.current = true;
     setDocName(tpl.name);
-    setTimeout(() => {
-      if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0) {
-        // Support both single-canvas and multi-page template JSON
-        if (tpl.canvas_json.version === "multi-page") {
-          canvas.loadJSON(tpl.canvas_json as any);
-        } else {
-          canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
-        }
-      } else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
-    }, 250);
-  }, [templateId, docId, allTemplates, canvas]);
+    if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0) {
+      if (tpl.canvas_json.version === "multi-page") {
+        canvas.loadJSON(tpl.canvas_json as any);
+      } else {
+        canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
+      }
+    } else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
+  }, [templateId, docId, allTemplates, canvas, canvas.isReady]);
 
   useEffect(() => {
-    if (!bulkSessionId || docLoadedRef.current) return;
+    if (!bulkSessionId || docLoadedRef.current || !canvas.isReady) return;
     const globalData = (window as any).__bulkSessionData;
     const key = `bulk_${bulkSessionId}`;
     const dataStr = sessionStorage.getItem(key);
@@ -132,17 +131,15 @@ export default function CanvasEditor() {
     if (globalData || dataStr) {
       docLoadedRef.current = true;
       setDocName("Bulk Generation");
-      setTimeout(() => {
-        try {
-          const parsed = globalData || JSON.parse(dataStr!);
-          canvas.loadJSON(parsed);
-          delete (window as any).__bulkSessionData;
-        } catch (err) {
-          toast.error("Failed to load bulk data");
-        }
-      }, 300);
+      try {
+        const parsed = globalData || JSON.parse(dataStr!);
+        canvas.loadJSON(parsed);
+        delete (window as any).__bulkSessionData;
+      } catch (err) {
+        toast.error("Failed to load bulk data");
+      }
     }
-  }, [bulkSessionId, canvas]);
+  }, [bulkSessionId, canvas, canvas.isReady]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

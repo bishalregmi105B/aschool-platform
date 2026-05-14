@@ -1,5 +1,5 @@
 """Attendance plugin API — mark, list, reports."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -266,6 +266,82 @@ def attendance_summary():
         "late": late,
         "not_marked": total_students - present - absent - late,
         "attendance_rate": round((present / total_students * 100), 1) if total_students else 0,
+    })
+
+
+@attendance_bp.route("/school-overview", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+@role_required("school_admin")
+def school_attendance_overview():
+    """Aggregated school-wide attendance: today/week/month percentages and per-class breakdown."""
+    from app.models.academic import Class
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+
+    def _pct(school_id, start, end=None):
+        end_date = end or start
+        total_students = Student.query.filter_by(
+            school_id=school_id, status="active", is_deleted=False
+        ).count()
+        if not total_students:
+            return 0.0
+        # Count distinct students present (or late) in range
+        query = db.session.query(Attendance.student_id).filter(
+            Attendance.school_id == school_id,
+            Attendance.is_deleted.is_(False),
+            Attendance.status.in_(["present", "late"]),
+            Attendance.date >= start,
+            Attendance.date <= end_date,
+        ).distinct()
+        present_count = query.count()
+        # For multi-day ranges, average per day instead of total
+        if start != end_date:
+            days = max((end_date - start).days + 1, 1)
+            return round(present_count / days / total_students * 100, 1)
+        return round(present_count / total_students * 100, 1)
+
+    today_pct = _pct(g.school_id, today)
+    week_pct = _pct(g.school_id, week_start, today)
+    month_pct = _pct(g.school_id, month_start, today)
+
+    # Per-class breakdown for today
+    classes = Class.query.filter_by(
+        school_id=g.school_id, is_deleted=False
+    ).order_by(Class.name).all()
+
+    class_wise = []
+    for klass in classes:
+        total = Student.query.filter_by(
+            school_id=g.school_id, class_id=klass.id, status="active", is_deleted=False
+        ).count()
+        if not total:
+            continue
+        present_today = Attendance.query.filter_by(
+            school_id=g.school_id,
+            class_id=klass.id,
+            date=today,
+            is_deleted=False,
+        ).filter(Attendance.status.in_(["present", "late"])).count()
+        class_wise.append({
+            "class_id": str(klass.id),
+            "class_name": klass.name,
+            "section_name": None,
+            "total_students": total,
+            "present_today": present_today,
+            "present_pct": round(present_today / total * 100, 1),
+        })
+
+    return success_response({
+        "summary": {
+            "today_pct": today_pct,
+            "week_pct": week_pct,
+            "month_pct": month_pct,
+        },
+        "class_wise": class_wise,
     })
 
 

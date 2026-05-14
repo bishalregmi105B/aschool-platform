@@ -58,6 +58,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
   const [zoom, setZoom]       = useState(1);
   const [pages, setPages]     = useState<PageState[]>([mkPage()]);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   const [currentPageSettings, setCurrentPageSettings] = useState<PageState>(mkPage());
 
   // ── snapshot ────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
       });
       fabricRef.current = fc;
       (window as any).__activeCanvas = fc;
+      setIsReady(true);
 
       fc.on("object:moving", (e: any) => {
         const snap = 5;
@@ -471,6 +473,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
 
   return {
     fabricCanvas: fabricRef.current,
+    isReady,
     selectedObject,
     canUndo, canRedo,
     zoom,

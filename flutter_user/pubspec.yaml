@@ -1,0 +1,35 @@
+name: aschool_user
+description: ASchool Unified User App (student + parent + teacher)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  aschool_shared:
+    path: ../flutter_shared
+  aschool_student:
+    path: ../flutter_student
+  aschool_parent:
+    path: ../flutter_parent
+  aschool_teacher:
+    path: ../flutter_teacher
+  flutter_riverpod: ^2.5.1
+  shared_preferences: ^2.5.3
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+dependency_overrides:
+  web: ^1.0.0
+  share_plus: ^10.0.2

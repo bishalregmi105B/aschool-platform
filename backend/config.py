@@ -75,6 +75,7 @@ class BaseConfig:
     # Nepal SMS
     SPARROW_SMS_TOKEN = os.getenv("SPARROW_SMS_TOKEN", "")
     SPARROW_SMS_FROM = os.getenv("SPARROW_SMS_FROM", "ASchool")
+    SMS_CONSOLE_MODE = os.getenv("SMS_CONSOLE_MODE", "false").lower() == "true"
 
     # WhatsApp
     WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")

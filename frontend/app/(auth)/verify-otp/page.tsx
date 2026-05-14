@@ -23,7 +23,8 @@ function VerifyOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams.get("phone") || "";
-  const [otp, setOtp] = useState("");
+  const devOtp = searchParams.get("dev_otp") || "";
+  const [otp, setOtp] = useState(devOtp);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
 
@@ -62,9 +63,12 @@ function VerifyOtpContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
+      const json = await res.json();
       if (res.ok) {
-        toast.success("OTP resent");
+        const newDevOtp = json.data?.otp;
+        toast.success(newDevOtp ? `OTP resent — Dev OTP: ${newDevOtp}` : "OTP resent");
         setResendTimer(60);
+        if (newDevOtp) setOtp(newDevOtp);
       } else {
         toast.error("Failed to resend OTP");
       }
@@ -82,6 +86,11 @@ function VerifyOtpContent() {
       </CardHeader>
 
       <CardContent>
+        {devOtp && (
+          <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+            <strong>Dev mode:</strong> OTP is <span className="font-mono font-bold">{devOtp}</span> (pre-filled)
+          </div>
+        )}
         <form onSubmit={handleVerify} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="otp">OTP Code</Label>

@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "Login failed");
     const { access_token, refresh_token, user: userData } = res.data.data;
-    Cookies.set("access_token", access_token, { sameSite: "lax" });
-    Cookies.set("refresh_token", refresh_token, { sameSite: "lax" });
+    Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+    Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
     setUser(userData);
   };
 
@@ -85,8 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "OTP verification failed");
     const { access_token, refresh_token, user: userData } = res.data.data;
-    Cookies.set("access_token", access_token, { sameSite: "lax" });
-    Cookies.set("refresh_token", refresh_token, { sameSite: "lax" });
+    Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+    Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
     setUser(userData);
   };
 
