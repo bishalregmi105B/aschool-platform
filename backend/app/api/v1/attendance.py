@@ -11,7 +11,7 @@ from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
-from app.utils.teacher_scope import teacher_allowed_class_ids
+from app.utils.teacher_scope import teacher_class_teacher_class_ids
 from extensions import db
 
 attendance_bp = Blueprint("attendance", __name__, url_prefix="/attendance")
@@ -33,7 +33,7 @@ def mark_attendance():
     allowed_class_ids = None
     allowed_class_ids_set = set()
     if g.role == "teacher" and g.user_id:
-        allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
+        allowed_class_ids = teacher_class_teacher_class_ids(g.school_id, g.user_id)
         allowed_class_ids_set = {str(cid) for cid in allowed_class_ids if cid}
         if not allowed_class_ids_set:
             return error_response("No assigned classes for this teacher", 403)
@@ -123,7 +123,7 @@ def submit_attendance_compat():
 @role_required("school_admin", "teacher")
 def list_students_for_attendance(class_id):
     if g.role == "teacher" and g.user_id:
-        allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
+        allowed_class_ids = teacher_class_teacher_class_ids(g.school_id, g.user_id)
         allowed_class_ids_set = {str(cid) for cid in allowed_class_ids if cid}
         if not allowed_class_ids_set or str(class_id) not in allowed_class_ids_set:
             return error_response("Not allowed to view this class", 403)
@@ -208,7 +208,7 @@ def list_attendance():
 
     # Teachers can only see attendance for their assigned classes
     if g.role == "teacher" and g.user_id:
-        allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
+        allowed_class_ids = teacher_class_teacher_class_ids(g.school_id, g.user_id)
         if not allowed_class_ids:
             return success_response([], meta={"pagination": {}})
         query = query.filter(Attendance.class_id.in_(allowed_class_ids))
@@ -221,7 +221,7 @@ def list_attendance():
     if class_id:
         # Ensure teacher isn't querying a class outside their scope
         if g.role == "teacher" and g.user_id:
-            allowed = {str(cid) for cid in teacher_allowed_class_ids(g.school_id, g.user_id)}
+            allowed = {str(cid) for cid in teacher_class_teacher_class_ids(g.school_id, g.user_id)}
             if str(class_id) not in allowed:
                 return error_response("Not allowed to view this class", 403)
         query = query.filter_by(class_id=class_id)
@@ -257,7 +257,7 @@ def attendance_summary():
 
     # Teachers can only view summary for their assigned classes
     if g.role == "teacher" and g.user_id:
-        allowed = {str(cid) for cid in teacher_allowed_class_ids(g.school_id, g.user_id)}
+        allowed = {str(cid) for cid in teacher_class_teacher_class_ids(g.school_id, g.user_id)}
         if str(class_id) not in allowed:
             return error_response("Not allowed to view this class", 403)
 

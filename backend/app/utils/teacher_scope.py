@@ -3,6 +3,22 @@
 from app.models.academic import Section, Subject
 
 
+def teacher_class_teacher_class_ids(school_id, user_id):
+    """Returns class IDs where the teacher is assigned as class teacher of a section.
+    Used for attendance — only class teachers can mark/view their own section's attendance."""
+    if not school_id or not user_id:
+        return []
+    return [
+        section.class_id
+        for section in Section.query.filter_by(
+            school_id=school_id,
+            class_teacher_id=user_id,
+            is_deleted=False,
+        ).all()
+        if section.class_id
+    ]
+
+
 def teacher_allowed_subject_ids(school_id, user_id):
     if not school_id or not user_id:
         return []

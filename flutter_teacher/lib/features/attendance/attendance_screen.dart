@@ -7,7 +7,7 @@ import 'package:aschool_shared/aschool_shared.dart';
 
 final myClassesProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final resp = await ApiClient.instance.get('/teacher/my-classes');
+  final resp = await ApiClient.instance.get('/teacher/my-classes?scope=class_teacher');
   return List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
 });
 

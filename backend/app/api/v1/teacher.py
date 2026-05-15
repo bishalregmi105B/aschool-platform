@@ -13,7 +13,7 @@ from app.models.timetable import TimetableSlot
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, success_response
-from app.utils.teacher_scope import teacher_allowed_class_ids
+from app.utils.teacher_scope import teacher_allowed_class_ids, teacher_class_teacher_class_ids
 from extensions import db
 
 teacher_bp = Blueprint("teacher", __name__, url_prefix="/teacher")
@@ -64,6 +64,19 @@ def teacher_dashboard():
 @school_required
 @role_required("teacher", "school_admin", "superadmin")
 def my_classes():
+    scope = request.args.get("scope")
+    if scope == "class_teacher" and g.role == "teacher" and g.user_id:
+        # Return only classes where this teacher is assigned as class teacher
+        from app.models.academic import Section
+        ct_class_ids = teacher_class_teacher_class_ids(g.school_id, g.user_id)
+        if not ct_class_ids:
+            return success_response([])
+        classes = Class.query.filter(
+            Class.school_id == g.school_id,
+            Class.id.in_(ct_class_ids),
+            Class.is_deleted.is_(False),
+        ).order_by(Class.sort_order, Class.name).all()
+        return success_response([_class_dict(klass) for klass in classes])
     return success_response(_teacher_classes())
 
 
