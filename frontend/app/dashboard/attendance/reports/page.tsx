@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,12 +17,20 @@ export default function AttendanceReportsPage() {
 }
 
 function ReportsContent() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
   const [classId, setClassId] = useState("");
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const { data: classes } = useQuery({
-    queryKey: ["classes"],
-    queryFn: async () => { const r = await api.get("/academics/classes"); return r.data?.data || []; },
+    queryKey: ["classes", isTeacher ? "class_teacher" : "all"],
+    queryFn: async () => {
+      const url = isTeacher
+        ? "/teacher/my-classes?scope=class_teacher"
+        : "/academics/classes";
+      const r = await api.get(url);
+      return r.data?.data || [];
+    },
   });
 
   const { data, isLoading } = useQuery({

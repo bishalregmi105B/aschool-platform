@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -85,6 +86,8 @@ export default function AttendancePage() {
 
 function AttendanceContent() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [date, setDate] = useState(
@@ -100,9 +103,12 @@ function AttendanceContent() {
 
   // ── Classes & sections ────────────────────────────────────────────────────
   const { data: classes } = useQuery({
-    queryKey: ["classes"],
+    queryKey: ["classes", isTeacher ? "class_teacher" : "all"],
     queryFn: async () => {
-      const r = await api.get("/academics/classes");
+      const url = isTeacher
+        ? "/teacher/my-classes?scope=class_teacher"
+        : "/academics/classes";
+      const r = await api.get(url);
       return r.data?.data || [];
     },
   });
