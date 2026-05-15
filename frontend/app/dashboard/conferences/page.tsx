@@ -21,6 +21,7 @@ import { PageLoader } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Plus, Search } from "lucide-react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Conference {
   id: string;
   title: string;
@@ -150,19 +151,17 @@ export default function ConferencesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <Input
-                    type="date"
+                  <BSDateInput
                     value={form.start_date}
-                    onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                    onChange={(v) => setForm({ ...form, start_date: v })}
                     required
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>End Date</Label>
-                  <Input
-                    type="date"
+                  <BSDateInput
                     value={form.end_date}
-                    onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                    onChange={(v) => setForm({ ...form, end_date: v })}
                     required
                   />
                 </div>

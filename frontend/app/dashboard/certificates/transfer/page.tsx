@@ -12,6 +12,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { ArrowRightLeft, Search, Printer, FileText } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface TemplateItem {
   id: string;
   name: string;
@@ -209,7 +210,7 @@ export default function TransferCertificatePage() {
                           </div>
                           <div className="space-y-2">
                             <Label>Date of Leaving</Label>
-                            <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                            <BSDateInput />
                           </div>
                         </div>
                       </div>

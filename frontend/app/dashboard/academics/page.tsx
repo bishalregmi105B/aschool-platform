@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { BSDateInput } from "@/components/ui/bs-date-input";
+import { displayBS } from "@/lib/nepali_date";
 import {
   BookMarked,
   BookOpen,
@@ -289,8 +291,8 @@ function AcademicYearsTab() {
               {years.map((year) => (
                 <TableRow key={year.id}>
                   <TableCell className="font-medium">{year.name}</TableCell>
-                  <TableCell>{year.start_date || "-"}</TableCell>
-                  <TableCell>{year.end_date || "-"}</TableCell>
+                  <TableCell>{displayBS(year.start_date) || "-"}</TableCell>
+                  <TableCell>{displayBS(year.end_date) || "-"}</TableCell>
                   <TableCell>
                     <Badge variant={year.is_current ? "success" : "secondary"}>
                       {year.is_current ? "Current" : "Past"}
@@ -358,18 +360,16 @@ function AcademicYearsTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input
+                <BSDateInput
                   name="start_date"
-                  type="date"
-                  defaultValue={getDateInputValue(editItem?.start_date)}
+                  value={getDateInputValue(editItem?.start_date) || undefined}
                 />
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Input
+                <BSDateInput
                   name="end_date"
-                  type="date"
-                  defaultValue={getDateInputValue(editItem?.end_date)}
+                  value={getDateInputValue(editItem?.end_date) || undefined}
                 />
               </div>
             </div>

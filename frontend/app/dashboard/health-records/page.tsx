@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { HeartPulse, Syringe, Stethoscope, PlusCircle } from "lucide-react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface HealthProfile {
   id: string;
   student_id: string;
@@ -103,7 +104,7 @@ function HealthRecordsContent() {
               createVisitMut.mutate(Object.fromEntries(fd) as Record<string, string>);
             }} className="space-y-4">
               <Input name="student_id" placeholder="Student ID" required />
-              <Input name="visit_date" type="date" required />
+              <BSDateInput name="visit_date" required />
               <Input name="reason" placeholder="Reason for visit" required />
               <Textarea name="diagnosis" placeholder="Diagnosis" rows={2} />
               <Textarea name="treatment" placeholder="Treatment given" rows={2} />

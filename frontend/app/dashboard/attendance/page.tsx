@@ -35,6 +35,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type AttendanceStatus = "present" | "absent" | "late" | "leave";
@@ -257,15 +258,13 @@ function AttendanceContent() {
               <label className="text-xs text-muted-foreground font-medium">
                 Date
               </label>
-              <input
-                type="date"
+              <BSDateInput
                 value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
+                onChange={(v) => {
+                  setDate(v);
                   setRecords({});
                   setHasChanges(false);
                 }}
-                className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
 

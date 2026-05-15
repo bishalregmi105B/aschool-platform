@@ -915,7 +915,7 @@ class _CreateAssignmentSheetState
                     Text(
                       _dueDate == null
                           ? 'Select Due Date'
-                          : '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}',
+                          : adToBsString(_dueDate!),
                       style: TextStyle(
                         fontSize: 14,
                         color: _dueDate == null ? Colors.grey.shade600 : null,

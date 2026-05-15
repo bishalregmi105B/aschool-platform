@@ -17,6 +17,7 @@ import { BookMarked, Plus, Folder } from "lucide-react";
 import Link from "next/link";
 import { PageLoader } from "@/components/ui/spinner";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface DiaryCategory {
   id: string;
   name: string;
@@ -197,7 +198,7 @@ function DiaryContent() {
               </div>
               <div className="space-y-2">
                 <Label>Entry Date</Label>
-                <Input name="entry_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
+                <BSDateInput name="entry_date" />
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
