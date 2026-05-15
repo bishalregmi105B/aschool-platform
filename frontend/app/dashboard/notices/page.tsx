@@ -22,6 +22,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, Pin, Calendar, Bell } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { displayBS } from "@/lib/nepali_date";
 interface Notice {
   id: string;
   title: string;

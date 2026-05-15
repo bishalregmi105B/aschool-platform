@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { BookOpen, PlusCircle, RotateCcw } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 interface Book {
   id: string;

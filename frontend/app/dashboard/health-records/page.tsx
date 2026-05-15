@@ -20,6 +20,7 @@ import {
 import { HeartPulse, Syringe, Stethoscope, PlusCircle } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { displayBS } from "@/lib/nepali_date";
 interface HealthProfile {
   id: string;
   student_id: string;

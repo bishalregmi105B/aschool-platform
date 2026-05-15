@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { BookMarked, ScanLine, RotateCcw } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function CheckoutPage() {
   return <PluginGate slug="library"><CheckoutContent /></PluginGate>;

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/spinner";
 import { Calendar, Clock } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 interface ExamScheduleItem {
   id: string;
