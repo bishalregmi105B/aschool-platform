@@ -1,6 +1,5 @@
 """Exam, Marks, and ReportCard models."""
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     Date,
@@ -12,7 +11,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
