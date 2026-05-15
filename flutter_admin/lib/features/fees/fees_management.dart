@@ -177,7 +177,7 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
                 children: [
                   Text('Rs ${p['amount']}',
                       style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(p['paid_at'] ?? '',
+                  Text((p['paid_at'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(p['paid_at']!) ?? DateTime.now()) : '',
                       style: TextStyle(fontSize: 11, color: Colors.grey[500])),
                 ],
               ),

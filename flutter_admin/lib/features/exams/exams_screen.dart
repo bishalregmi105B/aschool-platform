@@ -202,7 +202,7 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
                 .map((s) => Card(
                       child: ListTile(
                         title: Text(s['subject_name'] ?? ''),
-                        subtitle: Text(s['date'] ?? ''),
+                        subtitle: Text((s['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(s['date']!) ?? DateTime.now()) : ''),
                         trailing: Text('Full Marks: ${s['full_marks'] ?? ''}'),
                       ),
                     )),

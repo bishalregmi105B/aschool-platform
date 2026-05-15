@@ -72,7 +72,7 @@ class ParentDashboard extends ConsumerWidget {
                             ),
                           ),
                           title: Text(entry.value['title'] ?? ''),
-                          subtitle: Text(entry.value['date'] ?? ''),
+                          subtitle: Text((entry.value['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(entry.value['date']!) ?? DateTime.now()) : ''),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => context.go('/notices'),
                         ),

@@ -54,7 +54,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
                     t['title']?.toString() ??
                     'Template'),
                 subtitle: Text(t['template_type']?.toString() ?? ''),
-                trailing: Text(t['updated_at']?.toString() ?? ''),
+                trailing: Text((t['updated_at'] ?? '').toString().isNotEmpty ? adToBsString(DateTime.tryParse(t['updated_at'].toString()) ?? DateTime.now()) : ''),
               ),
             );
           },

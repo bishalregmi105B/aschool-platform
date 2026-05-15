@@ -227,7 +227,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                                 color: Colors.amber),
                           ),
                           title: Text(award['title'] ?? ''),
-                          subtitle: Text(award['date'] ?? ''),
+                          subtitle: Text((award['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(award['date']!) ?? DateTime.now()) : ''),
                           trailing: Text(award['category'] ?? '',
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey[600])),
