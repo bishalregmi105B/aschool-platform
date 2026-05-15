@@ -42,6 +42,7 @@ import {
   Wallet,
 } from "lucide-react";
 import {
+import { BSDateInput } from "@/components/ui/bs-date-input";
   EMPTY_PAYMENT_METHODS_RESPONSE,
   fetchPaymentMethods,
   type PaymentMethodConfig,
@@ -1265,10 +1266,9 @@ function StudentAccountWorkbench({
 
                         <div className="space-y-1.5">
                           <Label>Payment Date</Label>
-                          <Input
-                            type="date"
+                          <BSDateInput
                             value={payDate}
-                            onChange={(event) => setPayDate(event.target.value)}
+                            onChange={setPayDate}
                           />
                         </div>
 

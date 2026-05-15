@@ -21,6 +21,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, Receipt, Search, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Category {
   id: string;
   name: string;
@@ -207,7 +208,7 @@ export default function ExpensesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Date</Label>
-                <Input name="date" type="date" required defaultValue={editItem?.date ? editItem.date.split("T")[0] : new Date().toISOString().split("T")[0]} />
+                <BSDateInput name="date" required value={editItem?.date ? editItem.date.split("T")[0] : undefined} />
               </div>
             </div>
 

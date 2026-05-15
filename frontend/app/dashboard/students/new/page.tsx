@@ -16,6 +16,7 @@ import { ArrowLeft, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 export default function NewStudentPage() {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -100,7 +101,7 @@ export default function NewStudentPage() {
                   <SelectContent><SelectItem value="male">Male</SelectItem><SelectItem value="female">Female</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={form.date_of_birth} onChange={(e) => set("date_of_birth", e.target.value)} /></div>
+              <div className="space-y-2"><Label>Date of Birth</Label><BSDateInput value={form.date_of_birth} onChange={(v) => set("date_of_birth", v)} /></div>
               <div className="space-y-2"><Label>Blood Group</Label><Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} placeholder="e.g. A+" /></div>
             </div>
             <div className="space-y-2"><Label>Address</Label><Textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={2} /></div>
@@ -147,7 +148,7 @@ export default function NewStudentPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Enrollment No.</Label><Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Admission Date</Label><Input type="date" value={form.admission_date} onChange={(e) => set("admission_date", e.target.value)} /></div>
+                <div className="space-y-2"><Label>Admission Date</Label><BSDateInput value={form.admission_date} onChange={(v) => set("admission_date", v)} /></div>
               </div>
             </CardContent>
           </Card>

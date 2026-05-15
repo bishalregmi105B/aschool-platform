@@ -19,6 +19,7 @@ import {
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { CalendarOff, Plus, Pencil, Trash2 } from "lucide-react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Holiday {
   id: string;
   title: string;
@@ -114,7 +115,7 @@ function HolidaysContent() {
           <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const startDate = fd.get("date"); createMutation.mutate({ title: fd.get("title"), start_date: startDate, end_date: startDate, event_type: "holiday", is_holiday: true, description: fd.get("description") }); }} className="space-y-4">
             <div className="space-y-2"><Label>Title</Label><Input name="title" required placeholder="Holiday name" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Date</Label><Input name="date" type="date" required /></div>
+              <div className="space-y-2"><Label>Date</Label><BSDateInput name="date" required /></div>
               <div className="space-y-2"><Label>Type</Label>
                 <select name="type" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="holiday">Holiday</option>

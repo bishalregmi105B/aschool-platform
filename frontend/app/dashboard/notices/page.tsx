@@ -21,6 +21,7 @@ import {
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, Pin, Calendar, Bell } from "lucide-react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Notice {
   id: string;
   title: string;
@@ -283,11 +284,11 @@ function NoticesContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input name="start_date" type="date" required />
+                <BSDateInput name="start_date" required />
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Input name="end_date" type="date" />
+                <BSDateInput name="end_date" />
               </div>
             </div>
             <div className="flex items-center gap-2">

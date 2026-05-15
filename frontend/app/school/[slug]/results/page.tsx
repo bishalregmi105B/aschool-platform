@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface ResultEntry {
@@ -94,13 +95,11 @@ export default function ResultsPage({ params }: { params: { slug: string } }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Date of Birth (YYYY-MM-DD)
+            Date of Birth (BS)
           </label>
-          <input
-            type="date"
+          <BSDateInput
             value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={setDob}
             required
           />
         </div>

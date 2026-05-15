@@ -14,6 +14,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Calendar, Save, CheckCircle, XCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface User {
   id: string;
   full_name: string;
@@ -114,10 +115,9 @@ export default function StaffAttendancePage() {
           <p className="text-muted-foreground">Mark daily attendance for teachers and staff</p>
         </div>
         <div className="flex items-center gap-4">
-          <Input 
-            type="date" 
-            value={date} 
-            onChange={(e) => setDate(e.target.value)}
+          <BSDateInput
+            value={date}
+            onChange={setDate}
             className="w-auto"
           />
           <Button onClick={handleSave} disabled={saveMutation.isPending}>

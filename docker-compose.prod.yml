@@ -12,6 +12,9 @@ services:
       - flask
       - nextjs
     restart: always
+    networks:
+      - default
+      - vexel_default
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
@@ -185,3 +188,9 @@ volumes:
     driver: local
   uploads_data:
     driver: local
+
+networks:
+  default:
+    name: aschool_default
+  vexel_default:
+    external: true

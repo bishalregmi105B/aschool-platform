@@ -8,6 +8,7 @@ import { Award, Plus, Search, Star, Trophy, Loader2, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface PortfolioItem {
   id: string;
   student_id: string;
@@ -281,13 +282,12 @@ function PortfolioContent() {
 
               <div>
                 <label className="text-sm font-medium">Date</label>
-                <input
-                  type="date"
+                <BSDateInput
                   value={formData.achievement_date}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     setFormData((d) => ({
                       ...d,
-                      achievement_date: e.target.value,
+                      achievement_date: v,
                     }))
                   }
                   className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

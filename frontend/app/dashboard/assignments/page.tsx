@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle, FileText, Brain } from "lucide-react";
 
+import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Assignment {
   id: string;
   title: string;
@@ -96,7 +97,7 @@ function AssignmentsContent() {
               <Textarea name="description" placeholder="Description / Instructions" rows={4} />
               <div className="grid grid-cols-2 gap-4">
                 <Input name="total_marks" placeholder="Total Marks" type="number" defaultValue={10} />
-                <Input name="due_date" type="date" required />
+                <BSDateInput name="due_date" required />
               </div>
               <Button type="submit" disabled={createMut.isPending} className="w-full">
                 {createMut.isPending ? "Creating..." : "Create Assignment"}
