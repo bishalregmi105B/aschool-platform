@@ -78,7 +78,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                                 color:
                                     isPresent ? Colors.green : Colors.redAccent,
                               ),
-                              title: Text(record['date']?.toString() ?? 'Date'),
+                              title: Text((record['date'] ?? '').toString().isNotEmpty ? adToBsString(DateTime.tryParse(record['date'].toString()) ?? DateTime.now()) : 'Date'),
                               subtitle: Text(
                                 'Check-in: ${record['check_in'] ?? '-'} • Check-out: ${record['check_out'] ?? '-'}',
                               ),

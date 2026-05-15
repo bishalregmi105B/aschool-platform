@@ -278,7 +278,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
                 ),
               ),
               title: Text(item['description'] ?? ''),
-              subtitle: Text(item['date'] ?? '',
+              subtitle: Text((item['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(item['date']!) ?? DateTime.now()) : '',
                   style: const TextStyle(fontSize: 12)),
               trailing: Text(
                 '${positive ? '+' : ''}$points pts',

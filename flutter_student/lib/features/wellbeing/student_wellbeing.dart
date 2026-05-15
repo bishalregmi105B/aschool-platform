@@ -226,7 +226,7 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
                             title: Text(entry['mood'] ?? ''),
                             subtitle: Text(entry['note'] ?? '',
                                 maxLines: 2, overflow: TextOverflow.ellipsis),
-                            trailing: Text(entry['date'] ?? '',
+                            trailing: Text((entry['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(entry['date']!) ?? DateTime.now()) : '',
                                 style: TextStyle(
                                     fontSize: 11, color: Colors.grey[500])),
                           ),

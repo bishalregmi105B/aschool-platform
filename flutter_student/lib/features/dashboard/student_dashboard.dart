@@ -746,7 +746,7 @@ class _NoticeCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(n['date'] ?? '',
+        subtitle: Text((n['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(n['date']!) ?? DateTime.now()) : '',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       ),

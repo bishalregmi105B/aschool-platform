@@ -173,7 +173,7 @@ class TeacherDashboard extends ConsumerWidget {
                                   const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: Text(n['date'] ?? '',
+                            child: Text((n['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(n['date']!) ?? DateTime.now()) : '',
                                 style: TextStyle(
                                     color: Colors.grey.shade600, fontSize: 12)),
                           ),

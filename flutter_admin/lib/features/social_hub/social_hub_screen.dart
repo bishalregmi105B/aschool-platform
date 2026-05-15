@@ -114,7 +114,7 @@ class _SocialHubScreenState extends ConsumerState<SocialHubScreen>
                     child: _platformIcon(p),
                   )),
               const Spacer(),
-              Text(post['posted_at'] ?? '',
+              Text((post['posted_at'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(post['posted_at']!) ?? DateTime.now()) : '',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500])),
             ]),
             const SizedBox(height: 10),

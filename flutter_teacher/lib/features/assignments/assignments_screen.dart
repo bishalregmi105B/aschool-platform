@@ -249,7 +249,7 @@ class _AssignmentCard extends ConsumerWidget {
                           const Icon(Icons.timer_rounded,
                               size: 12, color: Colors.red),
                           const SizedBox(width: 4),
-                          Text(assignment['due_date'] ?? '',
+                          Text((assignment['due_date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(assignment['due_date']!) ?? DateTime.now()) : '',
                               style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
