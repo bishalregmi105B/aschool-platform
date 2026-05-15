@@ -73,7 +73,7 @@ export default function TeacherDashboard() {
                   <div className={`w-2 h-2 rounded-full mt-2 ${notice.urgent ? "bg-red-500" : "bg-gray-300"}`} />
                   <div>
                     <p className="font-medium text-sm">{notice.title}</p>
-                    <p className="text-xs text-muted-foreground">{notice.date ? new Date(notice.date).toLocaleDateString() : "—"}</p>
+                    <p className="text-xs text-muted-foreground">{notice.date ? displayBS(notice.date) : "—"}</p>
                   </div>
                 </div>
               ))}

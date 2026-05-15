@@ -142,7 +142,7 @@ function HealthRecordsContent() {
                 {visits?.map(v => (
                   <TableRow key={v.id}>
                     <TableCell>{v.student_id}</TableCell>
-                    <TableCell>{v.visit_date}</TableCell>
+                    <TableCell>{displayBS(v.visit_date)}</TableCell>
                     <TableCell>{v.reason}</TableCell>
                     <TableCell>{v.diagnosis}</TableCell>
                     <TableCell>{v.treatment}</TableCell>

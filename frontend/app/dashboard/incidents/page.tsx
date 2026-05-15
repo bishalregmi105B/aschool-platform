@@ -61,7 +61,7 @@ function IncidentsContent() {
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No incidents recorded</TableCell></TableRow>
               ) : incidents.map((i: any) => (
                 <TableRow key={i.id}>
-                  <TableCell>{i.created_at ? new Date(i.created_at).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{i.created_at ? displayBS(i.created_at) : "—"}</TableCell>
                   <TableCell className="font-medium">{i.title}</TableCell>
                   <TableCell><Badge variant="outline">{i.type}</Badge></TableCell>
                   <TableCell><Badge variant={severityColor(i.severity)}>{i.severity}</Badge></TableCell>

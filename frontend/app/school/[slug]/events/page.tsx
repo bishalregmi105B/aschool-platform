@@ -52,7 +52,7 @@ export default async function EventsPage({ params }: { params: { slug: string } 
                         {e.type && <span className="inline-block text-xs px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: "var(--color-secondary)", color: "var(--color-primary)" }}>{e.type}</span>}
                       </div>
                       <div className="text-right text-sm text-gray-500">
-                        <p>{new Date(e.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}</p>
+                        <p>{displayBS(e.date)}</p>
                         {e.location && <p className="text-xs">📍 {e.location}</p>}
                       </div>
                     </div>
@@ -71,7 +71,7 @@ export default async function EventsPage({ params }: { params: { slug: string } 
                   <div key={e.id} className="border rounded-lg p-4 opacity-80">
                     <div className="flex justify-between items-center">
                       <h3 className="font-medium">{e.title}</h3>
-                      <span className="text-sm text-gray-400">{new Date(e.date).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}</span>
+                      <span className="text-sm text-gray-400">{displayBS(e.date)}</span>
                     </div>
                   </div>
                 ))}

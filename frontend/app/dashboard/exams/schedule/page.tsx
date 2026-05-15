@@ -89,7 +89,7 @@ function ExamScheduleContent() {
                     {exam.schedules.map((s: ExamScheduleItem) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.subject_name}</TableCell>
-                        <TableCell>{s.exam_date}</TableCell>
+                        <TableCell>{displayBS(s.exam_date)}</TableCell>
                         <TableCell className="flex items-center gap-1">
                           <Clock className="h-3 w-3" /> {s.start_time} - {s.end_time}
                         </TableCell>

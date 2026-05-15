@@ -178,7 +178,7 @@ function LibraryContent() {
                     <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
                     <TableCell>{issue.book_id}</TableCell>
                     <TableCell>{issue.student_id}</TableCell>
-                    <TableCell>{issue.due_date}</TableCell>
+                    <TableCell>{displayBS(issue.due_date)}</TableCell>
                     <TableCell><Badge variant={issue.status === "returned" ? "default" : "destructive"}>{issue.status}</Badge></TableCell>
                     <TableCell>
                       {issue.status !== "returned" && (

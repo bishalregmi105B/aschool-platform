@@ -48,7 +48,7 @@ export default async function NewsPage({ params }: { params: { slug: string } })
                 <div className="p-6 flex-1">
                   <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
                     {a.category && <span className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: "var(--color-secondary)", color: "var(--color-primary)" }}>{a.category}</span>}
-                    {a.created_at && <time>{new Date(a.created_at).toLocaleDateString("en-NP", { year: "numeric", month: "short", day: "numeric" })}</time>}
+                    {a.created_at && <time>{displayBS(a.created_at)}</time>}
                   </div>
                   <a href={`/school/${params.slug}/news/${a.slug || a.id}`}>
                     <h2 className="text-xl font-semibold hover:underline" style={{ color: "var(--color-primary)" }}>{a.title}</h2>

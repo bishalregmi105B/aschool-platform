@@ -163,7 +163,7 @@ function NoticesContent() {
                   </p>
                   <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
                     {notice.author_name && <span>By {notice.author_name}</span>}
-                    <span>{new Date(notice.created_at).toLocaleDateString()}</span>
+                    <span>{displayBS(notice.created_at)}</span>
                     <div className="flex gap-1">
                       {notice.target_roles.map((r) => (
                         <Badge key={r} variant="outline" className="text-xs">

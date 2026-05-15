@@ -81,7 +81,7 @@ function CheckoutContent() {
             <div className="grid grid-cols-2 gap-2 text-sm">
               {result.book_title && <div><span className="text-muted-foreground">Book:</span> {result.book_title}</div>}
               {result.student_name && <div><span className="text-muted-foreground">Student:</span> {result.student_name}</div>}
-              {result.due_date && <div><span className="text-muted-foreground">Due Date:</span> {new Date(result.due_date).toLocaleDateString()}</div>}
+              {result.due_date && <div><span className="text-muted-foreground">Due Date:</span> {displayBS(result.due_date)}</div>}
               {result.fine && <div><span className="text-muted-foreground">Fine:</span> Rs. {result.fine}</div>}
             </div>
           </CardContent>

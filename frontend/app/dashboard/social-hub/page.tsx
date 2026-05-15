@@ -81,7 +81,7 @@ function PostComments({ postId }: { postId: string }) {
               <div>
                 <p className="text-sm">{c.content}</p>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(c.created_at).toLocaleDateString()}
+                  {displayBS(c.created_at)}
                 </span>
               </div>
             </div>
@@ -179,7 +179,7 @@ function SocialHubContent() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">User</span>
-                      <span className="text-xs text-muted-foreground">{new Date(post.created_at).toLocaleDateString()}</span>
+                      <span className="text-xs text-muted-foreground">{displayBS(post.created_at)}</span>
                       <Badge variant="outline" className="text-xs">{post.visibility}</Badge>
                     </div>
                     <p className="mt-2 text-sm">{post.content}</p>

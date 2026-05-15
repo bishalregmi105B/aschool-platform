@@ -27,7 +27,7 @@ export default async function NewsDetailPage({ params }: { params: { slug: strin
 
         <div className="flex items-center gap-3 text-sm text-gray-400 mb-4">
           {article.category && <span className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: "var(--color-secondary)", color: "var(--color-primary)" }}>{article.category}</span>}
-          {article.created_at && <time>{new Date(article.created_at).toLocaleDateString("en-NP", { year: "numeric", month: "long", day: "numeric" })}</time>}
+          {article.created_at && <time>{displayBS(article.created_at)}</time>}
           {article.author && <span>By {article.author}</span>}
         </div>
 

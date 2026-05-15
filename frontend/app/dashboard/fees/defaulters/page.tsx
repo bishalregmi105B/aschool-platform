@@ -48,7 +48,7 @@ function DefaultersContent() {
                   <TableCell className="font-medium">{d.student_name}</TableCell>
                   <TableCell>{d.class_name || "—"}</TableCell>
                   <TableCell className="font-bold text-red-600">Rs. {d.total_due?.toLocaleString()}</TableCell>
-                  <TableCell>{d.overdue_since ? new Date(d.overdue_since).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{d.overdue_since ? displayBS(d.overdue_since) : "—"}</TableCell>
                   <TableCell>
                     <div className="text-sm">
                       {d.parent_phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {d.parent_phone}</span>}

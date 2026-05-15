@@ -147,7 +147,7 @@ function WellbeingContent() {
                   <div className="flex items-center gap-2">
                     <Badge className={moodColors[entry.mood] || ""} variant="outline">{entry.mood}</Badge>
                     <span className="text-xs text-muted-foreground">Energy: {entry.energy_level}/5</span>
-                    <span className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-muted-foreground">{displayBS(entry.created_at)}</span>
                   </div>
                   {entry.notes && <p className="text-sm mt-1">{entry.notes}</p>}
                 </div>

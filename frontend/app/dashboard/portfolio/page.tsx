@@ -185,9 +185,7 @@ function PortfolioContent() {
                       )}
                       {item.achievement_date && (
                         <p className="text-xs text-muted-foreground">
-                          {new Date(item.achievement_date).toLocaleDateString(
-                            "en-NP",
-                          )}
+                          {displayBS(item.achievement_date)}
                         </p>
                       )}
                     </CardContent>
