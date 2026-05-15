@@ -44,6 +44,13 @@ final marksStudentsProvider = FutureProvider.autoDispose.family<
             fullMarks: (student['full_marks'] as num?)?.toDouble() ?? 100,
             passMarks: (student['pass_marks'] as num?)?.toDouble() ?? 32,
             hasPractical: student['has_practical'] == true,
+            theoryFullMarks: (student['theory_full_marks'] as num?)?.toDouble(),
+            practicalFullMarks:
+                (student['practical_full_marks'] as num?)?.toDouble(),
+            theoryPassMarks:
+                (student['theory_pass_marks'] as num?)?.toDouble(),
+            practicalPassMarks:
+                (student['practical_pass_marks'] as num?)?.toDouble(),
           ))
       .toList();
 });
@@ -193,14 +200,16 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
 
   double _practicalLimit(_StudentMark student) {
     if (!_usesPractical(student)) return 0;
-    return double.parse((student.fullMarks * 0.2).toStringAsFixed(1));
+    return student.practicalFullMarks ??
+        double.parse((student.fullMarks * 0.2).toStringAsFixed(1));
   }
 
   double _theoryLimit(_StudentMark student) {
     if (!_usesPractical(student)) return student.fullMarks;
-    return double.parse(
-      (student.fullMarks - _practicalLimit(student)).toStringAsFixed(1),
-    );
+    return student.theoryFullMarks ??
+        double.parse(
+          (student.fullMarks - _practicalLimit(student)).toStringAsFixed(1),
+        );
   }
 
   String? _validateMarks() {
@@ -841,6 +850,10 @@ class _StudentMark {
   final double fullMarks;
   final double passMarks;
   final bool hasPractical;
+  final double? theoryFullMarks;
+  final double? practicalFullMarks;
+  final double? theoryPassMarks;
+  final double? practicalPassMarks;
 
   _StudentMark({
     required this.id,
@@ -851,6 +864,10 @@ class _StudentMark {
     required this.fullMarks,
     required this.passMarks,
     required this.hasPractical,
+    this.theoryFullMarks,
+    this.practicalFullMarks,
+    this.theoryPassMarks,
+    this.practicalPassMarks,
   });
 
   double get totalMarks => (theoryMarks ?? 0) + (practicalMarks ?? 0);
@@ -868,6 +885,10 @@ class _StudentMark {
       fullMarks: fullMarks,
       passMarks: passMarks,
       hasPractical: hasPractical,
+      theoryFullMarks: theoryFullMarks,
+      practicalFullMarks: practicalFullMarks,
+      theoryPassMarks: theoryPassMarks,
+      practicalPassMarks: practicalPassMarks,
     );
   }
 }
