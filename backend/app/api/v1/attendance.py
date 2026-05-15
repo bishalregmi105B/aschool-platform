@@ -206,12 +206,24 @@ def list_attendance():
     """Get attendance records with filters."""
     query = Attendance.query.filter_by(school_id=g.school_id, is_deleted=False)
 
+    # Teachers can only see attendance for their assigned classes
+    if g.role == "teacher" and g.user_id:
+        allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
+        if not allowed_class_ids:
+            return success_response([], meta={"pagination": {}})
+        query = query.filter(Attendance.class_id.in_(allowed_class_ids))
+
     attendance_date = request.args.get("date")
     if attendance_date:
         query = query.filter_by(date=attendance_date)
 
     class_id = request.args.get("class_id")
     if class_id:
+        # Ensure teacher isn't querying a class outside their scope
+        if g.role == "teacher" and g.user_id:
+            allowed = {str(cid) for cid in teacher_allowed_class_ids(g.school_id, g.user_id)}
+            if str(class_id) not in allowed:
+                return error_response("Not allowed to view this class", 403)
         query = query.filter_by(class_id=class_id)
 
     section_id = request.args.get("section_id")
@@ -242,6 +254,12 @@ def attendance_summary():
 
     if not class_id:
         return error_response("class_id is required", 400)
+
+    # Teachers can only view summary for their assigned classes
+    if g.role == "teacher" and g.user_id:
+        allowed = {str(cid) for cid in teacher_allowed_class_ids(g.school_id, g.user_id)}
+        if str(class_id) not in allowed:
+            return error_response("Not allowed to view this class", 403)
 
     total_students = Student.query.filter_by(
         school_id=g.school_id, class_id=class_id, status="active", is_deleted=False
