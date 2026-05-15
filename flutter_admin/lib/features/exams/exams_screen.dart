@@ -97,7 +97,7 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
                 children: [
                   Icon(Icons.class_, size: 14, color: Colors.grey[500]),
                   const SizedBox(width: 4),
-                  Text(exam['classes'] ?? 'All classes',
+                  Text(exam['class_name']?.toString() ?? 'All classes',
                       style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                 ],
               ),
@@ -105,13 +105,9 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _miniStat('Subjects', '${exam['total_subjects'] ?? 0}'),
-                    const SizedBox(width: 24),
-                    _miniStat('Avg %',
-                        '${exam['avg_percentage']?.toStringAsFixed(1) ?? '-'}'),
-                    const SizedBox(width: 24),
-                    _miniStat('Pass %',
-                        '${exam['pass_percentage']?.toStringAsFixed(1) ?? '-'}'),
+                    _miniStat(
+                        'Subjects',
+                        '${(exam['subject_ids'] as List?)?.length ?? 0}'),
                   ],
                 ),
               ],
@@ -165,50 +161,113 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, ctrl) => ListView(
-          controller: ctrl,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(exam['name'] ?? '',
-                style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              NepaliFormatter.preferredDateRange(
-                startBs: exam['start_date_bs']?.toString(),
-                endBs: exam['end_date_bs']?.toString(),
-                startAd: exam['start_date']?.toString(),
-                endAd: exam['end_date']?.toString(),
-                separator: ' – ',
-              ),
-            ),
-            const SizedBox(height: 20),
-            ...List<Map<String, dynamic>>.from(exam['subjects'] ?? [])
-                .map((s) => Card(
-                      child: ListTile(
-                        title: Text(s['subject_name'] ?? ''),
-                        subtitle: Text((s['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(s['date']!) ?? DateTime.now()) : ''),
-                        trailing: Text('Full Marks: ${s['full_marks'] ?? ''}'),
-                      ),
-                    )),
-          ],
-        ),
-      ),
+      builder: (_) => _ExamDetailSheet(exam: exam),
     );
   }
 }
+
+class _ExamDetailSheet extends StatefulWidget {
+  final Map<String, dynamic> exam;
+  const _ExamDetailSheet({required this.exam});
+
+  @override
+  State<_ExamDetailSheet> createState() => _ExamDetailSheetState();
+}
+
+class _ExamDetailSheetState extends State<_ExamDetailSheet> {
+  List<Map<String, dynamic>>? _subjects;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    try {
+      final examId = widget.exam['id']?.toString() ?? '';
+      final resp =
+          await ApiClient.instance.get('/exams/$examId/subjects');
+      if (mounted) {
+        setState(() {
+          _subjects = List<Map<String, dynamic>>.from(
+              resp.data['data'] ?? []);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final exam = widget.exam;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, ctrl) => ListView(
+        controller: ctrl,
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(exam['name'] ?? '',
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text(
+            NepaliFormatter.preferredDateRange(
+              startBs: exam['start_date_bs']?.toString(),
+              endBs: exam['end_date_bs']?.toString(),
+              startAd: exam['start_date']?.toString(),
+              endAd: exam['end_date']?.toString(),
+              separator: ' – ',
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else if (_subjects == null || _subjects!.isEmpty)
+            const Text('No subjects found for this exam.',
+                style: TextStyle(color: Colors.grey))
+          else
+            ..._subjects!.map((s) => Card(
+                  child: ListTile(
+                    title: Text(s['name']?.toString() ?? ''),
+                    subtitle: s['code'] != null
+                        ? Text(s['code'].toString())
+                        : null,
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Full: ${s['total_full_marks'] ?? s['full_marks'] ?? ''}',
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          'Pass: ${s['total_pass_marks'] ?? s['pass_marks'] ?? ''}',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+        ],
+      ),
+    );
+  }

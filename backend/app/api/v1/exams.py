@@ -983,13 +983,17 @@ def get_grade_sheet(exam_id):
         r["rank"] = i
 
     klass = Class.query.get(class_id)
+    # Strip the internal _subject model reference before serialising to JSON
+    subjects_serializable = [
+        {k: v for k, v in s.items() if k != "_subject"} for s in subject_list
+    ]
     return success_response(
         {
             "exam_id": str(exam_id),
             "exam_name": exam.name,
             "class_id": class_id,
             "class_name": klass.name if klass else "",
-            "subjects": subject_list,
+            "subjects": subjects_serializable,
             "rows": rows,
             "total_full_marks": total_full_marks,
             "student_count": len(rows),
