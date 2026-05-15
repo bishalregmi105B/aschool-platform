@@ -111,6 +111,7 @@ th {{ background: #2c3e50; color: white; }}
         db.session.add(rc)
 
     rc.total_percentage = percentage
+    rc.total_marks = total_full
     rc.generated_at = datetime.now(timezone.utc)
 
     # In production, upload pdf_bytes to S3/MinIO and set rc.pdf_url

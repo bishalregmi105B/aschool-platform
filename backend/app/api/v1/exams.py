@@ -1483,11 +1483,14 @@ def _student_result_from_report_card(rc):
         exam_id=rc.exam_id,
         is_deleted=False,
     ).all()
+    marks_obtained = sum(float(m.total_marks or m.theory_marks or 0) for m in marks)
+    total_full = sum(float(m.full_marks or 100) for m in marks) if marks else 0
     return {
         "id": str(rc.id),
         "exam_id": str(rc.exam_id),
         "exam_name": exam.name if exam else "Exam Result",
-        "total_marks": float(rc.total_marks or 0),
+        "total_marks": total_full,
+        "marks_obtained": marks_obtained,
         "percentage": float(rc.total_percentage or rc.percentage or 0),
         "grade": rc.overall_grade or "N/A",
         "gpa": float(rc.overall_gpa or 0),
