@@ -57,7 +57,7 @@ export default function TransfersPage() {
                   <TableCell><Badge variant="outline">{t.transfer_type === "tc" ? "TC" : t.transfer_type}</Badge></TableCell>
                   <TableCell>{t.reason || "—"}</TableCell>
                   <TableCell>{t.destination_school || "—"}</TableCell>
-                  <TableCell>{t.created_at ? new Date(t.created_at).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{t.created_at ? displayBS(t.created_at) : "—"}</TableCell>
                   <TableCell><Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge></TableCell>
                 </TableRow>
               ))}

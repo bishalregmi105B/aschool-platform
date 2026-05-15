@@ -49,7 +49,7 @@ export default function SuperAdminDashboard() {
               {(data?.recent_schools || []).map((school: any, i: number) => (
                 <div key={i} className="flex justify-between py-2 border-b border-gray-800 text-sm">
                   <span className="text-gray-300">{school.name}</span>
-                  <span className="text-gray-500">{school.created_at ? new Date(school.created_at).toLocaleDateString() : "—"}</span>
+                  <span className="text-gray-500">{school.created_at ? displayBS(school.created_at) : "—"}</span>
                 </div>
               ))}
               {(data?.recent_schools || []).length === 0 && <p className="text-sm text-gray-500">No recent registrations.</p>}

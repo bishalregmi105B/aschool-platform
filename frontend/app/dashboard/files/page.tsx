@@ -390,7 +390,7 @@ function FilesContent() {
                     </div>
                     {doc.updated_at && (
                       <p className="text-xs text-muted-foreground/60 mt-1">
-                        {new Date(doc.updated_at).toLocaleDateString()}
+                        {displayBS(doc.updated_at)}
                       </p>
                     )}
                   </div>
@@ -707,7 +707,7 @@ function FilesContent() {
               <DetailRow label="Type" value={selectedFile.file_type} />
               {selectedFile.mime_type && <DetailRow label="MIME" value={selectedFile.mime_type} />}
               {selectedFile.extension && <DetailRow label="Ext" value={`.${selectedFile.extension}`} />}
-              <DetailRow label="Uploaded" value={new Date(selectedFile.created_at).toLocaleDateString()} />
+              <DetailRow label="Uploaded" value={displayBS(selectedFile.created_at)} />
               {selectedFile.linked_module && (
                 <DetailRow label="Module" value={selectedFile.linked_module} />
               )}
@@ -1157,7 +1157,7 @@ function FileRow({
       <span className="text-sm flex-1 truncate">{file.original_name}</span>
       <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size_bytes)}</span>
       <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
-        {new Date(file.created_at).toLocaleDateString()}
+        {displayBS(file.created_at)}
       </span>
     </div>
   );

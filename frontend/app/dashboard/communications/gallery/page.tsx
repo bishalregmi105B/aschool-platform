@@ -116,7 +116,7 @@ function GalleryContent() {
                   <div className="min-w-0">
                     <p className="font-medium truncate">{file.original_name || "Gallery image"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {file.created_at ? new Date(file.created_at).toLocaleDateString() : ""}
+                      {file.created_at ? displayBS(file.created_at) : ""}
                     </p>
                   </div>
                   {file.folder ? <Badge variant="outline">{file.folder}</Badge> : null}

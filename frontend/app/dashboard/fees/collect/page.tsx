@@ -1080,9 +1080,9 @@ function StudentAccountWorkbench({
                             ? `Receipt #${fee.receipt_number}`
                             : "No receipt generated yet"}
                           {fee.due_date
-                            ? ` • Due ${new Date(fee.due_date).toLocaleDateString("en-NP")}`
+                            ? ` • Due ${displayBS(fee.due_date)}`
                             : fee.created_at
-                              ? ` • Added ${new Date(fee.created_at).toLocaleDateString("en-NP")}`
+                              ? ` • Added ${displayBS(fee.created_at)}`
                               : ""}
                         </p>
                       </div>

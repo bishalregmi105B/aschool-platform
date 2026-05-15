@@ -62,8 +62,8 @@ function LeavesContent() {
                   <TableRow key={l.id}>
                     <TableCell className="font-medium">{l.staff_name}</TableCell>
                     <TableCell><Badge variant="outline">{l.leave_type || l.type}</Badge></TableCell>
-                    <TableCell>{l.from_date ? new Date(l.from_date).toLocaleDateString() : "—"}</TableCell>
-                    <TableCell>{l.to_date ? new Date(l.to_date).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell>{l.from_date ? displayBS(l.from_date) : "—"}</TableCell>
+                    <TableCell>{l.to_date ? displayBS(l.to_date) : "—"}</TableCell>
                     <TableCell>{days}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{l.reason || "—"}</TableCell>
                     <TableCell><Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge></TableCell>

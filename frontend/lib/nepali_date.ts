@@ -69,7 +69,11 @@ function daysBetween(a: Date, b: Date): number {
 export interface BSDate { year: number; month: number; day: number }
 
 export function adToBS(adDate: Date | string): BSDate {
-  const d = typeof adDate === "string" ? new Date(adDate + "T00:00:00") : adDate;
+  // Handle both date-only "YYYY-MM-DD" and full ISO datetime "YYYY-MM-DDT..."
+  const d =
+    typeof adDate === "string"
+      ? new Date(adDate.includes("T") ? adDate : adDate + "T00:00:00")
+      : adDate;
   let remaining = daysBetween(BS_EPOCH_AD, d);
   let bsYear = 2000;
   let bsMonth = 1;

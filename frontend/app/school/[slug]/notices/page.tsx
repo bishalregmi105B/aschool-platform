@@ -39,11 +39,7 @@ export default async function NoticesPage({ params }: { params: { slug: string }
                 </h2>
                 {notice.created_at && (
                   <time className="text-sm text-gray-400 whitespace-nowrap ml-4">
-                    {new Date(notice.created_at).toLocaleDateString("en-NP", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {displayBS(notice.created_at)}
                   </time>
                 )}
               </div>

@@ -482,12 +482,7 @@ function HistoryTab() {
                   className="hover:bg-muted/30 transition-colors"
                 >
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                    {new Date(log.created_at).toLocaleDateString("en-NP", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {displayBS(log.created_at)}
                   </td>
                   <td className="px-4 py-3 max-w-xs truncate">{log.message}</td>
                   <td className="px-4 py-3 text-muted-foreground">

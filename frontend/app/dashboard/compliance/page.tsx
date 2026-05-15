@@ -49,9 +49,9 @@ function ComplianceContent() {
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name || c.requirement}</TableCell>
                   <TableCell><Badge variant="outline">{c.category}</Badge></TableCell>
-                  <TableCell>{c.due_date ? new Date(c.due_date).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{c.due_date ? displayBS(c.due_date) : "—"}</TableCell>
                   <TableCell><Badge variant={c.status === "compliant" ? "default" : c.status === "pending" ? "secondary" : "destructive"}>{c.status}</Badge></TableCell>
-                  <TableCell>{c.updated_at ? new Date(c.updated_at).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell>{c.updated_at ? displayBS(c.updated_at) : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

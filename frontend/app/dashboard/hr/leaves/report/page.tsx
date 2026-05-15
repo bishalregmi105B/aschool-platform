@@ -145,8 +145,8 @@ export default function LeaveReportPage() {
                   <TableCell className="font-medium">{l.staff_name || "Unknown Staff"}</TableCell>
                   <TableCell className="capitalize">{l.leave_type}</TableCell>
                   <TableCell className="text-sm whitespace-nowrap">
-                    {l.start_date ? format(new Date(l.start_date), "MMM d") : "—"} -{" "}
-                    {l.end_date ? format(new Date(l.end_date), "MMM d") : "—"}
+                    {l.start_date ? displayBS(l.start_date) : "—"} -{" "}
+                    {l.end_date ? displayBS(l.end_date) : "—"}
                   </TableCell>
                   <TableCell>{l.days || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">

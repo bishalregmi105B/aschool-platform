@@ -254,7 +254,7 @@ function FeeOverviewContent() {
                       <p className="text-sm font-medium">{p.student_name}</p>
                       <p className="text-xs text-muted-foreground">
                         {p.fee_type} •{" "}
-                        {new Date(p.paid_at).toLocaleDateString("en-NP")}
+                        {displayBS(p.paid_at)}
                       </p>
                     </div>
                     <div className="text-right">

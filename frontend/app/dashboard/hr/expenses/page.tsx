@@ -137,7 +137,7 @@ export default function ExpensesPage() {
               {expenses.map((e: Expense) => (
                 <TableRow key={e.id}>
                   <TableCell className="whitespace-nowrap">
-                    {e.date ? format(new Date(e.date), "MMM d, yyyy") : "—"}
+                    {e.date ? displayBS(e.date) : "—"}
                   </TableCell>
                   <TableCell className="font-medium">{e.title}</TableCell>
                   <TableCell>
