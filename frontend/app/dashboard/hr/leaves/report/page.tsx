@@ -16,6 +16,7 @@ import { PageLoader } from "@/components/ui/spinner";
 import { CalendarOff, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { displayBS } from "@/lib/nepali_date";
 
 interface LeaveRequest {
   id: string;

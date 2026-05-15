@@ -1,3 +1,4 @@
+import { displayBS } from "@/lib/nepali_date";
 /** Public Notices Page — auto-synced from school management system */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Avatar } from "@/components/ui/avatar";
 import { Heart, MessageCircle, Send, Users } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 interface Comment {
   id: string;

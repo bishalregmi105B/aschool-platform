@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { AlertTriangle, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function DefaultersPage() {
   return <PluginGate slug="fees"><DefaultersContent /></PluginGate>;

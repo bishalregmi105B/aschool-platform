@@ -22,6 +22,7 @@ import { Plus, Receipt, Search, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { displayBS } from "@/lib/nepali_date";
 interface Category {
   id: string;
   name: string;

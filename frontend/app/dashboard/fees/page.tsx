@@ -18,6 +18,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import Link from "next/link";
+import { displayBS } from "@/lib/nepali_date";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface FeesSummary {

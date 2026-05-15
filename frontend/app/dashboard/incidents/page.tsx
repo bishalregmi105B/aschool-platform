@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, AlertCircle, Search } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function IncidentsPage() {
   return <PluginGate slug="incidents"><IncidentsContent /></PluginGate>;

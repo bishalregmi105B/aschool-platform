@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { ArrowLeftRight, Plus, Search } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function TransfersPage() {
   const queryClient = useQueryClient();

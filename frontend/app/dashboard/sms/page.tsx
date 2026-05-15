@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import {
+import { displayBS } from "@/lib/nepali_date";
   MessageSquare,
   Send,
   FileText,

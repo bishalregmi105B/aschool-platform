@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { ArrowLeft, Check, X, Calendar } from "lucide-react";
 import Link from "next/link";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function LeavesPage() {
   return <PluginGate slug="hr"><LeavesContent /></PluginGate>;

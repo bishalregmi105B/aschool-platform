@@ -14,6 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Smile, Frown, Meh, Brain, TrendingUp, FileHeart } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 interface MoodEntry {
   id: string;

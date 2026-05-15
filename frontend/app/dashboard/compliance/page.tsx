@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { ShieldCheck, FileText, AlertTriangle, Download } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function CompliancePage() {
   return <PluginGate slug="compliance"><ComplianceContent /></PluginGate>;

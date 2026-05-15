@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
 import { Users, ClipboardCheck, BookOpen, Calendar, Bell } from "lucide-react";
+import { displayBS } from "@/lib/nepali_date";
 
 export default function TeacherDashboard() {
   const { data, isLoading } = useQuery({
