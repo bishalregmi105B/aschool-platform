@@ -471,9 +471,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                         )
                       : const Icon(Icons.chevron_right_rounded,
                           color: Colors.grey),
-                  onTap: isMarked
-                      ? null
-                      : () => _loadStudents(c['id'].toString(), c['name']),
+                  onTap: () => _loadStudents(c['id'].toString(), c['name']),
                 ),
               );
             },
