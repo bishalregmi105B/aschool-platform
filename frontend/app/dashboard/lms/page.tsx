@@ -104,11 +104,11 @@ function LmsContent() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Published</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">{courses?.filter(c => c.status === "published").length || 0}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">{courses?.filter((c: any) => c.status === "published").length || 0}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Draft</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">{courses?.filter(c => c.status === "draft").length || 0}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">{courses?.filter((c: any) => c.status === "draft").length || 0}</p></CardContent>
         </Card>
       </div>
 

@@ -80,12 +80,12 @@ function TimetableContent() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
-                  <thead><tr className="border-b"><th className="text-left p-2 font-medium">Day</th>{periods.map(p => <th key={p} className="text-center p-2 font-medium">P{p}</th>)}</tr></thead>
+                  <thead><tr className="border-b"><th className="text-left p-2 font-medium">Day</th>{periods.map((p: any) => <th key={p} className="text-center p-2 font-medium">P{p}</th>)}</tr></thead>
                   <tbody>
-                    {days.map(day => (
+                    {days.map((day: any) => (
                       <tr key={day} className="border-b">
                         <td className="p-2 font-medium">{day}</td>
-                        {periods.map(p => {
+                        {periods.map((p: any) => {
                           const slot = schedule?.[day]?.[p] || schedule?.[day]?.[`period_${p}`];
                           return (
                             <td key={p} className="text-center p-2">

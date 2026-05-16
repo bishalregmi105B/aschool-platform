@@ -148,7 +148,7 @@ export default function PickupPointsPage() {
             </TableHeader>
             <TableBody>
               {stopsList.map((s: BusStop) => {
-                const routeName = routes?.find(r => r.id === s.route_id)?.name || "Unknown Route";
+                const routeName = routes?.find((r: any) => r.id === s.route_id)?.name || "Unknown Route";
                 return (
                   <TableRow key={s.id}>
                     <TableCell className="text-muted-foreground">{s.sequence_number}</TableCell>

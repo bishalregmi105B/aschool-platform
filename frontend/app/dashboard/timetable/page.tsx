@@ -50,7 +50,7 @@ function TimetableContent() {
     },
   });
 
-  const selectedClass = classes?.find(c => c.id === classId);
+  const selectedClass = classes?.find((c: any) => c.id === classId);
 
   const { data: slots, isLoading } = useQuery({
     queryKey: ["timetable", classId, sectionId],
@@ -75,12 +75,12 @@ function TimetableContent() {
 
   // Group slots by day
   const grouped: Record<string, TimetableSlot[]> = {};
-  DAYS.forEach(d => { grouped[d] = []; });
-  slots?.forEach(s => {
+  DAYS.forEach((d: any) => { grouped[d] = []; });
+  slots?.forEach((s: any) => {
     if (grouped[s.day_of_week]) grouped[s.day_of_week].push(s);
   });
 
-  const maxPeriods = Math.max(8, ...Object.values(grouped).map(arr => arr.length));
+  const maxPeriods = Math.max(8, ...Object.values(grouped).map((arr: any) => arr.length));
 
   return (
     <div className="space-y-6">
@@ -124,11 +124,11 @@ function TimetableContent() {
                 </tr>
               </thead>
               <tbody>
-                {DAYS.map(day => (
+                {DAYS.map((day: any) => (
                   <tr key={day}>
                     <td className="border p-2 font-medium bg-muted/50">{day}</td>
                     {Array.from({ length: maxPeriods }, (_, i) => {
-                      const slot = grouped[day]?.find(s => s.period_number === i + 1);
+                      const slot = grouped[day]?.find((s: any) => s.period_number === i + 1);
                       return (
                         <td key={i} className="border p-2 text-center text-xs">
                           {slot ? (

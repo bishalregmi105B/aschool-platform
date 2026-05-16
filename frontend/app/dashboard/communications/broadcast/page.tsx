@@ -57,7 +57,7 @@ function BroadcastContent() {
             <CardHeader><CardTitle>Channel</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {channels.map(c => (
+                {channels.map((c: any) => (
                   <button key={c.value} onClick={() => setForm({ ...form, channel: c.value })} className={`p-4 rounded-lg border text-center transition-colors ${form.channel === c.value ? "border-primary bg-primary/5" : "hover:bg-muted"}`}>
                     <c.icon className="h-6 w-6 mx-auto mb-2" /><span className="text-sm font-medium">{c.label}</span>
                   </button>
@@ -80,7 +80,7 @@ function BroadcastContent() {
           <Card>
             <CardHeader><CardTitle>Audience</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {audiences.map(a => (
+              {audiences.map((a: any) => (
                 <button key={a.value} onClick={() => setForm({ ...form, audience: a.value })} className={`w-full p-3 rounded-lg border text-left text-sm transition-colors ${form.audience === a.value ? "border-primary bg-primary/5" : "hover:bg-muted"}`}>{a.label}</button>
               ))}
               {form.audience === "class_parents" && <div className="space-y-2 mt-2"><Label>Class ID</Label><Input value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })} placeholder="Enter class ID" /></div>}

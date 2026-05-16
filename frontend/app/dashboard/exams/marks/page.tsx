@@ -201,8 +201,8 @@ function MarksContent() {
 
   // Stats
   const studentList: Student[] = students || [];
-  const entered = Object.values(marks).filter(m => m.theory_marks || m.practical_marks).length;
-  const passCount = Object.values(marks).filter(m => {
+  const entered = Object.values(marks).filter((m: any) => m.theory_marks || m.practical_marks).length;
+  const passCount = Object.values(marks).filter((m: any) => {
     const theory = parseFloat(m.theory_marks) || 0;
     const practical = parseFloat(m.practical_marks) || 0;
     return isPassingResolvedMarksConfig(marksConfig, theory, practical);

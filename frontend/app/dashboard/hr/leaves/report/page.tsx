@@ -57,9 +57,9 @@ export default function LeaveReportPage() {
   const leaves = data || [];
   
   // Stats
-  const pendingCount = leaves.filter(l => l.status === "pending").length;
-  const approvedCount = leaves.filter(l => l.status === "approved").length;
-  const rejectedCount = leaves.filter(l => l.status === "rejected").length;
+  const pendingCount = leaves.filter((l: any) => l.status === "pending").length;
+  const approvedCount = leaves.filter((l: any) => l.status === "approved").length;
+  const rejectedCount = leaves.filter((l: any) => l.status === "rejected").length;
 
   return (
     <div className="space-y-6">

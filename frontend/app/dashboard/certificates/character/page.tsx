@@ -159,7 +159,7 @@ export default function CharacterCertificatePage() {
             ) : (
               <div className="space-y-6">
                 {(() => {
-                  const student = students?.find(s => s.id === selectedStudentId);
+                  const student = students?.find((s: any) => s.id === selectedStudentId);
                   if (!student) return null;
                   
                   return (

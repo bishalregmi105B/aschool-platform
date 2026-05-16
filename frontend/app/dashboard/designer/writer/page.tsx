@@ -465,10 +465,10 @@ export default function WriterPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-48 max-h-72 overflow-y-auto">
                 <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold">SYSTEM</div>
-                {SYSTEM_FONTS.map(f => <DropdownMenuItem key={f} onSelect={() => applyFont(f)} style={{ fontFamily: f }}>{f}</DropdownMenuItem>)}
+                {SYSTEM_FONTS.map((f: any) => <DropdownMenuItem key={f} onSelect={() => applyFont(f)} style={{ fontFamily: f }}>{f}</DropdownMenuItem>)}
                 <DropdownMenuSeparator />
                 <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold">GOOGLE FONTS</div>
-                {GOOGLE_FONTS.map(f => <DropdownMenuItem key={f} onSelect={() => applyFont(f)} style={{ fontFamily: f }}>{f}</DropdownMenuItem>)}
+                {GOOGLE_FONTS.map((f: any) => <DropdownMenuItem key={f} onSelect={() => applyFont(f)} style={{ fontFamily: f }}>{f}</DropdownMenuItem>)}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -624,7 +624,7 @@ export default function WriterPage() {
                 Page Size
                 <select className="border rounded px-1 py-0.5 text-xs bg-background" value={config.size}
                   onChange={(e) => setConfig(c => ({ ...c, size: e.target.value }))}>
-                  {Object.keys(PAGE_SIZES).map(s => <option key={s} value={s}>{s}</option>)}
+                  {Object.keys(PAGE_SIZES).map((s: any) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
               <label className="flex items-center gap-1.5 whitespace-nowrap">

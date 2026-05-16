@@ -100,7 +100,7 @@ function WellbeingContent() {
       </div>
 
       <div className="flex gap-2">
-        {(["overview", "check-in", "entries"] as const).map(t => (
+        {(["overview", "check-in", "entries"] as const).map((t: any) => (
           <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
             {t === "overview" && <TrendingUp className="h-4 w-4 mr-2" />}
             {t === "check-in" && <FileHeart className="h-4 w-4 mr-2" />}
@@ -171,7 +171,7 @@ function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; e
       <CardHeader><CardTitle>How are you feeling today?</CardTitle></CardHeader>
       <CardContent className="space-y-6">
         <div className="flex gap-3 justify-center">
-          {(["happy", "neutral", "sad", "anxious", "angry"] as const).map(m => (
+          {(["happy", "neutral", "sad", "anxious", "angry"] as const).map((m: any) => (
             <button key={m} onClick={() => setMood(m)}
               className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${mood === m ? "border-primary bg-primary/5" : "border-transparent hover:border-muted"}`}>
               {moodIcons[m]}

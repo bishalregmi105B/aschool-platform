@@ -69,7 +69,7 @@ export default function TransportAllocationPage() {
   // Load existing allocations when stop is selected
   const handleStopChange = (stopId: string) => {
     setSelectedStopId(stopId);
-    const stop = stops?.find(s => s.id === stopId);
+    const stop = stops?.find((s: any) => s.id === stopId);
     if (stop && stop.student_ids) {
       setAllocatedIds(new Set(stop.student_ids));
     } else {

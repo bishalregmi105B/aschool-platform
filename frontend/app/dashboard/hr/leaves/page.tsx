@@ -45,7 +45,7 @@ function LeavesContent() {
       </div>
 
       <div className="flex gap-2">
-        {["pending", "approved", "rejected", "all"].map(f => (
+        {["pending", "approved", "rejected", "all"].map((f: any) => (
           <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)} className="capitalize">{f}</Button>
         ))}
       </div>

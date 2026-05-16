@@ -252,9 +252,9 @@ function ExamsContent() {
 
   const stats = {
     total: allExams.length,
-    scheduled: allExams.filter(e => e.status === "scheduled").length,
-    ongoing: allExams.filter(e => e.status === "ongoing").length,
-    completed: allExams.filter(e => e.status === "completed" || e.status === "result_published").length,
+    scheduled: allExams.filter((e: any) => e.status === "scheduled").length,
+    ongoing: allExams.filter((e: any) => e.status === "ongoing").length,
+    completed: allExams.filter((e: any) => e.status === "completed" || e.status === "result_published").length,
   };
 
   return (
@@ -411,7 +411,7 @@ function ExamsContent() {
               ) : (
                 filtered.map((exam) => {
                   const sc = STATUS_CONFIG[exam.status] || STATUS_CONFIG.scheduled;
-                  const et = EXAM_TYPES.find(t => t.value === exam.exam_type);
+                  const et = EXAM_TYPES.find((t: any) => t.value === exam.exam_type);
                   return (
                     <TableRow key={exam.id}>
                       <TableCell>

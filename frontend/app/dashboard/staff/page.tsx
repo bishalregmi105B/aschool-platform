@@ -64,9 +64,9 @@ export default function StaffPage() {
   const staff: Staff[] = data?.data || [];
   const stats = {
     total: staff.length,
-    teachers: staff.filter(s => s.role === "teacher").length,
-    support: staff.filter(s => s.role !== "teacher").length,
-    active: staff.filter(s => s.is_active).length,
+    teachers: staff.filter((s: any) => s.role === "teacher").length,
+    support: staff.filter((s: any) => s.role !== "teacher").length,
+    active: staff.filter((s: any) => s.is_active).length,
   };
 
   const saveMutation = useMutation({
