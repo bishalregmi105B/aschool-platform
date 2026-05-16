@@ -113,7 +113,7 @@ function LmsContent() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {courses?.map(course => (
+        {courses?.map((course: any) => (
           <Card key={course.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedCourse(course.id)}>
             <CardHeader>
               <div className="flex items-start justify-between">

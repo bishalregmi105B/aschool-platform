@@ -98,14 +98,14 @@ function TimetableContent() {
         <Select value={classId} onValueChange={setClassId}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Select Class" /></SelectTrigger>
           <SelectContent>
-            {classes?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {classes?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
         {selectedClass && (
           <Select value={sectionId} onValueChange={setSectionId}>
             <SelectTrigger className="w-48"><SelectValue placeholder="Select Section" /></SelectTrigger>
             <SelectContent>
-              {selectedClass.sections?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              {selectedClass.sections?.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
             </SelectContent>
           </Select>
         )}

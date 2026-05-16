@@ -140,7 +140,7 @@ function HealthRecordsContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visits?.map(v => (
+                {visits?.map((v: any) => (
                   <TableRow key={v.id}>
                     <TableCell>{v.student_id}</TableCell>
                     <TableCell>{displayBS(v.visit_date)}</TableCell>
@@ -168,7 +168,7 @@ function HealthRecordsContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {immunizations?.map(imm => (
+                {immunizations?.map((imm: any) => (
                   <TableRow key={imm.id}>
                     <TableCell>{imm.student_id}</TableCell>
                     <TableCell className="font-medium">{imm.vaccine_name}</TableCell>
