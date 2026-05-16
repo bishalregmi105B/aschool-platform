@@ -58,6 +58,9 @@ class User(BaseModel):
     # Push notifications
     fcm_tokens = Column(ARRAY(Text))
 
+    # OneSignal player IDs (multi-device support)
+    onesignal_player_ids = Column(ARRAY(Text))
+
     # Language
     preferred_language = Column(String(10), default="ne")
 
@@ -83,9 +86,6 @@ class User(BaseModel):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self, include_sensitive=False):
-        from app.utils.password import generate_default_password
-        default_pw = generate_default_password(self)
-
         data = {
             "id": str(self.id),
             "role": self.role,
@@ -103,7 +103,12 @@ class User(BaseModel):
             "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
             "school_id": str(self.school_id) if self.school_id else None,
             "login_id": self.email or self.phone,
-            "default_password_hint": default_pw,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+        # Only include sensitive data when explicitly requested (admin contexts only)
+        if include_sensitive:
+            from app.utils.password import generate_default_password
+            data["default_password_hint"] = generate_default_password(self)
+
         return data

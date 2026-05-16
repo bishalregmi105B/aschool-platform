@@ -138,25 +138,49 @@ function RowActions({
   deleteLabel: string;
   deleting?: boolean;
 }) {
+  const [showDelete, setShowDelete] = useState(false);
+
   return (
-    <div className="flex justify-end gap-2">
-      <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit item">
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={deleting}
-        onClick={() => {
-          if (confirm(deleteLabel)) {
-            onDelete();
-          }
-        }}
-        aria-label="Delete item"
-      >
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
-    </div>
+    <>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit item">
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={deleting}
+          onClick={() => setShowDelete(true)}
+          aria-label="Delete item"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+
+      <Dialog open={showDelete} onOpenChange={setShowDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          <p className="py-4 text-sm text-muted-foreground">{deleteLabel}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                onDelete();
+                setShowDelete(false);
+              }}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -148,6 +148,30 @@ class StudentShellScreen extends ConsumerWidget {
           path: '/dashboard/wellbeing',
           moduleKey: 'wellbeing',
           pluginSlug: 'wellbeing'),
+      _Tab(
+          icon: Icons.event_available_rounded,
+          label: 'Attendance',
+          path: '/dashboard/attendance',
+          moduleKey: 'attendance',
+          pluginSlug: 'attendance'),
+      _Tab(
+          icon: Icons.health_and_safety_rounded,
+          label: 'Health Records',
+          path: '/dashboard/health',
+          moduleKey: 'health',
+          pluginSlug: 'health_records'),
+      _Tab(
+          icon: Icons.military_tech_rounded,
+          label: 'Points & Badges',
+          path: '/dashboard/gamification',
+          moduleKey: 'gamification',
+          pluginSlug: 'gamification'),
+      _Tab(
+          icon: Icons.receipt_long_rounded,
+          label: 'My Fees',
+          path: '/dashboard/fees',
+          moduleKey: 'fees',
+          pluginSlug: 'fees'),
     ]),
   ];
 

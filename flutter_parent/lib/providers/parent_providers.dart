@@ -110,6 +110,32 @@ final parentWellbeingProvider =
   },
 );
 
+final parentConferencesProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String?>(
+  (ref, studentId) async {
+    final resp = await ApiClient.instance.get(
+      '/parent/conferences',
+      queryParameters: _studentQuery(studentId),
+    );
+    final raw = resp.data['data'];
+    if (raw is List) {
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const [];
+  },
+);
+
+final parentDismissalProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>, String?>(
+  (ref, studentId) async {
+    final resp = await ApiClient.instance.get(
+      '/parent/dismissal-status',
+      queryParameters: _studentQuery(studentId),
+    );
+    return Map<String, dynamic>.from(resp.data['data'] ?? {});
+  },
+);
+
 Map<String, dynamic> parentStudentQuery(String? studentId) =>
     _studentQuery(studentId);
 

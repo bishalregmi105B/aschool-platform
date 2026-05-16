@@ -8,7 +8,7 @@ emoji: "📖"
 icon: "BookOpen"
 description: "E-books, past papers, OER resources, digital library, AI-curated reading lists"
 
-api_blueprint: "app.api.v1.design_studio"
+api_blueprint: "app.api.v1.elibrary"
 models_module: "app.models.digital_content"
 
 depends_on: []

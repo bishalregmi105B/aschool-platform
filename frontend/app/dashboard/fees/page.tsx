@@ -49,11 +49,7 @@ interface FeesSummary {
 }
 
 export default function FeesPage() {
-  return (
-    <PluginGate slug="fees">
-      <FeeOverviewContent />
-    </PluginGate>
-  );
+  return <FeeOverviewContent />;
 }
 
 function FeeOverviewContent() {

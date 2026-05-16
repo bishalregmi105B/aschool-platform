@@ -10,6 +10,8 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.attendance import Attendance
+from app.models.conference import PTConference, ConferenceSlot
+from app.models.dismissal import AuthorizedPickup, DismissalRecord
 from app.models.exam import Marks, ReportCard
 from app.models.fee import FeeCollection
 from app.models.notice import Notice
@@ -782,3 +784,188 @@ def parent_send_chat_message(thread_id):
         return error_response(str(exc), 400)
 
     return success_response({**message_payload(message, current_user_id), "sent": True}, status_code=201)
+
+
+# ── Conferences (PT Meeting) ───────────────────────────────
+
+
+@parent_app_bp.route("/conferences", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+def parent_conferences():
+    """List active PT conferences for this school."""
+    conferences = (
+        PTConference.query.filter_by(
+            school_id=g.school_id, is_active=True, is_deleted=False
+        )
+        .order_by(PTConference.start_date.asc())
+        .all()
+    )
+
+    parent_user_id = _current_parent_user_id()
+    wards = _wards_for_parent(parent_user_id)
+    student_id = request.args.get("student_id")
+    selected = _pick_students(wards, student_id)
+    selected_ids = {str(s.id) for s in selected}
+
+    result = []
+    for conf in conferences:
+        slots = ConferenceSlot.query.filter_by(
+            conference_id=conf.id, is_deleted=False
+        ).all()
+        available_count = sum(1 for s in slots if not s.is_booked)
+
+        # Find parent's existing booking for any of their children
+        booked_slot = None
+        if parent_user_id:
+            for slot in slots:
+                if slot.is_booked and str(slot.parent_id) == str(parent_user_id):
+                    if not selected_ids or str(slot.student_id) in selected_ids:
+                        booked_slot = {
+                            "slot_id": str(slot.id),
+                            "start_time": slot.start_time.isoformat() if slot.start_time else None,
+                            "end_time": slot.end_time.isoformat() if slot.end_time else None,
+                            "teacher_name": slot.teacher.full_name if slot.teacher else None,
+                            "student_id": str(slot.student_id) if slot.student_id else None,
+                        }
+                        break
+
+        result.append({
+            "id": str(conf.id),
+            "title": conf.title,
+            "description": conf.description,
+            "start_date": conf.start_date.isoformat() if conf.start_date else None,
+            "end_date": conf.end_date.isoformat() if conf.end_date else None,
+            "is_virtual": conf.is_virtual,
+            "meeting_link": conf.meeting_link,
+            "total_slots": len(slots),
+            "available_slots": available_count,
+            "booked_slot": booked_slot,
+        })
+
+    return success_response(result)
+
+
+@parent_app_bp.route("/conferences/<uuid:conference_id>/book", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+def parent_book_conference_slot(conference_id):
+    """Book a conference time slot."""
+    conf = PTConference.query.filter_by(
+        id=conference_id, school_id=g.school_id, is_deleted=False, is_active=True
+    ).first()
+    if not conf:
+        return error_response("Conference not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    slot_id = data.get("slot_id")
+    student_id = data.get("student_id")
+
+    if not slot_id:
+        return error_response("slot_id is required", 400)
+
+    slot = ConferenceSlot.query.filter_by(
+        id=slot_id, conference_id=conference_id, is_deleted=False
+    ).first()
+    if not slot:
+        return error_response("Slot not found", 404)
+    if slot.is_booked:
+        return error_response("This slot is already booked", 409)
+
+    parent_user_id = _current_parent_user_id()
+    # Validate the student belongs to this parent
+    if student_id:
+        wards = _wards_for_parent(parent_user_id)
+        valid_ids = {str(w.id) for w in wards}
+        if str(student_id) not in valid_ids:
+            return error_response("Student not linked to your account", 403)
+
+    slot.is_booked = True
+    slot.parent_id = parent_user_id
+    slot.student_id = student_id
+
+    from app.extensions import db
+    db.session.commit()
+
+    return success_response({
+        "slot_id": str(slot.id),
+        "conference_title": conf.title,
+        "start_time": slot.start_time.isoformat() if slot.start_time else None,
+        "end_time": slot.end_time.isoformat() if slot.end_time else None,
+        "teacher_name": slot.teacher.full_name if slot.teacher else None,
+        "is_virtual": conf.is_virtual,
+        "meeting_link": conf.meeting_link,
+    }, status_code=201)
+
+
+# ── Dismissal Status ───────────────────────────────────────
+
+
+@parent_app_bp.route("/dismissal-status", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+def parent_dismissal_status():
+    """Return today's dismissal status + authorized pickups for a student."""
+    parent_user_id = _current_parent_user_id()
+    wards = _wards_for_parent(parent_user_id)
+    selected = _pick_students(wards, request.args.get("student_id"))
+
+    if not selected:
+        return success_response({"status": "no_child", "records": [], "authorized_pickups": []})
+
+    student = selected[0]
+    today = date.today()
+
+    today_record = (
+        DismissalRecord.query.filter(
+            DismissalRecord.school_id == g.school_id,
+            DismissalRecord.student_id == student.id,
+            DismissalRecord.is_deleted.is_(False),
+        )
+        .order_by(DismissalRecord.dismissed_at.desc())
+        .first()
+    )
+
+    status_val = "in_class"
+    dismissed_at = None
+    picked_up_by = None
+
+    if today_record and today_record.dismissed_at:
+        record_date = today_record.dismissed_at.date() if today_record.dismissed_at else None
+        if record_date == today:
+            status_val = "released"
+            dismissed_at = today_record.dismissed_at.isoformat()
+            picked_up_by = today_record.picked_up_by
+
+    authorized_pickups = (
+        AuthorizedPickup.query.filter_by(
+            school_id=g.school_id,
+            student_id=student.id,
+            is_active=True,
+            is_deleted=False,
+        ).all()
+    )
+
+    pickups_data = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "relation": p.relation,
+            "phone": p.phone,
+            "photo_url": p.photo_url,
+        }
+        for p in authorized_pickups
+    ]
+
+    return success_response({
+        "student_id": str(student.id),
+        "student_name": _student_display_name(student),
+        "status": status_val,
+        "dismissed_at": dismissed_at,
+        "picked_up_by": picked_up_by,
+        "authorized_pickups": pickups_data,
+        "parent_user_id": str(parent_user_id) if parent_user_id else None,
+    })

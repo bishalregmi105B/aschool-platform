@@ -47,8 +47,7 @@ final marksStudentsProvider = FutureProvider.autoDispose.family<
             theoryFullMarks: (student['theory_full_marks'] as num?)?.toDouble(),
             practicalFullMarks:
                 (student['practical_full_marks'] as num?)?.toDouble(),
-            theoryPassMarks:
-                (student['theory_pass_marks'] as num?)?.toDouble(),
+            theoryPassMarks: (student['theory_pass_marks'] as num?)?.toDouble(),
             practicalPassMarks:
                 (student['practical_pass_marks'] as num?)?.toDouble(),
           ))

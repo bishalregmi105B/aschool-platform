@@ -87,7 +87,15 @@ export default async function SchoolLayout({
   const website = data.website;
   const themeSlug = website?.theme_slug || "modern-minimal";
   const activeTheme = getThemeById(themeSlug) || getThemeById("modern-minimal");
-  const themeCss = activeTheme ? generateThemeCSS(activeTheme) : "";
+
+  // Apply stored customization colors as overrides on top of the base theme
+  const colorOverrides = (website?.customizations?.colors as Record<string, string>) || {};
+  const themeCss = activeTheme ? generateThemeCSS(activeTheme, colorOverrides) : "";
+
+  // Surface color override (not in ThemeColors but used by SectionRenderer)
+  const surfaceOverride = colorOverrides.surface
+    ? `:root { --color-surface: ${colorOverrides.surface}; }`
+    : "";
   const customCss = website?.customizations?.custom_css || "";
 
   const navLinks = [
@@ -112,6 +120,7 @@ export default async function SchoolLayout({
           dangerouslySetInnerHTML={{
             __html: `
               ${themeCss}
+              ${surfaceOverride}
               ${customCss}
               * { box-sizing: border-box; }
               html { scroll-behavior: smooth; }

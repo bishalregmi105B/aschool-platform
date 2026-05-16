@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
+import 'lesson_detail_screen.dart';
 
 // --- State Management ---
 
@@ -333,7 +334,12 @@ class _CreateLessonScreenState extends ConsumerState<CreateLessonScreen> {
                     trailing: const Icon(Icons.chevron_right_rounded,
                         color: Colors.grey),
                     onTap: () {
-                      // Navigate to Topics screen or pass state
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LessonDetailScreen(lesson: lesson),
+                        ),
+                      );
                     },
                   ),
                 ),

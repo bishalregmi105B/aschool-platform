@@ -93,6 +93,10 @@ class ParentShellScreen extends ConsumerWidget {
         return 'Notices';
       case '/wellbeing':
         return 'Wellbeing';
+      case '/elibrary':
+        return 'Digital Library';
+      case '/portfolio':
+        return "Child's Portfolio";
       default:
         return 'ASchool';
     }
@@ -205,6 +209,18 @@ class ParentShellScreen extends ConsumerWidget {
           path: '/wellbeing',
           moduleKey: 'wellbeing',
           pluginSlug: 'wellbeing'),
+      _ParentDrawerItem(
+          icon: Icons.library_books_rounded,
+          title: 'Digital Library',
+          path: '/elibrary',
+          moduleKey: 'elibrary',
+          pluginSlug: 'elibrary'),
+      _ParentDrawerItem(
+          icon: Icons.folder_special_rounded,
+          title: "Child's Portfolio",
+          path: '/portfolio',
+          moduleKey: 'portfolio',
+          pluginSlug: 'student_portfolio'),
     ]);
 
     return sections;

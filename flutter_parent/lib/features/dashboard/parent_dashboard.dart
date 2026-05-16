@@ -72,7 +72,11 @@ class ParentDashboard extends ConsumerWidget {
                             ),
                           ),
                           title: Text(entry.value['title'] ?? ''),
-                          subtitle: Text((entry.value['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(entry.value['date']!) ?? DateTime.now()) : ''),
+                          subtitle: Text((entry.value['date'] ?? '').isNotEmpty
+                              ? adToBsString(
+                                  DateTime.tryParse(entry.value['date']!) ??
+                                      DateTime.now())
+                              : ''),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => context.go('/notices'),
                         ),
@@ -349,6 +353,22 @@ class _QuickActions extends ConsumerWidget {
         color: ASchoolTheme.danger,
         moduleKey: 'wellbeing',
         requiredPlugin: 'wellbeing',
+      ),
+      const _ParentActionItem(
+        icon: Icons.people_rounded,
+        label: 'PT Meeting',
+        path: '/pt-conference',
+        color: ASchoolTheme.secondary,
+        moduleKey: 'pt_conference',
+        requiredPlugin: 'conferences',
+      ),
+      const _ParentActionItem(
+        icon: Icons.qr_code_rounded,
+        label: 'Pickup QR',
+        path: '/dismissal-qr',
+        color: ASchoolTheme.warning,
+        moduleKey: 'dismissal_qr',
+        requiredPlugin: 'dismissal',
       ),
     ];
 

@@ -1,4 +1,4 @@
-"""Flask application factory."""
+import logging
 import os
 import re as _re
 from uuid import UUID
@@ -9,6 +9,8 @@ from flask import Flask, g, jsonify, request
 from config import config
 from extensions import cache, celery, cors, db, init_redis, jwt, limiter, migrate, socketio
 
+logger = logging.getLogger(__name__)
+
 
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application."""
@@ -17,6 +19,35 @@ def create_app(config_name: str | None = None) -> Flask:
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # ── Production safety: validate critical config ──────────────────────
+    if config_name == "production":
+        from config import ProductionConfig
+        ProductionConfig.validate()
+
+    # ── Sentry APM ───────────────────────────────────────────────────────
+    sentry_dsn = app.config.get("SENTRY_DSN", "")
+    if sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.celery import CeleryIntegration
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                integrations=[
+                    FlaskIntegration(),
+                    CeleryIntegration(),
+                    SqlalchemyIntegration(),
+                ],
+                traces_sample_rate=0.1,
+                environment=config_name,
+                send_default_pii=False,
+            )
+            logger.info("Sentry initialized (env=%s)", config_name)
+        except ImportError:
+            logger.warning("sentry-sdk not installed — monitoring disabled")
 
     # Initialise extensions
     db.init_app(app)
@@ -34,7 +65,16 @@ def create_app(config_name: str | None = None) -> Flask:
         _re.compile(rf"https://[^./]+\.{_re.escape(_base)}"),  # *.base_domain
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:8080",
     ]
+    # CORS_EXTRA_ORIGINS: comma-separated list of additional allowed origins
+    # (use for Flutter web dev server, local network IPs, etc.)
+    _extra = os.getenv("CORS_EXTRA_ORIGINS", "")
+    if _extra:
+        _cors_origins.extend([o.strip() for o in _extra.split(",") if o.strip()])
     cors.init_app(app, resources={r"/*": {
         "origins": _cors_origins,
         "supports_credentials": True,
@@ -43,6 +83,7 @@ def create_app(config_name: str | None = None) -> Flask:
             "Authorization",
             "X-Requested-With",
             "Accept",
+            "X-School-Slug",
         ],
         "expose_headers": ["Content-Type", "Authorization"],
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -52,11 +93,14 @@ def create_app(config_name: str | None = None) -> Flask:
     limiter.init_app(app)
     cache.init_app(app)
     init_redis(app)
+    _socket_origins = [
+        _frontend, f"https://{_base}",
+        f"https://www.{_base}", f"https://api.{_base}",
+        "http://localhost:3000", "http://localhost:3001", "http://localhost:8080",
+    ] + ([o.strip() for o in _extra.split(",") if o.strip()] if _extra else [])
     socketio.init_app(
         app,
-        cors_allowed_origins=[_frontend, f"https://{_base}",
-                               f"https://www.{_base}", f"https://api.{_base}",
-                               "http://localhost:3000", "http://localhost:3001"],
+        cors_allowed_origins=_socket_origins,
         async_mode="eventlet",
     )
 
@@ -196,6 +240,9 @@ def create_app(config_name: str | None = None) -> Flask:
 
     PluginLoader.discover_and_register(app)
 
+    # Register cross-plugin event listeners
+    from app.plugins import listeners  # noqa: F401 — registers @on() handlers
+
     # Error handlers
     @app.errorhandler(400)
     def bad_request(e):
@@ -229,6 +276,48 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route("/health")
     def health():
         return jsonify(status="ok")
+
+    # Readiness probe — verifies DB + Redis connectivity
+    @app.route("/ready")
+    def ready():
+        checks = {}
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception as e:
+            checks["database"] = f"error: {e}"
+        try:
+            from extensions import redis_client
+            if redis_client:
+                redis_client.ping()
+                checks["redis"] = "ok"
+            else:
+                checks["redis"] = "not initialized"
+        except Exception as e:
+            checks["redis"] = f"error: {e}"
+
+        all_ok = all(v == "ok" for v in checks.values())
+        return jsonify(status="ok" if all_ok else "degraded", checks=checks), 200 if all_ok else 503
+
+    # ── Security headers ─────────────────────────────────────────────────
+    @app.after_request
+    def set_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if not app.debug:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "connect-src 'self' https: wss:"
+            )
+        return response
 
     # Serve locally-uploaded files (dev fallback when R2 is not configured)
     @app.route("/uploads/<path:filepath>")

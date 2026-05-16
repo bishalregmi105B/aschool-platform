@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
 import 'api_client.dart';
+import 'notification_service.dart';
 
 /// Auth state: holds current user + tokens
 class AuthState {
@@ -75,6 +76,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final user = User.fromJson(data['user']);
         ApiClient.setSchoolSlug(user.schoolSlug ?? '');
         state = AuthState(user: user);
+
+        // Register OneSignal player for push notifications
+        _registerPushNotifications(user);
+
         return true;
       } else {
         state = state.copyWith(
@@ -108,6 +113,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final user = User.fromJson(data['user']);
         ApiClient.setSchoolSlug(user.schoolSlug ?? '');
         state = AuthState(user: user);
+
+        // Register OneSignal player for push notifications
+        _registerPushNotifications(user);
+
         return true;
       } else {
         state = state.copyWith(
@@ -139,6 +148,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final user = User.fromJson(data['user']);
         ApiClient.setSchoolSlug(user.schoolSlug ?? '');
         state = AuthState(user: user);
+
+        // Register OneSignal player for push notifications
+        _registerPushNotifications(user);
+
         return true;
       } else {
         state = state.copyWith(
@@ -167,6 +180,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _storage.deleteAll();
     state = const AuthState();
+  }
+
+  /// Register push notification player ID after login
+  Future<void> _registerPushNotifications(User user) async {
+    try {
+      final notifService = NotificationService();
+      final fcmToken = notifService.fcmToken;
+      if (fcmToken != null) {
+        await notifService.registerOneSignalPlayer(fcmToken);
+        await notifService.setOneSignalTags(
+          schoolId: user.schoolId ?? '',
+          role: user.role ?? 'user',
+          userId: user.id,
+        );
+      }
+    } catch (_) {
+      // Non-fatal — push registration can retry later
+    }
   }
 }
 

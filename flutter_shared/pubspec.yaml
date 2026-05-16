@@ -62,6 +62,7 @@ dependencies:
   table_calendar: any
 
   # Payments (Nepal)
+  uuid: ^4.3.3
 
   # Utilities
   url_launcher: ^6.3.0

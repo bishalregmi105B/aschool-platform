@@ -1,4 +1,7 @@
 /** Public School Homepage — SSR with ISR (revalidate every 5 minutes) */
+import { SectionRenderer } from "@/components/website/SectionRenderer";
+import type { LiveData } from "@/components/website/SectionRenderer";
+
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
@@ -60,13 +63,36 @@ export default async function SchoolHomePage({ params }: { params: { slug: strin
   const data = await getSchoolData(params.slug);
   if (!data) return <div className="p-8 text-center text-lg">School not found</div>;
 
-  const { school, notices, teachers, gallery } = data as {
+  const { school, notices, teachers, gallery, sections } = data as {
     school: Record<string, string | number>;
     notices: Notice[];
     teachers: Teacher[];
     gallery: Gallery[];
+    sections: Array<{ id: string; type: string; title: string; content: Record<string, unknown>; sort_order: number }>;
   };
 
+  // ── Dynamic website-builder rendering (sections exist) ──────────────────────
+  const hasSections = Array.isArray(sections) && sections.length > 0;
+  if (hasSections) {
+    const liveData: LiveData = {
+      school: school as LiveData["school"],
+      notices: (notices || []).map((n) => ({ id: n.id, title: n.title, content: n.content, created_at: n.created_at })),
+    };
+    const sorted = [...sections].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    return (
+      <div>
+        {sorted.map((section) => (
+          <SectionRenderer
+            key={section.id}
+            section={{ ...section, content: section.content ?? {} } as Parameters<typeof SectionRenderer>[0]["section"]}
+            liveData={liveData}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // ── Fallback: classic hardcoded layout (no builder sections yet) ─────────────
   const recentNotices = (notices || []).slice(0, 6);
   const featuredTeachers = (teachers || []).slice(0, 4);
   const galleryItems = (gallery || []).slice(0, 6);

@@ -11,6 +11,7 @@ export 'services/notification_service.dart';
 export 'services/socket_service.dart';
 export 'services/notices_service.dart';
 export 'services/mobile_version_service.dart';
+export 'services/file_upload_service.dart';
 
 // Models
 export 'models/models.dart';
@@ -51,6 +52,7 @@ export 'widgets/search_bar_widget.dart';
 export 'widgets/pull_to_refresh.dart';
 export 'widgets/eschool_components.dart';
 export 'widgets/eschool_dialog.dart';
+export 'widgets/attachment_viewer.dart';
 
 // Theme
 export 'theme/app_theme.dart';

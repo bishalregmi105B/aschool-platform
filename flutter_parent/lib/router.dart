@@ -20,6 +20,10 @@ import 'features/holidays/holiday_list_screen.dart';
 import 'features/gallery/gallery_screen.dart';
 import 'features/results/parent_marksheet_screen.dart';
 import 'features/reports/child_reports_screen.dart';
+import 'features/pt_conference/pt_conference_screen.dart';
+import 'features/dismissal/dismissal_qr_screen.dart';
+import 'features/elibrary/parent_elibrary_screen.dart';
+import 'features/portfolio/parent_portfolio_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authUser = ref.watch(authProvider.select((state) => state.user));
@@ -95,6 +99,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/wellbeing',
                   builder: (_, __) => const ChildWellbeingScreen()),
+              GoRoute(
+                  path: '/pt-conference',
+                  builder: (_, __) => const PTConferenceScreen()),
+              GoRoute(
+                  path: '/dismissal-qr',
+                  builder: (_, __) => const DismissalQrScreen()),
             ],
           ),
           StatefulShellBranch(
@@ -108,6 +118,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                   path: '/fees', builder: (_, __) => const FeePaymentScreen()),
+              GoRoute(
+                  path: '/elibrary',
+                  builder: (_, __) => const ParentELibraryScreen()),
+              GoRoute(
+                  path: '/portfolio',
+                  builder: (_, __) => const ParentPortfolioScreen()),
             ],
           ),
           StatefulShellBranch(

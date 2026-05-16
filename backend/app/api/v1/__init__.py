@@ -65,3 +65,7 @@ api_v1_bp.register_blueprint(design_studio_bp)
 # AI Token Hub — admin stats & quota management (always registered, not plugin-gated)
 from app.api.v1.ai_usage import ai_usage_bp
 api_v1_bp.register_blueprint(ai_usage_bp)
+
+# Notification Center — in-app notifications (always available)
+from app.api.v1.notifications import notifications_bp
+api_v1_bp.register_blueprint(notifications_bp)

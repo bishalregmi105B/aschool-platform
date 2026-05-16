@@ -213,6 +213,12 @@ const CORE_SECTIONS: SidebarSection[] = [
         roles: ["superadmin", "school_admin", "staff"],
       },
       {
+        label: "Lessons & Study Material",
+        icon: BookOpenCheck,
+        href: "/dashboard/lms",
+        roles: ["superadmin", "school_admin", "staff", "student"],
+      },
+      {
         label: "Students",
         icon: GraduationCap,
         children: [
@@ -277,6 +283,35 @@ const CORE_SECTIONS: SidebarSection[] = [
     ],
   },
   {
+    header: "Exam & Performance",
+    items: [
+      {
+        label: "Examinations",
+        icon: FileText,
+        roles: ["superadmin", "school_admin", "staff", "student"],
+        pluginSlug: "exams",
+        children: [
+          { label: "All Exams", href: "/dashboard/exams" },
+          { label: "Schedule", href: "/dashboard/exams/schedule" },
+          { label: "Enter Marks", href: "/dashboard/exams/marks" },
+          { label: "Results", href: "/dashboard/exams/results" },
+          { label: "Report Cards", href: "/dashboard/exams/report-cards" },
+          { label: "AI Paper Generator", href: "/dashboard/exams/ai-paper" },
+        ],
+      },
+      {
+        label: "Assignments",
+        icon: PenTool,
+        roles: ["superadmin", "school_admin", "teacher"],
+        pluginSlug: "assignments",
+        children: [
+          { label: "All Assignments", href: "/dashboard/assignments" },
+          { label: "Submissions", href: "/dashboard/assignments/submissions" },
+        ],
+      },
+    ],
+  },
+  {
     header: "Personnel Management",
     items: [
       {
@@ -318,6 +353,12 @@ const CORE_SECTIONS: SidebarSection[] = [
         ],
       },
       {
+        label: "Fees Management",
+        icon: DollarSign,
+        href: "/dashboard/fees",
+        roles: ["superadmin", "school_admin"],
+      },
+      {
         label: "Payroll",
         icon: Banknote,
         roles: ["superadmin", "school_admin"],
@@ -339,6 +380,17 @@ const CORE_SECTIONS: SidebarSection[] = [
         icon: Award,
         href: "/dashboard/certificates",
         roles: ["superadmin", "school_admin"],
+      },
+    ],
+  },
+  {
+    header: "Transportation",
+    items: [
+      {
+        label: "Transport System",
+        icon: Bus,
+        href: "/dashboard/transport",
+        roles: ["superadmin", "school_admin", "staff", "student"],
       },
     ],
   },
@@ -463,8 +515,24 @@ export function Sidebar() {
         const pluginItems = bySection[sectionName];
         if (!pluginItems || pluginItems.length === 0) continue;
 
-        const navItems = pluginItems.map(pluginToNavItem);
         const existing = sections.find((s) => s.header === sectionName);
+
+        // Collect all core hrefs to detect duplicates
+        const coreHrefs = new Set<string>();
+        sections.forEach((s) =>
+          s.items.forEach((it) => {
+            if (it.href) coreHrefs.add(it.href);
+            (it.children || []).forEach((ch) => {
+              if (ch.href) coreHrefs.add(ch.href);
+            });
+          }),
+        );
+
+        const navItems = pluginItems
+          .map(pluginToNavItem)
+          .filter((ni) => !ni.href || !coreHrefs.has(ni.href));
+        if (navItems.length === 0) continue;
+
         if (existing) {
           existing.items.push(...navItems);
         } else {

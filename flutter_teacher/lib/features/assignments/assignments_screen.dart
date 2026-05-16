@@ -249,7 +249,12 @@ class _AssignmentCard extends ConsumerWidget {
                           const Icon(Icons.timer_rounded,
                               size: 12, color: Colors.red),
                           const SizedBox(width: 4),
-                          Text((assignment['due_date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(assignment['due_date']!) ?? DateTime.now()) : '',
+                          Text(
+                              (assignment['due_date'] ?? '').isNotEmpty
+                                  ? adToBsString(DateTime.tryParse(
+                                          assignment['due_date']!) ??
+                                      DateTime.now())
+                                  : '',
                               style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -761,6 +766,20 @@ class _CreateAssignmentSheetState
   String? _selectedSubjectId;
   DateTime? _dueDate;
   bool _saving = false;
+  String? _attachmentUrl;
+  String? _attachmentName;
+
+  Future<void> _pickAttachment() async {
+    final file = await FileUploadService.instance.pickAndUploadImage(
+      module: UploadModule.assignments,
+    );
+    if (file != null && mounted) {
+      setState(() {
+        _attachmentUrl = file.fileUrl;
+        _attachmentName = file.originalName;
+      });
+    }
+  }
 
   Future<void> _submit() async {
     if (_titleCtrl.text.trim().isEmpty ||
@@ -781,6 +800,7 @@ class _CreateAssignmentSheetState
         'class_id': _selectedClassId,
         'subject_id': _selectedSubjectId,
         'due_date': _dueDate?.toIso8601String(),
+        if (_attachmentUrl != null) 'attachment_urls': [_attachmentUrl],
       });
       widget.onSuccess();
     } catch (e) {
@@ -925,6 +945,52 @@ class _CreateAssignmentSheetState
                 ),
               ),
             ),
+            // Attachment picker
+            const SizedBox(height: 14),
+            if (_attachmentUrl != null)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withAlpha(15),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.green.withAlpha(50)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.attach_file_rounded,
+                        size: 18, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _attachmentName ?? 'Attachment',
+                        style: const TextStyle(
+                            color: Colors.green, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _attachmentUrl = null;
+                        _attachmentName = null;
+                      }),
+                      child: const Icon(Icons.close_rounded,
+                          size: 16, color: Colors.green),
+                    ),
+                  ],
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _pickAttachment,
+                icon: const Icon(Icons.attach_file_rounded, size: 18),
+                label: const Text('Attach File (optional)'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,

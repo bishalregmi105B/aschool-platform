@@ -46,11 +46,7 @@ interface BusItem {
 }
 
 export default function TransportPage() {
-  return (
-    <PluginGate slug="gps_tracking">
-      <TransportContent />
-    </PluginGate>
-  );
+  return <TransportContent />;
 }
 
 function TransportContent() {

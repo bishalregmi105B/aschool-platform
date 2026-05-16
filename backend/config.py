@@ -1,10 +1,14 @@
 """Flask application configuration."""
+import logging
 import os
+import secrets
 from datetime import timedelta
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def _default_celery_result_backend() -> str:
@@ -59,13 +63,15 @@ class BaseConfig:
     RATELIMIT_STORAGE_URI = REDIS_URL
     RATELIMIT_DEFAULT = "60/minute"
 
-    # AI — Anthropic (primary when Groq key absent)
+    # AI — Groq (PRIMARY provider)
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL_FAST = os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
+    GROQ_MODEL_QUALITY = os.getenv("GROQ_MODEL_QUALITY", "llama-3.3-70b-versatile")
+
+    # AI — Anthropic (FALLBACK when Groq key absent or Groq fails)
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
     AI_MODEL_FAST = os.getenv("AI_MODEL_FAST", "claude-haiku-4-5-20250514")
     AI_MODEL_QUALITY = os.getenv("AI_MODEL_QUALITY", "claude-sonnet-4-20250514")
-
-    # AI — Groq (used instead of Anthropic when GROQ_API_KEY is set)
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
     # AI Token Hub settings
     AI_DEFAULT_DAILY_LIMIT = int(os.getenv("AI_DEFAULT_DAILY_LIMIT", "10000"))
@@ -77,21 +83,19 @@ class BaseConfig:
     SPARROW_SMS_FROM = os.getenv("SPARROW_SMS_FROM", "ASchool")
     SMS_CONSOLE_MODE = os.getenv("SMS_CONSOLE_MODE", "false").lower() == "true"
 
-    # WhatsApp
-    WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
-    WA_ACCESS_TOKEN = os.getenv("WA_ACCESS_TOKEN", "")
-    WA_VERIFY_TOKEN = os.getenv("WA_VERIFY_TOKEN", "")
-    WA_APP_SECRET = os.getenv("WA_APP_SECRET", "")
-    WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", WA_PHONE_NUMBER_ID)
-    WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", WA_ACCESS_TOKEN)
+    # WhatsApp — DEFERRED (planned for future release)
+    # WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
+    # WA_ACCESS_TOKEN = os.getenv("WA_ACCESS_TOKEN", "")
 
-    # eSewa
-    ESEWA_MERCHANT_ID = os.getenv("ESEWA_MERCHANT_ID", "")
-    ESEWA_SECRET_KEY = os.getenv("ESEWA_SECRET_KEY", "")
+    # OneSignal Push Notifications
+    ONESIGNAL_APP_ID = os.getenv("ONESIGNAL_APP_ID", "")
+    ONESIGNAL_REST_API_KEY = os.getenv("ONESIGNAL_REST_API_KEY", "")
 
-    # Khalti
-    KHALTI_SECRET_KEY = os.getenv("KHALTI_SECRET_KEY", "")
-    KHALTI_PUBLIC_KEY = os.getenv("KHALTI_PUBLIC_KEY", "")
+    # Payment gateway environments (sandbox / production — deploy-level flag).
+    # Merchant credentials are stored per-school in fee_config, not here.
+    ESEWA_ENVIRONMENT = os.getenv("ESEWA_ENVIRONMENT", "sandbox")
+    KHALTI_ENVIRONMENT = os.getenv("KHALTI_ENVIRONMENT", "sandbox")
+    FONEPAY_ENVIRONMENT = os.getenv("FONEPAY_ENVIRONMENT", "sandbox")
 
     # R2 Storage
     R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
@@ -140,6 +144,28 @@ class ProductionConfig(BaseConfig):
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     RATELIMIT_DEFAULT = "60/minute"
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def validate(cls):
+        """Validate production configuration — fail loudly for insecure defaults."""
+        insecure_defaults = {"change-me", "change-me-jwt", ""}
+        if cls.SECRET_KEY in insecure_defaults:
+            raise RuntimeError(
+                "FATAL: SECRET_KEY is using an insecure default. "
+                "Set a strong SECRET_KEY in environment variables."
+            )
+        if cls.JWT_SECRET_KEY in insecure_defaults:
+            raise RuntimeError(
+                "FATAL: JWT_SECRET_KEY is using an insecure default. "
+                "Set a strong JWT_SECRET_KEY in environment variables."
+            )
+        if not cls.SQLALCHEMY_DATABASE_URI:
+            raise RuntimeError(
+                "FATAL: DATABASE_URL is not set for production."
+            )
 
 
 config = {

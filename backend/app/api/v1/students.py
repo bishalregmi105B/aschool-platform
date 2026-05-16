@@ -1,9 +1,14 @@
 """Students CRUD API."""
+import io
+import os
+import zipfile
+
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.student import Guardian, Student
 from app.utils.decorators import role_required, school_required
+from app.utils.file_upload import upload_file as _upload_file
 from app.utils.pagination import paginate
 from app.utils.response import (
     created_response,
@@ -221,6 +226,91 @@ def bulk_delete_students():
             count += 1
     db.session.commit()
     return success_response({"deleted": count})
+
+
+@students_bp.route("/bulk-profile-images", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def bulk_profile_images():
+    """Accept a ZIP of images named by student admission number, update photo_url.
+
+    Expected ZIP structure:  ADM1023.jpg, ADM1024.png, ...
+    The filename stem (without extension) is matched against Student.student_id.
+    """
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename.lower().endswith(".zip"):
+        return error_response("Please upload a .zip file", 400)
+
+    _ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+    details = []
+    total = 0
+    updated = 0
+    skipped = 0
+
+    try:
+        zip_bytes = uploaded.read()
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for name in zf.namelist():
+                base = os.path.basename(name)
+                stem, ext = os.path.splitext(base)
+                stem = stem.strip()
+                ext = ext.lower()
+
+                # Skip directories and unsupported types
+                if not stem or ext not in _ALLOWED_EXT:
+                    continue
+
+                total += 1
+                student = Student.query.filter_by(
+                    school_id=g.school_id, student_id=stem, is_deleted=False
+                ).first()
+
+                if not student:
+                    skipped += 1
+                    details.append({"filename": base, "student_id": stem, "status": "not_found"})
+                    continue
+
+                try:
+                    img_bytes = zf.read(name)
+
+                    class _FileWrap:
+                        """Minimal file-like wrapper for upload_file utility."""
+                        filename = f"photo{ext}"
+                        content_type = (
+                            "image/jpeg" if ext in (".jpg", ".jpeg") else
+                            "image/png" if ext == ".png" else
+                            "image/webp" if ext == ".webp" else
+                            "image/gif"
+                        )
+
+                        def __init__(self, data: bytes):
+                            self._buf = io.BytesIO(data)
+
+                        def read(self, *args):
+                            return self._buf.read(*args)
+
+                        def seek(self, *args):
+                            return self._buf.seek(*args)
+
+                    url = _upload_file(_FileWrap(img_bytes), "student-photos", f"{stem}{ext}")
+                    student.photo_url = url
+                    updated += 1
+                    details.append({"filename": base, "student_id": stem, "status": "updated"})
+                except Exception as exc:
+                    skipped += 1
+                    details.append({"filename": base, "student_id": stem, "status": "error", "message": str(exc)})
+    except zipfile.BadZipFile:
+        return error_response("The uploaded file is not a valid ZIP archive", 400)
+
+    db.session.commit()
+    return success_response({
+        "total": total,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": [d["message"] for d in details if d["status"] == "error"],
+        "details": details,
+    })
 
 
 # ── Guardians ──────────────────────────────────────────────

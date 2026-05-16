@@ -31,11 +31,7 @@ interface Lesson {
 }
 
 export default function LmsPage() {
-  return (
-    <PluginGate slug="lms">
-      <LmsContent />
-    </PluginGate>
-  );
+  return <LmsContent />;
 }
 
 function LmsContent() {
