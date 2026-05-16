@@ -48,6 +48,8 @@ def create_app(config_name: str | None = None) -> Flask:
             logger.info("Sentry initialized (env=%s)", config_name)
         except ImportError:
             logger.warning("sentry-sdk not installed — monitoring disabled")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Sentry init failed — monitoring disabled: %s", exc)
 
     # Initialise extensions
     db.init_app(app)
