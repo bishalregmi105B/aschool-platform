@@ -65,7 +65,7 @@ function LmsContent() {
           <p className="text-muted-foreground">{courseDetail.description}</p>
         </div>
         <div className="space-y-3">
-          {courseDetail.lessons?.map((lesson, i) => (
+          {courseDetail.lessons?.map((lesson: any, i: number) => (
             <Card key={lesson.id} className="cursor-pointer hover:border-primary transition-colors">
               <CardContent className="flex items-center gap-4 py-4">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
