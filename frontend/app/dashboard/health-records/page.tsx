@@ -54,7 +54,7 @@ function HealthRecordsContent() {
   const [showVisit, setShowVisit] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: visits, isLoading } = useQuery({
+  const { data: visits, isLoading } = useQuery<any>({
     queryKey: ["health-visits"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/health-records/visits");
@@ -63,7 +63,7 @@ function HealthRecordsContent() {
     enabled: tab === "visits",
   });
 
-  const { data: immunizations } = useQuery({
+  const { data: immunizations } = useQuery<any>({
     queryKey: ["health-immunizations"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/health-records/immunizations");

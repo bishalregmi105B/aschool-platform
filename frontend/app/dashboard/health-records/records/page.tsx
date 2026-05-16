@@ -27,7 +27,7 @@ function RecordsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ student_id: "", visit_date: "", reason: "", diagnosis: "", treatment: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["health-visits"],
     queryFn: async () => (await api.get("/health-records/visits")).data?.data || [],
   });

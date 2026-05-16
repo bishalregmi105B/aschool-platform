@@ -46,7 +46,7 @@ function TemplatesContent() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState(categoryFilter);
 
-  const { data: templates, isLoading } = useQuery({
+  const { data: templates, isLoading } = useQuery<any>({
     queryKey: ["design-templates"],
     queryFn: async () => {
       const res = await api.get("/design-studio/templates");

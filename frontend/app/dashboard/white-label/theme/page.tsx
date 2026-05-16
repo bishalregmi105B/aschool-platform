@@ -19,7 +19,7 @@ function ThemeContent() {
   const qc = useQueryClient();
   const [form, setForm] = useState<any>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["white-label-theme"],
     queryFn: async () => { const r = await api.get("/schools/white-label/theme"); return r.data?.data ?? r.data; },
     onSuccess: (d: any) => {

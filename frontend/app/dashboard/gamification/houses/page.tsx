@@ -25,7 +25,7 @@ function HousesContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", color: "red", motto: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["gamification-houses"],
     queryFn: async () => (await api.get("/gamification/houses")).data?.data || [],
   });

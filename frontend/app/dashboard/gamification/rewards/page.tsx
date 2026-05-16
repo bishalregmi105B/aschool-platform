@@ -25,7 +25,7 @@ function RewardsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", points_required: "100", quantity_available: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["gamification-rewards"],
     queryFn: async () => (await api.get("/gamification/rewards")).data?.data || [],
   });

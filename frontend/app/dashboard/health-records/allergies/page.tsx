@@ -35,7 +35,7 @@ function AllergiesContent() {
   const [lookupId, setLookupId] = useState("");
 
   // Fetch all visits to list students with health profiles
-  const { data: allVisits, isLoading } = useQuery({
+  const { data: allVisits, isLoading } = useQuery<any>({
     queryKey: ["health-allergy-visits"],
     queryFn: async () => (await api.get("/health-records/visits")).data?.data || [],
   });

@@ -26,12 +26,12 @@ function AppraisalContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ staff_id: "", period: new Date().getFullYear().toString(), teaching_score: "5", attendance_score: "5", teamwork_score: "5", comments: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["appraisals"],
     queryFn: async () => { const r = await api.get("/hr/appraisals"); return r.data; },
   });
 
-  const { data: staffData } = useQuery({
+  const { data: staffData } = useQuery<any>({
     queryKey: ["staff-options"],
     queryFn: async () => {
       const r = await api.get("/staff");

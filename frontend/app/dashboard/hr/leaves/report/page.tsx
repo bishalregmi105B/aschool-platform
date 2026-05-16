@@ -33,7 +33,7 @@ export default function LeaveReportPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["staff-leaves", statusFilter],
     queryFn: async () => {
       const url = statusFilter === "all" ? "/hr/leaves" : `/hr/leaves?status=${statusFilter}`;

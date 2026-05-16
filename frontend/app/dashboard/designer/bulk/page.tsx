@@ -33,7 +33,7 @@ function BulkContent() {
   const [templateId, setTemplateId] = useState("");
   const [examId, setExamId] = useState("");
 
-  const { data: classes } = useQuery({
+  const { data: classes } = useQuery<any>({
     queryKey: ["classes"],
     queryFn: async () => {
       const res = await api.get("/academics/classes");
@@ -41,7 +41,7 @@ function BulkContent() {
     },
   });
 
-  const { data: templates } = useQuery({
+  const { data: templates } = useQuery<any>({
     queryKey: ["design-templates-cat", type],
     queryFn: async () => {
       const res = await api.get(`/design-studio/templates?category=${type}`);
@@ -49,7 +49,7 @@ function BulkContent() {
     },
   });
 
-  const { data: exams } = useQuery({
+  const { data: exams } = useQuery<any>({
     queryKey: ["exams-list"],
     queryFn: async () => {
       const res = await api.get("/exams");

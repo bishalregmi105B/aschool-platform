@@ -26,7 +26,7 @@ function BadgesContent() {
   const [editItem, setEditItem] = useState<any>(null);
   const [form, setForm] = useState({ name: "", description: "", criteria: "", points_value: "10", icon: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["gamification-badges"],
     queryFn: async () => (await api.get("/gamification/badges")).data?.data || [],
   });

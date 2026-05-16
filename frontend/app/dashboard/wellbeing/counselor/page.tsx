@@ -24,7 +24,7 @@ function CounselorContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ student_id: "", note: "", session_type: "individual", action_taken: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["counselor-notes"],
     queryFn: async () => (await api.get("/wellbeing/counselor-notes")).data?.data || [],
   });

@@ -29,7 +29,7 @@ export default function ExpenseCategoriesPage() {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["expense-categories"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<Category[]>>("/hr/expense-categories");

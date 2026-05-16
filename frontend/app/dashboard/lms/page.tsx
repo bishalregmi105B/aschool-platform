@@ -37,7 +37,7 @@ export default function LmsPage() {
 function LmsContent() {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
 
-  const { data: courses, isLoading } = useQuery({
+  const { data: courses, isLoading } = useQuery<any>({
     queryKey: ["lms-courses"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/lms/courses");
@@ -45,7 +45,7 @@ function LmsContent() {
     },
   });
 
-  const { data: courseDetail } = useQuery({
+  const { data: courseDetail } = useQuery<any>({
     queryKey: ["lms-course", selectedCourse],
     queryFn: async () => {
       const res = await api.get<ApiResponse>(`/lms/courses/${selectedCourse}`);
