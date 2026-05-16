@@ -27,6 +27,10 @@ import 'features/holidays/holiday_list_screen.dart';
 import 'features/gallery/gallery_screen.dart';
 import 'features/guardians/guardian_details_screen.dart';
 import 'features/profile/student_profile_screen.dart';
+import 'features/attendance/student_attendance_screen.dart';
+import 'features/health_records/student_health_screen.dart';
+import 'features/gamification/gamification_screen.dart';
+import 'features/fees/student_fees_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _dashboardNavKey = GlobalKey<NavigatorState>(debugLabel: 'dashboardNav');
@@ -166,6 +170,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                       path: 'profile',
                       builder: (_, __) => const StudentProfileScreen()),
+                  GoRoute(
+                      path: 'attendance',
+                      builder: (_, __) => const StudentAttendanceScreen()),
+                  GoRoute(
+                      path: 'health',
+                      builder: (_, __) => const StudentHealthScreen()),
+                  GoRoute(
+                      path: 'gamification',
+                      builder: (_, __) => const GamificationScreen()),
+                  GoRoute(
+                      path: 'fees',
+                      builder: (_, __) => const StudentFeesScreen()),
                 ],
               ),
             ],

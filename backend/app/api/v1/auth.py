@@ -132,6 +132,14 @@ def change_password():
     if len(new_password) < 8:
         return error_response("Password must be at least 8 characters", 400)
 
+    # Password strength validation
+    if not any(c.isupper() for c in new_password):
+        return error_response("Password must contain at least one uppercase letter", 400)
+    if not any(c.islower() for c in new_password):
+        return error_response("Password must contain at least one lowercase letter", 400)
+    if not any(c.isdigit() for c in new_password):
+        return error_response("Password must contain at least one digit", 400)
+
     if not user.check_password(current_password):
         return error_response("Current password is incorrect", 401)
 
@@ -265,3 +273,52 @@ def register_fcm():
         db.session.commit()
 
     return success_response({"message": "FCM token registered"})
+
+
+@auth_bp.route("/register-onesignal", methods=["POST"])
+@jwt_required()
+def register_onesignal():
+    """Register OneSignal player ID and associate device with school + role.
+
+    Called after login on the Flutter app to link the device with the user's
+    school and role for targeted push notifications.
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    player_id = data.get("player_id") or data.get("onesignal_player_id")
+    if not player_id:
+        return error_response("player_id is required", 400)
+
+    # Store player ID on user
+    player_ids = user.onesignal_player_ids or []
+    if player_id not in player_ids:
+        player_ids.append(player_id)
+        # Keep max 5 devices per user
+        if len(player_ids) > 5:
+            player_ids = player_ids[-5:]
+        user.onesignal_player_ids = player_ids
+
+        from extensions import db
+        db.session.commit()
+
+    # Register tags with OneSignal for school-scoped targeting
+    if user.school_id:
+        try:
+            from app.services.communications.onesignal_service import OneSignalService
+
+            OneSignalService.register_player_tags(
+                player_id=player_id,
+                tags={
+                    "school_id": str(user.school_id),
+                    "role": user.role or "user",
+                    "user_id": str(user.id),
+                },
+            )
+        except Exception:
+            pass  # Non-fatal — tags can be set later
+
+    return success_response({"message": "OneSignal player registered"})

@@ -51,6 +51,8 @@ DEFAULT_PAYMENT_METHODS = {
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",
+        "secret_key": "",
     },
     "bank": {
         "label": "Bank Transfer",
@@ -61,6 +63,8 @@ DEFAULT_PAYMENT_METHODS = {
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",
+        "secret_key": "",
     },
     "cheque": {
         "label": "Cheque",
@@ -71,16 +75,20 @@ DEFAULT_PAYMENT_METHODS = {
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",
+        "secret_key": "",
     },
     "fonepay": {
         "label": "FonePay",
         "enabled": True,
-        "mode": "offline",
-        "requires_reference": True,
+        "mode": "online",  # FonePay supports hosted checkout via FonePayGateway
+        "requires_reference": False,
         "supports_qr": True,
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",  # FonePay merchant code (PID)
+        "secret_key": "",     # FonePay HMAC secret
     },
     "esewa": {
         "label": "eSewa",
@@ -91,6 +99,8 @@ DEFAULT_PAYMENT_METHODS = {
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",  # eSewa product code (e.g. EPAYTEST or school code)
+        "secret_key": "",     # eSewa HMAC secret
     },
     "khalti": {
         "label": "Khalti",
@@ -101,6 +111,8 @@ DEFAULT_PAYMENT_METHODS = {
         "qr_image_url": "",
         "qr_payload": "",
         "instructions": "",
+        "merchant_code": "",  # unused for Khalti; reserved
+        "secret_key": "",     # Khalti live secret key
     },
 }
 
@@ -222,15 +234,19 @@ def delete_fee_type(type_id):
 @school_required
 @plugin_required("fees")
 def get_payment_methods():
-    """Return school-level payment method configuration."""
+    """Return school-level payment method configuration.
+
+    secret_key fields are masked in the response; they are write-only via PUT.
+    """
     methods = _get_configured_payment_methods()
+    safe_methods = [_mask_method_credentials(m) for m in methods]
     return success_response(
         {
-            "methods": methods,
-            "enabled_methods": [m["key"] for m in methods if m["enabled"]],
+            "methods": safe_methods,
+            "enabled_methods": [m["key"] for m in safe_methods if m["enabled"]],
             "online_methods": [
                 m["key"]
-                for m in methods
+                for m in safe_methods
                 if m["enabled"] and m["mode"] == "online"
             ],
         }
@@ -253,6 +269,15 @@ def update_payment_methods():
     if not isinstance(incoming_methods, list):
         return error_response("methods must be a list", 400)
 
+    # Resolve "***" sentinel — when a client sends "***" for secret_key it means
+    # "keep the existing stored secret".  Substitute the actual stored value now so
+    # _normalize_payment_methods always receives either a real secret or an empty string.
+    existing_methods = {m["key"]: m for m in _get_configured_payment_methods()}
+    for item in incoming_methods:
+        if isinstance(item, dict) and item.get("secret_key") == "***":
+            key = str(item.get("key") or "").strip().lower()
+            item["secret_key"] = existing_methods.get(key, {}).get("secret_key", "")
+
     methods = _normalize_payment_methods(incoming_methods)
     if not any(m["enabled"] for m in methods):
         return error_response("At least one payment method must remain enabled", 400)
@@ -262,13 +287,14 @@ def update_payment_methods():
     school.fee_config = fee_config
     db.session.commit()
 
+    safe_methods = [_mask_method_credentials(m) for m in methods]
     return success_response(
         {
-            "methods": methods,
-            "enabled_methods": [m["key"] for m in methods if m["enabled"]],
+            "methods": safe_methods,
+            "enabled_methods": [m["key"] for m in safe_methods if m["enabled"]],
             "online_methods": [
                 m["key"]
-                for m in methods
+                for m in safe_methods
                 if m["enabled"] and m["mode"] == "online"
             ],
         }
@@ -891,12 +917,34 @@ def update_collection(collection_id):
 @plugin_required("fees")
 @role_required("school_admin", "accountant")
 def record_payment(collection_id):
-    """Record a payment against a fee collection."""
+    """Record a payment against a fee collection.
+
+    Supports idempotency: pass an 'idempotency_key' in the request body
+    to prevent duplicate payments on network retries or double-clicks.
+    """
     fc = FeeCollection.query.get(collection_id)
     if not fc or fc.is_deleted or str(fc.school_id) != str(g.school_id):
         return error_response("Fee collection not found", 404)
 
     data = request.get_json(silent=True) or {}
+
+    # ── Idempotency check ────────────────────────────────────────
+    idempotency_key = data.get("idempotency_key")
+    if idempotency_key:
+        existing = FeeReceipt.query.filter_by(
+            idempotency_key=idempotency_key
+        ).first()
+        if existing:
+            return success_response(
+                {
+                    "collection": _collection_dict(fc),
+                    "receipt": _receipt_dict(existing),
+                    "receipt_id": str(existing.id),
+                    "idempotent": True,
+                },
+                meta={"message": "Payment already recorded (idempotent)"},
+            )
+
     amount = float(data.get("amount", 0) or 0)
     if amount <= 0:
         return error_response("Payment amount must be greater than zero", 400)
@@ -937,6 +985,7 @@ def record_payment(collection_id):
         amount=recorded_amount,
         payment_method=method,
         transaction_id=fc.transaction_id,
+        idempotency_key=idempotency_key,
     )
     receipt.verified_hash = _receipt_hash(
         receipt.receipt_number, fc.id, recorded_amount
@@ -1092,26 +1141,53 @@ def _initiate_online_payment(collection_id, data):
     student_name = f"{student.first_name} {student.last_name}" if student else "Student"
     base_url = data.get("return_url", request.host_url.rstrip("/"))
 
-    if provider == "esewa":
-        result = EsewaGateway.initiate_payment(
-            transaction_uuid=str(collection_id),
-            amount=amount,
-            success_url=f"{base_url}/api/v1/webhooks/esewa/callback",
-            failure_url=f"{base_url}/api/v1/webhooks/esewa/callback",
-        )
-        return success_response({"provider": "esewa", **result})
+    # Per-school credentials — must be configured by the school admin.
+    school_merchant_code = (selected_method.get("merchant_code") or "").strip()
+    school_secret_key = (selected_method.get("secret_key") or "").strip()
 
-    elif provider == "khalti":
-        result = KhaltiGateway.initiate_payment(
-            purchase_order_id=str(collection_id),
-            purchase_order_name=f"School Fee — {student_name}",
-            amount_paisa=int(amount * 100),
-            return_url=f"{base_url}/api/v1/webhooks/khalti/callback",
-            customer_info={"name": student_name},
-        )
-        if not result.get("success"):
-            return error_response(result.get("error", "Khalti initiation failed"), 502)
-        return success_response({"provider": "khalti", **result})
+    try:
+        if provider == "esewa":
+            result = EsewaGateway.initiate_payment(
+                transaction_uuid=str(collection_id),
+                amount=amount,
+                product_code=school_merchant_code,
+                secret_key=school_secret_key,
+                success_url=f"{base_url}/api/v1/webhooks/esewa/callback",
+                failure_url=f"{base_url}/api/v1/webhooks/esewa/callback",
+            )
+            return success_response({"provider": "esewa", **result})
+
+        elif provider == "khalti":
+            result = KhaltiGateway.initiate_payment(
+                purchase_order_id=str(collection_id),
+                purchase_order_name=f"School Fee — {student_name}",
+                amount_paisa=int(amount * 100),
+                return_url=f"{base_url}/api/v1/webhooks/khalti/callback",
+                secret_key=school_secret_key,
+                customer_info={"name": student_name},
+            )
+            if not result.get("success"):
+                return error_response(result.get("error", "Khalti initiation failed"), 502)
+            return success_response({"provider": "khalti", **result})
+
+        elif provider == "fonepay":
+            from app.services.payments.fonepay_gateway import FonePayGateway
+
+            result = FonePayGateway.initiate_fee_payment(
+                school_slug=getattr(g, "school_slug", "school"),
+                fee_collection_id=str(collection_id),
+                amount=amount,
+                student_name=student_name,
+                return_url=f"{base_url}/api/v1/webhooks/fonepay/callback",
+                merchant_code=school_merchant_code,
+                secret_key=school_secret_key,
+            )
+            if not result.get("success"):
+                return error_response("FonePay initiation failed", 502)
+            return success_response({"provider": "fonepay", **result})
+
+    except ValueError as exc:
+        return error_response(str(exc), 422)
 
     return error_response(f"Unknown payment provider: {provider}", 400)
 
@@ -1159,6 +1235,10 @@ def _trimmed_text(value, max_length=300):
     return text[:max_length]
 
 
+# Gateways that support server-initiated hosted checkout.
+_ONLINE_CAPABLE_GATEWAYS = {"esewa", "khalti", "fonepay"}
+
+
 def _normalize_payment_methods(raw_methods):
     raw_map = {}
     if isinstance(raw_methods, list):
@@ -1177,8 +1257,8 @@ def _normalize_payment_methods(raw_methods):
         mode = str(incoming.get("mode") or defaults["mode"]).strip().lower()
         if mode not in {"online", "offline"}:
             mode = defaults["mode"]
-        # Only configured gateways support hosted checkout.
-        if key not in {"esewa", "khalti"}:
+        # Only gateways with a hosted checkout implementation can be online.
+        if key not in _ONLINE_CAPABLE_GATEWAYS:
             mode = "offline"
 
         methods.append(
@@ -1211,10 +1291,28 @@ def _normalize_payment_methods(raw_methods):
                     incoming.get("instructions") or defaults["instructions"],
                     max_length=1200,
                 ),
+                # Per-school gateway credentials (stored server-side, masked in responses).
+                # The "***" sentinel means "keep existing value" and is handled in
+                # update_payment_methods before calling this function.
+                "merchant_code": _trimmed_text(
+                    incoming.get("merchant_code") or defaults.get("merchant_code", ""),
+                    max_length=200,
+                ),
+                "secret_key": _trimmed_text(
+                    incoming.get("secret_key") or defaults.get("secret_key", ""),
+                    max_length=500,
+                ),
             }
         )
 
     return methods
+
+
+def _mask_method_credentials(method: dict) -> dict:
+    """Return a copy of method config with secret_key masked for API responses."""
+    masked = dict(method)
+    masked["secret_key"] = "***" if method.get("secret_key") else ""
+    return masked
 
 
 def _get_configured_payment_methods():

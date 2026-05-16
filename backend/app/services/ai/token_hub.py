@@ -3,9 +3,13 @@ Centralized AI Token Hub — the ONLY entry-point for all AI calls in ASchool.
 
 Every AI request must go through AITokenHub.request(). This service:
   1. Checks per-school quota (daily + monthly)
-  2. Routes to the configured provider (Groq first if key present, else Anthropic)
+  2. Routes to the configured provider (Groq PRIMARY, Anthropic FALLBACK)
   3. Logs every call to ai_usage_logs
   4. Returns a provider-agnostic AIHubResponse
+
+Provider priority:
+  1. Groq (fast, cost-effective) — always tried first when GROQ_API_KEY is set
+  2. Anthropic Claude (quality fallback) — used when Groq unavailable or fails
 
 Usage:
     result = AITokenHub.request(
@@ -294,20 +298,32 @@ class AITokenHub:
             )
             raise  # bubble up → API layer returns 429
 
-        # 2. Choose provider: Groq if key present AND groq installed, else Anthropic
+        # 2. Choose provider: Groq is PRIMARY, Anthropic is FALLBACK
         provider_fn = None
+        fallback_fn = None
         groq_key = current_app.config.get("GROQ_API_KEY", "")
+        anthropic_key = current_app.config.get("ANTHROPIC_API_KEY", "")
+
         if groq_key:
             try:
                 import groq as _  # noqa: F401
                 provider_fn = _call_groq
             except ImportError:
-                logger.debug("groq package not installed, falling back to Anthropic")
+                logger.debug("groq package not installed, trying Anthropic")
+
+        if anthropic_key:
+            if provider_fn is None:
+                provider_fn = _call_anthropic
+            else:
+                fallback_fn = _call_anthropic  # Anthropic available as fallback
 
         if provider_fn is None:
-            provider_fn = _call_anthropic
+            raise RuntimeError(
+                "No AI provider configured. Set GROQ_API_KEY (primary) "
+                "or ANTHROPIC_API_KEY (fallback)."
+            )
 
-        # 3. Call provider
+        # 3. Call provider (with fallback on failure)
         try:
             result = provider_fn(
                 messages=messages,
@@ -315,22 +331,53 @@ class AITokenHub:
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-        except Exception as exc:
-            _log_call(
-                school_id=school_id,
-                user_id=user_id,
-                feature=feature,
-                model="unknown",
-                provider="unknown",
-                prompt_tokens=0,
-                completion_tokens=0,
-                total_tokens=0,
-                latency_ms=0,
-                status="error",
-                error_message=str(exc),
-                metadata=metadata,
-            )
-            raise
+        except Exception as primary_exc:
+            # Try fallback provider if available
+            if fallback_fn:
+                logger.warning(
+                    "Primary AI provider failed (%s), trying fallback: %s",
+                    primary_exc,
+                    fallback_fn.__name__,
+                )
+                try:
+                    result = fallback_fn(
+                        messages=messages,
+                        model_key=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                except Exception as fallback_exc:
+                    _log_call(
+                        school_id=school_id,
+                        user_id=user_id,
+                        feature=feature,
+                        model="unknown",
+                        provider="unknown",
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        total_tokens=0,
+                        latency_ms=0,
+                        status="error",
+                        error_message=f"Primary: {primary_exc}; Fallback: {fallback_exc}",
+                        metadata=metadata,
+                    )
+                    raise fallback_exc
+            else:
+                _log_call(
+                    school_id=school_id,
+                    user_id=user_id,
+                    feature=feature,
+                    model="unknown",
+                    provider="unknown",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    latency_ms=0,
+                    status="error",
+                    error_message=str(primary_exc),
+                    metadata=metadata,
+                )
+                raise primary_exc
 
         # 4. Log success
         _log_call(

@@ -1,10 +1,13 @@
-"""eSewa Payment Gateway integration for Nepal."""
+"""eSewa Payment Gateway integration for Nepal.
 
+All merchant credentials MUST be supplied by the caller (loaded from the school's
+fee_config).  No system-wide environment variable fallbacks exist.
+"""
+
+import base64
 import hashlib
 import hmac
-import base64
 import json
-from urllib.parse import urlencode
 
 import requests
 from flask import current_app
@@ -24,19 +27,9 @@ class EsewaGateway:
         return "https://rc-epay.esewa.com.np"
 
     @classmethod
-    def _secret_key(cls) -> str:
-        return current_app.config["ESEWA_SECRET_KEY"]
-
-    @classmethod
-    def _product_code(cls) -> str:
-        return current_app.config.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
-
-    @classmethod
-    def _generate_signature(cls, message: str) -> str:
-        """Generate HMAC SHA256 signature for eSewa v2."""
-        key = cls._secret_key().encode()
-        msg = message.encode()
-        digest = hmac.new(key, msg, hashlib.sha256).digest()
+    def _generate_signature(cls, message: str, secret_key: str) -> str:
+        """Generate HMAC-SHA256 signature."""
+        digest = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).digest()
         return base64.b64encode(digest).decode()
 
     @classmethod
@@ -44,19 +37,26 @@ class EsewaGateway:
         cls,
         transaction_uuid: str,
         amount: float,
+        product_code: str,
+        secret_key: str,
         tax_amount: float = 0,
         service_charge: float = 0,
         delivery_charge: float = 0,
         success_url: str = "",
         failure_url: str = "",
     ) -> dict:
-        """Generate eSewa payment form data for frontend submission."""
-        total = amount + tax_amount + service_charge + delivery_charge
-        product_code = cls._product_code()
+        """Generate eSewa payment form data for frontend submission.
 
-        # Signature message format: total_amount,transaction_uuid,product_code
+        Raises ValueError if required credentials are missing.
+        """
+        if not product_code:
+            raise ValueError("eSewa product_code (merchant code) is not configured for this school")
+        if not secret_key:
+            raise ValueError("eSewa secret_key is not configured for this school")
+
+        total = amount + tax_amount + service_charge + delivery_charge
         sign_message = f"total_amount={total},transaction_uuid={transaction_uuid},product_code={product_code}"
-        signature = cls._generate_signature(sign_message)
+        signature = cls._generate_signature(sign_message, secret_key)
 
         return {
             "payment_url": f"{cls._base_url()}/api/epay/main/v2/form",
@@ -68,16 +68,22 @@ class EsewaGateway:
                 "product_code": product_code,
                 "product_service_charge": str(service_charge),
                 "product_delivery_charge": str(delivery_charge),
-                "success_url": success_url or current_app.config.get("ESEWA_SUCCESS_URL", ""),
-                "failure_url": failure_url or current_app.config.get("ESEWA_FAILURE_URL", ""),
+                "success_url": success_url,
+                "failure_url": failure_url,
                 "signed_field_names": "total_amount,transaction_uuid,product_code",
                 "signature": signature,
             },
         }
 
     @classmethod
-    def verify_payment(cls, encoded_data: str) -> dict:
-        """Verify eSewa payment callback data."""
+    def verify_payment(cls, encoded_data: str, secret_key: str) -> dict:
+        """Verify eSewa payment callback data.
+
+        Raises ValueError if secret_key is missing.
+        """
+        if not secret_key:
+            raise ValueError("eSewa secret_key is required to verify payment")
+
         try:
             decoded = base64.b64decode(encoded_data).decode()
             data = json.loads(decoded)
@@ -89,9 +95,8 @@ class EsewaGateway:
         product_code = data.get("product_code", "")
         status = data.get("status", "")
 
-        # Verify signature
         sign_message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
-        expected_sig = cls._generate_signature(sign_message)
+        expected_sig = cls._generate_signature(sign_message, secret_key)
 
         if data.get("signature") != expected_sig:
             return {"verified": False, "error": "Signature mismatch"}
@@ -105,9 +110,16 @@ class EsewaGateway:
         }
 
     @classmethod
-    def check_transaction_status(cls, transaction_uuid: str, total_amount: float) -> dict:
+    def check_transaction_status(
+        cls,
+        transaction_uuid: str,
+        total_amount: float,
+        product_code: str,
+    ) -> dict:
         """Lookup transaction status via eSewa API."""
-        product_code = cls._product_code()
+        if not product_code:
+            raise ValueError("eSewa product_code is required to check transaction status")
+
         url = f"{cls._base_url()}/api/epay/transaction/status/"
         params = {
             "product_code": product_code,

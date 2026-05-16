@@ -7,7 +7,8 @@ import 'package:aschool_shared/aschool_shared.dart';
 
 final myClassesProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final resp = await ApiClient.instance.get('/teacher/my-classes?scope=class_teacher');
+  final resp =
+      await ApiClient.instance.get('/teacher/my-classes');
   return List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
 });
 
@@ -160,7 +161,8 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('Are you sure you want to submit this attendance record?'),
+            const Text(
+                'Are you sure you want to submit this attendance record?'),
           ],
         ),
       ),

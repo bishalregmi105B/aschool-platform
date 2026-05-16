@@ -9,7 +9,7 @@ class AppConstants {
   /// Dev builds fall back to the LAN address.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.brighternepal.com',
+    defaultValue: 'http://localhost:5001',
   );
   static const String apiVersion = '/api/v1';
 

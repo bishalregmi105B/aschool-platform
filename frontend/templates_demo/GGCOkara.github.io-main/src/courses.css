@@ -1,0 +1,361 @@
+:root {
+    --primary-green: #006837;
+    --primary-dark: #004d29;
+    --accent-yellow: #FFF200;
+    --dark-overlay: rgba(0, 30, 15, 0.9);
+    --text-dark: #2c3e50;
+    --text-light: #6c757d;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-dark);
+    overflow-x: hidden;
+    background-color: #f8f9fa;
+}
+
+/* --- NAV & HEADER STYLES --- */
+.top-bar {
+    background-color: var(--primary-green);
+    color: white;
+    padding: 8px 0;
+    font-size: 0.85rem;
+}
+
+.top-bar a {
+    color: white;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.top-bar a:hover {
+    color: var(--accent-yellow);
+}
+
+.navbar {
+    background: white;
+    padding: 15px 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-brand img {
+    height: 60px;
+    margin-right: 15px;
+}
+
+.GPCLOGO:hover {
+    animation: ani3 2s linear;
+}
+
+@keyframes ani3 {
+    0% {
+        rotate: 0deg;
+        scale: 1;
+    }
+
+    100% {
+        rotate: 360deg;
+        scale: 0;
+    }
+}
+
+.brand-text h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.brand-text span {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.nav-link {
+    color: #444 !important;
+    font-weight: 500;
+    margin: 0 10px;
+    position: relative;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: var(--primary-green) !important;
+}
+
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: var(--primary-green);
+}
+
+.btn-admissions {
+    background-color: var(--primary-green);
+    color: white;
+    border-radius: 50px;
+    padding: 10px 25px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn-admissions:hover {
+    background-color: transparent;
+    color: var(--primary-green);
+    border: 2px solid var(--primary-green);
+}
+
+/* --- PAGE HEADER --- */
+.page-header {
+    background: linear-gradient(var(--dark-overlay), rgba(0, 104, 55, 0.8)), url('/src/img/main-department-002.webp');
+    background-size: cover;
+    background-position: center;
+    height: 350px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    margin-bottom: 50px;
+}
+
+.breadcrumb {
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+}
+
+.breadcrumb-item a {
+    color: var(--accent-yellow);
+    text-decoration: none;
+}
+
+.breadcrumb-item.active {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* --- SECTIONS --- */
+.section-padding {
+    padding: 80px 0;
+}
+
+.section-title {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.section-title span {
+    color: var(--primary-green);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.section-title h2 {
+    font-weight: 700;
+    color: var(--primary-green);
+    position: relative;
+    display: inline-block;
+    font-size: 2.2rem;
+}
+
+.section-title h2::after {
+    content: '';
+    width: 50px;
+    height: 3px;
+    background: var(--accent-yellow);
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* --- COURSE CARDS (BS) --- */
+.course-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    transition: 0.3s;
+    height: 100%;
+    border-bottom: 4px solid transparent;
+    position: relative;
+}
+
+.course-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    border-bottom-color: var(--primary-green);
+}
+
+.course-icon {
+    background: rgba(0, 104, 55, 0.08);
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 25px auto 15px;
+    color: var(--primary-green);
+    font-size: 2rem;
+    transition: 0.3s;
+}
+
+.course-card:hover .course-icon {
+    background: var(--primary-green);
+    color: white;
+}
+
+.course-body {
+    padding: 0 25px 25px;
+    text-align: center;
+}
+
+.course-title {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.course-meta {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 15px;
+}
+
+.btn-course {
+    color: var(--primary-green);
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--primary-green);
+    padding: 5px 20px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    transition: 0.3s;
+}
+
+.btn-course:hover {
+    background: var(--primary-green);
+    color: white;
+}
+
+/* --- INTERMEDIATE TABS --- */
+.nav-pills .nav-link {
+    color: var(--primary-green);
+    background: white;
+    border: 1px solid #ddd;
+    margin: 0 5px;
+    border-radius: 30px;
+    padding: 10px 25px;
+    font-weight: 500;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--primary-green);
+    color: white !important;
+    border-color: var(--primary-green);
+}
+
+.inter-box {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    border-left: 5px solid var(--accent-yellow);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.subject-badge {
+    background: #f1f1f1;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    display: inline-block;
+    color: #555;
+}
+
+/* --- ADP SECTION --- */
+.adp-row {
+    background-color: var(--primary-green);
+    color: white;
+    border-radius: 15px;
+    padding: 40px;
+}
+
+.adp-list li {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.adp-list i {
+    color: var(--accent-yellow);
+    margin-right: 10px;
+}
+
+/* Footer (Same as Home) */
+footer {
+    background-color: #1a1a1a;
+    color: #bbb;
+    padding-top: 80px;
+    border-top: 5px solid var(--accent-yellow);
+}
+
+footer h4 {
+    color: white;
+    margin-bottom: 25px;
+}
+
+footer a {
+    color: #bbb;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+footer a:hover {
+    color: var(--accent-yellow);
+}
+
+.footer-social a {
+    width: 35px;
+    height: 35px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.footer-social a:hover {
+    background: var(--primary-green);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-green);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+}

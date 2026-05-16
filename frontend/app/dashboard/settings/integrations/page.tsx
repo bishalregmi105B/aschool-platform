@@ -50,7 +50,11 @@ export default function IntegrationsPage() {
   }, [paymentConfig]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => updatePaymentMethods(methods),
+    mutationFn: async () => {
+      // State holds "***" if the key was loaded from server and not touched.
+      // Any other value (including "") is sent as-is — "" clears the key.
+      return updatePaymentMethods(methods);
+    },
     onSuccess: (updated) => {
       setMethods(updated.methods);
       queryClient.invalidateQueries({ queryKey: ["settings-payment-methods"] });
@@ -120,7 +124,34 @@ export default function IntegrationsPage() {
             </div>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
-            {methods.map((method) => (
+            {methods.map((method) => {
+              const isOnline = method.mode === "online";
+              const merchantLabel =
+                method.key === "esewa"
+                  ? "eSewa Product Code"
+                  : method.key === "fonepay"
+                    ? "FonePay Merchant Code (PID)"
+                    : "Merchant Code";
+              const secretLabel =
+                method.key === "khalti"
+                  ? "Khalti Live Secret Key"
+                  : method.key === "esewa"
+                    ? "eSewa HMAC Secret Key"
+                    : method.key === "fonepay"
+                      ? "FonePay HMAC Secret"
+                      : "Secret Key";
+              const merchantPlaceholder =
+                method.key === "esewa"
+                  ? "e.g. EPAYTEST or your product code"
+                  : method.key === "fonepay"
+                    ? "Your FonePay merchant PID"
+                    : "Merchant code";
+              const secretPlaceholder =
+                method.key === "khalti"
+                  ? "Key live_xxxxxxxxxxxxxxxx"
+                  : "Leave blank to keep existing key";
+
+              return (
               <Card key={method.key} className={method.enabled ? "border-emerald-200" : ""}>
                 <CardContent className="pt-5 space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -152,6 +183,43 @@ export default function IntegrationsPage() {
                       }
                     />
                   </div>
+
+                  {isOnline && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label>{merchantLabel}</Label>
+                        <Input
+                          value={method.merchant_code || ""}
+                          onChange={(event) =>
+                            updateMethod(method.key, { merchant_code: event.target.value })
+                          }
+                          placeholder={merchantPlaceholder}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>{secretLabel}</Label>
+                        <Input
+                          type="password"
+                          value={method.secret_key === "***" ? "" : (method.secret_key || "")}
+                          onChange={(event) =>
+                            updateMethod(method.key, { secret_key: event.target.value })
+                          }
+                          placeholder={
+                            method.secret_key === "***"
+                              ? "Configured — enter new value to replace"
+                              : secretPlaceholder
+                          }
+                          autoComplete="new-password"
+                        />
+                        {method.secret_key === "***" && (
+                          <p className="text-xs text-emerald-600">
+                            A secret key is currently configured. Leave blank to keep it.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label>QR Image URL</Label>
@@ -198,7 +266,8 @@ export default function IntegrationsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

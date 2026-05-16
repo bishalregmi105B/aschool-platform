@@ -1,6 +1,8 @@
 """Webhook handlers blueprint."""
-import hmac
+import base64
 import hashlib
+import hmac
+import json
 from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, request
@@ -11,27 +13,52 @@ from extensions import db
 webhooks_bp = Blueprint("webhooks", __name__)
 
 
+def _school_payment_method(school, key: str) -> dict:
+    """Return the stored payment method config for a given gateway key."""
+    fee_config = dict(getattr(school, "fee_config", {}) or {})
+    methods = fee_config.get("payment_methods") or []
+    return next((m for m in methods if m.get("key") == key), {})
+
+
 @webhooks_bp.route("/esewa/callback", methods=["GET", "POST"])
 def esewa_callback():
     """Handle eSewa payment callback — eSewa redirects with base64 encoded data."""
-    from app.services.payments.esewa_gateway import EsewaGateway
     from app.models.fee import FeeCollection, FeeReceipt
+    from app.models.school import School
+    from app.services.payments.esewa_gateway import EsewaGateway
 
     encoded_data = request.args.get("data") or (request.get_json(silent=True) or {}).get("data")
     if not encoded_data:
         current_app.logger.warning("eSewa callback with no data")
         return error_response("Missing callback data", 400)
 
-    result = EsewaGateway.verify_payment(encoded_data)
+    # Decode without verifying first to locate the school's credentials.
+    try:
+        raw = json.loads(base64.b64decode(encoded_data).decode())
+    except Exception:
+        return error_response("Invalid callback data", 400)
+
+    collection_id = raw.get("transaction_uuid")
+    fc = FeeCollection.query.get(collection_id)
+    if not fc:
+        return error_response("Fee collection not found", 404)
+
+    school = School.query.get(fc.school_id)
+    if not school:
+        return error_response("School not found", 404)
+
+    method_cfg = _school_payment_method(school, "esewa")
+    secret_key = (method_cfg.get("secret_key") or "").strip()
+
+    if not secret_key:
+        current_app.logger.error("eSewa secret_key not configured for school %s", fc.school_id)
+        return error_response("Payment gateway not configured for this school", 422)
+
+    result = EsewaGateway.verify_payment(encoded_data, secret_key=secret_key)
     current_app.logger.info(f"eSewa verify result: {result}")
 
     if not result.get("verified"):
         return error_response(result.get("error", "Payment verification failed"), 400)
-
-    collection_id = result.get("transaction_uuid")
-    fc = FeeCollection.query.get(collection_id)
-    if not fc:
-        return error_response("Fee collection not found", 404)
 
     amount = float(result.get("total_amount", 0) or 0)
     recorded_amount = _apply_fee_payment(fc, amount, "esewa", result.get("ref_id"))
@@ -52,6 +79,12 @@ def esewa_callback():
     receipt.pdf_url = fc.receipt_url
     db.session.commit()
 
+    try:
+        from app.plugins.events import emit
+        emit("fee.paid", school_id=str(fc.school_id), student_id=str(fc.student_id), amount=amount)
+    except Exception:
+        pass
+
     return success_response({
         "verified": True,
         "collection_id": str(fc.id),
@@ -63,35 +96,41 @@ def esewa_callback():
 @webhooks_bp.route("/khalti/callback", methods=["GET", "POST"])
 def khalti_callback():
     """Handle Khalti payment callback — Khalti redirects with pidx in query params."""
-    from app.services.payments.khalti_gateway import KhaltiGateway
     from app.models.fee import FeeCollection, FeeReceipt
+    from app.models.school import School
+    from app.services.payments.khalti_gateway import KhaltiGateway
 
-    pidx = request.args.get("pidx") or (request.get_json(silent=True) or {}).get("pidx")
-    purchase_order_id = request.args.get("purchase_order_id") or (
-        request.get_json(silent=True) or {}
-    ).get("purchase_order_id")
+    params = request.args.to_dict() or (request.get_json(silent=True) or {})
+    pidx = params.get("pidx")
+    purchase_order_id = params.get("purchase_order_id")
+
     if not pidx:
         current_app.logger.warning("Khalti callback with no pidx")
         return error_response("Missing pidx", 400)
 
-    result = KhaltiGateway.verify_payment(pidx)
+    fc = FeeCollection.query.get(purchase_order_id) if purchase_order_id else None
+    if not fc:
+        return error_response("Fee collection not found", 404)
+
+    school = School.query.get(fc.school_id)
+    if not school:
+        return error_response("School not found", 404)
+
+    method_cfg = _school_payment_method(school, "khalti")
+    secret_key = (method_cfg.get("secret_key") or "").strip()
+
+    if not secret_key:
+        current_app.logger.error("Khalti secret_key not configured for school %s", fc.school_id)
+        return error_response("Payment gateway not configured for this school", 422)
+
+    result = KhaltiGateway.verify_payment(pidx, secret_key=secret_key)
     current_app.logger.info(f"Khalti verify result: {result}")
 
     if not result.get("verified"):
         return error_response(f"Payment not verified: {result.get('status')}", 400)
 
-    collection_id = purchase_order_id
-    fc = FeeCollection.query.get(collection_id) if collection_id else None
-    if not fc:
-        return error_response("Fee collection not found", 404)
-
     amount = float(result.get("amount_npr", 0) or 0)
-    recorded_amount = _apply_fee_payment(
-        fc,
-        amount,
-        "khalti",
-        result.get("transaction_id"),
-    )
+    recorded_amount = _apply_fee_payment(fc, amount, "khalti", result.get("transaction_id"))
 
     receipt = FeeReceipt(
         school_id=fc.school_id,
@@ -109,6 +148,12 @@ def khalti_callback():
     receipt.pdf_url = fc.receipt_url
     db.session.commit()
 
+    try:
+        from app.plugins.events import emit
+        emit("fee.paid", school_id=str(fc.school_id), student_id=str(fc.student_id), amount=amount)
+    except Exception:
+        pass
+
     return success_response({
         "verified": True,
         "collection_id": str(fc.id),
@@ -117,12 +162,95 @@ def khalti_callback():
     })
 
 
-@webhooks_bp.route("/fonepay/callback", methods=["POST"])
+@webhooks_bp.route("/fonepay/callback", methods=["GET", "POST"])
 def fonepay_callback():
-    """Handle FonePay payment callback."""
-    data = request.get_json(silent=True) or request.form.to_dict()
+    """Handle FonePay payment callback — verifies signature and records payment."""
+    from app.models.fee import FeeCollection, FeeReceipt
+    from app.models.school import School
+    from app.services.payments.fonepay_gateway import FonePayGateway
+
+    data = request.args.to_dict() or request.form.to_dict() or (request.get_json(silent=True) or {})
     current_app.logger.info(f"FonePay callback: {data}")
-    return success_response({"received": True})
+
+    prn = data.get("PRN", "")
+    pid = data.get("PID", "")  # merchant code sent back by FonePay
+    if not prn or not pid:
+        return error_response("Missing PRN or PID", 400)
+
+    # Find the school by its FonePay merchant_code matching PID.
+    # fee_config is a JSON column; we query all schools and filter in Python
+    # (acceptable — FonePay callbacks are infrequent).
+    matching_school = None
+    for school in School.query.filter_by(is_deleted=False).all():
+        cfg = _school_payment_method(school, "fonepay")
+        if (cfg.get("merchant_code") or "").strip() == pid:
+            matching_school = school
+            break
+
+    if not matching_school:
+        current_app.logger.error("FonePay callback: no school found for PID=%s", pid)
+        return error_response("Payment gateway not configured", 422)
+
+    method_cfg = _school_payment_method(matching_school, "fonepay")
+    merchant_code = (method_cfg.get("merchant_code") or "").strip()
+    secret_key = (method_cfg.get("secret_key") or "").strip()
+
+    if not secret_key:
+        return error_response("Payment gateway not configured for this school", 422)
+
+    result = FonePayGateway.verify_payment(
+        prn, data, merchant_code=merchant_code, secret_key=secret_key
+    )
+
+    if not result.get("verified"):
+        return error_response(result.get("error", "Payment verification failed"), 400)
+
+    # Resolve collection: try purchase_order_id first, then scan school's collections.
+    collection_id = data.get("purchase_order_id") or data.get("R1", "")
+    fc = FeeCollection.query.filter_by(
+        id=collection_id, school_id=matching_school.id, is_deleted=False
+    ).first() if collection_id else None
+
+    if not fc:
+        current_app.logger.warning("FonePay: could not resolve collection from PRN=%s", prn)
+        return error_response("Fee collection not found", 404)
+
+    amount = float(result.get("amount", 0) or 0)
+    recorded_amount = _apply_fee_payment(fc, amount, "fonepay", result.get("transaction_id"))
+
+    receipt = FeeReceipt(
+        school_id=fc.school_id,
+        collection_id=fc.id,
+        student_id=fc.student_id,
+        receipt_number=_webhook_receipt_number(fc),
+        amount=recorded_amount,
+        payment_method="fonepay",
+        transaction_id=result.get("transaction_id"),
+    )
+    receipt.verified_hash = _webhook_receipt_hash(receipt.receipt_number, fc, recorded_amount)
+    db.session.add(receipt)
+    fc.receipt_number = receipt.receipt_number
+    fc.receipt_url = f"/api/v1/fees/receipts/{receipt.id}/pdf"
+    receipt.pdf_url = fc.receipt_url
+    db.session.commit()
+
+    try:
+        from app.plugins.events import emit
+        emit(
+            "fee.paid",
+            school_id=str(fc.school_id),
+            student_id=str(fc.student_id),
+            amount=amount,
+        )
+    except Exception:
+        pass
+
+    return success_response({
+        "verified": True,
+        "collection_id": str(fc.id),
+        "status": fc.payment_status,
+        "receipt_id": str(receipt.id),
+    })
 
 
 @webhooks_bp.route("/whatsapp", methods=["GET"])

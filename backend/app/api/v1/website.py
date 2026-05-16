@@ -4,6 +4,7 @@ from flask_jwt_extended import jwt_required
 
 from app.models.school import School, SchoolWebsite
 from app.models.notice import Notice
+from app.models.website import WebsitePage
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
@@ -35,6 +36,15 @@ def get_public_website(slug):
         .all()
     )
 
+    # Get home page sections from website builder
+    home_page = WebsitePage.query.filter_by(
+        school_id=school.id, slug="home", is_deleted=False
+    ).first()
+    page_sections = []
+    if home_page:
+        raw = home_page.sections or []
+        page_sections = sorted(raw, key=lambda s: s.get("sort_order", 0))
+
     return success_response({
         "school": {
             "name": school.name,
@@ -51,6 +61,8 @@ def get_public_website(slug):
             "established_year_bs": school.established_year_bs,
             "total_students": school.total_students,
             "total_staff": school.total_staff,
+            "about_us": getattr(school, "about_us", None),
+            "vision": getattr(school, "vision", None),
         },
         "website": {
             "theme_slug": website.theme_slug if website else "default",
@@ -58,6 +70,7 @@ def get_public_website(slug):
             "meta_title": website.meta_title if website else school.name,
             "meta_description": website.meta_description if website else None,
         } if website else None,
+        "sections": page_sections,
         "notices": [
             {
                 "id": str(n.id),

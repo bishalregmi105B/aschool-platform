@@ -1,5 +1,5 @@
 """Attendance models."""
-from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, String, Text, Time
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, String, Text, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -8,6 +8,12 @@ from app.models.base import SchoolModel
 
 class Attendance(SchoolModel):
     __tablename__ = "attendance"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id", "student_id", "date",
+            name="uq_attendance_student_date",
+        ),
+    )
 
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
@@ -29,6 +35,12 @@ class Attendance(SchoolModel):
 
 class TeacherAttendance(SchoolModel):
     __tablename__ = "teacher_attendance"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id", "user_id", "date",
+            name="uq_teacher_attendance_user_date",
+        ),
+    )
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)

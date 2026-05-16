@@ -95,3 +95,29 @@ class WhatsAppBotConfig(SchoolModel):
     auto_replies = Column(JSONB, default=list)  # [{keyword, response, match_type}]
     notification_types = Column(JSONB, default=list)  # ["attendance", "fee_reminder", ...]
     language = Column(String(5), default="en")
+
+
+class InAppNotification(SchoolModel):
+    """In-app notification center entries — supports read/unread + badge count.
+
+    Every push notification, event, or system alert creates an in-app entry
+    so users can review notifications in the dashboard even if they dismissed
+    the push.
+    """
+    __tablename__ = "in_app_notifications"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String(300), nullable=False)
+    body = Column(Text, nullable=False)
+    category = Column(String(50), default="general")  # attendance, fee, notice, exam, system
+    priority = Column(
+        Enum("low", "normal", "high", "urgent", name="notification_priority"),
+        default="normal",
+    )
+    data = Column(JSONB, default=dict)  # deep-link payload
+    is_read = Column(Boolean, default=False, index=True)
+    read_at = Column(DateTime)
+    action_url = Column(String(500))  # deep-link URL
+
+    user = relationship("User", backref="in_app_notifications")
+

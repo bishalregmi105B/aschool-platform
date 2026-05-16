@@ -81,6 +81,7 @@ class FeeReceipt(SchoolModel):
     transaction_id = Column(String(200))
     pdf_url = Column(Text)
     qr_code_url = Column(Text)
+    idempotency_key = Column(String(100), unique=True, index=True)
     sent_via_whatsapp = Column(Boolean, default=False)
     sent_at = Column(DateTime)
     verified_hash = Column(String(255))

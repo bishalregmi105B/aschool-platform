@@ -26,3 +26,6 @@ export { AdmissionCTA } from "./AdmissionCTA";
 export { ContactForm } from "./ContactForm";
 export { PhotoGallery } from "./PhotoGallery";
 export { Testimonials } from "./Testimonials";
+
+// Unified Section Renderer (used by website builder editor)
+export { SectionRenderer } from "./SectionRenderer";

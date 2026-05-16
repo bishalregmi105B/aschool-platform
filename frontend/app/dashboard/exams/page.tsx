@@ -77,11 +77,7 @@ const STATUS_CONFIG: Record<string, { variant: "default"|"secondary"|"destructiv
 };
 
 export default function ExamsPage() {
-  return (
-    <PluginGate slug="exams">
-      <ExamsContent />
-    </PluginGate>
-  );
+  return <ExamsContent />;
 }
 
 function ExamsContent() {
@@ -104,6 +100,7 @@ function ExamsContent() {
     is_practical: false,
     practical_marks: "25",
     description: "",
+    subject_ids: [] as string[],
   });
 
   const { data: exams, isLoading } = useQuery({
@@ -144,6 +141,26 @@ function ExamsContent() {
     },
   });
 
+  // Fetch subjects for selected class (for the exam creation dialog)
+  const { data: subjectsForClass } = useQuery({
+    queryKey: ["subjects-for-class", formData.class_id],
+    queryFn: async () => {
+      if (!formData.class_id) return [];
+      const res = await api.get(`/academics/subjects?class_id=${formData.class_id}`);
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+    enabled: !!formData.class_id && createOpen,
+  });
+
+  function toggleSubjectId(id: string) {
+    setFormData((prev) => ({
+      ...prev,
+      subject_ids: prev.subject_ids.includes(id)
+        ? prev.subject_ids.filter((s) => s !== id)
+        : [...prev.subject_ids, id],
+    }));
+  }
+
   function displayExamDate(bsDate?: string, adDate?: string) {
     return bsDate || adDate || "—";
   }
@@ -160,6 +177,7 @@ function ExamsContent() {
             ? payload.academic_year_id
             : undefined,
         class_id: payload.class_id || undefined,
+        subject_ids: payload.subject_ids.length > 0 ? payload.subject_ids : undefined,
       };
       if (editExam) {
         return (await api.put(`/exams/${editExam.id}`, body)).data;
@@ -197,7 +215,7 @@ function ExamsContent() {
     setFormData({
       name: "", name_nepali: "", exam_type: "terminal", academic_year_id: "current", class_id: "",
       start_date_bs: "", end_date_bs: "", total_marks: "100", pass_marks: "35",
-      is_practical: false, practical_marks: "25", description: "",
+      is_practical: false, practical_marks: "25", description: "", subject_ids: [],
     });
   }
 
@@ -216,6 +234,7 @@ function ExamsContent() {
       is_practical: exam.is_practical || false,
       practical_marks: String(exam.practical_marks || 25),
       description: exam.description || "",
+      subject_ids: [],
     });
     setCreateOpen(true);
   }
@@ -592,7 +611,7 @@ function ExamsContent() {
                 <Label>Class</Label>
                 <Select
                   value={formData.class_id}
-                  onValueChange={(v) => setFormData({ ...formData, class_id: v })}
+                  onValueChange={(v) => setFormData({ ...formData, class_id: v, subject_ids: [] })}
                 >
                   <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
@@ -603,6 +622,67 @@ function ExamsContent() {
                 </Select>
               </div>
             </div>
+
+            {/* Subject selection — only when a class is picked */}
+            {formData.class_id && (
+              <div className="space-y-2">
+                <Label>
+                  Subjects Included in this Exam
+                  <span className="ml-2 text-xs text-muted-foreground">(marks config per subject from Academic setup)</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto p-3 rounded-lg border bg-muted/30">
+                  {(subjectsForClass || []).length === 0 ? (
+                    <p className="col-span-2 text-xs text-muted-foreground text-center py-4">
+                      No subjects found for this class. Add subjects in Academic Setup.
+                    </p>
+                  ) : (
+                    (subjectsForClass || []).map((sub: { id: string; name: string; has_practical?: boolean; full_marks?: number; pass_marks?: number }) => (
+                      <label
+                        key={sub.id}
+                        className={`flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-background border transition-colors ${
+                          formData.subject_ids.includes(sub.id) ? "border-primary bg-primary/5" : "border-transparent"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={formData.subject_ids.includes(sub.id)}
+                          onCheckedChange={() => toggleSubjectId(sub.id)}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-medium leading-none">{sub.name}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            FM: {sub.full_marks ?? "—"} | PM: {sub.pass_marks ?? "—"}
+                            {sub.has_practical && " | Practical"}
+                          </p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {(subjectsForClass || []).length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-6"
+                      onClick={() => setFormData({ ...formData, subject_ids: (subjectsForClass || []).map((s: { id: string }) => s.id) })}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-6"
+                      onClick={() => setFormData({ ...formData, subject_ids: [] })}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -625,7 +705,7 @@ function ExamsContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Total / Full Marks</Label>
+                <Label>Default Full Marks <span className="text-xs text-muted-foreground">(overridden per subject)</span></Label>
                 <Input
                   type="number"
                   value={formData.total_marks}
@@ -633,7 +713,7 @@ function ExamsContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Pass Marks (NEB: 35%)</Label>
+                <Label>Default Pass Marks <span className="text-xs text-muted-foreground">(NEB: 35%)</span></Label>
                 <Input
                   type="number"
                   value={formData.pass_marks}

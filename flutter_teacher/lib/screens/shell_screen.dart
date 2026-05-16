@@ -103,6 +103,9 @@ class _TeacherShellScreenState extends ConsumerState<TeacherShellScreen> {
     if (location.startsWith('/leave')) return 'Leave';
     if (location.startsWith('/my-attendance')) return 'My Attendance';
     if (location.startsWith('/payroll')) return 'Payroll Slips';
+    if (location.startsWith('/library')) return 'Library';
+    if (location.startsWith('/student-wellbeing')) return 'Student Wellbeing';
+    if (location.startsWith('/portfolios')) return 'Portfolios';
     return 'ASchool';
   }
 
@@ -257,6 +260,24 @@ class _TeacherShellScreenState extends ConsumerState<TeacherShellScreen> {
           path: '/ai-tools',
           moduleKey: 'ai_tools',
           pluginSlug: 'ai_tutor'),
+      _TeacherDrawerItem(
+          icon: Icons.menu_book_rounded,
+          title: 'Library',
+          path: '/library',
+          moduleKey: 'library',
+          pluginSlug: 'library_management'),
+      _TeacherDrawerItem(
+          icon: Icons.favorite_rounded,
+          title: 'Student Wellbeing',
+          path: '/student-wellbeing',
+          moduleKey: 'wellbeing',
+          pluginSlug: 'wellbeing'),
+      _TeacherDrawerItem(
+          icon: Icons.folder_special_rounded,
+          title: 'Portfolios',
+          path: '/portfolios',
+          moduleKey: 'portfolios',
+          pluginSlug: 'student_portfolio'),
     ]);
 
     return sections;

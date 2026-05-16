@@ -18,6 +18,13 @@ export interface PaymentMethodConfig {
   qr_image_url?: string;
   qr_payload?: string;
   instructions?: string;
+  /** Gateway merchant/product code (eSewa product code, FonePay PID). */
+  merchant_code?: string;
+  /**
+   * Gateway secret key — write-only. The API returns "***" when a key is set
+   * and "" when none is configured. Submitting "***" preserves the existing key.
+   */
+  secret_key?: string;
 }
 
 export interface PaymentMethodsResponse {
@@ -31,75 +38,6 @@ export const EMPTY_PAYMENT_METHODS_RESPONSE: PaymentMethodsResponse = {
   enabled_methods: [],
   online_methods: [],
 };
-
-export const FALLBACK_PAYMENT_METHODS: PaymentMethodConfig[] = [
-  {
-    key: "cash",
-    label: "Cash",
-    enabled: true,
-    mode: "offline",
-    requires_reference: false,
-    supports_qr: false,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-  {
-    key: "bank",
-    label: "Bank Transfer",
-    enabled: true,
-    mode: "offline",
-    requires_reference: true,
-    supports_qr: true,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-  {
-    key: "cheque",
-    label: "Cheque",
-    enabled: true,
-    mode: "offline",
-    requires_reference: true,
-    supports_qr: false,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-  {
-    key: "fonepay",
-    label: "FonePay",
-    enabled: true,
-    mode: "offline",
-    requires_reference: true,
-    supports_qr: true,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-  {
-    key: "esewa",
-    label: "eSewa",
-    enabled: true,
-    mode: "online",
-    requires_reference: false,
-    supports_qr: true,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-  {
-    key: "khalti",
-    label: "Khalti",
-    enabled: true,
-    mode: "online",
-    requires_reference: false,
-    supports_qr: true,
-    qr_image_url: "",
-    qr_payload: "",
-    instructions: "",
-  },
-];
 
 export function normalizePaymentMethodsResponse(
   data?: Partial<PaymentMethodsResponse> | null,

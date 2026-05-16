@@ -54,18 +54,22 @@ class SmsGatewayService:
 
     @classmethod
     def send_bulk(cls, numbers: list[str], message: str, identity: str = "ASchool") -> dict:
-        """Send bulk SMS to multiple numbers."""
-        results = []
+        """Send bulk SMS — dispatches each message via Celery for async delivery.
+
+        This prevents HTTP request timeouts when sending to hundreds of numbers.
+        Each SMS is sent as an individual Celery task with retry logic.
+        """
+        from app.tasks.sms_sender import send_single_sms
+
+        queued = 0
         for number in numbers:
-            result = cls.send_sms(number, message, identity)
-            result["to"] = number
-            results.append(result)
+            send_single_sms.delay(number, message, identity)
+            queued += 1
 
         return {
             "total": len(numbers),
-            "sent": sum(1 for r in results if r["success"]),
-            "failed": sum(1 for r in results if not r["success"]),
-            "results": results,
+            "queued": queued,
+            "note": "SMS messages are being delivered asynchronously via background queue.",
         }
 
     @classmethod
