@@ -56,12 +56,12 @@ export default function StaffIdCardsPage() {
 
   const renderMutation = useMutation({
     mutationFn: async () => {
-      const selected = (staffList || []).filter(s => selectedStaffIds.has(s.id));
+      const selected = (staffList || []).filter((s: any) => selectedStaffIds.has(s.id));
       if (selected.length === 0) throw new Error("No staff selected");
       if (!selectedTemplateId) throw new Error("No template selected");
 
       // We'll generate them one by one in parallel using the generic render endpoint
-      const promises = selected.map(staff => 
+      const promises = selected.map((staff: any) => 
         api.post("/design-studio/render", {
           template_id: selectedTemplateId,
           data: staff.fields,
@@ -103,7 +103,7 @@ export default function StaffIdCardsPage() {
                 <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 4px;">Print ID Cards</button>
               </div>
               <div class="grid-container">
-                ${cards.map(card => `<div class="id-card">${card?.html || '<div style="padding:20px;text-align:center;">Template Error</div>'}</div>`).join("")}
+                ${cards.map((card: any) => `<div class="id-card">${card?.html || '<div style="padding:20px;text-align:center;">Template Error</div>'}</div>`).join("")}
               </div>
             </body>
           </html>
@@ -130,7 +130,7 @@ export default function StaffIdCardsPage() {
     if (selectedStaffIds.size === staffList.length) {
       setSelectedStaffIds(new Set());
     } else {
-      setSelectedStaffIds(new Set(staffList.map(s => s.id)));
+      setSelectedStaffIds(new Set(staffList.map((s: any) => s.id)));
     }
   };
 

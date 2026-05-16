@@ -53,7 +53,7 @@ function EmergencyContent() {
         <CardHeader><CardTitle className="text-red-700 flex items-center gap-2"><Siren className="h-5 w-5" /> Send Emergency Alert</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {types.map(t => (
+            {types.map((t: any) => (
               <button key={t.value} onClick={() => setType(t.value)} className={`p-3 rounded-lg text-center text-sm transition-all ${type === t.value ? `${t.color} ring-2 ring-offset-1` : "bg-white border hover:bg-muted"}`}>
                 <t.icon className="h-5 w-5 mx-auto mb-1" />{t.label}
               </button>

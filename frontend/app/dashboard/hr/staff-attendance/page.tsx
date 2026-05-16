@@ -53,7 +53,7 @@ export default function StaffAttendancePage() {
       
       // Pre-fill local state
       const newRecords: Record<string, AttendanceRecord> = {};
-      (res.data.data || []).forEach(record => {
+      (res.data.data || []).forEach((record: any) => {
         newRecords[record.user_id] = {
           user_id: record.user_id,
           status: record.status as any,
@@ -84,7 +84,7 @@ export default function StaffAttendancePage() {
 
   const markAll = (status: AttendanceRecord["status"]) => {
     const newRecords = { ...records };
-    (staffData || []).forEach(staff => {
+    (staffData || []).forEach((staff: any) => {
       newRecords[staff.id] = { ...newRecords[staff.id], user_id: staff.id, status };
     });
     setRecords(newRecords);

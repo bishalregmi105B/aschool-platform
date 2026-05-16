@@ -86,9 +86,9 @@ function OnlineExamContent() {
     onError: () => toast.error("Failed to create exam"),
   });
 
-  const upcoming = exams.filter(e => e.status === "upcoming").length;
-  const active = exams.filter(e => e.status === "active").length;
-  const completed = exams.filter(e => e.status === "completed").length;
+  const upcoming = exams.filter((e: any) => e.status === "upcoming").length;
+  const active = exams.filter((e: any) => e.status === "active").length;
+  const completed = exams.filter((e: any) => e.status === "completed").length;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,7 +254,7 @@ function OnlineExamContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {exams.map(exam => (
+                {exams.map((exam: any) => (
                   <TableRow key={exam.id}>
                     <TableCell className="font-medium">{exam.title}</TableCell>
                     <TableCell>{exam.subject_name ?? "—"}</TableCell>

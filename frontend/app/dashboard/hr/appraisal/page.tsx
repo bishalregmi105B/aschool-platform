@@ -114,7 +114,7 @@ function AppraisalContent() {
               { key: "teaching_score", label: "Teaching Quality (1-5)" },
               { key: "attendance_score", label: "Attendance & Punctuality (1-5)" },
               { key: "teamwork_score", label: "Teamwork & Communication (1-5)" },
-            ].map(s => (
+            ].map((s: any) => (
               <div key={s.key} className="space-y-2">
                 <Label>{s.label}</Label>
                 <Input type="number" min="1" max="5" value={(form as any)[s.key]} onChange={(e) => setForm({ ...form, [s.key]: e.target.value })} />

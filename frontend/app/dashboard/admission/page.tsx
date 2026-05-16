@@ -145,7 +145,7 @@ function AdmissionContent() {
       </div>
 
       <div className="flex gap-2">
-        {(["dashboard", "inquiries", "applications"] as const).map(t => (
+        {(["dashboard", "inquiries", "applications"] as const).map((t: any) => (
           <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
             {t === "dashboard" && <BarChart3 className="h-4 w-4 mr-2" />}
             {t === "inquiries" && <UserPlus className="h-4 w-4 mr-2" />}
@@ -161,7 +161,7 @@ function AdmissionContent() {
             <CardContent><p className="text-3xl font-bold">{dashboard?.total_inquiries || 0}</p></CardContent>
           </Card>
           <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {pipelineStages.map(stage => (
+            {pipelineStages.map((stage: any) => (
               <Card key={stage}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs text-muted-foreground capitalize">{stage.replace("_", " ")}</CardTitle>
@@ -228,7 +228,7 @@ function AdmissionContent() {
                       <Select onValueChange={(val) => statusMut.mutate({ id: app.id, status: val })}>
                         <SelectTrigger className="w-32 h-8"><SelectValue placeholder="Move to" /></SelectTrigger>
                         <SelectContent>
-                          {pipelineStages.map(s => <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>)}
+                          {pipelineStages.map((s: any) => <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </TableCell>

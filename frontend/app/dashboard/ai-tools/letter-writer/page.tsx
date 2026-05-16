@@ -59,7 +59,7 @@ function LetterContent() {
               <div className="space-y-2">
                 <Label>Letter Type</Label>
                 <select className="w-full border rounded-md p-2" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {types.map((t: any) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
