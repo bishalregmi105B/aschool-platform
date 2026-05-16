@@ -15,7 +15,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 EXPOSE 3000
 
