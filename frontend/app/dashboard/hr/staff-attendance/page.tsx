@@ -149,7 +149,7 @@ export default function StaffAttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(staffData || []).map((staff) => {
+              {(staffData || []).map((staff: any) => {
                 const record = records[staff.id] || { status: "absent" };
                 
                 return (

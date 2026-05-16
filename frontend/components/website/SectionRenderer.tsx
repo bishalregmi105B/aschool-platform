@@ -13,7 +13,7 @@ import { AdmissionCTA } from "@/components/website/AdmissionCTA";
 import { Testimonials } from "@/components/website/Testimonials";
 import type { SchoolSection } from "@/lib/school-website/types";
 
-type C = Record<string, unknown>;
+type C = Record<string, any>;
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 const bool = (v: unknown, fallback = true) => (typeof v === "boolean" ? v : fallback);
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
