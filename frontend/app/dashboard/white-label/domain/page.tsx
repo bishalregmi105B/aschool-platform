@@ -21,7 +21,7 @@ function DomainContent() {
   const qc = useQueryClient();
   const [domain, setDomain] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["white-label-domain"],
     queryFn: async () => { const r = await api.get("/schools/white-label/domain"); return r.data?.data ?? r.data; },
     onSuccess: (d: any) => { if (d?.custom_domain) setDomain(d.custom_domain); },
