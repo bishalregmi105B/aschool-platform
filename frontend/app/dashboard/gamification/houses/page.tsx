@@ -66,7 +66,7 @@ function HousesContent() {
                 <div className="h-8 w-8 rounded-full" style={{ backgroundColor: h.color }} />
                 <h3 className="font-semibold text-lg">{h.name}</h3>
               </div>
-              {h.motto && <p className="text-sm text-muted-foreground italic mb-2">"{h.motto}"</p>}
+              {h.motto && <p className="text-sm text-muted-foreground italic mb-2">&ldquo;{h.motto}&rdquo;</p>}
               <div className="flex justify-between items-center mt-3">
                 <span className="text-sm text-muted-foreground">{h.member_count || 0} members</span>
                 <Badge variant="outline" className="font-mono">{h.total_points?.toLocaleString() || 0} pts</Badge>
