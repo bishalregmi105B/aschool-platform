@@ -21,7 +21,7 @@ export default function LeaderboardPage() {
 }
 
 function LeaderboardContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["gamification-leaderboard-full"],
     queryFn: async () => (await api.get("/gamification/leaderboard", { params: { top: 50 } })).data?.data || [],
   });

@@ -42,7 +42,7 @@ function PayrollContent() {
     new Date().toISOString().slice(0, 7),
   );
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["payroll", month],
     queryFn: async () => {
       const r = await api.get("/hr/payroll", { params: { month } });

@@ -22,7 +22,7 @@ function LeavesContent() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("pending");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["leaves", filter],
     queryFn: async () => { const r = await api.get("/hr/leaves", { params: { status: filter !== "all" ? filter : undefined } }); return r.data; },
   });

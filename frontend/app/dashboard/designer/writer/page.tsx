@@ -245,7 +245,7 @@ export default function WriterPage() {
   }, [config.size, config.orientation]);
 
   // ── Load saved document ───────────────────────────────────────────
-  useQuery({
+  useQuery<any>({
     queryKey: ["writer-doc", docId],
     queryFn: async () => { const r = await api.get(`/design-studio/documents/${docId}`); return r.data?.data; },
     enabled: !!docId,
@@ -261,7 +261,7 @@ export default function WriterPage() {
   } as any);
 
   // ── Load template from writer_json (native blocks) ────────────────
-  useQuery({
+  useQuery<any>({
     queryKey: ["writer-template", templateId],
     queryFn: async () => {
       const r = await api.get("/design-studio/templates");

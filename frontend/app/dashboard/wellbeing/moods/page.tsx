@@ -30,12 +30,12 @@ export default function MoodsPage() {
 }
 
 function MoodsContent() {
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries, isLoading } = useQuery<any>({
     queryKey: ["wellbeing-moods-admin"],
     queryFn: async () => (await api.get("/wellbeing/mood")).data?.data || [],
   });
 
-  const { data: summary } = useQuery({
+  const { data: summary } = useQuery<any>({
     queryKey: ["wellbeing-mood-summary"],
     queryFn: async () => (await api.get("/wellbeing/mood/summary")).data?.data || {},
   });

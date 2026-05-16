@@ -15,7 +15,7 @@ export default function WhiteLabelPage() {
 }
 
 function WhiteLabelContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["white-label-overview"],
     queryFn: async () => { const r = await api.get("/schools/white-label/overview"); return r.data?.data ?? r.data; },
   });

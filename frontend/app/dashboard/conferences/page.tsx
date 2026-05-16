@@ -52,7 +52,7 @@ export default function ConferencesPage() {
   });
   const queryClient = useQueryClient();
 
-  const { data: conferences, isLoading } = useQuery({
+  const { data: conferences, isLoading } = useQuery<any>({
     queryKey: ["conferences"],
     queryFn: async () => {
       const res = await api.get("/conferences");

@@ -25,7 +25,7 @@ function SurveysContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", target_group: "all", is_anonymous: true });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["wellbeing-surveys"],
     queryFn: async () => (await api.get("/wellbeing/surveys")).data?.data || [],
   });

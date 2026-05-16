@@ -34,7 +34,7 @@ export default function StaffAttendancePage() {
   
   const queryClient = useQueryClient();
 
-  const { data: staffData, isLoading: staffLoading } = useQuery({
+  const { data: staffData, isLoading: staffLoading } = useQuery<any>({
     queryKey: ["staff-users"],
     queryFn: async () => {
       // Fetch both teachers and staff
@@ -46,7 +46,7 @@ export default function StaffAttendancePage() {
     },
   });
 
-  const { data: attendanceData, isLoading: attLoading } = useQuery({
+  const { data: attendanceData, isLoading: attLoading } = useQuery<any>({
     queryKey: ["staff-attendance", date],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>(`/attendance/teachers/list?date=${date}`);

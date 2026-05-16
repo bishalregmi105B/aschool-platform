@@ -26,7 +26,7 @@ function VaccinationsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ student_id: "", vaccine_name: "", dose_number: "1", administered_date: "", administered_by: "", next_due_date: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["health-immunizations"],
     queryFn: async () => (await api.get("/health-records/immunizations")).data?.data || [],
   });

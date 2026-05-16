@@ -59,7 +59,7 @@ function WellbeingContent() {
   const [tab, setTab] = useState<"overview" | "check-in" | "entries">("overview");
   const queryClient = useQueryClient();
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading } = useQuery<any>({
     queryKey: ["wellbeing-summary"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/wellbeing/mood/summary?days=7");
@@ -67,7 +67,7 @@ function WellbeingContent() {
     },
   });
 
-  const { data: entries } = useQuery({
+  const { data: entries } = useQuery<any>({
     queryKey: ["wellbeing-entries"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/wellbeing/mood");

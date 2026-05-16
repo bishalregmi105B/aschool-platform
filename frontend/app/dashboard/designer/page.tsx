@@ -39,7 +39,7 @@ export default function DesignerPage() {
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
-  const { data: templates = [], isLoading } = useQuery({
+  const { data: templates = [], isLoading } = useQuery<any>({
     queryKey: ["design-templates"],
     queryFn: async () => {
       const res = await api.get("/design-studio/templates");

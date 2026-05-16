@@ -36,7 +36,7 @@ export default function PayrollSettingsPage() {
     deductions: [] as Array<{ name: string; percentage: number }>
   });
 
-  const { data: school, isLoading } = useQuery({
+  const { data: school, isLoading } = useQuery<any>({
     queryKey: ["current-school"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<School>>("/schools/current");

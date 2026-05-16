@@ -62,7 +62,7 @@ function GamificationContent() {
   const [tab, setTab] = useState<"leaderboard" | "badges" | "houses">("leaderboard");
   const queryClient = useQueryClient();
 
-  const { data: leaderboard, isLoading: lbLoading } = useQuery({
+  const { data: leaderboard, isLoading: lbLoading } = useQuery<any>({
     queryKey: ["gamification-leaderboard"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/gamification/leaderboard", { params: { top: 20 } });
@@ -70,7 +70,7 @@ function GamificationContent() {
     },
   });
 
-  const { data: badges, isLoading: badgeLoading } = useQuery({
+  const { data: badges, isLoading: badgeLoading } = useQuery<any>({
     queryKey: ["gamification-badges"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/gamification/badges");
@@ -78,7 +78,7 @@ function GamificationContent() {
     },
   });
 
-  const { data: houses, isLoading: houseLoading } = useQuery({
+  const { data: houses, isLoading: houseLoading } = useQuery<any>({
     queryKey: ["gamification-houses"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/gamification/houses");

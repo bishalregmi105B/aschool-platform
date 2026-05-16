@@ -17,7 +17,7 @@ export default function BenchmarkingPage() {
 }
 
 function BenchmarkingContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["benchmarking"],
     queryFn: async () => {
       const res = await api.get("/benchmarking/overview");

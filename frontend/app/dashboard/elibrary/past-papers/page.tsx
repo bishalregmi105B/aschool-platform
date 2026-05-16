@@ -22,7 +22,7 @@ function PastPapersContent() {
   const [subject, setSubject] = useState("");
   const [classFilter, setClassFilter] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["past-papers", search, subject, classFilter],
     queryFn: async () => { const r = await api.get("/elibrary/past-papers", { params: { search: search || undefined, subject: subject || undefined, class_name: classFilter || undefined } }); return r.data?.data ?? r.data; },
   });

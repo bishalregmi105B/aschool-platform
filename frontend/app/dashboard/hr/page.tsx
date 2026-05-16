@@ -26,7 +26,7 @@ export default function HRPage() {
 }
 
 function HRContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["hr-stats"],
     queryFn: async () => {
       const r = await api.get("/hr/stats");

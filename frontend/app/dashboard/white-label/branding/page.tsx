@@ -18,7 +18,7 @@ export default function BrandingPage() {
 
 function BrandingContent() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["white-label-branding"],
     queryFn: async () => { const r = await api.get("/schools/white-label/branding"); return r.data?.data ?? r.data; },
   });

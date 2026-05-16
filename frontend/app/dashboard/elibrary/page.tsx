@@ -26,7 +26,7 @@ function ELibraryContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ title: "", author: "", category: "textbook", subject: "", class_name: "", isbn: "", description: "", file_url: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["elibrary", search, category],
     queryFn: async () => {
       const r = await api.get("/elibrary/books", { params: { search: search || undefined, category: category || undefined } });
