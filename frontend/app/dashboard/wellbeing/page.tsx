@@ -140,7 +140,7 @@ function WellbeingContent() {
 
       {tab === "entries" && (
         <div className="space-y-3">
-          {entries?.map(entry => (
+          {entries?.map((entry: any) => (
             <Card key={entry.id}>
               <CardContent className="flex items-center gap-4 py-4">
                 {moodIcons[entry.mood] || <Meh className="h-5 w-5" />}

@@ -188,7 +188,7 @@ function AdmissionContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inquiries?.map(inq => (
+                {inquiries?.map((inq: any) => (
                   <TableRow key={inq.id}>
                     <TableCell className="font-medium">{inq.student_name}</TableCell>
                     <TableCell>{inq.guardian_name}</TableCell>
@@ -218,7 +218,7 @@ function AdmissionContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {applications?.map(app => (
+                {applications?.map((app: any) => (
                   <TableRow key={app.id}>
                     <TableCell className="font-medium">{app.student_name}</TableCell>
                     <TableCell>{app.guardian_name}</TableCell>

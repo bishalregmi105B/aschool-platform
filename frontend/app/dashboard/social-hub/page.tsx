@@ -172,7 +172,7 @@ function SocialHubContent() {
           </Card>
 
           {/* Posts */}
-          {posts?.map(post => (
+          {posts?.map((post: any) => (
             <Card key={post.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
@@ -203,7 +203,7 @@ function SocialHubContent() {
             <CardHeader><CardTitle className="text-sm"><Users className="h-4 w-4 inline mr-2" />Groups</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {groups?.length === 0 && <p className="text-sm text-muted-foreground">No groups yet</p>}
-              {groups?.map(group => (
+              {groups?.map((group: any) => (
                 <div key={group.id} className="flex items-center justify-between p-2 rounded hover:bg-muted">
                   <span className="text-sm font-medium">{group.name}</span>
                   <Badge variant="outline" className="text-xs">{group.group_type}</Badge>
