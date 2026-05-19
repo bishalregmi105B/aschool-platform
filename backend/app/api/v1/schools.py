@@ -1,6 +1,6 @@
 """Schools CRUD API."""
 from flask import Blueprint, g, request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt
 
 from app.models.school import School
 from app.utils.decorators import role_required, school_required, superadmin_required
@@ -45,6 +45,9 @@ def get_school(school_id):
     school = School.query.get(school_id)
     if not school or school.is_deleted:
         return error_response("School not found", 404)
+    claims = get_jwt()
+    if not claims.get("is_superadmin") and str(school.id) != str(g.get("school_id")):
+        return error_response("Forbidden", 403)
     return success_response(school.to_dict())
 
 
@@ -108,7 +111,9 @@ def update_school(school_id):
     school = School.query.get(school_id)
     if not school or school.is_deleted:
         return error_response("School not found", 404)
-
+    claims = get_jwt()
+    if not claims.get("is_superadmin") and str(school.id) != str(g.get("school_id")):
+        return error_response("Forbidden", 403)
     data = request.get_json(silent=True) or {}
     _populate_school(school, data)
     db.session.commit()

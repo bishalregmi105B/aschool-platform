@@ -28,6 +28,8 @@ import 'features/announcements/announcement_screen.dart';
 import 'features/library/teacher_library_screen.dart';
 import 'features/wellbeing/student_wellbeing_screen.dart';
 import 'features/portfolio/student_portfolios_screen.dart';
+import 'features/emergency/emergency_screen.dart';
+import 'features/lms/lms_overview_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorDashboardKey =
@@ -153,6 +155,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/portfolios',
                   builder: (_, __) => const StudentPortfoliosScreen()),
+              GoRoute(
+                  path: '/emergency',
+                  builder: (_, __) => const TeacherEmergencyScreen()),
+              GoRoute(
+                  path: '/lms',
+                  builder: (_, __) => const TeacherLmsOverviewScreen()),
             ],
           ),
           StatefulShellBranch(

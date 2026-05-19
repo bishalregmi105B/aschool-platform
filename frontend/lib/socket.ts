@@ -1,6 +1,7 @@
 /**
  * Socket.IO Client — real-time events for notifications, live updates, chat.
  */
+import Cookies from "js-cookie";
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
@@ -14,7 +15,7 @@ const SOCKET_URL =
 
 export function getSocket(): Socket {
   if (!socket) {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const token = typeof window !== "undefined" ? Cookies.get("access_token") : undefined;
 
     socket = io(SOCKET_URL, {
       autoConnect: false,

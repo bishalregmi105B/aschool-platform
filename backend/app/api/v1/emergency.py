@@ -48,6 +48,16 @@ def trigger_alert():
             setattr(alert, key, data[key])
     db.session.add(alert)
     db.session.commit()
+
+    from app.plugins.events import emit
+    emit(
+        "emergency.alert_broadcast",
+        school_id=str(g.school_id),
+        alert_id=str(alert.id),
+        alert_type=alert.alert_type or "general",
+        title=alert.title or "Emergency Alert",
+    )
+
     return created_response(_alert_dict(alert))
 
 

@@ -65,6 +65,13 @@ import {
   Star,
   HelpCircle,
   BookOpenCheck,
+  Database,
+  Camera,
+  FileBarChart2,
+  Building2,
+  HelpCircle as QuestionMarkCircle,
+  BookUser,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -146,6 +153,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ImagePlus,
   ArrowRightLeft,
   ListOrdered,
+  Database,
+  Camera,
+  FileBarChart2,
+  BookUser,
+  CalendarRange,
 };
 
 function resolveIcon(name: string | undefined): LucideIcon {
@@ -187,7 +199,7 @@ const PLUGIN_SECTION_ORDER: string[] = [
   "Personnel Management",
   "Institutional Finance",
   "Transportation",
-  "Reports",
+  "Reporting & Analytics",
   "Digital & Design",
   "AI & Analytics",
   "Student Wellbeing",
@@ -232,6 +244,12 @@ const CORE_SECTIONS: SidebarSection[] = [
           {
             label: "Parents & Guardians",
             href: "/dashboard/parents",
+            roles: ["superadmin", "school_admin"],
+          },
+          {
+            label: "Admission Inquiries",
+            href: "/dashboard/admission",
+            icon: UserPlus,
             roles: ["superadmin", "school_admin"],
           },
           {
@@ -280,6 +298,71 @@ const CORE_SECTIONS: SidebarSection[] = [
         href: "/dashboard/users",
         roles: ["superadmin", "school_admin"],
       },
+      {
+        label: "Attendance",
+        icon: CalendarRange,
+        roles: ["superadmin", "school_admin", "teacher"],
+        children: [
+          { label: "Mark Attendance", href: "/dashboard/attendance/mark", icon: ClipboardCheck },
+          { label: "View Records", href: "/dashboard/attendance", icon: Calendar },
+          { label: "Monthly Report", href: "/dashboard/attendance/reports", icon: BarChart2 },
+          { label: "Holidays", href: "/dashboard/attendance/holidays", icon: CalendarOff },
+        ],
+      },
+      {
+        label: "Timetable",
+        icon: CalendarDays,
+        roles: ["superadmin", "school_admin", "teacher"],
+        children: [
+          { label: "View Timetable", href: "/dashboard/timetable" },
+          { label: "Teacher Timetable", href: "/dashboard/timetable/teacher" },
+          { label: "Create / Generate", href: "/dashboard/timetable/generate", roles: ["superadmin", "school_admin"] },
+        ],
+      },
+    ],
+  },
+  {
+    header: "Communication & Media",
+    items: [
+      {
+        label: "Notices",
+        icon: Megaphone,
+        href: "/dashboard/notices",
+        roles: ["superadmin", "school_admin", "teacher"],
+      },
+      {
+        label: "Announcements",
+        icon: Bell,
+        href: "/dashboard/communications/announcements",
+        roles: ["superadmin", "school_admin"],
+      },
+      {
+        label: "Student Diary",
+        icon: BookUser,
+        roles: ["superadmin", "school_admin", "teacher"],
+        children: [
+          { label: "Diary Categories", href: "/dashboard/communications/diary/categories" },
+          { label: "Manage Diaries", href: "/dashboard/communications/diary" },
+        ],
+      },
+      {
+        label: "Gallery",
+        icon: Camera,
+        href: "/dashboard/communications/gallery",
+        roles: ["superadmin", "school_admin"],
+      },
+      {
+        label: "Notifications",
+        icon: Bell,
+        href: "/dashboard/notifications",
+        roles: ["superadmin", "school_admin", "teacher"],
+      },
+      {
+        label: "FAQs",
+        icon: HelpCircle,
+        href: "/dashboard/faqs",
+        roles: ["superadmin", "school_admin"],
+      },
     ],
   },
   {
@@ -296,6 +379,7 @@ const CORE_SECTIONS: SidebarSection[] = [
           { label: "Enter Marks", href: "/dashboard/exams/marks" },
           { label: "Results", href: "/dashboard/exams/results" },
           { label: "Report Cards", href: "/dashboard/exams/report-cards" },
+          { label: "Online Exams", href: "/dashboard/exams/online" },
           { label: "AI Paper Generator", href: "/dashboard/exams/ai-paper" },
         ],
       },
@@ -394,6 +478,42 @@ const CORE_SECTIONS: SidebarSection[] = [
       },
     ],
   },
+  {
+    header: "Operations",
+    items: [
+      {
+        label: "Hostel",
+        icon: Building2,
+        href: "/dashboard/hostel",
+        pluginSlug: "hostel",
+        roles: ["superadmin", "school_admin"],
+      },
+      {
+        label: "Visitors",
+        icon: Users,
+        href: "/dashboard/visitors",
+        pluginSlug: "visitor_management",
+        roles: ["superadmin", "school_admin", "staff"],
+      },
+    ],
+  },
+  {
+    header: "Reporting & Analytics",
+    items: [
+      {
+        label: "Reports",
+        icon: FileBarChart2,
+        roles: ["superadmin", "school_admin"],
+        children: [
+          { label: "Student Reports", href: "/dashboard/reports" },
+          { label: "Exam Reports", href: "/dashboard/reports/exam" },
+          { label: "Expense Reports", href: "/dashboard/reports/expense" },
+          { label: "Teacher Reports", href: "/dashboard/reports/teacher" },
+          { label: "Attendance Reports", href: "/dashboard/attendance/reports" },
+        ],
+      },
+    ],
+  },
 ];
 
 // Static bottom nav items (always shown based on roles)
@@ -412,8 +532,14 @@ const STATIC_BOTTOM_NAV: NavItem[] = [
   {
     label: "Settings",
     icon: Settings,
-    href: "/dashboard/settings",
     roles: ["superadmin", "school_admin"],
+    children: [
+      { label: "General Settings", href: "/dashboard/settings" },
+      { label: "Notification Settings", href: "/dashboard/settings/notifications" },
+      { label: "Roles & Permissions", href: "/dashboard/settings/roles" },
+      { label: "Integrations", href: "/dashboard/settings/integrations" },
+      { label: "Database Backup", href: "/dashboard/settings/backup", icon: Database },
+    ],
   },
 ];
 

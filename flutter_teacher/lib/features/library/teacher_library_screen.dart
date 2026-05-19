@@ -125,8 +125,7 @@ class _BookList extends StatelessWidget {
           subtitle: Text(b['author'] ?? '—',
               style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           trailing: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: (available ? Colors.green : Colors.grey).withAlpha(20),
               borderRadius: BorderRadius.circular(8),
@@ -168,7 +167,8 @@ class _BorrowedList extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: (overdue ? Colors.red : Colors.blue).withAlpha(20),
+              backgroundColor:
+                  (overdue ? Colors.red : Colors.blue).withAlpha(20),
               child: Icon(
                 overdue ? Icons.warning_rounded : Icons.library_books_rounded,
                 color: overdue ? Colors.red : Colors.blue,

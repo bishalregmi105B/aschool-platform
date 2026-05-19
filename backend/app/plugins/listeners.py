@@ -24,16 +24,19 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════
 
 @on("attendance.marked")
-def on_attendance_marked(school_id: str, date: str, count: int, **kwargs):
+def on_attendance_marked(school_id: str, date, count: int, **kwargs):
     """Triggered when attendance is submitted for a class.
 
     Actions:
     - Send push notification to parents of absent students
     - Feed data to analytics
     """
+    # Normalize date to ISO string to prevent JSONB serialization errors
+    from datetime import date as _date
+    date_str = date.isoformat() if isinstance(date, _date) else str(date)
     logger.info(
         "[EVENT] attendance.marked — school=%s, date=%s, students=%d",
-        school_id, date, count,
+        school_id, date_str, count,
     )
     try:
         from app.tasks.push_notifications import send_push_to_school
@@ -41,9 +44,9 @@ def on_attendance_marked(school_id: str, date: str, count: int, **kwargs):
         send_push_to_school.delay(
             school_id=school_id,
             title="Attendance Updated",
-            body=f"Attendance for {date} has been recorded ({count} students).",
+            body=f"Attendance for {date_str} has been recorded ({count} students).",
             roles=["parent"],
-            data={"type": "attendance", "date": date},
+            data={"type": "attendance", "date": date_str},
         )
     except Exception:
         logger.exception("Failed to send attendance push notification")
@@ -53,10 +56,10 @@ def on_attendance_marked(school_id: str, date: str, count: int, **kwargs):
         _create_school_notifications(
             school_id=school_id,
             title="Attendance Updated",
-            body=f"Attendance for {date} has been recorded ({count} students).",
+            body=f"Attendance for {date_str} has been recorded ({count} students).",
             category="attendance",
             roles=["parent"],
-            data={"type": "attendance", "date": date},
+            data={"type": "attendance", "date": date_str},
         )
     except Exception:
         logger.exception("Failed to create attendance in-app notifications")
@@ -516,3 +519,278 @@ def _create_school_notifications(
         )
     except Exception:
         logger.exception("Failed to create school-wide in-app notifications")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ADMISSION EVENTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+@on("admission.accepted")
+def on_admission_accepted(school_id: str, application_id: str, **kwargs):
+    """Triggered when an admission application is accepted.
+
+    Actions:
+    - Auto-create a student User account + Student profile
+    - Send welcome SMS to parent/applicant
+    - Push notification to school admin
+    """
+    logger.info(
+        "[EVENT] admission.accepted — school=%s, application=%s",
+        school_id, application_id,
+    )
+    try:
+        from app.models.admission import AdmissionApplication
+        from app.models.user import User
+        from app.models.student import Student
+        from app.utils.password import generate_default_password
+        from extensions import db
+
+        app_obj = AdmissionApplication.query.filter_by(id=application_id, school_id=school_id).first()
+        if not app_obj:
+            logger.warning("Admission application %s not found", application_id)
+            return
+
+        # Skip if student already created
+        existing = Student.query.filter_by(
+            school_id=school_id,
+            admission_application_id=application_id,
+        ).first() if hasattr(Student, "admission_application_id") else None
+        if existing:
+            logger.info("Student already created for application %s", application_id)
+            return
+
+        # Create User account
+        user = User(
+            school_id=school_id,
+            role="student",
+            full_name=app_obj.student_name or "",
+            email=app_obj.parent_email or None,
+            phone=app_obj.parent_phone or None,
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        # Create Student profile
+        student = Student(
+            school_id=school_id,
+            user_id=user.id,
+            first_name=(app_obj.student_name or "").split(" ")[0],
+            last_name=" ".join((app_obj.student_name or "").split(" ")[1:]) or "",
+            class_id=app_obj.class_applied_id if hasattr(app_obj, "class_applied_id") else None,
+        )
+        db.session.add(student)
+        db.session.commit()
+
+        logger.info("Auto-created student user=%s from admission application=%s", user.id, application_id)
+
+        # Send welcome SMS to parent
+        if app_obj.parent_phone:
+            try:
+                from app.services.communications.sms_gateway import SMSGateway
+                SMSGateway.send_sms(
+                    app_obj.parent_phone,
+                    f"Congratulations! {app_obj.student_name}'s admission has been accepted. "
+                    f"Student login: {user.email or user.phone}. "
+                    f"Default password will be shared by school administration.",
+                )
+            except Exception:
+                logger.exception("Failed to send admission acceptance SMS")
+
+    except Exception:
+        logger.exception("Failed to auto-create student from admission application=%s", application_id)
+
+
+@on("admission.enrolled")
+def on_admission_enrolled(school_id: str, application_id: str, **kwargs):
+    """Triggered when an admitted student is formally enrolled."""
+    logger.info(
+        "[EVENT] admission.enrolled — school=%s, application=%s",
+        school_id, application_id,
+    )
+    # Notify admin + assign default fee structure (future enhancement)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ASSIGNMENT EVENTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+@on("assignment.submitted")
+def on_assignment_submitted(
+    school_id: str, assignment_id: str, student_id: str, submission_id: str, **kwargs
+):
+    """Triggered when a student submits an assignment.
+
+    Actions:
+    - Push/in-app notification to the assignment's teacher
+    - Award gamification XP to the student
+    """
+    logger.info(
+        "[EVENT] assignment.submitted — school=%s, assignment=%s, student=%s",
+        school_id, assignment_id, student_id,
+    )
+
+    # Notify the teacher who created the assignment
+    try:
+        from app.models.assignment import Assignment
+        assignment = Assignment.query.filter_by(id=assignment_id, school_id=school_id).first()
+        if assignment and assignment.created_by_id:
+            from app.models.user import User
+            teacher = User.query.filter_by(id=assignment.created_by_id, is_deleted=False).first()
+            if teacher:
+                _create_user_notification(
+                    school_id=school_id,
+                    user_id=str(teacher.id),
+                    title="📝 New Submission",
+                    body=f"A student submitted '{assignment.title}'.",
+                    category="assignment",
+                    data={"type": "assignment_submitted", "assignment_id": assignment_id},
+                )
+    except Exception:
+        logger.exception("Failed to notify teacher of assignment submission")
+
+    # Award gamification points for submitting on time
+    try:
+        _award_points_if_enabled(
+            school_id=school_id,
+            student_id=student_id,
+            points=3,
+            reason="Assignment submitted",
+            category="assignment_submission",
+        )
+    except Exception:
+        logger.exception("Failed to award points for assignment submission")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INCIDENT EVENTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+@on("incident.created")
+def on_incident_created(
+    school_id: str, incident_id: str, severity: str = "low", title: str = "", **kwargs
+):
+    """Triggered when an incident is reported.
+
+    Actions:
+    - Notify school admin via push + in-app notification
+    - If severity is high/critical, also send SMS to admin
+    """
+    logger.info(
+        "[EVENT] incident.created — school=%s, incident=%s, severity=%s",
+        school_id, incident_id, severity,
+    )
+
+    try:
+        from app.tasks.push_notifications import send_push_to_school
+
+        send_push_to_school.delay(
+            school_id=school_id,
+            title="⚠️ Incident Reported",
+            body=f"{title[:80]}" if title else "A new incident has been reported.",
+            roles=["school_admin", "superadmin"],
+            data={"type": "incident", "incident_id": incident_id, "severity": severity},
+        )
+    except Exception:
+        logger.exception("Failed to send incident push notification")
+
+    try:
+        _create_school_notifications(
+            school_id=school_id,
+            title="⚠️ Incident Reported",
+            body=f"{title[:100]}" if title else "A new incident has been reported.",
+            category="incident",
+            priority="high" if severity in ("high", "critical") else "normal",
+            roles=["school_admin"],
+            data={"type": "incident", "incident_id": incident_id},
+        )
+    except Exception:
+        logger.exception("Failed to create incident in-app notification")
+
+    # For high/critical severity, send SMS to admin
+    if severity in ("high", "critical"):
+        try:
+            from app.models.user import User
+            admins = User.query.filter_by(
+                school_id=school_id, role="school_admin", is_active=True, is_deleted=False
+            ).limit(5).all()
+            if admins:
+                from app.services.communications.sms_gateway import SMSGateway
+                for admin in admins:
+                    if admin.phone:
+                        SMSGateway.send_sms(
+                            admin.phone,
+                            f"URGENT: {severity.upper()} incident reported at school. "
+                            f"Title: {title[:60]}. Login to ASchool dashboard to review.",
+                        )
+        except Exception:
+            logger.exception("Failed to send high-severity incident SMS")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EMERGENCY EVENTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+@on("emergency.alert_broadcast")
+def on_emergency_alert(
+    school_id: str, alert_id: str, alert_type: str = "general", title: str = "", **kwargs
+):
+    """Triggered when an emergency alert is broadcast.
+
+    Actions:
+    - Push notification to ALL school users (parents, students, teachers, admin)
+    - Bulk SMS to all users with phone numbers
+    - In-app notification center entry for every user
+    """
+    logger.info(
+        "[EVENT] emergency.alert_broadcast — school=%s, alert=%s, type=%s",
+        school_id, alert_id, alert_type,
+    )
+
+    push_title = f"🚨 EMERGENCY: {title[:60]}" if title else "🚨 EMERGENCY ALERT"
+    push_body = f"An emergency alert has been issued. Please follow school instructions immediately."
+
+    # Push notification to ALL users in school
+    try:
+        from app.tasks.push_notifications import send_push_to_school
+        send_push_to_school.delay(
+            school_id=school_id,
+            title=push_title,
+            body=push_body,
+            data={"type": "emergency", "alert_id": alert_id, "alert_type": alert_type},
+        )
+    except Exception:
+        logger.exception("Failed to send emergency push notification")
+
+    # In-app notification for all users
+    try:
+        _create_school_notifications(
+            school_id=school_id,
+            title=push_title,
+            body=push_body,
+            category="emergency",
+            priority="urgent",
+            data={"type": "emergency", "alert_id": alert_id},
+        )
+    except Exception:
+        logger.exception("Failed to create emergency in-app notifications")
+
+    # Bulk SMS to all users with phone numbers
+    try:
+        from app.models.user import User
+        from app.services.communications.sms_gateway import SMSGateway
+
+        users_with_phones = User.query.filter(
+            User.school_id == school_id,
+            User.phone.isnot(None),
+            User.is_active.is_(True),
+            User.is_deleted.is_(False),
+        ).with_entities(User.phone).limit(1000).all()
+
+        numbers = [u.phone for u in users_with_phones if u.phone]
+        if numbers:
+            sms_body = f"EMERGENCY ALERT: {title[:80]}. Please follow school instructions." if title else \
+                       "EMERGENCY ALERT from ASchool. Please follow school instructions immediately."
+            SMSGateway.send_bulk(numbers, sms_body, identity="ASchool-Emergency")
+    except Exception:
+        logger.exception("Failed to send emergency bulk SMS")

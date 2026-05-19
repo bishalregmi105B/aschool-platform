@@ -1,4 +1,5 @@
 """Notices & Events plugin API."""
+import bleach
 from datetime import date, datetime, time, timezone
 
 from flask import Blueprint, g, request
@@ -189,12 +190,20 @@ def delete_event(event_id):
 # ── Helpers ────────────────────────────────────────────────
 
 
+def _sanitize_html(value: str) -> str:
+    """Strip dangerous tags; allow a safe subset for rich text."""
+    allowed_tags = [
+        "b", "strong", "i", "em", "u", "s", "p", "br", "ul", "ol", "li",
+        "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "a", "span",
+    ]
+    allowed_attrs = {"a": ["href", "title", "target"], "span": ["class"]}
+    return bleach.clean(value or "", tags=allowed_tags, attributes=allowed_attrs, strip=True)
+
+
 def _populate_notice(notice, data):
     for key in (
         "title",
         "title_nepali",
-        "content",
-        "content_nepali",
         "notice_type",
         "is_pinned",
         "expires_at",
@@ -202,6 +211,11 @@ def _populate_notice(notice, data):
     ):
         if key in data:
             setattr(notice, key, data[key])
+
+    if "content" in data:
+        notice.content = _sanitize_html(data["content"])
+    if "content_nepali" in data:
+        notice.content_nepali = _sanitize_html(data.get("content_nepali") or "")
 
     if "target_roles" in data:
         notice.target_audience = data.get("target_roles") or []

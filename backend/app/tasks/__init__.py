@@ -40,5 +40,6 @@ from app.tasks import (  # noqa: E402, F401
     academic_rollover,
     streak_updater,
     social_scheduler,
+    db_backup,
 )
 

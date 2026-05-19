@@ -1,4 +1,5 @@
 """Basic Website plugin API — public pages for school website."""
+import re
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
@@ -149,11 +150,19 @@ def update_website_config():
         website = SchoolWebsite(school_id=g.school_id)
         db.session.add(website)
 
-    for key in ("theme_slug", "customizations", "is_published", "custom_css",
+    for key in ("theme_slug", "customizations", "is_published",
                 "google_analytics_id", "facebook_pixel_id", "meta_title",
                 "meta_description", "og_image_url"):
         if key in data:
             setattr(website, key, data[key])
+
+    if "custom_css" in data:
+        css = data["custom_css"] or ""
+        # Strip any attempt to inject script/HTML tags inside CSS
+        css = re.sub(r"<[^>]*>", "", css, flags=re.IGNORECASE)
+        css = re.sub(r"javascript\s*:", "", css, flags=re.IGNORECASE)
+        css = re.sub(r"expression\s*\(", "", css, flags=re.IGNORECASE)
+        website.custom_css = css
 
     if data.get("is_published") and not website.published_at:
         from datetime import datetime, timezone

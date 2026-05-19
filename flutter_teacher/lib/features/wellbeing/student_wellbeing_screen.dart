@@ -11,8 +11,7 @@ class StudentWellbeingScreen extends ConsumerStatefulWidget {
       _StudentWellbeingScreenState();
 }
 
-class _StudentWellbeingScreenState
-    extends ConsumerState<StudentWellbeingScreen>
+class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<dynamic> _checkins = [];

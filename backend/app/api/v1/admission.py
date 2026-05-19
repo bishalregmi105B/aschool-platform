@@ -116,6 +116,15 @@ def update_application_status(app_id):
     application.status = new_status
     application.remarks = data.get("remarks", application.remarks)
     db.session.commit()
+
+    # Fire integration events based on status transitions
+    if new_status == "accepted":
+        from app.plugins.events import emit
+        emit("admission.accepted", school_id=str(g.school_id), application_id=str(application.id))
+    elif new_status == "enrolled":
+        from app.plugins.events import emit
+        emit("admission.enrolled", school_id=str(g.school_id), application_id=str(application.id))
+
     return success_response(_app_dict(application))
 
 

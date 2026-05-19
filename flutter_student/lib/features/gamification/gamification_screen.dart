@@ -7,8 +7,7 @@ class GamificationScreen extends ConsumerStatefulWidget {
   const GamificationScreen({super.key});
 
   @override
-  ConsumerState<GamificationScreen> createState() =>
-      _GamificationScreenState();
+  ConsumerState<GamificationScreen> createState() => _GamificationScreenState();
 }
 
 class _GamificationScreenState extends ConsumerState<GamificationScreen>
@@ -152,8 +151,7 @@ class _PointStat extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 fontSize: 16)),
         Text(label,
-            style:
-                const TextStyle(color: Colors.white70, fontSize: 11)),
+            style: const TextStyle(color: Colors.white70, fontSize: 11)),
       ],
     );
   }
@@ -189,8 +187,8 @@ class _LeaderboardTab extends StatelessWidget {
           leading: CircleAvatar(
             backgroundColor: rankColor.withAlpha(25),
             child: Text('$rank',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, color: rankColor)),
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: rankColor)),
           ),
           title: Text(s['student_name'] ?? s['name'] ?? '—',
               style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -238,9 +236,8 @@ class _BadgesTab extends StatelessWidget {
                   : Colors.grey.withAlpha(20),
               child: Text(
                 b['emoji'] ?? '🏅',
-                style: TextStyle(
-                    fontSize: 24,
-                    color: earned ? null : Colors.grey),
+                style:
+                    TextStyle(fontSize: 24, color: earned ? null : Colors.grey),
               ),
             ),
             const SizedBox(height: 8),
@@ -281,9 +278,8 @@ class _HousesTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final h = houses[index];
         final maxPoints = (houses
-                .map((x) => (x['total_points'] as num?) ?? 0)
-                .reduce((a, b) => a > b ? a : b))
-            .toDouble();
+            .map((x) => (x['total_points'] as num?) ?? 0)
+            .reduce((a, b) => a > b ? a : b)).toDouble();
         final pts = ((h['total_points'] as num?) ?? 0).toDouble();
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -300,8 +296,7 @@ class _HousesTab extends StatelessWidget {
                     Expanded(
                         child: Text(h['name'] ?? '—',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16))),
+                                fontWeight: FontWeight.bold, fontSize: 16))),
                     Text('${h['total_points'] ?? 0} pts',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ],
@@ -318,8 +313,7 @@ class _HousesTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text('${h['member_count'] ?? 0} members',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey[600])),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
               ],
             ),
           ),

@@ -116,6 +116,34 @@ class AuthService:
             "user": user.to_dict(),
         }
 
+    # Brute-force lockout settings
+    _MAX_FAILED_LOGINS = 5          # attempts before lock
+    _LOCKOUT_DURATION_MINUTES = 15  # how long to lock
+
+    @staticmethod
+    def _check_lockout(user: User) -> str | None:
+        """Return an error string if the user is currently locked, else None."""
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds() / 60) + 1
+            return f"Account locked due to too many failed login attempts. Try again in {remaining} minute(s)."
+        return None
+
+    @staticmethod
+    def _record_failed_login(user: User) -> None:
+        """Increment failed_login_count; lock account when threshold reached."""
+        user.failed_login_count = (user.failed_login_count or 0) + 1
+        if user.failed_login_count >= AuthService._MAX_FAILED_LOGINS:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(
+                minutes=AuthService._LOCKOUT_DURATION_MINUTES
+            )
+        db.session.commit()
+
+    @staticmethod
+    def _clear_failed_logins(user: User) -> None:
+        """Reset lockout state after a successful login."""
+        user.failed_login_count = 0
+        user.locked_until = None
+
     @staticmethod
     def login_with_password(email_or_phone: str, password: str) -> dict:
         """Login with email or phone + password (for staff / admin / parents)."""
@@ -123,12 +151,22 @@ class AuthService:
             ((User.email == email_or_phone) | (User.phone == email_or_phone)),
             User.is_deleted == False
         ).first()
-        if not user or not user.check_password(password):
+
+        if not user:
+            return {"error": "Invalid credentials"}
+
+        lockout_msg = AuthService._check_lockout(user)
+        if lockout_msg:
+            return {"error": lockout_msg}
+
+        if not user.check_password(password):
+            AuthService._record_failed_login(user)
             return {"error": "Invalid credentials"}
 
         if not user.is_active:
             return {"error": "Account is deactivated"}
 
+        AuthService._clear_failed_logins(user)
         user.last_login_at = datetime.now(timezone.utc)
         db.session.commit()
 
@@ -146,14 +184,23 @@ class AuthService:
         student = Student.query.filter_by(student_id=student_id, is_deleted=False).first()
         if not student or not student.user_id:
             return {"error": "Invalid student ID or account not set up"}
-        
+
         user = User.query.get(student.user_id)
-        if not user or not user.check_password(password):
+        if not user:
+            return {"error": "Invalid student ID or password"}
+
+        lockout_msg = AuthService._check_lockout(user)
+        if lockout_msg:
+            return {"error": lockout_msg}
+
+        if not user.check_password(password):
+            AuthService._record_failed_login(user)
             return {"error": "Invalid student ID or password"}
 
         if not user.is_active:
             return {"error": "Account is deactivated"}
 
+        AuthService._clear_failed_logins(user)
         user.last_login_at = datetime.now(timezone.utc)
         db.session.commit()
 

@@ -108,7 +108,8 @@ class _NotificationCenterScreenState
                 : state.notifications.isEmpty
                     ? const NoDataContainer(
                         icon: Icons.notifications_off_outlined,
-                        message: 'No notifications yet',
+                        title: 'No notifications yet',
+                        subtitle: 'You will see attendance, fee, exam, and system updates here.',
                       )
                     : RefreshIndicator(
                         onRefresh: () => ref

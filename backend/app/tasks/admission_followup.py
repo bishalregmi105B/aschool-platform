@@ -60,3 +60,20 @@ def cleanup_stale_applications(school_id: str, stale_days: int = 90):
     db.session.commit()
     current_app.logger.info(f"Archived {len(stale)} stale applications for school {school_id}")
     return {"archived": len(stale)}
+
+
+@celery.task(name="dispatch_admission_followups", queue="default")
+def dispatch_admission_followups():
+    """Fan-out admission follow-ups to all active schools."""
+    from app.models.plugin import SchoolPlugin
+
+    from extensions import db
+
+    active_schools = (
+        db.session.query(SchoolPlugin.school_id)
+        .filter_by(plugin_slug="admissions", active=True)
+        .all()
+    )
+    for (school_id,) in active_schools:
+        send_admission_followups.delay(str(school_id))
+    return {"queued": len(active_schools)}

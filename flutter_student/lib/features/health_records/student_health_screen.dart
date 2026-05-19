@@ -109,8 +109,8 @@ class _RecordsList extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(r['notes'] ?? r['description'] ?? '—',
                 maxLines: 2, overflow: TextOverflow.ellipsis),
-            trailing: Text(r['date'] ?? '—',
-                style: const TextStyle(fontSize: 12)),
+            trailing:
+                Text(r['date'] ?? '—', style: const TextStyle(fontSize: 12)),
           ),
         );
       },
@@ -139,8 +139,8 @@ class _VaccinationsList extends StatelessWidget {
         final bool isGiven = v['status'] == 'given' || v['date'] != null;
         return ListTile(
           leading: CircleAvatar(
-            backgroundColor: (isGiven ? Colors.green : Colors.orange)
-                .withAlpha(25),
+            backgroundColor:
+                (isGiven ? Colors.green : Colors.orange).withAlpha(25),
             child: Icon(
               isGiven ? Icons.check_circle_rounded : Icons.schedule_rounded,
               color: isGiven ? Colors.green : Colors.orange,

@@ -28,7 +28,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.models.file import FileFolder, ManagedFile
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.file_upload import delete_file, generate_presigned_url, upload_file
+from app.utils.file_upload import VirusDetectedError, delete_file, generate_presigned_url, upload_file
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -155,11 +155,14 @@ def upload():
         r2_key = f"{g.school_id}/{folder}/{uuid.uuid4().hex}.{ext}" if ext else f"{g.school_id}/{folder}/{uuid.uuid4().hex}"
         mime = f.content_type or "application/octet-stream"
 
-        # Rewind and upload
+        # Rewind and upload (raises VirusDetectedError if threat found)
         file_obj = io.BytesIO(data)
         file_obj.filename = f.filename
         file_obj.content_type = mime
-        public_url = upload_file(file_obj, folder=f"{g.school_id}/{folder}", filename=os.path.basename(r2_key))
+        try:
+            public_url = upload_file(file_obj, folder=f"{g.school_id}/{folder}", filename=os.path.basename(r2_key))
+        except VirusDetectedError as exc:
+            return error_response(f"File '{f.filename}' rejected: {exc}", 422)
 
         record = ManagedFile(
             school_id=g.school_id,

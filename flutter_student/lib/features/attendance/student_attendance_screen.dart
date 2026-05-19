@@ -31,9 +31,8 @@ class _StudentAttendanceScreenState
     setState(() => _loading = true);
     try {
       final res = await ApiClient.instance.get('/student/attendance',
-          queryParameters: _selectedMonth.isNotEmpty
-              ? {'month': _selectedMonth}
-              : null);
+          queryParameters:
+              _selectedMonth.isNotEmpty ? {'month': _selectedMonth} : null);
       final payload = res.data;
       setState(() {
         _stats = (payload?['stats'] as Map?)?.cast<String, dynamic>();
@@ -101,8 +100,7 @@ class _StudentAttendanceScreenState
                         ),
                         _StatChip(
                           label: 'Rate',
-                          value:
-                              '${_stats?['attendance_rate'] ?? 0}%',
+                          value: '${_stats?['attendance_rate'] ?? 0}%',
                           color: theme.colorScheme.primary,
                         ),
                       ],
@@ -150,18 +148,15 @@ class _StudentAttendanceScreenState
                                   title: Text(r['date'] ?? '—',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w500)),
-                                  subtitle:
-                                      r['subject'] != null
-                                          ? Text(r['subject'])
-                                          : null,
+                                  subtitle: r['subject'] != null
+                                      ? Text(r['subject'])
+                                      : null,
                                   trailing: Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color:
-                                          _statusColor(status).withAlpha(25),
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                      color: _statusColor(status).withAlpha(25),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       status.toUpperCase(),
@@ -175,20 +170,233 @@ class _StudentAttendanceScreenState
                                 );
                               },
                             ),
-                      // Calendar tab placeholder
-                      const Center(
-                        child: NoDataContainer(
-                          title: 'Calendar View',
-                          subtitle:
-                              'Monthly calendar view coming soon',
-                          icon: Icons.calendar_month_rounded,
-                        ),
-                      ),
+                      // Calendar tab — monthly attendance heatmap
+                      _buildMonthlyCalendar(),
                     ],
                   ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildMonthlyCalendar() {
+    final now = DateTime.now();
+    final firstDay = DateTime(now.year, now.month, 1);
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final startWeekday = firstDay.weekday % 7; // 0=Sun
+
+    // Build attendance map: date string → status
+    final Map<String, String> dateStatus = {};
+    for (final r in _records) {
+      final date = r['date'] as String?;
+      final status = r['status'] as String?;
+      if (date != null && status != null) {
+        dateStatus[date] = status;
+      }
+    }
+
+    Color _dayColor(int day) {
+      final dateStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final status = dateStatus[dateStr];
+      switch (status?.toLowerCase()) {
+        case 'present':
+          return Colors.green;
+        case 'absent':
+          return Colors.red;
+        case 'late':
+          return Colors.orange;
+        case 'holiday':
+          return Colors.blue;
+        default:
+          return Colors.grey.shade200;
+      }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_monthName(now.month)} ${now.year}',
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              // Legend
+              Row(
+                children: [
+                  _Legend(color: Colors.green, label: 'P'),
+                  const SizedBox(width: 6),
+                  _Legend(color: Colors.red, label: 'A'),
+                  const SizedBox(width: 6),
+                  _Legend(color: Colors.orange, label: 'L'),
+                  const SizedBox(width: 6),
+                  _Legend(color: Colors.blue, label: 'H'),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Day headers
+          Row(
+            children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                .map((d) => Expanded(
+                      child: Center(
+                        child: Text(d,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey)),
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          // Calendar grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1,
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+            ),
+            itemCount: startWeekday + daysInMonth,
+            itemBuilder: (context, index) {
+              if (index < startWeekday) return const SizedBox.shrink();
+              final day = index - startWeekday + 1;
+              final color = _dayColor(day);
+              final isToday = day == now.day;
+              return Container(
+                decoration: BoxDecoration(
+                  color:
+                      color.withAlpha(color == Colors.grey.shade200 ? 255 : 50),
+                  borderRadius: BorderRadius.circular(6),
+                  border:
+                      isToday ? Border.all(color: Colors.blue, width: 2) : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                      color: color == Colors.grey.shade200
+                          ? Colors.black54
+                          : color,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          // Summary
+          if (_stats != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Monthly Summary',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _SummaryItem(
+                            label: 'Total Days', value: '${_records.length}'),
+                        _SummaryItem(
+                          label: 'Present',
+                          value:
+                              '${_records.where((r) => r['status'] == 'present').length}',
+                          color: Colors.green,
+                        ),
+                        _SummaryItem(
+                          label: 'Absent',
+                          value:
+                              '${_records.where((r) => r['status'] == 'absent').length}',
+                          color: Colors.red,
+                        ),
+                        _SummaryItem(
+                          label: 'Rate',
+                          value: '${_stats?['attendance_rate'] ?? 0}%',
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _monthName(int month) {
+    const names = [
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return names[month];
+  }
+}
+
+class _Legend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _Legend({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 2),
+        Text(label, style: const TextStyle(fontSize: 10)),
+      ],
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  const _SummaryItem({required this.label, required this.value, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ],
     );
   }
 }

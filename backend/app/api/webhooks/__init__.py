@@ -261,7 +261,7 @@ def whatsapp_verify():
     challenge = request.args.get("hub.challenge")
 
     verify_token = current_app.config.get("WHATSAPP_VERIFY_TOKEN")
-    if mode == "subscribe" and token == verify_token:
+    if mode == "subscribe" and hmac.compare_digest(token or "", verify_token or ""):
         return challenge, 200
     return error_response("Verification failed", 403)
 

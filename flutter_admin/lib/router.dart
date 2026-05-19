@@ -41,6 +41,8 @@ import 'features/visitor_management/visitor_screen.dart';
 import 'features/inventory/inventory_screen.dart';
 import 'features/design_studio/design_studio_screen.dart';
 import 'features/exams/results/exam_results_screen.dart';
+import 'features/emergency/emergency_screen.dart';
+import 'features/dismissal/dismissal_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authUser = ref.watch(authProvider.select((state) => state.user));
@@ -167,15 +169,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/wellbeing',
                   builder: (_, __) => const WellbeingScreen()),
-              GoRoute(
-                  path: '/lms',
-                  builder: (_, __) => const LmsScreen()),
+              GoRoute(path: '/lms', builder: (_, __) => const LmsScreen()),
               GoRoute(
                   path: '/admission',
                   builder: (_, __) => const AdmissionScreen()),
               GoRoute(
-                  path: '/alumni',
-                  builder: (_, __) => const AlumniScreen()),
+                  path: '/alumni', builder: (_, __) => const AlumniScreen()),
               GoRoute(
                   path: '/health-records',
                   builder: (_, __) => const HealthRecordsScreen()),
@@ -183,8 +182,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: '/gamification',
                   builder: (_, __) => const GamificationScreen()),
               GoRoute(
-                  path: '/visitors',
-                  builder: (_, __) => const VisitorScreen()),
+                  path: '/visitors', builder: (_, __) => const VisitorScreen()),
               GoRoute(
                   path: '/inventory',
                   builder: (_, __) => const InventoryScreen()),
@@ -194,6 +192,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/exam-results',
                   builder: (_, __) => const ExamResultsScreen()),
+              GoRoute(
+                  path: '/emergency',
+                  builder: (_, __) => const EmergencyScreen()),
+              GoRoute(
+                  path: '/dismissal',
+                  builder: (_, __) => const DismissalScreen()),
             ],
           ),
         ],

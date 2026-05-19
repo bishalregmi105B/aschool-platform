@@ -83,12 +83,23 @@ export async function middleware(request: NextRequest) {
   // ─── Dashboard auth guard ──────────────────────────
   const token = request.cookies.get("access_token")?.value;
 
-  if (!token && pathname.startsWith("/dashboard")) {
+  function isTokenExpired(jwt: string): boolean {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(jwt.split(".")[1], "base64url").toString("utf8")
+      );
+      return typeof payload.exp === "number" && payload.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
+  }
+
+  if ((!token || isTokenExpired(token)) && pathname.startsWith("/dashboard")) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!token && pathname.startsWith("/website-builder")) {
+  if ((!token || isTokenExpired(token)) && pathname.startsWith("/website-builder")) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }

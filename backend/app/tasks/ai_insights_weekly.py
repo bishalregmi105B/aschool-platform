@@ -36,3 +36,14 @@ def calculate_risk_scores(school_id: str):
     except Exception as e:
         current_app.logger.error(f"Risk score calc failed for {school_id}: {e}")
         return {"success": False, "error": str(e)}
+
+
+@celery.task(name="dispatch_ai_insights_weekly", queue="default")
+def dispatch_ai_insights_weekly():
+    """Fan-out weekly AI insights generation to all active schools."""
+    from app.models.school import School
+
+    schools = School.query.filter_by(is_active=True, is_deleted=False).all()
+    for school in schools:
+        generate_weekly_insights.delay(str(school.id))
+    return {"queued": len(schools)}

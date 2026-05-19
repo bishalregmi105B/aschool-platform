@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,12 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { PageLoader } from "@/components/ui/spinner";
-import { Plug } from "lucide-react";
+import { Plug, Upload, QrCode, X } from "lucide-react";
+import Image from "next/image";
 import {
   EMPTY_PAYMENT_METHODS_RESPONSE,
   fetchPaymentMethods,
   updatePaymentMethods,
+  uploadQrImage,
   type PaymentMethodConfig,
+  type PaymentMethodKey,
 } from "@/lib/services/payment-methods.service";
 
 const integrations = [
@@ -33,6 +36,7 @@ const integrations = [
 export default function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [methods, setMethods] = useState<PaymentMethodConfig[]>([]);
+  const [uploadingQr, setUploadingQr] = useState<PaymentMethodKey | null>(null);
 
   const { data: paymentConfig, isLoading } = useQuery({
     queryKey: ["settings-payment-methods"],
@@ -83,6 +87,24 @@ export default function IntegrationsPage() {
         method.key === key ? { ...method, ...patch } : method,
       ),
     );
+  };
+
+  const handleQrUpload = async (
+    key: PaymentMethodKey,
+    file: File,
+  ) => {
+    setUploadingQr(key);
+    try {
+      const result = await uploadQrImage(file, key);
+      updateMethod(key, { qr_image_url: result.url });
+      queryClient.invalidateQueries({ queryKey: ["settings-payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-payment-methods"] });
+      toast.success("QR image uploaded successfully");
+    } catch {
+      toast.error("Failed to upload QR image");
+    } finally {
+      setUploadingQr(null);
+    }
   };
 
   if (isLoading) return <PageLoader />;
@@ -221,16 +243,91 @@ export default function IntegrationsPage() {
                     </>
                   )}
 
-                  <div className="space-y-1.5">
-                    <Label>QR Image URL</Label>
-                    <Input
-                      value={method.qr_image_url || ""}
-                      onChange={(event) =>
-                        updateMethod(method.key, { qr_image_url: event.target.value })
-                      }
-                      placeholder="https://files.example/your-qr.png"
-                    />
-                  </div>
+                  {/* QR Image — upload + preview */}
+                  {method.supports_qr && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        <QrCode className="h-3.5 w-3.5" />
+                        {method.key === "qr_pay" ? "Payment QR Code Image" : "QR Image (optional)"}
+                      </Label>
+                      {method.qr_image_url ? (
+                        <div className="flex items-start gap-3">
+                          <div className="relative h-28 w-28 flex-shrink-0 rounded border bg-white p-1">
+                            <Image
+                              src={method.qr_image_url}
+                              alt="QR code"
+                              fill
+                              className="object-contain"
+                              unoptimized
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleQrUpload(method.key, f);
+                                  e.target.value = "";
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={uploadingQr === method.key}
+                                asChild
+                              >
+                                <span>
+                                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                  {uploadingQr === method.key ? "Uploading..." : "Replace"}
+                                </span>
+                              </Button>
+                            </label>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => updateMethod(method.key, { qr_image_url: "" })}
+                            >
+                              <X className="mr-1 h-3.5 w-3.5" /> Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleQrUpload(method.key, f);
+                              e.target.value = "";
+                            }}
+                          />
+                          <div className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-5 hover:border-primary/40 transition-colors">
+                            <QrCode className="h-8 w-8 text-muted-foreground/50" />
+                            <span className="text-xs text-muted-foreground">
+                              {uploadingQr === method.key
+                                ? "Uploading..."
+                                : "Click to upload QR image (PNG / JPG / WEBP)"}
+                            </span>
+                          </div>
+                        </label>
+                      )}
+                      {/* Fallback URL input */}
+                      <Input
+                        value={method.qr_image_url || ""}
+                        onChange={(event) =>
+                          updateMethod(method.key, { qr_image_url: event.target.value })
+                        }
+                        placeholder="Or paste a direct image URL"
+                        className="text-xs"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label>QR ID / Payment Handle</Label>
