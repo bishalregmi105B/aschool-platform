@@ -24,6 +24,8 @@ import 'features/pt_conference/pt_conference_screen.dart';
 import 'features/dismissal/dismissal_qr_screen.dart';
 import 'features/elibrary/parent_elibrary_screen.dart';
 import 'features/portfolio/parent_portfolio_screen.dart';
+import 'features/emergency/emergency_screen.dart';
+import 'features/health_records/child_health_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authUser = ref.watch(authProvider.select((state) => state.user));
@@ -105,6 +107,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/dismissal-qr',
                   builder: (_, __) => const DismissalQrScreen()),
+              GoRoute(
+                  path: '/emergency',
+                  builder: (_, __) => const ParentEmergencyScreen()),
+              GoRoute(
+                  path: '/child-health',
+                  builder: (_, __) => const ChildHealthScreen()),
             ],
           ),
           StatefulShellBranch(

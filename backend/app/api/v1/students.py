@@ -121,6 +121,20 @@ def create_student():
     if missing:
         return error_response(f"Missing required fields: {', '.join(missing)}", 400)
 
+    # Duplicate roll number guard
+    roll_number = data.get("roll_number")
+    if roll_number is not None:
+        existing = Student.query.filter_by(
+            school_id=g.school_id,
+            class_id=data["class_id"],
+            roll_number=roll_number,
+            is_deleted=False,
+        ).first()
+        if existing:
+            return error_response(
+                f"Roll number {roll_number} is already assigned in this class", 409
+            )
+
     student = Student(school_id=g.school_id)
     _populate_student(student, data)
     db.session.add(student)

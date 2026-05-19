@@ -99,3 +99,39 @@ class KhaltiGateway:
             "fee": data.get("fee", 0),
             "refunded": data.get("refunded", False),
         }
+
+    @classmethod
+    def refund_payment(cls, pidx: str, secret_key: str) -> dict:
+        """Initiate a full refund for a Khalti payment.
+
+        Khalti refund API: POST /api/v2/transaction/refund/
+        The payment must be in Completed status to be refunded.
+
+        Raises ValueError if secret_key is missing.
+        """
+        if not secret_key:
+            raise ValueError("Khalti secret_key is required to process refund")
+
+        url = f"{cls._base_url()}/transaction/refund/"
+        headers = {
+            "Authorization": f"key {secret_key}",
+            "Content-Type": "application/json",
+        }
+
+        resp = requests.post(url, headers=headers, json={"pidx": pidx}, timeout=30)
+        data = resp.json()
+
+        if resp.status_code == 200:
+            return {
+                "success": True,
+                "pidx": pidx,
+                "status": data.get("status", "refunded"),
+                "message": data.get("detail", "Refund initiated successfully"),
+            }
+
+        return {
+            "success": False,
+            "pidx": pidx,
+            "error": data.get("detail", "Refund failed"),
+            "status_code": resp.status_code,
+        }

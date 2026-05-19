@@ -56,6 +56,19 @@ def create_app(config_name: str | None = None) -> Flask:
     migrate.init_app(app, db)
     jwt.init_app(app)
 
+    # ── JWT token blocklist (revocation) ─────────────────────────────────
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        """Called on every JWT-protected request to reject revoked tokens."""
+        jti = jwt_payload.get("jti")
+        if not jti:
+            return False
+        try:
+            from app.models.revoked_token import RevokedToken
+            return RevokedToken.is_revoked(jti)
+        except Exception:
+            return False
+
     # Build allowed CORS origins from environment so the Authorization header
     # is permitted and wildcard '*' is not used (required for credentialed requests).
     _base = app.config.get("BASE_DOMAIN", "aschool.com.np")
@@ -148,6 +161,25 @@ def create_app(config_name: str | None = None) -> Flask:
             "sitemap-rebuild-nightly": {
                 "task": "sitemap_rebuild",
                 "schedule": crontab(hour=2, minute=0),
+            },
+            "db-backup-daily": {
+                "task": "db_backup_daily",
+                "schedule": crontab(hour=3, minute=0),
+            },
+            # ── Auto monthly fee generation (BS month 1st) ────────────
+            "auto-generate-monthly-fees": {
+                "task": "auto_generate_monthly_fees",
+                "schedule": crontab(hour=0, minute=45),  # daily; task checks BS day
+            },
+            # ── AI insights weekly (Sunday 06:00) ─────────────────────
+            "ai-insights-weekly-dispatch": {
+                "task": "dispatch_ai_insights_weekly",
+                "schedule": crontab(hour=6, minute=0, day_of_week=0),
+            },
+            # ── Admission follow-up daily (09:00) ─────────────────────
+            "admission-followup-daily": {
+                "task": "dispatch_admission_followups",
+                "schedule": crontab(hour=9, minute=0),
             },
         },
     )

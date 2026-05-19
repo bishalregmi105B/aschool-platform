@@ -100,7 +100,9 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: categories.map((cat) {
-                          final label = cat.isEmpty ? 'All' : cat[0].toUpperCase() + cat.substring(1);
+                          final label = cat.isEmpty
+                              ? 'All'
+                              : cat[0].toUpperCase() + cat.substring(1);
                           final selected = _selectedCategory == cat;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -150,9 +152,8 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
                                             height: 160,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (_, __, ___) =>
-                                                    const SizedBox.shrink(),
+                                            errorBuilder: (_, __, ___) =>
+                                                const SizedBox.shrink(),
                                           ),
                                         ),
                                       Padding(
@@ -172,8 +173,7 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
                                                       fontSize: 15),
                                                 )),
                                                 if (e['is_featured'] == true)
-                                                  const Icon(
-                                                      Icons.star_rounded,
+                                                  const Icon(Icons.star_rounded,
                                                       color: Colors.amber,
                                                       size: 18),
                                               ],
@@ -202,8 +202,7 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
                                                       style: const TextStyle(
                                                           fontSize: 11),
                                                     ),
-                                                    padding:
-                                                        EdgeInsets.zero,
+                                                    padding: EdgeInsets.zero,
                                                     visualDensity:
                                                         VisualDensity.compact,
                                                   ),
@@ -252,10 +251,8 @@ class _SummaryStat extends StatelessWidget {
         Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 4),
         Text(value,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 18)),
-        Text(label,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
       ],
     );
   }

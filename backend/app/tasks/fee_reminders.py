@@ -1,5 +1,9 @@
-"""Fee reminder tasks."""
+"""Fee reminder tasks — reminders, auto-generation, monthly reports."""
+import logging
+
 from extensions import celery
+
+logger = logging.getLogger(__name__)
 
 
 @celery.task(name="dispatch_fee_reminders", queue="default")
@@ -132,3 +136,130 @@ def generate_monthly_fee_report(school_id: str, month: int, year: int):
     }
 
     return report
+
+
+# ── Auto-generate monthly fee collections (BS month 1) ──────────────────
+
+@celery.task(name="auto_generate_monthly_fees", queue="default")
+def auto_generate_monthly_fees():
+    """Run daily: generates FeeCollection records for all students on the 1st
+    of each Bikram Sambat month based on active monthly FeeStructures.
+
+    Safe to re-run: uses idempotency markers in notes to skip duplicates.
+    Only fires for schools with the 'fees' plugin active.
+    """
+    import nepali_datetime
+    from app.models.plugin import SchoolPlugin
+    from extensions import db
+
+    today_bs = nepali_datetime.date.today()
+    if today_bs.day > 2:
+        # Only generate on BS day 1 (allow day 2 retry window)
+        return {"skipped": "not first day of BS month", "bs_day": today_bs.day}
+
+    month_bs = f"{today_bs.year}-{today_bs.month:02d}"
+    year_bs = str(today_bs.year)
+
+    active_schools = (
+        db.session.query(SchoolPlugin.school_id)
+        .filter_by(plugin_slug="fees", active=True)
+        .all()
+    )
+
+    results = []
+    for (school_id,) in active_schools:
+        try:
+            result = _generate_monthly_fees_for_school(
+                school_id=str(school_id),
+                month_bs=month_bs,
+                year_bs=year_bs,
+            )
+            results.append(result)
+        except Exception:
+            db.session.rollback()
+            logger.exception(
+                "Failed auto monthly fee generation for school %s", school_id
+            )
+            results.append({"school_id": str(school_id), "error": "failed"})
+
+    return {"bs_month": month_bs, "schools_processed": len(results), "results": results}
+
+
+def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: str) -> dict:
+    """Generate pending FeeCollection rows for a single school for the given BS month."""
+    from app.models.fee import FeeCollection, FeeStructure
+    from app.models.student import Student
+    from extensions import db
+
+    structures = FeeStructure.query.filter_by(
+        school_id=school_id,
+        is_deleted=False,
+    ).all()
+
+    created_total = 0
+    skipped_total = 0
+
+    for structure in structures:
+        fee_items = structure.fee_items or []
+        monthly_items = [
+            item for item in fee_items
+            if str(item.get("frequency", "monthly")).lower() == "monthly"
+            and float(item.get("amount", 0) or 0) > 0
+        ]
+        if not monthly_items:
+            continue
+
+        # Students enrolled in this class/structure
+        student_query = Student.query.filter_by(
+            school_id=school_id,
+            is_deleted=False,
+            is_active=True,
+        )
+        if structure.class_id:
+            student_query = student_query.filter_by(class_id=structure.class_id)
+        students = student_query.all()
+
+        for student in students:
+            for item in monthly_items:
+                item_name = item.get("name", "Tuition Fee")
+                marker = (
+                    f"[auto_monthly:{structure.id}:{month_bs}:{item_name}]"
+                )
+
+                exists = FeeCollection.query.filter(
+                    FeeCollection.school_id == school_id,
+                    FeeCollection.student_id == student.id,
+                    FeeCollection.notes.ilike(f"%{marker}%"),
+                    FeeCollection.is_deleted.is_(False),
+                ).first()
+
+                if exists:
+                    skipped_total += 1
+                    continue
+
+                collection = FeeCollection(
+                    school_id=school_id,
+                    student_id=student.id,
+                    academic_year=structure.academic_year or year_bs,
+                    fee_item_name=item_name,
+                    amount=float(item.get("amount", 0)),
+                    month_bs=month_bs,
+                    year_bs=year_bs,
+                    payment_status="pending",
+                    notes=f"{marker} [auto_generated]",
+                )
+                db.session.add(collection)
+                created_total += 1
+
+    if created_total:
+        db.session.commit()
+    else:
+        db.session.rollback()
+
+    return {
+        "school_id": school_id,
+        "month_bs": month_bs,
+        "created": created_total,
+        "skipped": skipped_total,
+    }
+

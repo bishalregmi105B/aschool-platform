@@ -138,6 +138,16 @@ def submit_assignment(assignment_id):
     )
     db.session.add(sub)
     db.session.commit()
+
+    from app.plugins.events import emit
+    emit(
+        "assignment.submitted",
+        school_id=str(g.school_id),
+        assignment_id=str(assignment_id),
+        student_id=str(student_id),
+        submission_id=str(sub.id),
+    )
+
     return created_response(_submission_dict(sub))
 
 

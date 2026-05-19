@@ -1,5 +1,5 @@
 """Exams plugin API — exams, marks, results, report cards (Nepal NEB grading)."""
-
+import re
 from datetime import datetime, timezone
 from io import BytesIO
 from uuid import UUID
@@ -278,6 +278,18 @@ def list_online_exams():
 def create_online_exam():
     data = request.get_json(silent=True) or {}
     questions = data.get("questions") or []
+
+    def _sanitize_question_text(text):
+        if not isinstance(text, str):
+            return text
+        return re.sub(r"<script[\s\S]*?</script>", "", text, flags=re.IGNORECASE)
+
+    questions = [
+        {**q, "question_text": _sanitize_question_text(q.get("question_text")),
+              "text": _sanitize_question_text(q.get("text"))}
+        if isinstance(q, dict) else q
+        for q in questions
+    ]
 
     if g.role == "teacher" and _current_user_uuid():
         allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)

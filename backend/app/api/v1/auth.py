@@ -244,16 +244,225 @@ def register_school():
         "school": {"id": str(school.id), "name": school.name, "slug": school.slug, "plan": school.plan},
         "otp_sent": "error" not in otp_result,
     }
-    # In DEBUG mode, surface the OTP so devs can verify without real SMS
+    # Log OTP only to server-side debug log; never expose it in API responses
     if otp_result.get("otp"):
-        payload["dev_otp"] = otp_result["otp"]
+        from flask import current_app
+        current_app.logger.debug("DEV OTP for %s: %s", phone, otp_result["otp"])
 
     return success_response(payload, status_code=201)
 
 
-@auth_bp.route("/register-fcm", methods=["POST"])
+@auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
-def register_fcm():
+def logout():
+    """Revoke the current access token (mobile logout / session invalidation)."""
+    claims = get_jwt()
+    jti = claims.get("jti")
+    if jti:
+        from app.models.revoked_token import RevokedToken
+        from datetime import timedelta
+        from flask import current_app
+        delta = current_app.config.get("JWT_ACCESS_TOKEN_EXPIRES", timedelta(hours=1))
+        from datetime import datetime, timezone
+        expires_at = datetime.now(timezone.utc) + delta
+        RevokedToken.revoke(jti=jti, token_type="access", expires_at=expires_at)
+    return success_response({"message": "Logged out successfully"})
+
+
+@auth_bp.route("/logout-all", methods=["POST"])
+@jwt_required()
+def logout_all_sessions():
+    """Revoke all active tokens for the current user by rotating their JWT secret seed.
+
+    Works by storing a per-user 'invalidate_before' timestamp. All tokens
+    issued before this timestamp are rejected.
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    from datetime import datetime, timezone
+    from extensions import db
+    user.last_password_change = datetime.now(timezone.utc)
+    db.session.commit()
+
+    # Also revoke the current token
+    claims = get_jwt()
+    jti = claims.get("jti")
+    if jti:
+        from app.models.revoked_token import RevokedToken
+        from datetime import timedelta
+        from flask import current_app
+        delta = current_app.config.get("JWT_ACCESS_TOKEN_EXPIRES", timedelta(hours=1))
+        RevokedToken.revoke(jti=jti, token_type="access", expires_at=datetime.now(timezone.utc) + delta)
+
+    return success_response({"message": "All sessions revoked"})
+
+
+@auth_bp.route("/totp/setup", methods=["POST"])
+@jwt_required()
+def totp_setup():
+    """Generate a TOTP secret and provisioning URI for authenticator app setup.
+
+    Returns:
+        secret: base32 TOTP secret (store securely, show once)
+        uri: otpauth:// URI to encode as QR code
+        qr_data_url: base64 PNG QR code (optional, requires qrcode lib)
+    """
+    try:
+        import pyotp
+    except ImportError:
+        return error_response("TOTP support not installed (pip install pyotp)", 503)
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    secret = pyotp.random_base32()
+    issuer = "ASchool"
+    label = user.email or user.phone or str(user.id)
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=label, issuer_name=issuer)
+
+    # Temporarily store secret (pending confirmation) — never activate until verified
+    from extensions import cache
+    cache.set(f"totp_pending:{user_id}", secret, timeout=600)
+
+    payload = {"secret": secret, "uri": uri}
+
+    # Optionally include QR code PNG as data URL
+    try:
+        import qrcode, io, base64
+        img = qrcode.make(uri)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        payload["qr_data_url"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        pass  # qrcode not installed — client generates QR from uri
+
+    return success_response(payload)
+
+
+@auth_bp.route("/totp/verify", methods=["POST"])
+@jwt_required()
+def totp_verify():
+    """Verify a TOTP code and activate MFA for the user.
+
+    Body:
+        code (str): 6-digit TOTP code from authenticator app
+    """
+    try:
+        import pyotp
+    except ImportError:
+        return error_response("TOTP support not installed", 503)
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    code = str(data.get("code", "")).strip()
+    if not code:
+        return error_response("TOTP code is required", 400)
+
+    from extensions import cache, db
+    pending_secret = cache.get(f"totp_pending:{user_id}")
+    if not pending_secret:
+        return error_response("No pending TOTP setup found. Call /totp/setup first.", 400)
+
+    totp = pyotp.TOTP(pending_secret)
+    if not totp.verify(code, valid_window=1):
+        return error_response("Invalid or expired TOTP code", 401)
+
+    # Activate MFA — store secret in user settings
+    settings = user.permissions or {}
+    settings["totp_secret"] = pending_secret
+    settings["mfa_enabled"] = True
+    user.permissions = settings
+    db.session.commit()
+    cache.delete(f"totp_pending:{user_id}")
+
+    return success_response({"message": "MFA enabled successfully", "mfa_enabled": True})
+
+
+@auth_bp.route("/totp/disable", methods=["POST"])
+@jwt_required()
+def totp_disable():
+    """Disable TOTP MFA. Requires current password confirmation.
+
+    Body:
+        password (str): Current password
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    if not user.check_password(password):
+        return error_response("Incorrect password", 401)
+
+    from extensions import db
+    settings = user.permissions or {}
+    settings.pop("totp_secret", None)
+    settings["mfa_enabled"] = False
+    user.permissions = settings
+    db.session.commit()
+
+    return success_response({"message": "MFA disabled", "mfa_enabled": False})
+
+
+@auth_bp.route("/totp/challenge", methods=["POST"])
+def totp_challenge():
+    """Validate a TOTP code during login (step-2 of MFA flow).
+
+    Body:
+        mfa_token (str): Temporary token returned by /login when MFA is required
+        code (str): 6-digit TOTP code
+    """
+    try:
+        import pyotp
+    except ImportError:
+        return error_response("TOTP support not installed", 503)
+
+    data = request.get_json(silent=True) or {}
+    mfa_token = data.get("mfa_token", "").strip()
+    code = str(data.get("code", "")).strip()
+    if not mfa_token or not code:
+        return error_response("mfa_token and code are required", 400)
+
+    from extensions import cache
+    user_id = cache.get(f"mfa_pending:{mfa_token}")
+    if not user_id:
+        return error_response("MFA token expired or invalid", 401)
+
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    totp_secret = (user.permissions or {}).get("totp_secret")
+    if not totp_secret:
+        return error_response("MFA not configured for this account", 400)
+
+    totp = pyotp.TOTP(totp_secret)
+    if not totp.verify(code, valid_window=1):
+        return error_response("Invalid or expired TOTP code", 401)
+
+    cache.delete(f"mfa_pending:{mfa_token}")
+
+    from app.services.auth_service import AuthService
+    tokens = AuthService.create_tokens(user)
+    return success_response({
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "user": user.to_dict(),
+    })
+
+
+
     """Register FCM token for push notifications."""
     user_id = get_jwt_identity()
     user = User.query.get(user_id)

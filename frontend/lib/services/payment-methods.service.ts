@@ -6,7 +6,8 @@ export type PaymentMethodKey =
   | "cheque"
   | "fonepay"
   | "esewa"
-  | "khalti";
+  | "khalti"
+  | "qr_pay";
 
 export interface PaymentMethodConfig {
   key: PaymentMethodKey;
@@ -72,6 +73,21 @@ export async function updatePaymentMethods(
   const response = await api.put<ApiResponse<PaymentMethodsResponse>>(
     "/fees/payment-methods",
     { methods },
+  );
+  return response.data.data;
+}
+
+export async function uploadQrImage(
+  file: File,
+  methodKey: PaymentMethodKey = "qr_pay",
+): Promise<{ url: string; method_key: string }> {
+  const formData = new FormData();
+  formData.append("qr_image", file);
+  formData.append("method_key", methodKey);
+  const response = await api.post<ApiResponse<{ url: string; method_key: string }>>(
+    "/fees/payment-methods/upload-qr",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
   );
   return response.data.data;
 }

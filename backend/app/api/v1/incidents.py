@@ -45,6 +45,16 @@ def create_incident():
             setattr(incident, key, data[key])
     db.session.add(incident)
     db.session.commit()
+
+    from app.plugins.events import emit
+    emit(
+        "incident.created",
+        school_id=str(g.school_id),
+        incident_id=str(incident.id),
+        severity=incident.severity or "low",
+        title=incident.title or "",
+    )
+
     return created_response(_incident_dict(incident))
 
 

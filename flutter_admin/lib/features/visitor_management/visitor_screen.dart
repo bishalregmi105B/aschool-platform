@@ -36,11 +36,10 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res = await ApiClient.instance
-          .get('/visitors?per_page=30&date=today');
+      final res =
+          await ApiClient.instance.get('/visitors?per_page=30&date=today');
       setState(() {
-        _visitors =
-            List<Map<String, dynamic>>.from(res.data['data'] ?? []);
+        _visitors = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
     } catch (_) {
@@ -77,7 +76,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
             IconButton(
               icon: const Icon(Icons.qr_code_scanner_rounded),
               tooltip: 'Scan Badge',
-              onPressed: () {/* TODO: QR scanner */},
+              onPressed: () => _showQrScanDialog(context),
             ),
           ],
         ),
@@ -171,8 +170,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
                                         const SizedBox(height: 2),
                                         ESchoolInfoPill(
                                           icon: Icons.circle,
-                                          label:
-                                              isInside ? 'Inside' : 'Left',
+                                          label: isInside ? 'Inside' : 'Left',
                                           color: isInside
                                               ? ASchoolTheme.success
                                               : ASchoolTheme.mutedText,
@@ -228,8 +226,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
             const SizedBox(height: 10),
             TextField(
               controller: _purposeCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Purpose of Visit'),
+              decoration: const InputDecoration(labelText: 'Purpose of Visit'),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -251,5 +248,82 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
         ),
       ),
     );
+  }
+
+  void _showQrScanDialog(BuildContext context) {
+    final codeCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_scanner_rounded),
+            SizedBox(width: 8),
+            Text('Scan Visitor Badge'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter the visitor badge code or scan the QR code '
+              'using the device camera.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: codeCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Badge / QR Code',
+                prefixIcon: Icon(Icons.qr_code_rounded),
+              ),
+              onSubmitted: (code) {
+                Navigator.pop(context);
+                _processQrCode(context, code.trim());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final code = codeCtrl.text.trim();
+              Navigator.pop(context);
+              _processQrCode(context, code);
+            },
+            child: const Text('Look Up'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processQrCode(BuildContext context, String code) async {
+    if (code.isEmpty) return;
+    try {
+      final res = await ApiClient.instance.get('/visitors/badge/$code');
+      final visitor = res.data['data'];
+      if (context.mounted && visitor != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Visitor: ${visitor['visitor_name'] ?? code} '
+              '(${visitor['checked_out_at'] == null ? 'Inside' : 'Checked out'})',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No visitor found for code: $code')),
+        );
+      }
+    }
   }
 }

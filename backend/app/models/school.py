@@ -74,6 +74,7 @@ class School(BaseModel):
     affiliated_to = Column(String(200))
     regd_number = Column(String(100))
     pan_number = Column(String(20))
+    irb_number = Column(String(50))  # IRD registration number for tax receipts
 
     # Location
     province = Column(String(100))
@@ -151,6 +152,9 @@ class School(BaseModel):
             "logo_url": self.logo_url,
             "banner_url": self.banner_url,
             "plan": self.plan,
+            "regd_number": self.regd_number,
+            "pan_number": self.pan_number,
+            "irb_number": self.irb_number,
             "plan_expires_at": self.plan_expires_at.isoformat() if self.plan_expires_at else None,
             "status": self.status,
             "type": self.type,

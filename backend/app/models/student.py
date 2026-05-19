@@ -57,8 +57,24 @@ class Student(SchoolModel):
     nationality = Column(String(100), default="Nepali")
     religion = Column(String(100))
     ethnicity = Column(String(100))
+    caste = Column(String(100))                           # EMIS: जाति
+    mother_tongue = Column(String(100))                   # EMIS: मातृभाषा
     blood_group = Column(String(5))
     disability = Column(String(200))
+    disability_type = Column(                             # EMIS: अपाङ्गता प्रकार
+        String(50),
+        nullable=True,
+    )
+    # EMIS structured address fields (permanent)
+    permanent_province = Column(String(100))
+    permanent_district = Column(String(100))
+    permanent_municipality = Column(String(100))
+    permanent_ward = Column(String(10))
+    # EMIS structured address fields (temporary / current)
+    temporary_province = Column(String(100))
+    temporary_district = Column(String(100))
+    temporary_municipality = Column(String(100))
+    temporary_ward = Column(String(10))
     previous_school = Column(String(300))
     transport_enrolled = Column(Boolean, default=False)
     bus_stop_id = Column(UUID(as_uuid=True), ForeignKey("bus_stops.id"))

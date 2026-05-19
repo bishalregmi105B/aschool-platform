@@ -24,11 +24,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res =
-          await ApiClient.instance.get('/inventory?per_page=50');
+      final res = await ApiClient.instance.get('/inventory?per_page=50');
       setState(() {
-        _items =
-            List<Map<String, dynamic>>.from(res.data['data'] ?? []);
+        _items = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
     } catch (_) {
@@ -55,7 +53,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           title: const Text('Inventory & Assets'),
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: () {/* TODO: add item */},
+          onPressed: () => _showAddItemDialog(context),
           tooltip: 'Add Item',
           child: const Icon(Icons.add_rounded),
         ),
@@ -89,15 +87,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               final qty =
                                   (item['quantity'] as num?)?.toInt() ?? 0;
                               final minQty =
-                                  (item['min_quantity'] as num?)?.toInt() ??
-                                      0;
+                                  (item['min_quantity'] as num?)?.toInt() ?? 0;
                               final isLow = qty <= minQty && minQty > 0;
 
                               return ESchoolAnimatedEntry(
                                 index: i,
                                 child: ESchoolCard(
-                                  margin:
-                                      const EdgeInsets.only(bottom: 10),
+                                  margin: const EdgeInsets.only(bottom: 10),
                                   child: ListTile(
                                     contentPadding: EdgeInsets.zero,
                                     leading: CircleAvatar(
@@ -158,6 +154,93 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAddItemDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '0');
+    final minQtyCtrl = TextEditingController(text: '0');
+    final unitCtrl = TextEditingController(text: 'pcs');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add Inventory Item'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Item Name *'),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: qtyCtrl,
+                        decoration:
+                            const InputDecoration(labelText: 'Quantity'),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: unitCtrl,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: minQtyCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Min Quantity (for low-stock alert)',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(context);
+              try {
+                await ApiClient.instance.post('/inventory', data: {
+                  'name': nameCtrl.text.trim(),
+                  'quantity': int.tryParse(qtyCtrl.text) ?? 0,
+                  'min_quantity': int.tryParse(minQtyCtrl.text) ?? 0,
+                  'unit': unitCtrl.text.trim(),
+                });
+                _load();
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to add item')),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }

@@ -114,6 +114,18 @@ DEFAULT_PAYMENT_METHODS = {
         "merchant_code": "",  # unused for Khalti; reserved
         "secret_key": "",     # Khalti live secret key
     },
+    "qr_pay": {
+        "label": "QR Pay",
+        "enabled": False,
+        "mode": "offline",
+        "requires_reference": True,
+        "supports_qr": True,
+        "qr_image_url": "",   # School uploads their static QR image here
+        "qr_payload": "",     # Optional: merchant ID / payment handle
+        "instructions": "Scan the QR code below with any payment app (FonePay, eSewa, Khalti, banking app) and enter the transaction reference.",
+        "merchant_code": "",
+        "secret_key": "",
+    },
 }
 
 PAYMENT_METHOD_KEYS = tuple(DEFAULT_PAYMENT_METHODS.keys())
@@ -298,6 +310,68 @@ def update_payment_methods():
                 if m["enabled"] and m["mode"] == "online"
             ],
         }
+    )
+
+
+@fees_bp.route("/payment-methods/upload-qr", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def upload_qr_image():
+    """Upload a QR code image for a payment method.
+
+    Accepts multipart/form-data with:
+      - qr_image: the image file (PNG/JPG/WEBP)
+      - method_key: which payment method to attach it to (default: qr_pay)
+
+    Returns the public URL and automatically saves it on the school's fee config.
+    """
+    from app.utils.file_upload import VirusDetectedError, upload_file
+
+    school = _current_school()
+    if not school:
+        return error_response("School not found", 404)
+
+    file = request.files.get("qr_image")
+    if not file or not file.filename:
+        return error_response("No qr_image file provided", 400)
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
+        return error_response("Unsupported file type — use PNG, JPG, or WEBP", 400)
+
+    method_key = (request.form.get("method_key") or "qr_pay").strip().lower()
+    if method_key not in PAYMENT_METHOD_KEYS:
+        return error_response(f"Unknown method_key: {method_key}", 400)
+
+    try:
+        public_url = upload_file(
+            file,
+            folder=f"payment_qr/{school.slug}",
+        )
+    except VirusDetectedError:
+        return error_response("File failed virus scan — upload rejected", 422)
+    except Exception as exc:
+        return error_response(f"Upload failed: {exc}", 500)
+
+    # Persist the URL into the payment method config
+    fee_config = dict(school.fee_config or {})
+    existing_methods = {m["key"]: m for m in _get_configured_payment_methods()}
+    updated_methods = []
+    for key in PAYMENT_METHOD_KEYS:
+        m = dict(existing_methods.get(key, DEFAULT_PAYMENT_METHODS[key]))
+        if m["key"] == method_key:
+            m["qr_image_url"] = public_url
+        updated_methods.append(m)
+
+    fee_config["payment_methods"] = updated_methods
+    school.fee_config = fee_config
+    db.session.commit()
+
+    return success_response(
+        {"url": public_url, "method_key": method_key},
+        message="QR image uploaded and saved",
     )
 
 
@@ -1190,6 +1264,68 @@ def _initiate_online_payment(collection_id, data):
         return error_response(str(exc), 422)
 
     return error_response(f"Unknown payment provider: {provider}", 400)
+
+
+# ── Refunds ────────────────────────────────────────────────
+
+@fees_bp.route("/collections/<uuid:collection_id>/refund", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin")
+def refund_payment(collection_id):
+    """Initiate a refund for an online fee payment (Khalti only currently).
+
+    Body:
+        reason (str): Required. Reason for the refund.
+    """
+    from app.models.fee import FeeCollection
+    from app.utils.response import error_response, success_response
+
+    fc = FeeCollection.query.filter_by(id=collection_id, school_id=g.school_id).first_or_404()
+    data = request.get_json(silent=True) or {}
+    reason = data.get("reason", "").strip()
+    if not reason:
+        return error_response("reason is required", 400)
+
+    if fc.payment_status not in ("paid", "completed"):
+        return error_response("Only paid/completed collections can be refunded", 422)
+
+    if fc.payment_method != "khalti":
+        return error_response("Refunds are currently supported for Khalti payments only", 422)
+
+    gateway_ref = getattr(fc, "gateway_pidx", None) or getattr(fc, "transaction_id", None)
+    if not gateway_ref:
+        return error_response("No gateway reference found for this collection", 422)
+
+    # Retrieve school's Khalti secret key from fee config
+    from app.models.school import School
+    school = School.query.get(g.school_id)
+    fee_config = getattr(school, "fee_config", {}) or {}
+    khalti_cfg = fee_config.get("khalti", {})
+    secret_key = khalti_cfg.get("secret_key", "")
+    if not secret_key:
+        return error_response("Khalti is not configured for this school", 422)
+
+    from app.services.payments.khalti_gateway import KhaltiGateway
+    try:
+        result = KhaltiGateway.refund_payment(gateway_ref, secret_key)
+    except ValueError as exc:
+        return error_response(str(exc), 422)
+
+    if not result.get("success"):
+        return error_response(result.get("error", "Refund failed"), 502)
+
+    fc.payment_status = "refunded"
+    fc.notes = f"[REFUNDED: {reason}] {fc.notes or ''}".strip()
+    from extensions import db
+    db.session.commit()
+
+    return success_response({
+        "collection_id": str(fc.id),
+        "refund": result,
+        "message": "Refund initiated successfully",
+    })
 
 
 # ── Serializers ────────────────────────────────────────────

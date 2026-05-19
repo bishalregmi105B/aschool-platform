@@ -103,9 +103,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
                 leading: CircleAvatar(
                   backgroundColor: ASchoolTheme.primary.withAlpha(20),
                   child: Text(
-                    (a['name'] as String? ?? 'A')
-                        .substring(0, 1)
-                        .toUpperCase(),
+                    (a['name'] as String? ?? 'A').substring(0, 1).toUpperCase(),
                     style: const TextStyle(
                       color: ASchoolTheme.primary,
                       fontWeight: FontWeight.bold,
@@ -184,11 +182,94 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
   }
 
   Widget _buildDonations() {
-    return const Center(
-      child: Text(
-        'Donation tracking — coming soon',
-        style: TextStyle(color: ASchoolTheme.mutedText),
-      ),
+    return FutureBuilder(
+      future: ApiClient.instance.get('/alumni/donations?per_page=30'),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LoadingShimmer();
+        }
+        final donations = List<Map<String, dynamic>>.from(
+          snapshot.data?.data?['data'] ?? [],
+        );
+        if (donations.isEmpty) {
+          return const NoDataContainer(
+            title: 'No donations recorded',
+            subtitle: 'Alumni donations and contributions will appear here',
+            icon: Icons.volunteer_activism_rounded,
+          );
+        }
+        double totalAmount = donations.fold(
+          0,
+          (sum, d) => sum + ((d['amount'] as num?) ?? 0),
+        );
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.green.withAlpha(15),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      Text(
+                        donations.length.toString(),
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const Text('Donors',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      Text(
+                        'Rs. ${totalAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green),
+                      ),
+                      const Text('Total Donated',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: donations.length,
+                itemBuilder: (context, i) {
+                  final d = donations[i];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Colors.green,
+                        child: Icon(Icons.volunteer_activism_rounded,
+                            color: Colors.white, size: 18),
+                      ),
+                      title: Text(d['donor_name'] ?? 'Anonymous',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(d['purpose'] ?? 'General donation',
+                          style: const TextStyle(fontSize: 12)),
+                      trailing: Text(
+                        'Rs. ${d['amount'] ?? 0}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                            fontSize: 14),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

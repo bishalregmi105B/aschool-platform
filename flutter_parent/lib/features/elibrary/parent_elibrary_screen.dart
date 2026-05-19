@@ -82,7 +82,8 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
                       children: [
                         _ResourceList(
                           resources: _resources
-                              .where((r) => _searchQuery.isEmpty ||
+                              .where((r) =>
+                                  _searchQuery.isEmpty ||
                                   (r['title'] as String? ?? '')
                                       .toLowerCase()
                                       .contains(_searchQuery.toLowerCase()))
@@ -90,7 +91,8 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
                         ),
                         _ResourceList(
                           resources: _pastPapers
-                              .where((r) => _searchQuery.isEmpty ||
+                              .where((r) =>
+                                  _searchQuery.isEmpty ||
                                   (r['title'] as String? ?? '')
                                       .toLowerCase()
                                       .contains(_searchQuery.toLowerCase()))
@@ -118,8 +120,9 @@ class _ResourceList extends StatelessWidget {
     if (resources.isEmpty) {
       return NoDataContainer(
         title: isPastPaper ? 'No past papers' : 'No resources',
-        subtitle:
-            isPastPaper ? 'Past papers will appear here' : 'Resources will appear here',
+        subtitle: isPastPaper
+            ? 'Past papers will appear here'
+            : 'Resources will appear here',
         icon: isPastPaper ? Icons.quiz_rounded : Icons.library_books_rounded,
       );
     }
@@ -141,13 +144,15 @@ class _ResourceList extends StatelessWidget {
             title: Text(r['title'] ?? '—',
                 style: const TextStyle(fontWeight: FontWeight.w500)),
             subtitle: Text(
-              [r['subject'], r['class_name']].where((v) => v != null).join(' • '),
+              [r['subject'], r['class_name']]
+                  .where((v) => v != null)
+                  .join(' • '),
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
             trailing: r['file_url'] != null
                 ? IconButton(
-                    icon: const Icon(Icons.download_rounded,
-                        color: Colors.blue),
+                    icon:
+                        const Icon(Icons.download_rounded, color: Colors.blue),
                     onPressed: () {/* open url */},
                   )
                 : null,

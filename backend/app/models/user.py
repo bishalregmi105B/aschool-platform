@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     String,
     Text,
 )
@@ -54,6 +55,10 @@ class User(BaseModel):
     otp_expires_at = Column(DateTime)
     last_login_at = Column(DateTime)
     is_active = Column(Boolean, default=True)
+
+    # Brute-force lockout (per-user, independent of IP-level rate limiting)
+    failed_login_count = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)  # UTC; None means not locked
 
     # Push notifications
     fcm_tokens = Column(ARRAY(Text))

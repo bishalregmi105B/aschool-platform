@@ -31,6 +31,7 @@ import 'features/attendance/student_attendance_screen.dart';
 import 'features/health_records/student_health_screen.dart';
 import 'features/gamification/gamification_screen.dart';
 import 'features/fees/student_fees_screen.dart';
+import 'features/emergency/emergency_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _dashboardNavKey = GlobalKey<NavigatorState>(debugLabel: 'dashboardNav');
@@ -182,6 +183,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                       path: 'fees',
                       builder: (_, __) => const StudentFeesScreen()),
+                  GoRoute(
+                      path: 'emergency',
+                      builder: (_, __) => const StudentEmergencyScreen()),
                 ],
               ),
             ],

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
-import '../providers/attendance_provider.dart';
 import '../repositories/attendance_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/shimmer_loading_list.dart';
-import '../widgets/stat_card.dart';
 
 /// Student attendance view — monthly calendar with color-coded status.
 ///
@@ -42,18 +40,18 @@ class _StudentAttendanceScreenState
     setState(() => _isLoading = true);
     try {
       final repo = AttendanceRepository();
-      final response = await repo.getStudentAttendance(
+      final response = await repo.getAttendance(
         widget.studentId,
-        month: _focusedDay.month,
-        year: _focusedDay.year,
+        month: _focusedDay.month.toString(),
+        year: _focusedDay.year.toString(),
       );
 
       final map = <DateTime, String>{};
       int present = 0, absent = 0, late = 0;
 
       for (final record in response) {
-        final date = DateTime.parse(record['date'] as String);
-        final status = record['status'] as String? ?? 'absent';
+        final date = DateTime.parse(record.date);
+        final status = record.status;
         map[DateTime.utc(date.year, date.month, date.day)] = status;
 
         switch (status.toLowerCase()) {

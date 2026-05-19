@@ -7,8 +7,7 @@ class StudentFeesScreen extends ConsumerStatefulWidget {
   const StudentFeesScreen({super.key});
 
   @override
-  ConsumerState<StudentFeesScreen> createState() =>
-      _StudentFeesScreenState();
+  ConsumerState<StudentFeesScreen> createState() => _StudentFeesScreenState();
 }
 
 class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
@@ -66,20 +65,17 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
                       children: [
                         _FeeCard(
                           label: 'Total',
-                          amount:
-                              'Rs. ${_overview?['total_fees'] ?? 0}',
+                          amount: 'Rs. ${_overview?['total_fees'] ?? 0}',
                           color: Colors.blue,
                         ),
                         _FeeCard(
                           label: 'Paid',
-                          amount:
-                              'Rs. ${_overview?['paid'] ?? 0}',
+                          amount: 'Rs. ${_overview?['paid'] ?? 0}',
                           color: Colors.green,
                         ),
                         _FeeCard(
                           label: 'Due',
-                          amount:
-                              'Rs. ${_overview?['due'] ?? 0}',
+                          amount: 'Rs. ${_overview?['due'] ?? 0}',
                           color: (_overview?['due'] ?? 0) > 0
                               ? Colors.red
                               : Colors.grey,
@@ -119,9 +115,13 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
                       controller: _tabController,
                       children: [
                         _InvoicesList(
-                            invoices: _invoices.where((i) => i['status'] != 'paid').toList()),
+                            invoices: _invoices
+                                .where((i) => i['status'] != 'paid')
+                                .toList()),
                         _InvoicesList(
-                            invoices: _invoices.where((i) => i['status'] == 'paid').toList(),
+                            invoices: _invoices
+                                .where((i) => i['status'] == 'paid')
+                                .toList(),
                             paidView: true),
                       ],
                     ),
@@ -154,8 +154,7 @@ class _FeeCard extends StatelessWidget {
               fontWeight: FontWeight.bold, fontSize: 16, color: color),
         ),
         const SizedBox(height: 2),
-        Text(label,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
     );
   }
@@ -175,7 +174,8 @@ class _InvoicesList extends StatelessWidget {
         subtitle: paidView
             ? 'Your payment history will appear here'
             : 'All fees are paid up to date!',
-        icon: paidView ? Icons.receipt_long_rounded : Icons.check_circle_rounded,
+        icon:
+            paidView ? Icons.receipt_long_rounded : Icons.check_circle_rounded,
       );
     }
     return ListView.builder(
@@ -192,9 +192,7 @@ class _InvoicesList extends StatelessWidget {
               backgroundColor:
                   (isPaid ? Colors.green : Colors.orange).withAlpha(25),
               child: Icon(
-                isPaid
-                    ? Icons.check_circle_rounded
-                    : Icons.pending_rounded,
+                isPaid ? Icons.check_circle_rounded : Icons.pending_rounded,
                 color: isPaid ? Colors.green : Colors.orange,
               ),
             ),
@@ -205,9 +203,7 @@ class _InvoicesList extends StatelessWidget {
               children: [
                 if (inv['due_date'] != null)
                   Text('Due: ${inv['due_date']}',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600])),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
               ],
             ),
             trailing: Column(
@@ -221,11 +217,11 @@ class _InvoicesList extends StatelessWidget {
                       color: isPaid ? Colors.green : Colors.orange),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: (isPaid ? Colors.green : Colors.orange)
-                        .withAlpha(20),
+                    color:
+                        (isPaid ? Colors.green : Colors.orange).withAlpha(20),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

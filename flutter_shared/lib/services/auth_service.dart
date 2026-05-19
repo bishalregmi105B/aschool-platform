@@ -167,7 +167,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Request OTP
   Future<bool> requestOtp(String phone) async {
     try {
-      final response = await ApiClient.instance.post('/auth/request-otp', data: {
+      final response = await ApiClient.instance.post('/auth/send-otp', data: {
         'phone': phone,
       });
       return response.statusCode == 200 && response.data['success'] == true;
@@ -191,7 +191,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await notifService.registerOneSignalPlayer(fcmToken);
         await notifService.setOneSignalTags(
           schoolId: user.schoolId ?? '',
-          role: user.role ?? 'user',
+          role: user.role,
           userId: user.id,
         );
       }

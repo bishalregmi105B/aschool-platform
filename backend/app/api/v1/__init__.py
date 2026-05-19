@@ -69,3 +69,15 @@ api_v1_bp.register_blueprint(ai_usage_bp)
 # Notification Center — in-app notifications (always available)
 from app.api.v1.notifications import notifications_bp
 api_v1_bp.register_blueprint(notifications_bp)
+
+# FAQ management — school FAQ CRUD
+from app.api.v1.faqs import faqs_bp
+api_v1_bp.register_blueprint(faqs_bp)
+
+# Database backup management API
+from app.api.v1.db_backup_api import db_backup_api_bp
+api_v1_bp.register_blueprint(db_backup_api_bp)
+
+# Hostel management — rooms, allocations, occupancy
+from app.api.v1.hostel import hostel_bp
+api_v1_bp.register_blueprint(hostel_bp)

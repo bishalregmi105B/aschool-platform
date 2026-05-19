@@ -27,11 +27,11 @@ class _StudentPortfoliosScreenState
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res = await ApiClient.instance.get('/teacher/portfolios',
-          queryParameters: {
-            if (_search.isNotEmpty) 'search': _search,
-            if (_category.isNotEmpty) 'category': _category,
-          });
+      final res =
+          await ApiClient.instance.get('/teacher/portfolios', queryParameters: {
+        if (_search.isNotEmpty) 'search': _search,
+        if (_category.isNotEmpty) 'category': _category,
+      });
       final payload = res.data;
       setState(() {
         _entries = (payload?['entries'] as List?) ?? [];
@@ -100,7 +100,14 @@ class _StudentPortfoliosScreenState
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['', 'academic', 'creative', 'sports', 'community', 'project'];
+    final categories = [
+      '',
+      'academic',
+      'creative',
+      'sports',
+      'community',
+      'project'
+    ];
 
     return PluginGate(
       pluginSlug: 'student_portfolio',
@@ -120,8 +127,8 @@ class _StudentPortfoliosScreenState
                   prefixIcon: const Icon(Icons.search_rounded),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
@@ -131,7 +138,9 @@ class _StudentPortfoliosScreenState
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: categories.map((cat) {
-                  final label = cat.isEmpty ? 'All' : cat[0].toUpperCase() + cat.substring(1);
+                  final label = cat.isEmpty
+                      ? 'All'
+                      : cat[0].toUpperCase() + cat.substring(1);
                   final selected = _category == cat;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -154,7 +163,8 @@ class _StudentPortfoliosScreenState
                   : _entries.isEmpty
                       ? const NoDataContainer(
                           title: 'No portfolio entries',
-                          subtitle: 'Student portfolio entries will appear here',
+                          subtitle:
+                              'Student portfolio entries will appear here',
                           icon: Icons.folder_special_rounded,
                         )
                       : ListView.builder(
@@ -176,9 +186,8 @@ class _StudentPortfoliosScreenState
                                         height: 140,
                                         width: double.infinity,
                                         fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (_, __, ___) =>
-                                                const SizedBox.shrink(),
+                                        errorBuilder: (_, __, ___) =>
+                                            const SizedBox.shrink(),
                                       ),
                                     ),
                                   Padding(
@@ -197,8 +206,8 @@ class _StudentPortfoliosScreenState
                                                 color: Colors.grey[600])),
                                         if (e['description'] != null)
                                           Padding(
-                                            padding: const EdgeInsets.only(
-                                                top: 4),
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
                                             child: Text(
                                               e['description'],
                                               style: TextStyle(
@@ -222,13 +231,13 @@ class _StudentPortfoliosScreenState
                                               ),
                                             const Spacer(),
                                             TextButton.icon(
-                                              onPressed: () =>
-                                                  _addFeedback(e),
-                                              icon: const Icon(Icons.rate_review_rounded,
+                                              onPressed: () => _addFeedback(e),
+                                              icon: const Icon(
+                                                  Icons.rate_review_rounded,
                                                   size: 16),
                                               label: const Text('Feedback',
-                                                  style: TextStyle(
-                                                      fontSize: 12)),
+                                                  style:
+                                                      TextStyle(fontSize: 12)),
                                             ),
                                           ],
                                         ),

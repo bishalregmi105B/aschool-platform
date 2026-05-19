@@ -1,0 +1,40 @@
+slug: hostel
+name: "Hostel Management"
+name_nepali: "छात्रावास व्यवस्थापन"
+category: advanced
+price_monthly: 499
+price_yearly: 4999
+emoji: "🏠"
+icon: "Building"
+description: "Hostel rooms, student allocations, occupancy tracking, warden management, hostel fee collection"
+
+api_blueprint: "app.api.v1.hostel"
+models_module: "app.models.hostel"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/hostel"
+  sidebar:
+    label: "Hostel"
+    label_nepali: "छात्रावास"
+    icon: "Building"
+    section: "Operations"
+    subitems:
+      - { label: "Overview", route: "/hostel" }
+      - { label: "Manage Rooms", route: "/hostel/rooms" }
+      - { label: "Allocations", route: "/hostel/allocations" }
+    visible_to: ["school_admin"]
+
+flutter:
+  admin_app: { feature_folder: "hostel", tabs: ["Overview", "Rooms", "Allocations"] }
+  teacher_app: null
+  parent_app: null
+  student_app: null
+
+events:
+  emits:
+    - "hostel.student_allocated"
+    - "hostel.student_checkedout"
+  listens: []
