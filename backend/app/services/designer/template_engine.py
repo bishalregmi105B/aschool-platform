@@ -974,6 +974,30 @@ TEMPLATES: dict = {
         "canvas_json": {},
         "writer_json": _writer_fee_bill(),
     },
+    "admit_card_standard": {
+        "name": "Exam Admit Card",
+        "category": "admit_cards",
+        "editor_type": "designer",
+        "description": "Exam admit card with student details, photo box and subject schedule rows",
+        "page_size": "A4 Half",
+        "thumbnail_emoji": "🎫",
+        "is_default": True,
+        "width": 559, "height": 794,
+        "fields": ["school_name", "exam_name", "student_name", "class_name", "roll_no", "dob", "father_name", "photo"],
+        "canvas_json": _admit_card_standard(),
+    },
+    "character_certificate": {
+        "name": "Character Certificate",
+        "category": "certificates",
+        "editor_type": "designer",
+        "description": "Formal character certificate with conduct statement and principal seal line",
+        "page_size": "A4",
+        "thumbnail_emoji": "📜",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["school_name", "student_name", "class_name", "roll_no", "conduct", "issue_date"],
+        "canvas_json": _character_certificate(),
+    },
 }
 
 
