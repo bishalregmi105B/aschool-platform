@@ -70,3 +70,6 @@ backend/celerybeat-schedule
 # External vendor/source dumps (exclude from ASchool platform repo)
 eSchool SaaS v1.8.0 Nulled/
 Mighty School Pro v1.6/
+
+# local build logs
+*.log
