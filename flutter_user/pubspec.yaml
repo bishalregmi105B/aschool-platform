@@ -1,7 +1,7 @@
 name: aschool_user
 description: ASchool Unified User App (student + parent + teacher)
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -20,6 +20,8 @@ dependencies:
     path: ../flutter_teacher
   flutter_riverpod: ^2.5.1
   shared_preferences: ^2.5.3
+  onesignal_flutter: ^5.2.6
+  dio: ^5.4.3
 
 
 dev_dependencies:
