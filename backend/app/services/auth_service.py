@@ -231,9 +231,31 @@ class AuthService:
         return {"access_token": access_token, "refresh_token": refresh_token}
 
     @staticmethod
-    def refresh_tokens(user_id: str) -> dict:
-        """Refresh tokens for an existing user."""
+    def refresh_tokens(user_id: str, current_refresh_jti: str | None = None) -> dict:
+        """Refresh tokens for an existing user.
+
+        Rotation: the refresh token that was just used is revoked (its jti is
+        blocklisted until its natural expiry) so a stolen/leaked refresh token
+        cannot be replayed after rotation.
+        """
         user = User.query.get(user_id)
         if not user or not user.is_active or user.is_deleted:
             return {"error": "Invalid user"}
+
+        if current_refresh_jti:
+            from datetime import datetime, timedelta, timezone
+
+            from app.models.revoked_token import RevokedToken
+
+            refresh_expires = current_app.config.get("JWT_REFRESH_TOKEN_EXPIRES", 2592000)
+            if isinstance(refresh_expires, timedelta):
+                expires_at = datetime.now(timezone.utc) + refresh_expires
+            else:
+                expires_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=int(refresh_expires)
+                )
+            RevokedToken.revoke(
+                jti=current_refresh_jti, token_type="refresh", expires_at=expires_at
+            )
+
         return AuthService.create_tokens(user)

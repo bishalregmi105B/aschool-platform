@@ -7,6 +7,7 @@ from app.models.student import Guardian, Student
 from app.models.user import User
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
+from app.utils.validators import validate_password_strength
 from app.utils.response import (
     created_response,
     error_response,
@@ -86,6 +87,9 @@ def create_user():
     _populate_user(user, data)
 
     if data.get("password"):
+        ok, pw_error = validate_password_strength(data["password"])
+        if not ok:
+            return error_response(pw_error, 400)
         user.set_password(data["password"])
     else:
         user.set_password(generate_default_password(user))
@@ -109,6 +113,9 @@ def update_user(user_id):
     _populate_user(user, data)
 
     if data.get("password"):
+        ok, pw_error = validate_password_strength(data["password"])
+        if not ok:
+            return error_response(pw_error, 400)
         user.set_password(data["password"])
 
     db.session.commit()
