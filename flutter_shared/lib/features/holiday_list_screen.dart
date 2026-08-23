@@ -1,15 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:aschool_shared/aschool_shared.dart';
 
-class HolidayListScreen extends ConsumerStatefulWidget {
-  const HolidayListScreen({super.key});
+import '../services/api_client.dart';
+import '../utils/nepali_formatter.dart';
+import '../widgets/custom_app_bar.dart';
+import '../widgets/eschool_components.dart';
+import '../widgets/loading_shimmer.dart';
+import '../widgets/no_data_container.dart';
+
+/// Shared holiday list screen used by admin, teacher, parent and student apps.
+///
+/// Fetches published events from `/notices/events` and renders them as
+/// animated cards with BS/AD date ranges.
+class HolidayListScreen extends StatefulWidget {
+  final String title;
+  final bool showAppBar;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final bool showLocation;
+
+  const HolidayListScreen({
+    super.key,
+    this.title = 'Holiday List',
+    this.showAppBar = false,
+    this.emptyTitle = 'No holidays found',
+    this.emptySubtitle = 'Upcoming holiday events will appear here.',
+    this.showLocation = false,
+  });
 
   @override
-  ConsumerState<HolidayListScreen> createState() => _HolidayListScreenState();
+  State<HolidayListScreen> createState() => _HolidayListScreenState();
 }
 
-class _HolidayListScreenState extends ConsumerState<HolidayListScreen> {
+class _HolidayListScreenState extends State<HolidayListScreen> {
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
 
@@ -40,18 +62,19 @@ class _HolidayListScreenState extends ConsumerState<HolidayListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: widget.showAppBar ? CustomAppBar(title: widget.title) : null,
       body: _loading
           ? const LoadingShimmer()
           : RefreshIndicator(
               onRefresh: _load,
               child: _events.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
+                      children: [
+                        const SizedBox(height: 120),
                         NoDataContainer(
-                          title: 'No holidays found',
-                          subtitle: 'Upcoming holiday events will appear here.',
-                          icon: Icons.beach_access_outlined,
+                          title: widget.emptyTitle,
+                          subtitle: widget.emptySubtitle,
+                          icon: Icons.event_outlined,
                         ),
                       ],
                     )
@@ -64,8 +87,8 @@ class _HolidayListScreenState extends ConsumerState<HolidayListScreen> {
                           index: i,
                           child: ESchoolCard(
                             margin: const EdgeInsets.only(bottom: 10),
+                            padding: EdgeInsets.zero,
                             child: ListTile(
-                              contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.event_outlined),
                               title: Text(e['title']?.toString() ?? 'Holiday'),
                               subtitle: Text(
@@ -76,6 +99,9 @@ class _HolidayListScreenState extends ConsumerState<HolidayListScreen> {
                                   endAd: e['end_date']?.toString(),
                                 ),
                               ),
+                              trailing: widget.showLocation
+                                  ? Text(e['location']?.toString() ?? '')
+                                  : null,
                             ),
                           ),
                         );

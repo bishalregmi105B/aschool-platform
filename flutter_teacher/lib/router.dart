@@ -16,11 +16,10 @@ import 'features/notices/teacher_notices_screen.dart';
 import 'features/class_section/class_section_screen.dart';
 import 'features/lessons/create_lesson_screen.dart';
 import 'features/lessons/create_topic_screen.dart';
-import 'features/holidays/holiday_list_screen.dart';
 import 'features/exams/offline_exam_screen.dart';
 import 'features/exams/online_exam_screen.dart';
 import 'features/exams/report_cards_screen.dart';
-import 'features/diary/student_diary_screen.dart';
+import 'features/diary/diary_write_screen.dart';
 import 'features/leave/leave_screen.dart';
 import 'features/leave/my_attendance_screen.dart';
 import 'features/payroll/payroll_slips_screen.dart';
@@ -28,7 +27,6 @@ import 'features/announcements/announcement_screen.dart';
 import 'features/library/teacher_library_screen.dart';
 import 'features/wellbeing/student_wellbeing_screen.dart';
 import 'features/portfolio/student_portfolios_screen.dart';
-import 'features/emergency/emergency_screen.dart';
 import 'features/lms/lms_overview_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -129,7 +127,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   builder: (_, __) => const TeacherReportCardsScreen()),
               GoRoute(
                   path: '/diary',
-                  builder: (_, __) => const StudentDiaryScreen()),
+                  builder: (_, __) => const DiaryWriteScreen()),
               GoRoute(
                   path: '/announcements',
                   builder: (_, __) => const AnnouncementScreen()),
@@ -157,7 +155,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                   builder: (_, __) => const StudentPortfoliosScreen()),
               GoRoute(
                   path: '/emergency',
-                  builder: (_, __) => const TeacherEmergencyScreen()),
+                  builder: (_, __) => const EmergencyAlertsScreen(
+                    usePluginGate: true,
+                    allowHeadcount: true,
+                    emptyTitle: 'No Active Alerts',
+                    emptySubtitle:
+                        'You will be notified of emergency alerts.',
+                  )),
               GoRoute(
                   path: '/lms',
                   builder: (_, __) => const TeacherLmsOverviewScreen()),

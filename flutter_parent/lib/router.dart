@@ -16,15 +16,12 @@ import 'features/timetable/child_timetable_screen.dart';
 import 'features/subjects/child_subjects_screen.dart';
 import 'features/teachers/teachers_screen.dart';
 import 'features/homework/homework_screen.dart';
-import 'features/holidays/holiday_list_screen.dart';
-import 'features/gallery/gallery_screen.dart';
 import 'features/results/parent_marksheet_screen.dart';
 import 'features/reports/child_reports_screen.dart';
 import 'features/pt_conference/pt_conference_screen.dart';
 import 'features/dismissal/dismissal_qr_screen.dart';
 import 'features/elibrary/parent_elibrary_screen.dart';
 import 'features/portfolio/parent_portfolio_screen.dart';
-import 'features/emergency/emergency_screen.dart';
 import 'features/health_records/child_health_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -83,10 +80,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                   builder: (_, __) => const ParentHomeworkScreen()),
               GoRoute(
                   path: '/holidays',
-                  builder: (_, __) => const ParentHolidayScreen()),
+                  builder: (_, __) => const HolidayListScreen(
+                    emptyTitle: 'No upcoming holidays',
+                    emptySubtitle: 'Published holiday events will appear here.',
+                  )),
               GoRoute(
                   path: '/gallery',
-                  builder: (_, __) => const ParentGalleryScreen()),
+                  builder: (_, __) => const GalleryScreen(imagesOnly: false)),
               GoRoute(
                   path: '/reports',
                   builder: (_, __) => const ChildReportsScreen()),
@@ -109,7 +109,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                   builder: (_, __) => const DismissalQrScreen()),
               GoRoute(
                   path: '/emergency',
-                  builder: (_, __) => const ParentEmergencyScreen()),
+                  builder: (_, __) => const EmergencyAlertsScreen(
+                    emptyTitle: 'No Alerts',
+                    emptySubtitle:
+                        "No emergency alerts from your child's school.",
+                  )),
               GoRoute(
                   path: '/child-health',
                   builder: (_, __) => const ChildHealthScreen()),

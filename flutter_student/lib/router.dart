@@ -20,18 +20,15 @@ import 'features/achievements/achievements_screen.dart';
 import 'features/subjects/subjects_screen.dart';
 import 'features/classmates/classmates_screen.dart';
 import 'features/exams/student_exams_screen.dart';
-import 'features/diary/student_diary_screen.dart';
 import 'features/transport/student_transport_screen.dart';
 import 'features/teachers/teachers_list_screen.dart';
-import 'features/holidays/holiday_list_screen.dart';
-import 'features/gallery/gallery_screen.dart';
+import 'features/diary/diary_read_screen.dart';
 import 'features/guardians/guardian_details_screen.dart';
 import 'features/profile/student_profile_screen.dart';
 import 'features/attendance/student_attendance_screen.dart';
 import 'features/health_records/student_health_screen.dart';
 import 'features/gamification/gamification_screen.dart';
 import 'features/fees/student_fees_screen.dart';
-import 'features/emergency/emergency_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _dashboardNavKey = GlobalKey<NavigatorState>(debugLabel: 'dashboardNav');
@@ -126,7 +123,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       builder: (_, __) => const StudentExamsScreen()),
                   GoRoute(
                       path: 'diary',
-                      builder: (_, __) => const StudentDiaryScreen()),
+                      builder: (_, __) => const DiaryReadScreen()),
                   GoRoute(
                       path: 'library',
                       builder: (_, __) => const StudentLibrary()),
@@ -157,11 +154,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                       path: 'teachers',
                       builder: (_, __) => const TeachersListScreen()),
                   GoRoute(
-                      path: 'holidays',
-                      builder: (_, __) => const HolidayListScreen()),
+                      path: 'holidays', builder: (_, __) => const HolidayListScreen(showAppBar: true)),
                   GoRoute(
                       path: 'gallery',
-                      builder: (_, __) => const GalleryScreen()),
+                      builder: (_, __) =>
+                          const GalleryScreen(showAppBar: true)),
                   GoRoute(
                       path: 'transport',
                       builder: (_, __) => const StudentTransportScreen()),
@@ -185,7 +182,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                       builder: (_, __) => const StudentFeesScreen()),
                   GoRoute(
                       path: 'emergency',
-                      builder: (_, __) => const StudentEmergencyScreen()),
+                      builder: (_, __) => const EmergencyAlertsScreen(
+                        perPage: 10,
+                        showActiveBanner: true,
+                        emptyTitle: 'No Alerts',
+                        emptySubtitle: 'No emergency alerts at this time.',
+                      )),
                 ],
               ),
             ],
