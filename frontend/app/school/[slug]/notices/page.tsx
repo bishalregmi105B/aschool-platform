@@ -1,4 +1,5 @@
 import { displayBS } from "@/lib/nepali_date";
+import { sanitizeHtml } from "@/lib/sanitize";
 /** Public Notices Page — auto-synced from school management system */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
@@ -46,7 +47,7 @@ export default async function NoticesPage({ params }: { params: { slug: string }
               </div>
               <div
                 className="text-gray-700 mt-3 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: notice.content || "" }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(notice.content) }}
               />
             </article>
           ))}

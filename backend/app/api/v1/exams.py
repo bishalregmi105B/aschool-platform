@@ -280,14 +280,41 @@ def create_online_exam():
     questions = data.get("questions") or []
 
     def _sanitize_question_text(text):
+        """Allowlist-based HTML sanitization for question markup.
+
+        Question text may contain light formatting only; every tag outside the
+        allowlist is dropped, along with all attributes (so onerror/onload and
+        javascript: URLs cannot survive) — not just <script> blocks.
+        Plain strings (UUIDs, labels) pass through unchanged.
+        """
         if not isinstance(text, str):
             return text
-        return re.sub(r"<script[\s\S]*?</script>", "", text, flags=re.IGNORECASE)
+        try:
+            from bleach.sanitizer import Cleaner
+
+            cleaner = Cleaner(
+                tags=["b", "i", "em", "strong", "u", "br", "p", "sub", "sup", "code"],
+                attributes={},
+                strip=True,
+            )
+            return cleaner.clean(text)
+        except ImportError:
+            import html
+
+            return html.escape(re.sub(r"<[^>]*>", "", text))
+
+    def _sanitize_question_payload(value):
+        """Recursively sanitize every string inside a question payload."""
+        if isinstance(value, str):
+            return _sanitize_question_text(value)
+        if isinstance(value, dict):
+            return {k: _sanitize_question_payload(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_sanitize_question_payload(item) for item in value]
+        return value
 
     questions = [
-        {**q, "question_text": _sanitize_question_text(q.get("question_text")),
-              "text": _sanitize_question_text(q.get("text"))}
-        if isinstance(q, dict) else q
+        _sanitize_question_payload(q) if isinstance(q, dict) else q
         for q in questions
     ]
 
@@ -356,6 +383,20 @@ def submit_online_exam(online_exam_id):
     student_id = data.get("student_id") or (student.id if student else None)
     if not student_id:
         return error_response("student_id is required", 400)
+
+    # Students may only submit their own attempts.
+    if g.role == "student":
+        if not student or str(student_id) != str(student.id):
+            return error_response("You can only submit your own exam", 403)
+
+    # Enforce the published schedule window.
+    now = datetime.now(timezone.utc)
+    start_at = exam.start_at.replace(tzinfo=timezone.utc) if exam.start_at and exam.start_at.tzinfo is None else exam.start_at
+    end_at = exam.end_at.replace(tzinfo=timezone.utc) if exam.end_at and exam.end_at.tzinfo is None else exam.end_at
+    if start_at and now < start_at:
+        return error_response("This exam has not started yet", 400)
+    if end_at and now > end_at:
+        return error_response("This exam has already ended", 400)
 
     answers = data.get("answers") or {}
     score = _score_online_exam(exam.questions or [], answers)

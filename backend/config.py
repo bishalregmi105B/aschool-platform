@@ -49,6 +49,12 @@ class BaseConfig:
     )
     JWT_TOKEN_LOCATION = ["headers"]
 
+    # HttpOnly session cookies (web dashboard). JWT_TOKEN_LOCATION stays
+    # header-only so mobile Bearer auth is unaffected; cookies are an
+    # additional transport set by /auth/* responses.
+    COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN") or None  # e.g. ".aschool.com.np"
+    COOKIE_SECURE = os.getenv("COOKIE_SECURE", "auto")  # auto: Secure outside dev/test
+
     # Redis / Cache
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CACHE_TYPE = "RedisCache"

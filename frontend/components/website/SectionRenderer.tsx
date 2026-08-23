@@ -11,6 +11,7 @@ import { ProgramCards } from "@/components/website/ProgramCards";
 import { PrincipalMessage } from "@/components/website/PrincipalMessage";
 import { AdmissionCTA } from "@/components/website/AdmissionCTA";
 import { Testimonials } from "@/components/website/Testimonials";
+import { sanitizeHtml } from "@/lib/sanitize";
 import type { SchoolSection } from "@/lib/school-website/types";
 
 type C = Record<string, any>;
@@ -143,7 +144,7 @@ function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
           {school?.about_us ? (
             <div
               className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: school.about_us }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(school?.about_us) }}
             />
           ) : (
             <p className="text-gray-600 leading-relaxed">

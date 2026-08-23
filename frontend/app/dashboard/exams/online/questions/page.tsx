@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,7 +168,7 @@ export default function OnlineExamQuestionsPage() {
             ) : result ? (
               <div className="p-6 h-[600px] overflow-y-auto bg-muted/10 font-serif">
                 {result.html ? (
-                  <div dangerouslySetInnerHTML={{ __html: result.html }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.html) }} />
                 ) : (
                   <pre className="whitespace-pre-wrap font-sans text-sm">{result.text || JSON.stringify(result, null, 2)}</pre>
                 )}

@@ -28,10 +28,23 @@ describe("Simulation Security Regression Suite (Frontend)", () => {
   test("SEC-07 / M1: middleware must validate JWT expiry, not only cookie presence", () => {
     const middleware = read("middleware.ts");
 
-    const hasTokenDecoding = /(jwtDecode|decodeJwt|jsonwebtoken|jose|atob\(|split\(\"\\.\"\))/i.test(middleware);
+    // NOTE (2026-08-22): this assertion previously required the literal
+    // substring `split("\.")` — a doubly-escaped pattern that cannot appear
+    // in valid TypeScript. The code genuinely decodes the JWT payload via
+    // `jwt.split(".")` + Buffer/base64url and enforces `exp`; the check was
+    // tightened here to assert real decoding + expiry validation rather than
+    // an unreachable string match.
+    const hasTokenDecoding =
+      /(jwtDecode|decodeJwt|jsonwebtoken|jose|atob\(|split\(\s*["']\.["']\s*\))/i.test(
+        middleware
+      );
     const checksExpiryClaim = /\bexp\b/.test(middleware);
     const hasExpiryValidation = hasTokenDecoding && checksExpiryClaim;
     expect(hasExpiryValidation).toBe(true);
+
+    // The guard must actually redirect on an expired token, not just decode it.
+    expect(middleware).toMatch(/isTokenExpired/);
+    expect(middleware).toMatch(/redirect/);
   });
 
   test("C2: public school pages must sanitize dangerouslySetInnerHTML blocks", () => {

@@ -1,7 +1,7 @@
 /** @type {import('jest').Config} */
 const config = {
   testEnvironment: "jsdom",
-  setupFilesAfterSetup: ["<rootDir>/jest.setup.ts"],
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
     "\\.(css|less|scss|sass)$": "identity-obj-proxy",
@@ -10,8 +10,9 @@ const config = {
     "^.+\\.(ts|tsx)$": [
       "ts-jest",
       {
-        tsconfig: "tsconfig.json",
-        jsx: "react-jsx",
+        // Dedicated test tsconfig: the app config uses jsx:"preserve" (Next.js
+        // SWC), which leaves raw JSX in the output and breaks jest.
+        tsconfig: "<rootDir>/tsconfig.test.json",
       },
     ],
   },
