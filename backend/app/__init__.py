@@ -315,10 +315,22 @@ def create_app(config_name: str | None = None) -> Flask:
             return None
         if not (request.cookies.get("access_token") or request.cookies.get("refresh_token")):
             return None
-        # Token rotation is not a state-changing action and SameSite=Lax already
-        # stops cross-site requests from carrying cookies; exempt it so the
-        # silent auto-refresh interceptor works even if Origin is absent.
-        if request.path.rstrip("/").endswith("/auth/refresh"):
+        # Session establishment/rotation endpoints are unauthenticated by
+        # nature (or rotation-only) — SameSite=Lax covers them. Everything
+        # else that mutates state with a cookie still requires same-site
+        # Origin/Referer (e.g. /auth/change-password stays protected).
+        _path = request.path.rstrip("/")
+        if _path.endswith(
+            (
+                "/auth/login",
+                "/auth/verify-otp",
+                "/auth/student-login",
+                "/auth/send-otp",
+                "/auth/register",
+                "/auth/refresh",
+                "/auth/logout",
+            )
+        ):
             return None
 
         origin = request.headers.get("Origin") or request.headers.get("Referer")
