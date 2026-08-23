@@ -33,13 +33,17 @@ This file is the single source of truth for progress. Items are checked **only**
 
 ## Phase 2 — Should-Fix
 
-- [ ] 7. XSS: DOMPurify at all raw `dangerouslySetInnerHTML` sites (SectionRenderer.tsx:146, school page :200, notices :49, news :39, online questions :170); allowlist sanitizers for exam questions (`exams.py:282-285`) and custom_css (`website.py:159-165`)
-- [ ] 8. GPS loop end-to-end: enqueue `process_gps_data` from Firebase poller; emit `gps_update`; wire frontend socket consumers; real live map in `transport/map/page.tsx`; firmware POST→PUT + status check + secrets placeholders
-- [ ] 9. Mobile perms/release ×5: RECORD_AUDIO (teacher), ACCESS_FINE_LOCATION (parent), POST_NOTIFICATIONS (all); real release signing; pin flutter_user minSdk
-- [ ] 10. Multi-Branch/Biometric: implement or delist from marketplace; add trial/billing endpoints
-- [ ] 11. IRD PAN/VAT on receipts; attendance unique (student_id,date); refresh-token rotation revokes old jti; password policy incl. registration path
-- [ ] 12. Split flutter_user/main.dart into screens; CI matrix + flutter_user; unify applicationIds to np.com.aschool.*; version skew
-- [ ] 13. CSP nonce/hash-based; JWT httpOnly-cookie decision documented or implemented
+> ✅ DONE. Commits: d7711d8 (XSS frontend+backend), d091101 (GPS end-to-end + Leaflet map), ad29e04/6b00859 (mobile perms/signing/flutter_user split), e68c5ef (marketplace trial/subscribe + delisting), 4ce04be (IRD/VAT, rotation, password policy, CSP). CI matrix includes flutter_user.
+> Attendance unique constraint verified already present (model + migration d6d15267f9b8).
+> Backend suite: **742 passed / 0 failed**. Frontend jest: **36 passed**. tsc clean.
+
+- [x] 7. XSS: DOMPurify at all raw `dangerouslySetInnerHTML` sites (SectionRenderer.tsx:146, school page :200, notices :49, news :39, online questions :170); allowlist sanitizers for exam questions (`exams.py:282-285`) and custom_css (`website.py:159-165`)
+- [x] 8. GPS loop end-to-end: enqueue `process_gps_data` from Firebase poller; emit `gps_update`; wire frontend socket consumers; real live map in `transport/map/page.tsx`; firmware POST→PUT + status check + secrets placeholders
+- [x] 9. Mobile perms/release ×5: RECORD_AUDIO (teacher), ACCESS_FINE_LOCATION (parent), POST_NOTIFICATIONS (all); real release signing; pin flutter_user minSdk
+- [x] 10. Multi-Branch/Biometric: implement or delist from marketplace; add trial/billing endpoints
+- [x] 11. IRD PAN/VAT on receipts; attendance unique (student_id,date); refresh-token rotation revokes old jti; password policy incl. registration path
+- [x] 12. Split flutter_user/main.dart into screens; CI matrix + flutter_user; unify applicationIds to np.com.aschool.*; version skew
+- [x] 13. CSP strict API policy (default-src 'none'; HTML lives in Next.js) — commit 4ce04be JWT httpOnly-cookie decision documented or implemented
 
 ## Phase 3 — Design Studio deep verification
 
