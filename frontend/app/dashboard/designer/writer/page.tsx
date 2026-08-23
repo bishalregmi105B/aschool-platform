@@ -197,6 +197,67 @@ function writerBlocksToHTML(blocks: any[]): string {
         </div>\n`;
         break;
       }
+      case "subject_rows": {
+        const cs = "border:1px solid #cbd5e1;padding:5px 8px;";
+        html += `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:9pt;">
+          <thead><tr style="background:#065f46;color:#fff;">
+            <th style="${cs}text-align:left;">Subject</th>
+            <th style="${cs}width:56px;text-align:center;">Th. Full</th>
+            <th style="${cs}width:56px;text-align:center;">Th. Obt.</th>
+            <th style="${cs}width:56px;text-align:center;">Pr. Full</th>
+            <th style="${cs}width:56px;text-align:center;">Pr. Obt.</th>
+            <th style="${cs}width:44px;text-align:center;">Pass</th>
+            <th style="${cs}width:56px;text-align:center;">Total</th>
+            <th style="${cs}width:44px;text-align:center;">Grade</th>
+            <th style="${cs}width:44px;text-align:center;">Result</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#f8fafc;"><td style="${cs}color:#94a3b8;font-style:italic;">[Subject Name]</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td></tr>
+            <tr><td style="${cs}color:#94a3b8;font-style:italic;">[Subject Name]</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td></tr>
+            <tr style="background:#f0fdf4;"><td colspan="9" style="${cs}text-align:center;color:#065f46;font-style:italic;padding:6px;font-size:8pt;">Subject rows are auto-filled from student marks when generating the PDF</td></tr>
+          </tbody>
+        </table>\n`;
+        break;
+      }
+      case "subject_rows_neb": {
+        const cs = "border:1px solid #cbd5e1;padding:5px 8px;";
+        html += `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:9pt;">
+          <thead>
+            <tr style="background:#1e3a8a;color:#fff;">
+              <th style="${cs}text-align:left;">SUBJECTS</th>
+              <th style="${cs}width:80px;text-align:center;">CREDIT HOUR (CH)</th>
+              <th style="${cs}width:60px;text-align:center;">GRADE</th>
+              <th style="${cs}width:90px;text-align:center;">GRADE POINT (GP)</th>
+              <th style="${cs}width:70px;text-align:center;">FINAL GRADE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f8fafc;"><td style="${cs}color:#94a3b8;font-style:italic;">[Subject](TH)</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td rowspan="2" style="${cs}text-align:center;font-weight:700;">—</td></tr>
+            <tr style="background:#f8fafc;"><td style="${cs}color:#94a3b8;font-style:italic;">[Subject](IN)</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td><td style="${cs}text-align:center;">—</td></tr>
+            <tr style="background:#eff6ff;"><td colspan="5" style="${cs}text-align:center;color:#3b82f6;font-style:italic;padding:6px;font-size:8pt;">NEB subject rows (TH/IN per subject) are auto-filled from student marks when generating the PDF</td></tr>
+          </tbody>
+        </table>\n`;
+        break;
+      }
+      case "fee_rows": {
+        const cs = "border:1px solid #cbd5e1;padding:5px 8px;";
+        html += `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:10pt;">
+          <thead><tr style="background:#065f46;color:#fff;">
+            <th style="${cs}width:32px;">S.N.</th>
+            <th style="${cs}">Fee Description</th>
+            <th style="${cs}width:80px;text-align:right;">Amount (Rs.)</th>
+            <th style="${cs}width:80px;text-align:right;">Paid (Rs.)</th>
+            <th style="${cs}width:80px;text-align:right;">Balance (Rs.)</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#f8fafc;"><td style="${cs}text-align:center;">1</td><td style="${cs}color:#94a3b8;font-style:italic;">[Fee Item]</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td></tr>
+            <tr><td style="${cs}text-align:center;">2</td><td style="${cs}color:#94a3b8;font-style:italic;">[Fee Item]</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td></tr>
+            <tr style="background:#f0fdf4;font-weight:bold;"><td colspan="2" style="${cs}text-align:right;">TOTAL</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td><td style="${cs}text-align:right;">—</td></tr>
+            <tr style="background:#eff6ff;"><td colspan="5" style="${cs}text-align:center;color:#3b82f6;font-style:italic;padding:6px;font-size:8pt;">Fee rows are auto-filled from the student fee records when generating the bill</td></tr>
+          </tbody>
+        </table>\n`;
+        break;
+      }
     }
   }
 
@@ -245,47 +306,44 @@ export default function WriterPage() {
   }, [config.size, config.orientation]);
 
   // ── Load saved document ───────────────────────────────────────────
-  useQuery<any>({
+  const { data: savedDoc } = useQuery<any>({
     queryKey: ["writer-doc", docId],
     queryFn: async () => { const r = await api.get(`/design-studio/documents/${docId}`); return r.data?.data; },
     enabled: !!docId,
-    onSuccess: (data: any) => {
-      if (!data) return;
-      setDocName(data.name || "Untitled Document");
-      const state = data.canvas_state;
-      if (state?.type === "writer") {
-        if (state.config) setConfig(state.config);
-        if (editorRef.current && state.html) editorRef.current.innerHTML = state.html;
-      }
-    },
-  } as any);
+  });
+
+  useEffect(() => {
+    if (!savedDoc) return;
+    setDocName(savedDoc.name || "Untitled Document");
+    const state = savedDoc.canvas_state;
+    if (state?.type === "writer") {
+      if (state.config) setConfig(state.config);
+      if (editorRef.current && state.html) editorRef.current.innerHTML = state.html;
+    }
+  }, [savedDoc]);
 
   // ── Load template from writer_json (native blocks) ────────────────
-  useQuery<any>({
+  const { data: templateData } = useQuery<any>({
     queryKey: ["writer-template", templateId],
     queryFn: async () => {
       const r = await api.get("/design-studio/templates");
       const all = Array.isArray(r.data?.data) ? r.data.data : [];
-      return all.find((t: any) => t.id === templateId) || null;
+      return all.find((t: any) => t.id === templateId || t.template_key === templateId) || null;
     },
     enabled: !!templateId && !docId,
-    onSuccess: (tpl: any) => {
-      if (!tpl) return;
-      setDocName(tpl.name || "Untitled Document");
+  });
 
-      const writerData = tpl.writer_json;
-      if (writerData?.type === "writer") {
-        // Apply writer config (font, page size, header/footer)
-        if (writerData.config) {
-          setConfig(prev => ({ ...prev, ...writerData.config }));
-        }
-        // Render blocks → HTML
-        if (writerData.blocks?.length && editorRef.current) {
-          editorRef.current.innerHTML = writerBlocksToHTML(writerData.blocks);
-        }
+  useEffect(() => {
+    if (!templateData) return;
+    setDocName(templateData.name || "Untitled Document");
+    const writerData = templateData.writer_json;
+    if (writerData?.type === "writer") {
+      if (writerData.config) setConfig(prev => ({ ...prev, ...writerData.config }));
+      if (writerData.blocks?.length && editorRef.current) {
+        editorRef.current.innerHTML = writerBlocksToHTML(writerData.blocks);
       }
-    },
-  } as any);
+    }
+  }, [templateData]);
 
   // ── Save ──────────────────────────────────────────────────────────
   const saveMutation = useMutation({

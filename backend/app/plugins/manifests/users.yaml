@@ -1,0 +1,22 @@
+slug: users
+name: "User Management"
+name_nepali: "प्रयोगकर्ता व्यवस्थापन"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "👥"
+icon: "Users"
+description: "System users, roles, and permissions"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/users"
+  sidebar:
+    label: "Users"
+    label_nepali: "प्रयोगकर्ता"
+    icon: "Users"
+    subitems: []
+    visible_to: ["superadmin", "school_admin"]

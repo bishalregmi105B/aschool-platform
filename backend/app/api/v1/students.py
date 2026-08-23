@@ -242,6 +242,34 @@ def bulk_delete_students():
     return success_response({"deleted": count})
 
 
+@students_bp.route("/batch-roll-numbers", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin", "staff", "teacher")
+def batch_roll_numbers():
+    """Batch-update roll numbers for multiple students in one call."""
+    data = request.get_json(silent=True) or {}
+    updates = data.get("updates", [])
+    if not updates or not isinstance(updates, list):
+        return error_response("updates list is required", 400)
+
+    updated = 0
+    for item in updates:
+        sid = item.get("student_id")
+        roll = item.get("roll_number")
+        if not sid:
+            continue
+        student = Student.query.filter_by(
+            id=sid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if student:
+            student.roll_number = int(roll) if roll not in (None, "") else None
+            updated += 1
+
+    db.session.commit()
+    return success_response({"updated": updated})
+
+
 @students_bp.route("/bulk-profile-images", methods=["POST"])
 @jwt_required()
 @school_required

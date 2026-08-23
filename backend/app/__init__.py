@@ -214,6 +214,14 @@ def create_app(config_name: str | None = None) -> Flask:
                 _set_school_context(school)
                 return
 
+        # 1.5. Try X-School-Slug header (mobile apps)
+        slug_header = request.headers.get("X-School-Slug", "").strip()
+        if slug_header:
+            school = School.query.filter_by(slug=slug_header, is_active=True).first()
+            if school:
+                _set_school_context(school)
+                return
+
         # 2. Fallback: resolve from JWT school_id claim (for localhost / dev)
         from flask_jwt_extended import get_jwt, verify_jwt_in_request
         try:

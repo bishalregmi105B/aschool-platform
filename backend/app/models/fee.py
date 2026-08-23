@@ -1,4 +1,4 @@
-"""Fee models: FeeStructure, FeeCollection, FeeReceipt."""
+"""Fee models: FeeStructure, FeeCollection, FeeReceipt, FeeType, StudentScholarship."""
 from sqlalchemy import (
     Boolean,
     Column,
@@ -14,6 +14,15 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import SchoolModel
+
+
+class FeeType(SchoolModel):
+    """Custom fee type / category defined per school."""
+    __tablename__ = "fee_types"
+
+    name = Column(String(120), nullable=False)
+    description = Column(String(255))
+    is_system = Column(Boolean, default=False)
 
 
 class FeeStructure(SchoolModel):
@@ -88,3 +97,24 @@ class FeeReceipt(SchoolModel):
 
     collection = relationship("FeeCollection", backref="receipt")
     student = relationship("Student", backref="fee_receipts")
+
+
+class StudentScholarship(SchoolModel):
+    """Per-student fee discount/scholarship — auto-applied during fee generation.
+
+    discount_type: "percent" (0-100) or "fixed" (flat NPR amount)
+    fee_type: if null, applies to ALL fee types for this student
+    valid_until_bs: if null, scholarship is open-ended
+    """
+    __tablename__ = "student_scholarships"
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    fee_type = Column(String(100))          # null = all types
+    discount_type = Column(String(10), default="percent")   # "percent" | "fixed"
+    discount_value = Column(Numeric(10, 2), default=0)
+    reason = Column(String(255))
+    valid_from_bs = Column(String(20))
+    valid_until_bs = Column(String(20))
+    is_active = Column(Boolean, default=True)
+
+    student = relationship("Student", backref="scholarships")

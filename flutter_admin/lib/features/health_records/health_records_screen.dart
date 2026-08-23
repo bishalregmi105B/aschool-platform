@@ -182,7 +182,7 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
     return RefreshIndicator(
       onRefresh: _loadVaccinations,
       child: _vaccinations.isEmpty
-          ? const NoDataContainer(message: 'No vaccination records found')
+          ? const NoDataContainer(title: 'No vaccination records found')
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _vaccinations.length,

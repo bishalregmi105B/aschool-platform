@@ -70,9 +70,9 @@ class AuthService:
         send_sms.delay(phone, msg)
 
         result = {"message": "OTP sent successfully", "expires_in": AuthService.OTP_EXPIRY_SECONDS}
-        # In console/dev mode expose OTP in response so devs don't need to check logs
+        # In console/dev mode, log OTP securely instead of exposing in response
         if current_app.config.get("SMS_CONSOLE_MODE") or current_app.config.get("DEBUG"):
-            result["otp"] = otp
+            current_app.logger.debug("DEV OTP for %s: %s", phone, otp)
         return result
 
     @staticmethod

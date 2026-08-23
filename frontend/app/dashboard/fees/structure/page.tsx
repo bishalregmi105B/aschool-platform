@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Banknote } from "lucide-react";
 
 interface FeeStructure {
   id: string;
@@ -52,6 +52,8 @@ export default function FeeStructurePage() {
 function FeeStructureContent() {
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [batchClassId, setBatchClassId] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
 
   const { data, isLoading } = useQuery({
@@ -113,13 +115,32 @@ function FeeStructureContent() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fee-structures"] }); toast.success("Deleted"); },
   });
 
+  const batchMonthly = useMutation({
+    mutationFn: async (classId?: string) =>
+      (await api.post("/fees/batch-monthly", classId ? { class_id: classId } : {})).data,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["fee-structures"] });
+      setShowBatchDialog(false);
+      const d = res?.data;
+      toast.success(
+        `Done: ${d?.collections_created ?? 0} new fee records created, ${d?.collections_skipped ?? 0} already existed across ${d?.structures_processed ?? 0} structures.`
+      );
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to generate fees"),
+  });
+
   if (isLoading) return <PageLoader />;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Fee Structure</h1><p className="text-muted-foreground">Define reusable fee templates for each class and academic year</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Structure</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
+            <Banknote className="h-4 w-4 mr-2" /> Generate Monthly Fees
+          </Button>
+          <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Structure</Button>
+        </div>
       </div>
 
       <Card>
@@ -218,6 +239,43 @@ function FeeStructureContent() {
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_optional} onChange={(e) => setForm({ ...form, is_optional: e.target.checked })} /> Optional fee</label>
           </div>
           <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Create Structure</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Monthly Fees Dialog */}
+      <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Monthly Fees</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will generate pending fee records for all active students based on
+            their active fee structures for the current billing cycle. Existing records
+            are skipped (safe to re-run).
+          </p>
+          <div className="space-y-2">
+            <Label>Filter by Class (optional)</Label>
+            <select
+              className="w-full border rounded-md p-2"
+              value={batchClassId}
+              onChange={(e) => setBatchClassId(e.target.value)}
+            >
+              <option value="">All Classes</option>
+              {(classes || []).map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => batchMonthly.mutate(batchClassId || undefined)}
+              disabled={batchMonthly.isPending}
+            >
+              {batchMonthly.isPending ? <Spinner className="mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+              Generate Now
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

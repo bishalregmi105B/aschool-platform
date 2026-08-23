@@ -78,7 +78,7 @@ import { cn } from "@/lib/utils";
 import { useInstalledPlugins, type PluginSidebarItem } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar } from "@/components/ui/avatar";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 // ── Icon Registry (maps YAML icon string → Lucide component) ───────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -208,340 +208,6 @@ const PLUGIN_SECTION_ORDER: string[] = [
   "Compliance",
 ];
 
-// ── CORE NAV (always visible, no plugin gate) ──────────────────────────────
-// These are truly core features — they appear regardless of installed plugins.
-const CORE_SECTIONS: SidebarSection[] = [
-  {
-    header: null,
-    items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" }],
-  },
-  {
-    header: "Academic Management",
-    items: [
-      {
-        label: "Academics",
-        icon: BookOpen,
-        href: "/dashboard/academics",
-        roles: ["superadmin", "school_admin", "staff"],
-      },
-      {
-        label: "Lessons & Study Material",
-        icon: BookOpenCheck,
-        href: "/dashboard/lms",
-        roles: ["superadmin", "school_admin", "staff", "student"],
-      },
-      {
-        label: "Students",
-        icon: GraduationCap,
-        children: [
-          { label: "Student Details", href: "/dashboard/students" },
-          { label: "Add Student", href: "/dashboard/students/new" },
-          {
-            label: "Bulk Import",
-            href: "/dashboard/students/bulk-import",
-            icon: Upload,
-          },
-          {
-            label: "Parents & Guardians",
-            href: "/dashboard/parents",
-            roles: ["superadmin", "school_admin"],
-          },
-          {
-            label: "Admission Inquiries",
-            href: "/dashboard/admission",
-            icon: UserPlus,
-            roles: ["superadmin", "school_admin"],
-          },
-          {
-            label: "Assign Roll Numbers",
-            href: "/dashboard/students/roll-numbers",
-            icon: ListOrdered,
-          },
-          {
-            label: "Upload Profile Images",
-            href: "/dashboard/students/profile-images",
-            icon: ImagePlus,
-          },
-          {
-            label: "Transfer Student",
-            href: "/dashboard/students/transfers",
-            icon: ArrowRightLeft,
-          },
-          {
-            label: "Promote Students",
-            href: "/dashboard/students/promote",
-            icon: TrendingUp,
-          },
-          {
-            label: "Reset Password",
-            href: "/dashboard/students/reset-password",
-            icon: KeyRound,
-          },
-        ],
-      },
-      {
-        label: "Teachers",
-        icon: UserCog,
-        roles: ["superadmin", "school_admin", "staff"],
-        children: [
-          { label: "Manage Teachers", href: "/dashboard/teachers" },
-          {
-            label: "Bulk Upload",
-            href: "/dashboard/teachers/bulk-upload",
-            icon: Upload,
-          },
-        ],
-      },
-      {
-        label: "Users",
-        icon: Users,
-        href: "/dashboard/users",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Attendance",
-        icon: CalendarRange,
-        roles: ["superadmin", "school_admin", "teacher"],
-        children: [
-          { label: "Mark Attendance", href: "/dashboard/attendance/mark", icon: ClipboardCheck },
-          { label: "View Records", href: "/dashboard/attendance", icon: Calendar },
-          { label: "Monthly Report", href: "/dashboard/attendance/reports", icon: BarChart2 },
-          { label: "Holidays", href: "/dashboard/attendance/holidays", icon: CalendarOff },
-        ],
-      },
-      {
-        label: "Timetable",
-        icon: CalendarDays,
-        roles: ["superadmin", "school_admin", "teacher"],
-        children: [
-          { label: "View Timetable", href: "/dashboard/timetable" },
-          { label: "Teacher Timetable", href: "/dashboard/timetable/teacher" },
-          { label: "Create / Generate", href: "/dashboard/timetable/generate", roles: ["superadmin", "school_admin"] },
-        ],
-      },
-    ],
-  },
-  {
-    header: "Communication & Media",
-    items: [
-      {
-        label: "Notices",
-        icon: Megaphone,
-        href: "/dashboard/notices",
-        roles: ["superadmin", "school_admin", "teacher"],
-      },
-      {
-        label: "Announcements",
-        icon: Bell,
-        href: "/dashboard/communications/announcements",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Student Diary",
-        icon: BookUser,
-        roles: ["superadmin", "school_admin", "teacher"],
-        children: [
-          { label: "Diary Categories", href: "/dashboard/communications/diary/categories" },
-          { label: "Manage Diaries", href: "/dashboard/communications/diary" },
-        ],
-      },
-      {
-        label: "Gallery",
-        icon: Camera,
-        href: "/dashboard/communications/gallery",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Notifications",
-        icon: Bell,
-        href: "/dashboard/notifications",
-        roles: ["superadmin", "school_admin", "teacher"],
-      },
-      {
-        label: "FAQs",
-        icon: HelpCircle,
-        href: "/dashboard/faqs",
-        roles: ["superadmin", "school_admin"],
-      },
-    ],
-  },
-  {
-    header: "Exam & Performance",
-    items: [
-      {
-        label: "Examinations",
-        icon: FileText,
-        roles: ["superadmin", "school_admin", "staff", "student"],
-        pluginSlug: "exams",
-        children: [
-          { label: "All Exams", href: "/dashboard/exams" },
-          { label: "Schedule", href: "/dashboard/exams/schedule" },
-          { label: "Enter Marks", href: "/dashboard/exams/marks" },
-          { label: "Results", href: "/dashboard/exams/results" },
-          { label: "Report Cards", href: "/dashboard/exams/report-cards" },
-          { label: "Online Exams", href: "/dashboard/exams/online" },
-          { label: "AI Paper Generator", href: "/dashboard/exams/ai-paper" },
-        ],
-      },
-      {
-        label: "Assignments",
-        icon: PenTool,
-        roles: ["superadmin", "school_admin", "teacher"],
-        pluginSlug: "assignments",
-        children: [
-          { label: "All Assignments", href: "/dashboard/assignments" },
-          { label: "Submissions", href: "/dashboard/assignments/submissions" },
-        ],
-      },
-    ],
-  },
-  {
-    header: "Personnel Management",
-    items: [
-      {
-        label: "Staff Management",
-        icon: Briefcase,
-        href: "/dashboard/staff",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Leave",
-        icon: CalendarOff,
-        roles: ["superadmin", "school_admin", "staff"],
-        children: [
-          { label: "Staff Leave", href: "/dashboard/hr/leaves" },
-          { label: "Leave Report", href: "/dashboard/hr/leaves/report" },
-        ],
-      },
-      {
-        label: "Staff Attendance",
-        icon: ClipboardCheck,
-        href: "/dashboard/hr/staff-attendance",
-        roles: ["superadmin", "school_admin"],
-      },
-    ],
-  },
-  {
-    header: "Institutional Finance",
-    items: [
-      {
-        label: "Expense",
-        icon: Receipt,
-        roles: ["superadmin", "school_admin"],
-        children: [
-          {
-            label: "Manage Categories",
-            href: "/dashboard/hr/expense-categories",
-          },
-          { label: "Manage Expenses", href: "/dashboard/hr/expenses" },
-        ],
-      },
-      {
-        label: "Fees Management",
-        icon: DollarSign,
-        href: "/dashboard/fees",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Payroll",
-        icon: Banknote,
-        roles: ["superadmin", "school_admin"],
-        children: [
-          { label: "Manage Payroll", href: "/dashboard/hr/payroll" },
-          {
-            label: "Payroll Settings",
-            href: "/dashboard/hr/payroll/settings",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    header: "Certificate & ID Card",
-    items: [
-      {
-        label: "Certificates & ID Cards",
-        icon: Award,
-        href: "/dashboard/certificates",
-        roles: ["superadmin", "school_admin"],
-      },
-    ],
-  },
-  {
-    header: "Transportation",
-    items: [
-      {
-        label: "Transport System",
-        icon: Bus,
-        href: "/dashboard/transport",
-        roles: ["superadmin", "school_admin", "staff", "student"],
-      },
-    ],
-  },
-  {
-    header: "Operations",
-    items: [
-      {
-        label: "Hostel",
-        icon: Building2,
-        href: "/dashboard/hostel",
-        pluginSlug: "hostel",
-        roles: ["superadmin", "school_admin"],
-      },
-      {
-        label: "Visitors",
-        icon: Users,
-        href: "/dashboard/visitors",
-        pluginSlug: "visitor_management",
-        roles: ["superadmin", "school_admin", "staff"],
-      },
-    ],
-  },
-  {
-    header: "Reporting & Analytics",
-    items: [
-      {
-        label: "Reports",
-        icon: FileBarChart2,
-        roles: ["superadmin", "school_admin"],
-        children: [
-          { label: "Student Reports", href: "/dashboard/reports" },
-          { label: "Exam Reports", href: "/dashboard/reports/exam" },
-          { label: "Expense Reports", href: "/dashboard/reports/expense" },
-          { label: "Teacher Reports", href: "/dashboard/reports/teacher" },
-          { label: "Attendance Reports", href: "/dashboard/attendance/reports" },
-        ],
-      },
-    ],
-  },
-];
-
-// Static bottom nav items (always shown based on roles)
-const STATIC_BOTTOM_NAV: NavItem[] = [
-  {
-    label: "AI Token Hub",
-    icon: Sparkles,
-    href: "/dashboard/analytics/ai-usage",
-    roles: ["superadmin", "school_admin"],
-  },
-  {
-    label: "Marketplace",
-    icon: Package,
-    href: "/dashboard/marketplace",
-  },
-  {
-    label: "Settings",
-    icon: Settings,
-    roles: ["superadmin", "school_admin"],
-    children: [
-      { label: "General Settings", href: "/dashboard/settings" },
-      { label: "Notification Settings", href: "/dashboard/settings/notifications" },
-      { label: "Roles & Permissions", href: "/dashboard/settings/roles" },
-      { label: "Integrations", href: "/dashboard/settings/integrations" },
-      { label: "Database Backup", href: "/dashboard/settings/backup", icon: Database },
-    ],
-  },
-];
 
 // ── Helper — convert a PluginSidebarItem to NavItem ───────────────────────
 function pluginToNavItem(item: PluginSidebarItem): NavItem {
@@ -573,124 +239,74 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const userRole = user?.role ?? "";
-
-  // Check role visibility
-  const isRoleVisible = useCallback(
-    (roles?: string[]) => {
-      if (!roles || roles.length === 0) return true;
-      return roles.includes(userRole);
-    },
-    [userRole],
-  );
-
-  // Auto-expand active group
+  // Auto-expand active group based on API-driven sidebar items
   useEffect(() => {
     const next = new Set(expandedGroups);
-    const checkItems = (items: NavItem[]) => {
-      for (const item of items) {
-        if (item.children) {
-          const active = item.children.some(
-            (c) => pathname === c.href || pathname.startsWith(c.href + "/"),
-          );
-          if (active) next.add(item.label);
-        }
-      }
-    };
-    CORE_SECTIONS.forEach((s) => checkItems(s.items));
-    sidebarItems.forEach((si) => {
-      if (si.subitems?.length) {
-        const active = si.subitems.some(
+    for (const item of sidebarItems) {
+      if (item.subitems?.length) {
+        const active = item.subitems.some(
           (sub) =>
             pathname === sub.route || pathname.startsWith(sub.route + "/"),
         );
-        if (active) next.add(si.label);
+        if (active) next.add(item.label);
       }
-    });
+    }
     setExpandedGroups(next);
   }, [pathname, sidebarItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleGroup = useCallback((label: string) => {
+  const toggleGroup = (label: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
       else next.add(label);
       return next;
     });
-  }, []);
+  };
 
-  // Build merged sidebar sections: core sections + plugin items slotted in
+  // Build sidebar sections from API data only (no hardcoded nav)
   const mergedSections = useMemo((): SidebarSection[] => {
-    // Clone core sections (filter items by role)
-    const sections: SidebarSection[] = CORE_SECTIONS.map((s) => ({
-      header: s.header,
-      items: s.items.filter((item) => isRoleVisible(item.roles)),
-    })).filter((s) => s.items.length > 0);
+    if (isLoading || !sidebarItems.length) return [];
 
-    if (!isLoading && sidebarItems.length > 0) {
-      // Group plugin items by section
-      const bySection: Record<string, PluginSidebarItem[]> = {};
-      for (const item of sidebarItems) {
-        const sec = item.section || "__other__";
-        if (!bySection[sec]) bySection[sec] = [];
-        bySection[sec].push(item);
-      }
-
-      // Insert plugin items into sections (maintaining PLUGIN_SECTION_ORDER)
-      for (const sectionName of PLUGIN_SECTION_ORDER) {
-        const pluginItems = bySection[sectionName];
-        if (!pluginItems || pluginItems.length === 0) continue;
-
-        const existing = sections.find((s) => s.header === sectionName);
-
-        // Collect all core hrefs to detect duplicates
-        const coreHrefs = new Set<string>();
-        sections.forEach((s) =>
-          s.items.forEach((it) => {
-            if (it.href) coreHrefs.add(it.href);
-            (it.children || []).forEach((ch) => {
-              if (ch.href) coreHrefs.add(ch.href);
-            });
-          }),
-        );
-
-        const navItems = pluginItems
-          .map(pluginToNavItem)
-          .filter((ni) => !ni.href || !coreHrefs.has(ni.href));
-        if (navItems.length === 0) continue;
-
-        if (existing) {
-          existing.items.push(...navItems);
-        } else {
-          sections.push({ header: sectionName, items: navItems });
-        }
-      }
-
-      // Append any items with no recognised section at the end
-      if (bySection["__other__"]) {
-        const otherItems = bySection["__other__"].map(pluginToNavItem);
-        sections.push({ header: null, items: otherItems });
-      }
+    // Group items by section
+    const bySection = new Map<string | null, NavItem[]>();
+    for (const item of sidebarItems) {
+      const sec = (item.section as string | null) ?? null;
+      if (!bySection.has(sec)) bySection.set(sec, []);
+      bySection.get(sec)!.push(pluginToNavItem(item));
     }
 
+    const sections: SidebarSection[] = [];
+    // Null-section items first (Dashboard)
+    if (bySection.has(null)) {
+      sections.push({ header: null, items: bySection.get(null)! });
+    }
+    // Named sections in preferred order
+    for (const sectionName of PLUGIN_SECTION_ORDER) {
+      if (bySection.has(sectionName)) {
+        sections.push({ header: sectionName, items: bySection.get(sectionName)! });
+      }
+    }
+    // Any unrecognised sections appended at end
+    for (const [key, items] of bySection) {
+      if (key !== null && !PLUGIN_SECTION_ORDER.includes(key)) {
+        sections.push({ header: key, items });
+      }
+    }
     return sections;
-  }, [sidebarItems, isLoading, isRoleVisible]);
+  }, [sidebarItems, isLoading]);
 
-  // Build bottom nav: static items + plugin bottom-nav items (e.g. IEMIS Import)
+  // Bottom nav driven entirely by plugin manifests (settings_core, marketplace_nav, etc.)
   const bottomNavItems = useMemo((): NavItem[] => {
-    const dynamicItems: NavItem[] = pluginBottomNav
-      .filter(() => isRoleVisible(["superadmin", "school_admin"]))
-      .map((item) => ({
-        label: item.label,
-        icon: resolveIcon(item.icon),
-        href: item.route,
-        pluginSlug: item.slug,
-      }));
-    const staticItems = STATIC_BOTTOM_NAV.filter((item) =>
-      isRoleVisible(item.roles),
-    );
-    return [...dynamicItems, ...staticItems];
-  }, [pluginBottomNav, isRoleVisible]);
+    return pluginBottomNav.map((item) => ({
+      label: item.label,
+      icon: resolveIcon(item.icon),
+      href: item.subitems?.length ? undefined : item.route,
+      pluginSlug: item.slug,
+      children: item.subitems?.length
+        ? item.subitems.map((s) => ({ label: s.label, href: s.route }))
+        : undefined,
+    }));
+  }, [pluginBottomNav]);
 
   // ── Render helpers ────────────────────────────────────────────────────
 
@@ -703,17 +319,17 @@ export function Sidebar() {
       <Link
         key={key}
         href={item.href!}
+        title={collapsed ? item.label : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+          "flex items-center gap-2.5 rounded px-2.5 py-[7px] text-[13px] transition-colors",
           active
-            ? "bg-primary/10 text-primary font-medium"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            ? "bg-white/20 text-white font-medium"
+            : "text-white/75 hover:bg-white/10 hover:text-white",
           collapsed && "justify-center px-2",
         )}
-        title={collapsed ? item.label : undefined}
       >
-        <item.icon className="h-4 w-4 shrink-0" />
-        {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
+        <item.icon className="h-3.5 w-3.5 shrink-0 opacity-90" />
+        {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
       </Link>
     );
   };
@@ -728,22 +344,22 @@ export function Sidebar() {
       <div key={key}>
         <button
           onClick={() => toggleGroup(item.label)}
+          title={collapsed ? item.label : undefined}
           className={cn(
-            "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+            "w-full flex items-center gap-2.5 rounded px-2.5 py-[7px] text-[13px] transition-colors",
             hasActiveChild
-              ? "text-primary font-medium"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "text-white font-medium bg-white/10"
+              : "text-white/75 hover:bg-white/10 hover:text-white",
             collapsed && "justify-center px-2",
           )}
-          title={collapsed ? item.label : undefined}
         >
-          <item.icon className="h-4 w-4 shrink-0" />
+          <item.icon className="h-3.5 w-3.5 shrink-0 opacity-90" />
           {!collapsed && (
             <>
-              <span className="flex-1 text-left">{item.label}</span>
+              <span className="flex-1 text-left truncate">{item.label}</span>
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+                  "h-3 w-3 shrink-0 opacity-60 transition-transform duration-200",
                   expanded ? "rotate-0" : "-rotate-90",
                 )}
               />
@@ -751,28 +367,27 @@ export function Sidebar() {
           )}
         </button>
 
-        {/* Children */}
+        {/* Children — bullet-point style */}
         {!collapsed && expanded && item.children && (
-          <div className="ml-4 pl-3 border-l border-border/50 space-y-0.5 mt-0.5 mb-1">
-            {item.children
-              .filter((c) => isRoleVisible(c.roles))
-              .map((child) => {
+          <div className="ml-[22px] border-l border-white/15 pl-2.5 space-y-0.5 mt-0.5 mb-1">
+            {item.children.map((child) => {
                 const childActive = isActive(child.href);
                 return (
                   <Link
                     key={child.href}
                     href={child.href}
                     className={cn(
-                      "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+                      "flex items-center gap-1.5 rounded px-2 py-[5px] text-[12px] transition-colors",
                       childActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-white/20 text-white font-medium"
+                        : "text-white/65 hover:bg-white/10 hover:text-white",
                     )}
                   >
-                    {child.icon && (
-                      <child.icon className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span>{child.label}</span>
+                    <span className={cn(
+                      "w-1.5 h-1.5 rounded-full shrink-0",
+                      childActive ? "bg-white" : "bg-white/40",
+                    )} />
+                    <span className="truncate">{child.label}</span>
                   </Link>
                 );
               })}
@@ -795,38 +410,74 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col border-r bg-card h-screen sticky top-0 transition-all duration-200",
-        collapsed ? "w-16" : "w-64",
+        "flex flex-col h-screen sticky top-0 transition-all duration-200 shadow-xl",
+        collapsed ? "w-14" : "w-[228px]",
       )}
+      style={{ background: "hsl(var(--sidebar-bg))" }}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 h-16 border-b shrink-0">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-          A
+      {/* Logo / Brand */}
+      <div
+        className="flex items-center gap-2.5 px-3 h-[52px] shrink-0 select-none"
+        style={{ background: "hsl(var(--sidebar-header-bg))" }}
+      >
+        <div className="h-7 w-7 rounded bg-white/15 flex items-center justify-center shrink-0">
+          <span className="text-white font-black text-sm leading-none">A</span>
         </div>
         {!collapsed && (
-          <span className="font-bold text-lg truncate">ASchool</span>
+          <div className="min-w-0">
+            <span className="text-white font-bold text-[15px] tracking-wide leading-none">
+              A<span className="text-yellow-300">S</span>chool
+            </span>
+            <p className="text-white/50 text-[9px] uppercase tracking-widest leading-tight mt-0.5">
+              Management System
+            </p>
+          </div>
         )}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="ml-auto p-1 rounded hover:bg-white/10 text-white/60 hover:text-white shrink-0"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5" />
+          )}
+        </button>
       </div>
 
+      {/* School Name Strip */}
+      {!collapsed && user && (
+        <div
+          className="px-3 py-2 shrink-0"
+          style={{ background: "hsl(var(--sidebar-school-bg))" }}
+        >
+          <p className="text-white/90 text-[11px] font-medium leading-snug truncate">
+            {user.full_name}
+          </p>
+          <p className="text-white/55 text-[10px] capitalize mt-0.5">
+            {user.role?.replace(/_/g, " ")}
+          </p>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 scrollbar-thin">
+      <nav className="flex-1 overflow-y-auto py-2 px-1.5 sidebar-scroll">
         {mergedSections.map((section, sIdx) => (
-          <div key={sIdx}>
-            {/* Section header */}
+          <div key={sIdx} className="mb-0.5">
+            {/* Section divider / header */}
             {section.header && !collapsed && (
-              <div className="pt-4 pb-1.5 px-3">
-                <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+              <div className="pt-3 pb-1 px-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest"
+                  style={{ color: "hsl(var(--sidebar-text-muted))" }}>
                   {section.header}
                 </span>
               </div>
             )}
             {section.header && collapsed && (
-              <div className="border-t my-2 mx-2" />
+              <div className="my-2 mx-2 border-t border-white/10" />
             )}
 
-            {/* Items */}
-            <div className="space-y-0.5">
+            <div className="space-y-px">
               {section.items.map((item, iIdx) =>
                 renderNavItem(item, `${sIdx}-${iIdx}-${item.label}`),
               )}
@@ -835,37 +486,25 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom nav */}
-      <div className="border-t px-2 py-2 space-y-0.5">
+      {/* Bottom nav (Settings, Marketplace, AI) */}
+      <div
+        className="px-1.5 py-2 space-y-px shrink-0 border-t"
+        style={{ borderColor: "hsl(var(--sidebar-border))" }}
+      >
         {bottomNavItems.map((item, i) =>
           renderNavItem(item, `bottom-${i}-${item.label}`),
         )}
       </div>
 
-      {/* User + Collapse */}
-      <div className="border-t px-3 py-3 flex items-center justify-between">
-        {user && !collapsed && (
-          <div className="flex items-center gap-2 min-w-0">
-            <Avatar name={user.full_name} src={user.avatar_url} size="sm" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{user.full_name}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {user.role}
-              </p>
-            </div>
-          </div>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground ml-auto"
+      {/* Avatar row (collapsed only) */}
+      {collapsed && user && (
+        <div
+          className="px-1.5 py-2 border-t flex justify-center"
+          style={{ borderColor: "hsl(var(--sidebar-border))" }}
         >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+          <Avatar name={user.full_name} src={user.avatar_url} size="sm" />
+        </div>
+      )}
     </aside>
   );
 }

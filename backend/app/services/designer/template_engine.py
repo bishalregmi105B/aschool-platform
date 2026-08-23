@@ -603,40 +603,79 @@ def _writer_report_card():
 
 
 def _writer_marksheet():
+    """School progress report / marksheet showing raw marks per subject."""
     return _writer(
         config={"size": "A4", "orientation": "portrait", "font": "Arial", "fontSize": 10},
         blocks=[
-            _w_header_band("YOUR SCHOOL NAME", "Affiliated to Board of Secondary Education", "MARK SHEET", bg="#0f172a"),
-            _w_spacer(8),
+            _w_header_band("{school_name}", "{school_address}", "MARKSHEET / PROGRESS REPORT", bg="#065f46"),
+            _w_spacer(6),
+            _w_divider("#065f46"),
+            _w_spacer(4),
             _w_columns([
-                {"text": "Student Name: _______________", "align": "left"},
-                {"text": "Enrollment No.: _____________", "align": "left"},
-                {"text": "Exam: ________________", "align": "left"},
+                {"text": "Student:  **{name}**", "align": "left"},
+                {"text": "Roll No:  **{roll_no}**", "align": "center"},
+                {"text": "Class:  **{class_name}**", "align": "right"},
             ]),
             _w_columns([
-                {"text": "Father's Name: ______________", "align": "left"},
-                {"text": "Date of Birth: ______________", "align": "left"},
-                {"text": "Year: ________________", "align": "left"},
+                {"text": "Exam:  {exam_name}", "align": "left"},
+                {"text": "Section:  {section_name}", "align": "center"},
+                {"text": "Year:  {exam_year}", "align": "right"},
             ]),
+            _w_divider("#065f46"),
+            _w_spacer(6),
+            {"type": "subject_rows"},
+            _w_spacer(8),
             _w_columns([
-                {"text": "Mother's Name: ______________", "align": "left"},
-                {"text": "Class: ___  Section: ___", "align": "left"},
-                {"text": "", "align": "left"},
+                {"text": "Percentage: **{percentage}%**", "align": "left"},
+                {"text": "Overall Grade: **{grade}**", "align": "center"},
+                {"text": "GPA: **{gpa}**", "align": "right"},
             ]),
-            _w_spacer(8),
-            _w_table(
-                headers=["Subject", "Th. Max", "Th. Obt.", "Pr. Max", "Pr. Obt.", "Total", "Grade", "Result"],
-                rows=[
-                    [f"Subject {i+1}", "___", "___", "___", "___", "___", "___", "Pass"]
-                    for i in range(10)
-                ] + [
-                    ["**GRAND TOTAL**", "", "", "", "", "**___**", "**___**", ""],
-                ],
-            ),
-            _w_spacer(8),
-            _w_para("Result:  ☐ PASS    ☐ FAIL       Percentage: _______%    Division: _____________", bold=True),
+            _w_spacer(4),
+            _w_para("Result: {grade}  |  This is to certify that the above student has {status} the examination.", color="#0f172a"),
             _w_spacer(40),
-            _w_signature(["Examiner", "Head of Dept.", "Principal"]),
+            _w_signature(["Class Teacher", "Parent / Guardian", "Principal"]),
+        ],
+    )
+
+
+def _writer_grade_sheet():
+    """IEMIS-style NEB Grade Sheet with credit hours, grade points and GPA."""
+    return _writer(
+        config={"size": "A4", "orientation": "portrait", "font": "Arial", "fontSize": 10},
+        blocks=[
+            _w_header_band("{school_name}", "{school_address}", "GRADE SHEET", bg="#1e3a8a"),
+            _w_spacer(6),
+            _w_para("THE GRADE(S) SECURED BY  {name}  ({symbol_no})", bold=True, color="#0f172a"),
+            _w_columns([
+                {"text": "DATE OF BIRTH: {dob} (B.S.) {dob_ad}(A.D)", "align": "left"},
+                {"text": "SYMBOL NO: {symbol_no}", "align": "right"},
+            ]),
+            _w_para("OF {school_name}, {school_address}   IEMIS CODE {iemis_code}", color="#334155"),
+            _w_para("IN THE EDUCATION EXAMINATION OF YEAR {exam_year} B.S. ARE GIVEN BELOW.", color="#334155"),
+            _w_spacer(6),
+            {"type": "subject_rows_neb"},
+            _w_spacer(8),
+            _w_para("GRADE POINT AVERAGE = {gpa}", bold=True, color="#0f172a"),
+            _w_para("1. ONE CREDIT HOUR EQUALS 28 HOURS", italic=True, color="#64748b", size=9),
+            _w_para("2. TH: THEORY(FINAL/EXTERNAL)   IN: INTERNAL", italic=True, color="#64748b", size=9),
+            _w_spacer(8),
+            {
+                "type": "table",
+                "caption": "DETAILS OF GRADE SHEET",
+                "headers": ["S.N.", "Achievement In Percent", "Grade", "Description", "Grade Point"],
+                "rows": [
+                    ["1", "90 to 100", "A+", "Outstanding", "4.0"],
+                    ["2", "80 to below 90", "A", "Excellent", "3.6"],
+                    ["3", "70 to below 80", "B+", "Very Good", "3.2"],
+                    ["4", "60 to below 70", "B", "Good", "2.8"],
+                    ["5", "50 to below 60", "C+", "Satisfactory", "2.4"],
+                    ["6", "40 to below 50", "C", "Acceptable", "2.0"],
+                    ["7", "35 to below 40", "D", "Basic", "1.6"],
+                    ["8", "0 to below 35", "NG", "Not Graded", "—"],
+                ],
+            },
+            _w_spacer(40),
+            _w_signature(["Class Teacher", "Head Teacher"]),
         ],
     )
 
@@ -787,6 +826,37 @@ def _writer_letterhead_informal():
     )
 
 
+def _writer_fee_bill():
+    """Student fee bill / payment receipt template."""
+    return _writer(
+        config={"size": "A4", "orientation": "portrait", "font": "Arial", "fontSize": 11},
+        blocks=[
+            _w_header_band("{school_name}", "{school_address}", "FEE BILL / RECEIPT", bg="#065f46"),
+            _w_spacer(6),
+            _w_columns([
+                {"text": "Bill No: {bill_no}", "align": "left"},
+                {"text": "Date: {bill_date}", "align": "right"},
+            ]),
+            _w_divider("#065f46"),
+            _w_spacer(4),
+            _w_columns([
+                {"text": "Student: **{student_name}**", "align": "left"},
+                {"text": "Class: {class_name}  Section: {section_name}", "align": "right"},
+            ]),
+            _w_columns([
+                {"text": "Roll No: {roll_no}", "align": "left"},
+                {"text": "Due Date: {due_date}", "align": "right"},
+            ]),
+            _w_spacer(8),
+            {"type": "fee_rows"},
+            _w_spacer(8),
+            _w_para("Remarks: {remarks}", color="#64748b"),
+            _w_spacer(32),
+            _w_signature(["Accountant", "Principal"]),
+        ],
+    )
+
+
 # ── Template registry ──────────────────────────────────────────────────────────
 
 
@@ -824,10 +894,10 @@ def _nepali_calendar_page(month_name: str, width=794, height=1123):
 
 TEMPLATES: dict = {
     "id_card_standard": {
-        "name": "Standard Student ID Card",
+        "name": "Student ID Card",
         "category": "id_cards",
         "editor_type": "designer",
-        "description": "Horizontal student ID card with photo, name, class, roll & contacts",
+        "description": "Horizontal student ID card with photo, name, class, roll and contacts",
         "page_size": "ID Card",
         "thumbnail_emoji": "🪪",
         "is_default": True,
@@ -835,195 +905,72 @@ TEMPLATES: dict = {
         "fields": ["photo", "name", "class", "section", "roll_no", "blood_group", "phone"],
         "canvas_json": _id_card_standard(),
     },
-    "id_card_staff": {
-        "name": "Staff / Teacher ID Card",
-        "category": "id_cards",
-        "editor_type": "designer",
-        "description": "Professional ID card for teachers and administrative staff",
-        "page_size": "ID Card",
-        "thumbnail_emoji": "💳",
-        "is_default": False,
-        "width": 300, "height": 189,
-        "fields": ["photo", "name", "designation", "department", "employee_id", "phone"],
-        "canvas_json": _id_card_staff(),
-    },
-    "character_certificate": {
-        "name": "Character Certificate",
-        "category": "certificates",
-        "editor_type": "designer",
-        "description": "Official character certificate with bordered A4 layout",
-        "page_size": "A4",
-        "thumbnail_emoji": "📜",
-        "is_default": True,
-        "width": 794, "height": 1123,
-        "fields": ["name", "father_name", "class", "enrollment_number", "dob", "date"],
-        "canvas_json": _character_certificate(),
-    },
-    "transfer_certificate": {
-        "name": "Transfer Certificate (TC)",
-        "category": "certificates",
-        "editor_type": "designer",
-        "description": "Official TC with all standard numbered fields",
-        "page_size": "A4",
-        "thumbnail_emoji": "📋",
-        "is_default": False,
-        "width": 794, "height": 1123,
-        "fields": ["name", "father_name", "class_from", "enrollment_number", "reason", "date"],
-        "canvas_json": _transfer_certificate(),
-    },
-    "merit_certificate": {
-        "name": "Merit / Achievement Certificate",
-        "category": "certificates",
-        "editor_type": "designer",
-        "description": "Landscape award certificate for merit and academic achievements",
-        "page_size": "A4",
-        "thumbnail_emoji": "🏆",
-        "is_default": False,
-        "width": 1123, "height": 794,
-        "fields": ["name", "class", "achievement", "rank", "date"],
-        "canvas_json": _merit_certificate(),
-    },
-    "participation_certificate": {
-        "name": "Participation Certificate",
-        "category": "certificates",
-        "editor_type": "designer",
-        "description": "Landscape certificate for event or competition participation",
-        "page_size": "A4",
-        "thumbnail_emoji": "🎖️",
-        "is_default": False,
-        "width": 1123, "height": 794,
-        "fields": ["name", "class", "event", "date"],
-        "canvas_json": _participation_certificate(),
-    },
-    "admit_card_standard": {
-        "name": "Standard Exam Admit Card",
-        "category": "admit_cards",
-        "editor_type": "designer",
-        "description": "A5 admit card with schedule table, photo slot and instructions",
-        "page_size": "A5",
-        "thumbnail_emoji": "🎫",
-        "is_default": True,
-        "width": 559, "height": 794,
-        "fields": ["name", "class", "roll_no", "dob", "father_name"],
-        "canvas_json": _admit_card_standard(),
-    },
-    "admit_card_hall_ticket": {
-        "name": "Hall Ticket",
-        "category": "admit_cards",
-        "editor_type": "designer",
-        "description": "Board-style hall ticket with subject-wise schedule (A5)",
-        "page_size": "A5",
-        "thumbnail_emoji": "🎟️",
-        "is_default": False,
-        "width": 559, "height": 794,
-        "fields": ["name", "roll_no", "class", "centre"],
-        "canvas_json": _admit_card_hall_ticket(),
-    },
-    "report_card": {
-        "name": "Progress Report Card",
-        "category": "reports",
-        "editor_type": "writer",
-        "description": "A4 term-wise progress report with marks table and remarks",
-        "page_size": "A4",
-        "thumbnail_emoji": "📊",
-        "is_default": True,
-        "width": 794, "height": 1123,
-        "fields": ["name", "class", "section", "roll_no", "year"],
-        "canvas_json": _report_card(),
-        "writer_json": _writer_report_card(),
-    },
-    "marksheet": {
-        "name": "Detailed Marksheet",
-        "category": "reports",
-        "editor_type": "writer",
-        "description": "A4 subject-wise marksheet with theory, practical and grade columns",
-        "page_size": "A4",
-        "thumbnail_emoji": "📝",
-        "is_default": False,
-        "width": 794, "height": 1123,
-        "fields": ["name", "father_name", "class", "enrollment_number", "year"],
-        "canvas_json": _marksheet(),
-        "writer_json": _writer_marksheet(),
-    },
-    "notice": {
-        "name": "Official School Notice",
-        "category": "notices",
-        "editor_type": "writer",
-        "description": "Formal notice/announcement with red header",
-        "page_size": "A4",
-        "thumbnail_emoji": "📢",
-        "is_default": True,
-        "width": 794, "height": 1123,
-        "fields": ["subject", "date", "ref_no", "body"],
-        "canvas_json": _notice(),
-        "writer_json": _writer_notice(),
-    },
     "nepali_calendar_12_months": {
-        "name": "Nepali Calendar (12 months)",
+        "name": "Nepali School Calendar",
         "category": "calendars",
         "editor_type": "designer",
-        "description": "Multi-page Nepali calendar template — one month per page with school header and image placeholder",
+        "description": "Multi-page Nepali calendar — one month per page with school header and image placeholder",
         "page_size": "A4",
         "thumbnail_emoji": "🗓️",
-        "is_default": False,
+        "is_default": True,
         "width": 794, "height": 1123,
         "fields": ["school_name", "school_address", "school_logo"],
         "canvas_json": {
             "version": "multi-page",
             "pages": [
-                {"id": "m1", "json": _nepali_calendar_page("Baishakh"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m2", "json": _nepali_calendar_page("Jestha"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m3", "json": _nepali_calendar_page("Ashadh"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m4", "json": _nepali_calendar_page("Shrawan"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m5", "json": _nepali_calendar_page("Bhadra"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m6", "json": _nepali_calendar_page("Ashwin"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m7", "json": _nepali_calendar_page("Kartik"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m8", "json": _nepali_calendar_page("Mangsir"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m9", "json": _nepali_calendar_page("Poush"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m10", "json": _nepali_calendar_page("Magh"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m11", "json": _nepali_calendar_page("Falgun"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
-                {"id": "m12", "json": _nepali_calendar_page("Chaitra"), "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"}
+                {"id": "m1",  "json": _nepali_calendar_page("Baishakh"),  "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m2",  "json": _nepali_calendar_page("Jestha"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m3",  "json": _nepali_calendar_page("Ashadh"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m4",  "json": _nepali_calendar_page("Shrawan"),   "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m5",  "json": _nepali_calendar_page("Bhadra"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m6",  "json": _nepali_calendar_page("Ashwin"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m7",  "json": _nepali_calendar_page("Kartik"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m8",  "json": _nepali_calendar_page("Mangsir"),   "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m9",  "json": _nepali_calendar_page("Poush"),     "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m10", "json": _nepali_calendar_page("Magh"),      "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m11", "json": _nepali_calendar_page("Falgun"),    "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
+                {"id": "m12", "json": _nepali_calendar_page("Chaitra"),   "width": 794, "height": 1123, "orientation": "portrait", "margins": {"top": 10, "right": 10, "bottom": 10, "left": 10}, "background": "#ffffff"},
             ]
-        }
+        },
     },
-    "circular": {
-        "name": "School Circular",
-        "category": "notices",
+    "marksheet": {
+        "name": "NEB Marksheet",
+        "category": "reports",
         "editor_type": "writer",
-        "description": "Formal circular with acknowledgement slip section",
+        "description": "IEMIS-style NEB marksheet with theory/practical split, grade points and grading legend",
         "page_size": "A4",
-        "thumbnail_emoji": "📄",
-        "is_default": False,
-        "width": 794, "height": 1123,
-        "fields": ["circular_no", "to", "subject", "date", "body"],
-        "canvas_json": _circular(),
-        "writer_json": _writer_circular(),
-    },
-    "letterhead_official": {
-        "name": "Official Letterhead",
-        "category": "letterheads",
-        "editor_type": "writer",
-        "description": "Full letterhead with logo, header band and footer",
-        "page_size": "A4",
-        "thumbnail_emoji": "🏫",
+        "thumbnail_emoji": "📝",
         "is_default": True,
         "width": 794, "height": 1123,
-        "fields": ["to", "subject", "date", "ref_no", "body"],
-        "canvas_json": _letterhead_official(),
-        "writer_json": _writer_letterhead_official(),
+        "fields": ["name", "class_name", "roll_no", "exam_name", "subjects_marks", "grade", "gpa", "percentage"],
+        "canvas_json": _marksheet(),
+        "writer_json": _writer_marksheet(),
     },
-    "letterhead_informal": {
-        "name": "Minimal Letterhead",
-        "category": "letterheads",
+    "grade_sheet": {
+        "name": "NEB Grade Sheet",
+        "category": "reports",
         "editor_type": "writer",
-        "description": "Clean minimal letterhead with top bar and footer",
+        "description": "Official NEB grade sheet with credit hours, grade points and GPA (IEMIS format)",
         "page_size": "A4",
-        "thumbnail_emoji": "📃",
-        "is_default": False,
+        "thumbnail_emoji": "🎓",
+        "is_default": True,
         "width": 794, "height": 1123,
-        "fields": ["to", "subject", "date", "body"],
-        "canvas_json": _letterhead_informal(),
-        "writer_json": _writer_letterhead_informal(),
+        "fields": ["name", "dob", "symbol_no", "class_name", "school_name", "exam_year", "subjects_marks", "gpa"],
+        "canvas_json": _marksheet(),
+        "writer_json": _writer_grade_sheet(),
+    },
+    "fee_bill": {
+        "name": "Student Fee Bill",
+        "category": "reports",
+        "editor_type": "writer",
+        "description": "Student fee bill / payment receipt with itemised fee table",
+        "page_size": "A4",
+        "thumbnail_emoji": "🧾",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["student_name", "class_name", "roll_no", "bill_no", "bill_date", "due_date", "fee_items", "total_amount"],
+        "canvas_json": {},
+        "writer_json": _writer_fee_bill(),
     },
 }
 
@@ -1037,6 +984,8 @@ class TemplateEngineService:
         "character_certificate_v1": "character_certificate",
         "transfer_certificate_v1": "transfer_certificate",
         "staff_id_card_v1": "id_card_staff",
+        "gradesheet": "grade_sheet",
+        "grade-sheet": "grade_sheet",
     }
 
     _CATEGORY_ALIASES = {
@@ -1050,6 +999,8 @@ class TemplateEngineService:
         "reports": "reports",
         "marksheet": "reports",
         "marksheets": "reports",
+        "grade_sheet": "reports",
+        "grade_sheets": "reports",
         "letter": "letterheads",
         "letters": "letterheads",
         "letterhead": "letterheads",
@@ -1073,7 +1024,12 @@ class TemplateEngineService:
 
     @classmethod
     def _ensure_seeded(cls) -> None:
-        """Populate the template table from the built-in registry when empty."""
+        """Populate / sync the template table from the built-in registry.
+
+        Runs a full upsert so that builtin templates (school_id=None) always
+        reflect the latest writer_json / editor_type from the code.
+        Soft-deletes builtin templates that are no longer in the registry.
+        """
         try:
             from extensions import db
             from app.models.designer_template import DesignerTemplate
@@ -1081,35 +1037,67 @@ class TemplateEngineService:
             return
 
         try:
-            existing = DesignerTemplate.query.filter_by(is_deleted=False, school_id=None).count()
+            existing_rows = {
+                r.template_key: r
+                for r in DesignerTemplate.query.filter_by(is_deleted=False, school_id=None).all()
+            }
         except Exception:
             return
 
-        if existing:
-            return
-
+        changed = False
         for template_key, meta in TEMPLATES.items():
-            db.session.add(DesignerTemplate(
-                school_id=None,
-                template_key=template_key,
-                name=meta.get("name", template_key),
-                category=meta.get("category", "documents"),
-                editor_type=meta.get("editor_type", "designer"),
-                description=meta.get("description", ""),
-                page_size=meta.get("page_size", "A4"),
-                thumbnail_emoji=meta.get("thumbnail_emoji", "📄"),
-                thumbnail_url=meta.get("thumbnail_url", ""),
-                width=int(meta.get("width", 794)),
-                height=int(meta.get("height", 1123)),
-                page_count=max(1, int(meta.get("page_count", 1))),
-                is_default=1 if meta.get("is_default") else 0,
-                fields=meta.get("fields", []),
-                canvas_json=meta.get("canvas_json", {}),
-                writer_json=meta.get("writer_json") or {},
-                extra_config=meta.get("extra_config") or {},
-            ))
+            row = existing_rows.get(template_key)
 
-        db.session.commit()
+            new_editor_type = meta.get("editor_type", "designer")
+            new_writer_json = meta.get("writer_json") or {}
+            new_canvas_json = meta.get("canvas_json", {})
+
+            if row is None:
+                db.session.add(DesignerTemplate(
+                    school_id=None,
+                    template_key=template_key,
+                    name=meta.get("name", template_key),
+                    category=meta.get("category", "documents"),
+                    editor_type=new_editor_type,
+                    description=meta.get("description", ""),
+                    page_size=meta.get("page_size", "A4"),
+                    thumbnail_emoji=meta.get("thumbnail_emoji", "📄"),
+                    thumbnail_url=meta.get("thumbnail_url", ""),
+                    width=int(meta.get("width", 794)),
+                    height=int(meta.get("height", 1123)),
+                    page_count=max(1, int(meta.get("page_count", 1))),
+                    is_default=1 if meta.get("is_default") else 0,
+                    fields=meta.get("fields", []),
+                    canvas_json=new_canvas_json,
+                    writer_json=new_writer_json,
+                    extra_config=meta.get("extra_config") or {},
+                ))
+                changed = True
+            else:
+                # Always sync editor_type, writer_json, and canvas_json from code
+                row.editor_type = new_editor_type
+                row.writer_json = new_writer_json
+                row.canvas_json = new_canvas_json
+                row.name = meta.get("name", template_key)
+                row.description = meta.get("description", row.description or "")
+                row.fields = meta.get("fields", row.fields or [])
+                row.category = meta.get("category", row.category or "documents")
+                changed = True
+
+        # Soft-delete builtin templates removed from the registry
+        for key, row in existing_rows.items():
+            if key not in TEMPLATES:
+                row.is_deleted = True
+                changed = True
+
+        if changed:
+            try:
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
 
     @staticmethod
     def _template_page_count(meta: dict) -> int:
@@ -1597,6 +1585,18 @@ class TemplateEngineService:
             return text.replace("**", "<strong>", 1).replace("**", "</strong>", 1) if "**" in text else text
 
         body_parts = []
+
+        # ── Page dimensions & font from config ──────────────────────────────
+        _SIZE = {"A4": ("210mm", "297mm"), "A5": ("148mm", "210mm"), "LETTER": ("216mm", "279mm")}
+        _sz  = (config.get("size") or "A4").upper()
+        _ori = (config.get("orientation") or "portrait").lower()
+        pg_w, pg_h = _SIZE.get(_sz, _SIZE["A4"])
+        if _ori == "landscape":
+            pg_w, pg_h = pg_h, pg_w
+        _pad = "15mm"
+        font = esc(config.get("font") or "Times New Roman")
+        font_size = cls._num(config.get("fontSize"), 12)
+
         for block in blocks:
             block_type = block.get("type")
 
@@ -1685,7 +1685,7 @@ class TemplateEngineService:
 
             if block_type == "header_band":
                 body_parts.append(
-                    "<div style='padding:12px 20px;margin-bottom:10px;text-align:center;"
+                    f"<div style='padding:14px 24px;margin:-{_pad} -{_pad} 12px -{_pad};text-align:center;"
                     f"background:{block.get('bg') or '#1e40af'};color:{block.get('color') or '#ffffff'};'>"
                     f"<div style='font-size:18pt;font-weight:bold;'>{esc(block.get('school') or '')}</div>"
                     f"<div style='font-size:10pt;opacity:0.85;margin-top:2px;'>{esc(block.get('subtitle') or '')}</div>"
@@ -1696,19 +1696,164 @@ class TemplateEngineService:
 
             if block_type == "footer_band":
                 body_parts.append(
-                    "<div style='padding:6px 20px;margin-top:10px;text-align:center;font-size:8pt;"
+                    f"<div style='padding:6px 24px;margin:10px -{_pad} -{_pad} -{_pad};text-align:center;font-size:8pt;"
                     f"background:{block.get('bg') or '#1e293b'};color:{block.get('color') or '#94a3b8'};'>"
                     f"{esc(block.get('text') or '')}</div>"
                 )
                 continue
 
-        font = esc(config.get("font") or "Times New Roman")
-        font_size = cls._num(config.get("fontSize"), 12)
+            if block_type == "subject_rows":
+                # Marksheet table: Subject | Th.Full | Th.Obt | Pr.Full | Pr.Obt | Pass | Total | Grade | Result
+                subjects = merged_data.get("subjects_marks") or []
+                if subjects and isinstance(subjects, list):
+                    hdr = "border:1px solid #065f46;padding:5px 8px;background:#065f46;color:#fff;font-weight:600;text-align:center;"
+                    bw  = "border:1px solid #e2e8f0;padding:5px 8px;"
+                    parts = [
+                        "<table style='border-collapse:collapse;width:100%;margin:8px 0;font-size:9pt;'>",
+                        "<thead><tr>",
+                        f"<th style='{hdr}text-align:left;'>Subject</th>",
+                        f"<th style='{hdr}'>Th. Full</th>",
+                        f"<th style='{hdr}'>Th. Obt.</th>",
+                        f"<th style='{hdr}'>Pr. Full</th>",
+                        f"<th style='{hdr}'>Pr. Obt.</th>",
+                        f"<th style='{hdr}'>Pass</th>",
+                        f"<th style='{hdr}'>Total</th>",
+                        f"<th style='{hdr}'>Grade</th>",
+                        f"<th style='{hdr}'>Result</th>",
+                        "</tr></thead><tbody>",
+                    ]
+                    total_obt = total_full = 0.0
+                    for row in subjects:
+                        grade_val = row.get("grade", "")
+                        no_marks  = grade_val in ("—", "") and not row.get("obtained")
+                        is_pass   = grade_val not in ("NG", "", "—") and not no_marks
+                        res_color = "#16a34a" if is_pass else ("#94a3b8" if no_marks else "#dc2626")
+                        res_label = "—" if no_marks else ("Pass" if is_pass else "Fail")
+                        th_full   = row.get("th_full") or row.get("full_marks") or "—"
+                        th_obt    = row.get("th_obtained") if row.get("th_obtained") is not None else (row.get("obtained") or 0)
+                        pr_full   = row.get("pr_full") or "—"
+                        pr_obt    = row.get("pr_obtained") or "—"
+                        pass_m    = row.get("pass_marks") or "—"
+                        tot       = row.get("obtained") or 0
+                        total_obt  += float(tot)
+                        total_full += float(row.get("full_marks") or 0)
+                        row_bg = "" if is_pass or no_marks else "background:#fff5f5;"
+                        parts.append(f"<tr style='{row_bg}'>")
+                        parts.append(f"<td style='{bw}text-align:left;font-weight:500;'>{esc(row.get('subject', ''))}</td>")
+                        for val in [th_full, th_obt if not no_marks else "—", pr_full, pr_obt if not no_marks else "—", pass_m]:
+                            parts.append(f"<td style='{bw}text-align:center;'>{val}</td>")
+                        parts.append(f"<td style='{bw}text-align:center;font-weight:600;'>{tot if not no_marks else '—'}</td>")
+                        parts.append(f"<td style='{bw}text-align:center;'>{grade_val or '—'}</td>")
+                        parts.append(f"<td style='{bw}text-align:center;font-weight:600;color:{res_color};'>{res_label}</td>")
+                        parts.append("</tr>")
+                    pct = round(total_obt / total_full * 100, 1) if total_full else 0
+                    parts.append(
+                        f"<tr style='background:#f0fdf4;font-weight:700;border-top:2px solid #065f46;'>"
+                        f"<td style='border:1px solid #cbd5e1;padding:5px 8px;'>GRAND TOTAL</td>"
+                        f"<td colspan='5' style='border:1px solid #cbd5e1;padding:5px 8px;'></td>"
+                        f"<td style='border:1px solid #cbd5e1;padding:5px 8px;text-align:center;'>{total_obt:.0f} / {total_full:.0f}</td>"
+                        f"<td style='border:1px solid #cbd5e1;padding:5px 8px;text-align:center;'></td>"
+                        f"<td style='border:1px solid #cbd5e1;padding:5px 8px;text-align:center;color:#065f46;'>{pct}%</td>"
+                        f"</tr>"
+                    )
+                    parts.append("</tbody></table>")
+                    body_parts.append("".join(parts))
+                else:
+                    body_parts.append("<p style='color:#64748b;font-style:italic;'>No subject marks data available.</p>")
+                continue
+
+            if block_type == "subject_rows_neb":
+                # IEMIS-style NEB grade sheet: always TH/IN rows per subject
+                subjects = merged_data.get("subjects_marks") or []
+                if subjects and isinstance(subjects, list):
+                    bd = "border:1px solid #cbd5e1;"
+                    bw = "border:1px solid #e2e8f0;"
+                    hdr_style = f"{bd}padding:5px 8px;background:#1e3a8a;color:#fff;font-weight:600;text-align:center;"
+                    parts = [
+                        "<table style='border-collapse:collapse;width:100%;margin:8px 0;font-size:9.5pt;'>",
+                        "<thead><tr>",
+                        f"<th style='{hdr_style}'>SUBJECTS</th>",
+                        f"<th style='{hdr_style}width:90px;'>CREDIT HOUR (CH)</th>",
+                        f"<th style='{hdr_style}width:60px;'>GRADE</th>",
+                        f"<th style='{hdr_style}width:90px;'>GRADE POINT (GP)</th>",
+                        f"<th style='{hdr_style}width:70px;'>FINAL GRADE</th>",
+                        "</tr></thead><tbody>",
+                    ]
+                    total_ch = 0.0
+                    weighted_gp = 0.0
+                    gpa_sum = 0.0
+                    gpa_count = 0
+
+                    for row in subjects:
+                        subj_name  = esc(row.get("subject", ""))
+                        ch_total   = float(row.get("credit_hours") or 0)
+                        # TH = 75%, IN = 25% of total credit hours (NEB standard)
+                        ch_th_val  = round(ch_total * 0.75, 2) if ch_total else None
+                        ch_in_val  = round(ch_total * 0.25, 2) if ch_total else None
+                        ch_th_disp = ch_th_val if ch_th_val is not None else "—"
+                        ch_in_disp = ch_in_val if ch_in_val is not None else "—"
+
+                        th_grade   = esc(str(row.get("th_grade") or row.get("grade") or "—"))
+                        th_gp      = row.get("th_gpa") if row.get("th_gpa") is not None else row.get("gpa", "—")
+                        in_grade   = esc(str(row.get("in_grade") or row.get("grade") or "—"))
+                        in_gp      = row.get("in_gpa") if row.get("in_gpa") is not None else row.get("gpa", "—")
+                        final_gr   = esc(str(row.get("grade") or "—"))
+
+                        total_ch += ch_total
+                        gpa_v = float(row.get("gpa") or 0)
+                        if ch_total:
+                            weighted_gp += gpa_v * ch_total
+                        if gpa_v:
+                            gpa_sum += gpa_v
+                            gpa_count += 1
+
+                        # TH row — Final Grade spans 2 rows
+                        parts.append(
+                            f"<tr>"
+                            f"<td style='{bw}padding:4px 8px;'>{subj_name}(TH)</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{ch_th_disp}</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{th_grade}</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{th_gp}</td>"
+                            f"<td rowspan='2' style='{bw}padding:4px 8px;text-align:center;font-weight:700;'>{final_gr}</td>"
+                            f"</tr>"
+                        )
+                        # IN row — no Final Grade cell (covered by rowspan)
+                        parts.append(
+                            f"<tr>"
+                            f"<td style='{bw}padding:4px 8px;'>{subj_name}(IN)</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{ch_in_disp}</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{in_grade}</td>"
+                            f"<td style='{bw}padding:4px 8px;text-align:center;'>{in_gp}</td>"
+                            f"</tr>"
+                        )
+
+                    # Total row
+                    if total_ch > 0:
+                        gpa_avg  = round(weighted_gp / total_ch, 2)
+                        ch_disp  = round(total_ch, 2)
+                    else:
+                        gpa_avg = round(gpa_sum / gpa_count, 2) if gpa_count else 0.0
+                        ch_disp = "—"
+
+                    parts.append(
+                        f"<tr style='background:#f1f5f9;font-weight:700;'>"
+                        f"<td style='{bd}padding:5px 8px;'>&nbsp;</td>"
+                        f"<td style='{bd}padding:5px 8px;text-align:center;'>{ch_disp}</td>"
+                        f"<td colspan='2' style='{bd}padding:5px 8px;text-align:center;'>GRADE POINT AVERAGE = {gpa_avg}</td>"
+                        f"<td style='{bd}padding:5px 8px;'>&nbsp;</td>"
+                        f"</tr>"
+                    )
+                    parts.append("</tbody></table>")
+                    body_parts.append("".join(parts))
+                else:
+                    body_parts.append("<p style='color:#64748b;font-style:italic;'>No subject marks data available.</p>")
+                continue
+
         return (
-            "<div style='background:#fff;border:1px solid #e2e8f0;border-radius:4px;padding:20px;'>"
-            f"<div style='font-family:{font};font-size:{font_size}pt;color:#0f172a;line-height:1.45;'>"
+            f"<div style='width:{pg_w};min-height:{pg_h};padding:{_pad};box-sizing:border-box;"
+            f"background:#fff;font-family:{font};font-size:{font_size}pt;color:#0f172a;line-height:1.5;'>"
             f"{''.join(body_parts)}"
-            "</div></div>"
+            "</div>"
         )
 
     @classmethod

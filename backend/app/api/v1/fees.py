@@ -9,7 +9,7 @@ from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import or_
 
-from app.models.fee import FeeCollection, FeeReceipt, FeeStructure
+from app.models.fee import FeeCollection, FeeReceipt, FeeStructure, StudentScholarship
 from app.models.school import School
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
@@ -724,6 +724,171 @@ def apply_fee_structure(structure_id):
     payload = _structure_dict(structure)
     payload["applied_summary"] = summary
     return success_response(payload)
+
+
+@fees_bp.route("/batch-monthly", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant")
+def batch_monthly_billing():
+    """Generate current-cycle fee collections for all active structures.
+
+    Optionally filter by class_id. Safe to re-run — duplicates are skipped.
+    Returns aggregate counts of new collections created vs skipped.
+    """
+    data = request.get_json(silent=True) or {}
+    class_id = data.get("class_id")
+
+    query = FeeStructure.query.filter_by(
+        school_id=g.school_id,
+        is_deleted=False,
+    )
+    if class_id:
+        query = query.filter(
+            or_(FeeStructure.class_id == class_id, FeeStructure.class_id.is_(None))
+        )
+    structures = query.all()
+
+    total_created = 0
+    total_skipped = 0
+    total_students = 0
+    results = []
+
+    for struct in structures:
+        summary = _apply_fee_structure(struct)
+        total_created += summary.get("created_collections", 0)
+        total_skipped += summary.get("skipped_existing", 0)
+        total_students += summary.get("matched_students", 0)
+        results.append({
+            "structure_id": str(struct.id),
+            "name": _structure_item_name(struct),
+            "class_id": str(struct.class_id) if struct.class_id else None,
+            **summary,
+        })
+
+    return success_response({
+        "structures_processed": len(structures),
+        "total_students_matched": total_students,
+        "collections_created": total_created,
+        "collections_skipped": total_skipped,
+        "details": results,
+    })
+
+
+# ── Scholarships & Discounts ────────────────────────────────────────────────
+
+@fees_bp.route("/scholarships", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def list_scholarships():
+    """List all active scholarships/discounts for the school, optionally filtered by student."""
+    student_id = request.args.get("student_id")
+    query = StudentScholarship.query.filter_by(
+        school_id=g.school_id, is_deleted=False
+    ).order_by(StudentScholarship.created_at.desc())
+    if student_id:
+        query = query.filter_by(student_id=student_id)
+    items, meta = paginate(query)
+    return success_response([_scholarship_dict(s) for s in items], meta={"pagination": meta})
+
+
+@fees_bp.route("/scholarships", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def create_scholarship():
+    """Create a scholarship/discount for a student."""
+    data = request.get_json(silent=True) or {}
+    student_id = data.get("student_id")
+    if not student_id:
+        return error_response("student_id is required", 400)
+    student = Student.query.filter_by(id=student_id, school_id=g.school_id, is_deleted=False).first()
+    if not student:
+        return error_response("Student not found", 404)
+
+    discount_type = data.get("discount_type", "percent")
+    if discount_type not in ("percent", "fixed"):
+        return error_response("discount_type must be 'percent' or 'fixed'", 400)
+    discount_value = float(data.get("discount_value") or 0)
+    if discount_type == "percent" and not (0 < discount_value <= 100):
+        return error_response("discount_value must be 1-100 for percent type", 400)
+
+    sc = StudentScholarship(
+        school_id=g.school_id,
+        student_id=student_id,
+        fee_type=data.get("fee_type"),
+        discount_type=discount_type,
+        discount_value=discount_value,
+        reason=data.get("reason"),
+        valid_from_bs=data.get("valid_from_bs"),
+        valid_until_bs=data.get("valid_until_bs"),
+        is_active=data.get("is_active", True),
+    )
+    db.session.add(sc)
+    db.session.commit()
+    return created_response(_scholarship_dict(sc))
+
+
+@fees_bp.route("/scholarships/<uuid:scholarship_id>", methods=["PUT", "PATCH"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def update_scholarship(scholarship_id):
+    """Update a scholarship/discount."""
+    sc = StudentScholarship.query.filter_by(
+        id=scholarship_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not sc:
+        return error_response("Scholarship not found", 404)
+    data = request.get_json(silent=True) or {}
+    for field in ("fee_type", "discount_type", "discount_value", "reason",
+                  "valid_from_bs", "valid_until_bs", "is_active"):
+        if field in data:
+            setattr(sc, field, data[field])
+    db.session.commit()
+    return success_response(_scholarship_dict(sc))
+
+
+@fees_bp.route("/scholarships/<uuid:scholarship_id>", methods=["DELETE"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def delete_scholarship(scholarship_id):
+    """Delete (soft) a scholarship/discount."""
+    sc = StudentScholarship.query.filter_by(
+        id=scholarship_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not sc:
+        return error_response("Scholarship not found", 404)
+    sc.soft_delete()
+    return no_content_response()
+
+
+def _scholarship_dict(sc):
+    student = Student.query.filter_by(id=sc.student_id).first()
+    return {
+        "id": str(sc.id),
+        "student_id": str(sc.student_id),
+        "student_name": student.first_name + " " + (student.last_name or "") if student else "",
+        "roll_number": getattr(student, "roll_number", None),
+        "class_name": getattr(getattr(student, "klass", None), "name", None),
+        "fee_type": sc.fee_type,
+        "discount_type": sc.discount_type,
+        "discount_value": float(sc.discount_value or 0),
+        "reason": sc.reason,
+        "valid_from_bs": sc.valid_from_bs,
+        "valid_until_bs": sc.valid_until_bs,
+        "is_active": sc.is_active,
+        "created_at": sc.created_at.isoformat() if sc.created_at else None,
+    }
+
+
 
 
 @fees_bp.route("/structures/<uuid:structure_id>", methods=["DELETE"])
@@ -1624,12 +1789,48 @@ def _apply_fee_structure(structure):
         if due_day is not None:
             notes = f"{notes} [due_day:{due_day}]"
 
+        # Auto-apply student scholarship/discount if one exists
+        discount_amount = 0.0
+        is_scholarship = False
+        try:
+            import nepali_datetime
+            today_bs = nepali_datetime.date.today()
+            today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
+            sc = StudentScholarship.query.filter(
+                StudentScholarship.school_id == structure.school_id,
+                StudentScholarship.student_id == student.id,
+                StudentScholarship.is_active.is_(True),
+                StudentScholarship.is_deleted.is_(False),
+                or_(
+                    StudentScholarship.fee_type.is_(None),
+                    StudentScholarship.fee_type == item_name,
+                ),
+                or_(
+                    StudentScholarship.valid_from_bs.is_(None),
+                    StudentScholarship.valid_from_bs <= today_bs_str,
+                ),
+                or_(
+                    StudentScholarship.valid_until_bs.is_(None),
+                    StudentScholarship.valid_until_bs >= today_bs_str,
+                ),
+            ).first()
+            if sc:
+                if sc.discount_type == "percent":
+                    discount_amount = round(float(amount) * float(sc.discount_value) / 100, 2)
+                else:
+                    discount_amount = min(float(sc.discount_value), float(amount))
+                is_scholarship = True
+        except Exception:
+            pass
+
         collection = FeeCollection(
             school_id=structure.school_id,
             student_id=student.id,
             academic_year=structure.academic_year or student.academic_year or now_year,
             fee_item_name=item_name,
             amount=amount,
+            discount_amount=discount_amount,
+            is_scholarship=is_scholarship,
             month_bs=month_bs,
             year_bs=year_bs,
             payment_status="pending",

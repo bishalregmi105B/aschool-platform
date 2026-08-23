@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'api_client.dart';
 
 /// Unified notification service — OneSignal primary, FCM fallback.
@@ -88,10 +89,21 @@ class NotificationService {
     }
 
     try {
-      // OneSignal initialization
-      // Note: Import onesignal_flutter when the dependency is added
-      // For now, we use the REST API approach via player ID registration
-      _logger.i('OneSignal initialized with app ID: ${appId.substring(0, 8)}...');
+      OneSignal.Debug.setLogLevel(OSLogLevel.warn);
+      OneSignal.initialize(appId);
+      await OneSignal.Notifications.requestPermission(true);
+
+      // Capture player ID once subscription is ready
+      final subscription = OneSignal.User.pushSubscription;
+      _oneSignalPlayerId = subscription.id;
+      _logger
+          .i('OneSignal player ID: ${_oneSignalPlayerId?.substring(0, 8)}...');
+
+      // Listen for subscription changes (e.g., token rotation)
+      OneSignal.User.pushSubscription.addObserver((state) {
+        _oneSignalPlayerId = state.current.id;
+        _logger.i('OneSignal player ID updated');
+      });
     } catch (e) {
       _logger.e('OneSignal init failed: $e');
     }
@@ -119,8 +131,11 @@ class NotificationService {
     required String userId,
   }) async {
     try {
-      // Tags are set on the backend via the register-onesignal endpoint
-      // The backend handles tag registration with OneSignal REST API
+      OneSignal.User.addTags({
+        'school_id': schoolId,
+        'role': role,
+        'user_id': userId,
+      });
       _logger.i('OneSignal tags set: school=$schoolId, role=$role');
     } catch (e) {
       _logger.w('Failed to set OneSignal tags: $e');

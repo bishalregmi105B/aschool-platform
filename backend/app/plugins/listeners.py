@@ -66,9 +66,49 @@ def on_attendance_marked(school_id: str, date, count: int, **kwargs):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# FEE EVENTS
+# ASSIGNMENT / HOMEWORK EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
+@on("assignment.created")
+def on_assignment_created(school_id: str, assignment_id: str, title: str = "", class_id: str = None, **kwargs):
+    """Triggered when a new homework/assignment is created.
+
+    Actions:
+    - Send push notification to students and parents of the affected class
+    """
+    logger.info(
+        "[EVENT] assignment.created — school=%s, assignment=%s",
+        school_id, assignment_id,
+    )
+    try:
+        from app.tasks.push_notifications import send_push_to_school
+
+        send_push_to_school.delay(
+            school_id=school_id,
+            title="📚 New Homework",
+            body=f"{title[:80]}" if title else "A new assignment has been posted.",
+            roles=["student", "parent"],
+            data={"type": "homework", "assignment_id": assignment_id, "class_id": class_id},
+        )
+    except Exception:
+        logger.exception("Failed to send assignment push notification")
+
+    try:
+        _create_school_notifications(
+            school_id=school_id,
+            title="📚 New Homework",
+            body=f"{title[:80]}" if title else "A new assignment has been posted.",
+            category="homework",
+            roles=["student", "parent"],
+            data={"type": "homework", "assignment_id": assignment_id},
+        )
+    except Exception:
+        logger.exception("Failed to create assignment in-app notifications")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FEE EVENTS
+# ═══════════════════════════════════════════════════════════════════════════
 @on("fee.paid")
 def on_fee_paid(school_id: str, student_id: str, amount: float, **kwargs):
     """Triggered when a fee payment is recorded.

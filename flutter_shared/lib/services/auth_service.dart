@@ -186,9 +186,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _registerPushNotifications(User user) async {
     try {
       final notifService = NotificationService();
-      final fcmToken = notifService.fcmToken;
-      if (fcmToken != null) {
-        await notifService.registerOneSignalPlayer(fcmToken);
+      // Prefer OneSignal player ID; fall back to FCM token
+      final playerId = notifService.oneSignalPlayerId ?? notifService.fcmToken;
+      if (playerId != null) {
+        await notifService.registerOneSignalPlayer(playerId);
         await notifService.setOneSignalTags(
           schoolId: user.schoolId ?? '',
           role: user.role,

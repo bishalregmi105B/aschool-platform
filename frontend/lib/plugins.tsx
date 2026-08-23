@@ -28,14 +28,17 @@ export interface PluginSidebarItem {
   subitems: Array<{ label: string; route: string }>;
 }
 
+export interface PluginBottomNavItem {
+  slug: string;
+  label: string;
+  icon: string;
+  route: string;
+  subitems?: Array<{ label: string; route: string }>;
+}
+
 interface PluginSidebarResponse {
   items: PluginSidebarItem[];
-  bottom_nav: Array<{
-    slug: string;
-    label: string;
-    icon: string;
-    route: string;
-  }>;
+  bottom_nav: PluginBottomNavItem[];
 }
 
 interface PluginContextType {
@@ -45,13 +48,8 @@ interface PluginContextType {
   refreshPlugins: () => Promise<void>;
   /** Plugin-driven sidebar items from YAML manifests */
   sidebarItems: PluginSidebarItem[];
-  /** Plugin-driven bottom nav items (e.g. IEMIS Import) */
-  pluginBottomNav: Array<{
-    slug: string;
-    label: string;
-    icon: string;
-    route: string;
-  }>;
+  /** Plugin-driven bottom nav items (e.g. Settings, Marketplace) */
+  pluginBottomNav: PluginBottomNavItem[];
 }
 
 const PLUGIN_SLUG_ALIASES: Record<string, string> = {
@@ -109,9 +107,7 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [sidebarItems, setSidebarItems] = useState<PluginSidebarItem[]>([]);
-  const [pluginBottomNav, setPluginBottomNav] = useState<
-    Array<{ slug: string; label: string; icon: string; route: string }>
-  >([]);
+  const [pluginBottomNav, setPluginBottomNav] = useState<PluginBottomNavItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshPlugins = async () => {
