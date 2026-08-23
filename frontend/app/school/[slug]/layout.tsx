@@ -1,5 +1,6 @@
 /** Public school website layout — applies theme CSS variables */
 import { Metadata } from "next";
+import { sanitizeCss } from "@/lib/sanitize";
 import { generateThemeCSS, getThemeById, THEMES } from "@/themes/registry";
 import { SchoolNavbar } from "@/components/website/SchoolNavbar";
 
@@ -96,7 +97,7 @@ export default async function SchoolLayout({
   const surfaceOverride = colorOverrides.surface
     ? `:root { --color-surface: ${colorOverrides.surface}; }`
     : "";
-  const customCss = website?.customizations?.custom_css || "";
+  const customCss = sanitizeCss(website?.customizations?.custom_css || "");
 
   const navLinks = [
     { label: "Home", path: "" },

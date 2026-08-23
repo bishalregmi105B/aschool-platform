@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { sanitizeCss } from "@/lib/sanitize";
 import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/lib/school-website/registry";
 import { SectionRenderer } from "@/components/website/SectionRenderer";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
@@ -366,7 +367,7 @@ export default function WebsiteEditor() {
   });
 
   // Fetch website config for theme CSS injection in the preview canvas
-  const { data: websiteConfig } = useQuery<{ theme_slug?: string; customizations?: { colors?: Record<string, string> } }>({
+  const { data: websiteConfig } = useQuery<{ theme_slug?: string; customizations?: { colors?: Record<string, string>; custom_css?: string } }>({
     queryKey: ["website-config-theme"],
     queryFn: () => api.get("/website/config").then((r) => r.data.data || r.data),
     staleTime: 60_000,
@@ -377,7 +378,12 @@ export default function WebsiteEditor() {
     const activeTheme = getThemeById(themeSlug) || getThemeById("modern-minimal");
     const colorOverrides = websiteConfig?.customizations?.colors || {};
     if (!activeTheme) return "";
-    return generateThemeCSS(activeTheme, colorOverrides);
+    // sanitizeCss defends against custom_css smuggled through the config row;
+    // generated theme CSS is registry-controlled but passes through the same gate.
+    return sanitizeCss(
+      generateThemeCSS(activeTheme, colorOverrides) +
+        (websiteConfig?.customizations?.custom_css || "")
+    );
   })();
 
   const sections: SchoolSection[] = (localSections ?? pageData?.sections ?? [])

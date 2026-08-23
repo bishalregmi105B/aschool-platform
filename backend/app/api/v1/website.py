@@ -194,6 +194,14 @@ def update_website_config():
         if key in data:
             setattr(website, key, data[key])
 
+    # customizations.custom_css is rendered into the public site's <style>
+    # block — sanitize it on every write, same as top-level custom_css.
+    if isinstance(website.customizations, dict) and "custom_css" in website.customizations:
+        website.customizations = {
+            **website.customizations,
+            "custom_css": sanitize_custom_css(website.customizations.get("custom_css") or ""),
+        }
+
     if "custom_css" in data:
         css = sanitize_custom_css(data["custom_css"] or "")
         website.custom_css = css
