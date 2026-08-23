@@ -403,6 +403,47 @@ class AITokenHub:
         }
 
     # ------------------------------------------------------------------
+    # Simple prompt -> text helper used by the service modules
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def generate(
+        school_id,
+        prompt: str,
+        action: str = "service",
+        max_tokens: int = 500,
+        model: str = "smart",
+        temperature: float = 0.7,
+        system_prompt: str | None = None,
+        user_id=None,
+        metadata: dict | None = None,
+    ) -> str:
+        """
+        One-shot convenience wrapper around :meth:`request`.
+
+        Takes a single prompt (plus optional system prompt) and returns the
+        completion text. Quota enforcement, provider failover and usage
+        logging all behave exactly as in ``request()``, with the feature
+        namespaced as ``"service:<action>"``.
+        """
+        messages: list[dict] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        result = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature=f"service:{action}",
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            metadata=metadata,
+        )
+        return result.get("text", "")
+
+    # ------------------------------------------------------------------
     # Convenience helpers for admin stats
     # ------------------------------------------------------------------
 
