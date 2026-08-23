@@ -1,14 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
 import { Bus, Navigation } from "lucide-react";
-import { LiveBusMap, type BusPosition } from "@/components/transport/LiveBusMap";
+import type { BusPosition } from "@/components/transport/LiveBusMap";
 import { connectSocket, disconnectSocket, onGPSUpdate, joinSchoolRoom } from "@/lib/socket";
+
+// Leaflet touches window at import time — client-only.
+const LiveBusMap = dynamic(
+  () => import("@/components/transport/LiveBusMap").then((m) => m.LiveBusMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[26rem] flex items-center justify-center text-muted-foreground bg-muted rounded-lg">
+        Loading map…
+      </div>
+    ),
+  }
+);
 
 export default function TransportMapPage() {
   return (

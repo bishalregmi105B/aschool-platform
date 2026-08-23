@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // isomorphic-dompurify -> jsdom reads files from its own package dir at
+  // import time; it must be require()d at runtime, not webpack-bundled.
+  experimental: {
+    serverComponentsExternalPackages: ["isomorphic-dompurify", "jsdom"],
+  },
   images: {
     remotePatterns: [
       {
