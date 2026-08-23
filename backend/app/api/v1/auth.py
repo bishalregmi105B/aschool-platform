@@ -530,28 +530,6 @@ def totp_challenge():
     })
 
 
-
-    """Register FCM token for push notifications."""
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
-        return error_response("User not found", 404)
-
-    data = request.get_json(silent=True) or {}
-    token = data.get("fcm_token")
-    if not token:
-        return error_response("FCM token is required", 400)
-
-    tokens = user.fcm_tokens or []
-    if token not in tokens:
-        tokens.append(token)
-        user.fcm_tokens = tokens
-        from extensions import db
-        db.session.commit()
-
-    return success_response({"message": "FCM token registered"})
-
-
 @auth_bp.route("/register-onesignal", methods=["POST"])
 @jwt_required()
 def register_onesignal():

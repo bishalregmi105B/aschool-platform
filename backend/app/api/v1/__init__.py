@@ -3,6 +3,41 @@ from flask import Blueprint
 
 api_v1_bp = Blueprint("api_v1", __name__)
 
+# Modules whose blueprints are mounted below. Plugin manifests pointing at
+# these paths are skipped by the loader so each route exists exactly once
+# (previously ~10 modules were registered twice: static + manifest).
+STATICALLY_MOUNTED_MODULES = {
+    "app.api.v1.auth",
+    "app.api.v1.schools",
+    "app.api.v1.super_admin",
+    "app.api.v1.users",
+    "app.api.v1.students",
+    "app.api.v1.staff",
+    "app.api.v1.plugins",
+    "app.api.v1.academics",
+    "app.api.v1.analytics",
+    "app.api.v1.mobile",
+    "app.api.v1.parent_app",
+    "app.api.v1.student_app",
+    "app.api.v1.teacher",
+    "app.api.v1.sse",
+    "app.api.v1.webhooks",
+    "app.api.v1.search",
+    "app.api.v1.files",
+    "app.api.v1.iemis_importer",
+    "app.api.v1.communications",
+    "app.api.v1.sliders",
+    "app.api.v1.themes",
+    "app.api.v1.elibrary",
+    "app.api.v1.benchmarking",
+    "app.api.v1.design_studio",
+    "app.api.v1.ai_usage",
+    "app.api.v1.notifications",
+    "app.api.v1.faqs",
+    "app.api.v1.db_backup_api",
+    "app.api.v1.hostel",
+}
+
 # Core routes (always available, not plugin-gated)
 from app.api.v1.auth import auth_bp
 from app.api.v1.schools import schools_bp

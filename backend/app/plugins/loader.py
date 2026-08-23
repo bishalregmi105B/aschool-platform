@@ -37,6 +37,15 @@ class PluginLoader:
         cls._plugins.clear()
         registered_blueprints: set[str] = set()
 
+        # Blueprints mounted statically by the core app must not be
+        # re-registered from manifests (that created duplicate URL rules).
+        try:
+            from app.api.v1 import STATICALLY_MOUNTED_MODULES
+
+            registered_blueprints.update(STATICALLY_MOUNTED_MODULES)
+        except ImportError:  # pragma: no cover — defensive
+            pass
+
         # ── 1. New Odoo-style modules (modules/{slug}/manifest.yaml) ──────
         if cls._modules_dir.exists():
             for manifest_file in sorted(cls._modules_dir.rglob("manifest.yaml")):
