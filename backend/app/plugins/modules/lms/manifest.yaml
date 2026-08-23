@@ -15,7 +15,6 @@ services:
   - "app.services.lms.content_engine"
   - "app.services.ai.adaptive_learning"
 tasks:
-  - "app.tasks.lms_video_processor"
 
 depends_on:
   - attendance
