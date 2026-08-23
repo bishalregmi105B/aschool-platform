@@ -20,12 +20,16 @@ This file is the single source of truth for progress. Items are checked **only**
 
 ## Phase 1 — Must-Fix
 
-- [ ] 1.1 Prod compose: `-A app.celery` → `-A app.celery_app` (prod.yml:126,155); env_file or complete env lists (~30 dropped vars); mount `uploads_data`; remove/fix `./nginx/ssl` + `/var/www/app.brighternepal.com` mounts
-- [ ] 1.2 Student AI tutor double `/api/v1` prefix (`ai_tutor_screen.dart:55`)
-- [ ] 1.3 Domain unification on one canonical domain (.env / compose.prod / nginx.conf / host conf / middleware.ts / flutter constants.dart); purge other brands
-- [ ] 1.4 Remove plaintext prod password from `fix_server.py:52-56`; clean brighternepal residue
-- [ ] 1.5 Fix jest.config key (`setupFilesAfterEnv`); reconcile SEC-06/SEC-07/C2 by fixing code to meet the security posture (not loosening tests)
-- [ ] 1.6 Fix 10 orphaned AI services calling nonexistent `AITokenHub.generate()` (19 call sites)
+> ✅ DONE. Commits: e0d026e (compose), 4cd1b72 (student app), 3567493 (domain+password), d7711d8 (security batch: cookies/XSS/jest/tenant-403s/exam-window + frontend cookie auth + sanitizers), 03e57ad (AI hub).
+> Bonus fixes landed with 1.5: revoked_tokens table missing from create_all metadata; silent transaction poisoning in resolve_school/blocklist loader; Redis cache isolation between tests.
+> Backend suite after Phase 1: **733 passed / 0 failed**. Frontend jest: **36 passed / 0 failed** (9/9 suites).
+
+- [x] 1.1 Prod compose: `-A app.celery` → `-A app.celery_app` (prod.yml:126,155); env_file or complete env lists (~30 dropped vars); mount `uploads_data`; remove/fix `./nginx/ssl` + `/var/www/app.brighternepal.com` mounts
+- [x] 1.2 Student AI tutor double `/api/v1` prefix (`ai_tutor_screen.dart:55`)
+- [x] 1.3 Domain unification (canonical: aschool.com.np) on one canonical domain (.env / compose.prod / nginx.conf / host conf / middleware.ts / flutter constants.dart); purge other brands
+- [x] 1.4 Remove plaintext prod password (scripts deleted; ⚠ operator must still rotate the live credential) from `fix_server.py:52-56`; clean brighternepal residue
+- [x] 1.5 Fix jest.config key (`setupFilesAfterEnv`); reconcile SEC-06/SEC-07/C2 by fixing code to meet the security posture (not loosening tests)
+- [x] 1.6 Fix 10 orphaned AI services (implemented AITokenHub.generate() wrapper) — commit 03e57ad calling nonexistent `AITokenHub.generate()` (19 call sites)
 
 ## Phase 2 — Should-Fix
 
