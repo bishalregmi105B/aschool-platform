@@ -12,8 +12,8 @@
  *
  * Data flow:
  *   ESP32 → (every 15s) → Firebase Realtime DB
- *   Firebase → Parent Flutter App (real-time listener)
- *   Firebase → Backend Celery (polls every 30s → PostgreSQL history)
+ *   Firebase → Backend Celery beat poller "poll-firebase-gps" (15s → PostgreSQL
+ *   history + Socket.IO gps_update broadcast → web live map & parent app)
  */
 
 #include <TinyGPS++.h>
@@ -66,6 +66,19 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
+
+  // ── Configuration guard: refuse to run with placeholder identity/secrets.
+  // A device reporting under SCHOOL_ID_HERE would silently poison tenant data.
+  if (String(SCHOOL_ID) == "SCHOOL_ID_HERE" ||
+      String(FIREBASE_SECRET) == "FIREBASE_SECRET_HERE" ||
+      String(BUS_ID) == "BUS_001") {
+    Serial.println("[CONFIG] ERROR: per-device configuration incomplete!");
+    Serial.println("[CONFIG] Set BUS_ID, SCHOOL_ID and FIREBASE_SECRET before deployment.");
+    while (true) {  // SOS blink forever — visible failure, no bogus data
+      for (int i = 0; i < 3; i++) { digitalWrite(LED_PIN, HIGH); delay(150); digitalWrite(LED_PIN, LOW); delay(150); }
+      delay(300);
+    }
+  }
 
   // Initialize GPS on UART1
   gpsSerial.begin(9600, SERIAL_8N1, GPS_RX, GPS_TX);
@@ -150,6 +163,17 @@ void sendLocation(double lat, double lng, double speed,
   String path = "/schools/" + String(SCHOOL_ID) +
                 "/buses/" + String(BUS_ID) + "/location.json";
 
+  // Real UTC timestamp from the GPS fix (falls back to a null ts and lets the
+  // server stamp arrival time). millis() is uptime only — never an epoch.
+  String iso;
+  if (gps.date.isValid() && gps.time.isValid()) {
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+             gps.date.year(), gps.date.month(), gps.date.day(),
+             gps.time.hour(), gps.time.minute(), gps.time.second());
+    iso = String(buf);
+  }
+
   String payload = "{";
   payload += "\"lat\":" + String(lat, 7);
   payload += ",\"lng\":" + String(lng, 7);
@@ -157,14 +181,16 @@ void sendLocation(double lat, double lng, double speed,
   payload += ",\"heading\":" + String(heading, 1);
   payload += ",\"hdop\":" + String(hdop);
   payload += ",\"satellites\":" + String(satellites);
-  payload += ",\"ts\":" + String(millis());
+  if (iso.length()) {
+    payload += ",\"ts\":\"" + iso + "\"";
+  }
   payload += ",\"bus_id\":\"" + String(BUS_ID) + "\"";
   payload += "}";
 
   if (useWiFi && WiFi.status() == WL_CONNECTED) {
-    sendViaWiFi(path, payload);
+    sendViaWiFi(path, payload);   // HTTP PUT → replaces location node
   } else {
-    sendViaGPRS(path, payload);
+    sendViaGPRS(path, payload);   // HTTP POST → appends child; poller picks latest by ts
   }
 
   Serial.println("[LOC] " + String(lat, 6) + "," + String(lng, 6) +
@@ -190,7 +216,11 @@ void sendViaWiFi(String path, String payload) {
 }
 
 void sendViaGPRS(String path, String payload) {
-  // HTTP PUT via SIM800L AT commands
+  // HTTP POST via SIM800L AT commands.
+  // NOTE: SIM800L HTTPACTION supports only GET(0)/POST(1)/HEAD(2) — there is
+  // no PUT. POST to RTDB appends a push-child instead of replacing the node,
+  // so the backend poller reads the whole node and takes the newest child by
+  // "ts". Over WiFi we PUT directly, which replaces the flat object.
   sendAT("AT+HTTPTERM", 1000);
   sendAT("AT+HTTPINIT", 1000);
   sendAT("AT+HTTPPARA=\"CID\",1", 1000);
@@ -205,10 +235,30 @@ void sendViaGPRS(String path, String payload) {
   gsmSerial.print(payload);
   delay(2000);
 
-  // PUT request (custom method via SIM800L — use POST as fallback)
+  // POST request and CHECK the result status.
   sendAT("AT+HTTPACTION=1", 10000);  // 1 = POST
+  String actionResp = readSerialResponse(3000);
+  int codeIdx = actionResp.indexOf("+HTTPACTION:");
+  if (codeIdx >= 0) {
+    // Format: +HTTPACTION: <method>,<status>,<len>
+    String rest = actionResp.substring(codeIdx);
+    int c1 = rest.indexOf(',');
+    int c2 = rest.indexOf(',', c1 + 1);
+    if (c1 > 0 && c2 > c1) {
+      long status = rest.substring(c1 + 1, c2).toInt();
+      if (status == 200) {
+        Serial.println("[GPRS] Location sent OK");
+        failCount = 0;
+      } else {
+        Serial.println("[GPRS] Server returned " + String(status));
+        failCount++;
+      }
+    }
+  } else {
+    Serial.println("[GPRS] No HTTPACTION response — treating as failure");
+    failCount++;
+  }
 
-  Serial.println("[GPRS] Location sent");
   sendAT("AT+HTTPTERM", 1000);
 }
 
@@ -247,6 +297,18 @@ void initGSM() {
   sendAT("AT+HTTPSSL=1", 2000);
 
   Serial.println("[GSM] GPRS initialized");
+}
+
+// Drain the GSM serial line for up to `timeout` ms and return what arrives.
+String readSerialResponse(unsigned long timeout) {
+  String response = "";
+  unsigned long start = millis();
+  while (millis() - start < timeout) {
+    while (gsmSerial.available()) {
+      response += (char)gsmSerial.read();
+    }
+  }
+  return response;
 }
 
 String sendAT(String cmd, unsigned long timeout) {

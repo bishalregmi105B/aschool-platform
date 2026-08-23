@@ -120,6 +120,9 @@ def create_app(config_name: str | None = None) -> Flask:
         app,
         cors_allowed_origins=_socket_origins,
         async_mode="eventlet",
+        # External processes (Celery GPS workers) publish realtime events via
+        # the same Redis message queue so connected browsers receive them.
+        message_queue=app.config.get("SOCKET_MESSAGE_QUEUE") or app.config.get("REDIS_URL"),
     )
 
     # Celery
@@ -183,6 +186,12 @@ def create_app(config_name: str | None = None) -> Flask:
             "admission-followup-daily": {
                 "task": "dispatch_admission_followups",
                 "schedule": crontab(hour=9, minute=0),
+            },
+            # ── GPS: Firebase RTDB poller (device cadence is 15 s) ────
+            "poll-firebase-gps": {
+                "task": "poll_firebase_gps",
+                "schedule": 15.0,
+                "options": {"queue": "gps"},
             },
         },
     )
@@ -290,6 +299,9 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Register cross-plugin event listeners
     from app.plugins import listeners  # noqa: F401 — registers @on() handlers
+
+    # Socket.IO rooms for realtime events (join_school / leave_school)
+    from app import realtime  # noqa: F401 — registers socketio.on() handlers
 
     # ── CSRF guard for cookie-authenticated requests ────────────────────
     # Bearer-token clients (mobile apps, tests) are unaffected. Browser

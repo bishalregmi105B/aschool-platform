@@ -41,5 +41,6 @@ from app.tasks import (  # noqa: E402, F401
     streak_updater,
     social_scheduler,
     db_backup,
+    gps_firebase_poller,
 )
 
