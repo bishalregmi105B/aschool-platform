@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for all API/socket/image traffic (debug/profile get this via template; release needs it here). -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Microphone access for speech_to_text features. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
