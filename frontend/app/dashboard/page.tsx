@@ -100,28 +100,28 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-lg font-bold text-foreground">
           Welcome back, {user?.full_name?.split(" ")[0] || "Admin"}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           Here&apos;s what&apos;s happening at your school today.
         </p>
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {cards.map((card) => (
-          <Card key={card.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{card.title}</p>
-                  <p className="text-2xl font-bold mt-1">{card.value}</p>
+          <Card key={card.title} className="shadow-sm">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground leading-tight truncate">{card.title}</p>
+                  <p className="text-xl font-bold mt-0.5">{card.value}</p>
                 </div>
-                <div className={`p-3 rounded-full ${card.bg}`}>
-                  <card.icon className={`h-5 w-5 ${card.color}`} />
+                <div className={`p-2 rounded-lg shrink-0 ${card.bg}`}>
+                  <card.icon className={`h-4 w-4 ${card.color}`} />
                 </div>
               </div>
             </CardContent>
@@ -130,25 +130,25 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick info */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Active Plugins</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-[13px] font-semibold">Active Plugins</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
+          <CardContent className="px-4 pb-3">
+            <div className="flex flex-wrap gap-1.5">
               {installedPlugins
                 .filter((p) => p.active)
                 .map((p) => (
-                  <Badge key={p.plugin_slug} variant="secondary">
+                  <Badge key={p.plugin_slug} variant="secondary" className="text-[11px] py-0.5">
                     {p.plugin_slug.replace(/_/g, " ")}
                     {p.is_trial && (
-                      <span className="ml-1 text-xs text-amber-600">(trial)</span>
+                      <span className="ml-1 text-[10px] text-amber-600">(trial)</span>
                     )}
                   </Badge>
                 ))}
               {installedPlugins.filter((p) => p.active).length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   No plugins installed yet.{" "}
                   <a href="/dashboard/marketplace" className="text-primary hover:underline">
                     Browse marketplace
@@ -159,12 +159,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-[13px] font-semibold">Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="px-4 pb-3">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "Add Student", href: "/dashboard/students?action=add" },
                 { label: "Mark Attendance", href: "/dashboard/attendance" },
@@ -174,7 +174,7 @@ export default function DashboardPage() {
                 <a
                   key={action.label}
                   href={action.href}
-                  className="flex items-center justify-center p-3 rounded-lg border hover:bg-muted transition-colors text-sm font-medium"
+                  className="flex items-center justify-center p-2.5 rounded border hover:bg-accent transition-colors text-[12px] font-medium text-center"
                 >
                   {action.label}
                 </a>

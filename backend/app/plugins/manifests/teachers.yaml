@@ -1,0 +1,24 @@
+slug: teachers
+name: "Teacher Management"
+name_nepali: "शिक्षक व्यवस्थापन"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "👩‍🏫"
+icon: "UserCog"
+description: "Teacher profiles, subject assignments, bulk upload"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/teachers"
+  sidebar:
+    label: "Teachers"
+    label_nepali: "शिक्षक"
+    icon: "UserCog"
+    subitems:
+      - { label: "Manage Teachers", route: "/teachers" }
+      - { label: "Bulk Upload",     route: "/teachers/bulk-upload" }
+    visible_to: ["superadmin", "school_admin"]

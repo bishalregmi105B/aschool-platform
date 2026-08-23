@@ -30,6 +30,7 @@ frontend:
       - { label: "Dashboard", route: "/fees" }
       - { label: "Structure", route: "/fees/structure" }
       - { label: "Collect", route: "/fees/collect" }
+      - { label: "Scholarships", route: "/fees/scholarships" }
       - { label: "Defaulters", route: "/fees/defaulters" }
       - { label: "Reports", route: "/fees/reports" }
     visible_to: ["school_admin", "accountant"]

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { usePluginEnabled } from "@/lib/plugin-gate";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,7 @@ import {
   AlertTriangle,
   FileText,
   X,
-  Palette,
+  Eye,
   Download,
   TableIcon,
   ChevronRight,
@@ -126,7 +127,7 @@ export default function ResultsPage() {
   );
 }
 
-type ActiveTab = "results" | "gradesheet";
+type ActiveTab = "results" | "marksLedger";
 
 function ResultsContent() {
   const [examId, setExamId] = useState("");
@@ -134,7 +135,11 @@ function ResultsContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("results");
   const [selectedStudent, setSelectedStudent] =
     useState<StudentMarksheet | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [loadingMarksheet, setLoadingMarksheet] = useState<string | null>(null);
+  const [loadingStudentHtml, setLoadingStudentHtml] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
 
   const hasDesigner = usePluginEnabled("design_studio");
 
@@ -154,6 +159,36 @@ function ResultsContent() {
     },
   });
 
+  // Derived: exams filtered to only those belonging to the selected class
+  const filteredExams = classId
+    ? (exams || []).filter(
+        (e: { id: string; name: string; class_id: string | null }) =>
+          e.class_id === classId,
+      )
+    : (exams || []);
+
+  // When the user picks a class, clear exam selection if it no longer matches
+  const handleClassChange = (newClassId: string) => {
+    setClassId(newClassId);
+    const currentExam = (exams || []).find(
+      (e: { id: string; class_id: string | null }) => e.id === examId,
+    );
+    if (currentExam && currentExam.class_id !== newClassId) {
+      setExamId("");
+    }
+  };
+
+  // When the user picks an exam, auto-populate class if exam has a class_id
+  const handleExamChange = (newExamId: string) => {
+    setExamId(newExamId);
+    const chosen = (exams || []).find(
+      (e: { id: string; class_id: string | null }) => e.id === newExamId,
+    );
+    if (chosen?.class_id && !classId) {
+      setClassId(chosen.class_id);
+    }
+  };
+
   const { data: results, isLoading: loadingResults } = useQuery({
     queryKey: ["results", examId, classId],
     queryFn: async () => {
@@ -171,27 +206,84 @@ function ResultsContent() {
       );
       return res.data?.data as GradeSheet | null;
     },
-    enabled: !!examId && !!classId && activeTab === "gradesheet",
+    enabled: !!examId && !!classId && activeTab === "marksLedger",
   });
 
-  const designerMarksheetMutation = useMutation({
-    mutationFn: async () => {
+  // ── Preview & PDF helpers ─────────────────────────────────────────────────
+  const previewTemplate = async (templateId: "marksheet" | "grade_sheet") => {
+    if (!examId || !classId) return;
+    setPreviewingTemplate(templateId);
+    try {
       const res = await api.post(`/exams/${examId}/designer-marksheet`, {
         class_id: classId,
+        template_id: templateId,
       });
-      return res.data?.data;
-    },
-    onSuccess: () => {
-      // Redirect to designer with the generated marksheets
-      window.location.href = `/dashboard/designer?source=exam&exam_id=${examId}&class_id=${classId}`;
-    },
-  });
+      const marksheets: any[] = res.data?.data?.marksheets || [];
+      if (!marksheets.length) {
+        toast.error("No data — enter marks first");
+        return;
+      }
+      const htmlPages = marksheets.map((m: any) => m.html || "").filter(Boolean);
+      if (!htmlPages.length) {
+        toast.error("No rendered content");
+        return;
+      }
+      const title = templateId === "grade_sheet" ? "Grade Sheets" : "Marksheets";
+      const combined = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${title}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; background: #fff; }
+  .aschool-page { page-break-after: always; }
+  .aschool-page:last-child { page-break-after: avoid; }
+</style>
+</head><body>
+${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
+</body></html>`;
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.open();
+        w.document.write(combined);
+        w.document.close();
+        w.focus();
+      } else {
+        toast.error("Popup blocked — allow popups for this site");
+      }
+    } catch {
+      toast.error("Failed to generate preview");
+    } finally {
+      setPreviewingTemplate(null);
+    }
+  };
+
+  const downloadPdf = async (templateId: "marksheet" | "grade_sheet") => {
+    if (!examId || !classId) return;
+    setDownloadingPdf(templateId);
+    try {
+      const res = await api.get(
+        `/exams/${examId}/bulk-marksheet-pdf?class_id=${classId}&template_id=${templateId}`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${templateId === "grade_sheet" ? "grade_sheets" : "marksheets"}_${examId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF downloaded");
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
 
   const openMarksheet = async (studentId: string) => {
     setLoadingMarksheet(studentId);
     try {
       const res = await api.get(`/exams/${examId}/marksheet/${studentId}`);
       if (res.data?.data) {
+        setSelectedStudentId(studentId);
         setSelectedStudent(res.data.data as StudentMarksheet);
       }
     } finally {
@@ -229,17 +321,61 @@ function ResultsContent() {
           </p>
         </div>
         {isReady && hasDesigner && (
-          <Button
-            variant="outline"
-            onClick={() => designerMarksheetMutation.mutate()}
-            disabled={designerMarksheetMutation.isPending}
-            className="gap-2"
-          >
-            <Palette className="h-4 w-4" />
-            {designerMarksheetMutation.isPending
-              ? "Preparing..."
-              : "Generate Marksheets via Designer"}
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Marksheet group */}
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+              <span className="px-2 text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">
+                Marksheet
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={previewingTemplate === "marksheet"}
+                onClick={() => previewTemplate("marksheet")}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {previewingTemplate === "marksheet" ? "Loading…" : "Preview"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={downloadingPdf === "marksheet"}
+                onClick={() => downloadPdf("marksheet")}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingPdf === "marksheet" ? "Generating…" : "PDF"}
+              </Button>
+            </div>
+
+            {/* Grade Sheet group */}
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+              <span className="px-2 text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
+                Grade Sheet
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={previewingTemplate === "grade_sheet"}
+                onClick={() => previewTemplate("grade_sheet")}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {previewingTemplate === "grade_sheet" ? "Loading…" : "Preview"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={downloadingPdf === "grade_sheet"}
+                onClick={() => downloadPdf("grade_sheet")}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingPdf === "grade_sheet" ? "Generating…" : "PDF"}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -247,23 +383,8 @@ function ResultsContent() {
       <Card>
         <CardContent className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Select Exam</Label>
-            <Select value={examId} onValueChange={setExamId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose exam" />
-              </SelectTrigger>
-              <SelectContent>
-                {(exams || []).map((e: { id: string; name: string }) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
             <Label>Select Class</Label>
-            <Select value={classId} onValueChange={setClassId}>
+            <Select value={classId} onValueChange={handleClassChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose class" />
               </SelectTrigger>
@@ -271,6 +392,21 @@ function ResultsContent() {
                 {(classes || []).map((c: { id: string; name: string }) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Select Exam</Label>
+            <Select value={examId} onValueChange={handleExamChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose exam" />
+              </SelectTrigger>
+              <SelectContent>
+                {filteredExams.map((e: { id: string; name: string }) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -329,7 +465,7 @@ function ResultsContent() {
               {(
                 [
                   { id: "results", label: "Student Results", icon: FileText },
-                  { id: "gradesheet", label: "Grade Sheet", icon: TableIcon },
+                  { id: "marksLedger", label: "Marks Ledger", icon: TableIcon },
                 ] as const
               ).map((tab) => (
                 <button
@@ -434,23 +570,9 @@ function ResultsContent() {
             </Card>
           )}
 
-          {/* Grade Sheet */}
-          {activeTab === "gradesheet" && (
+          {/* Marks Ledger */}
+          {activeTab === "marksLedger" && (
             <div className="space-y-3">
-              {hasDesigner && (
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => designerMarksheetMutation.mutate()}
-                    disabled={designerMarksheetMutation.isPending}
-                    className="gap-2"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Export via Designer
-                  </Button>
-                </div>
-              )}
               <Card>
                 <CardContent className="p-0 overflow-auto">
                   {loadingGradeSheet ? (
@@ -728,16 +850,40 @@ function ResultsContent() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      window.open(
-                        `/dashboard/designer?source=exam_result&exam_id=${examId}&student_id=${selectedStudent?.student_name}`,
-                        "_blank",
-                      );
+                    disabled={loadingStudentHtml}
+                    onClick={async () => {
+                      if (!selectedStudent || !examId) return;
+                      setLoadingStudentHtml(true);
+                      try {
+                        const sid = selectedStudentId;
+                        if (!sid) { toast.error("Student ID not found"); return; }
+                        const res = await api.get(
+                          `/exams/${examId}/marksheet/${sid}/html?template_id=marksheet`,
+                        );
+                        const html = res.data?.data?.html || "";
+                        if (!html) { toast.error("No HTML generated"); return; }
+                        const w = window.open("", "_blank");
+                        if (w) {
+                          w.document.open();
+                          w.document.write(
+                            `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Marksheet</title>` +
+                            `<style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${html}</body></html>`,
+                          );
+                          w.document.close();
+                          w.focus();
+                        } else {
+                          toast.error("Popup blocked — allow popups for this site");
+                        }
+                      } catch {
+                        toast.error("Failed to generate marksheet");
+                      } finally {
+                        setLoadingStudentHtml(false);
+                      }
                     }}
                     className="gap-1.5"
                   >
-                    <Palette className="h-3.5 w-3.5" />
-                    Open in Designer
+                    <Eye className="h-3.5 w-3.5" />
+                    {loadingStudentHtml ? "Generating..." : "Preview Marksheet"}
                   </Button>
                 )}
                 <Button

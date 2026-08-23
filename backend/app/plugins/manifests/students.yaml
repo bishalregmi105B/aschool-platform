@@ -1,0 +1,32 @@
+slug: students
+name: "Student Management"
+name_nepali: "विद्यार्थी व्यवस्थापन"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "🎓"
+icon: "GraduationCap"
+description: "Student records, enrollment, transfers, promotions"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/students"
+  sidebar:
+    label: "Students"
+    label_nepali: "विद्यार्थी"
+    icon: "GraduationCap"
+    subitems:
+      - { label: "Student Details",      route: "/students" }
+      - { label: "Add Student",          route: "/students/new" }
+      - { label: "Bulk Import",          route: "/students/bulk-import" }
+      - { label: "Parents & Guardians",  route: "/parents" }
+      - { label: "Admission Inquiries",  route: "/admission" }
+      - { label: "Assign Roll Numbers",  route: "/students/roll-numbers" }
+      - { label: "Upload Profile Images",route: "/students/profile-images" }
+      - { label: "Transfer Student",     route: "/students/transfers" }
+      - { label: "Promote Students",     route: "/students/promote" }
+      - { label: "Reset Password",       route: "/students/reset-password" }
+    visible_to: []

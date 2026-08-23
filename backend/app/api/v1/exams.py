@@ -896,20 +896,37 @@ def get_grade_sheet(exam_id):
         school_id=g.school_id, exam_id=exam_id, class_id=class_id, is_deleted=False
     ).all()
 
-    # Collect unique subjects (preserve insertion order)
-    subjects_seen: dict = {}
+    # Build subject list from exam config (not from marks), so columns always
+    # appear even when no marks have been entered yet.
+    subj_query = Subject.query.filter_by(school_id=g.school_id, is_deleted=False)
+    if exam.subject_ids:
+        subj_query = subj_query.filter(Subject.id.in_(exam.subject_ids))
+    else:
+        subj_query = subj_query.filter(
+            Subject.class_ids.any(UUID(class_id))
+        )
+    configured_subjects = subj_query.order_by(Subject.name).all()
+
+    # Build marks override map: subject_id → full_marks (from entered marks)
+    marks_full_marks: dict = {}
     for m in all_marks:
         sid = str(m.subject_id)
-        if sid not in subjects_seen:
-            subj = Subject.query.get(m.subject_id)
-            subjects_seen[sid] = {
+        if sid not in marks_full_marks and m.full_marks:
+            marks_full_marks[sid] = float(m.full_marks)
+
+    subject_list = []
+    for subj in configured_subjects:
+        sid = str(subj.id)
+        full_marks = marks_full_marks.get(sid, float(subj.full_marks or 100))
+        subject_list.append(
+            {
                 "id": sid,
-                "name": subj.name if subj else "Unknown",
-                "full_marks": float(m.full_marks or 100),
+                "name": subj.name,
+                "full_marks": full_marks,
                 "_subject": subj,
             }
+        )
 
-    subject_list = list(subjects_seen.values())
     total_full_marks = sum(s["full_marks"] for s in subject_list)
 
     # Group marks by student
@@ -1119,6 +1136,49 @@ def get_student_marksheet(exam_id, student_id):
 # ── Designer Marksheet Integration ─────────────────────────────────────────
 
 
+@exams_bp.route("/<uuid:exam_id>/marksheet/<uuid:student_id>/html", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def get_student_marksheet_html(exam_id, student_id):
+    """Return rendered HTML marksheet for a single student using the template engine."""
+    template_id = request.args.get("template_id", "marksheet")
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+
+    student = _resolve_accessible_student(student_id)
+    if not student or str(student.id) != str(student_id):
+        return error_response("Student not found", 404)
+
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    school = School.query.get(g.school_id)
+    school_config = {
+        "name": school.name if school else "",
+        "address": school.address if school else "",
+        "phone": school.phone if school else "",
+        "logo_url": school.logo_url if school else "",
+    }
+
+    class_id = str(student.class_id) if student.class_id else None
+    if not class_id:
+        return error_response("Student has no class assigned", 400)
+
+    all_marksheets = BulkGeneratorService.generate_bulk_marksheets(
+        school_id=str(g.school_id),
+        exam_id=str(exam_id),
+        class_id=class_id,
+        template_id=template_id,
+    )
+    ms = next((m for m in all_marksheets if m.get("student_id") == str(student_id)), None)
+    if not ms:
+        return error_response("Could not generate marksheet for this student", 404)
+
+    html = ms.get("html", "")
+    return success_response({"html": html, "student_id": str(student_id), "template_id": template_id})
+
+
 @exams_bp.route("/<uuid:exam_id>/designer-marksheet", methods=["POST"])
 @jwt_required()
 @school_required
@@ -1263,6 +1323,74 @@ def generate_report_cards(exam_id):
 
     return success_response(
         {"message": "Report card generation started", "exam_id": str(exam_id)}
+    )
+
+
+@exams_bp.route("/<uuid:exam_id>/bulk-marksheet-pdf", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+@role_required("school_admin", "teacher")
+def bulk_marksheet_pdf(exam_id):
+    """Generate a single PDF containing marksheets/grade sheets for all students in a class."""
+    class_id = request.args.get("class_id")
+    template_id = request.args.get("template_id", "marksheet")
+    if not class_id:
+        return error_response("class_id is required", 400)
+
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    marksheets = BulkGeneratorService.generate_bulk_marksheets(
+        school_id=str(g.school_id),
+        exam_id=str(exam_id),
+        class_id=class_id,
+        template_id=template_id,
+    )
+    if not marksheets:
+        return error_response("No students found for this class/exam", 404)
+
+    pages_html = [m["html"] for m in marksheets if m.get("html")]
+    if not pages_html:
+        return error_response("No rendered HTML found — template may not support HTML output", 500)
+
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        return error_response("PDF export is unavailable on this server", 501)
+
+    # Use template config for proper @page size/orientation
+    from app.services.designer.template_engine import TemplateEngineService
+    _tmpl = TemplateEngineService.get_template(template_id, school_id=str(g.school_id)) or {}
+    _cfg  = (_tmpl.get("writer_json") or {}).get("config", {}) if isinstance(_tmpl.get("writer_json"), dict) else {}
+    _pg_size = (_cfg.get("size") or "A4").upper()
+    _pg_ori  = (_cfg.get("orientation") or "portrait").lower()
+    _page_css_size = _pg_size + (" landscape" if _pg_ori == "landscape" else "")
+
+    combined_html = (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        f"<style>@page{{size:{_page_css_size};margin:0}}.page{{page-break-after:always}}</style>"
+        "</head><body>"
+        + "".join(f'<div class="page">{p}</div>' for p in pages_html)
+        + "</body></html>"
+    )
+
+    try:
+        pdf_bytes = HTML(string=combined_html).write_pdf()
+    except Exception as exc:
+        return error_response(f"PDF generation failed: {exc}", 500)
+
+    buf = BytesIO(pdf_bytes)
+    buf.seek(0)
+    label = "grade_sheets" if template_id == "grade_sheet" else "marksheets"
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"{label}_{exam_id}.pdf",
     )
 
 

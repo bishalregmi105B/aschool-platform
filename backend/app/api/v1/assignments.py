@@ -54,6 +54,20 @@ def create_assignment():
     )
     db.session.add(a)
     db.session.commit()
+
+    # Notify students/parents about new assignment
+    try:
+        from app.plugins.events import emit_for_school
+        emit_for_school(
+            "assignment.created",
+            school_id=str(g.school_id),
+            assignment_id=str(a.id),
+            title=a.title,
+            class_id=str(a.class_id) if a.class_id else None,
+        )
+    except Exception:
+        pass
+
     return created_response(_assignment_dict(a))
 
 

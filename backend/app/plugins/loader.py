@@ -139,17 +139,113 @@ class PluginLoader:
     def get_all_manifests(cls) -> dict:
         return cls._plugins
 
+    # ── Core slugs always included regardless of installation status ──────────
+    CORE_ALWAYS_SLUGS: list[str] = [
+        "dashboard",
+        "students",
+        "teachers",
+        "users",
+        "academics",
+        "attendance",
+        "notices",
+        "basic_reports",
+    ]
+
+    # ── Bottom-nav slugs always included ─────────────────────────────────────
+    BOTTOM_NAV_ALWAYS_SLUGS: list[str] = [
+        "marketplace_nav",
+        "settings_core",
+    ]
+
+    # ── Fallback section mapping (used when manifest has no explicit section) ─
+    SLUG_SECTION_MAP: dict[str, str | None] = {
+        # null section = no header (Dashboard)
+        "dashboard": None,
+        # Academic Management
+        "academics": "Academic Management",
+        "students": "Academic Management",
+        "teachers": "Academic Management",
+        "users": "Academic Management",
+        "attendance": "Academic Management",
+        "timetable": "Academic Management",
+        "admission": "Academic Management",
+        # Exam & Performance
+        "exams": "Exam & Performance",
+        "assignments": "Exam & Performance",
+        "ai_grading": "Exam & Performance",
+        # Communication & Media
+        "notices": "Communication & Media",
+        "sms_notifications": "Communication & Media",
+        "whatsapp_bot": "Communication & Media",
+        "conferences": "Communication & Media",
+        # Library & Learning
+        "library_management": "Library & Learning",
+        "library": "Library & Learning",
+        "digital_content": "Library & Learning",
+        "elibrary": "Library & Learning",
+        "lms": "Library & Learning",
+        # Personnel Management
+        "hr_payroll": "Personnel Management",
+        # Institutional Finance
+        "fees": "Institutional Finance",
+        # Transportation
+        "gps_tracking": "Transportation",
+        # Operations
+        "hostel": "Operations",
+        "visitor_management": "Operations",
+        "inventory": "Operations",
+        "dismissal": "Operations",
+        "biometric": "Operations",
+        "multi_branch": "Operations",
+        # Reporting & Analytics
+        "basic_reports": "Reporting & Analytics",
+        "advanced_analytics": "Reporting & Analytics",
+        # AI & Analytics
+        "ai_insights": "AI & Analytics",
+        "ai_tools": "AI & Analytics",
+        "ai_adaptive_learning": "AI & Analytics",
+        "ai_tutor": "AI & Analytics",
+        # Student Wellbeing
+        "wellbeing": "Student Wellbeing",
+        "health_records": "Student Wellbeing",
+        # Digital & Design
+        "design_studio": "Digital & Design",
+        "website_builder": "Digital & Design",
+        "basic_website": "Digital & Design",
+        "white_label": "Digital & Design",
+        # Growth
+        "gamification": "Growth",
+        "alumni": "Growth",
+        "benchmarking": "Growth",
+        "social_hub": "Growth",
+        "portfolio": "Growth",
+        "student_portfolio": "Growth",
+        "social_ads": "Growth",
+        # Compliance
+        "compliance": "Compliance",
+        "emergency": "Compliance",
+        "disaster_management": "Compliance",
+        "incident_management": "Compliance",
+        "incidents": "Compliance",
+    }
+
     @classmethod
     def get_frontend_sidebar(cls, installed_slugs: list[str], user_role: str) -> list:
         """Build dynamic sidebar items for a school based on installed plugins.
 
-        Returns ordered list of sidebar items for the given role, with:
+        Always includes CORE_ALWAYS_SLUGS first (regardless of installation),
+        then appends installed plugin slugs (deduped). Returns ordered list with:
         - Routes normalized to /dashboard/ prefix
-        - Section info for grouping in the frontend
+        - Section info for grouping in the frontend (manifest field, else SLUG_SECTION_MAP)
         - Icon name string (maps to Lucide component on frontend)
         """
+        # Merge core + installed, preserving order and deduplicating
+        all_slugs: list[str] = list(
+            dict.fromkeys([*cls.CORE_ALWAYS_SLUGS, *installed_slugs])
+        )
+
         sidebar = []
-        for slug in installed_slugs:
+        for slug in all_slugs:
             manifest = cls._plugins.get(slug)
             if not manifest:
                 continue
@@ -168,7 +264,10 @@ class PluginLoader:
                 continue
 
             section = sb.get("section")
-            # Skip items marked for bottom_nav — frontend handles those separately
+            # Use SLUG_SECTION_MAP as fallback when manifest has no explicit section
+            if section is None:
+                section = cls.SLUG_SECTION_MAP.get(slug)
+            # Skip items marked for bottom_nav — handled by get_bottom_nav_items
             if section == "bottom_nav":
                 continue
 
@@ -208,9 +307,16 @@ class PluginLoader:
 
     @classmethod
     def get_bottom_nav_items(cls, installed_slugs: list[str], user_role: str) -> list:
-        """Return plugin items specifically marked for the sidebar bottom nav."""
+        """Return plugin items specifically marked for the sidebar bottom nav.
+
+        Always includes BOTTOM_NAV_ALWAYS_SLUGS (Settings, Marketplace) and
+        any installed plugin marked section: bottom_nav. Includes subitems.
+        """
+        all_slugs: list[str] = list(
+            dict.fromkeys([*cls.BOTTOM_NAV_ALWAYS_SLUGS, *installed_slugs])
+        )
         items = []
-        for slug in installed_slugs:
+        for slug in all_slugs:
             manifest = cls._plugins.get(slug)
             if not manifest:
                 continue
@@ -221,12 +327,25 @@ class PluginLoader:
             visible_to = sb.get("visible_to", [])
             if visible_to and "all" not in visible_to and user_role not in visible_to:
                 continue
+
+            def _normalize(route: str | None) -> str:
+                if not route:
+                    return "/dashboard"
+                if route.startswith("/dashboard"):
+                    return route
+                return f"/dashboard{route}"
+
+            subitems = [
+                {"label": s.get("label"), "route": _normalize(s.get("route"))}
+                for s in sb.get("subitems", [])
+            ]
             items.append(
                 {
                     "slug": slug,
                     "label": sb.get("label") or manifest.get("name", slug),
                     "icon": sb.get("icon") or manifest.get("icon", "Package"),
-                    "route": fe.get("route", "/dashboard"),
+                    "route": _normalize(fe.get("route", "/dashboard")),
+                    "subitems": subitems,
                 }
             )
         return items

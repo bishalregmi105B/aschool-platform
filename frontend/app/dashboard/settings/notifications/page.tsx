@@ -1,78 +1,143 @@
 "use client";
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Bell, MessageCircle, Phone, Mail, Smartphone } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Bell, MessageCircle, Phone, Smartphone } from "lucide-react";
 
-const channels = [
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, color: "text-green-600" },
-  { id: "sms", label: "SMS", icon: Phone, color: "text-blue-600" },
-  { id: "push", label: "Push Notification", icon: Smartphone, color: "text-violet-600" },
-  { id: "email", label: "Email", icon: Mail, color: "text-orange-600" },
-];
+interface NotificationConfig {
+  push_enabled: boolean;
+  sms_enabled: boolean;
+  whatsapp_enabled: boolean;
+  types: {
+    attendance: boolean;
+    fee_reminder: boolean;
+    fee_payment: boolean;
+    notice: boolean;
+    homework: boolean;
+    exam_result: boolean;
+    gamification: boolean;
+    [key: string]: boolean;
+  };
+}
 
-const notifications = [
-  { event: "Student Absent", description: "Alert parents when student is marked absent", default: ["whatsapp", "push"] },
-  { event: "Fee Due Reminder", description: "Remind parents about upcoming fee deadlines", default: ["whatsapp", "sms"] },
-  { event: "Exam Results Published", description: "Notify when exam results are available", default: ["whatsapp", "push"] },
-  { event: "Notice Published", description: "Notify about new school notices", default: ["push"] },
-  { event: "Emergency Alert", description: "Critical emergency broadcasts to all", default: ["whatsapp", "sms", "push"] },
-  { event: "Bus Arrival", description: "Notify parents about bus arrival/departure", default: ["push"] },
-  { event: "Assignment Due", description: "Remind students about upcoming deadlines", default: ["push"] },
-  { event: "Report Card Ready", description: "Notify when report cards are generated", default: ["whatsapp", "push"] },
-  { event: "Library Book Overdue", description: "Alert about overdue library books", default: ["push"] },
-  { event: "PT Conference", description: "Parent-teacher meeting reminders", default: ["whatsapp", "sms"] },
-];
+const TYPE_LABELS: Record<string, { label: string; description: string }> = {
+  attendance: { label: "Attendance Alerts", description: "Notify parents when student is marked absent" },
+  fee_reminder: { label: "Fee Reminders", description: "Remind parents about overdue fee payments" },
+  fee_payment: { label: "Payment Receipts", description: "Confirm payment to parent when fee is collected" },
+  notice: { label: "Notices & Circulars", description: "Push new school notices to all users" },
+  homework: { label: "Homework / Assignments", description: "Alert students & parents when homework is posted" },
+  exam_result: { label: "Exam Results", description: "Notify when exam results are published" },
+  gamification: { label: "Gamification", description: "Celebrate points, badges, and achievements" },
+};
 
 export default function NotificationSettingsPage() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery<NotificationConfig>({
+    queryKey: ["notification-settings"],
+    queryFn: async () => {
+      const r = await api.get("/schools/current/notification-settings");
+      return r.data?.data;
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: async (patch: Partial<NotificationConfig>) =>
+      api.put("/schools/current/notification-settings", patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
+      toast.success("Notification settings saved.");
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error || "Failed to save settings"),
+  });
+
+  const toggleChannel = (
+    channel: keyof Pick<NotificationConfig, "push_enabled" | "sms_enabled" | "whatsapp_enabled">
+  ) => {
+    if (!data) return;
+    save.mutate({ [channel]: !data[channel] });
+  };
+
+  const toggleType = (type: string) => {
+    if (!data) return;
+    save.mutate({ types: { ...data.types, [type]: !data.types[type] } });
+  };
+
+  if (isLoading) return <PageLoader />;
+  if (!data) return null;
+
+  const channels = [
+    { key: "push_enabled" as const, label: "Push Notifications", icon: Smartphone, color: "text-violet-600" },
+    { key: "sms_enabled" as const, label: "SMS", icon: Phone, color: "text-blue-600" },
+    { key: "whatsapp_enabled" as const, label: "WhatsApp", icon: MessageCircle, color: "text-green-600" },
+  ];
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Bell className="h-6 w-6" />Notification Settings</h1>
-        <p className="text-muted-foreground">Configure which channels are used for each notification type</p>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Bell className="h-6 w-6" /> Notification Settings
+        </h1>
+        <p className="text-muted-foreground">
+          Control which channels and event types are active for your school.
+        </p>
       </div>
 
+      {/* Global channel toggles */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Notification Channels per Event</CardTitle>
+          <CardTitle className="text-base">Notification Channels</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 font-medium">Event</th>
-                  {channels.map((ch) => (
-                    <th key={ch.id} className="text-center py-3 font-medium">
-                      <div className="flex flex-col items-center gap-1">
-                        <ch.icon className={`h-4 w-4 ${ch.color}`} />
-                        <span className="text-xs">{ch.label}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {notifications.map((n) => (
-                  <tr key={n.event} className="border-b hover:bg-muted/50">
-                    <td className="py-3">
-                      <p className="font-medium">{n.event}</p>
-                      <p className="text-xs text-muted-foreground">{n.description}</p>
-                    </td>
-                    {channels.map((ch) => (
-                      <td key={ch.id} className="text-center py-3">
-                        <input type="checkbox" defaultChecked={n.default.includes(ch.id)} className="h-4 w-4 rounded" />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 flex justify-end"><Button>Save Preferences</Button></div>
+        <CardContent className="space-y-4">
+          {channels.map((ch) => (
+            <div key={ch.key} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ch.icon className={`h-5 w-5 ${ch.color}`} />
+                <Label className="text-sm font-medium">{ch.label}</Label>
+              </div>
+              <Switch
+                checked={data[ch.key]}
+                onCheckedChange={() => toggleChannel(ch.key)}
+                disabled={save.isPending}
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
+
+      {/* Per-type toggles */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Notification Types</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {Object.entries(TYPE_LABELS).map(([key, meta]) => (
+            <div key={key} className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">{meta.label}</p>
+                <p className="text-xs text-muted-foreground">{meta.description}</p>
+              </div>
+              <Switch
+                checked={data.types[key] ?? true}
+                onCheckedChange={() => toggleType(key)}
+                disabled={save.isPending}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {save.isPending && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner className="h-4 w-4" /> Saving…
+        </div>
+      )}
     </div>
   );
 }

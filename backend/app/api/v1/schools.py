@@ -131,6 +131,90 @@ def delete_school(school_id):
     return no_content_response()
 
 
+@schools_bp.route("/lookup", methods=["GET"])
+def lookup_schools():
+    """Public school search — used by mobile app login picker. No auth required."""
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return success_response([])
+    results = School.query.filter(
+        School.is_active.is_(True),
+        School.is_deleted.is_(False),
+        db.or_(
+            School.name.ilike(f"%{q}%"),
+            School.slug.ilike(f"%{q}%"),
+        ),
+    ).limit(12).all()
+    return success_response([
+        {
+            "name": s.name,
+            "slug": s.slug,
+            "logo_url": s.logo_url,
+            "address": s.address,
+        }
+        for s in results
+    ])
+
+
+_DEFAULT_NOTIFICATION_CONFIG = {
+    "push_enabled": True,
+    "sms_enabled": True,
+    "whatsapp_enabled": True,
+    "types": {
+        "attendance": True,
+        "fee_reminder": True,
+        "fee_payment": True,
+        "notice": True,
+        "homework": True,
+        "exam_result": True,
+        "gamification": True,
+    },
+}
+
+
+@schools_bp.route("/current/notification-settings", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def get_notification_settings():
+    """Get per-school notification settings."""
+    school = School.query.filter_by(id=g.school_id, is_deleted=False).first()
+    if not school:
+        return error_response("School not found", 404)
+    config = school.notification_config or {}
+    # Merge with defaults so all keys are present
+    merged = {**_DEFAULT_NOTIFICATION_CONFIG, **config}
+    merged["types"] = {**_DEFAULT_NOTIFICATION_CONFIG["types"], **config.get("types", {})}
+    return success_response(merged)
+
+
+@schools_bp.route("/current/notification-settings", methods=["PUT", "PATCH"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def update_notification_settings():
+    """Update per-school notification settings."""
+    school = School.query.filter_by(id=g.school_id, is_deleted=False).first()
+    if not school:
+        return error_response("School not found", 404)
+    data = request.get_json(silent=True) or {}
+    current = school.notification_config or {}
+    # Merge top-level keys
+    for key in ("push_enabled", "sms_enabled", "whatsapp_enabled"):
+        if key in data:
+            current[key] = bool(data[key])
+    # Merge nested types
+    if "types" in data and isinstance(data["types"], dict):
+        current.setdefault("types", {})
+        for t, v in data["types"].items():
+            current["types"][t] = bool(v)
+    school.notification_config = current
+    db.session.commit()
+    merged = {**_DEFAULT_NOTIFICATION_CONFIG, **current}
+    merged["types"] = {**_DEFAULT_NOTIFICATION_CONFIG["types"], **current.get("types", {})}
+    return success_response(merged)
+
+
 def _populate_school(school: School, data: dict):
     """Set allowed fields on school from request data."""
     allowed = {

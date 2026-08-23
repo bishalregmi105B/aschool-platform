@@ -12,26 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Palette, FileText, Search, Plus, ArrowRight,
-  LayoutTemplate, FileImage, ImageIcon, Star,
+  LayoutTemplate, ImageIcon,
 } from "lucide-react";
 
 const CATEGORIES = [
-  { id: "all",          label: "All" },
-  { id: "id_cards",      label: "ID Cards" },
-  { id: "certificates",  label: "Certificates" },
-  { id: "admit_cards",   label: "Admit Cards" },
-  { id: "reports",       label: "Reports" },
-  { id: "letterheads",   label: "Letters" },
-  { id: "notices",       label: "Notices" },
+  { id: "all",       label: "All" },
+  { id: "id_cards",  label: "ID Cards" },
+  { id: "calendars", label: "Calendar" },
+  { id: "reports",   label: "Reports" },
 ];
 
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
-  id_cards:     <ImageIcon className="h-4 w-4" />,
-  certificates: <Star className="h-4 w-4" />,
-  admit_cards:  <FileImage className="h-4 w-4" />,
-  reports:      <LayoutTemplate className="h-4 w-4" />,
-  letterheads:  <FileText className="h-4 w-4" />,
-  notices:      <FileText className="h-4 w-4" />,
+  id_cards:  <ImageIcon className="h-4 w-4" />,
+  calendars: <LayoutTemplate className="h-4 w-4" />,
+  reports:   <FileText className="h-4 w-4" />,
 };
 
 export default function DesignerPage() {

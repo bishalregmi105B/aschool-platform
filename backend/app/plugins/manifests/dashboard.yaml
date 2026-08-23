@@ -1,0 +1,22 @@
+slug: dashboard
+name: "Dashboard"
+name_nepali: "ड्यासबोर्ड"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: "🏠"
+icon: "LayoutDashboard"
+description: "School overview dashboard"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard"
+  sidebar:
+    label: "Dashboard"
+    label_nepali: "ड्यासबोर्ड"
+    icon: "LayoutDashboard"
+    subitems: []
+    visible_to: []

@@ -43,16 +43,51 @@ def send_fee_reminders(school_id: str):
         student = Student.query.get(fee.student_id)
         if not student:
             continue
+        pending_amount = max(float(fee.amount or 0) - _fee_paid_amount(fee), 0)
+        period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part) or "your billing period"
         guardian = Guardian.query.filter_by(student_id=student.id, is_primary=True).first()
         if guardian and guardian.phone:
-            pending_amount = max(float(fee.amount or 0) - _fee_paid_amount(fee), 0)
-            period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part) or "your billing period"
             msg = (
                 f"Fee Reminder: Rs.{pending_amount:.2f} pending for "
                 f"{student.first_name} ({period}). "
                 f"Pay via eSewa/Khalti at aschool.com.np"
             )
             send_sms.delay(guardian.phone, msg, school_id)
+
+        # Push notification to parent/guardian via OneSignal
+        try:
+            from app.models.user import User
+            from app.tasks.push_notifications import send_push_notification
+
+            parent_user = None
+            if guardian and guardian.user_id:
+                parent_user = User.query.filter_by(
+                    id=guardian.user_id, is_deleted=False
+                ).first()
+            if not parent_user and student.user_id:
+                parent_user = User.query.filter_by(
+                    id=student.user_id, is_deleted=False
+                ).first()
+
+            if parent_user:
+                push_title = "Fee Reminder"
+                push_body = (
+                    f"Rs.{pending_amount:,.0f} pending for "
+                    f"{student.first_name} ({period})."
+                )
+                for pid in (parent_user.onesignal_player_ids or []):
+                    send_push_notification.delay(
+                        player_id=pid,
+                        title=push_title,
+                        body=push_body,
+                        data={
+                            "type": "fee_reminder",
+                            "student_id": str(student.id),
+                            "fee_id": str(fee.id),
+                        },
+                    )
+        except Exception as _e:
+            logger.warning("Fee reminder push failed for student %s: %s", student.id, _e)
 
 
 def _fee_paid_amount(collection) -> float:

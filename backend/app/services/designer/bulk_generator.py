@@ -153,38 +153,114 @@ class BulkGeneratorService:
             resolved_template_id = "marksheet"
         template_meta = TemplateEngineService.get_template(resolved_template_id, school_id=school_id) or {}
 
+        from app.models.academic import Subject
+
         exam = Exam.query.get(exam_id)
         if not exam:
             return []
 
-        students = Student.query.filter_by(school_id=school_id, class_id=class_id, status="active").all()
+        # Pre-load all subjects referenced by this exam
+        subject_map: dict = {}
+        if exam.subject_ids:
+            for subj in Subject.query.filter(Subject.id.in_(exam.subject_ids)).all():
+                subject_map[str(subj.id)] = subj
+        else:
+            from app.models.academic import Class as ClassModel
+            klass = ClassModel.query.get(class_id)
+            if klass:
+                for subj in Subject.query.filter(Subject.class_ids.any(klass.id)).all():
+                    subject_map[str(subj.id)] = subj
+
+        students = Student.query.filter_by(school_id=school_id, class_id=class_id, status="active").order_by(Student.roll_number).all()
         marksheets = []
 
         for student in students:
-            marks_list = Marks.query.filter_by(exam_id=exam_id, student_id=student.id).all()
-            if not marks_list:
-                continue
+            marks_list = Marks.query.filter_by(exam_id=exam_id, student_id=student.id, is_deleted=False).all()
+            marks_by_subject = {str(m.subject_id): m for m in marks_list}
 
             subjects_data = []
-            total_obtained = 0
-            total_full = 0
+            total_obtained = 0.0
+            total_full = 0.0
+            total_credit_hours = 0.0
+            weighted_gpa_sum = 0.0
 
-            for m in marks_list:
+            # Use configured subject order; fall back to whatever marks exist
+            subject_ids_ordered = list(subject_map.keys()) or list(marks_by_subject.keys())
+            for sid in subject_ids_ordered:
+                subj = subject_map.get(sid)
+                m = marks_by_subject.get(sid)
+
+                subj_name = subj.name if subj else (m.subject.name if m and m.subject else "Unknown")
+                full = float(m.full_marks or (subj.full_marks if subj else 100) or 100) if m else float(subj.full_marks or 100)
+                th_full = float(subj.full_marks - (subj.practical_full_marks or 0)) if subj and subj.has_practical else full
+                pr_full = float(subj.practical_full_marks or 0) if subj and subj.has_practical else 0.0
+                pass_m = float(m.pass_marks or (subj.pass_marks if subj else 32) or 32) if m else float(subj.pass_marks or 32)
+                credit = float(subj.credit_hours or 0) if subj else 0.0
+
+                if m:
+                    th_obt = float(m.theory_marks or 0)
+                    pr_obt = float(m.practical_marks or 0)
+                    total_obt = float(m.total_marks or m.obtained_marks or (th_obt + pr_obt))
+                    grade = m.grade or cls._neb_grade(total_obt, full)
+                    gpa_val = float(m.gpa or cls._neb_gpa(total_obt, full))
+                    # Compute TH and IN grades separately for IEMIS grade sheet
+                    if subj and subj.has_practical and pr_full and th_full:
+                        th_grade_val = cls._neb_grade(th_obt, th_full)
+                        th_gpa_val   = cls._neb_gpa(th_obt, th_full)
+                        in_grade_val = cls._neb_grade(pr_obt, pr_full)
+                        in_gpa_val   = cls._neb_gpa(pr_obt, pr_full)
+                    else:
+                        # No separate practical marks — IN uses same overall grade
+                        th_grade_val = grade
+                        th_gpa_val   = gpa_val
+                        in_grade_val = grade
+                        in_gpa_val   = gpa_val
+                else:
+                    th_obt = pr_obt = total_obt = 0.0
+                    grade = "—"
+                    gpa_val = 0.0
+                    th_grade_val = in_grade_val = "—"
+                    th_gpa_val = in_gpa_val = 0.0
+
                 subjects_data.append({
-                    "subject": m.subject_name if hasattr(m, "subject_name") else str(m.subject_id),
-                    "full_marks": m.full_marks,
-                    "pass_marks": m.pass_marks,
-                    "obtained": m.obtained_marks,
-                    "grade": cls._calculate_grade(m.obtained_marks, m.full_marks),
+                    "subject": subj_name,
+                    "th_full": th_full,
+                    "th_obtained": th_obt,
+                    "pr_full": pr_full,
+                    "pr_obtained": pr_obt,
+                    "full_marks": full,
+                    "pass_marks": pass_m,
+                    "obtained": total_obt,
+                    "grade": grade,
+                    "gpa": gpa_val,
+                    "th_grade": th_grade_val,
+                    "th_gpa": th_gpa_val,
+                    "in_grade": in_grade_val,
+                    "in_gpa": in_gpa_val,
+                    "credit_hours": credit,
+                    "has_practical": bool(subj.has_practical) if subj else bool(pr_full),
                 })
-                total_obtained += m.obtained_marks or 0
-                total_full += m.full_marks or 0
+                total_obtained += total_obt
+                total_full += full
+                if credit:
+                    total_credit_hours += credit
+                    weighted_gpa_sum += gpa_val * credit
 
-            percentage = round(total_obtained / total_full * 100, 1) if total_full else 0
+            percentage = round(total_obtained / total_full * 100, 1) if total_full else 0.0
+            # Weighted GPA if credit hours configured, otherwise simple average
+            if total_credit_hours > 0:
+                gpa_avg = round(weighted_gpa_sum / total_credit_hours, 2)
+            else:
+                scored = [s["gpa"] for s in subjects_data if s.get("gpa", 0) > 0]
+                gpa_avg = round(sum(scored) / len(scored), 2) if scored else 0.0
+            overall_grade = cls._neb_grade_from_gpa(gpa_avg)
 
             class_name = student.klass.name if getattr(student, "klass", None) else ""
             section_name = student.section.name if getattr(student, "section", None) else ""
             roll_no = str(student.roll_number) if student.roll_number is not None else ""
+            dob = student.dob_bs or (student.dob_ad.isoformat() if student.dob_ad else "")
+            symbol_no = getattr(student, "symbol_number", "") or ""
+            enrollment_number = student.admission_number or student.student_id or ""
 
             data = {
                 "name": f"{student.first_name} {student.last_name}",
@@ -194,10 +270,24 @@ class BulkGeneratorService:
                 "section_name": section_name,
                 "roll_no": roll_no,
                 "roll_number": roll_no,
+                "dob": dob,
+                "dob_ad": student.dob_ad.strftime("%Y-%m-%d") if student.dob_ad else "",
+                "symbol_no": symbol_no,
+                "enrollment_number": enrollment_number,
+                "iemis_code": getattr(school, "regd_number", "") or "",
+                "exam_name": exam.name or "",
+                "exam_year": (
+                    exam.start_date_bs[:4] if exam.start_date_bs
+                    else (str(exam.start_date.year) if exam.start_date else
+                          (str(exam.created_at.year) if exam.created_at else ""))
+                ),
                 "subjects_marks": subjects_data,
                 "total": total_obtained,
+                "total_full": total_full,
                 "percentage": percentage,
-                "grade": cls._percentage_to_gpa(percentage),
+                "grade": overall_grade,
+                "gpa": gpa_avg,
+                "total_credit_hours": total_credit_hours,
                 **school_fields,
             }
 
@@ -215,17 +305,18 @@ class BulkGeneratorService:
                 "canvas_json": canvas_json,
             })
 
-        # Calculate ranks
+        # Calculate ranks after all have been processed
         marksheets.sort(key=lambda x: x["percentage"], reverse=True)
         for i, ms in enumerate(marksheets, 1):
             ms["rank"] = i
 
         return marksheets
 
+    # ── NEB Grading helpers ──────────────────────────────────────────────────
     @staticmethod
-    def _calculate_grade(obtained: float, full: float) -> str:
+    def _neb_grade(obtained: float, full: float) -> str:
         if not full:
-            return "N/A"
+            return "NG"
         pct = obtained / full * 100
         if pct >= 90: return "A+"
         if pct >= 80: return "A"
@@ -233,15 +324,30 @@ class BulkGeneratorService:
         if pct >= 60: return "B"
         if pct >= 50: return "C+"
         if pct >= 40: return "C"
-        if pct >= 30: return "D"
-        return "E"
+        if pct >= 35: return "D"
+        return "NG"
 
     @staticmethod
-    def _percentage_to_gpa(pct: float) -> str:
-        if pct >= 90: return "4.0"
-        if pct >= 80: return "3.6"
-        if pct >= 70: return "3.2"
-        if pct >= 60: return "2.8"
-        if pct >= 50: return "2.4"
-        if pct >= 40: return "2.0"
-        return "1.6"
+    def _neb_gpa(obtained: float, full: float) -> float:
+        if not full:
+            return 0.0
+        pct = obtained / full * 100
+        if pct >= 90: return 4.0
+        if pct >= 80: return 3.6
+        if pct >= 70: return 3.2
+        if pct >= 60: return 2.8
+        if pct >= 50: return 2.4
+        if pct >= 40: return 2.0
+        if pct >= 35: return 1.6
+        return 0.0
+
+    @staticmethod
+    def _neb_grade_from_gpa(gpa: float) -> str:
+        if gpa >= 3.9: return "A+"
+        if gpa >= 3.5: return "A"
+        if gpa >= 3.1: return "B+"
+        if gpa >= 2.7: return "B"
+        if gpa >= 2.3: return "C+"
+        if gpa >= 1.9: return "C"
+        if gpa >= 1.5: return "D"
+        return "NG"

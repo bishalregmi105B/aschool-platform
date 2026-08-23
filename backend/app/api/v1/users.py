@@ -22,7 +22,7 @@ users_bp = Blueprint("users", __name__, url_prefix="/users")
 @users_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@role_required("superadmin", "school_admin")
+@role_required("superadmin", "school_admin", "accountant", "teacher", "staff")
 def list_users():
     """List users for the current school."""
     query = User.query.filter_by(school_id=g.school_id, is_deleted=False)
