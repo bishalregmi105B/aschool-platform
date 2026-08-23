@@ -8,8 +8,8 @@ def send_whatsapp(phone: str, template: str, params: dict = None):
     import requests
     from flask import current_app
 
-    token = current_app.config["WHATSAPP_TOKEN"]
-    phone_id = current_app.config["WHATSAPP_PHONE_ID"]
+    token = current_app.config["WHATSAPP_ACCESS_TOKEN"]
+    phone_id = current_app.config["WHATSAPP_PHONE_NUMBER_ID"]
 
     payload = {
         "messaging_product": "whatsapp",
@@ -38,8 +38,8 @@ def send_whatsapp_text(phone: str, text: str):
     import requests
     from flask import current_app
 
-    token = current_app.config["WHATSAPP_TOKEN"]
-    phone_id = current_app.config["WHATSAPP_PHONE_ID"]
+    token = current_app.config["WHATSAPP_ACCESS_TOKEN"]
+    phone_id = current_app.config["WHATSAPP_PHONE_NUMBER_ID"]
 
     resp = requests.post(
         f"https://graph.facebook.com/v18.0/{phone_id}/messages",

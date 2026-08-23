@@ -15,7 +15,7 @@ def send_daily_absent_alerts():
     """
     from extensions import db
     from app.models.school import School
-    from app.models.attendance import AttendanceRecord
+    from app.models.attendance import Attendance
     from app.models.plugin import SchoolPlugin
     from datetime import date
 
@@ -30,7 +30,7 @@ def send_daily_absent_alerts():
 
     for (school_id,) in active_schools:
         try:
-            absent_records = AttendanceRecord.query.filter_by(
+            absent_records = Attendance.query.filter_by(
                 school_id=school_id,
                 date=today,
                 status="absent",

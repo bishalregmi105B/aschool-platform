@@ -1,5 +1,6 @@
-"""Monthly payroll processing — auto-generates payroll for all staff."""
+"""Monthly payroll processing — auto-generates draft payroll for all staff."""
 from extensions import celery
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -7,18 +8,19 @@ logger = logging.getLogger(__name__)
 
 @celery.task(name="payroll_monthly_process")
 def process_monthly_payroll():
-    """Run on 1st of each month: generate payroll records for all active staff.
+    """Run on 1st of each month: generate draft payroll records for all active staff.
 
     Only processes for schools with the 'hr_payroll' plugin active.
+    Mirrors the API's POST /hr/payroll/generate behavior (draft rows, salary 0
+    until an admin fills in allowances/deductions).
     """
     from extensions import db
     from app.models.plugin import SchoolPlugin
-    from app.models.hr_payroll import Payroll, Staff
-    from datetime import date, datetime
+    from app.models.hr_payroll import StaffPayroll
+    from app.models.user import User
 
     today = date.today()
-    month = today.month
-    year = today.year
+    month = today.strftime("%Y-%m")  # StaffPayroll.month is String(7) YYYY-MM
 
     active_schools = (
         db.session.query(SchoolPlugin.school_id)
@@ -28,39 +30,44 @@ def process_monthly_payroll():
 
     for (school_id,) in active_schools:
         try:
-            # Check if payroll already generated for this month
-            existing = Payroll.query.filter_by(
-                school_id=school_id,
-                month=month,
-                year=year,
-            ).first()
-
-            if existing:
-                logger.info("Payroll already exists for school %s, %s/%s", school_id, month, year)
-                continue
-
-            # Get active staff
-            staff_members = Staff.query.filter_by(
-                school_id=school_id,
-                is_deleted=False,
+            staff_members = User.query.filter(
+                User.school_id == school_id,
+                User.is_deleted.is_(False),
+                User.is_active.is_(True),
+                User.role.in_(("school_admin", "accountant", "teacher", "staff")),
             ).all()
 
-            for staff in staff_members:
-                payroll = Payroll(
+            created = 0
+            for user in staff_members:
+                exists = StaffPayroll.query.filter_by(
                     school_id=school_id,
-                    staff_id=staff.id,
+                    user_id=user.id,
                     month=month,
-                    year=year,
-                    basic_salary=staff.basic_salary or 0,
-                    status="pending",
+                    is_deleted=False,
+                ).first()
+                if exists:
+                    continue
+
+                payroll = StaffPayroll(
+                    school_id=school_id,
+                    user_id=user.id,
+                    month=month,
+                    basic_salary=0,
+                    allowances={},
+                    deductions={},
+                    gross_salary=0,
+                    net_salary=0,
+                    status="draft",
                 )
                 db.session.add(payroll)
+                created += 1
 
             db.session.commit()
             logger.info(
-                "Generated payroll for %d staff in school %s",
-                len(staff_members),
+                "Generated %d draft payroll records for school %s (%s)",
+                created,
                 school_id,
+                month,
             )
         except Exception:
             db.session.rollback()

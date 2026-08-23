@@ -11,9 +11,8 @@ def aggregate_daily_metrics():
     from extensions import db
     from app.models.school import School
     from app.models.student import Student
-    from app.models.attendance import AttendanceRecord
+    from app.models.attendance import Attendance
     from app.models.fee import FeeCollection
-    from app.models.ai_insight import DailyMetric
     from datetime import date
     from sqlalchemy import func
 
@@ -29,10 +28,10 @@ def aggregate_daily_metrics():
             ).count()
 
             # Today's attendance
-            present = AttendanceRecord.query.filter_by(
+            present = Attendance.query.filter_by(
                 school_id=school.id, date=today, status="present"
             ).count()
-            absent = AttendanceRecord.query.filter_by(
+            absent = Attendance.query.filter_by(
                 school_id=school.id, date=today, status="absent"
             ).count()
             total_marked = present + absent
@@ -46,20 +45,9 @@ def aggregate_daily_metrics():
                 .scalar()
             )
 
-            # Upsert daily metric
-            metric = DailyMetric.query.filter_by(
-                school_id=school.id, date=today
-            ).first()
-
-            if not metric:
-                metric = DailyMetric(school_id=school.id, date=today)
-                db.session.add(metric)
-
-            metric.total_students = student_count
-            metric.attendance_rate = round(attendance_rate, 2)
-            metric.fees_collected = fees_collected
-            metric.present_count = present
-            metric.absent_count = absent
+            # No DailyMetric table exists; keep denormalized school totals fresh.
+            # Per-day history lives in the attendance/fee tables themselves.
+            school.total_students = student_count
 
             # Update denormalized school totals
             school.total_students = student_count
