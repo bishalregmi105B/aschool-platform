@@ -2091,6 +2091,36 @@ def _receipt_pdf_html(receipt):
     )
     hash_text = escape(receipt.verified_hash or "")
 
+    # ── IRD (Nepal tax) fields ────────────────────────────────────────
+    # PAN is shown whenever the school has registered one. VAT breakdown is
+    # rendered only when the school opted in via fee_config.vat_percent
+    # (e.g. 13 for VAT-registered institutions), per IRD invoice norms.
+    pan_number = escape(str(school.pan_number)) if school and school.pan_number else ""
+    vat_percent = 0
+    if school and isinstance(school.fee_config, dict):
+        try:
+            vat_percent = float(school.fee_config.get("vat_percent") or 0)
+        except (TypeError, ValueError):
+            vat_percent = 0
+
+    if amount > 0 and vat_percent > 0:
+        base_amount = amount / (1 + vat_percent / 100)
+        vat_amount = amount - base_amount
+        tax_rows = (
+            f"<tr><td>Base Amount (before {vat_percent:g}% VAT)</td>"
+            f"<td>NPR {base_amount:,.2f}</td></tr>"
+            f"<tr><td>VAT ({vat_percent:g}%)</td>"
+            f"<td>NPR {vat_amount:,.2f}</td></tr>"
+            f"<tr><td><strong>Total (incl. VAT)</strong></td>"
+            f"<td>NPR {amount:,.2f}</td></tr>"
+        )
+    else:
+        tax_rows = f"<tr><td>{fee_type}</td><td>NPR {amount:,.2f}</td></tr>"
+
+    pan_html = (
+        f'<div class="muted">PAN: {pan_number}</div>' if pan_number else ""
+    )
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -2123,6 +2153,7 @@ def _receipt_pdf_html(receipt):
       <div>
         <div class="school">{school_name}</div>
         <div class="muted">Digital fee receipt</div>
+        {pan_html}
       </div>
       <div class="number">
         <div class="muted">Receipt No.</div>
@@ -2142,7 +2173,7 @@ def _receipt_pdf_html(receipt):
     <table>
       <thead><tr><th>Description</th><th>Amount</th></tr></thead>
       <tbody>
-        <tr><td>{fee_type}</td><td>NPR {amount:,.2f}</td></tr>
+        {tax_rows}
       </tbody>
     </table>
 

@@ -405,13 +405,18 @@ def create_app(config_name: str | None = None) -> Flask:
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if not app.debug:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            # The Flask app serves JSON APIs, PDFs and uploaded files — no HTML
+            # documents with inline scripts. HTML rendering lives in the Next.js
+            # tier, which sets its own CSP. A deny-everything policy is therefore
+            # both safe here and removes the previous unsafe-inline/unsafe-eval.
             response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https:; "
-                "font-src 'self' https://fonts.gstatic.com; "
-                "connect-src 'self' https: wss:"
+                "default-src 'none'; "
+                "frame-ancestors 'none'; "
+                "img-src 'self' data:; "
+                "style-src 'self'; "
+                "font-src 'self'; "
+                "base-uri 'none'; "
+                "form-action 'none'"
             )
         return response
 

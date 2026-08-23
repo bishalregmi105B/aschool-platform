@@ -10,6 +10,7 @@ from app.models.student import Guardian, Student
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import upload_file as _upload_file
 from app.utils.pagination import paginate
+from app.utils.validators import validate_password_strength
 from app.utils.response import (
     created_response,
     error_response,
@@ -149,6 +150,9 @@ def create_student():
         email=data.get("email") or None,
     )
     if data.get("password"):
+        ok, pw_error = validate_password_strength(data["password"])
+        if not ok:
+            return error_response(pw_error, 400)
         user.set_password(data["password"])
     else:
         user.set_password(generate_default_password(user, student))
@@ -195,6 +199,9 @@ def update_student(student_id):
     if data.get("password") and student.user_id:
         user = User.query.get(student.user_id)
         if user:
+            ok, pw_error = validate_password_strength(data["password"])
+            if not ok:
+                return error_response(pw_error, 400)
             user.set_password(data["password"])
 
     if student.user_id:

@@ -36,3 +36,23 @@ def validate_bs_date(date_str: str) -> bool:
     """Validate BS date format: YYYY-MM-DD."""
     pattern = r"^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[0-2])$"
     return bool(re.match(pattern, date_str))
+
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """ASchool password policy for user-chosen passwords.
+
+    Minimum 8 characters with at least one uppercase letter, one lowercase
+    letter and one digit. (System-generated default passwords are exempt —
+    they are issued by the school and contain the EMIS id.)
+
+    Returns (ok, error_message).
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit"
+    return True, ""

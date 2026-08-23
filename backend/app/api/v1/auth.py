@@ -7,6 +7,7 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from app.services.auth_service import AuthService
 from app.models.user import User
 from app.utils.response import error_response, success_response
+from app.utils.validators import validate_password_strength
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -84,7 +85,7 @@ def send_otp():
     if not phone:
         return error_response("Phone number is required", 400)
 
-    from app.utils.validators import validate_nepal_phone
+    from app.utils.validators import validate_nepal_phone, validate_password_strength
     if not validate_nepal_phone(phone):
         return error_response("Invalid Nepali phone number", 400)
 
@@ -145,7 +146,8 @@ def student_login():
 def refresh_token():
     """Refresh access token using refresh token (Bearer header or HttpOnly cookie)."""
     user_id = get_jwt_identity()
-    result = AuthService.refresh_tokens(user_id)
+    used_refresh_jti = get_jwt().get("jti")
+    result = AuthService.refresh_tokens(user_id, current_refresh_jti=used_refresh_jti)
     if "error" in result:
         return error_response(result["error"], 401)
     return _tokens_response(result)
@@ -197,16 +199,9 @@ def change_password():
     if not current_password or not new_password:
         return error_response("Current and new passwords are required", 400)
 
-    if len(new_password) < 8:
-        return error_response("Password must be at least 8 characters", 400)
-
-    # Password strength validation
-    if not any(c.isupper() for c in new_password):
-        return error_response("Password must contain at least one uppercase letter", 400)
-    if not any(c.islower() for c in new_password):
-        return error_response("Password must contain at least one lowercase letter", 400)
-    if not any(c.isdigit() for c in new_password):
-        return error_response("Password must contain at least one digit", 400)
+    ok, pw_error = validate_password_strength(new_password)
+    if not ok:
+        return error_response(pw_error, 400)
 
     if not user.check_password(current_password):
         return error_response("Current password is incorrect", 401)
@@ -224,7 +219,7 @@ def register_school():
     import re
     from extensions import db
     from app.models.school import School
-    from app.utils.validators import validate_nepal_phone
+    from app.utils.validators import validate_nepal_phone, validate_password_strength
 
     data = request.get_json(silent=True) or {}
 
@@ -287,6 +282,10 @@ def register_school():
         email=email,
         is_active=True,
     )
+    ok, pw_error = validate_password_strength(data["password"])
+    if not ok:
+        return error_response(pw_error, 400)
+
     user.set_password(data["password"])
     db.session.add(user)
     db.session.flush()  # get user.id
