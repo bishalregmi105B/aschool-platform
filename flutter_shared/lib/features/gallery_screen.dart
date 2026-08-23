@@ -1,16 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:aschool_shared/aschool_shared.dart';
 
-class GalleryScreen extends ConsumerStatefulWidget {
-  const GalleryScreen({super.key});
+import '../services/api_client.dart';
+import '../widgets/custom_app_bar.dart';
+import '../widgets/loading_shimmer.dart';
+import '../widgets/no_data_container.dart';
+
+/// Shared photo gallery used by admin, parent and student apps.
+///
+/// Fetches files from `/files`, groups them by year, and supports in-app
+/// preview with presigned URL resolution plus open/download via the browser.
+/// Admin additionally can create albums (`canCreateAlbum`); parent lists all
+/// file types (`imagesOnly: false`).
+class GalleryScreen extends StatefulWidget {
+  final String title;
+  final bool showAppBar;
+  final bool imagesOnly;
+  final bool canCreateAlbum;
+
+  const GalleryScreen({
+    super.key,
+    this.title = 'Gallery',
+    this.showAppBar = false,
+    this.imagesOnly = true,
+    this.canCreateAlbum = false,
+  });
 
   @override
-  ConsumerState<GalleryScreen> createState() => _GalleryScreenState();
+  State<GalleryScreen> createState() => _GalleryScreenState();
 }
 
-class _GalleryScreenState extends ConsumerState<GalleryScreen> {
+class _GalleryScreenState extends State<GalleryScreen> {
   List<Map<String, dynamic>> _files = [];
   bool _loading = true;
   String _selectedYear = 'all';
@@ -26,7 +46,8 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
     try {
       final response = await ApiClient.instance.get(
         '/files/',
-        queryParameters: {'type': 'image'},
+        queryParameters:
+            widget.imagesOnly ? {'type': 'image'} : null,
       );
       final data = (response.data is Map<String, dynamic>)
           ? response.data['data']
@@ -55,7 +76,8 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
     }
 
     try {
-      final response = await ApiClient.instance.get('/files/$fileId/presigned');
+      final response =
+          await ApiClient.instance.get('/files/$fileId/presigned');
       final payload = response.data;
       if (payload is! Map<String, dynamic>) return directUrl;
       final data = payload['data'];
@@ -176,13 +198,59 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
     );
   }
 
+  Future<void> _showCreateAlbumDialog() async {
+    final nameCtrl = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create Album'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(labelText: 'Album name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+              await ApiClient.instance.post('/files/folders', data: {
+                'name': name,
+                'module': 'gallery',
+              });
+              if (!dialogContext.mounted) return;
+              Navigator.pop(dialogContext);
+              await _load();
+              if (!mounted) return;
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                const SnackBar(content: Text('Album created')),
+              );
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final years = _availableYears();
     final files = _filteredFiles();
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Gallery'),
+      appBar: widget.showAppBar ? CustomAppBar(title: widget.title) : null,
+      floatingActionButton: widget.canCreateAlbum
+          ? FloatingActionButton.extended(
+              onPressed: _showCreateAlbumDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Create Album'),
+            )
+          : null,
       body: _loading
           ? const LoadingShimmer()
           : RefreshIndicator(
@@ -204,10 +272,13 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
                     ),
                   ),
                   if (files.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
                       child: NoDataContainer(
                         title: 'No gallery photos',
+                        subtitle: widget.canCreateAlbum
+                            ? 'Upload image files to publish them in gallery views.'
+                            : null,
                         icon: Icons.photo_library_outlined,
                       ),
                     )
@@ -216,8 +287,8 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
                       padding: const EdgeInsets.all(16),
                       sliver: SliverGrid(
                         gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 220,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
                           childAspectRatio: 0.82,
@@ -249,6 +320,7 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
   Widget _photoTile(Map<String, dynamic> file) {
     final url = file['url']?.toString();
     final title = file['original_name']?.toString() ?? 'Gallery photo';
+    final folder = file['folder']?.toString() ?? '';
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -272,31 +344,42 @@ class _GalleryScreenState extends ConsumerState<GalleryScreen> {
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    onPressed: () => _showPreview(file),
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 20),
-                    tooltip: 'Preview',
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => _openInBrowser(file),
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    tooltip: 'Open / Download',
-                  ),
+                  if (folder.isNotEmpty)
+                    Text(
+                      folder,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
                 ],
               ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  onPressed: () => _showPreview(file),
+                  icon:
+                      const Icon(Icons.remove_red_eye_outlined, size: 20),
+                  tooltip: 'Preview',
+                ),
+                IconButton(
+                  onPressed: () => _openInBrowser(file),
+                  icon: const Icon(Icons.download_rounded, size: 20),
+                  tooltip: 'Open / Download',
+                ),
+              ],
             ),
           ],
         ),

@@ -11,7 +11,6 @@ import 'features/teachers/teachers_screen.dart';
 import 'features/academics/class_subjects_screen.dart';
 import 'features/academics/class_sections_screen.dart';
 import 'features/attendance/attendance_overview.dart';
-import 'features/attendance/holiday_list_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/assignments/assignments_screen.dart';
 import 'features/exams/exams_screen.dart';
@@ -28,7 +27,6 @@ import 'features/library/library_screen.dart';
 import 'features/incidents/incident_screen.dart';
 import 'features/notices/notices_screen.dart';
 import 'features/communications/announcements_screen.dart';
-import 'features/communications/gallery_screen.dart';
 import 'features/certificates/certificates_screen.dart';
 import 'features/reports/reports_hub_screen.dart';
 import 'features/wellbeing/wellbeing_screen.dart';
@@ -114,7 +112,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   builder: (_, __) => const TimetableScreen()),
               GoRoute(
                   path: '/holidays',
-                  builder: (_, __) => const HolidayListScreen()),
+                  builder: (_, __) =>
+                      const HolidayListScreen(showLocation: true)),
             ],
           ),
           StatefulShellBranch(
@@ -145,7 +144,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: '/announcements',
                   builder: (_, __) => const AnnouncementsScreen()),
               GoRoute(
-                  path: '/gallery', builder: (_, __) => const GalleryScreen()),
+                  path: '/gallery',
+                  builder: (_, __) => const GalleryScreen(canCreateAlbum: true)),
               GoRoute(
                   path: '/chat',
                   builder: (_, __) => const SharedChatScreen(title: 'Chat')),

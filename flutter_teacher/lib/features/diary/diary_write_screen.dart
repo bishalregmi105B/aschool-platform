@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
-class StudentDiaryScreen extends ConsumerStatefulWidget {
-  const StudentDiaryScreen({super.key});
+class DiaryWriteScreen extends ConsumerStatefulWidget {
+  const DiaryWriteScreen({super.key});
 
   @override
-  ConsumerState<StudentDiaryScreen> createState() => _StudentDiaryScreenState();
+  ConsumerState<DiaryWriteScreen> createState() => _DiaryWriteScreenState();
 }
 
-class _StudentDiaryScreenState extends ConsumerState<StudentDiaryScreen> {
+class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
   List<Map<String, dynamic>> _entries = [];
   bool _loading = true;
 
