@@ -721,3 +721,30 @@ def test_module_13_public_school_page_loads(client, sim_env):
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     assert data.get("school", {}).get("slug") == sim_env["alpha"].slug
+
+
+def test_sec_04b_customizations_custom_css_script_injection_sanitized(client, sim_env):
+    """customizations.custom_css renders into the public <style> block —
+    it must be sanitized on write, same as the top-level custom_css field."""
+    headers = _auth_headers(sim_env["alpha_admin"])
+    # Attack block and legit block are separate — the sanitizer drops any
+    # selector-block containing dangerous content (fail-closed per block).
+    payload = {
+        "customizations": {
+            "colors": {"primary": "#123456"},
+            "custom_css": "</style><script>alert('xss')</script> } body { color: red; }",
+        }
+    }
+    update = client.put("/api/v1/website/config", json=payload, headers=headers)
+    assert update.status_code == 200
+
+    cfg = client.get("/api/v1/website/config", headers=headers)
+    assert cfg.status_code == 200
+    customizations = cfg.get_json()["data"].get("customizations") or {}
+    css = (customizations.get("custom_css") or "").lower()
+    assert "<script" not in css
+    assert "</style>" not in css
+    # Legit declarations survive
+    assert "color: red" in css or "color:red" in css.replace(" ", "")
+    # Other customizations keys are preserved
+    assert customizations.get("colors", {}).get("primary") == "#123456"
