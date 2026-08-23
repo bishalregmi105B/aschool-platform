@@ -30,8 +30,9 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
     try {
       final res = await ApiClient.instance.get('/student/library');
       setState(() {
-        _catalog = (res.data?['catalog'] as List?) ?? [];
-        _issued = (res.data?['issued'] as List?) ?? [];
+        final payload = res.data?['data'] as Map?;
+        _catalog = (payload?['catalog'] as List?) ?? [];
+        _issued = (payload?['issued'] as List?) ?? [];
       });
     } catch (_) {}
     setState(() => _loading = false);

@@ -31,9 +31,10 @@ class _ELibraryScreenState extends ConsumerState<ELibraryScreen>
     try {
       final res = await ApiClient.instance.get('/student/elibrary');
       setState(() {
-        _ebooks = (res.data?['ebooks'] as List?) ?? [];
-        _pastPapers = (res.data?['past_papers'] as List?) ?? [];
-        _resources = (res.data?['resources'] as List?) ?? [];
+        final payload = res.data?['data'] as Map?;
+        _ebooks = (payload?['ebooks'] as List?) ?? [];
+        _pastPapers = (payload?['past_papers'] as List?) ?? [];
+        _resources = (payload?['resources'] as List?) ?? [];
       });
     } catch (_) {}
     setState(() => _loading = false);

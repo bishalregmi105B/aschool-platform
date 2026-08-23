@@ -28,7 +28,7 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
     setState(() => _loading = true);
     try {
       final res = await ApiClient.instance.get('/student/fees');
-      final payload = res.data;
+      final payload = res.data?['data'] as Map?;
       setState(() {
         _overview = (payload?['overview'] as Map?)?.cast<String, dynamic>();
         _invoices = (payload?['invoices'] as List?) ?? [];
