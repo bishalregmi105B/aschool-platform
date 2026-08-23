@@ -52,8 +52,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - BASE_DOMAIN=${BASE_DOMAIN}
-      - CELERY_BROKER_URL=${REDIS_URL}
-      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       - SECRET_KEY=${SECRET_KEY}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -134,8 +134,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - BASE_DOMAIN=${BASE_DOMAIN}
-      - CELERY_BROKER_URL=${REDIS_URL}
-      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - SPARROW_SMS_TOKEN=${SPARROW_SMS_TOKEN}
@@ -149,6 +149,12 @@ services:
       redis:
         condition: service_healthy
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
     deploy:
       replicas: 2
       resources:
@@ -165,8 +171,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - BASE_DOMAIN=${BASE_DOMAIN}
-      - CELERY_BROKER_URL=${REDIS_URL}
-      - CELERY_RESULT_BACKEND=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       - SENTRY_DSN=${SENTRY_DSN}
     env_file:
       - .env
@@ -174,6 +180,12 @@ services:
       redis:
         condition: service_healthy
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
 
   flower:
     image: mher/flower:2.0

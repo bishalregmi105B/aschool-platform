@@ -19,7 +19,7 @@ def backup_status():
 
     # Try to get last backup info from Celery result backend or env
     last_backup = os.environ.get("LAST_DB_BACKUP_AT", None)
-    backup_dest = os.environ.get("DB_BACKUP_DEST", "r2" if os.environ.get("R2_BUCKET") else "local")
+    backup_dest = os.environ.get("DB_BACKUP_DEST", "r2" if os.environ.get("R2_BUCKET_NAME") else "local")
 
     return success_response({
         "last_backup_at": last_backup,

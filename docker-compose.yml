@@ -35,7 +35,7 @@ services:
       - "5001:5000"
     environment:
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql://aschool:aschool@postgres:5432/aschool
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aschool}:${POSTGRES_PASSWORD:-aschool}@postgres:5432/aschool
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
@@ -54,7 +54,7 @@ services:
       - ./backend:/app
       - uploads_data:/app/uploads
     environment:
-      - DATABASE_URL=postgresql://aschool:aschool@postgres:5432/aschool
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aschool}:${POSTGRES_PASSWORD:-aschool}@postgres:5432/aschool
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
@@ -73,7 +73,7 @@ services:
       - ./backend:/app
       - uploads_data:/app/uploads
     environment:
-      - DATABASE_URL=postgresql://aschool:aschool@postgres:5432/aschool
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aschool}:${POSTGRES_PASSWORD:-aschool}@postgres:5432/aschool
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
