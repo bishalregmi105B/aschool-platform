@@ -1,6 +1,7 @@
 """Bulk Document Generator — Mass generate ID cards, certificates, report cards."""
 
 from extensions import db
+from app.utils.nepali_date import today_bs
 
 
 def _absolute_url(path: str) -> str:
@@ -168,6 +169,193 @@ class BulkGeneratorService:
             })
 
         return cards
+
+    @classmethod
+    def _active_students(cls, school_id: str, class_id: str | None):
+        from app.models.student import Student
+
+        query = (
+            Student.query.options(
+                db.selectinload(Student.klass),
+                db.selectinload(Student.section),
+                db.selectinload(Student.user),
+                db.selectinload(Student.guardians),
+            )
+            .filter_by(school_id=school_id, status="active")
+        )
+        if class_id:
+            query = query.filter_by(class_id=class_id)
+        return query.all()
+
+    @classmethod
+    def _render_for_student(
+        cls,
+        school_id,
+        student,
+        template_meta,
+        resolved_template_id,
+        school_config,
+        data_extra,
+    ):
+        class_name = student.klass.name if getattr(student, "klass", None) else ""
+        section_name = student.section.name if getattr(student, "section", None) else ""
+        roll_no = str(student.roll_number) if student.roll_number is not None else ""
+        enrollment_number = student.admission_number or student.student_id or ""
+
+        data = {
+            "student_name": f"{student.first_name} {student.last_name}",
+            "name": f"{student.first_name} {student.last_name}",
+            "class": class_name,
+            "class_name": class_name,
+            "section": section_name,
+            "section_name": section_name,
+            "roll_no": roll_no,
+            "roll_number": roll_no,
+            "enrollment_number": enrollment_number,
+            "symbol_no": enrollment_number,
+            "dob": student.dob_bs
+            or (student.dob_ad.isoformat() if getattr(student, "dob_ad", None) else ""),
+            "photo": _absolute_url(student.photo_url or ""),
+            "photo_url": _absolute_url(student.photo_url or ""),
+            **data_extra,
+        }
+
+        html = TemplateEngineService.render_html(
+            resolved_template_id,
+            data,
+            school_config,
+            school_id=school_id,
+            template_meta=template_meta or None,
+        )
+        canvas_json = TemplateEngineService.render_document(
+            resolved_template_id,
+            data,
+            school_config,
+            school_id=school_id,
+            template_meta=template_meta or None,
+        )
+        return {
+            "student_id": str(student.id),
+            "student_name": data["name"],
+            "student_roll": roll_no,
+            "template_id": resolved_template_id,
+            "template_width": template_meta.get("width") if template_meta else None,
+            "template_height": template_meta.get("height") if template_meta else None,
+            "html": html,
+            "canvas_json": canvas_json,
+        }
+
+    @classmethod
+    def generate_bulk_admit_cards(
+        cls,
+        school_id: str,
+        class_id: str | None = None,
+        exam_id: str | None = None,
+        template_id: str | None = None,
+    ) -> list[dict]:
+        """Generate admit cards for all students (optionally one class) for an exam."""
+        from app.models.exam import Exam
+        from app.models.school import School
+        from app.services.designer.template_engine import TemplateEngineService
+
+        school = School.query.get(school_id)
+        school_config = {
+            "name": school.name if school else "",
+            "address": school.address if school else "",
+            "phone": school.phone if school else "",
+            "email": school.email if school else "",
+            "website": school.website_external if school else "",
+            "logo_url": school.logo_url if school else "",
+        }
+        school_fields = cls._school_fields(school)
+
+        exam = Exam.query.filter(
+            Exam.id == exam_id, Exam.school_id == school_id
+        ).first() if exam_id else None
+
+        resolved_template_id = TemplateEngineService.resolve_template_id(
+            template_id or "admit_card_standard"
+        )
+        template_meta = (
+            TemplateEngineService.get_template(resolved_template_id, school_id=school_id)
+            or {}
+        )
+
+        students = cls._active_students(school_id, class_id)
+
+        exam_data = {
+            "exam_name": exam.name if exam else "",
+            "exam_type": (getattr(exam, "exam_type", "") or "") if exam else "",
+            "exam_year": (
+                exam.academic_year.name if getattr(exam, "academic_year", None) else ""
+            ),
+            "exam_instructions": (exam.instructions or "") if exam else "",
+            **school_fields,
+        }
+
+        return [
+            cls._render_for_student(
+                school_id, student, template_meta, resolved_template_id,
+                school_config, exam_data,
+            )
+            for student in students
+        ]
+
+    @classmethod
+    def generate_bulk_certificates(
+        cls,
+        school_id: str,
+        class_id: str | None = None,
+        certificate_type: str = "character",
+        template_id: str | None = None,
+    ) -> list[dict]:
+        """Generate certificates (character/transfer/merit/participation)."""
+        from datetime import date
+
+        from app.models.school import School
+        from app.services.designer.template_engine import TemplateEngineService
+
+        school = School.query.get(school_id)
+        school_config = {
+            "name": school.name if school else "",
+            "address": school.address if school else "",
+            "phone": school.phone if school else "",
+            "email": school.email if school else "",
+            "website": school.website_external if school else "",
+            "logo_url": school.logo_url if school else "",
+        }
+        school_fields = cls._school_fields(school)
+
+        default_templates = {
+            "character": "character_certificate",
+            "transfer": "transfer_certificate",
+            "merit": "character_certificate",
+            "participation": "character_certificate",
+        }
+        resolved_template_id = TemplateEngineService.resolve_template_id(
+            template_id or default_templates.get(certificate_type, "character_certificate")
+        )
+        template_meta = (
+            TemplateEngineService.get_template(resolved_template_id, school_id=school_id)
+            or {}
+        )
+
+        students = cls._active_students(school_id, class_id)
+
+        cert_common = {
+            "certificate_type": certificate_type,
+            "issue_date": today_bs(),
+            "issue_date_ad": date.today().isoformat(),
+            **school_fields,
+        }
+
+        return [
+            cls._render_for_student(
+                school_id, student, template_meta, resolved_template_id,
+                school_config, cert_common,
+            )
+            for student in students
+        ]
 
     @classmethod
     def generate_bulk_marksheets(

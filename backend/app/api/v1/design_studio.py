@@ -495,6 +495,48 @@ def bulk_marksheets():
     return success_response({"count": len(marksheets), "marksheets": marksheets})
 
 
+@design_studio_bp.route("/bulk/admit-cards", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin")
+def bulk_admit_cards():
+    """Generate admit cards for all students (optionally one class) for an exam."""
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    data = request.get_json(silent=True) or {}
+    if not data.get("exam_id"):
+        return error_response("exam_id is required", 400)
+
+    cards = BulkGeneratorService.generate_bulk_admit_cards(
+        school_id=g.school_id,
+        class_id=data.get("class_id"),
+        exam_id=data.get("exam_id"),
+        template_id=data.get("template_id"),
+    )
+    return success_response({"count": len(cards), "cards": cards})
+
+
+@design_studio_bp.route("/bulk/certificates", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin")
+def bulk_certificates():
+    """Generate certificates (character/transfer/merit/participation) for a class."""
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    data = request.get_json(silent=True) or {}
+
+    certs = BulkGeneratorService.generate_bulk_certificates(
+        school_id=g.school_id,
+        class_id=data.get("class_id"),
+        certificate_type=data.get("certificate_type", "character"),
+        template_id=data.get("template_id"),
+    )
+    return success_response({"count": len(certs), "certificates": certs})
+
+
 # ── AI Features ───────────────────────────────────────────
 
 
