@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 import '../../providers/parent_providers.dart';
@@ -79,13 +80,32 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
         'fee_ids': feeIds,
         'gateway': gateway,
       });
-      final paymentUrl = resp.data['data']?['payment_url'];
-      if (paymentUrl != null) {
+      final data = resp.data['data'] ?? {};
+      final checkoutHtml = data['checkout_html'] as String?;
+      final paymentUrl = data['payment_url'] as String?;
+
+      if (checkoutHtml != null && mounted) {
+        // eSewa requires a browser POST — load the auto-submitting form
+        // document in a WebView instead of launchUrl().
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => _GatewayWebViewScreen(
+              title: gateway.toUpperCase(),
+              html: checkoutHtml,
+            ),
+          ),
+        );
+      } else if (paymentUrl != null) {
         final uri = Uri.parse(paymentUrl);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          throw Exception('No browser available for $paymentUrl');
         }
+      } else {
+        throw Exception('No payment URL returned');
       }
+
       ref.invalidate(parentFeesProvider(selectedChildId));
       setState(() => _selected.clear());
     } catch (_) {
@@ -276,6 +296,25 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
           : Text(label,
               style:
                   const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+    );
+  }
+}
+
+/// Loads a gateway's auto-submitting checkout form (eSewa) in-app.
+class _GatewayWebViewScreen extends StatelessWidget {
+  const _GatewayWebViewScreen({required this.title, required this.html});
+
+  final String title;
+  final String html;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadHtmlString(html, baseUrl: null);
+    return Scaffold(
+      appBar: AppBar(title: Text('Pay with $title')),
+      body: WebViewWidget(controller: controller),
     );
   }
 }
