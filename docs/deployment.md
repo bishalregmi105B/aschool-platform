@@ -118,3 +118,50 @@ See [.env.example](../.env.example) for the complete list. Critical production v
 | `SPARROW_SMS_TOKEN` | Sparrow SMS gateway token |
 | `R2_*` | Cloudflare R2 file storage |
 | `FIREBASE_DATABASE_URL` | GPS tracking Firebase RTDB |
+
+## TLS posture (current architecture, as of 2026-08)
+
+TLS terminates at **Cloudflare**; the origin chain is plain HTTP:
+
+```
+Browser ──HTTPS──> Cloudflare ──HTTP:80──> host nginx (host_nginx_aschool.conf)
+                                            └── HTTP:8080 ──> docker nginx
+                                                  ├── /api/* → flask:5000
+                                                  └── /*     → nextjs:3000
+```
+
+This is an accepted trade-off for now (Cloudflare→origin over public internet
+is still plaintext and CAN be observed). To harden:
+
+1. Issue a Cloudflare **Origin CA certificate**, mount it at `./nginx/ssl/`
+   (the compose volume slot is ready), switch `nginx/nginx.conf` to
+   `listen 443 ssl`, and set the SSL/TLS mode in Cloudflare to *Full (strict)*.
+2. Re-enable the HTTP→HTTPS redirect server block.
+
+Until then, ensure Cloudflare's "Always Use HTTPS" is on so no user traffic
+traverses HTTP.
+
+## Backups & restore
+
+- Automated: Celery beat `db-backup-daily` runs daily 03:00
+  (`backend/app/tasks/db_backup.py`); destination via `DB_BACKUP_DEST`
+  (`r2` when R2 credentials are configured, otherwise local). Status/API:
+  `/api/v1/db-backup/*` (`backend/app/api/v1/db_backup_api.py`).
+- **Restore drill (run quarterly):**
+  ```bash
+  # 1. Fetch latest backup artifact (R2 or local dir from DB_BACKUP_DEST)
+  # 2. Restore into a scratch database first — never straight onto prod:
+  createdb aschool_restore_test
+  pg_restore -d aschool_restore_test --no-owner <backup.dump>
+  # 3. Sanity queries (counts of users/students/schools), then promote:
+  #    stop api → swap DATABASE_URL → start api
+  ```
+- Retention policy is not yet automated — track it as an operator task.
+
+## Student-data privacy / parent consent
+
+There is **no parent-consent capture flow in the product yet**. Local-market
+competitors advertise data-protection commitments; before commercial launch,
+add: guardian consent flag at admission (`Guardian.consent_given_at`),
+a consent record for photo/publicity use, and a privacy-policy page rendered
+on school sites. Tracked as an open item in `FIX_TRACKER.md`.
