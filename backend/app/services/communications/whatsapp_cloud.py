@@ -8,6 +8,10 @@ import requests
 from flask import current_app
 
 
+class NotConfiguredError(RuntimeError):
+    """Raised internally when WhatsApp Cloud credentials are absent."""
+
+
 class WhatsAppCloudService:
     """Meta WhatsApp Cloud API v17+ integration."""
 
@@ -15,7 +19,24 @@ class WhatsAppCloudService:
     BASE_URL = "https://graph.facebook.com"
 
     @classmethod
+    def is_configured(cls) -> bool:
+        """True when WhatsApp Cloud credentials are present.
+
+        Config keys live in env: WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID
+        (see .env.example). When unset, send_* calls return a clean
+        {"skipped": ...} result instead of raising KeyError.
+        """
+        return bool(
+            current_app.config.get("WHATSAPP_ACCESS_TOKEN")
+            and current_app.config.get("WHATSAPP_PHONE_NUMBER_ID")
+        )
+
+    @classmethod
     def _headers(cls) -> dict:
+        if not cls.is_configured():
+            from app.utils.response import error_response  # noqa: F401 — kept for API symmetry
+
+            raise NotConfiguredError("WhatsApp Cloud credentials are not configured")
         return {
             "Authorization": f"Bearer {current_app.config['WHATSAPP_ACCESS_TOKEN']}",
             "Content-Type": "application/json",
@@ -34,6 +55,8 @@ class WhatsAppCloudService:
         components: list[dict] | None = None,
     ) -> dict:
         """Send a pre-approved WhatsApp template message."""
+        if not cls.is_configured():
+            return {"skipped": True, "reason": "whatsapp_not_configured"}
         url = f"{cls.BASE_URL}/{cls.API_VERSION}/{cls._phone_number_id()}/messages"
 
         payload = {
@@ -55,6 +78,8 @@ class WhatsAppCloudService:
     @classmethod
     def send_text(cls, to_number: str, message: str) -> dict:
         """Send a free-form text message (within 24h window)."""
+        if not cls.is_configured():
+            return {"skipped": True, "reason": "whatsapp_not_configured"}
         url = f"{cls.BASE_URL}/{cls.API_VERSION}/{cls._phone_number_id()}/messages"
 
         payload = {

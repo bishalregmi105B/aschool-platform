@@ -406,7 +406,8 @@ def _populate_student(student: Student, data: dict):
         "first_name", "first_name_nepali", "last_name", "last_name_nepali",
         "student_id", "roll_number", "class_id", "section_id",
         "academic_year_id", "gender", "dob_bs", "dob_ad", "blood_group",
-        "religion", "ethnicity", "nationality", "photo_url", "address",
+        "religion", "ethnicity", "caste", "mother_tongue",
+        "disability", "disability_type", "nationality", "photo_url", "address",
         "previous_school", "status", "admission_date_bs",
     }
     for key in allowed:

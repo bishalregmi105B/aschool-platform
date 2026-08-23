@@ -115,6 +115,10 @@ class BaseConfig:
     LOCAL_UPLOAD_DIR = os.getenv("LOCAL_UPLOAD_DIR", "/app/uploads")
 
     # Firebase
+    # WhatsApp Cloud API (optional — service degrades to {"skipped": ...} when unset)
+    WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+    WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+
     FIREBASE_DATABASE_URL = os.getenv("FIREBASE_DATABASE_URL", "")
     FIREBASE_SECRET = os.getenv("FIREBASE_SECRET", "")
     FIREBASE_SERVER_KEY = os.getenv("FIREBASE_SERVER_KEY", FIREBASE_SECRET)
@@ -171,6 +175,19 @@ class ProductionConfig(BaseConfig):
         if not cls.SQLALCHEMY_DATABASE_URI:
             raise RuntimeError(
                 "FATAL: DATABASE_URL is not set for production."
+            )
+        # OTP logins are the primary auth path for parents/students — a
+        # missing SMS provider would silently break all of them.
+        sparrow_token = os.getenv("SPARROW_SMS_TOKEN", "")
+        if (
+            not sparrow_token
+            or sparrow_token in insecure_defaults
+            or str(os.getenv("SMS_CONSOLE_MODE", "")).lower() in ("1", "true", "yes")
+        ):
+            raise RuntimeError(
+                "FATAL: SMS delivery is not configured for production "
+                "(empty SPARROW_SMS_TOKEN or SMS_CONSOLE_MODE enabled). "
+                "OTPs would never reach users' phones."
             )
 
 
