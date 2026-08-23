@@ -58,21 +58,40 @@ class EsewaGateway:
         sign_message = f"total_amount={total},transaction_uuid={transaction_uuid},product_code={product_code}"
         signature = cls._generate_signature(sign_message, secret_key)
 
+        form_data = {
+            "amount": str(amount),
+            "tax_amount": str(tax_amount),
+            "total_amount": str(total),
+            "transaction_uuid": transaction_uuid,
+            "product_code": product_code,
+            "product_service_charge": str(service_charge),
+            "product_delivery_charge": str(delivery_charge),
+            "success_url": success_url,
+            "failure_url": failure_url,
+            "signed_field_names": "total_amount,transaction_uuid,product_code",
+            "signature": signature,
+        }
+
+        # eSewa ePay v2 requires a browser POST of these fields to the form
+        # endpoint. Mobile clients cannot launchUrl() a POST, so also return a
+        # self-submitting HTML document they can load in a WebView.
+        hidden_inputs = "\n".join(
+            f'<input type="hidden" name="{k}" value="{v}"/>'
+            for k, v in form_data.items()
+        )
+        autoform_html = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            "<title>Redirecting to eSewa…</title></head><body>"
+            f"<form id='f' method='POST' action='{cls._base_url()}/api/epay/main/v2/form'>"
+            f"{hidden_inputs}</form>"
+            "<script>document.getElementById('f').submit();</script>"
+            "</body></html>"
+        )
+
         return {
             "payment_url": f"{cls._base_url()}/api/epay/main/v2/form",
-            "form_data": {
-                "amount": str(amount),
-                "tax_amount": str(tax_amount),
-                "total_amount": str(total),
-                "transaction_uuid": transaction_uuid,
-                "product_code": product_code,
-                "product_service_charge": str(service_charge),
-                "product_delivery_charge": str(delivery_charge),
-                "success_url": success_url,
-                "failure_url": failure_url,
-                "signed_field_names": "total_amount,transaction_uuid,product_code",
-                "signature": signature,
-            },
+            "form_data": form_data,
+            "checkout_html": autoform_html,
         }
 
     @classmethod
