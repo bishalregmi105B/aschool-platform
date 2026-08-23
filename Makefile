@@ -28,7 +28,7 @@ downgrade:
 	cd backend && flask db downgrade
 
 seed:
-	cd backend && flask seed-plugins
+	cd backend && python seed.py
 
 # ── Celery ───────────────────────────────────────────────
 worker:
