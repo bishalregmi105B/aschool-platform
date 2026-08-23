@@ -13,16 +13,12 @@ const MAIN_HOSTS = new Set([
   "aschool.com.np",
   "www.aschool.com.np",
   "app.aschool.com.np",
-  "brighternepal.com",
-  "www.brighternepal.com",
-  "app.brighternepal.com",
-  "api.brighternepal.com",
   "localhost:3000",
   "localhost:3001",
   "localhost",
 ]);
 
-const SCHOOL_BASE_DOMAINS = ["aschool.com.np", "brighternepal.com"];
+const SCHOOL_BASE_DOMAINS = ["aschool.com.np"];
 
 function normalizeHost(host: string) {
   return host.split(":")[0].toLowerCase();
