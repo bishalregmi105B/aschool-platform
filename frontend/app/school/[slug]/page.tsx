@@ -1,5 +1,6 @@
 /** Public School Homepage — SSR with ISR (revalidate every 5 minutes) */
 import { SectionRenderer } from "@/components/website/SectionRenderer";
+import { sanitizeHtml } from "@/lib/sanitize";
 import type { LiveData } from "@/components/website/SectionRenderer";
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
@@ -197,7 +198,7 @@ export default async function SchoolHomePage({ params }: { params: { slug: strin
           {school.about_us ? (
             <div
               className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: school.about_us as string }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(school.about_us as string) }}
             />
           ) : (
             <p className="text-gray-600 leading-relaxed">

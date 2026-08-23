@@ -48,3 +48,4 @@ from app.models.hr import StaffPayroll as HRPayrollAlias  # noqa: F401
 from app.models.analytics import WeeklyInsightReport as AnalyticsInsightReport  # noqa: F401
 from app.models.designer import DesignerDocument as DesignerDocumentAlias  # noqa: F401
 from app.models.ad_campaign import AdCampaign as AdCampaignAlias  # noqa: F401
+from app.models.revoked_token import RevokedToken  # noqa: F401,E402 — must be in metadata for create_all/Alembic autogenerate

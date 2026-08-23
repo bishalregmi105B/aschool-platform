@@ -192,6 +192,13 @@ def get_auth_headers(client, email, password):
 
 def _reset_database():
     _db.session.remove()
+    # Clear the shared Redis cache (OTP rate-limits, plugin lists, MFA state)
+    # so tests are isolated from each other's side effects.
+    try:
+        from extensions import cache as _cache
+        _cache.clear()
+    except Exception:
+        pass
     _db.session.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
     _db.session.execute(text("CREATE SCHEMA public"))
     _db.session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))

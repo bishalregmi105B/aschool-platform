@@ -67,6 +67,9 @@ def create_app(config_name: str | None = None) -> Flask:
             from app.models.revoked_token import RevokedToken
             return RevokedToken.is_revoked(jti)
         except Exception:
+            # Never block a token on lookup failure, but clear the aborted
+            # transaction so later statements on this connection still work.
+            db.session.rollback()
             return False
 
     # Build allowed CORS origins from environment so the Authorization header
@@ -242,6 +245,7 @@ def create_app(config_name: str | None = None) -> Flask:
                         is_deleted=False,
                     ).first()
                 except Exception:
+                    db.session.rollback()
                     g.current_user = None
             school_id = claims.get("school_id")
             if school_id:
@@ -249,7 +253,9 @@ def create_app(config_name: str | None = None) -> Flask:
                 if school:
                     _set_school_context(school)
         except Exception:
-            pass
+            # Resolution is best-effort; roll back so the request's handlers
+            # start from a clean transaction instead of an aborted one.
+            db.session.rollback()
 
     def _set_school_context(school):
         g.school = school
@@ -284,6 +290,42 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Register cross-plugin event listeners
     from app.plugins import listeners  # noqa: F401 — registers @on() handlers
+
+    # ── CSRF guard for cookie-authenticated requests ────────────────────
+    # Bearer-token clients (mobile apps, tests) are unaffected. Browser
+    # sessions rely on HttpOnly cookies, so state-changing requests without
+    # an Authorization header must present a same-site Origin/Referer.
+    @app.before_request
+    def csrf_protect_cookie_auth():
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return None
+        if request.headers.get("Authorization"):
+            return None
+        if not (request.cookies.get("access_token") or request.cookies.get("refresh_token")):
+            return None
+        # Token rotation is not a state-changing action and SameSite=Lax already
+        # stops cross-site requests from carrying cookies; exempt it so the
+        # silent auto-refresh interceptor works even if Origin is absent.
+        if request.path.rstrip("/").endswith("/auth/refresh"):
+            return None
+
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if not origin:
+            return jsonify(success=False, data=None, error="CSRF check failed: missing Origin"), 403
+
+        from urllib.parse import urlparse
+
+        origin_host = urlparse(origin).netloc.lower()
+        request_host = request.host.lower()
+        base = (app.config.get("BASE_DOMAIN") or "").lower()
+        allowed = (
+            origin_host == request_host
+            or (base and origin_host == base)
+            or (base and origin_host.endswith("." + base))
+        )
+        if not allowed:
+            return jsonify(success=False, data=None, error="CSRF check failed: cross-origin request"), 403
+        return None
 
     # Error handlers
     @app.errorhandler(400)

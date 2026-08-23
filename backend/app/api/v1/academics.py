@@ -600,7 +600,9 @@ def list_class_subjects(class_id):
 @role_required("superadmin", "school_admin")
 def assign_subject_to_class(class_id):
     klass = Class.query.get(class_id)
-    if not klass or klass.is_deleted or str(klass.school_id) != str(g.school_id):
+    if klass and not klass.is_deleted and str(klass.school_id) != str(g.school_id):
+        return error_response("Class belongs to another school", 403)
+    if not klass or klass.is_deleted:
         return error_response("Class not found", 404)
 
     data = request.get_json(silent=True) or {}
@@ -609,7 +611,9 @@ def assign_subject_to_class(class_id):
         return error_response("subject_id is required", 400)
 
     subject = Subject.query.get(subject_id)
-    if not subject or subject.is_deleted or str(subject.school_id) != str(g.school_id):
+    if subject and not subject.is_deleted and str(subject.school_id) != str(g.school_id):
+        return error_response("Subject belongs to another school", 403)
+    if not subject or subject.is_deleted:
         return error_response("Subject not found", 404)
 
     class_ids = list(subject.class_ids or [])

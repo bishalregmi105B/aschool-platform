@@ -1,5 +1,4 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 
 const PLUGIN_MARKETPLACE_ALIASES: Record<string, string> = {
   communications: "sms_notifications",
@@ -17,18 +16,27 @@ export const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
+  // Session tokens live in HttpOnly cookies set by the backend (/auth/*).
+  // Same registrable domain (app.* -> api.*) so cookies ride along on XHR.
+  withCredentials: true,
 });
 
-// Request interceptor: attach JWT
-api.interceptors.request.use((config) => {
-  const token = Cookies.get("access_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Response interceptor: handle 401 + cookie-based token refresh
+let refreshInFlight: Promise<unknown> | null = null;
+
+async function refreshSession(): Promise<boolean> {
+  try {
+    const res = await axios.post(
+      `${API_BASE_URL}/api/v1/auth/refresh`,
+      null,
+      { withCredentials: true }
+    );
+    return res.data?.success === true;
+  } catch {
+    return false;
   }
-  return config;
-});
+}
 
-// Response interceptor: handle 401 + token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -36,29 +44,21 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = Cookies.get("refresh_token");
 
-      if (refreshToken) {
-        try {
-          const res = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, null, {
-            headers: { Authorization: `Bearer ${refreshToken}` },
-          });
+      if (!refreshInFlight) {
+        refreshInFlight = refreshSession().finally(() => {
+          refreshInFlight = null;
+        });
+      }
 
-          if (res.data.success) {
-            const { access_token, refresh_token } = res.data.data;
-            Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-            Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
-            return api(originalRequest);
-          }
-        } catch {
-          // Refresh failed — force logout
-          Cookies.remove("access_token");
-          Cookies.remove("refresh_token");
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-        }
+      const refreshed = await refreshInFlight;
+      if (refreshed) {
+        return api(originalRequest);
+      }
+
+      // Refresh failed — session is over
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
       }
     }
 

@@ -1,4 +1,5 @@
 import { displayBS } from "@/lib/nepali_date";
+import { sanitizeHtml } from "@/lib/sanitize";
 /** Public News Article Detail Page */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
@@ -36,7 +37,7 @@ export default async function NewsDetailPage({ params }: { params: { slug: strin
           {article.title}
         </h1>
 
-        <div className="prose prose-lg max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: article.content || "" }} />
+        <div className="prose prose-lg max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }} />
       </article>
     </div>
   );

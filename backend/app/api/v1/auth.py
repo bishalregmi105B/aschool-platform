@@ -1,5 +1,7 @@
 """Auth API routes — OTP, login, token refresh, me."""
-from flask import Blueprint, request
+from functools import wraps
+
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.services.auth_service import AuthService
@@ -7,6 +9,71 @@ from app.models.user import User
 from app.utils.response import error_response, success_response
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+ACCESS_COOKIE = "access_token"
+REFRESH_COOKIE = "refresh_token"
+ACCESS_COOKIE_MAX_AGE = 3600  # keep in sync with JWT_ACCESS_TOKEN_EXPIRES
+REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
+
+
+def _cookie_params():
+    """Cookie attributes: HttpOnly always; Secure + Domain configurable.
+
+    COOKIE_DOMAIN (e.g. ".aschool.com.np") makes the session visible to the
+    app. subdomain middleware; unset -> host-only cookie (dev/single host).
+    COOKIE_SECURE forces the Secure attribute; "auto" (default) enables it
+    only outside development/testing so the Flask test client still works.
+    """
+    secure_setting = str(current_app.config.get("COOKIE_SECURE", "auto")).lower()
+    if secure_setting == "auto":
+        secure = current_app.config.get("FLASK_ENV") == "production"
+    else:
+        secure = secure_setting in ("1", "true", "yes")
+    return {
+        "httponly": True,
+        "secure": secure,
+        "samesite": "Lax",
+        "domain": current_app.config.get("COOKIE_DOMAIN") or None,
+        "path": "/",
+    }
+
+
+def _tokens_response(result, status_code=200):
+    """Build the standard success response and mirror tokens into HttpOnly cookies."""
+    resp = jsonify({"success": True, "data": result, "error": None, "meta": {}})
+    resp.status_code = status_code
+    access = result.get("access_token")
+    refresh = result.get("refresh_token")
+    params = _cookie_params()
+    if access:
+        resp.set_cookie(ACCESS_COOKIE, access, max_age=ACCESS_COOKIE_MAX_AGE, **params)
+    if refresh:
+        resp.set_cookie(REFRESH_COOKIE, refresh, max_age=REFRESH_COOKIE_MAX_AGE, **params)
+    return resp
+
+
+def _clear_auth_cookies(resp):
+    params = _cookie_params()
+    for name in (ACCESS_COOKIE, REFRESH_COOKIE):
+        resp.set_cookie(name, "", max_age=0, expires=0, **params)
+    return resp
+
+
+def _refresh_token_from_cookie():
+    """Allow browser clients to refresh via HttpOnly cookie (no JS-readable token)."""
+
+    def wrapper(fn):
+        @wraps(fn)
+        def inner(*args, **kwargs):
+            if not request.headers.get("Authorization"):
+                token = request.cookies.get(REFRESH_COOKIE)
+                if token:
+                    request.environ["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+            return fn(*args, **kwargs)
+
+        return inner
+
+    return wrapper
 
 
 @auth_bp.route("/send-otp", methods=["POST"])
@@ -39,7 +106,7 @@ def verify_otp():
     result = AuthService.verify_otp(phone, otp)
     if "error" in result:
         return error_response(result["error"], 401)
-    return success_response(result)
+    return _tokens_response(result)
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -54,7 +121,7 @@ def login():
     result = AuthService.login_with_password(email_or_phone, password)
     if "error" in result:
         return error_response(result["error"], 401)
-    return success_response(result)
+    return _tokens_response(result)
 
 
 @auth_bp.route("/student-login", methods=["POST"])
@@ -69,18 +136,19 @@ def student_login():
     result = AuthService.login_student(student_id, password)
     if "error" in result:
         return error_response(result["error"], 401)
-    return success_response(result)
+    return _tokens_response(result)
 
 
 @auth_bp.route("/refresh", methods=["POST"])
+@_refresh_token_from_cookie()
 @jwt_required(refresh=True)
 def refresh_token():
-    """Refresh access token using refresh token."""
+    """Refresh access token using refresh token (Bearer header or HttpOnly cookie)."""
     user_id = get_jwt_identity()
     result = AuthService.refresh_tokens(user_id)
     if "error" in result:
         return error_response(result["error"], 401)
-    return success_response(result)
+    return _tokens_response(result)
 
 
 @auth_bp.route("/me", methods=["GET"])
@@ -266,7 +334,8 @@ def logout():
         from datetime import datetime, timezone
         expires_at = datetime.now(timezone.utc) + delta
         RevokedToken.revoke(jti=jti, token_type="access", expires_at=expires_at)
-    return success_response({"message": "Logged out successfully"})
+    resp = jsonify({"success": True, "data": {"message": "Logged out successfully"}, "error": None, "meta": {}})
+    return _clear_auth_cookies(resp)
 
 
 @auth_bp.route("/logout-all", methods=["POST"])
@@ -455,7 +524,7 @@ def totp_challenge():
 
     from app.services.auth_service import AuthService
     tokens = AuthService.create_tokens(user)
-    return success_response({
+    return _tokens_response({
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
         "user": user.to_dict(),

@@ -1,7 +1,6 @@
 /**
  * Socket.IO Client — real-time events for notifications, live updates, chat.
  */
-import Cookies from "js-cookie";
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
@@ -15,12 +14,11 @@ const SOCKET_URL =
 
 export function getSocket(): Socket {
   if (!socket) {
-    const token = typeof window !== "undefined" ? Cookies.get("access_token") : undefined;
-
     socket = io(SOCKET_URL, {
       autoConnect: false,
       transports: ["websocket", "polling"],
-      auth: { token },
+      // Auth via HttpOnly session cookie (sent automatically, never JS-readable).
+      withCredentials: true,
     });
 
     socket.on("connect", () => {
@@ -39,11 +37,8 @@ export function getSocket(): Socket {
   return socket;
 }
 
-export function connectSocket(token?: string): Socket {
+export function connectSocket(): Socket {
   const s = getSocket();
-  if (token) {
-    s.auth = { token };
-  }
   if (!s.connected) {
     s.connect();
   }

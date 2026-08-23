@@ -11,6 +11,44 @@ from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
 from extensions import db
 
+
+# ── custom_css sanitization ─────────────────────────────────────────────
+# Allowlist approach: CSS is injected into a <style> block on public pages,
+# so anything beyond plain declarations is dropped. Blocks url()/expression()
+# exfiltration and script/HTML injection vectors rather than blacklisting them.
+_CSS_URL_RE = re.compile(r"url\s*\(", re.IGNORECASE)
+_CSS_DANGER_RE = re.compile(
+    r"(javascript\s*:|expression\s*\(|@import|behavior\s*:|<|\\)",
+    re.IGNORECASE,
+)
+_CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_CSS_SAFE_SELECTOR_RE = re.compile(r"^[A-Za-z0-9_\-\s\.\#>,:\*\[\]=\"'\(\)\+%~|^$]*$")
+_CSS_SAFE_DECL_RE = re.compile(r"^[-a-zA-Z]+\s*:\s*[^;{}]*$", re.IGNORECASE)
+
+
+def sanitize_custom_css(css: str) -> str:
+    """Return only syntactically-safe selector{declaration} blocks."""
+    if not css:
+        return ""
+    css = _CSS_COMMENT_RE.sub("", css)
+
+    safe_blocks = []
+    # Split top-level blocks "selector { declarations }"
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css):
+        selector, body = match.group(1).strip(), match.group(2)
+        if not selector or not _CSS_SAFE_SELECTOR_RE.match(selector):
+            continue
+        if _CSS_URL_RE.search(body) or _CSS_DANGER_RE.search(body):
+            continue
+        decls = []
+        for decl in body.split(";"):
+            decl = decl.strip()
+            if decl and _CSS_SAFE_DECL_RE.match(decl):
+                decls.append(decl)
+        if decls:
+            safe_blocks.append(f"{selector} {{ { '; '.join(decls)}; }}")
+    return "\n".join(safe_blocks)
+
 website_bp = Blueprint("basic_website", __name__, url_prefix="/website")
 
 
@@ -157,11 +195,7 @@ def update_website_config():
             setattr(website, key, data[key])
 
     if "custom_css" in data:
-        css = data["custom_css"] or ""
-        # Strip any attempt to inject script/HTML tags inside CSS
-        css = re.sub(r"<[^>]*>", "", css, flags=re.IGNORECASE)
-        css = re.sub(r"javascript\s*:", "", css, flags=re.IGNORECASE)
-        css = re.sub(r"expression\s*\(", "", css, flags=re.IGNORECASE)
+        css = sanitize_custom_css(data["custom_css"] or "")
         website.custom_css = css
 
     if data.get("is_published") and not website.published_at:

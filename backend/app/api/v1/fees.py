@@ -1093,7 +1093,9 @@ def create_collection():
 def update_collection(collection_id):
     """Adjust a fee bill without recording a new payment."""
     collection = FeeCollection.query.get(collection_id)
-    if not collection or collection.is_deleted or str(collection.school_id) != str(g.school_id):
+    if collection and not collection.is_deleted and str(collection.school_id) != str(g.school_id):
+        return error_response("Fee collection belongs to another school", 403)
+    if not collection or collection.is_deleted:
         return error_response("Fee collection not found", 404)
 
     data = request.get_json(silent=True) or {}
@@ -1162,7 +1164,9 @@ def record_payment(collection_id):
     to prevent duplicate payments on network retries or double-clicks.
     """
     fc = FeeCollection.query.get(collection_id)
-    if not fc or fc.is_deleted or str(fc.school_id) != str(g.school_id):
+    if fc and not fc.is_deleted and str(fc.school_id) != str(g.school_id):
+        return error_response("Fee collection belongs to another school", 403)
+    if not fc or fc.is_deleted:
         return error_response("Fee collection not found", 404)
 
     data = request.get_json(silent=True) or {}
@@ -1360,7 +1364,9 @@ def _initiate_online_payment(collection_id, data):
     from app.services.payments.khalti_gateway import KhaltiGateway
 
     fc = FeeCollection.query.get(collection_id)
-    if not fc or fc.is_deleted or str(fc.school_id) != str(g.school_id):
+    if fc and not fc.is_deleted and str(fc.school_id) != str(g.school_id):
+        return error_response("Fee collection belongs to another school", 403)
+    if not fc or fc.is_deleted:
         return error_response("Fee collection not found", 404)
 
     provider = str(data.get("provider") or data.get("gateway") or "esewa").strip().lower()

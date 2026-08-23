@@ -1,4 +1,3 @@
-import Cookies from "js-cookie";
 
 import { api, type ApiResponse } from "@/lib/api";
 
@@ -140,10 +139,8 @@ export async function uploadFilesToFolder(
       const result = await new Promise<ManagedFile>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/files/upload`);
-
-        // Copy auth header from axios instance
-        const token = Cookies.get("access_token");
-        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        // Cookie-based session auth: credentials ride along automatically.
+        xhr.withCredentials = true;
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {

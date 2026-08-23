@@ -7,7 +7,6 @@ import {
   useEffect,
   useState,
 } from "react";
-import Cookies from "js-cookie";
 import { api, type ApiResponse } from "./api";
 
 export interface User {
@@ -43,11 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const token = Cookies.get("access_token");
-      if (!token) {
-        setUser(null);
-        return;
-      }
+      // Session lives in HttpOnly cookies; /auth/me is the source of truth.
       const res = await api.get<ApiResponse<User>>("/auth/me");
       if (res.data.success) {
         setUser(res.data.data);
@@ -67,10 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       { email, password }
     );
     if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "Login failed");
-    const { access_token, refresh_token, user: userData } = res.data.data;
-    Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-    Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-    setUser(userData);
+    // Tokens are delivered as HttpOnly cookies by the backend — nothing JS-readable here.
+    setUser(res.data.data.user);
   };
 
   const sendOtp = async (phone: string) => {
@@ -84,19 +77,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       { phone, otp }
     );
     if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "OTP verification failed");
-    const { access_token, refresh_token, user: userData } = res.data.data;
-    Cookies.set("access_token", access_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-    Cookies.set("refresh_token", refresh_token, { sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-    setUser(userData);
+    setUser(res.data.data.user);
   };
 
   const logout = () => {
-    Cookies.remove("access_token");
-    Cookies.remove("refresh_token");
-    setUser(null);
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
+    // Revoke server-side and clear HttpOnly cookies via the API.
+    api.post("/auth/logout").catch(() => {}).finally(() => {
+      setUser(null);
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    });
   };
 
   return (
