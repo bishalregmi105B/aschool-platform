@@ -30,9 +30,10 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
     setState(() => _loading = true);
     try {
       final res = await ApiClient.instance.get('/student/lms');
+      final payload = res.data?['data'] as Map?;
       setState(() {
-        _courses = (res.data?['courses'] as List?) ?? [];
-        _quizzes = (res.data?['quizzes'] as List?) ?? [];
+        _courses = (payload?['courses'] as List?) ?? [];
+        _quizzes = (payload?['quizzes'] as List?) ?? [];
       });
     } catch (_) {}
     setState(() => _loading = false);

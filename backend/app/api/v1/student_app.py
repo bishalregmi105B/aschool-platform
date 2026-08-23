@@ -7,6 +7,7 @@ from app.models.attendance import Attendance
 from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.exam import Marks, ReportCard
 from app.models.academic import Subject
+from app.models.fee import FeeCollection
 from app.models.library import Book, BookIssue
 from app.models.lms import Course, Quiz, QuizAttempt, StudentProgress
 from app.models.notice import Notice
@@ -685,3 +686,75 @@ def submit_student_mood():
     db.session.add(entry)
     db.session.commit()
     return success_response({"saved": True})
+
+
+def _student_partial_paid(collection) -> float:
+    """Paid amount for a collection, mirroring parent_app._extract_partial_paid."""
+    if collection.payment_status == "paid":
+        return float(collection.amount or 0)
+
+    notes = collection.notes or ""
+    marker = "[partial_paid:"
+    if marker not in notes:
+        return 0
+
+    try:
+        value = notes.split(marker, 1)[1].split("]", 1)[0]
+        return min(max(float(value), 0), float(collection.amount or 0))
+    except (ValueError, IndexError):
+        return 0
+
+
+@student_app_bp.route("/fees", methods=["GET"])
+@jwt_required()
+@school_required
+def student_fees():
+    """The student's own fee overview and collection history."""
+    student = _current_student()
+    if not student:
+        return error_response("Student profile not found", 404)
+
+    collections = (
+        FeeCollection.query.filter_by(
+            school_id=g.school_id,
+            student_id=student.id,
+            is_deleted=False,
+        )
+        .order_by(FeeCollection.created_at.desc())
+        .all()
+    )
+
+    total_fees = 0.0
+    paid = 0.0
+    invoices = []
+    for c in collections:
+        amount = float(c.amount or 0)
+        paid_amount = _student_partial_paid(c)
+        due_amount = max(amount - paid_amount, 0)
+        total_fees += amount
+        paid += paid_amount
+        status = c.payment_status or "pending"
+        if due_amount <= 0 and status in (None, "pending", "partial"):
+            status = "paid"
+        month_parts = [part for part in [c.month_bs, c.year_bs] if part]
+        invoices.append(
+            {
+                "id": str(c.id),
+                "title": c.fee_item_name or "Fee",
+                "fee_type": c.fee_item_name or "Fee",
+                "month": " ".join(month_parts) if month_parts else None,
+                "amount": round(due_amount if due_amount > 0 else amount, 2),
+                "status": status,
+            }
+        )
+
+    return success_response(
+        {
+            "overview": {
+                "total_fees": round(total_fees, 2),
+                "paid": round(paid, 2),
+                "due": round(max(total_fees - paid, 0), 2),
+            },
+            "invoices": invoices,
+        }
+    )

@@ -52,17 +52,15 @@ class _AITutorScreenState extends ConsumerState<AITutorScreen> {
 
     try {
       final res = await ApiClient.instance.post(
-        '/api/v1/ai-tools/homework-helper',
+        '/ai-tools/homework-help',
         data: {
-          'message': text,
+          'question': text,
           'subject': _selectedSubject,
-          'context': _messages
-              .take(10)
-              .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'text': m.text})
-              .toList(),
         },
       );
-      final reply = res.data?['reply'] ?? 'Sorry, I could not process that.';
+      final payload = res.data?['data'] as Map?;
+      final reply = payload?['response'] ??
+          'Sorry, I could not process that.';
       setState(() {
         _messages.add(_ChatMessage(text: reply, isUser: false));
         _typing = false;
