@@ -87,8 +87,10 @@ def _id_card_standard():
         _text(86, 52, W - 96, "{name}", 13, bold=True, color="#1e293b", align="left"),
         _text(86, 72, W - 96, "Class: {class}  Sec: {section}  Roll: {roll_no}", 9, color="#334155", align="left"),
         _text(86, 88, W - 96, "DOB: {dob}  Blood: {blood_group}", 9, color="#334155", align="left"),
-        _text(86, 104, W - 96, "Phone: {phone}", 9, color="#334155", align="left"),
-        _text(86, 118, W - 96, "Address: {address}", 8, color="#64748b", align="left"),
+        _text(86, 104, 160, "Phone: {phone}", 9, color="#334155", align="left"),
+        _text(86, 118, 164, "Address: {address}", 8, color="#64748b", align="left"),
+        # QR verification box — empty {qr_code} degrades to blank space
+        _image(258, 112, 32, 32, "{qr_code}"),
         _line(0, 152, W, "#cbd5e1"),
         _text(6, 157, W - 12, "{school_address}  •  {school_phone}  •  {school_website}", 7, color="#64748b"),
     ])
@@ -980,6 +982,9 @@ class TemplateEngineService:
 
     _TOKEN_PATTERN = re.compile(r"\{\{([^{}]+)\}\}|\{([^{}]+)\}")
 
+    _SEED_CHECK_INTERVAL_SECONDS = 30.0
+    _last_seed_at: float | None = None
+
     _TEMPLATE_ALIASES = {
         "character_certificate_v1": "character_certificate",
         "transfer_certificate_v1": "transfer_certificate",
@@ -1029,7 +1034,22 @@ class TemplateEngineService:
         Runs a full upsert so that builtin templates (school_id=None) always
         reflect the latest writer_json / editor_type from the code.
         Soft-deletes builtin templates that are no longer in the registry.
+
+        The sweep is memoized for _SEED_CHECK_INTERVAL_SECONDS per process:
+        it hydrates every builtin row's full canvas/writer JSON, which made
+        bulk generation pay thousands of JSONB round-trips (one sweep per
+        render). Content edits land within that window; freshly wiped
+        databases are covered by the registry fallback paths in
+        get_template()/list_templates_for_school().
         """
+        import time as _time
+
+        now = _time.monotonic()
+        if cls._last_seed_at is not None and (
+            now - cls._last_seed_at < cls._SEED_CHECK_INTERVAL_SECONDS
+        ):
+            return
+
         try:
             from extensions import db
             from app.models.designer_template import DesignerTemplate
@@ -1074,15 +1094,32 @@ class TemplateEngineService:
                 ))
                 changed = True
             else:
-                # Always sync editor_type, writer_json, and canvas_json from code
-                row.editor_type = new_editor_type
-                row.writer_json = new_writer_json
-                row.canvas_json = new_canvas_json
-                row.name = meta.get("name", template_key)
-                row.description = meta.get("description", row.description or "")
-                row.fields = meta.get("fields", row.fields or [])
-                row.category = meta.get("category", row.category or "documents")
-                changed = True
+                # Sync from code only when content actually drifted. Without
+                # this guard every get_template() call rewrites + commits all
+                # builtin rows — a hidden per-render write storm that wrecks
+                # bulk generation throughput.
+                new_name = meta.get("name", template_key)
+                new_description = meta.get("description", "")
+                new_fields = meta.get("fields", [])
+                new_category = meta.get("category", "documents")
+                desc_drift = bool(new_description) and row.description != new_description
+                if (
+                    row.editor_type != new_editor_type
+                    or row.writer_json != new_writer_json
+                    or row.canvas_json != new_canvas_json
+                    or row.name != new_name
+                    or desc_drift
+                    or row.fields != new_fields
+                    or row.category != new_category
+                ):
+                    row.editor_type = new_editor_type
+                    row.writer_json = new_writer_json
+                    row.canvas_json = new_canvas_json
+                    row.name = new_name
+                    row.description = meta.get("description", row.description or "")
+                    row.fields = meta.get("fields", row.fields or [])
+                    row.category = meta.get("category", row.category or "documents")
+                    changed = True
 
         # Soft-delete builtin templates removed from the registry
         for key, row in existing_rows.items():
@@ -1098,6 +1135,8 @@ class TemplateEngineService:
                     db.session.rollback()
                 except Exception:
                     pass
+
+        cls._last_seed_at = now
 
     @staticmethod
     def _template_page_count(meta: dict) -> int:
@@ -1368,9 +1407,24 @@ class TemplateEngineService:
         return value
 
     @classmethod
-    def render_document(cls, template_id: str, data: dict, school_config: dict | None = None, school_id=None) -> dict:
-        """Return canvas_json with {field} / {{field}} placeholders substituted."""
-        template = cls.get_template(template_id, school_id=school_id)
+    def render_document(
+        cls,
+        template_id: str,
+        data: dict,
+        school_config: dict | None = None,
+        school_id=None,
+        template_meta: dict | None = None,
+    ) -> dict:
+        """Return canvas_json with {field} / {{field}} placeholders substituted.
+
+        Callers that already resolved the template (bulk generation) can pass
+        ``template_meta`` to skip the per-document DB lookup.
+        """
+        template = (
+            template_meta
+            if template_meta is not None
+            else cls.get_template(template_id, school_id=school_id)
+        )
         if not template:
             raise ValueError(f"Template '{template_id}' not found")
 
@@ -1889,9 +1943,24 @@ class TemplateEngineService:
         )
 
     @classmethod
-    def render_html(cls, template_id: str, data: dict | None = None, school_config: dict | None = None, school_id=None) -> str:
-        """Render printable HTML for both designer and writer templates."""
-        template = cls.get_template(template_id, school_id=school_id)
+    def render_html(
+        cls,
+        template_id: str,
+        data: dict | None = None,
+        school_config: dict | None = None,
+        school_id=None,
+        template_meta: dict | None = None,
+    ) -> str:
+        """Render printable HTML for both designer and writer templates.
+
+        Callers that already resolved the template (bulk generation) can pass
+        ``template_meta`` to skip the per-document DB lookup.
+        """
+        template = (
+            template_meta
+            if template_meta is not None
+            else cls.get_template(template_id, school_id=school_id)
+        )
         if not template:
             raise ValueError(f"Template '{template_id}' not found")
 

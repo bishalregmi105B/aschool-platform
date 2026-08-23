@@ -1,5 +1,8 @@
 """Bulk Document Generator — Mass generate ID cards, certificates, report cards."""
 
+from extensions import db
+
+
 def _absolute_url(path: str) -> str:
     """Return an absolute URL for an upload path using the current Flask request."""
     if not path:
@@ -12,6 +15,30 @@ def _absolute_url(path: str) -> str:
         return base + (path if path.startswith("/") else "/" + path)
     except RuntimeError:
         return path
+
+
+def _qr_data_uri(payload: str, box_size: int = 3) -> str:
+    """Render a payload as a PNG data-URI QR code.
+
+    Returns "" when the qrcode lib is unavailable or the payload is empty —
+    the canvas renderer drops empty image objects, so templates degrade
+    gracefully to a blank QR box.
+    """
+    if not payload:
+        return ""
+    try:
+        import io
+
+        import qrcode
+
+        img = qrcode.make(payload, box_size=box_size, border=1)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        import base64
+
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return ""
 
 
 class BulkGeneratorService:
@@ -65,7 +92,15 @@ class BulkGeneratorService:
             resolved_template_id = "id_card_standard"
         template_meta = TemplateEngineService.get_template(resolved_template_id, school_id=school_id) or {}
 
-        query = Student.query.filter_by(school_id=school_id, status="active")
+        query = (
+            Student.query.options(
+                db.selectinload(Student.klass),
+                db.selectinload(Student.section),
+                db.selectinload(Student.user),
+                db.selectinload(Student.guardians),
+            )
+            .filter_by(school_id=school_id, status="active")
+        )
         if class_id:
             query = query.filter_by(class_id=class_id)
 
@@ -106,10 +141,21 @@ class BulkGeneratorService:
                 "phone": phone,
                 "photo": _absolute_url(student.photo_url or ""),
                 "photo_url": _absolute_url(student.photo_url or ""),
+                # QR verification payload (scannable identity string; a public
+                # verify URL can replace this once an endpoint exists).
+                "qr_code": _qr_data_uri(
+                    f"ASCHOOL-ID|{school_id}|{student.id}|{enrollment_number}"
+                ),
                 **school_fields,
             }
-            html = TemplateEngineService.render_html(resolved_template_id, data, school_config, school_id=school_id)
-            canvas_json = TemplateEngineService.render_document(resolved_template_id, data, school_config, school_id=school_id)
+            html = TemplateEngineService.render_html(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
+            canvas_json = TemplateEngineService.render_document(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
             cards.append({
                 "student_id": str(student.id),
                 "student_name": data["name"],
@@ -171,11 +217,37 @@ class BulkGeneratorService:
                 for subj in Subject.query.filter(Subject.class_ids.any(klass.id)).all():
                     subject_map[str(subj.id)] = subj
 
-        students = Student.query.filter_by(school_id=school_id, class_id=class_id, status="active").order_by(Student.roll_number).all()
+        students = (
+            Student.query.options(
+                db.selectinload(Student.klass),
+                db.selectinload(Student.section),
+                db.selectinload(Student.guardians),
+            )
+            .filter_by(school_id=school_id, class_id=class_id, status="active")
+            .order_by(Student.roll_number)
+            .all()
+        )
+
+        # Batch-fetch every mark for these students in ONE query (avoids
+        # a per-student SELECT + lazy subject loads → N+1).
+        marks_by_student: dict = {}
+        if students:
+            all_marks = (
+                Marks.query.options(db.selectinload(Marks.subject))
+                .filter(
+                    Marks.exam_id == exam_id,
+                    Marks.is_deleted == False,  # noqa: E712
+                    Marks.student_id.in_([s.id for s in students]),
+                )
+                .all()
+            )
+            for m in all_marks:
+                marks_by_student.setdefault(str(m.student_id), []).append(m)
+
         marksheets = []
 
         for student in students:
-            marks_list = Marks.query.filter_by(exam_id=exam_id, student_id=student.id, is_deleted=False).all()
+            marks_list = marks_by_student.get(str(student.id), [])
             marks_by_subject = {str(m.subject_id): m for m in marks_list}
 
             subjects_data = []
@@ -291,8 +363,14 @@ class BulkGeneratorService:
                 **school_fields,
             }
 
-            html = TemplateEngineService.render_html(resolved_template_id, data, school_config, school_id=school_id)
-            canvas_json = TemplateEngineService.render_document(resolved_template_id, data, school_config, school_id=school_id)
+            html = TemplateEngineService.render_html(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
+            canvas_json = TemplateEngineService.render_document(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
             marksheets.append({
                 "student_id": str(student.id),
                 "student_name": data["name"],
