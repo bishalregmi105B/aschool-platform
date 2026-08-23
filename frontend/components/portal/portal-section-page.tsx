@@ -26,7 +26,7 @@ export function PortalSectionPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Section Ready</CardTitle>
+          <CardTitle>Coming soon</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">{meta.guidance}</p>
