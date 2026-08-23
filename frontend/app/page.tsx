@@ -291,7 +291,7 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div className="rounded-2xl border border-black/8 p-3 float">
                         <p className="text-[10px] text-[color:var(--muted)]">School Website</p>
-                        <p className="text-xs font-semibold mt-0.5 text-[color:var(--ink)]">your-school.brighternepal.com</p>
+                        <p className="text-xs font-semibold mt-0.5 text-[color:var(--ink)]">your-school.aschool.com.np</p>
                         <p className="text-[10px] text-green-600 mt-0.5">✓ Live</p>
                       </div>
                       <div className="rounded-2xl border border-black/8 p-3 float" style={{ animationDelay: "1s" }}>

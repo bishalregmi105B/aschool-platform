@@ -1,5 +1,5 @@
 /**
- * School Website Theme Type System — WordPress-like architecture adapted from Vexel.
+ * School Website Theme Type System — WordPress-like theme architecture.
  *
  * Each theme is a self-contained package with:
  *   - Colors (light/dark palettes)

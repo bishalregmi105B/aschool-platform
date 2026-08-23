@@ -1,7 +1,7 @@
 /**
  * School Theme Loader — Unified theme loading from folders + API.
  *
- * WordPress-like architecture adapted from Vexel for school websites:
+ * WordPress-like theme architecture for school websites:
  *   1. Built-in themes live in /themes/{slug}/index.ts
  *   2. DB-stored themes from API
  *   3. School installations merge base theme + overrides

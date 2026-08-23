@@ -1,7 +1,7 @@
 /**
  * School Website Widget Registry
  * Defines all available section/widget types for school websites.
- * Adapted from Vexel's registry pattern for school-specific widgets.
+ * Registry pattern for school-specific widgets.
  */
 import type { SchoolWidgetDef, WidgetCategory } from "./types";
 

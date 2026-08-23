@@ -5,7 +5,7 @@ class AppConstants {
   static const String appName = 'ASchool';
 
   /// Resolved at build time via --dart-define=API_BASE_URL=https://...
-  /// Release builds: flutter build apk --dart-define=API_BASE_URL=https://api.brighternepal.com
+  /// Release builds: flutter build apk --dart-define=API_BASE_URL=https://api.aschool.com.np
   /// Dev builds fall back to the LAN address.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',

@@ -1,6 +1,6 @@
 /**
  * School Website Widget Type System
- * Adapted from Vexel visual editor architecture for school-specific use cases.
+ * School website visual editor type system.
  */
 
 export type ControlType =
