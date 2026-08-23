@@ -55,7 +55,7 @@ test-frontend:
 	cd frontend && npm test
 
 test-flutter:
-	cd flutter_shared && flutter test
+	cd aschool_shared && flutter test
 
 test-all: test test-frontend test-flutter
 
