@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
 
   aschool_shared:
-    path: ../flutter_shared
+    path: ../aschool_shared
 
   # State & Routing
   flutter_riverpod: ^2.5.1

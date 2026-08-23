@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   aschool_shared:
-    path: ../flutter_shared
+    path: ../aschool_shared
   aschool_student:
     path: ../flutter_student
   aschool_parent:

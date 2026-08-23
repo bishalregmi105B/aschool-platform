@@ -28,7 +28,7 @@ packages:
   aschool_shared:
     dependency: "direct main"
     description:
-      path: "../flutter_shared"
+      path: "../aschool_shared"
       relative: true
     source: path
     version: "1.0.0"
