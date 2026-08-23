@@ -17,7 +17,7 @@ const PORTAL_ROUTE_META: Record<PortalName, Record<string, PortalRouteMeta>> = {
     attendance: {
       title: "Attendance",
       description: "Review your child attendance updates and daily presence status.",
-      guidance: "Use the parent portal home for the latest overview while this dedicated web section is being completed.",
+      guidance: "This section is coming soon to the web portal. The ASchool parent app already covers it today.",
     },
     results: {
       title: "Results",
@@ -27,12 +27,12 @@ const PORTAL_ROUTE_META: Record<PortalName, Record<string, PortalRouteMeta>> = {
     fees: {
       title: "Fees",
       description: "Track fee status, due balances, and collection activity.",
-      guidance: "Fee payment and live balance details continue to be available in the parent app while this portal screen is finalized.",
+      guidance: "This section is coming soon to the web portal. The ASchool parent app already covers fee payment today.",
     },
     notices: {
       title: "Notices",
       description: "Read school announcements and shared updates for guardians.",
-      guidance: "Use the parent dashboard for highlights until the full notices workspace is connected here.",
+      guidance: "This section is coming soon to the web portal. Notices are available on the dashboard meanwhile.",
     },
     bus: {
       title: "Bus Tracker",
@@ -54,7 +54,7 @@ const PORTAL_ROUTE_META: Record<PortalName, Record<string, PortalRouteMeta>> = {
     homework: {
       title: "Homework",
       description: "Review homework tasks, due dates, and class assignments.",
-      guidance: "Homework workflow is under active integration across web and mobile, so this portal route now resolves cleanly while the full screen is finalized.",
+      guidance: "This section is coming soon to the student web portal.",
     },
     results: {
       title: "Results",
@@ -86,7 +86,7 @@ const PORTAL_ROUTE_META: Record<PortalName, Record<string, PortalRouteMeta>> = {
     marks: {
       title: "Marks",
       description: "Enter and review student marks and assessment records.",
-      guidance: "Marks entry remains available through the exam workflow while this teacher portal shortcut is finalized.",
+      guidance: "This section is coming soon to the teacher web portal. Marks entry lives in the Exams module meanwhile.",
     },
     assignments: {
       title: "Assignments",
@@ -106,7 +106,7 @@ const PORTAL_ROUTE_META: Record<PortalName, Record<string, PortalRouteMeta>> = {
     "ai-tools": {
       title: "AI Tools",
       description: "Open AI-assisted teaching tools and planning helpers.",
-      guidance: "AI teaching utilities are available in the broader dashboard while this teacher portal shortcut is being completed.",
+      guidance: "This section is coming soon to the teacher web portal. AI tools live in the main dashboard meanwhile.",
     },
   },
 };
