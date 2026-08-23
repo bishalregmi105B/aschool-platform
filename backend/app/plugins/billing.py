@@ -11,7 +11,7 @@ def install_plugin(school_id: str, plugin_slug: str, billing_cycle: str = "month
     """Install a plugin for a school with a free trial. Returns dict."""
     plugin = Plugin.query.filter_by(slug=plugin_slug, is_published=True).first()
     if not plugin:
-        return {"error": f"Plugin '{plugin_slug}' not found"}
+        return {"error": f"Plugin '{plugin_slug}' not found or not available"}
 
     existing = SchoolPlugin.query.filter_by(
         school_id=school_id, plugin_slug=plugin_slug

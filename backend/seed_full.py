@@ -58,8 +58,8 @@ ALL_PLUGINS = [
     {"slug": "disaster_management", "name": "Disaster Management", "name_nepali": "विपद व्यवस्थापन", "category": "premium", "price_monthly": 999, "price_yearly": 9999, "is_free": False, "trial_days": 7, "emoji": "🆘", "icon": "Shield", "description": "Earthquake API, evacuation plans, drill scheduling", "depends_on": ["emergency"], "sort_order": 42},
     {"slug": "benchmarking", "name": "School Benchmarking", "name_nepali": "विद्यालय बेन्चमार्किङ", "category": "premium", "price_monthly": 1499, "price_yearly": 14999, "is_free": False, "trial_days": 7, "emoji": "📈", "icon": "TrendingUp", "description": "Anonymous school-to-school comparison, national rankings", "sort_order": 43},
     {"slug": "ai_adaptive_learning", "name": "AI Adaptive Learning", "name_nepali": "AI अनुकूली शिक्षा", "category": "premium", "price_monthly": 1499, "price_yearly": 14999, "is_free": False, "trial_days": 7, "emoji": "🧠", "icon": "Brain", "description": "Personalized learning paths per student", "depends_on": ["lms"], "sort_order": 44},
-    {"slug": "multi_branch", "name": "Multi-Branch Chain", "name_nepali": "बहु-शाखा चेन", "category": "premium", "price_monthly": 2999, "price_yearly": 29999, "is_free": False, "trial_days": 7, "emoji": "🏢", "icon": "Building2", "description": "Cross-school unified dashboard, chain analytics", "sort_order": 45},
-    {"slug": "biometric", "name": "Biometric Integration", "name_nepali": "बायोमेट्रिक इन्टिग्रेसन", "category": "premium", "price_monthly": 1999, "price_yearly": 19999, "is_free": False, "trial_days": 7, "emoji": "✋", "icon": "Fingerprint", "description": "ZKTeco fingerprint attendance", "depends_on": ["attendance"], "sort_order": 46},
+    {"slug": "multi_branch", "is_published": False, "name": "Multi-Branch Chain", "name_nepali": "बहु-शाखा चेन", "category": "premium", "price_monthly": 2999, "price_yearly": 29999, "is_free": False, "trial_days": 7, "emoji": "🏢", "icon": "Building2", "description": "Cross-school unified dashboard, chain analytics", "sort_order": 45},
+    {"slug": "biometric", "is_published": False, "name": "Biometric Integration", "name_nepali": "बायोमेट्रिक इन्टिग्रेसन", "category": "premium", "price_monthly": 1999, "price_yearly": 19999, "is_free": False, "trial_days": 7, "emoji": "✋", "icon": "Fingerprint", "description": "ZKTeco fingerprint attendance", "depends_on": ["attendance"], "sort_order": 46},
     {"slug": "white_label", "name": "White-Label Branding", "name_nepali": "ह्वाइट-लेबल ब्राण्डिङ", "category": "premium", "price_monthly": 2999, "price_yearly": 29999, "is_free": False, "trial_days": 7, "emoji": "🏷️", "icon": "Tag", "description": "Custom branding, own domain, remove ASchool branding", "sort_order": 47},
 ]
 
@@ -84,7 +84,7 @@ def seed_all_plugins():
             existing.sort_order = p_data.get("sort_order", 0)
             existing.depends_on = p_data.get("depends_on", [])
             existing.trial_days = p_data.get("trial_days", 14)
-            existing.is_published = True
+            existing.is_published = p_data.get("is_published", True)
             updated += 1
         else:
             plugin = Plugin(
@@ -101,7 +101,7 @@ def seed_all_plugins():
                 description=p_data.get("description"),
                 depends_on=p_data.get("depends_on", []),
                 sort_order=p_data.get("sort_order", 0),
-                is_published=True,
+                is_published=p_data.get("is_published", True),
                 version="1.0.0",
             )
             db.session.add(plugin)
