@@ -5,6 +5,8 @@ from flask_jwt_extended import jwt_required
 
 from app.models.plugin import Plugin, SchoolPlugin
 from app.plugins.billing import install_plugin, uninstall_plugin
+
+from datetime import datetime, timedelta, timezone
 from app.plugins.loader import PluginLoader
 from app.utils.decorators import role_required, school_required
 from app.utils.response import (
@@ -152,6 +154,142 @@ def install():
         return error_response(result["error"], status)
 
     return created_response(result)
+
+
+@plugins_bp.route("/<slug>/trial", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def start_trial(slug):
+    """Start (or resume) a free trial for a plugin — no billing obligation.
+
+    409 if the plugin is already installed or its trial was already used.
+    """
+    plugin = Plugin.query.filter_by(
+        slug=slug, is_published=True, is_deleted=False
+    ).first()
+    if not plugin:
+        return error_response(f"Plugin '{slug}' not found or not available", 404)
+
+    existing = SchoolPlugin.query.filter_by(
+        school_id=g.school_id, plugin_slug=slug
+    ).first()
+    if existing and existing.active:
+        return error_response(f"Plugin '{slug}' is already installed", 409)
+    if existing and existing.trial_started_at:
+        return error_response(
+            f"Trial for '{slug}' was already used by this school", 409
+        )
+
+    trial_days = plugin.trial_days or 14
+    now = datetime.now(timezone.utc)
+
+    if existing:
+        existing.active = True
+        existing.uninstalled_at = None
+        existing.is_trial = True
+        existing.trial_started_at = now
+        existing.trial_ends_at = now + timedelta(days=trial_days)
+        existing.billing_cycle = "monthly"
+        sp = existing
+    else:
+        # Dependency check still applies for trials.
+        for dep_slug in (plugin.depends_on or []):
+            dep = SchoolPlugin.query.filter_by(
+                school_id=g.school_id, plugin_slug=dep_slug, active=True
+            ).first()
+            if not dep:
+                return error_response(
+                    f"Dependency not met: '{dep_slug}' must be installed first",
+                    409,
+                )
+        sp = SchoolPlugin(
+            school_id=g.school_id,
+            plugin_slug=slug,
+            active=True,
+            billing_cycle="monthly",
+            is_trial=True,
+            trial_started_at=now,
+            trial_ends_at=now + timedelta(days=trial_days),
+            next_billing_date=(now + timedelta(days=trial_days)).date(),
+        )
+        db.session.add(sp)
+        plugin.install_count = (plugin.install_count or 0) + 1
+
+    db.session.commit()
+
+    from app.plugins.billing import _invalidate_plugin_cache
+
+    _invalidate_plugin_cache(str(g.school_id))
+
+    return created_response(
+        {
+            "plugin_slug": slug,
+            "is_trial": True,
+            "trial_days": trial_days,
+            "trial_ends_at": sp.trial_ends_at.isoformat() if sp.trial_ends_at else None,
+        }
+    )
+
+
+@plugins_bp.route("/<slug>/subscribe", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def subscribe(slug):
+    """Convert an active trial to a paid subscription (or subscribe directly).
+
+    Body: {"billing_cycle": "monthly" | "yearly"}
+    """
+    data = request.get_json(silent=True) or {}
+    billing_cycle = data.get("billing_cycle", "monthly")
+    if billing_cycle not in ("monthly", "yearly"):
+        return error_response("billing_cycle must be 'monthly' or 'yearly'", 400)
+
+    plugin = Plugin.query.filter_by(
+        slug=slug, is_published=True, is_deleted=False
+    ).first()
+    if not plugin:
+        return error_response(f"Plugin '{slug}' not found or not available", 404)
+    if plugin.is_free:
+        return error_response(f"Plugin '{slug}' is free and needs no subscription", 400)
+
+    sp = SchoolPlugin.query.filter_by(
+        school_id=g.school_id, plugin_slug=slug, active=True
+    ).first()
+
+    now = datetime.now(timezone.utc)
+    if not sp:
+        result = install_plugin(str(g.school_id), slug, billing_cycle)
+        if "error" in result:
+            return error_response(result["error"], 409)
+        sp = SchoolPlugin.query.filter_by(
+            school_id=g.school_id, plugin_slug=slug
+        ).first()
+    else:
+        period = timedelta(days=365) if billing_cycle == "yearly" else timedelta(days=30)
+        sp.is_trial = False
+        sp.billing_cycle = billing_cycle
+        sp.next_billing_date = (now + period).date()
+
+    db.session.commit()
+
+    from app.plugins.billing import _invalidate_plugin_cache
+
+    _invalidate_plugin_cache(str(g.school_id))
+
+    return success_response(
+        {
+            "plugin_slug": slug,
+            "billing_cycle": billing_cycle,
+            "price_monthly": float(plugin.price_monthly or 0),
+            "price_yearly": float(plugin.price_yearly or 0),
+            "is_trial": False,
+            "next_billing_date": sp.next_billing_date.isoformat()
+            if getattr(sp, "next_billing_date", None)
+            else None,
+        }
+    )
 
 
 @plugins_bp.route("/uninstall", methods=["POST"])
