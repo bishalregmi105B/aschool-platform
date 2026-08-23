@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [flutter_shared, flutter_admin, flutter_teacher, flutter_parent, flutter_student]
+        app: [flutter_shared, flutter_admin, flutter_teacher, flutter_parent, flutter_student, flutter_user]
     steps:
       - uses: actions/checkout@v4
 
