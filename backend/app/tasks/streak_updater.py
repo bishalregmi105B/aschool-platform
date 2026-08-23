@@ -14,8 +14,8 @@ def update_student_streaks():
     """
     from extensions import db
     from app.models.plugin import SchoolPlugin
-    from app.models.gamification import StudentStreak, StudentBadge, Badge
-    from app.models.attendance import AttendanceRecord
+    from app.models.gamification import StudentBadge, Badge
+    from app.models.attendance import Attendance
     from datetime import date, timedelta
 
     today = date.today()
@@ -29,29 +29,43 @@ def update_student_streaks():
 
     for (school_id,) in active_schools:
         try:
-            # Get all student streaks for this school
-            streaks = StudentStreak.query.filter_by(
-                school_id=school_id,
-                streak_type="attendance",
-            ).all()
+            # Derive attendance streaks from attendance records; award milestone badges.
+            # There is no StudentStreak table — streak state is computed per student
+            # by counting consecutive present days ending yesterday.
+            students = (
+                Attendance.query.with_entities(Attendance.student_id)
+                .filter_by(school_id=school_id)
+                .distinct()
+                .all()
+            )
+            streaks = [
+                type("StreakView", (), {"student_id": sid})()
+                for (sid,) in students
+            ]
 
             for streak in streaks:
-                # Check if student was present yesterday
-                was_present = AttendanceRecord.query.filter_by(
-                    school_id=school_id,
-                    student_id=streak.student_id,
-                    date=yesterday,
-                    status="present",
-                ).first()
+                # Count consecutive present days ending yesterday.
+                current_count = 0
+                check_date = yesterday
+                while True:
+                    present = (
+                        Attendance.query.filter_by(
+                            school_id=school_id,
+                            student_id=streak.student_id,
+                            date=check_date,
+                            status="present",
+                        ).first()
+                        is not None
+                    )
+                    if not present:
+                        break
+                    current_count += 1
+                    check_date -= timedelta(days=1)
 
-                if was_present:
-                    streak.current_count += 1
-                    if streak.current_count > streak.best_count:
-                        streak.best_count = streak.current_count
-
+                if current_count > 0:
                     # Check milestone badges (7, 30, 100 days)
                     for milestone in [7, 30, 100]:
-                        if streak.current_count == milestone:
+                        if current_count == milestone:
                             emit_for_school(
                                 "gamification.streak_milestone",
                                 school_id=str(school_id),
@@ -59,9 +73,6 @@ def update_student_streaks():
                                 streak_type="attendance",
                                 days=milestone,
                             )
-                else:
-                    # Reset streak
-                    streak.current_count = 0
 
             db.session.commit()
             logger.info("Updated streaks for school %s", school_id)

@@ -18,14 +18,15 @@ class HomeworkHelperService:
     def get_help(
         cls,
         question: str,
-        subject: str,
-        grade_level: int,
+        subject: str | None = None,
+        grade_level: int | None = None,
         conversation_history: list[dict] | None = None,
         student_attempt: str | None = None,
     ) -> dict:
         """Provide Socratic tutoring help — guide without giving direct answers."""
-
-        system_prompt = f"""You are a friendly, patient tutor helping a Grade {grade_level} student in Nepal with {subject}.
+        subject_label = subject or "their subject"
+        grade_label = f"Grade {grade_level}" if grade_level else "school"
+        system_prompt = f"""You are a friendly, patient tutor helping a {grade_label} student in Nepal with {subject_label}.
 
 RULES:
 1. NEVER give the direct answer. Instead, guide the student step by step.

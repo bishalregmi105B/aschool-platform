@@ -13,8 +13,7 @@ def rebuild_all_sitemaps():
     """
     from extensions import db
     from app.models.plugin import SchoolPlugin
-    from app.models.school import School
-    from app.models.website import SchoolWebsite
+    from app.models.school import School, SchoolWebsite
 
     active_schools = (
         db.session.query(SchoolPlugin.school_id)
@@ -57,8 +56,11 @@ def rebuild_all_sitemaps():
                 {"url": f"{base_url}/alumni", "priority": "0.4"},
             ]
 
-            # Store as JSONB on website record for SSR serving
-            website.sitemap_data = pages
+            # Store in customizations JSONB (no dedicated sitemap column) so the
+            # SSR/frontend layer can serve sitemap.xml from published config.
+            customizations = dict(website.customizations or {})
+            customizations["sitemap"] = pages
+            website.customizations = customizations
             db.session.commit()
 
             logger.info("Rebuilt sitemap for %s (%d pages)", school.slug, len(pages))

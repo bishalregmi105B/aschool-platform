@@ -12,15 +12,22 @@ class EmailService:
 
     @classmethod
     def _get_smtp(cls) -> smtplib.SMTP:
+        import os
+
+        # MAIL_* keys live in the environment (.env.example documents them);
+        # config.py doesn't map them, so read env directly with sane defaults.
+        username = os.getenv("MAIL_USERNAME", "")
+        password = os.getenv("MAIL_PASSWORD", "")
+        if not username or not password:
+            raise RuntimeError(
+                "MAIL_USERNAME/MAIL_PASSWORD not configured — email sending disabled"
+            )
         smtp = smtplib.SMTP(
-            current_app.config.get("MAIL_SERVER", "smtp.gmail.com"),
-            current_app.config.get("MAIL_PORT", 587),
+            os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+            int(os.getenv("MAIL_PORT", "587")),
         )
         smtp.starttls()
-        smtp.login(
-            current_app.config["MAIL_USERNAME"],
-            current_app.config["MAIL_PASSWORD"],
-        )
+        smtp.login(username, password)
         return smtp
 
     @classmethod

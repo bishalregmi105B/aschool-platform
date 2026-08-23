@@ -13,7 +13,7 @@ def check_overdue_books():
     Only fires for schools with the 'library' plugin active.
     """
     from extensions import db
-    from app.models.library import BookCheckout
+    from app.models.library import BookTransaction
     from app.models.plugin import SchoolPlugin
     from datetime import date
 
@@ -27,20 +27,20 @@ def check_overdue_books():
 
     for (school_id,) in active_schools:
         try:
-            overdue = BookCheckout.query.filter(
-                BookCheckout.school_id == school_id,
-                BookCheckout.due_date < today,
-                BookCheckout.returned_at.is_(None),
+            overdue = BookTransaction.query.filter(
+                BookTransaction.school_id == school_id,
+                BookTransaction.due_date < today,
+                BookTransaction.return_date.is_(None),
             ).all()
 
-            for checkout in overdue:
+            for tx in overdue:
                 emit_for_school(
                     "library.book_overdue",
                     school_id=str(school_id),
-                    checkout_id=str(checkout.id),
-                    student_id=str(checkout.student_id),
-                    book_id=str(checkout.book_id),
-                    due_date=str(checkout.due_date),
+                    transaction_id=str(tx.id),
+                    student_id=str(tx.student_id),
+                    book_id=str(tx.book_id),
+                    due_date=str(tx.due_date),
                 )
 
             logger.info("Found %d overdue books for school %s", len(overdue), school_id)

@@ -152,8 +152,7 @@ def homework_help():
     result = HomeworkHelperService.get_help(
         question=question,
         subject=data.get("subject"),
-        grade=data.get("grade"),
-        language=data.get("language", "english"),
+        grade_level=data.get("grade_level"),
     )
     return success_response(result)
 

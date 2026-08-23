@@ -34,14 +34,16 @@ def moderate_social_content(post_id: str):
     if not post:
         return {"moderated": False, "reason": "Post not found"}
 
-    # Basic keyword filter (expandable)
+    # Basic keyword filter (expandable).
+    # Post has no is_flagged column — flagging hides the post (soft delete)
+    # and logs it; a proper moderation-queue model is a future feature.
     flagged_words = ["spam", "scam", "abuse"]
     content_lower = (post.content or "").lower()
 
     is_flagged = any(word in content_lower for word in flagged_words)
     if is_flagged:
-        post.is_flagged = True
+        post.is_deleted = True
         db.session.commit()
-        current_app.logger.warning(f"Post {post_id} flagged for moderation")
+        current_app.logger.warning(f"Post {post_id} flagged and hidden for moderation")
 
     return {"moderated": True, "flagged": is_flagged}
