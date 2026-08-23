@@ -1,6 +1,6 @@
 name: aschool_admin
 description: ASchool Admin — Principal & office management app
-version: 1.0.0+1
+version: 2.0.0+2
 publish_to: 'none'
 
 environment:
