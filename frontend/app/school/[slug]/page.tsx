@@ -1,18 +1,8 @@
 /** Public School Homepage — SSR with ISR (revalidate every 5 minutes) */
 import { SectionRenderer } from "@/components/website/SectionRenderer";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { getPublicSite } from "@/lib/public-site";
 import type { LiveData } from "@/components/website/SectionRenderer";
-
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
-
-async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300 },
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data;
-}
 
 type Notice = { id: string; title: string; content: string; created_at: string; category?: string };
 type Teacher = { id: string; name: string; subject?: string; photo?: string; designation?: string };
@@ -61,9 +51,25 @@ function formatDate(dateStr: string) {
 }
 
 export default async function SchoolHomePage({ params }: { params: { slug: string } }) {
-  const data = await getSchoolData(params.slug);
-  if (!data) return <div className="p-8 text-center text-lg">School not found</div>;
+  const site = await getPublicSite(params.slug);
 
+  // Defensive: the layout normally intercepts these, but keep page-level
+  // honesty if it ever renders children without data.
+  if (!site.ok) {
+    return site.reason === "unpublished" ? (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
+        <div className="text-5xl mb-4">🚧</div>
+        <h1 className="text-2xl font-bold mb-2">
+          {site.schoolName ? `${site.schoolName} — Website Coming Soon` : "Website Coming Soon"}
+        </h1>
+        <p className="text-gray-600">This school&apos;s website hasn&apos;t been published yet.</p>
+      </div>
+    ) : (
+      <div className="min-h-[60vh] flex items-center justify-center text-lg">School not found</div>
+    );
+  }
+
+  const data = site.data;
   const { school, notices, teachers, gallery, sections } = data as {
     school: Record<string, string | number>;
     notices: Notice[];
@@ -76,7 +82,13 @@ export default async function SchoolHomePage({ params }: { params: { slug: strin
   const hasSections = Array.isArray(sections) && sections.length > 0;
   if (hasSections) {
     const liveData: LiveData = {
-      school: school as LiveData["school"],
+      school: {
+        ...(school as LiveData["school"]),
+        slug: params.slug,
+        // Sanitize rich-text fields SERVER-SIDE before passing them into the
+        // client-side SectionRenderer (which must not bundle jsdom/DOMPurify).
+        about_us: sanitizeHtml(school.about_us as string),
+      },
       notices: (notices || []).map((n) => ({ id: n.id, title: n.title, content: n.content, created_at: n.created_at })),
     };
     const sorted = [...sections].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));

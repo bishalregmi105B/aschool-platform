@@ -50,6 +50,31 @@ _MIME_TYPE_MAP = {
     "text/plain": "document",
 }
 
+# E167: the upload endpoint previously had NO type restriction (any binary,
+# including .exe/.html/.svg-with-JS, was stored and served). Allowlist the
+# extensions the product actually uploads (FilePicker: images/video/audio,
+# pdf/doc/txt, xls/csv; students bulk-import: .zip) — overridable via env.
+DEFAULT_ALLOWED_EXTENSIONS = {
+    # images (svg intentionally excluded — stored-XSS vector when served
+    # same-origin from /uploads)
+    "jpg", "jpeg", "png", "webp", "gif", "bmp",
+    # video / audio
+    "mp4", "webm", "mov", "avi", "mp3", "wav", "ogg", "m4a",
+    # documents
+    "pdf", "doc", "docx", "txt",
+    # spreadsheets
+    "xls", "xlsx", "csv",
+    # archives (bulk profile-image ZIP imports)
+    "zip",
+}
+
+
+def _allowed_extensions() -> set[str]:
+    raw = os.getenv("FILE_ALLOWED_EXTENSIONS", "")
+    if raw.strip():
+        return {e.strip().lower().lstrip(".") for e in raw.split(",") if e.strip()}
+    return DEFAULT_ALLOWED_EXTENSIONS
+
 
 def _detect_file_type(mime: str) -> str:
     if not mime:
@@ -152,6 +177,13 @@ def upload():
             return error_response(f"File '{f.filename}' exceeds {MAX_SIZE // (1024*1024)} MB limit", 413)
 
         ext = os.path.splitext(f.filename)[1].lstrip(".").lower() if f.filename else ""
+        # E167: extension allowlist (size limit alone was not enough).
+        if ext and ext not in _allowed_extensions():
+            return error_response(
+                f"File type '.{ext}' is not allowed. Permitted: "
+                + ", ".join(sorted(_allowed_extensions())),
+                415,
+            )
         r2_key = f"{g.school_id}/{folder}/{uuid.uuid4().hex}.{ext}" if ext else f"{g.school_id}/{folder}/{uuid.uuid4().hex}"
         mime = f.content_type or "application/octet-stream"
 
@@ -196,12 +228,19 @@ def upload():
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
-@files_bp.route("/", methods=["GET"])
+@files_bp.route("/", methods=["GET"], strict_slashes=False)
 @jwt_required()
 @school_required
 @plugin_required("file_management")
 def list_files():
-    """List files for the school with optional filters."""
+    """List files for the school with optional filters.
+
+    strict_slashes=False is load-bearing: without it, GET /files (no slash —
+    what the Next.js dev server 308-normalizes /files/ down to) bounces with a
+    308 whose Location is absolute and built from the proxied Host header
+    (http://flask:5000/...), which leaks the Docker-internal hostname into the
+    browser (ERR_NAME_NOT_RESOLVED) and makes the files page list nothing.
+    """
     q = ManagedFile.query.filter_by(school_id=g.school_id, is_deleted=False)
 
     folder_id = request.args.get("folder_id")
@@ -309,7 +348,14 @@ def get_presigned(file_id):
     if not f:
         return error_response("File not found", 404)
 
-    expires = int(request.args.get("expires", 3600))
+    # E162: expires used to be int()-parsed unvalidated — non-numeric values
+    # 500ed, negative values passed straight through, and huge values would
+    # fail at botocore on R2 (max signature age is 7 days). Clamp to [60s, 7d].
+    try:
+        expires = int(request.args.get("expires", 3600))
+    except (TypeError, ValueError):
+        return error_response("expires must be an integer number of seconds", 400)
+    expires = max(60, min(expires, 7 * 24 * 3600))
     url = generate_presigned_url(f.key, expires_in=expires)
     return success_response({"presigned_url": url, "expires_in": expires})
 
@@ -437,8 +483,13 @@ def stock_search():
     """
     q = (request.args.get("q") or "").strip()
     source = request.args.get("source", "unsplash")
-    page = max(1, int(request.args.get("page", 1)))
-    per_page = min(max(1, int(request.args.get("per_page", 20))), 30)
+    # E162: page/per_page were int()-parsed unvalidated → ValueError 500 on
+    # garbage query strings.
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(max(1, int(request.args.get("per_page", 20))), 30)
+    except (TypeError, ValueError):
+        return error_response("page and per_page must be integers", 400)
 
     if not q:
         return success_response({"results": [], "total": 0, "has_more": False})
@@ -454,6 +505,7 @@ def stock_search():
 @plugin_required("file_management")
 def stock_import():
     """Download a stock image URL and save it to the school's file library."""
+    from urllib.parse import urlparse
     from werkzeug.utils import secure_filename
     user_id = get_jwt_identity()
     data = request.get_json() or {}
@@ -465,6 +517,22 @@ def stock_import():
 
     if not url:
         return error_response("url is required", 400)
+
+    # E166: this used to fetch ANY user-supplied URL server-side — a classic
+    # SSRF (internal services, cloud metadata endpoints, MinIO admin). Only
+    # the stock CDNs the feature actually sources from are allowed now.
+    _STOCK_HOSTS = {
+        "images.unsplash.com",
+        "plus.unsplash.com",
+        "images.pexels.com",
+        "videos.pexels.com",
+    }
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in _STOCK_HOSTS:
+        return error_response(
+            "url must be an https stock image from images.unsplash.com or images.pexels.com",
+            400,
+        )
 
     # Fire Unsplash download trigger (required by Unsplash API terms)
     if source == "unsplash" and trigger_url:

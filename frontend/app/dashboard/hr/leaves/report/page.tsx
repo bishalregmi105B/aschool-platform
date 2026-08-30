@@ -33,13 +33,14 @@ export default function LeaveReportPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["staff-leaves", statusFilter],
     queryFn: async () => {
       const url = statusFilter === "all" ? "/hr/leaves" : `/hr/leaves?status=${statusFilter}`;
       const res = await api.get<ApiResponse<LeaveRequest[]>>(url);
       return res.data.data || [];
     },
+    retry: 1,
   });
 
   const updateStatusMutation = useMutation({
@@ -53,6 +54,17 @@ export default function LeaveReportPage() {
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load leave requests. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const leaves = data || [];
   

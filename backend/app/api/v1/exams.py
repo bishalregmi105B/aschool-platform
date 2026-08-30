@@ -156,6 +156,9 @@ def _build_subject_grade(
         practical_pass_marks=config["practical_pass_marks"],
     )
     result.update(config)
+    # Credit hours flow into calculate_gpa so the overall GPA is credit-weighted
+    # (matching report cards); None → equal weighting, explicit 0 → no weight.
+    result["credit_hours"] = getattr(subject, "credit_hours", None)
     return result
 
 
@@ -389,6 +392,20 @@ def submit_online_exam(online_exam_id):
         if not student or str(student_id) != str(student.id):
             return error_response("You can only submit your own exam", 403)
 
+    # E177: for staff tokens a bogus/foreign student_id flowed straight into
+    # the attempt INSERT — FK IntegrityError 500 (bogus) or a cross-tenant
+    # attempt row (valid id from another school). Resolve within this school.
+    student_uuid = _coerce_uuid(student_id)
+    if not student_uuid:
+        return error_response("student_id is not a valid id", 400)
+    from app.models.student import Student as _Student
+
+    attempt_student = _Student.query.filter_by(
+        id=student_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not attempt_student:
+        return error_response("student_id does not match a student at this school", 400)
+
     # Enforce the published schedule window.
     now = datetime.now(timezone.utc)
     start_at = exam.start_at.replace(tzinfo=timezone.utc) if exam.start_at and exam.start_at.tzinfo is None else exam.start_at
@@ -403,7 +420,7 @@ def submit_online_exam(online_exam_id):
     attempt = OnlineExamAttempt(
         school_id=g.school_id,
         online_exam_id=exam.id,
-        student_id=student_id,
+        student_id=student_uuid,
         answers=answers,
         score=score,
         status="submitted",
@@ -632,20 +649,38 @@ def submit_marks(exam_id):
         if not allowed_subject_ids and not allowed_class_ids:
             return error_response("Not allowed to submit marks", 403)
 
-    for rec in records:
-        sid = rec.get("student_id")
-        subj = rec.get("subject_id") or subject_id
-        cls_id = rec.get("class_id") or data.get("class_id")
-
+    # Pre-validate EVERY record up front (E17-class guards): coerce ids and
+    # verify the student/subject/class exist in this school BEFORE any write,
+    # so a bad row fails the whole batch with a 400 instead of an unhandled
+    # DataError/IntegrityError mid-commit — marks commit in ONE transaction,
+    # so a mid-batch failure must leave zero partial rows.
+    cleaned = []
+    for idx, rec in enumerate(records):
+        sid = _coerce_uuid(rec.get("student_id"))
+        subj = _coerce_uuid(rec.get("subject_id") or subject_id)
         if not sid or not subj:
-            continue
+            return error_response(
+                f"records[{idx}]: student_id and subject_id are required and must be valid ids",
+                400,
+            )
 
         if g.role == "teacher":
             if (
                 str(subj) not in allowed_subject_ids
-                and str(cls_id) not in allowed_class_ids
+                and str(rec.get("class_id") or data.get("class_id")) not in allowed_class_ids
             ):
                 continue
+
+        student_row = Student.query.filter_by(
+            id=sid,
+            school_id=g.school_id,
+            is_deleted=False,
+        ).first()
+        if not student_row:
+            return error_response(
+                f"records[{idx}]: student_id does not match a student at this school",
+                400,
+            )
 
         subject_key = str(subj)
         if subject_key not in subject_cache:
@@ -655,7 +690,32 @@ def submit_marks(exam_id):
                 is_deleted=False,
             ).first()
         subject = subject_cache[subject_key]
+        if not subject:
+            return error_response(
+                f"records[{idx}]: subject_id does not match a subject at this school",
+                400,
+            )
 
+        # Persist the class alongside the marks: results/grade-sheet filter by
+        # class_id, so rows saved with NULL would be invisible there. Resolve
+        # rec → request-level default → the student's own class (E24-exams-class-id).
+        cls_id = rec.get("class_id") or data.get("class_id")
+        if cls_id:
+            cls_uuid = _coerce_uuid(cls_id)
+            if not cls_uuid or not Class.query.filter_by(
+                id=cls_uuid, school_id=g.school_id, is_deleted=False
+            ).first():
+                return error_response(
+                    f"records[{idx}]: class_id does not match a class at this school",
+                    400,
+                )
+            cls_id = cls_uuid
+        else:
+            cls_id = student_row.class_id
+
+        cleaned.append((rec, sid, subj, cls_id, subject))
+
+    for rec, sid, subj, cls_id, subject in cleaned:
         theory = float(rec.get("theory_marks", rec.get("marks", 0)) or 0)
         practical = float(rec.get("practical_marks", 0) or 0)
         total = theory + practical
@@ -695,13 +755,15 @@ def submit_marks(exam_id):
             existing.gpa = grade_result["gpa"]
             existing.remarks = rec.get("remarks")
             existing.is_absent = rec.get("is_absent", False)
+            if cls_id and not existing.class_id:
+                existing.class_id = cls_id
         else:
             marks = Marks(
                 school_id=g.school_id,
                 exam_id=exam_id,
                 student_id=sid,
                 subject_id=subj,
-                class_id=rec.get("class_id"),
+                class_id=cls_id,
                 theory_marks=theory,
                 practical_marks=practical,
                 total_marks=total,
@@ -747,7 +809,11 @@ def get_exam_subjects(exam_id):
     if exam.subject_ids:
         query = query.filter(Subject.id.in_(exam.subject_ids))
     elif request.args.get("class_id"):
-        query = query.filter(Subject.class_ids.any(UUID(request.args["class_id"])))
+        # E177: raw UUID() on a query param 500ed (ValueError) for garbage ids.
+        class_uuid = _coerce_uuid(request.args["class_id"])
+        if not class_uuid:
+            return error_response("Invalid class_id", 400)
+        query = query.filter(Subject.class_ids.any(class_uuid))
     if g.role == "teacher" and _current_user_uuid():
         class_id = request.args.get("class_id")
         allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
@@ -922,6 +988,11 @@ def get_grade_sheet(exam_id):
     if not class_id:
         return error_response("class_id is required", 400)
 
+    # E177: garbage class_id died with ValueError (500) at UUID(class_id) below.
+    class_uuid = _coerce_uuid(class_id)
+    if not class_uuid:
+        return error_response("class_id is not a valid id", 400)
+
     if g.role == "teacher" and _current_user_uuid():
         allowed_class_ids = teacher_allowed_class_ids(g.school_id, g.user_id)
         allowed_class_ids_set = {str(cid) for cid in allowed_class_ids}
@@ -944,7 +1015,7 @@ def get_grade_sheet(exam_id):
         subj_query = subj_query.filter(Subject.id.in_(exam.subject_ids))
     else:
         subj_query = subj_query.filter(
-            Subject.class_ids.any(UUID(class_id))
+            Subject.class_ids.any(class_uuid)
         )
     configured_subjects = subj_query.order_by(Subject.name).all()
 

@@ -26,7 +26,8 @@ class _ClassSectionsScreenState extends State<ClassSectionsScreen> {
     });
     try {
       _classes = await AcademicDataService.fetchClasses();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ClassSectionsScreen load failed: $e\n$st');
       _error = 'Unable to load classes right now.';
     }
     if (mounted) {
@@ -71,7 +72,7 @@ class _ClassSectionsScreenState extends State<ClassSectionsScreen> {
       itemCount: _classes.length,
       itemBuilder: (context, index) {
         final klass = _classes[index];
-        final sections = (klass['sections'] as List?) ?? const [];
+        final sections = safeMapList(klass['sections']);
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
@@ -90,8 +91,7 @@ class _ClassSectionsScreenState extends State<ClassSectionsScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: sections.map((item) {
-                      final section = (item as Map).cast<String, dynamic>();
+                    children: sections.map((section) {
                       final capacity = section['capacity']?.toString() ?? '-';
                       return Chip(
                         label:

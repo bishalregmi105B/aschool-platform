@@ -1,8 +1,16 @@
 /// HR Models
 
+/// Coerce a JSON value (int, double, numeric string, null) to double.
+double _num(dynamic v) {
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v) ?? 0;
+  return 0;
+}
+
 class PayrollSlip {
   final String id;
   final String userId;
+  final String? staffName;
   final String? month;
   final String? year;
   final double basicSalary;
@@ -15,6 +23,7 @@ class PayrollSlip {
   const PayrollSlip({
     required this.id,
     required this.userId,
+    this.staffName,
     this.month,
     this.year,
     this.basicSalary = 0,
@@ -25,18 +34,25 @@ class PayrollSlip {
     this.paymentDate,
   });
 
+  /// Field names follow the backend `_payroll_dict` serializer
+  /// (`backend/app/api/v1/hr_payroll.py`): `allowances_total`,
+  /// `deductions_total`, `paid_at`. Legacy aliases kept for older payloads.
   factory PayrollSlip.fromJson(Map<String, dynamic> json) {
     return PayrollSlip(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
-      month: json['month'] as String?,
+      staffName: json['staff_name'] as String?,
+      month: json['month']?.toString(),
       year: json['year']?.toString(),
-      basicSalary: (json['basic_salary'] as num?)?.toDouble() ?? 0,
-      totalAllowances: (json['total_allowances'] as num?)?.toDouble() ?? 0,
-      totalDeductions: (json['total_deductions'] as num?)?.toDouble() ?? 0,
-      netSalary: (json['net_salary'] as num?)?.toDouble() ?? 0,
+      basicSalary: _num(json['basic_salary']),
+      totalAllowances:
+          _num(json['allowances_total'] ?? json['total_allowances']),
+      totalDeductions:
+          _num(json['deductions_total'] ?? json['total_deductions']),
+      netSalary: _num(json['net_salary']),
       status: json['status'] as String?,
-      paymentDate: json['payment_date'] as String?,
+      paymentDate:
+          (json['paid_at'] ?? json['payment_date'])?.toString(),
     );
   }
 }
@@ -66,7 +82,7 @@ class LeaveRequest {
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
     return LeaveRequest(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       leaveType: json['leave_type'] as String?,
       startDate: json['start_date'] as String? ?? '',

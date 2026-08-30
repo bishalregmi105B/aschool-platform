@@ -13,6 +13,7 @@ class StudentsScreen extends ConsumerStatefulWidget {
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   List<Map<String, dynamic>> _students = [];
   bool _loading = true;
+  String? _error;
   String _search = '';
   String? _classFilter;
   int _page = 1;
@@ -34,7 +35,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   }
 
   Future<void> _loadStudents() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final params = <String, dynamic>{'page': 1, 'per_page': 30};
       if (_search.isNotEmpty) params['search'] = _search;
@@ -48,8 +52,12 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
         _hasMore = (response.data['meta']?['pagination']?['has_next'] ?? false);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('StudentsScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load students.';
+        _loading = false;
+      });
     }
   }
 
@@ -65,7 +73,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             List<Map<String, dynamic>>.from(response.data['data'] ?? []));
         _hasMore = (response.data['meta']?['pagination']?['has_next'] ?? false);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      // Pagination failure keeps the already-loaded list usable.
+      debugPrint('StudentsScreen loadMore failed: $e\n$st');
+    }
   }
 
   @override
@@ -88,7 +99,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
         Expanded(
           child: _loading
               ? const LoadingShimmer()
-              : RefreshIndicator(
+              : (_error != null && _students.isEmpty)
+                  ? ErrorContainer(errorMessage: _error!, onRetry: _loadStudents)
+                  : RefreshIndicator(
                   onRefresh: _loadStudents,
                   child: ListView.builder(
                     controller: _scrollController,

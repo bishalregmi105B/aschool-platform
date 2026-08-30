@@ -46,7 +46,10 @@ def get_school(school_id):
     if not school or school.is_deleted:
         return error_response("School not found", 404)
     claims = get_jwt()
-    if not claims.get("is_superadmin") and str(school.id) != str(g.get("school_id")):
+    # E161: this used to check claims.get("is_superadmin") — a claim
+    # AuthService.create_tokens never sets, so even the platform superadmin
+    # got 403 on their own school detail/update. Check the role instead.
+    if claims.get("role") != "superadmin" and str(school.id) != str(g.get("school_id")):
         return error_response("Forbidden", 403)
     return success_response(school.to_dict())
 
@@ -71,6 +74,8 @@ def update_current_school():
         return error_response("School not found", 404)
 
     data = request.get_json(silent=True) or {}
+    # E161b: tenant admins may not change routing/plan fields (see update_school).
+    data = {k: v for k, v in data.items() if k not in ("slug", "custom_domain", "plan", "max_students", "is_active")}
     _populate_school(school, data)
     db.session.commit()
     return success_response(school.to_dict())
@@ -112,9 +117,14 @@ def update_school(school_id):
     if not school or school.is_deleted:
         return error_response("School not found", 404)
     claims = get_jwt()
-    if not claims.get("is_superadmin") and str(school.id) != str(g.get("school_id")):
+    # E161: same dead-claim bug as get_school (see above).
+    if claims.get("role") != "superadmin" and str(school.id) != str(g.get("school_id")):
         return error_response("Forbidden", 403)
     data = request.get_json(silent=True) or {}
+    # Tenant admins may not touch routing/plan fields — slug + custom_domain
+    # drive subdomain resolution and plan drives entitlements.
+    if claims.get("role") != "superadmin":
+        data = {k: v for k, v in data.items() if k not in ("slug", "custom_domain", "plan", "max_students", "is_active")}
     _populate_school(school, data)
     db.session.commit()
     return success_response(school.to_dict())

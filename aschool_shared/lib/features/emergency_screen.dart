@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../widgets/error_container.dart';
 import '../widgets/loading_shimmer.dart';
 import '../widgets/no_data_container.dart';
 import '../widgets/plugin_gate.dart';
@@ -38,6 +39,7 @@ class EmergencyAlertsScreen extends StatefulWidget {
 class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
   List<Map<String, dynamic>> _alerts = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -46,7 +48,10 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance
           .get('/emergency/alerts?per_page=${widget.perPage}');
@@ -54,7 +59,10 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
       setState(() {
         _alerts = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('EmergencyAlertsScreen load failed: $e\n$st');
+      _error = 'Could not load emergency alerts.';
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -124,6 +132,9 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
         _alerts.where((a) => a['status'] == 'active').toList();
 
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -327,7 +338,8 @@ class _AlertCard extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EmergencyAlertsScreen _formatDate parse failed: $e');
       return iso;
     }
   }

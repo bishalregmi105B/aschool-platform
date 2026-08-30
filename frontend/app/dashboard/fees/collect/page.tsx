@@ -290,6 +290,8 @@ function CollectContent() {
     data: collectionsData,
     isLoading,
     isFetching,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: ["fee-collections", classId, sectionId, search, statusFilter],
     queryFn: async () => {
@@ -301,6 +303,7 @@ function CollectContent() {
       const response = await api.get("/fees/collections", { params });
       return (response.data?.data || []) as FeeCollection[];
     },
+    retry: 1,
   });
 
   const collections = collectionsData || [];
@@ -563,7 +566,12 @@ function CollectContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-0">
-            {isLoading ? (
+            {isError ? (
+              <div className="flex flex-col items-center py-12 space-y-3">
+                <p className="text-sm text-destructive">Failed to load student ledgers. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            ) : isLoading ? (
               <div className="flex justify-center py-16">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
@@ -1052,11 +1060,22 @@ function StudentAccountWorkbench({
                 const isSelected = fee.id === selectedFeeId;
 
                 return (
-                  <button
+                  // E206: must NOT be a <button> — the receipt <Button> below
+                  // is a real descendant and <button> cannot nest <button>
+                  // (React hydration error). A div with button semantics keeps
+                  // the card selectable AND keyboard-operable.
+                  <div
                     key={fee.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedFeeId(fee.id)}
-                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedFeeId(fee.id);
+                      }
+                    }}
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition cursor-pointer ${
                       isSelected
                         ? "border-primary bg-primary/5 shadow-sm"
                         : "hover:bg-muted/30"
@@ -1136,7 +1155,7 @@ function StudentAccountWorkbench({
                         </Button>
                       ) : null}
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}

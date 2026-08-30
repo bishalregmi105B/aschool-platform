@@ -26,7 +26,8 @@ class _NoticesScreenState extends State<NoticesScreen> {
     });
     try {
       _notices = await NoticesService.fetchNotices();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('NoticesScreen load failed: $e\n$st');
       _error = 'Unable to load notices right now.';
     }
     if (mounted) {
@@ -73,16 +74,28 @@ class _NoticesScreenState extends State<NoticesScreen> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () async {
-                  await NoticesService.createNotice(
-                    title: titleCtrl.text.trim(),
-                    content: contentCtrl.text.trim(),
-                    targetRoles: const [
-                      'school_admin',
-                      'teacher',
-                      'parent',
-                      'student'
-                    ],
-                  );
+                  try {
+                    await NoticesService.createNotice(
+                      title: titleCtrl.text.trim(),
+                      content: contentCtrl.text.trim(),
+                      targetRoles: const [
+                        'school_admin',
+                        'teacher',
+                        'parent',
+                        'student'
+                      ],
+                    );
+                  } catch (e, st) {
+                    debugPrint('NoticesScreen create failed: $e\n$st');
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text('Could not publish notice. Please retry.')),
+                    );
+                    return;
+                  }
                   if (!mounted) return;
                   Navigator.pop(context);
                 },

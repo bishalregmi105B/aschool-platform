@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
@@ -52,7 +53,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _storage.deleteAll();
         state = const AuthState();
       }
-    } catch (_) {
+    } catch (e) {
+      // Session restore failed (network/parse). Tokens are kept; the user
+      // simply lands on the login screen.
+      debugPrint('AuthNotifier session restore failed: $e');
       state = const AuthState();
     }
   }
@@ -171,7 +175,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'phone': phone,
       });
       return response.statusCode == 200 && response.data['success'] == true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AuthNotifier requestOtp failed: $e');
       return false;
     }
   }
@@ -182,12 +187,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState();
   }
 
-  /// Register push notification player ID after login
+  /// Register push notification channels after login.
+  ///
+  /// Uses the shared NotificationService singleton so the tokens captured
+  /// during init() at startup are available here.
   Future<void> _registerPushNotifications(User user) async {
     try {
       final notifService = NotificationService();
-      // Prefer OneSignal player ID; fall back to FCM token
-      final playerId = notifService.oneSignalPlayerId ?? notifService.fcmToken;
+      // FCM fallback channel — dedicated endpoint that persists the token on
+      // the user record (retry after login: init() ran pre-authentication).
+      await notifService.registerFcmTokenWithBackend();
+      // OneSignal primary channel — register player ID + tags when available.
+      final playerId = notifService.oneSignalPlayerId;
       if (playerId != null) {
         await notifService.registerOneSignalPlayer(playerId);
         await notifService.setOneSignalTags(
@@ -196,8 +207,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
           userId: user.id,
         );
       }
-    } catch (_) {
-      // Non-fatal — push registration can retry later
+    } catch (e) {
+      // Non-fatal fire-and-forget — push registration can retry later.
+      debugPrint('Push registration failed for ${user.role}: $e');
     }
   }
 }

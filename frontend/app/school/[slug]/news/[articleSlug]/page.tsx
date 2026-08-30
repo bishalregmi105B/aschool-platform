@@ -5,7 +5,7 @@ const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http:
 
 async function getArticle(schoolSlug: string, articleSlug: string) {
   try {
-    const res = await fetch(`${API_URL}/api/v1/website/public/${schoolSlug}/news/${articleSlug}`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_URL}/api/v1/website/public/${schoolSlug}/news/${articleSlug}`, { next: { revalidate: 300, tags: [`school-${schoolSlug}`] } });
     if (!res.ok) return null;
     return (await res.json()).data;
   } catch { return null; }

@@ -1,4 +1,7 @@
-"""Auth API routes — OTP, login, token refresh, me."""
+"""Auth API routes — OTP, login, token refresh, me, password recovery."""
+import hashlib
+import os
+import secrets
 from functools import wraps
 
 from flask import Blueprint, current_app, jsonify, request
@@ -15,6 +18,58 @@ ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
 ACCESS_COOKIE_MAX_AGE = 3600  # keep in sync with JWT_ACCESS_TOKEN_EXPIRES
 REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
+
+# ── Password recovery (E96) ──────────────────────────────────────────────────
+# Tokens are random 32-byte urlsafe strings; ONLY their SHA-256 hash is stored
+# (Redis, 30-minute TTL). The raw token exists solely in the emailed link and,
+# when SMTP is unconfigured, in the server log. Reset is single-use: the key
+# is deleted on successful reset. Reset also bumps tokens_invalid_before so
+# every previously issued JWT (access + refresh, all devices) is rejected.
+#
+# NOTE: tokens deliberately live in the raw `redis_client` namespace (db key
+# `pwreset:<sha256>`), NOT in flask-caching — runtime monitoring during the
+# audit caught flask_cache_ keys being swept by unrelated batch DELs
+# (school-plugin cache invalidations), which would silently void outstanding
+# reset tokens. The cooldown marker below stays in flask-caching because
+# losing it is harmless (just a shorter rate-limit window).
+PWRESET_TTL_SECONDS = 30 * 60
+PWRESET_COOLDOWN_SECONDS = 60
+
+
+def _pwreset_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _pwreset_store_set(token: str, user_id: str) -> None:
+    from extensions import redis_client
+
+    key = f"pwreset:{_pwreset_hash(token)}"
+    if redis_client is not None:
+        redis_client.set(key, user_id, ex=PWRESET_TTL_SECONDS)
+    else:  # testing fallback without a shared redis
+        from extensions import cache
+        cache.set(key, user_id, timeout=PWRESET_TTL_SECONDS)
+
+
+def _pwreset_store_get(token: str) -> str | None:
+    from extensions import redis_client
+
+    key = f"pwreset:{_pwreset_hash(token)}"
+    if redis_client is not None:
+        return redis_client.get(key)
+    from extensions import cache
+    return cache.get(key)
+
+
+def _pwreset_store_delete(token: str) -> None:
+    from extensions import redis_client
+
+    key = f"pwreset:{_pwreset_hash(token)}"
+    if redis_client is not None:
+        redis_client.delete(key)
+    else:
+        from extensions import cache
+        cache.delete(key)
 
 
 def _cookie_params():
@@ -207,15 +262,155 @@ def change_password():
         return error_response("Current password is incorrect", 401)
 
     user.set_password(new_password)
+    # Invalidate tokens on all other devices (blocklist loader checks iat).
+    from datetime import datetime, timezone
+    user.tokens_invalid_before = datetime.now(timezone.utc)
 
     from extensions import db
     db.session.commit()
     return success_response({"message": "Password changed successfully"})
 
 
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    """Issue a single-use, 30-minute password reset token for an email account.
+
+    Honest delivery contract (E96/E164): the response never claims an email
+    was sent unless EmailService actually reported success. When SMTP is
+    unconfigured or the send fails, the raw token is logged server-side so
+    the operator can hand it to the user, and delivery is reported as
+    "unavailable". Unknown emails report "skipped" (nothing was attempted).
+    """
+    from extensions import redis_client
+    from app.utils.validators import validate_email
+
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        return error_response("Email is required", 400)
+    if not validate_email(email):
+        return error_response("Invalid email address", 400)
+
+    generic = "If that email belongs to an active account, a password reset has been initiated."
+
+    # Cooldown per email (mirrors the OTP cooldown pattern) to slow abuse.
+    # Raw redis_client namespace: flask_cache_ keys were observed being swept
+    # by unrelated batch DELs, which silently disabled this rate limit.
+    cooldown_key = f"pwreset_cooldown:{email}"
+    if redis_client is not None:
+        cooldown_active = bool(redis_client.get(cooldown_key))
+    else:
+        from extensions import cache
+        cooldown_active = bool(cache.get(cooldown_key))
+    if cooldown_active:
+        return error_response("Please wait before requesting another reset link", 429)
+
+    user = User.query.filter_by(email=email, is_deleted=False).first()
+    if not user or not user.is_active:
+        return success_response({"message": generic, "delivery": "skipped"})
+
+    token = secrets.token_urlsafe(32)
+    _pwreset_store_set(token, str(user.id))
+    if redis_client is not None:
+        redis_client.set(cooldown_key, 1, ex=PWRESET_COOLDOWN_SECONDS)
+    else:
+        from extensions import cache
+        cache.set(cooldown_key, True, timeout=PWRESET_COOLDOWN_SECONDS)
+
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url.rstrip('/')}/reset-password?token={token}"
+
+    from app.services.communications.email_service import EmailService
+    sent = False
+    try:
+        sent = EmailService.send_email(
+            to=email,
+            subject="Reset your ASchool password",
+            html_body=(
+                f"<p>Namaste {user.full_name or ''},</p>"
+                f"<p>A password reset was requested for your ASchool account.</p>"
+                f"<p>Open this link within 30 minutes to choose a new password "
+                f"(the link works once):</p>"
+                f"<p><a href=\"{reset_link}\">Reset my password</a></p>"
+                f"<p>If you did not request this, ignore this email — your password is unchanged.</p>"
+            ),
+            text_body=(
+                f"A password reset was requested for your ASchool account. "
+                f"Open within 30 minutes (single use): {reset_link}"
+            ),
+        )
+    except Exception:
+        current_app.logger.exception("Password-reset email attempt failed for %s", email)
+
+    if sent:
+        return success_response({
+            "message": generic,
+            "delivery": "sent",
+            "expires_in": PWRESET_TTL_SECONDS,
+        })
+
+    # SMTP unconfigured or send failed — never fake success. Log the token so
+    # an operator can complete the reset out-of-band.
+    current_app.logger.warning(
+        "PASSWORD RESET (delivery unavailable) email=%s user=%s token=%s "
+        "(valid %d minutes, single use) link=%s",
+        email, user.id, token, PWRESET_TTL_SECONDS // 60, reset_link,
+    )
+    return success_response({
+        "message": generic + " Email delivery is currently unavailable — "
+        "contact your school administrator to receive the reset token.",
+        "delivery": "unavailable",
+        "expires_in": PWRESET_TTL_SECONDS,
+    })
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    """Consume a single-use reset token and set a new password.
+
+    Body: {"token": "<raw token>", "new_password": "..."}
+    On success every previously issued session for the user is invalidated
+    (tokens_invalid_before), so a stolen session does not survive a reset.
+    """
+    from datetime import datetime, timezone
+
+    from extensions import cache, db
+
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or data.get("reset_token") or "").strip()
+    new_password = data.get("new_password") or data.get("password")
+    if not token or not new_password:
+        return error_response("token and new_password are required", 400)
+
+    ok, pw_error = validate_password_strength(new_password)
+    if not ok:
+        return error_response(pw_error, 400)
+
+    user_id = _pwreset_store_get(token)
+    if not user_id:
+        return error_response("Invalid or expired reset token", 400)
+
+    # Delete FIRST so a concurrent replay of the same token fails (single-use).
+    _pwreset_store_delete(token)
+
+    user = User.query.get(user_id)
+    if not user or user.is_deleted or not user.is_active:
+        return error_response("Invalid or expired reset token", 400)
+
+    user.set_password(new_password)
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.tokens_invalid_before = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return success_response({"message": "Password reset successfully"})
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register_school():
-    """Public school self-registration — creates school + admin user, then sends OTP."""
+    """Public school self-registration — creates school + admin user and
+    logs in directly. The phone is NOT marked verified at signup; it becomes
+    verified only through POST /auth/send-otp + /auth/verify-otp (E9)."""
     import re
     from extensions import db
     from app.models.school import School
@@ -280,6 +475,10 @@ def register_school():
         full_name=data["full_name"].strip(),
         phone=phone,
         email=email,
+        # Honest state: the phone has NOT been verified at signup. It becomes
+        # verified only via POST /auth/send-otp + /auth/verify-otp. Password
+        # login does not gate on this flag, so new users are unaffected (E9).
+        phone_verified=False,
         is_active=True,
     )
     ok, pw_error = validate_password_strength(data["password"])
@@ -295,28 +494,56 @@ def register_school():
 
     db.session.commit()
 
-    # ── Auto-install core plugins ─────────────────────────────────────────────
+    # ── Auto-install plugins for the chosen plan (tier-based entitlements) ────
+    # Plan tier → plugin categories (single source of truth in entitlements).
+    # Paid-plan grants are is_trial=False / no trial dates; free plan never
+    # receives a paid plugin; no trial rows are created at signup (E1/E1b).
+    plugins_granted: list[dict] = []
     try:
-        from app.plugins.billing import install_plugin
-        for plugin_slug in ["attendance", "notices", "academics", "basic_reports", "basic_website"]:
-            install_plugin(str(school.id), plugin_slug)
+        from app.plugins.entitlements import grant_plan_plugins
+        plugins_granted = grant_plan_plugins(str(school.id), plan)
     except Exception:
-        pass  # Non-fatal — plugins can be installed later
+        current_app.logger.exception(
+            "Plan plugin grant failed for school %s (plan=%s) — "
+            "plugins can be granted later from the marketplace",
+            school.id,
+            plan,
+        )
 
-    # ── Send OTP for phone verification ──────────────────────────────────────
-    otp_result = AuthService.send_otp(phone)
+    # ── Provision the per-school AI token quota (mandatory at creation) ──────
+    # AITokenHub._check_quota() treats a MISSING ai_school_quotas row as
+    # "inactive" and raises QuotaExceededError — there is no None=unlimited
+    # fallback. Without eager provisioning a freshly registered school would
+    # get 429s on every hub-routed AI call until an admin called
+    # POST /api/v1/ai-usage/quota/init, so provision the env-default budget
+    # (AI_DEFAULT_DAILY_LIMIT / AI_DEFAULT_MONTHLY_LIMIT) here.
+    try:
+        from app.services.ai.token_hub import AITokenHub
+        AITokenHub.ensure_quota_exists(str(school.id))
+    except Exception:
+        current_app.logger.exception(
+            "AI quota provisioning failed for school %s — provision later "
+            "via POST /api/v1/ai-usage/quota/init",
+            school.id,
+        )
 
-    payload = {
-        "message": "School registered successfully. Please verify your phone.",
-        "school": {"id": str(school.id), "name": school.name, "slug": school.slug, "plan": school.plan},
-        "otp_sent": "error" not in otp_result,
+    # SMS needs no provisioning step: there is no per-school SMS-quota model.
+    # Per-school usage is derived from SMSLog.cost sums (api/v1/sms.py
+    # sms_stats) and the remaining balance lives provider-side
+    # (SMSGateway.check_credits() → Sparrow SMS account credits).
+
+    # Direct login on registration (no mandatory OTP blocking)
+    tokens = AuthService.create_tokens(user)
+    result = {
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "user": user.to_dict(),
+        "school": school.to_dict(),
+        "plan": plan,
+        "plugins_granted": plugins_granted,
+        "message": "School registered successfully.",
     }
-    # Log OTP only to server-side debug log; never expose it in API responses
-    if otp_result.get("otp"):
-        from flask import current_app
-        current_app.logger.debug("DEV OTP for %s: %s", phone, otp_result["otp"])
-
-    return success_response(payload, status_code=201)
+    return _tokens_response(result, status_code=201)
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -352,7 +579,9 @@ def logout_all_sessions():
 
     from datetime import datetime, timezone
     from extensions import db
-    user.last_password_change = datetime.now(timezone.utc)
+    # Real global invalidation: the blocklist loader rejects any token whose
+    # iat predates this timestamp (covers refresh tokens + other devices).
+    user.tokens_invalid_before = datetime.now(timezone.utc)
     db.session.commit()
 
     # Also revoke the current token
@@ -527,6 +756,49 @@ def totp_challenge():
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
         "user": user.to_dict(),
+    })
+
+
+@auth_bp.route("/register-fcm", methods=["POST"])
+@jwt_required()
+def register_fcm():
+    """Register an FCM device token for push notifications (fallback channel).
+
+    Persists the token on the user record (User.fcm_tokens, deduped, max 5
+    devices). Called by the Flutter apps from NotificationService — at startup
+    (when a stored session exists) and after login.
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return error_response("User not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    token = (data.get("fcm_token") or data.get("token") or "").strip()
+    if not token:
+        return error_response("fcm_token is required", 400)
+
+    tokens = list(user.fcm_tokens or [])
+    if token not in tokens:
+        tokens.append(token)
+        # Keep max 5 devices per user (mirrors onesignal_player_ids policy)
+        if len(tokens) > 5:
+            tokens = tokens[-5:]
+        user.fcm_tokens = tokens  # reassign so SQLAlchemy detects the change
+
+        from extensions import db
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception(
+                "Failed to persist FCM token for user %s", user_id
+            )
+            return error_response("Failed to store FCM token", 500)
+
+    return success_response({
+        "message": "FCM token registered",
+        "registered_devices": len(user.fcm_tokens or []),
     })
 
 

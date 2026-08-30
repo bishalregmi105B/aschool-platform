@@ -95,12 +95,27 @@ def calculate_subject_grade(
 
 
 def calculate_gpa(subject_grades: list[dict]) -> dict:
-    """Calculate overall GPA from a list of subject grade results."""
+    """Calculate overall GPA from a list of subject grade results.
+    Accepts 'credit_hours' in the subject dictionary for weighted GPA calculation.
+    """
     if not subject_grades:
         return {"gpa": 0.0, "grade": "NG", "status": "fail"}
 
-    total_gpa = sum(sg["gpa"] for sg in subject_grades)
-    avg_gpa = round(total_gpa / len(subject_grades), 2)
+    total_credit_points = 0.0
+    total_credits = 0.0
+    
+    for sg in subject_grades:
+        credits = sg.get("credit_hours")
+        if credits is None:
+            # Explicit null weight falls back to equal weighting (1.0) instead
+            # of crashing the GPA math. An explicit 0 is honoured: the subject
+            # keeps contributing to marks totals but carries no GPA weight.
+            credits = 1.0
+        total_credit_points += sg["gpa"] * credits
+        total_credits += credits
+
+    avg_gpa = round(total_credit_points / total_credits, 2) if total_credits > 0 else 0.0
+    
     total_obtained = sum(sg.get("total_obtained", 0) for sg in subject_grades)
     total_full = sum(sg.get("total_full", 0) for sg in subject_grades)
     overall_pct = (total_obtained / total_full * 100) if total_full > 0 else 0

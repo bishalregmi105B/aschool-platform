@@ -1,0 +1,20 @@
+# ASchool Project Rules for AI Assistants
+
+1. MANDATORY CONTEXT:
+   - Before writing or editing code, ALWAYS check the latest audit in `audits/PACKAGE_SELECTION_AND_FEATURE_AUDIT_2026-08-27.md` and `audits/AUDIT_INDEX.md`.
+   - After completing edits, log the changes in `audits/AUDIT_INDEX.md`.
+
+2. TECH STACK:
+   - Frontend: Next.js 14 App Router, TypeScript, Tailwind CSS, TanStack Query, Radix UI.
+   - Backend: Python 3.12, Flask 3.0, SQLAlchemy, PostgreSQL 16 (pgvector), Redis 7, Celery.
+   - Mobile: Flutter multi-app architecture (`flutter_admin`, `flutter_teacher`, `flutter_parent`, `flutter_student`, `flutter_user`, `aschool_shared`).
+
+3. THEMING:
+   - Forest Green theme tokens: Primary `#0e3b2e`, Accent `#c5f4dd`, Background `#f7f5f0`, Text `#0d1f14`.
+   - Never introduce unstyled purple or blue default colors unless explicitly part of status indicators (e.g. info badge).
+
+4. PLUGIN SYSTEM:
+   - 57 plugins catalog.
+   - Backend endpoints MUST have `@plugin_required("<slug>")`.
+   - Frontend pages MUST have `<PluginGate slug="<slug>">`.
+   - Always invalidate cache on plugin state changes: `_invalidate_plugin_cache(school_id)`.

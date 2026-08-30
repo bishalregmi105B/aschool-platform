@@ -23,13 +23,16 @@ export default function TransferCertificatePage() {
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [leavingReason, setLeavingReason] = useState("passed");
+  const [leavingDate, setLeavingDate] = useState("");
 
-  const { data: students, isLoading } = useQuery({
+  const { data: students, isLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
     queryKey: ["design-studio-students", search],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>(`/design-studio/data-sources/student/records?q=${search}&limit=50`);
       return res.data.data;
     },
+    retry: 1,
   });
 
   const { data: certificateTemplates = [] } = useQuery({
@@ -47,17 +50,30 @@ export default function TransferCertificatePage() {
     setSelectedTemplateId(preferred);
   }, [certificateTemplates, selectedTemplateId]);
 
+  const REASON_LABELS: Record<string, string> = {
+    passed: "Passed Final Exam",
+    transfer: "Parent Transfer",
+    other: "Other / Personal",
+  };
+
   const renderMutation = useMutation({
     mutationFn: async (studentData: any) => {
       const res = await api.post("/design-studio/render", {
         template_id: selectedTemplateId,
-        data: studentData.fields,
+        data: {
+          ...studentData.fields,
+          // The transfer template prints these tokens — include the leaving
+          // details the admin actually chose instead of dropping them.
+          leaving_reason: REASON_LABELS[leavingReason] || leavingReason,
+          leaving_date: leavingDate || undefined,
+          date: new Date().toISOString().slice(0, 10),
+        },
       });
       return res.data;
     },
     onSuccess: (data: any) => {
       toast.success("Certificate generated successfully");
-      
+
       const newWin = window.open("", "_blank");
       if (newWin) {
         newWin.document.write(`
@@ -66,19 +82,23 @@ export default function TransferCertificatePage() {
               <title>Transfer Certificate</title>
               <style>
                 body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
-                .cert-container { border: 10px solid #double; padding: 40px; max-width: 800px; margin: 0 auto; text-align: center; }
+                .cert-container { border: 10px double #dc2626; padding: 40px; max-width: 800px; margin: 0 auto; text-align: center; }
                 @media print { .no-print { display: none; } }
               </style>
             </head>
             <body>
               <div class="no-print" style="margin-bottom: 20px; text-align: right;">
-                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Print Document</button>
+                <button id="print-btn" style="padding: 10px 20px; cursor: pointer;">Print Document</button>
               </div>
               ${data.data?.html || data.html || "<div class='cert-container'><h1>Transfer Certificate</h1><p>Template rendering fallback.</p></div>"}
             </body>
           </html>
         `);
         newWin.document.close();
+        newWin.document.getElementById("print-btn")?.addEventListener("click", () => {
+          newWin.focus();
+          newWin.print();
+        });
       }
     },
     onError: () => {
@@ -121,13 +141,19 @@ export default function TransferCertificatePage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
+
+            {studentsError ? (
+              <div className="text-center py-6 space-y-3">
+                <p className="text-sm text-destructive">Failed to load students. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchStudents()}>Retry</Button>
+              </div>
+            ) : (
             <div className="space-y-2 pt-4 max-h-[500px] overflow-y-auto">
               {isLoading ? (
                 <div className="flex justify-center py-4"><Spinner /></div>
               ) : (
                 (students || []).map((student) => (
-                  <div 
+                  <div
                     key={student.id}
                     onClick={() => setSelectedStudentId(student.id)}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -143,6 +169,7 @@ export default function TransferCertificatePage() {
                 <div className="text-center text-sm text-muted-foreground py-4">No students found</div>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -199,7 +226,7 @@ export default function TransferCertificatePage() {
                           </div>
                           <div className="space-y-2">
                             <Label>Reason for Leaving</Label>
-                            <Select defaultValue="passed">
+                            <Select value={leavingReason} onValueChange={setLeavingReason}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="passed">Passed Final Exam</SelectItem>
@@ -210,7 +237,7 @@ export default function TransferCertificatePage() {
                           </div>
                           <div className="space-y-2">
                             <Label>Date of Leaving</Label>
-                            <BSDateInput />
+                            <BSDateInput value={leavingDate} onChange={setLeavingDate} />
                           </div>
                         </div>
                       </div>

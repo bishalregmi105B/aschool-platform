@@ -8,8 +8,10 @@ emoji: "🏷️"
 icon: "Tag"
 description: "Custom branding, own domain, remove ASchool branding"
 
-api_blueprint: "app.api.v1.schools"
+api_blueprint: "app.api.v1.white_label"
 models_module: "app.models.school"
+services:
+  - "app.services.website.white_label"
 
 depends_on: []
 conflicts_with: []

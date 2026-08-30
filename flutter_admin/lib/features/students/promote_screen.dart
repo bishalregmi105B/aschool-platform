@@ -11,6 +11,7 @@ class PromoteScreen extends StatefulWidget {
 class _PromoteScreenState extends State<PromoteScreen> {
   List<Map<String, dynamic>> _students = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,7 +20,10 @@ class _PromoteScreenState extends State<PromoteScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/students',
           queryParameters: {'status': 'active', 'per_page': 100});
@@ -30,8 +34,10 @@ class _PromoteScreenState extends State<PromoteScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('PromoteScreen load failed: $e\n$st');
       _students = [];
+      _error = 'Could not load students.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -39,6 +45,11 @@ class _PromoteScreenState extends State<PromoteScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: LoadingShimmer());
+    if (_error != null) {
+      return Scaffold(
+        body: ErrorContainer(errorMessage: _error!, onRetry: _load),
+      );
+    }
 
     return Scaffold(
       body: RefreshIndicator(

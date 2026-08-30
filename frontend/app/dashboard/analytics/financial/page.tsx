@@ -6,18 +6,29 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
-import { ArrowLeft, Download, DollarSign, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import Link from "next/link";
 
 export default function FinancialAnalyticsPage() {
   const [period, setPeriod] = useState("yearly");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["financial-analytics", period],
     queryFn: async () => { const r = await api.get("/analytics/financial", { params: { period } }); return r.data?.data; },
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load financial analytics. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const analytics = data || {};
   const monthly = analytics.monthly_trend || [];
@@ -32,7 +43,7 @@ export default function FinancialAnalyticsPage() {
         <select className="border rounded-md px-3 py-2" value={period} onChange={(e) => setPeriod(e.target.value)}>
           <option value="monthly">This Month</option><option value="quarterly">This Quarter</option><option value="yearly">This Year</option>
         </select>
-        <Button variant="outline"><Download className="h-4 w-4 mr-2" /> Export</Button>
+        
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

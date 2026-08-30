@@ -63,8 +63,7 @@ class ChildAttendance extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
-                      value: ((summary['percentage'] ?? 0) as num).toDouble() /
-                          100,
+                      value: safeDouble(summary['percentage']) / 100,
                       color: ASchoolTheme.success,
                       backgroundColor: ASchoolTheme.success.withAlpha(20),
                       minHeight: 8,

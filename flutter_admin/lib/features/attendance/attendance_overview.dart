@@ -14,6 +14,7 @@ class _AttendanceOverviewState extends ConsumerState<AttendanceOverview> {
   Map<String, dynamic>? _stats;
   List<Map<String, dynamic>> _classWise = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,7 +23,10 @@ class _AttendanceOverviewState extends ConsumerState<AttendanceOverview> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp =
           await ApiClient.instance.get('/attendance/school-overview');
@@ -32,14 +36,21 @@ class _AttendanceOverviewState extends ConsumerState<AttendanceOverview> {
             resp.data['data']?['class_wise'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      debugPrint('AttendanceOverview load failed: $e');
+      setState(() {
+        _error = 'Could not load attendance overview.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return RefreshIndicator(
       onRefresh: _load,

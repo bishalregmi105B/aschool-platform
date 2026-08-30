@@ -1,4 +1,6 @@
 /// Fee models — maps to backend fee.py
+import '../utils/safe_parse.dart';
+
 class FeeType {
   final String id;
   final String name;
@@ -9,10 +11,11 @@ class FeeType {
   const FeeType({required this.id, required this.name, this.description, this.amount = 0, this.isOptional = false});
 
   factory FeeType.fromJson(Map<String, dynamic> json) => FeeType(
-    id: json['id'] as String, name: json['name'] as String? ?? '',
-    description: json['description'] as String?,
-    amount: (json['amount'] as num?)?.toDouble() ?? 0,
-    isOptional: json['is_optional'] as bool? ?? false,
+    id: safeString(json['id']),
+    name: safeString(json['name']),
+    description: safeStringOrNull(json['description']),
+    amount: safeDouble(json['amount']),
+    isOptional: safeBool(json['is_optional']),
   );
 }
 
@@ -27,11 +30,11 @@ class FeeDetails {
   double get percentPaid => totalFees > 0 ? (paidAmount / totalFees) * 100 : 0;
 
   factory FeeDetails.fromJson(Map<String, dynamic> json) => FeeDetails(
-    totalFees: (json['total_fees'] as num?)?.toDouble() ?? 0,
-    paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
-    dueAmount: (json['due_amount'] as num?)?.toDouble() ?? 0,
-    items: ((json['items'] ?? []) as List).map((i) => FeeLineItem.fromJson(Map<String, dynamic>.from(i))).toList(),
-    payments: ((json['payments'] ?? []) as List).map((p) => FeePayment.fromJson(Map<String, dynamic>.from(p))).toList(),
+    totalFees: safeDouble(json['total_fees']),
+    paidAmount: safeDouble(json['paid_amount']),
+    dueAmount: safeDouble(json['due_amount']),
+    items: safeMapList(json['items']).map(FeeLineItem.fromJson).toList(),
+    payments: safeMapList(json['payments']).map(FeePayment.fromJson).toList(),
   );
 }
 
@@ -46,11 +49,12 @@ class FeeLineItem {
   const FeeLineItem({required this.id, required this.name, this.amount = 0, this.paidAmount = 0, this.isOptional = false, this.status});
 
   factory FeeLineItem.fromJson(Map<String, dynamic> json) => FeeLineItem(
-    id: json['id'] as String, name: json['name'] as String? ?? '',
-    amount: (json['amount'] as num?)?.toDouble() ?? 0,
-    paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
-    isOptional: json['is_optional'] as bool? ?? false,
-    status: json['status'] as String?,
+    id: safeString(json['id']),
+    name: safeString(json['name']),
+    amount: safeDouble(json['amount']),
+    paidAmount: safeDouble(json['paid_amount']),
+    isOptional: safeBool(json['is_optional']),
+    status: safeStringOrNull(json['status']),
   );
 }
 
@@ -66,11 +70,12 @@ class FeePayment {
   const FeePayment({required this.id, this.amount = 0, this.paymentMethod, this.transactionId, this.paidDate, this.status, this.receiptUrl});
 
   factory FeePayment.fromJson(Map<String, dynamic> json) => FeePayment(
-    id: json['id'] as String, amount: (json['amount'] as num?)?.toDouble() ?? 0,
-    paymentMethod: json['payment_method'] as String?,
-    transactionId: json['transaction_id'] as String?,
-    paidDate: json['paid_date'] as String?,
-    status: json['status'] as String?,
-    receiptUrl: json['receipt_url'] as String?,
+    id: safeString(json['id']),
+    amount: safeDouble(json['amount']),
+    paymentMethod: safeStringOrNull(json['payment_method']),
+    transactionId: safeStringOrNull(json['transaction_id']),
+    paidDate: safeStringOrNull(json['paid_date']),
+    status: safeStringOrNull(json['status']),
+    receiptUrl: safeStringOrNull(json['receipt_url']),
   );
 }

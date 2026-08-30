@@ -1,4 +1,5 @@
 """Emergency Management API — alerts, evacuation plans, headcount."""
+import uuid
 from datetime import datetime
 
 from flask import Blueprint, g, request
@@ -37,6 +38,11 @@ def list_alerts():
 @role_required("superadmin", "school_admin")
 def trigger_alert():
     data = request.get_json(silent=True) or {}
+    valid_types = {"earthquake", "fire", "flood", "lockdown", "medical", "drill", "other"}
+    if not data.get("alert_type") or data["alert_type"] not in valid_types:
+        return error_response(f"alert_type is required (one of: {', '.join(sorted(valid_types))})", 400)
+    if not data.get("title"):
+        return error_response("title is required", 400)
     claims = get_jwt()
     alert = EmergencyAlert(
         school_id=g.school_id,
@@ -73,7 +79,10 @@ def resolve_alert(alert_id):
     if not alert:
         return error_response("Alert not found", 404)
     data = request.get_json(silent=True) or {}
-    alert.status = data.get("status", "resolved")
+    valid_status = {"active", "resolved", "false_alarm"}
+    if data.get("status") and data["status"] not in valid_status:
+        return error_response(f"status must be one of: {', '.join(sorted(valid_status))}", 400)
+    alert.status = data.get("status") or "resolved"
     alert.resolved_at = datetime.utcnow()
     db.session.commit()
     return success_response(_alert_dict(alert))
@@ -99,6 +108,8 @@ def list_plans():
 @role_required("superadmin", "school_admin")
 def create_plan():
     data = request.get_json(silent=True) or {}
+    if not (data.get("name") or "").strip():
+        return error_response("name is required", 400)
     plan = EvacuationPlan(school_id=g.school_id)
     for key in ("name", "emergency_type", "instructions", "assembly_points", "floor_plan_url", "is_active"):
         if key in data:
@@ -162,8 +173,31 @@ def list_headcounts(alert_id):
 @school_required
 @plugin_required("emergency")
 def submit_headcount(alert_id):
+    alert = EmergencyAlert.query.filter_by(
+        id=alert_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not alert:
+        return error_response("Alert not found", 404)
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
+    # Integer guards — raw strings into Integer columns would raise DataError → 500
+    for int_key in ("total_expected", "total_present"):
+        if int_key in data and data[int_key] is not None:
+            try:
+                data[int_key] = int(data[int_key])
+            except (TypeError, ValueError):
+                return error_response(f"{int_key} must be an integer", 400)
+    # UUID-array guard — missing_student_ids is a Postgres UUID[] column
+    if data.get("missing_student_ids") is not None:
+        if not isinstance(data["missing_student_ids"], list):
+            return error_response("missing_student_ids must be a list of student ids", 400)
+        cleaned = []
+        for item in data["missing_student_ids"]:
+            try:
+                cleaned.append(uuid.UUID(str(item)))
+            except (TypeError, ValueError, AttributeError):
+                return error_response(f"missing_student_ids contains an invalid student id: {item}", 400)
+        data["missing_student_ids"] = cleaned
     hc = EmergencyHeadcount(
         school_id=g.school_id,
         alert_id=alert_id,

@@ -46,7 +46,11 @@ interface BusItem {
 }
 
 export default function TransportPage() {
-  return <TransportContent />;
+  return (
+    <PluginGate slug="gps_tracking">
+      <TransportContent />
+    </PluginGate>
+  );
 }
 
 function TransportContent() {
@@ -233,7 +237,6 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
       const res = await api.post<ApiResponse>("/transport/buses", {
         vehicle_number: data.vehicle_number,
         capacity: parseInt(data.capacity, 10) || 40,
-        driver_name: data.driver_name,
         gps_device_id: data.gps_device_id,
         route_id: data.route_id || undefined,
       });
@@ -268,7 +271,9 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
             >
               <Input name="vehicle_number" placeholder="Vehicle number (e.g., Ba 2 Kha 1234)" required />
               <Input name="capacity" type="number" placeholder="Capacity" defaultValue="40" />
-              <Input name="driver_name" placeholder="Driver name" />
+              {/* No driver_name input: buses.driver_id is a FK to users — pick a
+                  driver from staff on the Buses page once staff accounts exist;
+                  a free-text driver_name was silently dropped by the API. */}
               <Input name="gps_device_id" placeholder="GPS device ID (optional)" />
               <select name="route_id" className="w-full border rounded-md px-3 py-2 text-sm">
                 <option value="">Assign to route (optional)</option>
@@ -290,20 +295,18 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
             <TableRow>
               <TableHead>Vehicle#</TableHead>
               <TableHead>Capacity</TableHead>
-              <TableHead>Driver</TableHead>
               <TableHead>GPS</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {buses.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No buses yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No buses yet</TableCell></TableRow>
             ) : (
               buses.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.vehicle_number}</TableCell>
                   <TableCell>{b.capacity}</TableCell>
-                  <TableCell>{b.driver_name || "—"}</TableCell>
                   <TableCell>
                     {b.gps_device_id ? (
                       <Badge variant="default" className="bg-green-600">Tracked</Badge>

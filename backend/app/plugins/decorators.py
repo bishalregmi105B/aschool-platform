@@ -18,32 +18,42 @@ PLUGIN_SLUG_ALIASES = {
     "visitors": "visitor_management",
     "library": "library_management",
     "digital_content": "elibrary",
-    "design_studio": "digital_content",
+    # portfolio was a duplicate publication of student_portfolio (same name,
+    # same api_blueprint app.api.v1.portfolio, same models; all consumer
+    # surfaces — web PluginGate, mobile visibility, flutter apps — gate
+    # student_portfolio). Renamed to the canonical slug; alias KEPT so
+    # legacy portfolio installs still pass student_portfolio-gated routes.
+    "portfolio": "student_portfolio",
+    # NOTE: no "design_studio" entry — it is its own published plugin
+    # (growth, NPR 499), a different feature from the e-library pair.
+    # Aliasing it to digital_content let an elibrary (starter, NPR 299)
+    # install unlock design_studio routes via a transitive chain.
 }
 
 
 def _acceptable_plugin_slugs(plugin_slug: str) -> set[str]:
-    """Return all equivalent slugs accepted for a requested plugin slug."""
+    """Return all equivalent slugs accepted for a requested plugin slug.
+
+    Expansion is single-hop only: the requested slug, its direct alias
+    target, and any legacy slug aliasing directly to it. Chaining is
+    deliberately NOT followed (non-transitive) so an alias can never
+    unlock a third plugin's routes.
+    """
     requested = str(plugin_slug or "").strip()
-    accepted = {requested} if requested else set()
+    if not requested:
+        return set()
 
-    # Resolve aliases transitively so groups like
-    # design_studio <-> digital_content <-> elibrary are all accepted.
-    frontier = list(accepted)
-    while frontier:
-        current = frontier.pop()
+    accepted = {requested}
 
-        mapped = PLUGIN_SLUG_ALIASES.get(current)
-        if mapped and mapped not in accepted:
-            accepted.add(mapped)
-            frontier.append(mapped)
+    mapped = PLUGIN_SLUG_ALIASES.get(requested)
+    if mapped:
+        accepted.add(mapped)
 
-        for old_slug, current_slug in PLUGIN_SLUG_ALIASES.items():
-            if current_slug == current and old_slug not in accepted:
-                accepted.add(old_slug)
-                frontier.append(old_slug)
+    for old_slug, current_slug in PLUGIN_SLUG_ALIASES.items():
+        if current_slug == requested and old_slug not in accepted:
+            accepted.add(old_slug)
 
-    return {slug for slug in accepted if slug}
+    return accepted
 
 
 def plugin_required(plugin_slug: str):

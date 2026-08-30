@@ -13,6 +13,7 @@ class _HrPayrollScreenState extends State<HrPayrollScreen> {
   List<Map<String, dynamic>> _payroll = [];
   List<Map<String, dynamic>> _leaveRequests = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,7 +22,10 @@ class _HrPayrollScreenState extends State<HrPayrollScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final responses = await Future.wait([
         ApiClient.instance.get('/users', queryParameters: {'role': 'teacher'}),
@@ -52,15 +56,22 @@ class _HrPayrollScreenState extends State<HrPayrollScreen> {
         );
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('HrPayrollScreen load failed: $e\n$st');
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = 'Could not load HR & payroll data.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('HR & Payroll')),

@@ -69,10 +69,13 @@ function daysBetween(a: Date, b: Date): number {
 export interface BSDate { year: number; month: number; day: number }
 
 export function adToBS(adDate: Date | string): BSDate {
-  // Handle both date-only "YYYY-MM-DD" and full ISO datetime "YYYY-MM-DDT..."
+  // Handle date-only "YYYY-MM-DD" and full datetimes ("YYYY-MM-DDT..." and
+  // the backend's "YYYY-MM-DD HH:MM:SS..." — Python str(datetime) uses a
+  // SPACE separator, and appending T00:00:00 to that produced an Invalid
+  // Date → every datetime rendered as "1 Baisakh 2000").
   const d =
     typeof adDate === "string"
-      ? new Date(adDate.includes("T") ? adDate : adDate + "T00:00:00")
+      ? new Date(/[T ]/.test(adDate) ? adDate : adDate + "T00:00:00")
       : adDate;
   let remaining = daysBetween(BS_EPOCH_AD, d);
   let bsYear = 2000;

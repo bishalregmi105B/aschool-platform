@@ -19,7 +19,7 @@ export default function OverduePage() {
 function OverdueContent() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["library-overdue"],
     queryFn: async () => {
       const r = await api.get("/library/issues", { params: { status: "issued" } });
@@ -27,6 +27,7 @@ function OverdueContent() {
       const today = new Date();
       return all.filter((issue: any) => issue.due_date && new Date(issue.due_date) < today);
     },
+    retry: 1,
   });
 
   const returnMutation = useMutation({
@@ -39,6 +40,14 @@ function OverdueContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load overdue books. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const overdue = data || [];
 
@@ -80,11 +89,11 @@ function OverdueContent() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        {issue.book?.title || issue.book_id}
+                        {issue.book_title || issue.book_id}
                       </div>
                     </TableCell>
-                    <TableCell>{issue.student?.name || issue.student_id}</TableCell>
-                    <TableCell className="text-sm">{issue.issue_date ? displayBS(issue.issue_date) : "—"}</TableCell>
+                    <TableCell>{issue.student_name || issue.student_id}</TableCell>
+                    <TableCell className="text-sm">{issue.issued_date ? displayBS(issue.issued_date) : "—"}</TableCell>
                     <TableCell className="text-sm">{issue.due_date ? displayBS(issue.due_date) : "—"}</TableCell>
                     <TableCell>
                       <Badge variant="destructive">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""}</Badge>

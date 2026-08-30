@@ -6,12 +6,36 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Sparkles, Download, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+
+interface SolverSlot {
+  day: string;
+  period: number;
+  subject_name: string;
+  teacher_name: string | null;
+}
+
+interface SolverClass {
+  class_id: string;
+  class_name: string;
+  section_id: string | null;
+  section_name: string | null;
+  slots: SolverSlot[];
+}
+
+interface SolverResult {
+  classes: SolverClass[];
+  conflicts: string[];
+  periods_per_day: number;
+  days: string[];
+}
 
 export default function TimetablePage() {
   return (
@@ -20,26 +44,32 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  const [form, setForm] = useState({ academic_year: new Date().getFullYear().toString(), max_periods_per_day: "8", break_after_period: "4" });
-  const [result, setResult] = useState<any>(null);
+  const [academicYearId, setAcademicYearId] = useState("");
+  const [periodsPerDay, setPeriodsPerDay] = useState("8");
+  const [result, setResult] = useState<SolverResult | null>(null);
 
-  const { data: classes } = useQuery({
-    queryKey: ["classes"],
-    queryFn: async () => { const r = await api.get("/academics/classes"); return r.data?.data || []; },
+  const { data: years } = useQuery({
+    queryKey: ["academic-years-timetable"],
+    queryFn: async () => {
+      const r = await api.get("/academics/years?per_page=200");
+      return Array.isArray(r.data?.data) ? r.data.data : [];
+    },
   });
 
   const gen = useMutation({
     mutationFn: async () => {
-      const res = await api.post("/ai-tools/timetable", { ...form, max_periods_per_day: parseInt(form.max_periods_per_day), break_after_period: parseInt(form.break_after_period) });
+      const res = await api.post("/ai-tools/timetable", {
+        academic_year_id: academicYearId,
+        periods_per_day: parseInt(periodsPerDay) || 8,
+      });
       return res.data;
     },
     onSuccess: (d) => { setResult(d?.data); toast.success("Timetable generated!"); },
     onError: () => toast.error("Generation failed"),
   });
 
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const periods = Array.from({ length: parseInt(form.max_periods_per_day) || 8 }, (_, i) => i + 1);
-  const timetable = result?.timetable || result?.schedule || {};
+  const days: string[] = result?.days || ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const periods = Array.from({ length: result?.periods_per_day || parseInt(periodsPerDay) || 8 }, (_, i) => i + 1);
   const conflicts = result?.conflicts || [];
 
   return (
@@ -52,14 +82,34 @@ function TimetableContent() {
       <Card>
         <CardHeader><CardTitle>Settings</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Academic Year</Label><Input value={form.academic_year} onChange={(e) => setForm({ ...form, academic_year: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Max Periods Per Day</Label><Input type="number" value={form.max_periods_per_day} onChange={(e) => setForm({ ...form, max_periods_per_day: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Break After Period</Label><Input type="number" value={form.break_after_period} onChange={(e) => setForm({ ...form, break_after_period: e.target.value })} /></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Academic Session</Label>
+              <Select value={academicYearId} onValueChange={setAcademicYearId}>
+                <SelectTrigger><SelectValue placeholder="Select session" /></SelectTrigger>
+                <SelectContent>
+                  {(years || []).map((y: { id: string; name: string; is_current?: boolean }) => (
+                    <SelectItem key={y.id} value={y.id}>{y.name}{y.is_current ? " (Current)" : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Periods Per Day</Label>
+              <Select value={periodsPerDay} onValueChange={setPeriodsPerDay}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} periods</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex gap-2 mt-4">
-            <Button onClick={() => gen.mutate()} disabled={gen.isPending}><Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Generating..." : "Generate Timetable"}</Button>
-            {result && <Button variant="outline"><Download className="h-4 w-4 mr-2" /> Export PDF</Button>}
+          <div className="mt-4">
+            <Button onClick={() => gen.mutate()} disabled={gen.isPending || !academicYearId}>
+              <Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Generating..." : "Generate Timetable"}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -73,40 +123,51 @@ function TimetableContent() {
         </Card>
       )}
 
-      {result && Object.keys(timetable).length > 0 ? (
-        Object.entries(timetable).map(([className, schedule]: [string, any]) => (
-          <Card key={className}>
-            <CardHeader><CardTitle>{className}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead><tr className="border-b"><th className="text-left p-2 font-medium">Day</th>{periods.map((p: any) => <th key={p} className="text-center p-2 font-medium">P{p}</th>)}</tr></thead>
-                  <tbody>
-                    {days.map((day: any) => (
-                      <tr key={day} className="border-b">
-                        <td className="p-2 font-medium">{day}</td>
-                        {periods.map((p: any) => {
-                          const slot = schedule?.[day]?.[p] || schedule?.[day]?.[`period_${p}`];
-                          return (
-                            <td key={p} className="text-center p-2">
-                              {p === parseInt(form.break_after_period) + 1 ? (
-                                <Badge variant="secondary">Break</Badge>
-                              ) : slot ? (
-                                <div className="text-xs"><div className="font-medium">{slot.subject || slot}</div>{slot.teacher && <div className="text-muted-foreground">{slot.teacher}</div>}</div>
-                              ) : <span className="text-muted-foreground">—</span>}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ))
+      {result && (result.classes || []).length > 0 ? (
+        result.classes.map((cls) => {
+          // day × period lookup for this class section
+          const grid: Record<string, Record<number, SolverSlot>> = {};
+          for (const slot of cls.slots || []) {
+            grid[slot.day] = grid[slot.day] || {};
+            grid[slot.day][slot.period] = slot;
+          }
+          return (
+            <Card key={`${cls.class_id}-${cls.section_id ?? ""}`}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {cls.class_name}
+                  {cls.section_name && <Badge variant="outline">{cls.section_name}</Badge>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead><tr className="border-b"><th className="text-left p-2 font-medium">Day</th>{periods.map((p) => <th key={p} className="text-center p-2 font-medium">P{p}</th>)}</tr></thead>
+                    <tbody>
+                      {days.map((day) => (
+                        <tr key={day} className="border-b">
+                          <td className="p-2 font-medium">{day}</td>
+                          {periods.map((p) => {
+                            const slot = grid[day]?.[p];
+                            return (
+                              <td key={p} className="text-center p-2">
+                                {slot ? (
+                                  <div className="text-xs"><div className="font-medium">{slot.subject_name}</div>{slot.teacher_name && <div className="text-muted-foreground">{slot.teacher_name}</div>}</div>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
       ) : !gen.isPending && (
-        <Card><CardContent className="py-16 text-center text-muted-foreground"><CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Configure settings and generate a clash-free timetable</p></CardContent></Card>
+        <Card><CardContent className="py-16 text-center text-muted-foreground"><CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Select a session and generate a clash-free timetable</p></CardContent></Card>
       )}
     </div>
   );

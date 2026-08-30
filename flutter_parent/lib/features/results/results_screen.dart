@@ -62,13 +62,13 @@ class _ExamCard extends StatelessWidget {
         subjects.fold<double>(
           0,
           (sum, subject) =>
-              sum + ((subject['obtained'] as num?)?.toDouble() ?? 0),
+              sum + (safeDoubleOrNull(subject['obtained']) ?? 0),
         );
     final totalFull = result.totalMarks ??
         subjects.fold<double>(
           0,
           (sum, subject) =>
-              sum + ((subject['full_marks'] as num?)?.toDouble() ?? 0),
+              sum + (safeDoubleOrNull(subject['full_marks']) ?? 0),
         );
     final pct = result.percentage;
     final examId = result.examId ?? '';
@@ -133,9 +133,9 @@ class _ExamCard extends StatelessWidget {
                 ),
                 ...subjects.map((subject) {
                   final obtained =
-                      (subject['obtained'] as num?)?.toDouble() ?? 0;
+                      safeDoubleOrNull(subject['obtained']) ?? 0;
                   final full =
-                      (subject['full_marks'] as num?)?.toDouble() ?? 100;
+                      safeDoubleOrNull(subject['full_marks']) ?? 100;
                   final subjectPct = full > 0 ? obtained / full * 100 : 0.0;
                   return TableRow(
                     children: [

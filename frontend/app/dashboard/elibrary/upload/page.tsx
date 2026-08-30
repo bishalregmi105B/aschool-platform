@@ -26,13 +26,42 @@ function UploadContent() {
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("No file selected");
+      // Two-step contract (backend stores bytes centrally, metadata per type):
+      // 1) POST /files/upload (multipart) → {url}
+      // 2) POST /elibrary/books | /elibrary/papers | /elibrary/resources with that URL
       const fd = new FormData();
       fd.append("file", file);
-      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
-      return (await api.post("/elibrary/upload", fd, { headers: { "Content-Type": "multipart/form-data" } })).data;
+      fd.append("folder", "elibrary");
+      const uploaded = (await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } })).data;
+      const fileUrl = uploaded?.data?.url || uploaded?.url;
+      if (!fileUrl) throw new Error("Upload did not return a file URL");
+      const meta = {
+        title: form.title,
+        description: form.description || undefined,
+        year: form.year || undefined,
+      };
+      if (form.type === "past_paper") {
+        return (await api.post("/elibrary/papers", { ...meta, file_url: fileUrl, exam_type: form.exam_type })).data;
+      }
+      if (form.type === "oer") {
+        return (await api.post("/elibrary/resources", { ...meta, url: fileUrl, resource_type: "document" })).data;
+      }
+      // ebook / worksheet / notes → stored as a digital book (the only other
+      // backend-backed elibrary entity)
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
+      return (await api.post("/elibrary/books", {
+        title: form.title,
+        author: form.subject || undefined,
+        file_url: fileUrl,
+        file_type: ext === "epub" ? "epub" : "pdf",
+      })).data;
     },
     onSuccess: () => { toast.success("Resource uploaded successfully"); setUploaded(true); setFile(null); setForm({ title: "", type: "past_paper", subject: "", class_name: "", year: "", exam_type: "final", description: "" }); },
-    onError: () => toast.error("Upload failed"),
+    onError: (e: any) => {
+      // surface the backend's actionable message (e.g. "Install this plugin
+      // from the marketplace." when file_management is not installed)
+      toast.error(e?.response?.data?.error || e?.message || "Upload failed");
+    },
   });
 
   return (

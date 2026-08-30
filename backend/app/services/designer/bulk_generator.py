@@ -188,6 +188,31 @@ class BulkGeneratorService:
         return query.all()
 
     @classmethod
+    def _guardian_name(cls, student, mother: bool = False, primary_only: bool = False) -> str:
+        """Resolve a guardian display name for template tokens.
+
+        mother=True picks the guardian with relation == 'mother'; otherwise
+        the primary guardian (or father) is preferred.
+        """
+        guardians = list(getattr(student, "guardians", []) or [])
+        if not guardians:
+            return ""
+        if mother:
+            match = next((g for g in guardians if g.relation == "mother" and g.full_name), None)
+            if match:
+                return match.full_name
+            return ""
+        if primary_only:
+            match = next(
+                (g for g in guardians if g.relation == "father" and g.full_name),
+                None,
+            ) or next((g for g in guardians if g.is_primary and g.full_name), None)
+            if match:
+                return match.full_name
+        match = next((g for g in guardians if g.is_primary and g.full_name), None)
+        return match.full_name if match else ""
+
+    @classmethod
     def _render_for_student(
         cls,
         school_id,
@@ -197,6 +222,11 @@ class BulkGeneratorService:
         school_config,
         data_extra,
     ):
+        # Latent NameError fix: this helper renders via the template engine but
+        # (unlike the other generators) never imported it — bulk admit cards and
+        # bulk certificates 500'd on every call before this import existed.
+        from app.services.designer.template_engine import TemplateEngineService
+
         class_name = student.klass.name if getattr(student, "klass", None) else ""
         section_name = student.section.name if getattr(student, "section", None) else ""
         roll_no = str(student.roll_number) if student.roll_number is not None else ""
@@ -205,6 +235,10 @@ class BulkGeneratorService:
         data = {
             "student_name": f"{student.first_name} {student.last_name}",
             "name": f"{student.first_name} {student.last_name}",
+            "father_name": cls._guardian_name(student, primary_only=True),
+            "mother_name": cls._guardian_name(student, mother=True),
+            "admission_date": student.admission_date_bs
+            or (student.admission_date_ad.isoformat() if getattr(student, "admission_date_ad", None) else ""),
             "class": class_name,
             "class_name": class_name,
             "section": section_name,
@@ -329,8 +363,8 @@ class BulkGeneratorService:
         default_templates = {
             "character": "character_certificate",
             "transfer": "transfer_certificate",
-            "merit": "character_certificate",
-            "participation": "character_certificate",
+            "merit": "merit_certificate",
+            "participation": "participation_certificate",
         }
         resolved_template_id = TemplateEngineService.resolve_template_id(
             template_id or default_templates.get(certificate_type, "character_certificate")
@@ -382,6 +416,9 @@ class BulkGeneratorService:
         }
         school_fields = cls._school_fields(school)
 
+        # The registry "marksheet" template is the data-driven one (writer
+        # engine with a subject_rows table + {name}/{exam_name}/{gpa} tokens),
+        # so bulk output carries each student's real marks.
         resolved_template_id = TemplateEngineService.resolve_template_id(template_id or "marksheet")
         if not TemplateEngineService.get_template(resolved_template_id, school_id=school_id):
             resolved_template_id = "marksheet"

@@ -1,4 +1,6 @@
 /// Subject model — maps to backend Subject (subjects table)
+import '../utils/safe_parse.dart';
+
 class Subject {
   final String id;
   final String name;
@@ -39,25 +41,25 @@ class Subject {
   });
 
   factory Subject.fromJson(Map<String, dynamic> json) {
-    final type = (json['subject_type'] as String? ?? 'compulsory').toLowerCase();
+    final type = safeString(json['subject_type'], fallback: 'compulsory').toLowerCase();
     return Subject(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      nameNepali: json['name_nepali'] as String?,
-      code: json['code'] as String?,
-      classId: json['class_id'] as String?,
-      classIds: _toStringList(json['class_ids']),
-      teacherId: json['teacher_id'] as String?,
-      teacherIds: _toStringList(json['teacher_ids']),
-      teacherName: json['teacher_name'] as String?,
-      creditHours: json['credit_hours'] as int?,
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      nameNepali: safeStringOrNull(json['name_nepali']),
+      code: safeStringOrNull(json['code']),
+      classId: safeStringOrNull(json['class_id']),
+      classIds: safeStringList(json['class_ids']),
+      teacherId: safeStringOrNull(json['teacher_id']),
+      teacherIds: safeStringList(json['teacher_ids']),
+      teacherName: safeStringOrNull(json['teacher_name']),
+      creditHours: safeIntOrNull(json['credit_hours']),
       subjectType: type,
-      isOptional: json['is_optional'] as bool? ?? type == 'optional',
-      hasPractical: json['has_practical'] as bool? ?? false,
-      fullMarks: json['full_marks'] as int?,
-      passMarks: json['pass_marks'] as int?,
-      bgColor: json['bg_color'] as String?,
-      image: json['image'] as String?,
+      isOptional: safeBool(json['is_optional'], fallback: type == 'optional'),
+      hasPractical: safeBool(json['has_practical']),
+      fullMarks: safeIntOrNull(json['full_marks']),
+      passMarks: safeIntOrNull(json['pass_marks']),
+      bgColor: safeStringOrNull(json['bg_color']),
+      image: safeStringOrNull(json['image']),
     );
   }
 
@@ -83,11 +85,5 @@ class Subject {
   String get displayName {
     if (hasPractical) return '$name - ${subjectType == 'practical' ? 'Practical' : 'Theory'}';
     return nameNepali ?? name;
-  }
-
-  static List<String> _toStringList(dynamic value) {
-    if (value == null) return [];
-    if (value is List) return value.map((e) => e.toString()).toList();
-    return [];
   }
 }

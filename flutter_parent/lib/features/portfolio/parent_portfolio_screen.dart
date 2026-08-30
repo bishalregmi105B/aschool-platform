@@ -16,6 +16,7 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
   Map<String, dynamic>? _summary;
   bool _loading = true;
   String _selectedCategory = '';
+  String? _error;
 
   @override
   void initState() {
@@ -24,18 +25,26 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/parent/portfolio',
           queryParameters: _selectedCategory.isNotEmpty
               ? {'category': _selectedCategory}
               : null);
-      final payload = res.data;
+      // ApiClient returns the raw envelope {success, data, error}; unwrap it
+      // before reading payload keys (previously read off the envelope -> always null).
+      final payload = res.data is Map ? (res.data['data'] as Map<String, dynamic>?) : res.data;
       setState(() {
-        _entries = (payload?['entries'] as List?) ?? [];
-        _summary = (payload?['summary'] as Map?)?.cast<String, dynamic>();
+        _entries = safeList(payload?['entries']);
+        _summary = safeMapOrNull(payload?['summary']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ParentPortfolioScreen load failed: $e\n$st');
+      _error = "Could not load your child's portfolio.";
+    }
     setState(() => _loading = false);
   }
 
@@ -57,7 +66,9 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
         appBar: const CustomAppBar(title: "Child's Portfolio"),
         body: _loading
             ? const LoadingShimmer()
-            : CustomScrollView(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : CustomScrollView(
                 slivers: [
                   // Summary header
                   if (_summary != null)

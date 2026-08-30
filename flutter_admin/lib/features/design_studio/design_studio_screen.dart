@@ -19,6 +19,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
   List<Map<String, dynamic>> _templates = [];
   List<Map<String, dynamic>> _documents = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -34,7 +35,10 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/design-studio/templates'),
@@ -47,8 +51,12 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('DesignStudioScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load design studio content.';
+        _loading = false;
+      });
     }
   }
 
@@ -69,10 +77,12 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [_buildTemplates(), _buildDocuments()],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [_buildTemplates(), _buildDocuments()],
+                  ),
       ),
     );
   }
@@ -93,7 +103,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
     // Group templates by category
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final t in _templates) {
-      final cat = t['category'] as String? ?? 'Other';
+      final cat = safeStringOrNull(t['category']) ?? 'Other';
       grouped.putIfAbsent(cat, () => []).add(t);
     }
 
@@ -152,7 +162,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              template['name'] as String? ?? '',
+              safeStringOrNull(template['name']) ?? '',
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -197,7 +207,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
                   ),
                 ),
                 title: Text(
-                  doc['name'] as String? ?? '',
+                  safeStringOrNull(doc['name']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -232,7 +242,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              template['name'] as String? ?? '',
+              safeStringOrNull(template['name']) ?? '',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge

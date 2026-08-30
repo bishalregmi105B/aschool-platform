@@ -17,6 +17,7 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
   final Set<String> _selected = {};
   bool _paying = false;
   bool _loadingMethods = true;
+  String? _methodsError;
   List<Map<String, dynamic>> _onlineMethods = const [];
 
   @override
@@ -26,6 +27,10 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
   }
 
   Future<void> _loadPaymentMethods() async {
+    setState(() {
+      _loadingMethods = true;
+      _methodsError = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/fees/payment-methods');
       final methods = List<Map<String, dynamic>>.from(
@@ -52,16 +57,20 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
           _loadingMethods = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('FeePaymentScreen loadPaymentMethods failed: $e');
       if (mounted) {
-        setState(() => _loadingMethods = false);
+        setState(() {
+          _methodsError = 'Could not load payment methods.';
+          _loadingMethods = false;
+        });
       }
     }
   }
 
   double _selectedTotal(List<Map<String, dynamic>> fees) => fees
       .where((f) => _selected.contains(f['id']?.toString()))
-      .fold(0.0, (sum, f) => sum + ((f['amount'] as num?)?.toDouble() ?? 0));
+      .fold(0.0, (sum, f) => sum + (safeDoubleOrNull(f['amount']) ?? 0));
 
   Future<void> _payWith(
     String gateway,
@@ -81,8 +90,8 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
         'gateway': gateway,
       });
       final data = resp.data['data'] ?? {};
-      final checkoutHtml = data['checkout_html'] as String?;
-      final paymentUrl = data['payment_url'] as String?;
+      final checkoutHtml = safeStringOrNull(data['checkout_html']);
+      final paymentUrl = safeStringOrNull(data['payment_url']);
 
       if (checkoutHtml != null && mounted) {
         // eSewa requires a browser POST — load the auto-submitting form
@@ -108,16 +117,33 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
 
       ref.invalidate(parentFeesProvider(selectedChildId));
       setState(() => _selected.clear());
-    } catch (_) {
+    } catch (e) {
+      debugPrint('FeePaymentScreen initiate-payment failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Payment initiation failed'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Payment initiation failed: ${_paymentErrorMessage(e)}'),
           backgroundColor: ASchoolTheme.danger,
         ));
       }
     } finally {
-      setState(() => _paying = false);
+      if (mounted) setState(() => _paying = false);
     }
+  }
+
+  /// Pulls the backend `error` message out of an HTTP failure's response
+  /// body (DioException carries it on `response.data`), falling back to a
+  /// generic message for connection/other failures.
+  String _paymentErrorMessage(Object e) {
+    if (e is ApiException) return e.message;
+    try {
+      final response = (e as dynamic).response?.data;
+      if (response is Map && (response['error'] ?? '').toString().isNotEmpty) {
+        return response['error'].toString();
+      }
+    } on NoSuchMethodError {
+      // Not an HTTP error (e.g. launchUrl failure above).
+    }
+    return 'Please check your connection and try again.';
   }
 
   @override
@@ -223,14 +249,35 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
                       child: LinearProgressIndicator(minHeight: 2),
                     )
                   else if (_onlineMethods.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        'No online payment methods are enabled by your school.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _methodsError ??
+                                  'No online payment methods are enabled by your school.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _methodsError != null
+                                    ? ASchoolTheme.danger
+                                    : Colors.black54,
+                              ),
+                            ),
+                          ),
+                          if (_methodsError != null) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _loadPaymentMethods,
+                              child: const Text('Retry',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ],
                       ),
                     )
                   else

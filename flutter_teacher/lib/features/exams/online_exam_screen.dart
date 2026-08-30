@@ -12,6 +12,7 @@ class OnlineExamScreen extends ConsumerStatefulWidget {
 class _OnlineExamScreenState extends ConsumerState<OnlineExamScreen> {
   List<Map<String, dynamic>> _exams = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _OnlineExamScreenState extends ConsumerState<OnlineExamScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/exams/online');
       final data = (res.data is Map<String, dynamic>) ? res.data['data'] : null;
@@ -30,8 +34,10 @@ class _OnlineExamScreenState extends ConsumerState<OnlineExamScreen> {
               .map((row) => Map<String, dynamic>.from(row))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e) {
+      debugPrint('OnlineExamScreen load failed: $e');
       _exams = [];
+      _error = 'Could not load online exams.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -41,7 +47,12 @@ class _OnlineExamScreenState extends ConsumerState<OnlineExamScreen> {
     return Scaffold(
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(
+                  errorMessage: _error!,
+                  onRetry: _load,
+                )
+              : RefreshIndicator(
               onRefresh: _load,
               child: _exams.isEmpty
                   ? ListView(
@@ -111,14 +122,25 @@ class _OnlineExamScreenState extends ConsumerState<OnlineExamScreen> {
             onPressed: () async {
               final title = titleCtrl.text.trim();
               if (title.isEmpty) return;
-              await ApiClient.instance.post('/exams/online', data: {
-                'title': title,
-                'duration_minutes':
-                    int.tryParse(durationCtrl.text.trim()) ?? 30,
-                'total_marks': int.tryParse(marksCtrl.text.trim()) ?? 0,
-                'questions': [],
-                'status': 'upcoming',
-              });
+              try {
+                await ApiClient.instance.post('/exams/online', data: {
+                  'title': title,
+                  'duration_minutes':
+                      int.tryParse(durationCtrl.text.trim()) ?? 30,
+                  'total_marks': int.tryParse(marksCtrl.text.trim()) ?? 0,
+                  'questions': [],
+                  'status': 'upcoming',
+                });
+              } catch (e) {
+                debugPrint('OnlineExamScreen create failed: $e');
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(
+                    content: Text('Could not create the exam. Please try again.'),
+                    backgroundColor: ASchoolTheme.danger,
+                  ));
+                }
+                return; // Keep the dialog open so the input is not lost.
+              }
               if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
               await _load();

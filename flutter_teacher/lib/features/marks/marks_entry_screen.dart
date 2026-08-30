@@ -10,13 +10,13 @@ final marksDropdownsProvider =
     ApiClient.instance.get('/exams?status=ongoing,completed'),
   ]);
 
-  final exams = List<Map<String, dynamic>>.from(results[1].data['data'] ?? [])
+  final exams = safeMapList(envelopeData(results[1].data))
     ..removeWhere(
       (exam) => exam['status']?.toString() == 'result_published',
     );
 
   return {
-    'classes': List<Map<String, dynamic>>.from(results[0].data['data'] ?? []),
+    'classes': safeMapList(envelopeData(results[0].data)),
     'exams': exams,
   };
 });
@@ -26,7 +26,7 @@ final examSubjectsProvider = FutureProvider.autoDispose
         (ref, args) async {
   final resp = await ApiClient.instance
       .get('/exams/${args.examId}/subjects?class_id=${args.classId}');
-  return List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
+  return safeMapList(envelopeData(resp.data));
 });
 
 final marksStudentsProvider = FutureProvider.autoDispose.family<
@@ -34,22 +34,22 @@ final marksStudentsProvider = FutureProvider.autoDispose.family<
     ({String examId, String classId, String subjectId})>((ref, args) async {
   final resp = await ApiClient.instance.get(
       '/exams/${args.examId}/marks?class_id=${args.classId}&subject_id=${args.subjectId}');
-  return List<Map<String, dynamic>>.from(resp.data['data'] ?? [])
+  return safeMapList(envelopeData(resp.data))
       .map((student) => _StudentMark(
             id: student['student_id']?.toString() ?? '',
             name: student['name']?.toString() ?? '',
-            rollNo: student['roll_no'] as int? ?? 0,
-            theoryMarks: (student['theory_marks'] as num?)?.toDouble(),
-            practicalMarks: (student['practical_marks'] as num?)?.toDouble(),
-            fullMarks: (student['full_marks'] as num?)?.toDouble() ?? 100,
-            passMarks: (student['pass_marks'] as num?)?.toDouble() ?? 32,
+            rollNo: safeInt(student['roll_no']),
+            theoryMarks: safeDoubleOrNull(student['theory_marks']),
+            practicalMarks: safeDoubleOrNull(student['practical_marks']),
+            fullMarks: safeDouble(student['full_marks'], fallback: 100),
+            passMarks: safeDouble(student['pass_marks'], fallback: 32),
             hasPractical: student['has_practical'] == true,
-            theoryFullMarks: (student['theory_full_marks'] as num?)?.toDouble(),
+            theoryFullMarks: safeDoubleOrNull(student['theory_full_marks']),
             practicalFullMarks:
-                (student['practical_full_marks'] as num?)?.toDouble(),
-            theoryPassMarks: (student['theory_pass_marks'] as num?)?.toDouble(),
+                safeDoubleOrNull(student['practical_full_marks']),
+            theoryPassMarks: safeDoubleOrNull(student['theory_pass_marks']),
             practicalPassMarks:
-                (student['practical_pass_marks'] as num?)?.toDouble(),
+                safeDoubleOrNull(student['practical_pass_marks']),
           ))
       .toList();
 });
@@ -115,6 +115,7 @@ class _MarksEntryNotifier
             .toList(),
       });
     } catch (e) {
+      debugPrint('Marks submit failed for exam $examId/class $classId/subject $subjectId: $e');
       throw Exception('Failed to submit marks');
     }
   }
@@ -179,7 +180,8 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
 
       ref.read(marksEntryProvider.notifier).setStudents(asyncStudents);
       setState(() => _editorVersion++);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Marks load failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Could not load marks for the selected class.'),
@@ -315,7 +317,8 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
           backgroundColor: Colors.green,
         ));
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Marks save failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Failed to save marks. Please check your connection.'),

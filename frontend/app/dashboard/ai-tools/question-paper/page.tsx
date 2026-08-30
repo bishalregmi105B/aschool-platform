@@ -29,6 +29,7 @@ function QuestionPaperContent() {
     subject: "",
     grade: "",
     total_marks: "100",
+    duration_minutes: "180",
     difficulty: "medium",
     chapters: "",
     instructions: "",
@@ -38,9 +39,13 @@ function QuestionPaperContent() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const res = await api.post("/ai-tools/question-paper", {
-        ...form,
+        subject: form.subject,
+        grade: form.grade,
         total_marks: parseInt(form.total_marks),
-        chapters: form.chapters.split(",").map((c) => c.trim()).filter(Boolean),
+        duration_minutes: parseInt(form.duration_minutes) || 180,
+        difficulty: form.difficulty,
+        topics: form.chapters.split(",").map((c) => c.trim()).filter(Boolean),
+        instructions: form.instructions || undefined,
       });
       return res.data;
     },
@@ -79,6 +84,10 @@ function QuestionPaperContent() {
               <div className="space-y-2">
                 <Label>Total Marks</Label>
                 <Input type="number" value={form.total_marks} onChange={(e) => setForm({ ...form, total_marks: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Duration (minutes)</Label>
+                <Input type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Difficulty</Label>

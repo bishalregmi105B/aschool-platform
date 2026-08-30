@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
-import { usePluginEnabled } from "@/lib/plugin-gate";
+import { PluginGate, usePluginEnabled } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -189,7 +188,7 @@ function ResultsContent() {
     }
   };
 
-  const { data: results, isLoading: loadingResults } = useQuery({
+  const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
     queryKey: ["results", examId, classId],
     queryFn: async () => {
       const res = await api.get(`/exams/${examId}/results?class_id=${classId}`);
@@ -198,7 +197,7 @@ function ResultsContent() {
     enabled: !!examId && !!classId,
   });
 
-  const { data: gradeSheet, isLoading: loadingGradeSheet } = useQuery({
+  const { data: gradeSheet, isLoading: loadingGradeSheet, isError: gradeSheetError, refetch: refetchGradeSheet } = useQuery({
     queryKey: ["grade-sheet", examId, classId],
     queryFn: async () => {
       const res = await api.get(
@@ -488,7 +487,12 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
           {activeTab === "results" && (
             <Card>
               <CardContent className="p-0">
-                {loadingResults ? (
+                {resultsError ? (
+                  <div className="flex flex-col items-center py-12 space-y-3">
+                    <p className="text-sm text-destructive">Failed to load results. Please try again.</p>
+                    <Button variant="outline" size="sm" onClick={() => refetchResults()}>Retry</Button>
+                  </div>
+                ) : loadingResults ? (
                   <div className="flex justify-center py-16">
                     <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
@@ -575,7 +579,12 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
             <div className="space-y-3">
               <Card>
                 <CardContent className="p-0 overflow-auto">
-                  {loadingGradeSheet ? (
+                  {gradeSheetError ? (
+                    <div className="flex flex-col items-center py-12 space-y-3">
+                      <p className="text-sm text-destructive">Failed to load the grade sheet. Please try again.</p>
+                      <Button variant="outline" size="sm" onClick={() => refetchGradeSheet()}>Retry</Button>
+                    </div>
+                  ) : loadingGradeSheet ? (
                     <div className="flex justify-center py-16">
                       <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -733,7 +742,7 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
               </div>
 
               {/* Subject marks table */}
-              <div className="border rounded-xl overflow-hidden">
+              <div className="border rounded-xl overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 border-b">
                     <tr>

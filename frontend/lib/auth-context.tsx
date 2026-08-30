@@ -7,7 +7,18 @@ import {
   useEffect,
   useState,
 } from "react";
+import axios from "axios";
 import { api, type ApiResponse } from "./api";
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err) && err.response?.data) {
+    const error = (err.response.data as { error?: unknown })?.error;
+    if (typeof error === "string") return error;
+    if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 export interface User {
   id: string;
@@ -57,27 +68,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshUser]);
 
   const login = async (email: string, password: string) => {
-    const res = await api.post<ApiResponse<{ access_token: string; refresh_token: string; user: User }>>(
-      "/auth/login",
-      { email, password }
-    );
-    if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "Login failed");
-    // Tokens are delivered as HttpOnly cookies by the backend — nothing JS-readable here.
-    setUser(res.data.data.user);
+    try {
+      const res = await api.post<ApiResponse<{ access_token: string; refresh_token: string; user: User }>>(
+        "/auth/login",
+        { email, password }
+      );
+      if (!res.data.success) {
+        throw new Error(typeof res.data.error === "string" ? res.data.error : "Login failed");
+      }
+      setUser(res.data.data.user);
+    } catch (err: unknown) {
+      throw new Error(extractErrorMessage(err, "Login failed"));
+    }
   };
 
   const sendOtp = async (phone: string) => {
-    const res = await api.post<ApiResponse>("/auth/send-otp", { phone });
-    if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "Failed to send OTP");
+    try {
+      const res = await api.post<ApiResponse>("/auth/send-otp", { phone });
+      if (!res.data.success) {
+        throw new Error(typeof res.data.error === "string" ? res.data.error : "Failed to send OTP");
+      }
+    } catch (err: unknown) {
+      throw new Error(extractErrorMessage(err, "Failed to send OTP"));
+    }
   };
 
   const loginWithOtp = async (phone: string, otp: string) => {
-    const res = await api.post<ApiResponse<{ access_token: string; refresh_token: string; user: User }>>(
-      "/auth/verify-otp",
-      { phone, otp }
-    );
-    if (!res.data.success) throw new Error(typeof res.data.error === "string" ? res.data.error : "OTP verification failed");
-    setUser(res.data.data.user);
+    try {
+      const res = await api.post<ApiResponse<{ access_token: string; refresh_token: string; user: User }>>(
+        "/auth/verify-otp",
+        { phone, otp }
+      );
+      if (!res.data.success) {
+        throw new Error(typeof res.data.error === "string" ? res.data.error : "OTP verification failed");
+      }
+      setUser(res.data.data.user);
+    } catch (err: unknown) {
+      throw new Error(extractErrorMessage(err, "OTP verification failed"));
+    }
   };
 
   const logout = () => {

@@ -18,14 +18,30 @@ sms_bp = Blueprint("sms", __name__, url_prefix="/sms")
 @plugin_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def send_sms():
-    """Queue an SMS for sending via Sparrow SMS."""
+    """Queue an SMS for sending via Sparrow SMS.
+
+    Body: {"phones": [...]} (canonical) — "to" is accepted as an alias
+    because the web dashboard sends it. Each recipient becomes one SMSLog
+    row (status `queued`); the Celery task flips it to sent/failed with the
+    real per-message outcome (cost is counted only when a message is
+    actually sent).
+    """
     data = request.get_json(silent=True) or {}
-    phones = data.get("phones", [])
-    message = data.get("message", "")
+    phones = data.get("phones") or data.get("to") or []
+    message = (data.get("message") or "").strip()
     template_name = data.get("template_name")
+
+    if not isinstance(phones, list):
+        phones = [phones]
+    phones = [str(p).strip() for p in phones if str(p).strip()]
+    invalid = [p for p in phones if not _valid_phone(p)]
 
     if not phones or not message:
         return error_response("phones and message are required")
+    if invalid:
+        return error_response(
+            f"Invalid phone number(s): {', '.join(invalid)}", 400
+        )
 
     logs = []
     for phone in phones:
@@ -35,6 +51,7 @@ def send_sms():
             message=message,
             template_name=template_name,
             status="queued",
+            cost=0,  # credited only on actual send (task-side)
             sent_by_id=g.current_user.id,
         )
         db.session.add(log)
@@ -42,15 +59,28 @@ def send_sms():
 
     db.session.commit()
 
-    # Queue async sending
+    # Queue async sending — each task updates its SMSLog row's status.
     from app.tasks.sms_sender import send_bulk_sms
 
-    send_bulk_sms.delay([{"phone": phone, "message": message} for phone in phones])
+    send_bulk_sms.delay([
+        {"phone": log.to_phone, "message": message, "log_id": str(log.id)}
+        for log in logs
+    ])
 
     return created_response({
         "queued": len(logs),
         "log_ids": [str(l.id) for l in logs],
     })
+
+
+def _valid_phone(phone: str) -> bool:
+    """Nepal-friendly E.164-ish check: optional +, then 7-15 digits
+    (spaces/hyphens allowed as separators)."""
+    import re
+
+    return bool(re.fullmatch(r"\+?\d[\d\s-]{6,17}", phone)) and (
+        7 <= len("".join(ch for ch in phone if ch.isdigit())) <= 15
+    )
 
 
 @sms_bp.route("/history", methods=["GET"])
@@ -88,11 +118,22 @@ def list_templates():
 @role_required("superadmin", "school_admin")
 def create_template():
     data = request.get_json(silent=True) or {}
+    # E197: an unnamed/empty template was stored verbatim and then showed up
+    # in every template picker as a blank row — validate instead.
+    name = (data.get("name") or "").strip()
+    body = (data.get("body") or data.get("content") or "").strip()
+    if not name or not body:
+        return error_response("name and body are required", 400)
+    channel = data.get("channel", "sms")
+    if channel not in ("sms", "email", "whatsapp", "push"):
+        return error_response(
+            "channel must be one of: sms, email, whatsapp, push", 400
+        )
     tpl = NotificationTemplate(
         school_id=g.school_id,
-        name=data.get("name", ""),
-        channel=data.get("channel", "sms"),
-        template_en=data.get("body") or data.get("content") or "",
+        name=name,
+        channel=channel,
+        template_en=body,
         template_ne=data.get("template_ne"),
         variables=data.get("variables", []),
         is_active=data.get("is_active", True),
@@ -120,11 +161,16 @@ def sms_stats():
     failed = db.session.query(func.count(SMSLog.id)).filter_by(
         school_id=g.school_id, is_deleted=False, status="failed"
     ).scalar()
+    queued = db.session.query(func.count(SMSLog.id)).filter_by(
+        school_id=g.school_id, is_deleted=False, status="queued"
+    ).scalar()
+    # Credits are counted only for messages that were actually sent —
+    # queued/failed rows cost nothing (cost is set by the sender task).
     credits_used = db.session.query(func.coalesce(func.sum(SMSLog.cost), 0)).filter_by(
-        school_id=g.school_id, is_deleted=False
+        school_id=g.school_id, is_deleted=False, status="sent"
     ).scalar()
     return success_response({
-        "total": total, "sent": sent, "failed": failed,
+        "total": total, "sent": sent, "failed": failed, "queued": queued,
         "credits_used": int(credits_used),
     })
 

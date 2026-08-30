@@ -17,6 +17,7 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
   List<Map<String, dynamic>> _records = [];
   List<Map<String, dynamic>> _vaccinations = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -32,15 +33,22 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/health/records?per_page=30');
       setState(() {
         _records = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('HealthRecordsScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load health records.';
+        _loading = false;
+      });
     }
     _loadVaccinations();
   }
@@ -52,8 +60,9 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
       setState(() {
         _vaccinations = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
       });
-    } catch (_) {
-      // silent fail — vaccination endpoint may not exist yet
+    } catch (e, st) {
+      // Vaccination endpoint may not exist yet — records tab stays usable.
+      debugPrint('HealthRecordsScreen loadVaccinations failed: $e\n$st');
     }
   }
 
@@ -88,6 +97,9 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
   }
 
   Widget _buildRecords() {
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
     if (_records.isEmpty) {
       return const NoDataContainer(
         title: 'No health records',
@@ -117,7 +129,7 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
                   ),
                 ),
                 title: Text(
-                  r['student_name'] as String? ?? '',
+                  safeStringOrNull(r['student_name']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -163,11 +175,11 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
                 color: ASchoolTheme.danger,
               ),
               title: Text(
-                a['student_name'] as String? ?? '',
+                safeStringOrNull(a['student_name']) ?? '',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
-                a['description'] as String? ?? '',
+                safeStringOrNull(a['description']) ?? '',
                 style: const TextStyle(
                     fontSize: 12, color: ASchoolTheme.mutedText),
               ),
@@ -188,8 +200,8 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
               itemCount: _vaccinations.length,
               itemBuilder: (context, i) {
                 final v = _vaccinations[i];
-                final dueDate = v['due_date'] as String?;
-                final givenDate = v['given_date'] as String?;
+                final dueDate = safeStringOrNull(v['due_date']);
+                final givenDate = safeStringOrNull(v['given_date']);
                 final isOverdue = dueDate != null &&
                     givenDate == null &&
                     DateTime.tryParse(dueDate)?.isBefore(DateTime.now()) ==
@@ -218,7 +230,7 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
                       ),
                     ),
                     title: Text(
-                      v['vaccine_name'] as String? ?? 'Unknown Vaccine',
+                      safeStringOrNull(v['vaccine_name']) ?? 'Unknown Vaccine',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Column(

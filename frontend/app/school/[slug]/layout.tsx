@@ -1,10 +1,10 @@
 /** Public school website layout — applies theme CSS variables */
 import { Metadata } from "next";
 import { sanitizeCss } from "@/lib/sanitize";
-import { generateThemeCSS, getThemeById, THEMES } from "@/themes/registry";
+import { getPublicSite, getPublicSiteStatus } from "@/lib/public-site";
+import { generateThemeCSS, getThemeById, THEMES, DEFAULT_THEME_ID } from "@/themes/registry";
 import { SchoolNavbar } from "@/components/website/SchoolNavbar";
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || "aschool.com.np";
 const FONT_NAMES = Array.from(
   new Set(THEMES.flatMap((theme) => [theme.fonts.heading, theme.fonts.body])),
@@ -12,12 +12,23 @@ const FONT_NAMES = Array.from(
 const FONT_QUERY = FONT_NAMES.map((font) => `family=${font.replace(/ /g, "+")}:wght@400;500;600;700`).join("&");
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300 }, // ISR: 5 minutes
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data;
+  const site = await getPublicSite(slug);
+  return site.ok ? site.data : null;
+}
+
+/** Honest titles for the two 404 cases (unpublished site vs unknown school). */
+async function unavailableSiteMetadata(slug: string): Promise<Metadata> {
+  // E201: decide on the no-store guard, not the ISR-cached payload — a
+  // just-unpublished site must show coming-soon metadata immediately.
+  const status = await getPublicSiteStatus(slug);
+  if (status.published) return {};
+  if (status.exists) {
+    return {
+      title: status.schoolName ? `${status.schoolName} — Website Coming Soon` : "Website Coming Soon",
+      description: "This school's website has not been published yet. Please check back soon.",
+    };
+  }
+  return { title: "School Not Found" };
 }
 
 export async function generateMetadata({
@@ -25,6 +36,11 @@ export async function generateMetadata({
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
+  // E201: the no-store guard decides FIRST — a just-unpublished site must
+  // not keep advertising the full site's metadata from the ISR cache.
+  const status = await getPublicSiteStatus(params.slug);
+  if (!status.published) return unavailableSiteMetadata(params.slug);
+
   const data = await getSchoolData(params.slug);
   if (!data) return { title: "School Not Found" };
 
@@ -69,25 +85,72 @@ export default async function SchoolLayout({
   children: React.ReactNode;
   params: { slug: string };
 }) {
-  const data = await getSchoolData(params.slug);
+  // E201: publish-status GUARD at request time (no-store). The ISR-cached
+  // data fetch can be up to 5 minutes stale and builder-UI revalidation only
+  // fires from the dashboard — an API-driven unpublish used to keep serving
+  // the full site for minutes. The guard is the source of truth for whether
+  // ANY page under /school/<slug> renders; published sites keep ISR for the
+  // heavy content below.
+  const status = await getPublicSiteStatus(params.slug);
 
-  if (!data) {
-    return (
-      <html lang="en">
-        <body className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">School Not Found</h1>
-            <p className="text-gray-600">The school website you&apos;re looking for doesn&apos;t exist.</p>
+  if (!status.published) {
+    // Nested layouts must NOT render <html>/<body> — only the root layout
+    // owns them (app/layout.tsx). Rendering them here put <html> inside the
+    // root <body> (React: "In HTML, <html> cannot be a child of <body>") and
+    // crashed SSR with "Element type is invalid: got: undefined".
+    if (status.exists) {
+      // The school exists but its website is offline (builder "Unpublish").
+      // Render an honest coming-soon state instead of pretending bad URL.
+      return (
+        <div className="min-h-screen flex items-center justify-center px-6">
+          <div className="text-center max-w-md">
+            <div className="text-5xl mb-4">🚧</div>
+            <h1 className="text-3xl font-bold mb-3">
+              {status.schoolName ? `${status.schoolName} — Website Coming Soon` : "Website Coming Soon"}
+            </h1>
+            <p className="text-gray-600 mb-2">
+              {status.schoolName
+                ? `${status.schoolName}'s website hasn't been published yet. Please check back soon.`
+                : "This school's website hasn't been published yet. Please check back soon."}
+            </p>
+            <p className="text-gray-400 text-xs">Website not published</p>
           </div>
-        </body>
-      </html>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4">School Not Found</h1>
+          <p className="text-gray-600">The school website you&apos;re looking for doesn&apos;t exist.</p>
+        </div>
+      </div>
     );
   }
 
+  // Guard says published — fetch the heavy content via ISR. If the data cache
+  // still holds a pre-publish 404 (pollution from an unpublish window), retry
+  // once without the cache so the site returns immediately.
+  let site = await getPublicSite(params.slug);
+  if (!site.ok) site = await getPublicSite(params.slug, { noStore: true });
+
+  if (!site.ok) {
+    // Should not happen (guard + backend disagree) — fail honest.
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4">School Not Found</h1>
+          <p className="text-gray-600">The school website you&apos;re looking for doesn&apos;t exist.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const data = site.data;
   const school = data.school;
   const website = data.website;
-  const themeSlug = website?.theme_slug || "modern-minimal";
-  const activeTheme = getThemeById(themeSlug) || getThemeById("modern-minimal");
+  const themeSlug = website?.theme_slug || DEFAULT_THEME_ID;
+  const activeTheme = getThemeById(themeSlug) || getThemeById(DEFAULT_THEME_ID);
 
   // Apply stored customization colors as overrides on top of the base theme
   const colorOverrides = (website?.customizations?.colors as Record<string, string>) || {};
@@ -111,25 +174,25 @@ export default async function SchoolLayout({
   ];
 
   return (
-    <html lang="en">
-      <head>
-        <link
-          href={`https://fonts.googleapis.com/css2?${FONT_QUERY}&display=swap`}
-          rel="stylesheet"
-        />
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-              ${themeCss}
-              ${surfaceOverride}
-              ${customCss}
-              * { box-sizing: border-box; }
-              html { scroll-behavior: smooth; }
-            `,
-          }}
-        />
-      </head>
-      <body
+    <>
+      {/* Theme fonts + CSS variables. Rendered as a nested <style> — the root
+          layout owns <html>/<head>/<body> (E51: nested html/body crashed SSR). */}
+      <link
+        href={`https://fonts.googleapis.com/css2?${FONT_QUERY}&display=swap`}
+        rel="stylesheet"
+      />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            ${themeCss}
+            ${surfaceOverride}
+            ${customCss}
+            * { box-sizing: border-box; }
+            html { scroll-behavior: smooth; }
+          `,
+        }}
+      />
+      <div
         className="min-h-screen flex flex-col"
         style={{ fontFamily: "var(--font-body)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
         data-theme={themeSlug}
@@ -231,7 +294,7 @@ export default async function SchoolLayout({
             <a href="/" className="underline hover:opacity-100">ASchool</a>
           </div>
         </footer>
-      </body>
-    </html>
+      </div>
+    </>
   );
 }

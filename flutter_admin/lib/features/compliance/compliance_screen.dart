@@ -12,6 +12,7 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
   List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _auditLogs = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/compliance/reports'),
@@ -36,9 +40,13 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
         );
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ComplianceScreen load failed: $e\n$st');
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = 'Could not load compliance data.';
+        _loading = false;
+      });
     }
   }
 
@@ -56,7 +64,8 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('$type report generated')));
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ComplianceScreen generate($type) failed: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to generate report')),
@@ -67,6 +76,9 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     final reportTypes = <Map<String, dynamic>>[
       {
@@ -101,11 +113,11 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
           children: [
             ...reportTypes.map(
               (item) => _ReportCard(
-                title: item['title'] as String,
-                description: item['description'] as String,
+                title: safeString(item['title']),
+                description: safeString(item['description']),
                 icon: item['icon'] as IconData,
                 color: item['color'] as Color,
-                onGenerate: () => _generate(item['type'] as String),
+                onGenerate: () => safeString(_generate(item['type'])),
               ),
             ),
             const SizedBox(height: 12),

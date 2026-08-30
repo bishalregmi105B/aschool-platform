@@ -28,7 +28,46 @@ function BroadcastContent() {
           class_id: form.class_id || undefined,
         })
       ).data,
-    onSuccess: (d) => { toast.success(`Broadcast sent to ${d?.data?.recipients || "all"} recipients!`); setForm({ ...form, subject: "", message: "" }); },
+    onSuccess: (d) => {
+      // E122: surface the honest per-channel outcome — push delivers in-app
+      // notifications, SMS queues logs, email/WhatsApp may honestly skip or
+      // fail (no credentials) and the UI must not claim success then.
+      const r = d?.data || {};
+      if (r.status === "skipped" || r.status === "failed") {
+        const reason =
+          r.reason === "whatsapp_not_configured"
+            ? "WhatsApp is not configured for this school"
+            : r.reason === "email_not_configured_or_smtp_error"
+              ? "Email could not be sent — SMTP is not configured or failed"
+              : "Delivery was skipped";
+        toast.error(`${reason}. Nothing was sent.`);
+        return;
+      }
+      if (r.channel === "push") {
+        toast.success(
+          r.queued > 0
+            ? `In-app notification delivered to ${r.queued} recipient${r.queued === 1 ? "" : "s"}`
+            : "No matching recipients in this audience",
+        );
+      } else if (r.channel === "email") {
+        toast.success(
+          r.queued > 0
+            ? `Email sent to ${r.queued} recipient${r.queued === 1 ? "" : "s"}${r.failed ? ` (${r.failed} failed)` : ""}`
+            : "No matching recipients with an email address",
+        );
+      } else if (r.status === "partial") {
+        toast.warning(
+          `WhatsApp sent to ${r.queued} of ${r.recipients} recipients (${r.failed} skipped)`,
+        );
+      } else {
+        toast.success(
+          r.queued > 0
+            ? `Broadcast queued for ${r.queued} recipient${r.queued === 1 ? "" : "s"}`
+            : "No matching recipients in this audience",
+        );
+      }
+      setForm({ ...form, subject: "", message: "" });
+    },
     onError: () => toast.error("Failed to send broadcast"),
   });
 

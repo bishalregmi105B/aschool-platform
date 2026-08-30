@@ -15,12 +15,21 @@ export default function IncidentManagementPage() {
 }
 
 function IncidentMgmtContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["incident-management-overview"],
     queryFn: async () => { const r = await api.get("/incidents/management/overview"); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load incident management overview. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const stats = data?.stats ?? {};
   const recentCases: any[] = data?.recent_cases ?? [];

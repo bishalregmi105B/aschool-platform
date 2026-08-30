@@ -19,9 +19,10 @@ export default function EscalationsPage() {
 function EscalationsContent() {
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["escalations"],
     queryFn: async () => { const r = await api.get("/incidents/management/escalations"); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   const escalations: any[] = Array.isArray(data) ? data : data?.items ?? [];
@@ -35,11 +36,19 @@ function EscalationsContent() {
 
   const scheduleConference = useMutation({
     mutationFn: async (id: string) => (await api.post(`/incidents/management/${id}/conference`)).data,
-    onSuccess: () => toast.success("Parent conference scheduled"),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["escalations"] }); toast.success("Parent conference scheduled"); },
     onError: () => toast.error("Failed to schedule"),
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load escalated cases. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

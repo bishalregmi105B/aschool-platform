@@ -16,15 +16,25 @@ export default function CompliancePage() {
 }
 
 function ComplianceContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["compliance"],
     queryFn: async () => { const r = await api.get("/compliance/reports"); return r.data; },
+    retry: 1,
   });
 
   const items = data?.data || [];
   const overdue = items.filter((c: any) => c.status === "overdue" || c.status === "expired").length;
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load compliance reports. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

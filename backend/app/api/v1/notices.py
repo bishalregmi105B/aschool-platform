@@ -15,6 +15,27 @@ from extensions import db
 
 notices_bp = Blueprint("notices", __name__, url_prefix="/notices")
 
+# nepali_datetime only covers roughly BS 1975-2100 (AD ~1918-2044); a date
+# outside that range must be rejected with a 400 on write, and a row that
+# already carries such a date (legacy/bad data) must not 500 the whole list
+# serializer — see _bs_or_none.
+_BS_MIN_AD = (1918, 1, 1)
+_BS_MAX_AD = (2044, 12, 31)
+
+
+def _bs_in_range(d: date) -> bool:
+    return (_BS_MIN_AD <= (d.year, d.month, d.day) <= _BS_MAX_AD) if d else True
+
+
+def _bs_or_none(ad_date):
+    """ad_to_bs that degrades to None instead of OverflowError on bad rows."""
+    if not ad_date:
+        return None
+    try:
+        return ad_to_bs(ad_date)
+    except (OverflowError, ValueError):
+        return None
+
 
 # ── Notices ────────────────────────────────────────────────
 
@@ -29,6 +50,11 @@ def list_notices():
 
     notice_type = request.args.get("type")
     if notice_type:
+        # E127: notice_type is a Postgres enum — an unknown value used to
+        # reach the DB and surface as an unhandled DataError 500. Unknown
+        # types simply match nothing.
+        if notice_type not in ("general", "academic", "event", "holiday", "urgent"):
+            return success_response([])
         query = query.filter_by(notice_type=notice_type)
 
     target = request.args.get("target_role")
@@ -147,11 +173,25 @@ def list_events():
 def create_event():
     """Create a school event."""
     data = request.get_json(silent=True) or {}
+    # title/start_date are NOT NULL columns — 400 up front, not a 500.
+    missing = [f for f in ("title", "start_date") if not data.get(f)]
+    if missing:
+        return error_response(f"Missing required fields: {', '.join(missing)}", 400)
     event = Event(
         school_id=g.school_id,
         created_by_id=get_jwt_identity(),
     )
     _populate_event(event, data)
+    if not event.start_date:
+        return error_response("start_date must be a valid ISO date", 400)
+    bad = [f for f, d in (("start_date", event.start_date), ("end_date", event.end_date))
+           if d and not _bs_in_range(d)]
+    if bad:
+        db.session.rollback()
+        return error_response(
+            f"{', '.join(bad)} is outside the supported BS calendar range "
+            f"(AD 1918-2044)", 400,
+        )
     db.session.add(event)
     db.session.commit()
     return created_response(_event_dict(event))
@@ -169,6 +209,16 @@ def update_event(event_id):
         return error_response("Event not found", 404)
     data = request.get_json(silent=True) or {}
     _populate_event(event, data)
+    if "start_date" in data and not event.start_date:
+        return error_response("start_date must be a valid ISO date", 400)
+    bad = [f for f, d in (("start_date", event.start_date), ("end_date", event.end_date))
+           if d and not _bs_in_range(d)]
+    if bad:
+        db.session.rollback()
+        return error_response(
+            f"{', '.join(bad)} is outside the supported BS calendar range "
+            f"(AD 1918-2044)", 400,
+        )
     db.session.commit()
     return success_response(_event_dict(event))
 
@@ -273,8 +323,8 @@ def _event_dict(e):
         "event_type": getattr(e, "event_type", None),
         "start_date": str(e.start_date) if e.start_date else None,
         "end_date": str(e.end_date) if e.end_date else None,
-        "start_date_bs": ad_to_bs(e.start_date) if e.start_date else None,
-        "end_date_bs": ad_to_bs(e.end_date) if e.end_date else None,
+        "start_date_bs": _bs_or_none(e.start_date),
+        "end_date_bs": _bs_or_none(e.end_date),
         "location": getattr(e, "location", None),
         "is_all_day": getattr(e, "is_all_day", True),
         "color": getattr(e, "color", None),

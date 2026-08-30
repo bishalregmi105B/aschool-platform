@@ -15,10 +15,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageLoader } from "@/components/ui/spinner";
 import { Building2, BedDouble, Users, Plus, UserX } from "lucide-react";
 
-interface Hostel { id: string; name: string; gender: string; warden_name?: string; total_rooms: number; occupied_beds: number; available_beds: number; capacity?: number; phone?: string; }
-interface HostelRoom { id: string; hostel_id: string; room_number: string; floor?: number; room_type?: string; capacity: number; occupied_count: number; is_full: boolean; monthly_fee?: number; }
-interface HostelAllocation { id: string; student_id: string; hostel_id: string; room_id: string; student_name: string; roll_number?: string; hostel_name: string; room_number: string; allocated_at: string; checked_out_at?: string; monthly_fee?: number; }
-interface HostelSummary { total_hostels: number; total_capacity: number; total_occupied: number; total_available: number; occupancy_rate: number; hostels: Hostel[]; }
+// Backend GET /hostel/summary returns an array of per-hostel stats:
+// {hostel_id, hostel_name, type, total_rooms, total_capacity, occupied, available, occupancy_pct}
+// (totals are derived client-side). GET /hostel/allocations rows now carry
+// room_number/hostel_name/monthly_fee from the backend serializer.
+interface HostelStat { hostel_id: string; hostel_name: string; type: string; total_rooms: number; total_capacity: number; occupied: number; available: number; occupancy_pct: number; }
+interface HostelSummary { total_hostels: number; total_capacity: number; total_occupied: number; total_available: number; occupancy_rate: number; hostels: HostelStat[]; }
+interface HostelRoom { id: string; hostel_id: string; room_number: string; floor?: number | string; room_type?: string; capacity: number; occupied_count: number; is_full: boolean; monthly_fee?: number; }
+interface HostelAllocation { id: string; student_id: string; room_id: string; student_name: string; student_roll?: number; hostel_name?: string; room_number?: string; check_in_date?: string; check_out_date?: string; status?: string; monthly_fee?: number; }
+
+function deriveSummary(stats: HostelStat[] | null | undefined): HostelSummary | null {
+  if (!stats) return null;
+  const total_capacity = stats.reduce((s, h) => s + (h.total_capacity || 0), 0);
+  const total_occupied = stats.reduce((s, h) => s + (h.occupied || 0), 0);
+  const total_available = stats.reduce((s, h) => s + (h.available || 0), 0);
+  return {
+    total_hostels: stats.length,
+    total_capacity,
+    total_occupied,
+    total_available,
+    occupancy_rate: total_capacity ? (total_occupied / total_capacity) * 100 : 0,
+    hostels: stats,
+  };
+}
 
 function fmt(v?: number) { return v != null ? `Rs. ${v.toLocaleString()}` : "—"; }
 
@@ -37,21 +56,25 @@ function HostelContent() {
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [selHostel, setSelHostel] = useState("");
 
-  const { data: summary, isLoading: sl } = useQuery({
+  const { data: rawSummary, isLoading: sl, isError: se, refetch: srefetch } = useQuery({
     queryKey: ["hostel-summary"],
-    queryFn: async () => { const r = await api.get("/hostel/summary"); return r.data?.data as HostelSummary | null; },
+    queryFn: async () => { const r = await api.get("/hostel/summary"); return (r.data?.data ?? []) as HostelStat[]; },
+    retry: 1,
   });
+  const summary = deriveSummary(rawSummary);
 
-  const { data: rooms, isLoading: rl } = useQuery({
+  const { data: rooms, isLoading: rl, isError: re, refetch: rrefetch } = useQuery({
     queryKey: ["hostel-rooms", selHostel],
     enabled: tab === "rooms",
     queryFn: async () => { const p = selHostel ? `?hostel_id=${selHostel}` : ""; const r = await api.get(`/hostel/rooms${p}`); return (r.data?.data ?? []) as HostelRoom[]; },
+    retry: 1,
   });
 
-  const { data: allocs, isLoading: al } = useQuery({
+  const { data: allocs, isLoading: al, isError: ae, refetch: arefetch } = useQuery({
     queryKey: ["hostel-allocations"],
     enabled: tab === "allocations",
     queryFn: async () => { const r = await api.get("/hostel/allocations?per_page=50"); return (r.data?.data ?? []) as HostelAllocation[]; },
+    retry: 1,
   });
 
   const checkout = useMutation({
@@ -62,6 +85,14 @@ function HostelContent() {
 
   const hostels = summary?.hostels ?? [];
   if (sl && tab === "overview") return <PageLoader />;
+  if (se) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load hostel data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => srefetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -98,13 +129,13 @@ function HostelContent() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {hostels.map((h) => (
-                <Card key={h.id}><CardContent className="pt-4 space-y-3">
+                <Card key={h.hostel_id}><CardContent className="pt-4 space-y-3">
                   <div className="flex justify-between gap-2">
-                    <div><p className="font-semibold">{h.name}</p><p className="text-xs text-muted-foreground capitalize">{h.gender}{h.warden_name ? ` · ${h.warden_name}` : ""}</p></div>
-                    <Badge variant="outline" className="capitalize">{h.gender}</Badge>
+                    <div><p className="font-semibold">{h.hostel_name}</p><p className="text-xs text-muted-foreground capitalize">{h.type}</p></div>
+                    <Badge variant="outline" className="capitalize">{h.type}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">{h.occupied_beds}</span>/{h.capacity ?? "?"} occupied · <span className="text-green-600 font-medium">{h.available_beds}</span> free</p>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => { setSelHostel(h.id); setTab("rooms"); }}>View Rooms</Button>
+                  <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">{h.occupied}</span>/{h.total_capacity} occupied · <span className="text-green-600 font-medium">{h.available}</span> free · {h.total_rooms} rooms</p>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => { setSelHostel(h.hostel_id); setTab("rooms"); }}>View Rooms</Button>
                 </CardContent></Card>
               ))}
             </div>
@@ -115,11 +146,16 @@ function HostelContent() {
           <div className="flex items-center justify-between">
             <select className="rounded border bg-background px-3 py-1.5 text-sm" value={selHostel} onChange={(e) => setSelHostel(e.target.value)}>
               <option value="">All Hostels</option>
-              {hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+              {hostels.map((h) => <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>)}
             </select>
             <Button size="sm" onClick={() => setShowAddRoom(true)}><Plus className="mr-1.5 h-3.5 w-3.5" />Add Room</Button>
           </div>
-          {rl ? <PageLoader /> : !rooms?.length ? (
+          {rl ? <PageLoader /> : re ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <p className="text-sm text-destructive">Failed to load rooms.</p>
+              <Button size="sm" variant="outline" onClick={() => rrefetch()}>Retry</Button>
+            </div>
+          ) : !rooms?.length ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center"><BedDouble className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No rooms</p><p className="text-sm text-muted-foreground">Add rooms to this hostel</p></div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -136,7 +172,12 @@ function HostelContent() {
         </TabsContent>
 
         <TabsContent value="allocations" className="mt-4">
-          {al ? <PageLoader /> : !allocs?.length ? (
+          {al ? <PageLoader /> : ae ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <p className="text-sm text-destructive">Failed to load allocations.</p>
+              <Button size="sm" variant="outline" onClick={() => arefetch()}>Retry</Button>
+            </div>
+          ) : !allocs?.length ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center"><Users className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No allocations</p><p className="text-sm text-muted-foreground">Students have not been allocated to hostel rooms yet</p></div>
           ) : (
             <div className="overflow-x-auto rounded-lg border">
@@ -145,12 +186,12 @@ function HostelContent() {
                 <tbody>
                   {allocs.map((a, i) => (
                     <tr key={a.id} className={i % 2 ? "bg-muted/20" : ""}>
-                      <td className="px-4 py-2.5"><p className="font-medium">{a.student_name}</p>{a.roll_number && <p className="text-xs text-muted-foreground">Roll: {a.roll_number}</p>}</td>
-                      <td className="px-4 py-2.5"><p>{a.hostel_name}</p><p className="text-xs text-muted-foreground">Room {a.room_number}</p></td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{a.allocated_at ? new Date(a.allocated_at).toLocaleDateString("ne-NP") : "—"}</td>
+                      <td className="px-4 py-2.5"><p className="font-medium">{a.student_name}</p>{a.student_roll != null && <p className="text-xs text-muted-foreground">Roll: {a.student_roll}</p>}</td>
+                      <td className="px-4 py-2.5"><p>{a.hostel_name || "—"}</p><p className="text-xs text-muted-foreground">Room {a.room_number || "—"}</p></td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{a.check_in_date ? new Date(a.check_in_date).toLocaleDateString("ne-NP") : "—"}</td>
                       <td className="px-4 py-2.5 text-green-700 font-medium">{fmt(a.monthly_fee)}</td>
-                      <td className="px-4 py-2.5">{a.checked_out_at ? <Badge variant="outline" className="text-xs">Checked Out</Badge> : <Badge variant="success" className="text-xs">Active</Badge>}</td>
-                      <td className="px-4 py-2.5">{!a.checked_out_at && <Button size="sm" variant="outline" className="text-destructive border-destructive/30 h-7 text-xs" onClick={() => { if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id); }}><UserX className="mr-1 h-3 w-3" />Checkout</Button>}</td>
+                      <td className="px-4 py-2.5">{(a.status === "checked_out" || a.check_out_date) ? <Badge variant="outline" className="text-xs">Checked Out</Badge> : <Badge variant="success" className="text-xs">Active</Badge>}</td>
+                      <td className="px-4 py-2.5">{!(a.status === "checked_out" || a.check_out_date) && <Button size="sm" variant="outline" className="text-destructive border-destructive/30 h-7 text-xs" onClick={() => { if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id); }}><UserX className="mr-1 h-3 w-3" />Checkout</Button>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -172,7 +213,8 @@ function AddHostelDialog({ open, onClose, onSaved }: { open: boolean; onClose: (
   const save = async () => {
     if (!f.name.trim()) { toast.error("Name required"); return; }
     setSaving(true);
-    try { await api.post("/hostel", f); onSaved(); toast.success("Hostel added"); setF({ name: "", gender: "male", warden_name: "", phone: "", address: "" }); }
+    // Backend contract: POST /hostel {name, type(boys|girls|mixed), warden_name, warden_phone, description}
+    try { await api.post("/hostel", { name: f.name.trim(), type: f.gender === "male" ? "boys" : f.gender === "female" ? "girls" : "mixed", warden_name: f.warden_name || undefined, warden_phone: f.phone || undefined, description: f.address || undefined }); onSaved(); toast.success("Hostel added"); setF({ name: "", gender: "male", warden_name: "", phone: "", address: "" }); }
     catch { toast.error("Failed to add hostel"); }
     finally { setSaving(false); }
   };
@@ -192,8 +234,8 @@ function AddHostelDialog({ open, onClose, onSaved }: { open: boolean; onClose: (
   );
 }
 
-function AddRoomDialog({ open, hostels, defaultHostelId, onClose, onSaved }: { open: boolean; hostels: Hostel[]; defaultHostelId: string; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ hostel_id: defaultHostelId || hostels[0]?.id || "", room_number: "", capacity: "4", room_type: "standard", floor: "0", monthly_fee: "" });
+function AddRoomDialog({ open, hostels, defaultHostelId, onClose, onSaved }: { open: boolean; hostels: HostelStat[]; defaultHostelId: string; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ hostel_id: defaultHostelId || hostels[0]?.hostel_id || "", room_number: "", capacity: "4", room_type: "standard", floor: "0", monthly_fee: "" });
   const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!f.hostel_id) { toast.error("Select hostel"); return; }
@@ -207,7 +249,7 @@ function AddRoomDialog({ open, hostels, defaultHostelId, onClose, onSaved }: { o
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent><DialogHeader><DialogTitle>Add Room</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="space-y-1.5"><Label>Hostel *</Label><select className="w-full rounded border bg-background px-3 py-2 text-sm" value={f.hostel_id} onChange={(e) => setF({ ...f, hostel_id: e.target.value })}>{hostels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}</select></div>
+          <div className="space-y-1.5"><Label>Hostel *</Label><select className="w-full rounded border bg-background px-3 py-2 text-sm" value={f.hostel_id} onChange={(e) => setF({ ...f, hostel_id: e.target.value })}>{hostels.map((h) => <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>Room Number *</Label><Input value={f.room_number} onChange={(e) => setF({ ...f, room_number: e.target.value })} placeholder="e.g. 101" /></div>
             <div className="space-y-1.5"><Label>Capacity (beds)</Label><Input type="number" value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} min={1} /></div>

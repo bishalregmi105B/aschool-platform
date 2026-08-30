@@ -28,4 +28,6 @@ flutter:
   uses-material-design: true
 
 dependency_overrides:
-  web: ^1.0.0
+  # share_plus 9 (from aschool_shared) is incompatible with web >=1.1 —
+  # pin the same 0.5.x line the other apps resolve to, or web builds fail.
+  web: 0.5.1

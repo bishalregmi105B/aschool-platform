@@ -8,6 +8,18 @@ emoji: "🎨"
 icon: "Palette"
 description: "Digital student portfolios, achievement tracking, micro-credentials, project showcases"
 
+# DEPRECATED duplicate of `student_portfolio` (growth, NPR 299) — same
+# feature (same name, same api_blueprint app.api.v1.portfolio, same models)
+# published twice at different prices. All consumer surfaces gate
+# student_portfolio (web PluginGate, mobile visibility, flutter apps), so
+# student_portfolio is canonical. seed.py syncs `published: false` →
+# Plugin.is_published=False so the marketplace lists only student_portfolio.
+# The portfolio→student_portfolio alias in app/plugins/decorators.py is KEPT
+# so schools that already installed portfolio keep passing
+# student_portfolio-gated routes.
+published: false
+deprecated: true
+
 api_blueprint: "app.api.v1.portfolio"
 models_module: "app.models.portfolio"
 

@@ -14,6 +14,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Map<String, dynamic>? _school;
   bool _loading = true;
+  String? _error;
   bool _darkMode = false;
   bool _pushNotifications = true;
   bool _nepaliLanguage = false;
@@ -25,7 +26,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/schools/current');
       final data = Map<String, dynamic>.from(resp.data['data'] ?? {});
@@ -39,14 +43,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _nepaliLanguage = data['default_language'] == 'ne';
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('SettingsScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load school settings.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     final auth = ref.watch(authProvider);
     return ListView(
@@ -401,7 +412,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Password updated')),
                 );
-              } catch (_) {
+              } catch (e, st) {
+                debugPrint('SettingsScreen change-password failed: $e\n$st');
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -431,7 +443,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showPaymentMethods() {
     final feeConfig = Map<String, dynamic>.from(_school?['fee_config'] ?? {});
-    final rawMethods = (feeConfig['payment_methods'] as List?) ?? const [];
+    final rawMethods = safeList(feeConfig['payment_methods']);
     final enabledLabels = rawMethods
         .whereType<Map>()
         .where((item) => item['enabled'] == true)
@@ -495,7 +507,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final resp = await ApiClient.instance.get('/mobile/version');
       config = Map<String, dynamic>.from(resp.data['data'] ?? {});
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('SettingsScreen mobile-version fetch failed (using cached): $e\n$st');
       config = Map<String, dynamic>.from(
           (_school?['settings'] ?? {})['mobile_version'] ?? {});
     }

@@ -12,9 +12,8 @@ class ParentDashboardData {
 
   factory ParentDashboardData.fromJson(Map<String, dynamic>? json) {
     return ParentDashboardData(
-      children: List<Map<String, dynamic>>.from(json?['children'] ?? []),
-      recentNotices:
-          List<Map<String, dynamic>>.from(json?['recent_notices'] ?? []),
+      children: safeMapList(json?['children']),
+      recentNotices: safeMapList(json?['recent_notices']),
     );
   }
 }
@@ -23,7 +22,7 @@ final parentDashboardProvider =
     FutureProvider.autoDispose<ParentDashboardData>((ref) async {
   final resp = await ApiClient.instance.get('/parent/dashboard');
   return ParentDashboardData.fromJson(
-    Map<String, dynamic>.from(resp.data['data'] ?? {}),
+    safeMap(envelopeData(resp.data)),
   );
 });
 
@@ -55,7 +54,7 @@ final parentAttendanceProvider =
       '/parent/child-attendance',
       queryParameters: _studentQuery(studentId),
     );
-    return Map<String, dynamic>.from(resp.data['data'] ?? {});
+    return safeMap(envelopeData(resp.data));
   },
 );
 
@@ -83,8 +82,8 @@ final parentTimetableProvider =
       '/parent/child-timetable',
       queryParameters: _studentQuery(studentId),
     );
-    final data = Map<String, dynamic>.from(resp.data['data'] ?? {});
-    return List<Map<String, dynamic>>.from(data['periods'] ?? const []);
+    final data = safeMap(envelopeData(resp.data));
+    return safeMapList(data['periods']);
   },
 );
 
@@ -95,7 +94,7 @@ final parentFeesProvider =
       '/parent/outstanding-fees',
       queryParameters: _studentQuery(studentId),
     );
-    return List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
+    return safeMapList(envelopeData(resp.data));
   },
 );
 
@@ -106,7 +105,7 @@ final parentWellbeingProvider =
       '/parent/child-wellbeing',
       queryParameters: _studentQuery(studentId),
     );
-    return Map<String, dynamic>.from(resp.data['data'] ?? {});
+    return safeMap(envelopeData(resp.data));
   },
 );
 
@@ -117,11 +116,7 @@ final parentConferencesProvider =
       '/parent/conferences',
       queryParameters: _studentQuery(studentId),
     );
-    final raw = resp.data['data'];
-    if (raw is List) {
-      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    }
-    return const [];
+    return safeMapList(envelopeData(resp.data));
   },
 );
 
@@ -132,7 +127,7 @@ final parentDismissalProvider =
       '/parent/dismissal-status',
       queryParameters: _studentQuery(studentId),
     );
-    return Map<String, dynamic>.from(resp.data['data'] ?? {});
+    return safeMap(envelopeData(resp.data));
   },
 );
 

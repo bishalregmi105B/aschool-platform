@@ -16,6 +16,7 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
   Map<String, dynamic>? _overview;
   List<dynamic> _invoices = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -25,15 +26,21 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/fees');
-      final payload = res.data?['data'] as Map?;
+      final payload = safeMapOrNull(res.data?['data']);
       setState(() {
-        _overview = (payload?['overview'] as Map?)?.cast<String, dynamic>();
-        _invoices = (payload?['invoices'] as List?) ?? [];
+        _overview = safeMapOrNull(payload?['overview']);
+        _invoices = safeList(payload?['invoices']);
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StudentFeesScreen load failed: $e');
+      setState(() => _error = 'Could not load your fees.');
+    }
     setState(() => _loading = false);
   }
 
@@ -53,7 +60,12 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
         appBar: const CustomAppBar(title: 'My Fees'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(
+                    errorMessage: _error!,
+                    onRetry: _load,
+                  )
+                : Column(
                 children: [
                   // Fee summary banner
                   Container(
@@ -183,7 +195,7 @@ class _InvoicesList extends StatelessWidget {
       itemCount: invoices.length,
       itemBuilder: (context, index) {
         final inv = invoices[index];
-        final status = (inv['status'] as String?) ?? 'pending';
+        final status = safeStringOrNull(inv['status']) ?? 'pending';
         final isPaid = status == 'paid';
         return Card(
           margin: const EdgeInsets.only(bottom: 8),

@@ -12,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Avatar } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Send, Users } from "lucide-react";
+import { Heart, MessageCircle, Send, Users, Trash2 } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
+import { useAuth } from "@/lib/auth-context";
 
 interface Comment {
   id: string;
@@ -25,6 +26,7 @@ interface Comment {
 interface Post {
   id: string;
   author_id: string;
+  author_name?: string | null;
   content: string;
   post_type: string;
   media_urls: string[];
@@ -67,6 +69,7 @@ function PostComments({ postId }: { postId: string }) {
       setText("");
       toast.success("Comment posted!");
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to post comment"),
   });
 
   return (
@@ -110,13 +113,26 @@ function PostComments({ postId }: { postId: string }) {
 function SocialHubContent() {
   const [newPost, setNewPost] = useState("");
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  // matches the backend's delete_post authorization (author OR
+  // superadmin/school_admin) — teachers who are not the author get a 403,
+  // so the moderation button must not be offered to them (E132)
+  const canModerate =
+    user?.role === "school_admin" ||
+    user?.role === "superadmin" ||
+    user?.role === "teacher";
+  const canDeletePost = (post: Post) =>
+    user?.role === "school_admin" ||
+    user?.role === "superadmin" ||
+    (user?.id != null && user.id === post.author_id);
 
-  const { data: posts, isLoading } = useQuery({
+  const { data: posts, isLoading, isError, refetch } = useQuery({
     queryKey: ["social-posts"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/social/posts");
       return (res.data.data as Post[]) || [];
     },
+    retry: 1,
   });
 
   const { data: groups } = useQuery({
@@ -137,6 +153,7 @@ function SocialHubContent() {
       setNewPost("");
       toast.success("Post shared!");
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to share post"),
   });
 
   const likeMut = useMutation({
@@ -145,8 +162,30 @@ function SocialHubContent() {
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["social-posts"] }),
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to update like"),
   });
 
+  const deleteMut = useMutation({
+    // moderation surface: DELETE /social/posts/<id> (backend enforces
+    // author-or-admin; soft-delete keeps audit trail)
+    mutationFn: async (postId: string) => (await api.delete(`/social/posts/${postId}`)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social-posts"] });
+      toast.success("Post removed");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to remove post"),
+  });
+
+  if (isError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load the social feed. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
   if (isLoading) return <PageLoader />;
 
   return (
@@ -176,12 +215,24 @@ function SocialHubContent() {
             <Card key={post.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <Avatar name="User" />
+                  <Avatar name={post.author_name || "User"} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">User</span>
+                      <span className="font-medium text-sm">{post.author_name || "User"}</span>
                       <span className="text-xs text-muted-foreground">{displayBS(post.created_at)}</span>
                       <Badge variant="outline" className="text-xs">{post.visibility}</Badge>
+                      {canModerate && canDeletePost(post) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-7 px-2 text-muted-foreground hover:text-destructive"
+                          disabled={deleteMut.isPending}
+                          title="Remove post (moderation)"
+                          onClick={() => { if (confirm("Remove this post?")) deleteMut.mutate(post.id); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                     <p className="mt-2 text-sm">{post.content}</p>
                     <div className="flex items-center gap-4 mt-3">

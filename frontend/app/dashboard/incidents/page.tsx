@@ -25,9 +25,9 @@ function IncidentsContent() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ title: "", type: "behavior", severity: "low", student_id: "", description: "", action_taken: "" });
+  const [form, setForm] = useState({ title: "", type: "behavioral", severity: "low", student_id: "", description: "" });
 
-  const { data, isLoading } = useQuery({
+  const { isError, refetch, data, isLoading } = useQuery({
     queryKey: ["incidents", search],
     queryFn: async () => { const r = await api.get("/incidents", { params: { search: search || undefined } }); return r.data; },
   });
@@ -35,12 +35,31 @@ function IncidentsContent() {
   const incidents = data?.data || [];
 
   const create = useMutation({
-    mutationFn: async () => (await api.post("/incidents", { ...form, student_id: form.student_id ? parseInt(form.student_id) : undefined })).data,
+    // Backend contract: POST /incidents {title, incident_type, severity, description,
+    // involved_student_ids: [student uuid]} — incident_type enum is
+    // bullying|fighting|vandalism|theft|medical|behavioral|other; disciplinary
+    // follow-ups are separate records via POST /incidents/<id>/actions (admin only).
+    mutationFn: async () => (await api.post("/incidents", {
+      title: form.title,
+      incident_type: form.type,
+      severity: form.severity,
+      description: form.description,
+      involved_student_ids: form.student_id.trim() ? [form.student_id.trim()] : undefined,
+    })).data,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["incidents"] }); setShowDialog(false); toast.success("Incident recorded"); },
     onError: () => toast.error("Failed to record"),
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
 
   const severityColor = (s: string) => s === "high" ? "destructive" : s === "medium" ? "secondary" : "outline";
 
@@ -56,18 +75,17 @@ function IncidentsContent() {
       <Card>
         <CardContent className="pt-6">
           <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Severity</TableHead><TableHead>Student</TableHead><TableHead>Action Taken</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Severity</TableHead><TableHead>Student</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
             <TableBody>
               {incidents.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No incidents recorded</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No incidents recorded</TableCell></TableRow>
               ) : incidents.map((i: any) => (
                 <TableRow key={i.id}>
                   <TableCell>{i.created_at ? displayBS(i.created_at) : "—"}</TableCell>
                   <TableCell className="font-medium">{i.title}</TableCell>
-                  <TableCell><Badge variant="outline">{i.type}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{i.incident_type}</Badge></TableCell>
                   <TableCell><Badge variant={severityColor(i.severity)}>{i.severity}</Badge></TableCell>
                   <TableCell>{i.student_name || "—"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{i.action_taken || "—"}</TableCell>
                   <TableCell><Badge variant={i.status === "resolved" ? "default" : "secondary"}>{i.status || "open"}</Badge></TableCell>
                 </TableRow>
               ))}
@@ -85,7 +103,7 @@ function IncidentsContent() {
               <div className="space-y-2">
                 <Label>Type</Label>
                 <select className="w-full border rounded-md p-2" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="behavior">Behavior</option><option value="bullying">Bullying</option><option value="injury">Injury</option><option value="property">Property Damage</option><option value="academic">Academic</option><option value="other">Other</option>
+                  <option value="behavioral">Behavior</option><option value="bullying">Bullying</option><option value="fighting">Fighting</option><option value="vandalism">Vandalism</option><option value="theft">Theft</option><option value="medical">Medical</option><option value="other">Other</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -97,7 +115,6 @@ function IncidentsContent() {
             </div>
             <div className="space-y-2"><Label>Student ID (optional)</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} /></div>
             <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
-            <div className="space-y-2"><Label>Action Taken</Label><Input value={form.action_taken} onChange={(e) => setForm({ ...form, action_taken: e.target.value })} /></div>
           </div>
           <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Submit</Button></DialogFooter>
         </DialogContent>

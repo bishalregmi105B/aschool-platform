@@ -11,6 +11,14 @@ from app.models.user import User
 from extensions import db
 
 
+class ChatNotAllowedError(ValueError):
+    """Raised when the sender's role may not message the target's role.
+
+    Subclasses ValueError so existing `except ValueError -> 400` callers keep
+    working; communications.py additionally maps it to 403.
+    """
+
+
 def parse_user_id(value) -> UUID | None:
     if isinstance(value, UUID):
         return value
@@ -30,6 +38,21 @@ def role_contacts_for(role: str | None) -> list[str]:
     if role in ("school_admin", "superadmin", "accountant"):
         return ["school_admin", "accountant", "teacher", "staff", "parent", "student"]
     return ["school_admin", "teacher", "staff"]
+
+
+def can_message(sender_role: str | None, target_role: str | None) -> bool:
+    """E190: the /contacts role matrix is the messaging permission model.
+
+    The contacts list has always been filtered by role_contacts_for(), but
+    /send and /messages accepted ANY user id of the school — a student could
+    DM an arbitrary parent (or another student) by POSTing a raw uuid even
+    though the contact never appears in their directory. Both API surfaces
+    (dashboard /communications and the parent app) now enforce the same
+    matrix here, so what you can see is exactly what you can message.
+    Teachers messaging any parent of the school remains allowed BY DESIGN
+    (school-staff directory model), as is parent -> teacher.
+    """
+    return target_role in role_contacts_for(sender_role)
 
 
 def list_contact_users(school_id, current_user_id, role: str | None) -> list[User]:
@@ -98,6 +121,21 @@ def list_messages(school_id, current_user_id, other_user_id, mark_read: bool = F
             for message in unread:
                 message.is_read = True
                 message.read_at = now
+            # E191: reading the thread also clears the "New message"
+            # in-app notifications for that thread, so the bell badge
+            # matches what the user has actually seen.
+            from app.models.notification import InAppNotification
+
+            InAppNotification.query.filter(
+                InAppNotification.school_id == school_id,
+                InAppNotification.user_id == current_user_id,
+                InAppNotification.category == "message",
+                InAppNotification.is_read.is_(False),
+                InAppNotification.data["thread_user_id"].astext == str(other_user_id),
+            ).update(
+                {"is_read": True, "read_at": now},
+                synchronize_session=False,
+            )
             db.session.commit()
 
     return thread, messages
@@ -111,6 +149,19 @@ def send_message(
     file_url: str | None = None,
     file_type: str | None = None,
 ) -> ChatMessage:
+    sender = User.query.filter_by(id=sender_id, school_id=school_id).first()
+    receiver = User.query.filter_by(id=receiver_id, school_id=school_id).first()
+    if not receiver:
+        raise ValueError("Chat contact not found")
+    # E190: enforce the directory role matrix on EVERY send path (dashboard
+    # and parent app both funnel through here).
+    if not can_message(
+        getattr(sender, "role", None), getattr(receiver, "role", None)
+    ):
+        raise ChatNotAllowedError(
+            "You are not allowed to message this user"
+        )
+
     thread = get_or_create_thread(school_id, sender_id, receiver_id)
     message = ChatMessage(
         school_id=school_id,
@@ -123,7 +174,26 @@ def send_message(
     )
     thread.last_message = content
     thread.last_message_at = datetime.now(timezone.utc)
+
+    # E191: the recipient must SEE the message — write the in-app
+    # notification row in the SAME commit as the message so the
+    # /notifications inbox can never lag or lose a chat message.
+    from app.models.notification import InAppNotification
+
+    notification = InAppNotification(
+        school_id=school_id,
+        user_id=receiver_id,
+        title=f"New message from {getattr(sender, 'full_name', None) or 'a user'}",
+        body=(content or file_type or "Sent an attachment")[:500],
+        category="message",
+        priority="normal",
+        data={
+            "thread_user_id": str(sender_id),
+            "message_id": str(message.id),
+        },
+    )
     db.session.add(message)
+    db.session.add(notification)
     db.session.commit()
     return message
 

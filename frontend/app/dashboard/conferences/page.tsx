@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/spinner";
+import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Plus, Search } from "lucide-react";
 
@@ -40,6 +41,14 @@ function displayConferenceDate(bsDate?: string, adDate?: string) {
 }
 
 export default function ConferencesPage() {
+  return (
+    <PluginGate slug="conferences">
+      <ConferencesContent />
+    </PluginGate>
+  );
+}
+
+function ConferencesContent() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
@@ -52,12 +61,13 @@ export default function ConferencesPage() {
   });
   const queryClient = useQueryClient();
 
-  const { data: conferences, isLoading } = useQuery<any>({
+  const { data: conferences, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["conferences"],
     queryFn: async () => {
       const res = await api.get("/conferences");
       return (res.data.data || []) as Conference[];
     },
+    retry: 1,
   });
 
   const createConference = useMutation({
@@ -90,6 +100,18 @@ export default function ConferencesPage() {
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError)
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-destructive mb-4">Failed to load conferences.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
 
   const list = conferences || [];
 

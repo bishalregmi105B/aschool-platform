@@ -16,7 +16,6 @@ class ParentShellScreen extends ConsumerWidget {
     final plugins = ref.watch(pluginProvider);
     final user = ref.watch(authProvider).user;
     final drawerSections = _buildDrawerSections(plugins);
-    final showNoticesAction = plugins.isModuleVisible('notices');
 
     return Scaffold(
       appBar: CustomAppBar(
@@ -25,12 +24,10 @@ class ParentShellScreen extends ConsumerWidget {
         showBackButton: false,
         actions: [
           const _ChildSwitcher(),
-          if (showNoticesAction)
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              tooltip: 'Notices',
-              onPressed: () => context.go('/notices'),
-            ),
+          NotificationBell(
+            tooltip: 'Notifications',
+            onTap: () => context.push('/notifications'),
+          ),
         ],
       ),
       body: navigationShell,

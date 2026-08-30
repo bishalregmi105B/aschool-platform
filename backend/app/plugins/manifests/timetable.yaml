@@ -26,7 +26,7 @@ frontend:
     subitems:
       - { label: "View", route: "/timetable" }
       - { label: "AI Generate", route: "/timetable/generate" }
-      - { label: "Substitution", route: "/timetable/substitution" }
+      # Substitution subitem removed — dead link (no page, no API).
     visible_to: ["school_admin"]
 
 flutter:

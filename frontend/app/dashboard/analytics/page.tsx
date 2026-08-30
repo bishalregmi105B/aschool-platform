@@ -10,12 +10,23 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
 export default function AnalyticsPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["analytics-overview"],
     queryFn: async () => { const r = await api.get("/analytics/overview"); return r.data?.data; },
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load analytics overview. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const stats = data || {};
 

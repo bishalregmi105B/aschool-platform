@@ -22,9 +22,9 @@ class StudentDashboard extends ConsumerWidget {
         title: 'Namaste, $firstName! 👋',
         showBackButton: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => context.go('/dashboard/notices'),
+          NotificationBell(
+            tooltip: 'Notifications',
+            onTap: () => context.push('/notifications'),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -52,10 +52,10 @@ class StudentDashboard extends ConsumerWidget {
           ),
           data: (data) {
             final raw = data.rawData;
-            final todayClasses = (raw['today_classes'] as List?) ?? [];
-            final pendingHomework = (raw['pending_homework'] as List?) ?? [];
-            final recentResults = (raw['recent_results'] as List?) ?? [];
-            final notices = (raw['notices'] as List?) ?? [];
+            final todayClasses = safeList(raw['today_classes']);
+            final pendingHomework = safeList(raw['pending_homework']);
+            final recentResults = safeList(raw['recent_results']);
+            final notices = safeList(raw['notices']);
             final attendance = raw['attendance'] ?? {};
             final rank = raw['rank'];
 

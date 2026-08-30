@@ -21,6 +21,8 @@ from app.models.timetable import TimetableSlot
 from app.models.transport import Bus, BusStop, GPSLog
 from app.models.user import User
 from app.services.chat_service import (
+    ChatNotAllowedError,
+    can_message,
     contact_payload,
     list_contact_users,
     list_messages as list_chat_messages,
@@ -29,6 +31,7 @@ from app.services.chat_service import (
     send_message as persist_chat_message,
 )
 from app.models.wellbeing import CounselorNote, MoodEntry
+from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import error_response, success_response
@@ -159,7 +162,9 @@ def parent_dashboard():
         ).all()
 
         total_days = len(attendance_rows)
-        present_like = len([r for r in attendance_rows if r.status in ("present", "late", "half_day")])
+        # Uniform late rule: percentage counts present + late (a late student
+        # attended); half_day does not count toward the rate.
+        present_like = len([r for r in attendance_rows if r.status in ("present", "late")])
         attendance_pct = round((present_like / total_days) * 100, 1) if total_days else 0
 
         today_row = Attendance.query.filter(
@@ -235,9 +240,13 @@ def parent_child_attendance():
         .all()
     )
 
-    present = len([row for row in rows if row.status in ("present", "half_day")])
+    # Per-status counters (uniform late rule: the percentage below counts
+    # present + late — a late student DID attend; half_day never counts toward
+    # the rate and is reported separately, matching /attendance/student/<id>/summary).
+    present = len([row for row in rows if row.status == "present"])
     absent = len([row for row in rows if row.status == "absent"])
     late = len([row for row in rows if row.status == "late"])
+    half_day = len([row for row in rows if row.status == "half_day"])
     total_days = len(rows)
 
     records = [
@@ -257,8 +266,9 @@ def parent_child_attendance():
                 "present": present,
                 "absent": absent,
                 "late": late,
+                "half_day": half_day,
                 "total_days": total_days,
-                "percentage": round((present / total_days) * 100, 1) if total_days else 0,
+                "percentage": round(((present + late) / total_days) * 100, 1) if total_days else 0,
             },
             "records": records,
         }
@@ -734,6 +744,10 @@ def parent_chat_messages(thread_id):
     if not target:
         return error_response("Chat contact not found", 404)
 
+    # E190: thread reads honor the same directory role matrix as sends.
+    if not can_message(getattr(g.current_user, "role", None), target.role):
+        return error_response("You are not allowed to message this user", 403)
+
     try:
         _, messages = list_chat_messages(
             g.school_id,
@@ -780,6 +794,9 @@ def parent_send_chat_message(thread_id):
             contact_user_id,
             content,
         )
+    except ChatNotAllowedError:
+        # E190: role pair outside the directory matrix -> 403.
+        return error_response("You are not allowed to message this user", 403)
     except ValueError as exc:
         return error_response(str(exc), 400)
 
@@ -866,8 +883,13 @@ def parent_book_conference_slot(conference_id):
     if not slot_id:
         return error_response("slot_id is required", 400)
 
+    # E192 companion: a junk slot_id must be a 400, never a Postgres
+    # DataError 500.
+    slot_uuid = parse_user_id(slot_id)
+    if not slot_uuid:
+        return error_response("slot_id must be a valid id", 400)
     slot = ConferenceSlot.query.filter_by(
-        id=slot_id, conference_id=conference_id, is_deleted=False
+        id=slot_uuid, conference_id=conference_id, is_deleted=False
     ).first()
     if not slot:
         return error_response("Slot not found", 404)
@@ -898,6 +920,249 @@ def parent_book_conference_slot(conference_id):
         "is_virtual": conf.is_virtual,
         "meeting_link": conf.meeting_link,
     }, status_code=201)
+
+
+# ── Child Health / Portfolio / eLibrary (E165) ─────────────
+# The Flutter parent screens (child_health, portfolio, elibrary) called these
+# /parent/* paths but no such routes existed anywhere — every screen loaded
+# its permanent error state even with live data. They are ward-scoped proxies
+# over the existing plugin tables and enforce the same plugin gates.
+
+
+@parent_app_bp.route("/child-health", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+@plugin_required("health_records")
+def parent_child_health():
+    """Ward-scoped child health data for the parent app.
+
+    ?type=records (default)  → medical visits (date/diagnosis/notes/doctor)
+    ?type=vaccinations       → immunizations
+    ?type=allergies          → allergy + condition entries from the profile
+    """
+    from app.models.health_records import HealthProfile, Immunization, MedicalVisit
+
+    data_type = (request.args.get("type") or "records").strip().lower()
+    wards = _wards_for_parent(_current_parent_user_id())
+    selected = _pick_students(wards, request.args.get("student_id"))
+    if not selected:
+        return success_response([])
+
+    student_ids = [s.id for s in selected]
+
+    if data_type == "vaccinations":
+        rows = (
+            Immunization.query.filter(
+                Immunization.school_id == g.school_id,
+                Immunization.student_id.in_(student_ids),
+                Immunization.is_deleted.is_(False),
+            )
+            .order_by(Immunization.date_administered.desc())
+            .all()
+        )
+        return success_response([
+            {
+                "id": str(i.id),
+                "student_id": str(i.student_id),
+                "student_name": _student_display_name(
+                    next((s for s in selected if s.id == i.student_id), None)
+                ) if len(selected) > 1 else None,
+                "vaccine_name": i.vaccine_name,
+                "dose_number": i.dose_number,
+                "date_administered": str(i.date_administered) if i.date_administered else None,
+                "next_due_date": str(i.next_due_date) if i.next_due_date else None,
+                "administered_by": i.administered_by,
+                "notes": i.notes,
+            }
+            for i in rows
+        ])
+
+    if data_type == "allergies":
+        entries = []
+        for profile in HealthProfile.query.filter(
+            HealthProfile.school_id == g.school_id,
+            HealthProfile.student_id.in_(student_ids),
+            HealthProfile.is_deleted.is_(False),
+        ).all():
+            for allergy in profile.allergies or []:
+                entries.append({
+                    "student_id": str(profile.student_id),
+                    "allergen": allergy,
+                    "severity": "unknown",
+                    "reaction": "",
+                })
+            for condition in profile.medical_conditions or []:
+                entries.append({
+                    "student_id": str(profile.student_id),
+                    "allergen": condition,
+                    "severity": "unknown",
+                    "reaction": "Chronic condition",
+                })
+        return success_response(entries)
+
+    # default: medical visit records
+    rows = (
+        MedicalVisit.query.filter(
+            MedicalVisit.school_id == g.school_id,
+            MedicalVisit.student_id.in_(student_ids),
+            MedicalVisit.is_deleted.is_(False),
+        )
+        .order_by(MedicalVisit.visit_date.desc())
+        .limit(100)
+        .all()
+    )
+    return success_response([
+        {
+            "id": str(v.id),
+            "student_id": str(v.student_id),
+            "student_name": _student_display_name(
+                next((s for s in selected if s.id == v.student_id), None)
+            ) if len(selected) > 1 else None,
+            "record_date": str(v.visit_date) if v.visit_date else None,
+            "visit_date": str(v.visit_date) if v.visit_date else None,
+            "title": v.reason or v.diagnosis or "Health visit",
+            "diagnosis": v.diagnosis,
+            "treatment": v.treatment,
+            "notes": v.notes,
+            "doctor_name": v.recorder.full_name if v.recorder else None,
+        }
+        for v in rows
+    ])
+
+
+@parent_app_bp.route("/portfolio", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+@plugin_required("student_portfolio")
+def parent_portfolio():
+    """Ward-scoped portfolio entries + summary for the parent app."""
+    from app.models.portfolio import PortfolioItem, StudentPortfolio
+
+    wards = _wards_for_parent(_current_parent_user_id())
+    selected = _pick_students(wards, request.args.get("student_id"))
+    if not selected:
+        return success_response({"entries": [], "summary": {}})
+
+    student_ids = [s.id for s in selected]
+    category = (request.args.get("category") or "").strip().lower()
+
+    entries = []
+    type_counts: dict[str, int] = {}
+    for portfolio in StudentPortfolio.query.filter(
+        StudentPortfolio.school_id == g.school_id,
+        StudentPortfolio.student_id.in_(student_ids),
+        StudentPortfolio.is_deleted.is_(False),
+    ).all():
+        items = (
+            PortfolioItem.query.filter_by(
+                portfolio_id=portfolio.id, school_id=g.school_id, is_deleted=False
+            )
+            .order_by(PortfolioItem.created_at.desc())
+            .all()
+        )
+        for item in items:
+            if category:
+                haystack = [str(item.item_type or "").lower()] + [
+                    str(t).lower() for t in (item.tags or [])
+                ]
+                if category not in haystack:
+                    continue
+            type_counts[item.item_type or "other"] = type_counts.get(item.item_type or "other", 0) + 1
+            entries.append({
+                "id": str(item.id),
+                "student_id": str(portfolio.student_id),
+                "student_name": _student_display_name(
+                    next((s for s in selected if s.id == portfolio.student_id), None)
+                ) if len(selected) > 1 else None,
+                "title": item.title,
+                "description": item.description,
+                "item_type": item.item_type,
+                "media_urls": item.media_urls or [],
+                "tags": item.tags or [],
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            })
+
+    summary = {
+        "total_entries": len(entries),
+        "by_type": type_counts,
+        "children_count": len({e["student_id"] for e in entries}) if entries else 0,
+    }
+    return success_response({"entries": entries, "summary": summary})
+
+
+@parent_app_bp.route("/elibrary", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+@plugin_required("elibrary")
+def parent_elibrary():
+    """School e-library catalogue (books / past papers / OER resources) for
+    the parent app. Read-only and scoped to the school."""
+    from app.models.digital_content import DigitalBook, OERResource, PastPaper
+
+    books = (
+        DigitalBook.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .order_by(DigitalBook.title.asc())
+        .all()
+    )
+    papers = (
+        PastPaper.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .order_by(PastPaper.year.desc())
+        .all()
+    )
+    resources = (
+        OERResource.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .order_by(OERResource.created_at.desc())
+        .all()
+    )
+
+    def _book_dict(b):
+        return {
+            "id": str(b.id),
+            "title": b.title,
+            "author": b.author,
+            "file_url": b.file_url,
+            "cover_url": b.cover_url,
+            "file_type": b.file_type,
+            "pages": b.pages,
+        }
+
+    def _paper_dict(p):
+        return {
+            "id": str(p.id),
+            "title": p.title,
+            "exam_type": p.exam_type,
+            "year": p.year,
+            "file_url": p.file_url,
+            "answer_key_url": p.answer_key_url,
+        }
+
+    def _resource_dict(r):
+        return {
+            "id": str(r.id),
+            "title": r.title,
+            "description": r.description,
+            "resource_type": r.resource_type,
+            "url": r.url,
+            "tags": r.tags or [],
+        }
+
+    q = (request.args.get("q") or "").strip().lower()
+    book_list = [_book_dict(b) for b in books]
+    paper_list = [_paper_dict(p) for p in papers]
+    resource_list = [_resource_dict(r) for r in resources]
+    if q:
+        book_list = [b for b in book_list if q in (b["title"] or "").lower() or q in (b["author"] or "").lower()]
+        paper_list = [p for p in paper_list if q in (p["title"] or "").lower()]
+        resource_list = [r for r in resource_list if q in (r["title"] or "").lower()]
+
+    return success_response({
+        "books": book_list,
+        "past_papers": paper_list,
+        "resources": resource_list,
+    })
 
 
 # ── Dismissal Status ───────────────────────────────────────

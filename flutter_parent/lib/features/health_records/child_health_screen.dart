@@ -16,6 +16,7 @@ class _ChildHealthScreenState extends State<ChildHealthScreen>
   List<Map<String, dynamic>> _vaccinations = [];
   List<Map<String, dynamic>> _allergies = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _ChildHealthScreenState extends State<ChildHealthScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/parent/child-health?type=records'),
@@ -44,7 +48,10 @@ class _ChildHealthScreenState extends State<ChildHealthScreen>
         _vaccinations = _toList(results[1].data);
         _allergies = _toList(results[2].data);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ChildHealthScreen load failed: $e\n$st');
+      _error = "Could not load your child's health records.";
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -79,15 +86,17 @@ class _ChildHealthScreenState extends State<ChildHealthScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _RecordsTab(records: _records, onRefresh: _load),
-                  _VaccinationsTab(
-                      vaccinations: _vaccinations, onRefresh: _load),
-                  _AllergiesTab(allergies: _allergies, onRefresh: _load),
-                ],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _RecordsTab(records: _records, onRefresh: _load),
+                      _VaccinationsTab(
+                          vaccinations: _vaccinations, onRefresh: _load),
+                      _AllergiesTab(allergies: _allergies, onRefresh: _load),
+                    ],
+                  ),
       ),
     );
   }
@@ -148,7 +157,8 @@ class _RecordsTab extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ChildHealthScreen _fmtDate parse failed: $e');
       return iso;
     }
   }
@@ -221,7 +231,8 @@ class _VaccinationsTab extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ChildHealthScreen _fmtDate parse failed: $e');
       return iso;
     }
   }

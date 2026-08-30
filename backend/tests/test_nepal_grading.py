@@ -70,3 +70,95 @@ def test_gpa_aggregation_counts_failed_subject_as_zero_per_neb():
     assert result["subjects_failed"] == 1
     # Any NG fails the aggregate regardless of GPA.
     assert result["status"] == "fail"
+
+
+def test_letter_grade_boundaries_match_neb_bands():
+    """Exact threshold values land on the higher band; one tick below does not."""
+    from app.utils.nepal_grading import calculate_grade
+
+    cases = [
+        (90, "A+", 4.0), (89.99, "A", 3.6), (80, "A", 3.6), (79.99, "B+", 3.2),
+        (70, "B+", 3.2), (69.99, "B", 2.8), (60, "B", 2.8), (59.99, "C+", 2.4),
+        (50, "C+", 2.4), (49.99, "C", 2.0), (40, "C", 2.0), (39.99, "D", 1.6),
+        (35, "D", 1.6), (34.99, "NG", 0.0), (0, "NG", 0.0),
+    ]
+    for pct, grade, gpa in cases:
+        result = calculate_grade(pct)
+        assert result["grade"] == grade, pct
+        assert result["gpa"] == gpa, pct
+        assert result["status"] == ("fail" if grade == "NG" else "pass"), pct
+
+
+def test_weighted_gpa_with_unequal_credit_hours():
+    """Weighted GPA: 4.0x4 + 3.6x3 + 3.2x2 + 2.8x1 = 36.0 over 10 credits = 3.60."""
+    from app.utils.nepal_grading import calculate_gpa
+
+    subjects = [
+        {"gpa": 4.0, "grade": "A+", "total_obtained": 90, "total_full": 100,
+         "credit_hours": 4},
+        {"gpa": 3.6, "grade": "A", "total_obtained": 80, "total_full": 100,
+         "credit_hours": 3},
+        {"gpa": 3.2, "grade": "B+", "total_obtained": 70, "total_full": 100,
+         "credit_hours": 2},
+        {"gpa": 2.8, "grade": "B", "total_obtained": 60, "total_full": 100,
+         "credit_hours": 1},
+    ]
+    result = calculate_gpa(subjects)
+    assert result["gpa"] == 3.6
+    # Marks totals still include every subject: 300/400 = 75% -> B+.
+    assert result["percentage"] == 75.0
+    assert result["grade"] == "B+"
+
+
+def test_null_credit_hours_falls_back_to_equal_weighting():
+    """An explicit null weight must not crash; it is treated as 1.0."""
+    from app.utils.nepal_grading import calculate_gpa
+
+    subjects = [
+        {"gpa": 3.6, "grade": "A", "total_obtained": 80, "total_full": 100,
+         "credit_hours": None},
+        {"gpa": 4.0, "grade": "A+", "total_obtained": 90, "total_full": 100},
+    ]
+    assert calculate_gpa(subjects)["gpa"] == 3.8
+
+
+def test_zero_credit_subject_keeps_marks_but_no_gpa_weight():
+    """Zero weight drops GPA contribution only, never the marks totals."""
+    from app.utils.nepal_grading import calculate_gpa
+
+    subjects = [
+        {"gpa": 4.0, "grade": "A+", "total_obtained": 90, "total_full": 100,
+         "credit_hours": 0},
+        {"gpa": 3.6, "grade": "A", "total_obtained": 80, "total_full": 100,
+         "credit_hours": 3},
+    ]
+    result = calculate_gpa(subjects)
+    assert result["gpa"] == 3.6          # 3.6x3 / 3 — zero-credit excluded
+    assert result["total_obtained"] == 170   # marks totals untouched
+    assert result["percentage"] == 85.0  # 170/200 -> A
+    assert result["grade"] == "A"
+
+    # All-zero credits must not divide by zero.
+    zero = calculate_gpa([
+        {"gpa": 4.0, "grade": "A+", "total_obtained": 90, "total_full": 100,
+         "credit_hours": 0},
+        {"gpa": 3.6, "grade": "A", "total_obtained": 80, "total_full": 100,
+         "credit_hours": 0},
+    ])
+    assert zero["gpa"] == 0.0
+    assert zero["grade"] == "A"
+
+
+def test_zero_total_marks_subject_is_ng_without_dividing_by_zero():
+    from app.utils.nepal_grading import calculate_gpa, calculate_subject_grade
+
+    empty = calculate_subject_grade(0, 0)
+    assert empty["grade"] == "NG"
+    assert empty["percentage"] == 0
+
+    result = calculate_gpa([empty,
+                            {"gpa": 4.0, "grade": "A+", "total_obtained": 90,
+                             "total_full": 100}])
+    assert result["gpa"] == 2.0          # (0 + 4.0) / 2
+    assert result["subjects_failed"] == 1  # zero-mark subject not silently dropped
+    assert result["status"] == "fail"

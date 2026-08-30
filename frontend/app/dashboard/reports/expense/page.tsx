@@ -29,12 +29,13 @@ interface ExpenseCategory {
 export default function ExpenseReportsPage() {
   const [period, setPeriod] = useState("this_month");
 
-  const { data: expenses, isLoading: expensesLoading } = useQuery({
+  const { data: expenses, isLoading: expensesLoading, isError: expensesError, refetch: refetchExpenses } = useQuery({
     queryKey: ["expenses-all"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<Expense[]>>("/hr/expenses");
       return res.data.data;
     },
+    retry: 1,
   });
 
   const { data: categories } = useQuery({
@@ -45,6 +46,16 @@ export default function ExpenseReportsPage() {
     },
   });
 
+  if (expensesError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load expense reports. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetchExpenses()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
   if (expensesLoading) return <PageLoader />;
 
   const filteredExpenses = (expenses || []).filter((expense) => isExpenseInPeriod(expense.date, period));

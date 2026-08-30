@@ -23,10 +23,9 @@ class ShellScreen extends ConsumerWidget {
               title: Text(_titleFor(location,
                   fallback: user?.schoolName ?? 'ASchool Admin')),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  tooltip: 'Notices',
-                  onPressed: () => context.go('/notices'),
+                NotificationBell(
+                  tooltip: 'Notifications',
+                  onTap: () => context.push('/notifications'),
                 ),
                 IconButton(
                   icon: const Icon(Icons.storefront_rounded),

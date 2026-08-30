@@ -6,6 +6,7 @@ library;
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
+import '../utils/safe_parse.dart';
 import 'api_client.dart';
 
 class UploadedFile {
@@ -31,12 +32,13 @@ class UploadedFile {
 
   factory UploadedFile.fromJson(Map<String, dynamic> json) {
     return UploadedFile(
-      id: json['id']?.toString() ?? '',
-      fileUrl: json['url'] as String? ?? json['file_url'] as String? ?? '',
-      originalName: json['original_name'] as String? ?? json['name'] as String? ?? 'file',
-      fileType: json['file_type'] as String? ?? 'other',
-      fileSize: (json['file_size'] as num?)?.toInt(),
-      mimeType: json['mime_type'] as String?,
+      id: safeString(json['id']),
+      fileUrl: safeString(json['url'] ?? json['file_url']),
+      originalName:
+          safeString(json['original_name'] ?? json['name'], fallback: 'file'),
+      fileType: safeString(json['file_type'], fallback: 'other'),
+      fileSize: safeIntOrNull(json['file_size']),
+      mimeType: safeStringOrNull(json['mime_type']),
     );
   }
 }
@@ -169,10 +171,16 @@ class FileUploadService {
       );
 
       final data = response.data;
-      if (data['success'] == true) {
+      if (data is Map && data['success'] == true) {
         final files = data['data'];
         if (files is List && files.isNotEmpty) {
-          return UploadedFile.fromJson(Map<String, dynamic>.from(files.first));
+          final first = files.first;
+          if (first is Map) {
+            return UploadedFile.fromJson(Map<String, dynamic>.from(first));
+          }
+          logJsonShape('FileUploadService._uploadFile',
+              'list element is ${first.runtimeType}, expected a map');
+          return null;
         }
         if (files is Map) {
           return UploadedFile.fromJson(Map<String, dynamic>.from(files));

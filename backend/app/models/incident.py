@@ -1,6 +1,7 @@
 """Incident models."""
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     Column,
     DateTime,
     Enum,
@@ -47,7 +48,21 @@ class Incident(SchoolModel):
     resolution = Column(Text)
     resolved_at = Column(DateTime)
 
-    reported_by = relationship("User")
+    # ── incident_management extension (E41): workflow columns ──────────────
+    # Staff member the case is assigned to (management-tier assign endpoint).
+    assigned_to_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), index=True)
+    # Latest escalation pointer (full history in IncidentEscalation).
+    escalated_at = Column(DateTime)
+    escalated_to_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    parent_notified = Column(Boolean, default=False)
+    conference_scheduled = Column(Boolean, default=False)
+    conference_scheduled_at = Column(DateTime)
+
+    # Multiple users FKs live on this table (reported_by_id, assigned_to_id,
+    # escalated_to_id), so every User relationship must pin its column.
+    reported_by = relationship("User", foreign_keys=[reported_by_id])
+    assignee = relationship("User", foreign_keys=[assigned_to_id])
+    escalation_target = relationship("User", foreign_keys=[escalated_to_id])
 
 
 class WitnessStatement(SchoolModel):

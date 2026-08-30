@@ -1,4 +1,6 @@
 /// User model — shared across all 4 Flutter apps
+import '../utils/safe_parse.dart';
+
 class User {
   final String id;
   final String? email;
@@ -47,16 +49,16 @@ class User {
 
     return User(
       id: (json['id'] ?? '').toString(),
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
+      email: safeStringOrNull(json['email']),
+      phone: safeStringOrNull(json['phone']),
       firstName: resolvedFirstName,
       lastName: resolvedLastName,
-      role: json['role'] as String? ?? 'student',
+      role: safeString(json['role'], fallback: 'student'),
       schoolId: json['school_id']?.toString(),
-      schoolSlug: json['school_slug'] as String?,
-      schoolName: json['school_name'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
-      isActive: json['is_active'] as bool? ?? true,
+      schoolSlug: safeStringOrNull(json['school_slug']),
+      schoolName: safeStringOrNull(json['school_name']),
+      avatarUrl: safeStringOrNull(json['avatar_url']),
+      isActive: safeBool(json['is_active'], fallback: true),
     );
   }
 

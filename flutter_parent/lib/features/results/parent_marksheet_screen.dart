@@ -37,7 +37,7 @@ class ParentMarksheetScreen extends ConsumerWidget {
             ),
           ),
           data: (data) {
-            final subjects = ((data['subjects'] as List?) ?? [])
+            final subjects = (safeList(data['subjects']))
                 .whereType<Map>()
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList();
@@ -51,10 +51,10 @@ class ParentMarksheetScreen extends ConsumerWidget {
             }
 
             final totalObtained =
-                (data['total_obtained'] as num?)?.toDouble() ?? 0;
-            final totalFull = (data['total_full'] as num?)?.toDouble() ?? 0;
-            final percentage = (data['percentage'] as num?)?.toDouble() ?? 0;
-            final failedSubjects = (data['failed_subjects'] as int?) ?? 0;
+                safeDoubleOrNull(data['total_obtained']) ?? 0;
+            final totalFull = safeDoubleOrNull(data['total_full']) ?? 0;
+            final percentage = safeDoubleOrNull(data['percentage']) ?? 0;
+            final failedSubjects = safeIntOrNull(data['failed_subjects']) ?? 0;
             final status = (data['status']?.toString() ?? 'pass').toLowerCase();
             final isPass = status == 'pass';
 
@@ -109,7 +109,7 @@ class ParentMarksheetScreen extends ConsumerWidget {
                             _SummaryChip(
                               label: 'GPA',
                               value:
-                                  ((data['overall_gpa'] as num?)?.toDouble() ??
+                                  (safeDoubleOrNull(data['overall_gpa']) ??
                                           0)
                                       .toStringAsFixed(2),
                               color: ASchoolTheme.warning,
@@ -196,10 +196,10 @@ class ParentMarksheetScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 ...subjects.map((subject) {
                   final obtained =
-                      (subject['obtained_marks'] as num?)?.toDouble() ??
-                          (subject['obtained'] as num?)?.toDouble() ??
+                      safeDoubleOrNull(subject['obtained_marks']) ??
+                          safeDoubleOrNull(subject['obtained']) ??
                           0;
-                  final full = (subject['full_marks'] as num?)?.toDouble() ?? 0;
+                  final full = safeDoubleOrNull(subject['full_marks']) ?? 0;
                   final grade = subject['grade']?.toString() ?? '-';
                   final isSubjectPass = subject['pass'] != false;
 

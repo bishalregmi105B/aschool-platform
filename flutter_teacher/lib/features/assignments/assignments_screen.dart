@@ -647,7 +647,8 @@ class _SubmissionTile extends ConsumerWidget {
                     const SnackBar(content: Text('Grade saved')),
                   );
                 }
-              } catch (_) {
+              } catch (e) {
+                debugPrint('Grade submission failed: $e');
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Failed to save grade')),

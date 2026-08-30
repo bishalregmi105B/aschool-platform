@@ -47,7 +47,7 @@ class _MoodOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avg = (data['avg_mood'] as num?)?.toDouble() ?? 3.0;
+    final avg = safeDoubleOrNull(data['avg_mood']) ?? 3.0;
     return ESchoolCard(
       child: Column(
         children: [

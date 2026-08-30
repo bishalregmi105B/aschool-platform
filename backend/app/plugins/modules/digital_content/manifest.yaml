@@ -8,6 +8,16 @@ emoji: "📖"
 icon: "BookOpen"
 description: "E-books, past papers, OER resources, digital library, AI-curated reading lists"
 
+# DEPRECATED duplicate of `elibrary` (starter, NPR 299) — same feature
+# (E-Library & Digital Content), published twice at different prices, which
+# let schools pay 499 for what elibrary sells at 299. seed.py syncs
+# `published: false` → Plugin.is_published=False so the marketplace/catalog
+# lists only elibrary. The digital_content→elibrary alias in
+# app/plugins/decorators.py is KEPT so schools that already installed
+# digital_content keep passing elibrary-gated routes.
+published: false
+deprecated: true
+
 api_blueprint: "app.api.v1.design_studio"
 models_module: "app.models.digital_content"
 

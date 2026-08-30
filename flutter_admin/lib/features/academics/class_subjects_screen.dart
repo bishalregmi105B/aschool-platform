@@ -32,7 +32,8 @@ class _ClassSubjectsScreenState extends State<ClassSubjectsScreen> {
         _selectedClassId = _classes.first['id']?.toString();
         await _loadSubjects();
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ClassSubjectsScreen load failed: $e\n$st');
       _error = 'Unable to load class subjects right now.';
     }
     if (mounted) {

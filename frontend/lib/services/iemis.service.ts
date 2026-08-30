@@ -85,7 +85,27 @@ export async function getHistory(page = 1): Promise<ImportHistoryResponse> {
   const res = await api.get<ApiResponse<ImportHistoryResponse>>(
     `/iemis/history?${q}`,
   );
-  return res.data.data;
+  // The backend returns `data: [...]` (a plain list) with pagination under
+  // `meta.pagination` — normalize to the {items, pagination} shape the pages
+  // consume, otherwise the history table showed "No imports yet." forever.
+  const raw = res.data?.data as unknown;
+  const items: ImportLog[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as ImportHistoryResponse)?.items)
+      ? (raw as ImportHistoryResponse).items
+      : [];
+  const pagination =
+    (
+      res.data as unknown as {
+        meta?: { pagination?: ImportHistoryResponse["pagination"] };
+      }
+    )?.meta?.pagination ?? undefined;
+  return { items, pagination };
+}
+
+/** URL of the backend-generated import template (.xlsx download). */
+export function getTemplateUrl(format: string): string {
+  return `${api.defaults.baseURL}/iemis/template?format=${encodeURIComponent(format)}`;
 }
 
 export async function getHistoryDetail(id: string): Promise<ImportLog> {

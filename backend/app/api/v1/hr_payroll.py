@@ -51,11 +51,18 @@ def hr_stats():
         )
         .scalar()
     )
+    # E185: the HR dashboard labels this "Monthly Payroll" — sum only the
+    # current month's payroll rows (month is stored as "YYYY-MM"), not every
+    # payroll row ever created for the school.
+    from datetime import datetime as _dt
+
+    current_month = _dt.utcnow().strftime("%Y-%m")
     monthly_payroll = (
         db.session.query(func.coalesce(func.sum(StaffPayroll.net_salary), 0))
         .filter(
             StaffPayroll.school_id == g.school_id,
             StaffPayroll.is_deleted.is_(False),
+            StaffPayroll.month == current_month,
         )
         .scalar()
     )
@@ -101,6 +108,30 @@ def list_payroll():
 @role_required("superadmin", "school_admin", "accountant")
 def create_payroll():
     data = request.get_json(silent=True) or {}
+    # user_id/month/basic_salary are NOT NULL columns — validate up front so a
+    # missing field gets a 400 instead of an unhandled IntegrityError (500).
+    missing = [
+        field
+        for field in ("user_id", "month", "basic_salary")
+        if not data.get(field)
+    ]
+    if missing:
+        return error_response(
+            f"Missing required field(s): {', '.join(missing)}", 400
+        )
+    # user_id is a NOT NULL FK to users.id — reject ids that don't belong to
+    # this school with a 400 instead of an unhandled IntegrityError (500).
+    import uuid as _uuid
+
+    try:
+        user_uuid = _uuid.UUID(str(data["user_id"]))
+    except (ValueError, AttributeError, TypeError):
+        return error_response("user_id must be a valid UUID", 400)
+    staff_user = User.query.filter_by(
+        id=user_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not staff_user:
+        return error_response("user_id does not match a user at this school", 400)
     payroll = StaffPayroll(school_id=g.school_id)
     for key in (
         "user_id",
@@ -115,6 +146,29 @@ def create_payroll():
     ):
         if key in data:
             setattr(payroll, key, data[key])
+
+    # Server-side money math: when gross/net are not supplied explicitly,
+    # derive them from the itemized components instead of storing nothing.
+    if "gross_salary" not in data or "net_salary" not in data:
+        gross, net = _compute_payroll_totals(
+            payroll.basic_salary, payroll.allowances, payroll.deductions
+        )
+        if "gross_salary" not in data:
+            payroll.gross_salary = gross
+        if "net_salary" not in data:
+            # Derive net from the gross that will actually be stored (an
+            # explicit client gross wins over the component math) so the
+            # stored pair always satisfies net = gross − Σdeductions — the
+            # same formula the payslip fallback uses.
+            stored_gross = (
+                float(payroll.gross_salary)
+                if payroll.gross_salary is not None
+                else gross
+            )
+            payroll.net_salary = round(
+                stored_gross - _sum_money(payroll.deductions), 2
+            )
+
     db.session.add(payroll)
     db.session.commit()
     return created_response(_payroll_dict(payroll))
@@ -191,6 +245,33 @@ def update_payroll(payroll_id):
     ):
         if key in data:
             setattr(payroll, key, data[key])
+
+    # If a money component changed but gross/net were not re-specified,
+    # recompute so stored totals can never drift from
+    # basic + Σallowances − Σdeductions. Unrelated updates (notes, status)
+    # never touch stored amounts.
+    components_touched = bool(
+        {"basic_salary", "allowances", "deductions"} & set(data)
+    )
+    if components_touched and ("gross_salary" not in data or "net_salary" not in data):
+        gross, net = _compute_payroll_totals(
+            payroll.basic_salary, payroll.allowances, payroll.deductions
+        )
+        if "gross_salary" not in data:
+            payroll.gross_salary = gross
+        if "net_salary" not in data:
+            # Same rule as create: net derives from the gross that will
+            # actually be stored so the pair can never disagree with
+            # net = gross − Σdeductions.
+            stored_gross = (
+                float(payroll.gross_salary)
+                if payroll.gross_salary is not None
+                else gross
+            )
+            payroll.net_salary = round(
+                stored_gross - _sum_money(payroll.deductions), 2
+            )
+
     db.session.commit()
     return success_response(_payroll_dict(payroll))
 
@@ -240,37 +321,41 @@ def download_payslip(payroll_id):
     school_name = school.name if school else "ASchool"
 
     basic = float(payroll.basic_salary or 0)
-    gross = float(payroll.gross_salary or basic)
-    net = float(payroll.net_salary or basic)
 
-    # Build allowances / deductions tables
+    # Build allowances / deductions tables (single shared money-math helper)
     allowances_data = payroll.allowances if isinstance(payroll.allowances, dict) else {}
     deductions_data = payroll.deductions if isinstance(payroll.deductions, dict) else {}
 
-    total_allowances = sum(
-        float(v) for v in allowances_data.values() if isinstance(v, (int, float))
+    total_allowances = _sum_money(allowances_data)
+    total_deductions = _sum_money(deductions_data)
+
+    computed_gross, _ = _compute_payroll_totals(basic, allowances_data, deductions_data)
+    # Same semantics as _payroll_dict: a stored value (including an explicit
+    # 0) always wins; only a missing one falls back to the component math.
+    gross = (
+        float(payroll.gross_salary)
+        if payroll.gross_salary is not None
+        else computed_gross
     )
-    total_deductions = sum(
-        float(v) for v in deductions_data.values() if isinstance(v, (int, float))
+    net = (
+        float(payroll.net_salary)
+        if payroll.net_salary is not None
+        else round(gross - total_deductions, 2)
     )
 
-    allowances_rows = (
-        "".join(
-            f"<tr><td>{k}</td><td class='amount'>NPR {float(v):,.2f}</td></tr>"
-            for k, v in allowances_data.items()
-            if isinstance(v, (int, float))
-        )
-        or "<tr><td colspan='2'>—</td></tr>"
-    )
+    allowances_rows = "".join(
+        f"<tr><td>{k}</td><td class='amount'>NPR {float(v):,.2f}</td></tr>"
+        for k, v in allowances_data.items()
+        if isinstance(v, (int, float)) and not isinstance(v, bool)
+        or isinstance(v, str) and v.replace(".", "", 1).isdigit()
+    ) or "<tr><td colspan='2'>—</td></tr>"
 
-    deductions_rows = (
-        "".join(
-            f"<tr><td>{k}</td><td class='amount'>NPR {float(v):,.2f}</td></tr>"
-            for k, v in deductions_data.items()
-            if isinstance(v, (int, float))
-        )
-        or "<tr><td colspan='2'>—</td></tr>"
-    )
+    deductions_rows = "".join(
+        f"<tr><td>{k}</td><td class='amount'>NPR {float(v):,.2f}</td></tr>"
+        for k, v in deductions_data.items()
+        if isinstance(v, (int, float)) and not isinstance(v, bool)
+        or isinstance(v, str) and v.replace(".", "", 1).isdigit()
+    ) or "<tr><td colspan='2'>—</td></tr>"
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset='utf-8'>
@@ -311,6 +396,7 @@ td.amount {{ text-align: right; font-family: monospace; }}
 <div class='summary'>
   <div class='item'><div class='value'>NPR {basic:,.2f}</div><div class='label'>Basic Salary</div></div>
   <div class='item'><div class='value'>NPR {total_allowances:,.2f}</div><div class='label'>Total Allowances</div></div>
+  <div class='item'><div class='value'>NPR {gross:,.2f}</div><div class='label'>Gross Salary</div></div>
   <div class='item'><div class='value'>NPR {total_deductions:,.2f}</div><div class='label'>Total Deductions</div></div>
   <div class='item'><div class='value' style='color:#166534'>NPR {net:,.2f}</div><div class='label'>Net Pay</div></div>
 </div>
@@ -367,6 +453,10 @@ def mark_paid(payroll_id):
     payroll.status = "paid"
     payroll.paid_at = datetime.utcnow()
     payroll.bank_ref = data.get("bank_ref")
+    # E123: the payroll page sends payment_method here — store it instead of
+    # silently dropping it (the serializer exposes the column).
+    if data.get("payment_method"):
+        payroll.payment_method = data.get("payment_method")
     db.session.commit()
     return success_response(_payroll_dict(payroll))
 
@@ -405,13 +495,37 @@ def list_leave_plural():
 def apply_leave():
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
+    # leave_type/start_date/end_date are NOT NULL columns — validate up front
+    # so a missing field gets a 400 instead of an unhandled IntegrityError.
+    missing = [
+        field
+        for field in ("leave_type", "start_date", "end_date")
+        if not data.get(field)
+    ]
+    if missing:
+        return error_response(
+            f"Missing required field(s): {', '.join(missing)}", 400
+        )
+    # E185: the leave must target a user at THIS school (default: self).
+    requested_user_id = data.get("user_id") or claims.get("sub")
+    staff_user = _school_user_or_none(requested_user_id)
+    if not staff_user:
+        return error_response(
+            "user_id does not match a user at this school", 400
+        )
     leave = StaffLeave(
         school_id=g.school_id,
-        user_id=data.get("user_id") or claims.get("sub"),
+        user_id=staff_user.id,
     )
     for key in ("leave_type", "start_date", "end_date", "days", "reason"):
         if key in data:
             setattr(leave, key, data[key])
+    # E185: date columns are NOT NULL dates — reject unparseable values.
+    for field in ("start_date", "end_date"):
+        parsed = _parse_date_value(getattr(leave, field, None) or data.get(field))
+        if parsed is None:
+            return error_response(f"{field} must be a valid ISO date", 400)
+        setattr(leave, field, parsed)
     db.session.add(leave)
     db.session.commit()
     return created_response(_leave_dict(leave))
@@ -432,7 +546,15 @@ def approve_leave(leave_id):
         return error_response("Leave request not found", 404)
     claims = get_jwt()
     data = request.get_json(silent=True) or {}
-    leave.status = data.get("status", "approved")
+    new_status = data.get("status", "approved")
+    # E185: free-form statuses ("banana") polluted the pipeline — restrict to
+    # the documented set.
+    if new_status not in VALID_LEAVE_STATUSES:
+        return error_response(
+            "Invalid status. Must be one of: " + ", ".join(VALID_LEAVE_STATUSES),
+            400,
+        )
+    leave.status = new_status
     leave.approved_by_id = claims.get("sub")
     leave.approved_at = datetime.utcnow()
     leave.notes = data.get("notes", leave.notes)
@@ -453,7 +575,13 @@ def update_leave_status(leave_id):
         return error_response("Leave request not found", 404)
 
     data = request.get_json(silent=True) or {}
-    leave.status = data.get("status", leave.status)
+    new_status = data.get("status", leave.status)
+    if new_status not in VALID_LEAVE_STATUSES:
+        return error_response(
+            "Invalid status. Must be one of: " + ", ".join(VALID_LEAVE_STATUSES),
+            400,
+        )
+    leave.status = new_status
     leave.notes = data.get("notes", leave.notes)
     db.session.commit()
     return success_response(_leave_dict(leave))
@@ -486,12 +614,30 @@ def list_appraisals():
 def create_appraisal():
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
+    if "staff_id" in data and "user_id" not in data:
+        data["user_id"] = data.get("staff_id")
+    # staff_appraisals.user_id is NOT NULL — validate up front so a missing
+    # staff id gets a 400 instead of an unhandled IntegrityError (500).
+    if not data.get("user_id"):
+        return error_response("user_id (or staff_id) is required", 400)
+    # E185: the appraisee must be a user of THIS school; a bad uuid or a
+    # foreign-school user previously produced a 500 / cross-tenant row.
+    staff_user = _school_user_or_none(data["user_id"])
+    if not staff_user:
+        return error_response("user_id (or staff_id) does not match a user at this school", 400)
     scores = data.get("scores") or {
         "teaching": data.get("teaching_score"),
         "attendance": data.get("attendance_score"),
         "teamwork": data.get("teamwork_score"),
     }
-    numeric_scores = [float(value) for value in scores.values() if value is not None]
+    if not isinstance(scores, dict):
+        return error_response("scores must be an object", 400)
+    try:
+        numeric_scores = [
+            float(value) for value in scores.values() if value is not None
+        ]
+    except (TypeError, ValueError):
+        return error_response("scores must be numeric", 400)
     overall = data.get("overall_score")
     if overall is None and numeric_scores:
         overall = round(sum(numeric_scores) / len(numeric_scores), 1)
@@ -499,12 +645,11 @@ def create_appraisal():
         school_id=g.school_id,
         reviewer_id=claims.get("sub"),
     )
-    if "staff_id" in data and "user_id" not in data:
-        data["user_id"] = data.get("staff_id")
     data["scores"] = scores
     data["overall_score"] = overall
     if "comments" in data and "strengths" not in data:
         data["strengths"] = data.get("comments")
+    data["user_id"] = staff_user.id
     for key in (
         "user_id",
         "period",
@@ -533,6 +678,13 @@ def update_appraisal(appraisal_id):
     if not appraisal:
         return error_response("Appraisal not found", 404)
     data = request.get_json(silent=True) or {}
+    # E185: overall_score is Numeric(3,1) — reject non-numeric values with a
+    # 400 instead of a DataError 500.
+    if "overall_score" in data and data["overall_score"] is not None:
+        try:
+            data["overall_score"] = float(data["overall_score"])
+        except (TypeError, ValueError):
+            return error_response("overall_score must be a number", 400)
     for key in (
         "scores",
         "overall_score",
@@ -658,13 +810,37 @@ def create_expense():
     ):
         return error_response("title, amount, date, and category_id are required")
 
+    # E185: amount must be a positive number, date a real date, and the
+    # category must belong to THIS school (a bad uuid or foreign category
+    # previously caused a 500 or a cross-tenant reference).
+    try:
+        amount = float(data["amount"])
+    except (TypeError, ValueError):
+        return error_response("amount must be a number", 400)
+    if amount <= 0:
+        return error_response("amount must be greater than zero", 400)
+    expense_date = _parse_date_value(data["date"])
+    if expense_date is None:
+        return error_response("date must be a valid ISO date", 400)
+    import uuid as _uuid
+
+    try:
+        category_uuid = _uuid.UUID(str(data["category_id"]))
+    except (ValueError, AttributeError, TypeError):
+        return error_response("category_id must be a valid UUID", 400)
+    category = ExpenseCategory.query.filter_by(
+        id=category_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not category:
+        return error_response("category_id does not match a category at this school", 400)
+
     expense = Expense(
         school_id=g.school_id,
         recorded_by_id=claims.get("sub"),
         title=data["title"],
-        amount=data["amount"],
-        date=data["date"],
-        category_id=data["category_id"],
+        amount=amount,
+        date=expense_date,
+        category_id=category.id,
         notes=data.get("notes"),
         receipt_url=data.get("receipt_url"),
     )
@@ -691,6 +867,33 @@ def update_expense(expense_id):
         return success_response({"id": str(expense.id)})
 
     data = request.get_json(silent=True) or {}
+    # E185: mirror the create-side validation on updates so bad amounts,
+    # dates or foreign categories cannot slip through PUT.
+    if "amount" in data:
+        try:
+            amount = float(data["amount"])
+        except (TypeError, ValueError):
+            return error_response("amount must be a number", 400)
+        if amount <= 0:
+            return error_response("amount must be greater than zero", 400)
+        data["amount"] = amount
+    if "date" in data:
+        parsed_date = _parse_date_value(data["date"])
+        if parsed_date is None:
+            return error_response("date must be a valid ISO date", 400)
+        data["date"] = parsed_date
+    if "category_id" in data:
+        import uuid as _uuid
+
+        try:
+            category_uuid = _uuid.UUID(str(data["category_id"]))
+        except (ValueError, AttributeError, TypeError):
+            return error_response("category_id must be a valid UUID", 400)
+        category = ExpenseCategory.query.filter_by(
+            id=category_uuid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if not category:
+            return error_response("category_id does not match a category at this school", 400)
     for key in ("title", "amount", "date", "category_id", "notes", "receipt_url"):
         if key in data:
             setattr(expense, key, data[key])
@@ -700,8 +903,44 @@ def update_expense(expense_id):
 
 # ── Serializers ────────────────────────────────────────────
 
+VALID_LEAVE_STATUSES = ("pending", "approved", "rejected", "cancelled")
+
+
+def _school_user_or_none(user_id):
+    """E185: resolve a user id that must exist at THIS school (None if not).
+    Bad uuids and foreign-school ids used to end as FK-violation 500s — or
+    worse, as successful rows linking other schools' users."""
+    import uuid as _uuid
+
+    try:
+        user_uuid = _uuid.UUID(str(user_id))
+    except (ValueError, AttributeError, TypeError):
+        return None
+    return User.query.filter_by(
+        id=user_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+
+
+def _parse_date_value(value):
+    """Parse a client-supplied date/datetime; None when unparseable."""
+    from datetime import date as _date, datetime as _dt
+
+    if value is None or value == "":
+        return None
+    if isinstance(value, _dt):
+        return value.date()
+    if isinstance(value, _date):
+        return value
+    try:
+        return _date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
 
 def _payroll_dict(p):
+    computed_gross, _computed_net = _compute_payroll_totals(
+        p.basic_salary, p.allowances, p.deductions
+    )
     return {
         "id": str(p.id),
         "user_id": str(p.user_id),
@@ -712,8 +951,28 @@ def _payroll_dict(p):
         "allowances_total": _sum_money(p.allowances),
         "deductions": _sum_money(p.deductions),
         "deductions_total": _sum_money(p.deductions),
-        "gross_salary": float(p.gross_salary) if p.gross_salary else None,
-        "net_salary": float(p.net_salary) if p.net_salary else None,
+        # E123: raw component dicts so the payroll page's component editor can
+        # hydrate names/amounts (the summed numbers above are display-only).
+        "allowance_items": dict(p.allowances)
+        if isinstance(p.allowances, dict)
+        else {},
+        "deduction_items": dict(p.deductions)
+        if isinstance(p.deductions, dict)
+        else {},
+        # Stored totals win; when a total was never stored, report the value
+        # derived from the real records. Net is derived from the stored gross
+        # (if one exists) so the reported pair always satisfies
+        # net = gross − Σdeductions — identical to the payslip fallback.
+        "gross_salary": round(float(p.gross_salary), 2)
+        if p.gross_salary is not None
+        else computed_gross,
+        "net_salary": round(float(p.net_salary), 2)
+        if p.net_salary is not None
+        else round(
+            (float(p.gross_salary) if p.gross_salary is not None else computed_gross)
+            - _sum_money(p.deductions),
+            2,
+        ),
         "status": p.status,
         "paid_at": str(p.paid_at) if p.paid_at else None,
         "payment_method": p.payment_method,
@@ -760,10 +1019,40 @@ def _appraisal_dict(a):
     }
 
 
+def _numeric_component(value):
+    """Return the numeric amount of an itemized component value.
+
+    Plain numbers and numeric strings (e.g. "1500") count; anything else
+    (percent labels, booleans, None) contributes nothing — matching the
+    payslip's own itemized-row filter.
+    """
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value or 0)
+    if isinstance(value, str) and value.replace(".", "", 1).isdigit():
+        return float(value)
+    return 0.0
+
+
 def _sum_money(value):
     if isinstance(value, dict):
-        return round(sum(float(v or 0) for v in value.values()), 2)
+        return round(sum(_numeric_component(v) for v in value.values()), 2)
     return round(float(value or 0), 2)
+
+
+def _compute_payroll_totals(basic_salary, allowances, deductions):
+    """gross = basic + Σallowances ; net = gross − Σdeductions.
+
+    Single source of truth for the payroll money math — used by
+    create/update endpoints, the list serializer and the payslip fallback.
+    """
+    basic = float(basic_salary or 0)
+    total_allowances = _sum_money(allowances)
+    total_deductions = _sum_money(deductions)
+    gross = round(basic + total_allowances, 2)
+    net = round(gross - total_deductions, 2)
+    return gross, net
 
 
 def _expense_dict(e):

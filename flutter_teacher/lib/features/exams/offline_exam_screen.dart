@@ -36,9 +36,8 @@ class _OfflineExamScreenState extends ConsumerState<OfflineExamScreen> {
   String? _selectedClassId;
 
   void _showSubjectResults(Map<String, dynamic> row) {
-    final subjects = ((row['subject_results'] as List?) ??
-            (row['subjects'] as List?) ??
-            const [])
+    final primary = safeList(row['subject_results']);
+    final subjects = (primary.isNotEmpty ? primary : safeList(row['subjects']))
         .whereType<Map>()
         .map((entry) => Map<String, dynamic>.from(entry))
         .toList();
@@ -125,11 +124,11 @@ class _OfflineExamScreenState extends ConsumerState<OfflineExamScreen> {
                     itemBuilder: (_, index) {
                       final item = subjects[index];
                       final obtained =
-                          (item['total_obtained'] as num?)?.toDouble() ??
-                              (item['obtained'] as num?)?.toDouble() ??
+                          safeDoubleOrNull(item['total_obtained']) ??
+                              safeDoubleOrNull(item['obtained']) ??
                               0;
-                      final full = (item['total_full'] as num?)?.toDouble() ??
-                          (item['full_marks'] as num?)?.toDouble() ??
+                      final full = safeDoubleOrNull(item['total_full']) ??
+                          safeDoubleOrNull(item['full_marks']) ??
                           0;
                       final grade = item['grade']?.toString() ?? '-';
                       final failed =
@@ -467,7 +466,7 @@ class _OfflineExamScreenState extends ConsumerState<OfflineExamScreen> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            '${((row['percentage'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}%',
+                            '${(safeDoubleOrNull(row['percentage']) ?? 0).toStringAsFixed(0)}%',
                             style: const TextStyle(
                               color: ASchoolTheme.primary,
                               fontWeight: FontWeight.w700,
@@ -510,7 +509,7 @@ class _OfflineExamScreenState extends ConsumerState<OfflineExamScreen> {
                               ),
                             ),
                             Text(
-                              'GPA ${((row['gpa'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                              'GPA ${(safeDoubleOrNull(row['gpa']) ?? 0).toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: ASchoolTheme.mutedText,
                                 fontSize: 11,

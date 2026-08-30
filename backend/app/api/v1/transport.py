@@ -1,4 +1,5 @@
 """Transport / GPS Bus Tracking API — routes, buses, stops, GPS logs."""
+import uuid
 from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
@@ -36,6 +37,10 @@ def list_routes():
 @role_required("superadmin", "school_admin")
 def create_route():
     data = request.get_json(silent=True) or {}
+    # routes.name is NOT NULL — validate up front so a missing name gets a
+    # 400 instead of an unhandled IntegrityError (500).
+    if not str(data.get("name") or "").strip():
+        return error_response("name is required", 400)
     route = Route(school_id=g.school_id)
     for key in ("name", "description", "distance_km", "estimated_time_mins", "is_active"):
         if key in data:
@@ -97,6 +102,20 @@ def list_buses():
 @role_required("superadmin", "school_admin")
 def create_bus():
     data = request.get_json(silent=True) or {}
+    # buses.vehicle_number is NOT NULL — validate up front so a missing
+    # vehicle number gets a 400 instead of an unhandled IntegrityError (500).
+    if not str(data.get("vehicle_number") or "").strip():
+        return error_response("vehicle_number is required", 400)
+    # route_id is an FK to routes.id — make sure it points at a route of this
+    # school (same contract as the GPS ingest bus_id check) before writing.
+    route_id = data.get("route_id")
+    if route_id:
+        try:
+            route_uuid = uuid.UUID(str(route_id))
+        except (ValueError, AttributeError, TypeError):
+            return error_response("route_id must be a valid UUID", 400)
+        if not Route.query.filter_by(id=route_uuid, school_id=g.school_id, is_deleted=False).first():
+            return error_response("route_id does not match a route at this school", 400)
     bus = Bus(school_id=g.school_id)
     for key in ("vehicle_number", "driver_id", "conductor_id", "capacity",
                 "gps_device_id", "make", "model", "year", "insurance_expiry",
@@ -118,6 +137,15 @@ def update_bus(bus_id):
     if not bus:
         return error_response("Bus not found", 404)
     data = request.get_json(silent=True) or {}
+    # E189: route_id on update must satisfy the same school-scoped FK check
+    # as POST (a bad uuid used to 500; a foreign route used to link silently).
+    if data.get("route_id"):
+        try:
+            route_uuid = uuid.UUID(str(data["route_id"]))
+        except (ValueError, AttributeError, TypeError):
+            return error_response("route_id must be a valid UUID", 400)
+        if not Route.query.filter_by(id=route_uuid, school_id=g.school_id, is_deleted=False).first():
+            return error_response("route_id does not match a route at this school", 400)
     for key in ("vehicle_number", "driver_id", "conductor_id", "capacity",
                 "gps_device_id", "make", "model", "year", "insurance_expiry",
                 "route_id", "is_active"):
@@ -150,6 +178,23 @@ def list_stops():
 @role_required("superadmin", "school_admin")
 def create_stop():
     data = request.get_json(silent=True) or {}
+    # bus_stops.route_id/name are NOT NULL — validate up front so bad payloads
+    # get a 400 instead of an unhandled IntegrityError (500).
+    missing = [
+        field
+        for field in ("route_id", "name")
+        if not data.get(field)
+    ]
+    if missing:
+        return error_response(
+            f"Missing required field(s): {', '.join(missing)}", 400
+        )
+    try:
+        route_uuid = uuid.UUID(str(data["route_id"]))
+    except (ValueError, AttributeError, TypeError):
+        return error_response("route_id must be a valid UUID", 400)
+    if not Route.query.filter_by(id=route_uuid, school_id=g.school_id, is_deleted=False).first():
+        return error_response("route_id does not match a route at this school", 400)
     stop = BusStop(school_id=g.school_id)
     for key in ("route_id", "name", "name_nepali", "latitude", "longitude",
                 "sequence_number", "arrival_time_am", "arrival_time_pm", "student_ids"):
@@ -170,6 +215,15 @@ def update_stop(stop_id):
     if not stop:
         return error_response("Stop not found", 404)
     data = request.get_json(silent=True) or {}
+    # E189: route_id on update must satisfy the same school-scoped FK check
+    # as POST.
+    if data.get("route_id"):
+        try:
+            route_uuid = uuid.UUID(str(data["route_id"]))
+        except (ValueError, AttributeError, TypeError):
+            return error_response("route_id must be a valid UUID", 400)
+        if not Route.query.filter_by(id=route_uuid, school_id=g.school_id, is_deleted=False).first():
+            return error_response("route_id does not match a route at this school", 400)
     for key in ("route_id", "name", "name_nepali", "latitude", "longitude",
                 "sequence_number", "arrival_time_am", "arrival_time_pm", "student_ids"):
         if key in data:
@@ -214,6 +268,22 @@ def list_gps_logs():
 def ingest_gps(self=None):
     """Accept GPS data from ESP32 devices."""
     data = request.get_json(silent=True) or {}
+    # bus_id/latitude/longitude are NOT NULL + bus_id is an FK to buses.id:
+    # validate up front so bad payloads get 400, not an IntegrityError (500).
+    bus_id = data.get("bus_id")
+    try:
+        bus_uuid = uuid.UUID(str(bus_id))
+    except (ValueError, AttributeError, TypeError):
+        return error_response("bus_id must be a valid UUID", 400)
+    if not Bus.query.filter_by(id=bus_uuid, school_id=g.school_id, is_deleted=False).first():
+        return error_response("bus_id does not match a bus at this school", 400)
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return error_response("latitude and longitude are required numbers", 400)
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        return error_response("latitude/longitude out of range", 400)
     log = GPSLog(school_id=g.school_id)
     for key in ("bus_id", "latitude", "longitude", "speed_kmh", "heading",
                 "accuracy_m"):
@@ -263,12 +333,13 @@ def _stop_dict(s):
 
 
 def _gps_dict(l):
+    ts = l.timestamp.isoformat() + "Z" if l.timestamp else None  # E143: naive-UTC → ISO-Z so browser Date renders tenant-local time
     return {
         "id": str(l.id), "bus_id": str(l.bus_id),
         "latitude": float(l.latitude), "longitude": float(l.longitude),
         "speed_kmh": l.speed_kmh, "heading": l.heading,
         "accuracy_m": l.accuracy_m,
-        "timestamp": str(l.timestamp) if l.timestamp else None,
+        "timestamp": ts,
     }
 
 

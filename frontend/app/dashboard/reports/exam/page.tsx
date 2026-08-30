@@ -45,12 +45,13 @@ export default function ExamReportsPage() {
   const [examId, setExamId] = useState("");
   const [classId, setClassId] = useState("all");
 
-  const { data: exams = [], isLoading: examsLoading } = useQuery({
+  const { data: exams = [], isLoading: examsLoading, isError: examsError, refetch: refetchExams } = useQuery({
     queryKey: ["exam-report-exams"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ExamItem[]>>("/exams?per_page=200");
       return res.data.data ?? [];
     },
+    retry: 1,
   });
 
   const { data: classes = [] } = useQuery({
@@ -126,6 +127,16 @@ export default function ExamReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  if (examsError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load the exam list. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetchExams()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
   if (examsLoading) return <PageLoader />;
 
   return (

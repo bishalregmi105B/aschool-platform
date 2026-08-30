@@ -25,16 +25,43 @@ function CheckoutContent() {
   const [studentId, setStudentId] = useState("");
   const [result, setResult] = useState<any>(null);
 
+  // Backend ids are UUIDs and /library/issues expects {book_id, student_id};
+  // returns must resolve the active issue first (POST /library/issues/return
+  // does not exist — the real route is /library/issues/<id>/return).
+  const fail = (e: any, fallback: string) =>
+    toast.error(e?.response?.data?.error || fallback);
+
   const checkout = useMutation({
-    mutationFn: async () => (await api.post("/library/issues", { book_id: parseInt(bookId), student_id: parseInt(studentId) })).data,
-    onSuccess: (data) => { setResult(data.data || data); queryClient.invalidateQueries({ queryKey: ["library"] }); toast.success("Book issued successfully"); },
-    onError: () => toast.error("Checkout failed"),
+    mutationFn: async () => (await api.post("/library/issues", { book_id: bookId.trim(), student_id: studentId.trim() })).data,
+    onSuccess: (data) => {
+      setResult(data.data || data);
+      // ["library"] is not an element-wise prefix of ["library-books"]/["library-issues"]
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      queryClient.invalidateQueries({ queryKey: ["library-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overdue"] });
+      toast.success("Book issued successfully");
+    },
+    onError: (e) => fail(e, "Checkout failed — check the Book and Student IDs"),
   });
 
   const returnBook = useMutation({
-    mutationFn: async () => (await api.post("/library/issues/return", { book_id: parseInt(bookId), student_id: parseInt(studentId) })).data,
-    onSuccess: (data) => { setResult(data.data || data); queryClient.invalidateQueries({ queryKey: ["library"] }); toast.success("Book returned successfully"); },
-    onError: () => toast.error("Return failed"),
+    mutationFn: async () => {
+      const res = await api.get("/library/issues", {
+        params: { status: "issued", book_id: bookId.trim(), student_id: studentId.trim() },
+      });
+      const issues = res.data?.data ?? [];
+      const issue = Array.isArray(issues) ? issues[0] : undefined;
+      if (!issue?.id) throw new Error("No active issue found for that Book and Student ID pair");
+      return (await api.post(`/library/issues/${issue.id}/return`, {})).data;
+    },
+    onSuccess: (data) => {
+      setResult(data.data || data);
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      queryClient.invalidateQueries({ queryKey: ["library-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overdue"] });
+      toast.success("Book returned successfully");
+    },
+    onError: (e) => fail(e, "Return failed — no active issue for that Book and Student ID pair"),
   });
 
   const handleSubmit = () => {
@@ -58,15 +85,15 @@ function CheckoutContent() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Book ID / Barcode</Label>
+              <Label>Book ID (UUID)</Label>
               <div className="flex gap-2">
-                <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Scan or enter book ID" />
+                <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Book UUID (from Catalog)" />
                 <Button variant="outline" size="icon"><ScanLine className="h-4 w-4" /></Button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Student ID</Label>
-              <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="Student enrollment no." />
+              <Label>Student ID (UUID)</Label>
+              <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="Student UUID" />
             </div>
           </div>
           <Button onClick={handleSubmit} disabled={isPending} className="w-full">

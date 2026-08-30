@@ -1,5 +1,6 @@
 import '../services/api_client.dart';
 import '../models/models.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 class StudentRepository {
@@ -22,18 +23,17 @@ class StudentRepository {
 
       if (response.data['success'] != true) {
         throw ApiException(
-            response.data['error'] ?? 'Failed to resolve student');
+            envelopeErrorText(response.data, 'Failed to resolve student'));
       }
 
-      final list = response.data['data'] as List?;
-      if (list == null || list.isEmpty) {
+      final rows = envelopeRows(response.data,
+          source: 'StudentRepository.getCurrentStudent');
+      if (rows.isEmpty) {
         return null;
       }
-
-      final first = list.first;
-      if (first is! Map) return null;
-      return Student.fromJson(Map<String, dynamic>.from(first));
+      return Student.fromJson(rows.first);
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -42,11 +42,14 @@ class StudentRepository {
     try {
       final response = await ApiClient.instance.get('/students/$studentId');
       if (response.data['success'] == true) {
-        return Student.fromJson(response.data['data']);
+        return Student.fromJson(
+            envelopeObject(response.data, source: 'StudentRepository.getProfile') ??
+                const {});
       }
-      throw ApiException(
-          response.data['error'] ?? 'Failed to fetch student profile');
+      throw ApiException(envelopeErrorText(
+          response.data, 'Failed to fetch student profile'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -55,10 +58,12 @@ class StudentRepository {
     try {
       final response = await ApiClient.instance.get('/student/dashboard');
       if (response.data['success'] == true) {
-        return response.data['data'] as Map<String, dynamic>;
+        return envelopeObject(response.data, source: 'StudentRepository.getDashboard') ??
+            const {};
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch dashboard');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch dashboard'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -67,13 +72,14 @@ class StudentRepository {
     try {
       final response = await ApiClient.instance.get('/student/classmates');
       if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => Student.fromJson(e))
+        return envelopeRows(response.data, source: 'StudentRepository.getClassmates')
+            .map(Student.fromJson)
             .toList();
       }
-      throw ApiException(
-          response.data['error'] ?? 'Failed to fetch classmates');
+      throw ApiException(envelopeErrorText(
+          response.data, 'Failed to fetch classmates'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }

@@ -42,5 +42,6 @@ from app.tasks import (  # noqa: E402, F401
     social_scheduler,
     db_backup,
     gps_firebase_poller,
+    trial_expiry,
 )
 

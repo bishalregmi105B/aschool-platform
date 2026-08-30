@@ -48,7 +48,7 @@ export default function ExamSchedulePage() {
 }
 
 function ExamScheduleContent() {
-  const { data: exams, isLoading } = useQuery({
+  const { data: exams, isLoading, isError } = useQuery({
     queryKey: ["exams"],
     queryFn: async () => {
       const res = await api.get("/exams");
@@ -57,6 +57,13 @@ function ExamScheduleContent() {
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError)
+    return (
+      <div className="p-6 border border-destructive/30 bg-destructive/5 rounded-lg text-sm text-destructive text-center">
+        Failed to load the exam schedule. Please refresh the page to try again.
+      </div>
+    );
 
   return (
     <div className="space-y-6">

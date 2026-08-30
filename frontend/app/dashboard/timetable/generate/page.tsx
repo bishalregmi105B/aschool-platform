@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { PluginGate } from "@/lib/plugins";
@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Spinner, PageLoader } from "@/components/ui/spinner";
 import { Wand2, CheckCircle, Calendar, AlertCircle } from "lucide-react";
 
@@ -20,10 +19,28 @@ interface ClassItem {
   name: string;
 }
 
+interface SolverSlot {
+  day: string;
+  period: number;
+  subject_id: string;
+  subject_name?: string;
+  teacher_id?: string | null;
+  teacher_name?: string;
+}
+
+interface SolverClass {
+  class_id: string;
+  class_name?: string;
+  section_id: string;
+  section_name?: string;
+  slots: SolverSlot[];
+}
+
 interface GenerateResult {
-  status: string;
-  slots_created: number;
-  message?: string;
+  classes: SolverClass[];
+  conflicts?: string[];
+  days?: string[];
+  periods_per_day?: number;
 }
 
 export default function TimetableGeneratePage() {
@@ -35,6 +52,7 @@ export default function TimetableGeneratePage() {
 }
 
 function GenerateContent() {
+  const queryClient = useQueryClient();
   const [classId, setClassId] = useState("");
   const [result, setResult] = useState<GenerateResult | null>(null);
 
@@ -48,29 +66,64 @@ function GenerateContent() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
+      // The solver always works school-wide; class_id is applied as a preview/
+      // save scope below (backend POST /timetable/save replaces only the
+      // (class, section) pairs included in the payload).
       const res = await api.post<ApiResponse<GenerateResult>>("/timetable/generate", {
-        class_id: classId || undefined,
+        periods_per_day: 8,
       });
       return res.data.data;
     },
     onSuccess: (data) => {
       setResult(data ?? null);
-      toast.success(`Timetable generated: ${data?.slots_created ?? 0} slots created`);
+      const totalSlots = (data?.classes ?? []).reduce((n, c) => n + (c.slots?.length ?? 0), 0);
+      if (totalSlots === 0) {
+        toast.error("The solver produced no slots — assign subjects to classes first.");
+      } else {
+        toast.success(`Preview ready: ${totalSlots} slots across ${(data?.classes ?? []).length} class sections`);
+      }
     },
     onError: () => toast.error("Failed to generate timetable"),
   });
 
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!result) return null;
+      // Scoped save: when a class is selected only that class's slots are
+      // replaced — other classes (and manual slots) are left untouched.
+      const payload = {
+        classes: classId
+          ? (result.classes ?? []).filter((c) => c.class_id === classId)
+          : (result.classes ?? []),
+      };
+      const res = await api.post<ApiResponse<{ saved_slots: number }>>("/timetable/save", payload);
+      return res.data.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Saved ${data?.saved_slots ?? 0} slots to the timetable`);
+      queryClient.invalidateQueries({ queryKey: ["timetable"] });
+    },
+    onError: () => toast.error("Failed to save the timetable"),
+  });
+
   if (isLoading) return <PageLoader />;
+
+  const previewClasses = result
+    ? classId
+      ? (result.classes ?? []).filter((c) => c.class_id === classId)
+      : (result.classes ?? [])
+    : [];
+  const previewSlotCount = previewClasses.reduce((n, c) => n + (c.slots?.length ?? 0), 0);
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Wand2 className="h-6 w-6" /> AI Timetable Generator
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <Wand2 className="h-6 w-6" /> Timetable Generator
         </h1>
         <p className="text-muted-foreground mt-1">
-          Automatically generate optimized timetables using AI — considers teacher availability,
-          subject load, and room constraints.
+          Auto-generate a clash-free timetable — assigns subjects to periods while keeping
+          each teacher to one class per period.
         </p>
       </div>
 
@@ -81,13 +134,13 @@ function GenerateContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Class (optional — leave blank to generate for all classes)</Label>
-            <Select value={classId} onValueChange={setClassId}>
+            <Label>Class (optional — scope the preview and save to one class)</Label>
+            <Select value={classId || "all"} onValueChange={(v) => setClassId(v === "all" ? "" : v)}>
               <SelectTrigger className="mt-1.5">
                 <SelectValue placeholder="All Classes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Classes</SelectItem>
+                <SelectItem value="all">All Classes</SelectItem>
                 {(classes ?? []).map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
@@ -96,13 +149,11 @@ function GenerateContent() {
           </div>
 
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <h4 className="text-sm font-medium">What the AI considers:</h4>
+            <h4 className="text-sm font-medium">What the generator considers:</h4>
             <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Teacher weekly subject load and availability</li>
+              <li>Every subject assigned to each class section</li>
               <li>No teacher double-booking across classes</li>
-              <li>Subject distribution across days (no clustering)</li>
-              <li>Free periods and break times</li>
-              <li>Room/lab availability for specialized subjects</li>
+              <li>Round-robin subject distribution across periods</li>
             </ul>
           </div>
 
@@ -118,26 +169,46 @@ function GenerateContent() {
         </CardContent>
       </Card>
 
-      {/* Result */}
+      {/* Result preview */}
       {result && (
-        <Card className="border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-900/10">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex gap-3 items-start">
-              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-green-800 dark:text-green-400">
-                  Timetable Generated Successfully
-                </p>
-                <p className="text-sm text-green-700 dark:text-green-500 mt-1">
-                  {result.slots_created} time slots created.
-                  {result.message && ` ${result.message}`}
-                </p>
-                <Button variant="outline" size="sm" className="mt-3" asChild>
-                  <a href="/dashboard/timetable">
-                    <Calendar className="h-3.5 w-3.5 mr-2" /> View Timetable
-                  </a>
-                </Button>
-              </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle className="h-5 w-5 text-green-600" /> Generated Preview
+            </CardTitle>
+            <CardDescription>
+              {previewSlotCount} slots for {previewClasses.length} class section(s)
+              {classId ? " (filtered by class)" : ""} — review before saving.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {previewClasses.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No sections matched the selected class.
+              </p>
+            ) : (
+              previewClasses.map((c) => (
+                <div key={`${c.class_id}-${c.section_id}`} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm">
+                  <span className="font-medium">
+                    {c.class_name || c.class_id} {c.section_name ? `- ${c.section_name}` : ""}
+                  </span>
+                  <span className="text-muted-foreground">{c.slots?.length ?? 0} slots</span>
+                </div>
+              ))
+            )}
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || previewSlotCount === 0}
+              >
+                {saveMutation.isPending
+                  ? <><Spinner size="sm" className="mr-2" /> Saving...</>
+                  : <><Calendar className="h-4 w-4 mr-2" /> Save to Timetable{classId ? " (selected class only)" : ""}</>}
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/dashboard/timetable">View Timetable</a>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -149,8 +220,9 @@ function GenerateContent() {
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700 dark:text-amber-500">
-              Generating a timetable will replace any existing auto-generated slots for the selected class.
-              Manually created or locked slots will not be affected. Review the result in the Timetable view before publishing.
+              Saving replaces the existing slots for the saved class sections only.
+              Classes not included in the save keep their current slots. Review the result in the
+              Timetable view before saving.
             </p>
           </div>
         </CardContent>

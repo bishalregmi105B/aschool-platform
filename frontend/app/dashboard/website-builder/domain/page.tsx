@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface DomainSettings {
   subdomain: string;
@@ -15,9 +17,10 @@ export default function DomainPage() {
   const qc = useQueryClient();
   const [domain, setDomain] = useState("");
 
-  const { data: settings, isLoading } = useQuery<DomainSettings>({
+  const { data: settings, isLoading, isError, refetch } = useQuery<DomainSettings>({
     queryKey: ["website-domain"],
     queryFn: () => api.get("/website-builder/domain").then((r) => r.data.data),
+    retry: 1,
   });
 
   const updateMut = useMutation({
@@ -37,6 +40,17 @@ export default function DomainPage() {
     return (
       <div className="p-8 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load domain settings. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
       </div>
     );
   }
@@ -125,7 +139,7 @@ export default function DomainPage() {
                 <button
                   onClick={() => verifyMut.mutate()}
                   disabled={verifyMut.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 disabled:opacity-50"
                 >
                   {verifyMut.isPending ? "Checking..." : "Check DNS Verification"}
                 </button>
@@ -157,7 +171,7 @@ export default function DomainPage() {
             <button
               type="submit"
               disabled={!domain.trim() || updateMut.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 disabled:opacity-50"
             >
               {updateMut.isPending ? "Saving..." : "Connect Domain"}
             </button>

@@ -50,6 +50,14 @@ interface House {
   total_points: number;
 }
 
+interface StudentRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+const POINT_CATEGORIES = ["academic", "behavior", "sports", "attendance", "general"];
+
 export default function GamificationPage() {
   return (
     <PluginGate slug="gamification">
@@ -62,12 +70,13 @@ function GamificationContent() {
   const [tab, setTab] = useState<"leaderboard" | "badges" | "houses">("leaderboard");
   const queryClient = useQueryClient();
 
-  const { data: leaderboard, isLoading: lbLoading } = useQuery<any>({
+  const { data: leaderboard, isLoading: lbLoading, isError: lbError, refetch: lbRefetch } = useQuery<any>({
     queryKey: ["gamification-leaderboard"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/gamification/leaderboard", { params: { top: 20 } });
       return (Array.isArray(res.data.data) ? res.data.data : []) as LeaderEntry[];
     },
+    retry: 1,
   });
 
   const { data: badges, isLoading: badgeLoading } = useQuery<any>({
@@ -87,12 +96,23 @@ function GamificationContent() {
   });
 
   if (lbLoading) return <PageLoader />;
+  if (lbError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load gamification data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => lbRefetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Gamification</h1>
-        <p className="text-muted-foreground">Points, badges, houses & leaderboard</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Gamification</h1>
+          <p className="text-muted-foreground">Points, badges, houses & leaderboard</p>
+        </div>
+        <AwardPointsDialog onAwarded={() => lbRefetch()} />
       </div>
 
       {/* Stats */}
@@ -260,7 +280,7 @@ function BadgesTab({ data }: { data: BadgeItem[] }) {
                   <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
                     <Medal className="h-6 w-6 text-purple-600" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold">{badge.name}</h3>
                     <p className="text-sm text-muted-foreground">{badge.description}</p>
                     <div className="flex gap-2 mt-2">
@@ -268,6 +288,9 @@ function BadgesTab({ data }: { data: BadgeItem[] }) {
                       <Badge variant="secondary" className="text-xs">
                         <Star className="h-3 w-3 mr-1" /> {badge.points_value} pts
                       </Badge>
+                    </div>
+                    <div className="mt-3">
+                      <AwardBadgeDialog badgeId={badge.id} badgeName={badge.name} />
                     </div>
                   </div>
                 </div>
@@ -353,5 +376,158 @@ function HousesTab({ data }: { data: House[] }) {
         )}
       </div>
     </div>
+  );
+}
+
+function useStudents() {
+  return useQuery({
+    queryKey: ["gamification-students"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/students?per_page=200");
+      return ((res.data.data as StudentRow[]) || []).filter((s) => !!s.id);
+    },
+    retry: 1,
+  });
+}
+
+function StudentSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const { data: students, isLoading } = useStudents();
+  return (
+    <select
+      className="w-full border rounded-md p-2"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={isLoading}
+      required
+    >
+      <option value="">{isLoading ? "Loading students…" : "Select student…"}</option>
+      {(students || []).map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.first_name} {s.last_name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// POST /gamification/points {student_id, points, reason, category} — the only
+// award path the backend exposes (this page previously had no way to award).
+function AwardPointsDialog({ onAwarded }: { onAwarded?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [studentId, setStudentId] = useState("");
+  const [points, setPoints] = useState("10");
+  const [reason, setReason] = useState("");
+  const [category, setCategory] = useState("academic");
+  const queryClient = useQueryClient();
+
+  const award = useMutation({
+    mutationFn: async () => {
+      const res = await api.post<ApiResponse>("/gamification/points", {
+        student_id: studentId,
+        points: parseInt(points, 10),
+        reason: reason || undefined,
+        category,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gamification-leaderboard"] });
+      queryClient.invalidateQueries({ queryKey: ["gamification-leaderboard-full"] });
+      setOpen(false);
+      setStudentId("");
+      setPoints("10");
+      setReason("");
+      toast.success("Points awarded");
+      onAwarded?.();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to award points"),
+  });
+
+  const parsed = parseInt(points, 10);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><Award className="h-4 w-4 mr-2" /> Award Points</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Award Points</DialogTitle></DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => { e.preventDefault(); if (studentId && parsed) award.mutate(); }}
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Student</label>
+            <StudentSelect value={studentId} onChange={setStudentId} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Points (negative = deduction)</label>
+              <Input type="number" value={points} onChange={(e) => setPoints(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <select className="w-full border rounded-md p-2" value={category} onChange={(e) => setCategory(e.target.value)}>
+                {POINT_CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Reason</label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Won inter-school quiz" />
+          </div>
+          <Button type="submit" disabled={!studentId || !parsed || award.isPending} className="w-full">
+            {award.isPending ? "Awarding..." : "Award Points"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// POST /gamification/award-badge {student_id, badge_id} — per-badge award action.
+function AwardBadgeDialog({ badgeId, badgeName }: { badgeId: string; badgeName: string }) {
+  const [open, setOpen] = useState(false);
+  const [studentId, setStudentId] = useState("");
+  const queryClient = useQueryClient();
+
+  const award = useMutation({
+    mutationFn: async () => {
+      const res = await api.post<ApiResponse>("/gamification/award-badge", {
+        student_id: studentId,
+        badge_id: badgeId,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      setOpen(false);
+      setStudentId("");
+      toast.success("Badge awarded");
+      queryClient.invalidateQueries({ queryKey: ["gamification-leaderboard"] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to award badge"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Award className="h-3 w-3 mr-1" /> Award to student</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Award &ldquo;{badgeName}&rdquo;</DialogTitle></DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => { e.preventDefault(); if (studentId) award.mutate(); }}
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Student</label>
+            <StudentSelect value={studentId} onChange={setStudentId} />
+          </div>
+          <Button type="submit" disabled={!studentId || award.isPending} className="w-full">
+            {award.isPending ? "Awarding..." : "Award Badge"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

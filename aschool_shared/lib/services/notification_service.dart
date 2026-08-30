@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +11,18 @@ import 'api_client.dart';
 /// Flow:
 /// 1. OneSignal SDK init → registers player ID with backend
 /// 2. FCM retained for local notification display
-/// 3. After login, tags are set: school_id, role, user_id
+/// 3. After login, tokens are registered with the backend and tags are set:
+///    school_id, role, user_id
+///
+/// Singleton: every `NotificationService()` returns the same instance, so the
+/// tokens captured during init() are visible to AuthService after login.
 class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+
+  factory NotificationService() => _instance;
+
+  NotificationService._internal();
+
   final _logger = Logger();
   final _localNotifications = FlutterLocalNotificationsPlugin();
   String? _fcmToken;
@@ -20,7 +31,13 @@ class NotificationService {
   String? get fcmToken => _fcmToken;
   String? get oneSignalPlayerId => _oneSignalPlayerId;
 
-  /// Initialize all notification channels
+  /// Initialize all notification channels.
+  ///
+  /// Call once from main() at startup. Safe to run before login: FCM token
+  /// retrieval works unauthenticated, and the backend registration POST picks
+  /// up a stored access token (if any) via ApiClient's auth interceptor.
+  /// AuthService re-registers after a fresh login. Each channel is isolated —
+  /// a missing Firebase/OneSignal config logs a warning instead of crashing.
   Future<void> init() async {
     await _initLocalNotifications();
     await _initFCM();
@@ -29,52 +46,65 @@ class NotificationService {
 
   /// Initialize local notification display
   Future<void> _initLocalNotifications() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-    await _localNotifications.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
-      onDidReceiveNotificationResponse: _onNotificationTap,
-    );
+    try {
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      await _localNotifications.initialize(
+        const InitializationSettings(android: androidInit, iOS: iosInit),
+        onDidReceiveNotificationResponse: _onNotificationTap,
+      );
+    } catch (e) {
+      _logger.e('Local notifications init failed: $e');
+    }
   }
 
   /// Initialize FCM for token + foreground message display
   Future<void> _initFCM() async {
-    final messaging = FirebaseMessaging.instance;
+    try {
+      // Required before any FirebaseMessaging use; throws when the host app
+      // ships without Firebase config (google-services.json / plist).
+      await Firebase.initializeApp();
 
-    // Request permission
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    _logger.i('FCM permission: ${settings.authorizationStatus}');
+      final messaging = FirebaseMessaging.instance;
 
-    // Get token
-    _fcmToken = await messaging.getToken();
-    _logger.i('FCM token: $_fcmToken');
+      // Request permission
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      _logger.i('FCM permission: ${settings.authorizationStatus}');
 
-    // Register FCM token with backend (fallback channel)
-    if (_fcmToken != null) {
-      _registerFcmToken(_fcmToken!);
-    }
+      // Get token
+      _fcmToken = await messaging.getToken();
+      _logger.i('FCM token: $_fcmToken');
 
-    // Listen for token refresh
-    messaging.onTokenRefresh.listen(_registerFcmToken);
+      // Register FCM token with backend (fallback channel). Before login this
+      // is unauthenticated and logged; AuthService retries after login.
+      if (_fcmToken != null) {
+        _registerFcmToken(_fcmToken!);
+      }
 
-    // Foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      // Listen for token refresh
+      messaging.onTokenRefresh.listen(_registerFcmToken);
 
-    // Background/terminated message tap
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
+      // Foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // Check if app was opened from notification
-    final initialMessage = await messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessageTap(initialMessage);
+      // Background/terminated message tap
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
+
+      // Check if app was opened from notification
+      final initialMessage = await messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleMessageTap(initialMessage);
+      }
+    } catch (e) {
+      _logger.e('FCM init failed (is Firebase configured?): $e');
     }
   }
 
@@ -96,8 +126,8 @@ class NotificationService {
       // Capture player ID once subscription is ready
       final subscription = OneSignal.User.pushSubscription;
       _oneSignalPlayerId = subscription.id;
-      _logger
-          .i('OneSignal player ID: ${_oneSignalPlayerId?.substring(0, 8)}...');
+      final shortId = _oneSignalPlayerId;
+      _logger.i('OneSignal player ID: ${shortId == null || shortId.length <= 8 ? shortId : shortId.substring(0, 8)}...');
 
       // Listen for subscription changes (e.g., token rotation)
       OneSignal.User.pushSubscription.addObserver((state) {
@@ -117,10 +147,21 @@ class NotificationService {
       await ApiClient.instance.post('/auth/register-onesignal', data: {
         'player_id': playerId,
       });
-      _logger.i('OneSignal player registered: ${playerId.substring(0, 8)}...');
+      _logger.i('OneSignal player registered: ${playerId.substring(0, playerId.length < 8 ? playerId.length : 8)}...');
     } catch (e) {
       _logger.w('Failed to register OneSignal player: $e');
     }
+  }
+
+  /// Re-register the captured FCM token with the backend.
+  ///
+  /// Call from AuthService after a fresh login: init() may have run before
+  /// authentication, in which case the automatic register call was rejected
+  /// (401) and only logged. No-op when no FCM token was captured.
+  Future<void> registerFcmTokenWithBackend() async {
+    final token = _fcmToken;
+    if (token == null) return;
+    await _registerFcmToken(token);
   }
 
   /// Set OneSignal tags for school-scoped push targeting.

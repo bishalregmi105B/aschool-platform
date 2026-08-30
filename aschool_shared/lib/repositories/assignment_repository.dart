@@ -1,5 +1,6 @@
 import '../services/api_client.dart';
 import '../models/models.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 class AssignmentRepository {
@@ -20,14 +21,13 @@ class AssignmentRepository {
         final payload = response.data['data'];
         final rows = <Map<String, dynamic>>[];
         if (payload is Map) {
-          rows.addAll(((payload['pending'] ?? []) as List).map((item) {
+          rows.addAll(safeMapList(payload['pending']).map((row) {
             return {
-              ...Map<String, dynamic>.from(item as Map),
+              ...row,
               'submission_status': 'pending',
             };
           }));
-          rows.addAll(((payload['submitted'] ?? []) as List).map((item) {
-            final row = Map<String, dynamic>.from(item as Map);
+          rows.addAll(safeMapList(payload['submitted']).map((row) {
             return {
               ...row,
               'submission_status':
@@ -39,15 +39,18 @@ class AssignmentRepository {
               },
             };
           }));
+        } else if (payload is List) {
+          rows.addAll(safeMapList(payload));
         } else {
-          rows.addAll((payload as List)
-              .map((item) => Map<String, dynamic>.from(item as Map)));
+          logJsonShape('AssignmentRepository.getAssignments',
+              'unexpected payload type ${payload.runtimeType}');
         }
         return rows.map((e) => Assignment.fromJson(e)).toList();
       }
       throw ApiException(
-          response.data['error'] ?? 'Failed to fetch assignments');
+          envelopeErrorText(response.data, 'Failed to fetch assignments'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }

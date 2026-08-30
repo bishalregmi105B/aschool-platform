@@ -23,12 +23,13 @@ export default function CharacterCertificatePage() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
-  const { data: students, isLoading } = useQuery({
+  const { data: students, isLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
     queryKey: ["design-studio-students", search],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>(`/design-studio/data-sources/student/records?q=${search}&limit=50`);
       return res.data.data;
     },
+    retry: 1,
   });
 
   const { data: certificateTemplates = [] } = useQuery({
@@ -50,13 +51,16 @@ export default function CharacterCertificatePage() {
     mutationFn: async (studentData: any) => {
       const res = await api.post("/design-studio/render", {
         template_id: selectedTemplateId,
-        data: studentData.fields,
+        data: {
+          ...studentData.fields,
+          date: new Date().toISOString().slice(0, 10),
+        },
       });
       return res.data;
     },
     onSuccess: (data: any) => {
       toast.success("Certificate generated successfully");
-      
+
       // Open in new tab for printing
       const newWin = window.open("", "_blank");
       if (newWin) {
@@ -66,19 +70,23 @@ export default function CharacterCertificatePage() {
               <title>Character Certificate</title>
               <style>
                 body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
-                .cert-container { border: 10px solid #double; padding: 40px; max-width: 800px; margin: 0 auto; text-align: center; }
+                .cert-container { border: 10px double #1e40af; padding: 40px; max-width: 800px; margin: 0 auto; text-align: center; }
                 @media print { .no-print { display: none; } }
               </style>
             </head>
             <body>
               <div class="no-print" style="margin-bottom: 20px; text-align: right;">
-                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Print Document</button>
+                <button id="print-btn" style="padding: 10px 20px; cursor: pointer;">Print Document</button>
               </div>
               ${data.data?.html || data.html || "<div class='cert-container'><h1>Character Certificate</h1><p>Template rendering fallback.</p></div>"}
             </body>
           </html>
         `);
         newWin.document.close();
+        newWin.document.getElementById("print-btn")?.addEventListener("click", () => {
+          newWin.focus();
+          newWin.print();
+        });
       }
     },
     onError: () => {
@@ -122,12 +130,18 @@ export default function CharacterCertificatePage() {
               />
             </div>
             
+            {studentsError ? (
+              <div className="text-center py-6 space-y-3">
+                <p className="text-sm text-destructive">Failed to load students. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchStudents()}>Retry</Button>
+              </div>
+            ) : (
             <div className="space-y-2 pt-4 max-h-[500px] overflow-y-auto">
               {isLoading ? (
                 <div className="flex justify-center py-4"><Spinner /></div>
               ) : (
                 (students || []).map((student) => (
-                  <div 
+                  <div
                     key={student.id}
                     onClick={() => setSelectedStudentId(student.id)}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -143,6 +157,7 @@ export default function CharacterCertificatePage() {
                 <div className="text-center text-sm text-muted-foreground py-4">No students found</div>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
 

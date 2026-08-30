@@ -39,12 +39,13 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export default function IemisHistoryPage() {
-  const { data: logs, isLoading } = useQuery({
+  const { data: logs, isLoading, isError, refetch } = useQuery({
     queryKey: ["iemis-history"],
     queryFn: async () => {
       const res = await getHistory(1);
       return (res.items ?? []) as ImportLog[];
     },
+    retry: 1,
   });
 
   return (
@@ -63,7 +64,14 @@ export default function IemisHistoryPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load import history. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <PageLoader />
       ) : !logs?.length ? (
         <Card>

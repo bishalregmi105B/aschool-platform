@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import 'api_client.dart';
@@ -27,7 +28,8 @@ class NoticesService {
     try {
       final dt = DateTime.parse(raw.toString()).toLocal();
       return DateFormat('MMM d, yyyy • h:mm a').format(dt);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('NoticesService.formatNoticeDate parse failed: $e');
       return raw.toString();
     }
   }

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ALL_TEMPLATES } from "@/lib/school-website/templates";
+import { revalidateSchoolSite } from "@/lib/revalidate";
 import type { SchoolTemplate } from "@/lib/school-website/types";
 
 interface Theme {
@@ -99,7 +102,7 @@ function TemplateCard({
           ) : (
             <button
               onClick={() => setShowConfirm(true)}
-              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 group-hover:bg-blue-700 transition-colors"
+              className="px-3 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 group-hover:bg-blue-700 transition-colors"
             >
               Use Template
             </button>
@@ -119,15 +122,17 @@ export default function ThemesPage() {
   const [previewTheme, setPreviewTheme] = useState<Theme | null>(null);
   const [applyingTemplate, setApplyingTemplate] = useState<string | null>(null);
 
-  const { data: themes = [], isLoading: themesLoading } = useQuery<Theme[]>({
+  const { data: themes = [], isLoading: themesLoading, isError: themesError, refetch: refetchThemes } = useQuery<Theme[]>({
     queryKey: ["website-themes"],
     queryFn: () => api.get("/website-builder/themes").then((r) => r.data.data.themes || []),
+    retry: 1,
   });
 
   const applyThemeMut = useMutation({
     mutationFn: (themeId: string) => api.post("/website-builder/themes/apply", { theme_id: themeId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-status"] });
+      revalidateSchoolSite();
       alert("Theme applied successfully!");
     },
   });
@@ -181,6 +186,7 @@ export default function ThemesPage() {
     onSuccess: () => {
       setApplyingTemplate(null);
       qc.invalidateQueries({ queryKey: ["website-status"] });
+      revalidateSchoolSite();
       alert("✅ Template applied! Go to Pages → Edit Home to customize the sections.");
     },
     onError: () => setApplyingTemplate(null),
@@ -258,7 +264,7 @@ export default function ThemesPage() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filter === f ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"
+                  filter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"
                 }`}
               >
                 {f === "all" ? `All (${themes.length})` : f === "free" ? `Free (${themes.filter((t) => t.tier === "free").length})` : `Pro (${themes.filter((t) => t.tier === "pro").length})`}
@@ -266,7 +272,12 @@ export default function ThemesPage() {
             ))}
           </div>
 
-          {themesLoading ? (
+          {themesError ? (
+            <div className="flex flex-col items-center py-16 space-y-3">
+              <p className="text-sm text-destructive">Failed to load themes. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetchThemes()}>Retry</Button>
+            </div>
+          ) : themesLoading ? (
             <div className="flex justify-center py-16">
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
             </div>
@@ -296,7 +307,7 @@ export default function ThemesPage() {
                     <p className="text-xs text-gray-400 mt-1">Fonts: {theme.fonts.heading} / {theme.fonts.body}</p>
                     <div className="mt-3 flex gap-2">
                       <button onClick={() => setPreviewTheme(theme)} className="flex-1 px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">Preview</button>
-                      <button onClick={() => applyThemeMut.mutate(theme.id)} disabled={applyThemeMut.isPending} className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Apply</button>
+                      <button onClick={() => applyThemeMut.mutate(theme.id)} disabled={applyThemeMut.isPending} className="flex-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Apply</button>
                     </div>
                   </div>
                 </div>
@@ -331,7 +342,7 @@ export default function ThemesPage() {
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button onClick={() => setPreviewTheme(null)} className="px-4 py-2 border rounded-lg text-sm">Close</button>
-                <button onClick={() => { applyThemeMut.mutate(previewTheme.id); setPreviewTheme(null); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Apply Theme</button>
+                <button onClick={() => { applyThemeMut.mutate(previewTheme.id); setPreviewTheme(null); }} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90">Apply Theme</button>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 /// Transport Model
+import '../utils/safe_parse.dart';
 
 class TransportRoute {
   final String id;
@@ -23,15 +24,15 @@ class TransportRoute {
 
   factory TransportRoute.fromJson(Map<String, dynamic> json) {
     return TransportRoute(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      vehicleId: json['vehicle_id']?.toString(),
-      vehicleNumber: json['vehicle_number'] as String?,
-      driverName: json['driver_name'] as String?,
-      driverPhone: json['driver_phone'] as String?,
-      fareAmount: (json['fare_amount'] as num?)?.toDouble(),
-      stops: ((json['stops'] ?? json['route_stops'] ?? []) as List)
-          .map((s) => TransportStop.fromJson(Map<String, dynamic>.from(s)))
+      id: safeString(json['id']),
+      title: safeString(json['title']),
+      vehicleId: safeStringOrNull(json['vehicle_id']),
+      vehicleNumber: safeStringOrNull(json['vehicle_number']),
+      driverName: safeStringOrNull(json['driver_name']),
+      driverPhone: safeStringOrNull(json['driver_phone']),
+      fareAmount: safeDoubleOrNull(json['fare_amount']),
+      stops: safeMapList(json['stops'] ?? json['route_stops'])
+          .map(TransportStop.fromJson)
           .toList(),
     );
   }
@@ -60,14 +61,14 @@ class TransportStop {
 
   factory TransportStop.fromJson(Map<String, dynamic> json) {
     return TransportStop(
-      id: (json['id'] ?? '').toString(),
-      name: json['name'] as String? ?? json['stop_name'] as String? ?? '',
-      pickTime: json['pick_time'] as String?,
-      dropTime: json['drop_time'] as String?,
-      distance: (json['distance'] as num?)?.toDouble(),
-      additionalFare: (json['additional_fare'] as num?)?.toDouble(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
+      id: safeString(json['id']),
+      name: safeString(json['name'], fallback: safeString(json['stop_name'])),
+      pickTime: safeStringOrNull(json['pick_time']),
+      dropTime: safeStringOrNull(json['drop_time']),
+      distance: safeDoubleOrNull(json['distance']),
+      additionalFare: safeDoubleOrNull(json['additional_fare']),
+      latitude: safeDoubleOrNull(json['latitude']),
+      longitude: safeDoubleOrNull(json['longitude']),
     );
   }
 }

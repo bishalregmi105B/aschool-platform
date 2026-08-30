@@ -357,7 +357,7 @@ export default function Home() {
           </section>
 
           {/* ── APPS SHOWCASE ── */}
-          <section className="bg-white border-y border-black/8">
+          <section id="mobile-apps" className="bg-white border-y border-black/8">
             <div className="mx-auto max-w-6xl px-5 py-16">
               <div className="grid md:grid-cols-[1fr_1fr] gap-12 items-center">
                 <div className="space-y-5">
@@ -658,7 +658,7 @@ export default function Home() {
         {/* ── FOOTER ── */}
         <footer className="bg-[color:var(--ink)] text-white">
           <div className="mx-auto max-w-6xl px-5 py-12">
-            <div className="grid gap-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+            <div className="grid gap-8 md:grid-cols-[1.5fr_1fr_1fr]">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-[color:var(--ocean)] grid place-items-center text-xs font-bold">AS</div>
@@ -679,8 +679,14 @@ export default function Home() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-3">Platform</p>
                 <ul className="space-y-2">
-                  {["Features", "Pricing", "Mobile Apps", "School Website", "EMIS Reports"].map((link) => (
-                    <li key={link}><a href="#" className="text-xs text-white/60 hover:text-white transition-colors">{link}</a></li>
+                  {([
+                    { label: "Features", href: "#features" },
+                    { label: "Pricing", href: "#pricing" },
+                    { label: "Mobile Apps", href: "#mobile-apps" },
+                    { label: "School Website", href: "#features" },
+                    { label: "EMIS Reports", href: "#features" },
+                  ] as const).map(({ label, href }) => (
+                    <li key={label}><a href={href} className="text-xs text-white/60 hover:text-white transition-colors">{label}</a></li>
                   ))}
                 </ul>
               </div>
@@ -688,15 +694,7 @@ export default function Home() {
                 <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-3">Solutions</p>
                 <ul className="space-y-2">
                   {["Schools", "Colleges", "Multi-Branch", "Transport", "With Biometric"].map((link) => (
-                    <li key={link}><a href="#" className="text-xs text-white/60 hover:text-white transition-colors">{link}</a></li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-3">Company</p>
-                <ul className="space-y-2">
-                  {["About Us", "Blog", "Careers", "Privacy Policy", "Terms of Service"].map((link) => (
-                    <li key={link}><a href="#" className="text-xs text-white/60 hover:text-white transition-colors">{link}</a></li>
+                    <li key={link}><a href="#institutions" className="text-xs text-white/60 hover:text-white transition-colors">{link}</a></li>
                   ))}
                 </ul>
               </div>
@@ -704,9 +702,7 @@ export default function Home() {
             <div className="mt-10 border-t border-white/10 pt-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <p className="text-xs text-white/40">© 2026 ASchool. All rights reserved. Made with ❤️ in Nepal</p>
               <div className="flex gap-4">
-                <a href="#" className="text-xs text-white/40 hover:text-white/70 transition-colors">Privacy</a>
-                <a href="#" className="text-xs text-white/40 hover:text-white/70 transition-colors">Terms</a>
-                <a href="#" className="text-xs text-white/40 hover:text-white/70 transition-colors">Support</a>
+                <a href="#contact" className="text-xs text-white/40 hover:text-white/70 transition-colors">Support</a>
               </div>
             </div>
           </div>

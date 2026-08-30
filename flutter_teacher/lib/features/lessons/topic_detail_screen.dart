@@ -11,8 +11,8 @@ final topicMaterialsProvider = FutureProvider.autoDispose
   final resp =
       await ApiClient.instance.get('/lms/materials?topic_id=$topicId');
   if (resp.data['success'] == true) {
-    return (resp.data['data'] as List)
-        .map((e) => StudyMaterial.fromJson(Map<String, dynamic>.from(e)))
+    return envelopeRows(resp.data, source: 'topicMaterialsProvider')
+        .map(StudyMaterial.fromJson)
         .toList();
   }
   return [];
@@ -62,7 +62,8 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               backgroundColor: Colors.green),
         );
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TopicDetailScreen upload failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

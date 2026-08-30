@@ -28,6 +28,14 @@ class Student(SchoolModel):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
+    # Set when the student was auto-enrolled from an admission application —
+    # the admission.accepted listener uses it as its idempotency key so a
+    # re-accept can never create a duplicate User/Student pair.
+    admission_application_id = Column(
+        UUID(as_uuid=True), ForeignKey("admission_applications.id"),
+        nullable=True, index=True,
+    )
+
     # Name (denormalized for quick access)
     first_name = Column(String(150), nullable=False)
     first_name_nepali = Column(String(150))

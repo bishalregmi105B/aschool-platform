@@ -99,6 +99,39 @@ class FeeReceipt(SchoolModel):
     student = relationship("Student", backref="fee_receipts")
 
 
+class PaymentInitiation(SchoolModel):
+    """One hosted-checkout attempt per gateway redirect (audit E60).
+
+    Persisted BEFORE the user is redirected to the gateway so every
+    callback can be matched to a server-side record of what was
+    initiated (amount + gateway reference). Callbacks are anchored to
+    this row for amount cross-checking and idempotency — money is never
+    applied without a server-side record of the initiated charge.
+
+    gateway_ref holds the gateway's transaction reference:
+      esewa  -> transaction_uuid (the fee collection id)
+      khalti -> pidx returned by the initiate API
+      fonepay-> PRN generated at initiation
+
+    status: initiated -> completed | failed
+    """
+
+    __tablename__ = "payment_initiations"
+
+    collection_id = Column(
+        UUID(as_uuid=True), ForeignKey("fee_collections.id"), nullable=False, index=True
+    )
+    gateway = Column(String(20), nullable=False)  # esewa | khalti | fonepay
+    gateway_ref = Column(String(200), nullable=False, index=True)
+    amount = Column(Numeric(12, 2), nullable=False)
+    status = Column(String(20), default="initiated")  # initiated|completed|failed
+    initiated_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    completed_at = Column(DateTime)
+
+    collection = relationship("FeeCollection", backref="payment_initiations")
+    initiated_by = relationship("User")
+
+
 class StudentScholarship(SchoolModel):
     """Per-student fee discount/scholarship — auto-applied during fee generation.
 

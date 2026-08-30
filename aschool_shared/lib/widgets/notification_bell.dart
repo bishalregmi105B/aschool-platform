@@ -17,14 +17,15 @@ import '../providers/notification_provider.dart';
 /// ```
 class NotificationBell extends ConsumerWidget {
   final VoidCallback? onTap;
+  final String? tooltip;
 
-  const NotificationBell({super.key, this.onTap});
+  const NotificationBell({super.key, this.onTap, this.tooltip});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
-    return Material(
+    final bell = Material(
       color: Colors.white.withAlpha(42),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
@@ -72,5 +73,8 @@ class NotificationBell extends ConsumerWidget {
         ),
       ),
     );
+
+    if (tooltip == null) return bell;
+    return Tooltip(message: tooltip!, child: bell);
   }
 }

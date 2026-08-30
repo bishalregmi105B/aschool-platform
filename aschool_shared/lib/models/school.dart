@@ -1,4 +1,6 @@
 /// School model — basic school info cached locally
+import '../utils/safe_parse.dart';
+
 class School {
   final String id;
   final String name;
@@ -26,16 +28,16 @@ class School {
 
   factory School.fromJson(Map<String, dynamic> json) {
     return School(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      slug: json['slug'] as String? ?? '',
-      address: json['address'] as String?,
-      phone: json['phone'] as String?,
-      email: json['email'] as String?,
-      logoUrl: json['logo_url'] as String?,
-      plan: json['plan'] as String?,
-      academicYear: json['academic_year'] as String?,
-      settings: json['settings'] as Map<String, dynamic>?,
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      slug: safeString(json['slug']),
+      address: safeStringOrNull(json['address']),
+      phone: safeStringOrNull(json['phone']),
+      email: safeStringOrNull(json['email']),
+      logoUrl: safeStringOrNull(json['logo_url']),
+      plan: safeStringOrNull(json['plan']),
+      academicYear: safeStringOrNull(json['academic_year']),
+      settings: safeMapOrNull(json['settings']),
     );
   }
 

@@ -12,6 +12,7 @@ class LeaveScreen extends ConsumerStatefulWidget {
 class _LeaveScreenState extends ConsumerState<LeaveScreen> {
   List<Map<String, dynamic>> _leaves = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get(
         '/hr/leave',
@@ -33,8 +37,10 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
               .map((row) => Map<String, dynamic>.from(row))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('LeaveScreen load failed: $e\n$st');
       _leaves = [];
+      _error = 'Could not load leave applications.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -94,6 +100,9 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
 
   Widget _leaveReportTab(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
     return RefreshIndicator(
       onRefresh: _load,
       child: _leaves.isEmpty

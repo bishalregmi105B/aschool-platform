@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,18 +24,37 @@ function EmergencyContent() {
   const [type, setType] = useState("earthquake");
   const [message, setMessage] = useState("");
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["emergency-plans"],
     queryFn: async () => { const r = await api.get("/emergency/plans"); return r.data?.data || []; },
   });
 
   const plans = data || [];
 
+  // Backend contract: POST /emergency/alerts {alert_type, title, description}
+  // (alert_type enum: earthquake|fire|flood|lockdown|medical|drill|other).
+  // The old payload {type, message} never mapped — every alert 500'd.
+  // Hooks must run unconditionally — before any early return below.
   const alert = useMutation({
-    mutationFn: async () => (await api.post("/emergency/alerts", { type, message })).data,
+    mutationFn: async () => (await api.post("/emergency/alerts", {
+      alert_type: type === "security" ? "lockdown" : type,
+      title: (message || `${type} alert`).slice(0, 120),
+      description: message,
+    })).data,
     onSuccess: () => { toast.success("Emergency alert sent to all parents!"); setMessage(""); },
     onError: () => toast.error("Failed to send alert"),
   });
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
+  if (isLoading) return <PageLoader />;
 
   const types = [
     { value: "earthquake", label: "Earthquake", icon: Siren, color: "bg-red-100 text-red-700" },
@@ -68,12 +88,13 @@ function EmergencyContent() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {plans.length > 0 ? plans.map((p: any, i: number) => (
-          <Card key={i}>
+          <Card key={p.id || i}>
             <CardContent className="pt-6">
               <h3 className="font-semibold mb-2">{p.name}</h3>
-              <Badge variant="outline" className="mb-2">{p.type}</Badge>
-              <p className="text-sm text-muted-foreground">{p.description}</p>
-              {p.assembly_point && <p className="text-sm mt-2"><strong>Assembly Point:</strong> {p.assembly_point}</p>}
+              <Badge variant="outline" className="mb-2 capitalize">{p.emergency_type}</Badge>
+              <p className="text-sm text-muted-foreground">{p.instructions}</p>
+              {Array.isArray(p.assembly_points) && p.assembly_points.length > 0 && <p className="text-sm mt-2"><strong>Assembly Point:</strong> {p.assembly_points.join(", ")}</p>}
+              {!Array.isArray(p.assembly_points) && p.assembly_points && <p className="text-sm mt-2"><strong>Assembly Point:</strong> {p.assembly_points}</p>}
             </CardContent>
           </Card>
         )) : (

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import 'repository_providers.dart';
@@ -25,7 +26,10 @@ class ExamsNotifier extends AutoDisposeAsyncNotifier<ExamsData> {
     List<OnlineExam> online = [];
     try {
       online = await repo.getOnlineExams();
-    } catch (_) {}
+    } catch (e) {
+      // Offline exams still render; surface the online-exam failure in logs.
+      debugPrint('ExamsProvider getOnlineExams failed: $e');
+    }
 
     return ExamsData(
       offlineExams: offline,

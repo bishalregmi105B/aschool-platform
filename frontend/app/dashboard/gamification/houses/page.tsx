@@ -25,9 +25,10 @@ function HousesContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", color: "red", motto: "" });
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["gamification-houses"],
     queryFn: async () => (await api.get("/gamification/houses")).data?.data || [],
+    retry: 1,
   });
 
   const houses: any[] = data || [];
@@ -43,6 +44,14 @@ function HousesContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load houses. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

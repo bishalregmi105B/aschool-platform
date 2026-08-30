@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -30,7 +31,7 @@ export default function MoodsPage() {
 }
 
 function MoodsContent() {
-  const { data: entries, isLoading } = useQuery<any>({
+  const { isError, refetch, data: entries, isLoading } = useQuery<any>({
     queryKey: ["wellbeing-moods-admin"],
     queryFn: async () => (await api.get("/wellbeing/mood")).data?.data || [],
   });
@@ -41,6 +42,15 @@ function MoodsContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
 
   const moodEntries: any[] = Array.isArray(entries) ? entries : [];
   const dist: Record<string, number> = summary?.mood_distribution || {};
@@ -86,7 +96,7 @@ function MoodsContent() {
                 <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No mood entries yet</TableCell></TableRow>
               ) : moodEntries.map((e: any) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-medium">{e.student?.name || e.student_id}</TableCell>
+                  <TableCell className="font-medium">{e.student_name || e.student_id}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${moodColor[e.mood] || "bg-muted"}`}>
                       {moodIcon[e.mood]} {e.mood}

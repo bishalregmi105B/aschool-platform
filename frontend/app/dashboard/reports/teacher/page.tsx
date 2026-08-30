@@ -12,7 +12,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default function TeacherReportsPage() {
-  const { data: staff, isLoading } = useQuery({
+  const { data: staff, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["teachers-report"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>("/design-studio/data-sources/teacher/records?limit=100");
@@ -21,6 +22,16 @@ export default function TeacherReportsPage() {
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load staff list. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
   const rows = staff || [];
   const attendanceValues = rows
     .map((teacher) => metricValue(teacher, ["attendance_pct", "attendance_percentage", "attendance"]))

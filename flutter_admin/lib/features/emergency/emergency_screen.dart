@@ -14,6 +14,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   late TabController _tabCtrl;
   List<Map<String, dynamic>> _alerts = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -29,7 +30,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/emergency/alerts?per_page=30');
       if (!mounted) return;
@@ -38,7 +42,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           res.data['data'] ?? [],
         );
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('EmergencyScreen load failed: $e\n$st');
+      _error = 'Could not load emergency alerts.';
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -96,7 +103,11 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         body: TabBarView(
           controller: _tabCtrl,
           children: [
-            _AlertsTab(alerts: _alerts, loading: _loading, onRefresh: _load),
+            _AlertsTab(
+                alerts: _alerts,
+                loading: _loading,
+                error: _error,
+                onRefresh: _load),
             const _EvacuationTab(),
           ],
         ),
@@ -108,17 +119,22 @@ class _EmergencyScreenState extends State<EmergencyScreen>
 class _AlertsTab extends StatelessWidget {
   final List<Map<String, dynamic>> alerts;
   final bool loading;
+  final String? error;
   final VoidCallback onRefresh;
 
   const _AlertsTab({
     required this.alerts,
     required this.loading,
+    this.error,
     required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     if (loading) return const LoadingShimmer();
+    if (error != null) {
+      return ErrorContainer(errorMessage: error!, onRetry: onRefresh);
+    }
     if (alerts.isEmpty) {
       return const NoDataContainer(
         title: 'No Alerts',
@@ -246,7 +262,8 @@ class _AlertCard extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EmergencyScreen _formatDate parse failed: $e');
       return iso;
     }
   }
@@ -277,7 +294,8 @@ class _EvacuationTabState extends State<_EvacuationTab> {
         _plans = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('EvacuationTab load failed: $e\n$st');
       if (mounted) setState(() => _loading = false);
     }
   }

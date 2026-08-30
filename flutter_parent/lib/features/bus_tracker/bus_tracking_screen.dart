@@ -23,6 +23,7 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
   bool _loading = true;
   Timer? _refreshTimer;
   String? _activeStudentId;
+  String? _error;
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
   Future<void> _load(String? studentId) async {
     setState(() {
       _loading = true;
+      _error = null;
       _activeStudentId = studentId;
     });
     try {
@@ -51,7 +53,7 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
         '/parent/bus-info',
         queryParameters: parentStudentQuery(studentId),
       );
-      final data = resp.data['data'] as Map<String, dynamic>?;
+      final data = safeMapOrNull(envelopeData(resp.data));
       if (!mounted) return;
       setState(() {
         _busData = data;
@@ -61,7 +63,8 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
         _loading = false;
       });
       await _loadLocation();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('BusTrackingScreen load failed: $e\n$st');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -73,8 +76,8 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
           .get('/parent/bus-location/${_busData!['bus_id']}');
       final loc = resp.data['data'];
       if (loc != null) {
-        final lat = (loc['lat'] as num?)?.toDouble();
-        final lng = (loc['lng'] as num?)?.toDouble();
+        final lat = safeDoubleOrNull(loc['lat']);
+        final lng = safeDoubleOrNull(loc['lng']);
         if (!mounted) return;
         setState(() {
           _busLocation = lat != null && lng != null ? LatLng(lat, lng) : null;
@@ -85,13 +88,16 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
           _busData!['boarded'] = loc['boarded'];
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      // Location polling refreshes every 15s — log and let the next tick retry.
+      debugPrint('BusTrackingScreen loadLocation failed: $e\n$st');
+    }
   }
 
   LatLng? _parseLatLng(Map<String, dynamic>? obj) {
     if (obj == null) return null;
-    final lat = (obj['lat'] as num?)?.toDouble();
-    final lng = (obj['lng'] as num?)?.toDouble();
+    final lat = safeDoubleOrNull(obj['lat']);
+    final lng = safeDoubleOrNull(obj['lng']);
     if (lat == null || lng == null) return null;
     return LatLng(lat, lng);
   }
@@ -106,6 +112,13 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
     }
 
     if (_loading) return const LoadingShimmer();
+
+    if (_error != null && _busData == null) {
+      return ErrorContainer(
+        errorMessage: _error!,
+        onRetry: () => _load(_activeStudentId),
+      );
+    }
 
     if (_busData == null) {
       return const PluginGate(

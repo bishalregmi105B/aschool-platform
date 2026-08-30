@@ -7,6 +7,7 @@ import {
   validateImport,
   runImport,
   getHistory,
+  getTemplateUrl,
   type IemisFormat,
   type ImportPreview,
   type ImportLog,
@@ -220,6 +221,24 @@ function IemisImportContent() {
                   </Select>
                 </div>
 
+                {/* Template download */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={getTemplateUrl("student_namewise")}
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Student Template (.xlsx)
+                  </a>
+                  <a
+                    href={getTemplateUrl("school_level")}
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    School Level Template
+                  </a>
+                </div>
+
                 {/* File input */}
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50/40 transition-colors">
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
@@ -231,10 +250,28 @@ function IemisImportContent() {
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1 mb-3">Supports .xlsx and .xls — max 20 MB</p>
-                  <Button variant="outline" size="sm" onClick={() => setShowFilePicker(true)}>
-                    <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                    Choose from File Manager
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 text-sm border rounded-lg px-3 py-1.5 cursor-pointer hover:bg-muted">
+                      <Upload className="h-3.5 w-3.5" />
+                      Choose Local File
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          setSelectedFile(f);
+                          setPreview(null);
+                          setStep("upload");
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <Button variant="outline" size="sm" onClick={() => setShowFilePicker(true)}>
+                      <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                      Choose from File Manager
+                    </Button>
+                  </div>
                 </div>
 
                 {selectedFile && (

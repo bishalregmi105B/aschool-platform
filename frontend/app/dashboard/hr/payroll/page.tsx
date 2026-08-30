@@ -17,16 +17,66 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   ArrowLeft,
   CheckCircle,
   DollarSign,
-  Download,
   FileText,
-  Send,
+  Pencil,
+  Plus,
+  Trash2,
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
+
+interface PayrollRow {
+  id: string;
+  staff_name: string;
+  month?: string;
+  basic_salary: number | null;
+  allowances: number;
+  allowances_total?: number;
+  deductions: number;
+  deductions_total?: number;
+  allowance_items?: Record<string, number>;
+  deduction_items?: Record<string, number>;
+  gross_salary: number;
+  net_salary: number;
+  status: string;
+}
+
+interface ComponentRow {
+  name: string;
+  amount: string;
+}
+
+function componentsToRows(items: Record<string, number> | undefined): ComponentRow[] {
+  return Object.entries(items || {}).map(([name, amount]) => ({
+    name,
+    amount: String(amount ?? ""),
+  }));
+}
+
+function rowsToComponents(rows: ComponentRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  rows.forEach((r) => {
+    const name = r.name.trim();
+    const amount = Number.parseFloat(r.amount);
+    if (name && Number.isFinite(amount) && amount !== 0) {
+      out[name] = amount;
+    }
+  });
+  return out;
+}
 
 export default function PayrollPage() {
   return (
@@ -41,27 +91,62 @@ function PayrollContent() {
   const [month, setMonth] = useState(() =>
     new Date().toISOString().slice(0, 7),
   );
+  const [editing, setEditing] = useState<PayrollRow | null>(null);
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["payroll", month],
     queryFn: async () => {
       const r = await api.get("/hr/payroll", { params: { month } });
       return r.data;
     },
+    retry: 1,
   });
 
-  const payroll = data?.data || [];
+  const payroll: PayrollRow[] = data?.data || [];
   const summary = data?.summary || {};
 
   const generate = useMutation({
     mutationFn: async () =>
       (await api.post("/hr/payroll/generate", { month })).data,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["payroll"] });
-      toast.success("Payroll generated!");
+      const created = res?.data?.created ?? 0;
+      toast.success(
+        created > 0
+          ? `Payroll generated for ${created} staff member${created === 1 ? "" : "s"}. Edit each row to set salary components.`
+          : "All staff already have payroll records for this month.",
+      );
     },
-    onError: () => toast.error("Failed to generate payroll"),
+    onError: (error: any) =>
+      toast.error(
+        error?.response?.data?.error || "Failed to generate payroll",
+      ),
   });
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/hr">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">Payroll Management</h1>
+        </div>
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">
+              Failed to load payroll records. Please try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) return <PageLoader />;
 
@@ -152,12 +237,6 @@ function PayrollContent() {
           )}{" "}
           Generate Payroll
         </Button>
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" /> Export
-        </Button>
-        <Button variant="outline">
-          <Send className="h-4 w-4 mr-2" /> Send Payslips
-        </Button>
       </div>
 
       <Card>
@@ -217,6 +296,18 @@ function PayrollContent() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {/* E123: component editor — set basic salary,
+                            allowances and deductions before approving */}
+                        {p.status !== "paid" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Edit salary components"
+                            onClick={() => setEditing(p)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                         {/* Payslip PDF Download */}
                         <Button
                           variant="ghost"
@@ -298,6 +389,171 @@ function PayrollContent() {
           </Table>
         </CardContent>
       </Card>
+
+      {editing ? (
+        <EditComponentsDialog
+          payroll={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function EditComponentsDialog({
+  payroll,
+  onClose,
+}: {
+  payroll: PayrollRow;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [basicSalary, setBasicSalary] = useState(
+    () => String(payroll.basic_salary ?? ""),
+  );
+  const [allowanceRows, setAllowanceRows] = useState<ComponentRow[]>(() =>
+    componentsToRows(payroll.allowance_items),
+  );
+  const [deductionRows, setDeductionRows] = useState<ComponentRow[]>(() =>
+    componentsToRows(payroll.deduction_items),
+  );
+
+  const num = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const sumRows = (rows: ComponentRow[]) =>
+    rows.reduce((sum, r) => sum + num(r.amount), 0);
+
+  const basic = num(basicSalary);
+  const allowancesTotal = sumRows(allowanceRows);
+  const deductionsTotal = sumRows(deductionRows);
+  const gross = basic + allowancesTotal;
+  const net = gross - deductionsTotal;
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, unknown> = {
+        basic_salary: basic,
+        allowances: rowsToComponents(allowanceRows),
+        deductions: rowsToComponents(deductionRows),
+      };
+      return (await api.put(`/hr/payroll/${payroll.id}`, payload)).data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      toast.success(`Salary components saved for ${payroll.staff_name}`);
+      onClose();
+    },
+    onError: (error: any) =>
+      toast.error(
+        error?.response?.data?.error || "Failed to save salary components",
+      ),
+  });
+
+  const renderRows = (
+    rows: ComponentRow[],
+    setRows: (rows: ComponentRow[]) => void,
+  ) => (
+    <div className="space-y-2">
+      {rows.map((row, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <Input
+            placeholder="Name (e.g. Transport)"
+            value={row.name}
+            onChange={(e) => {
+              const next = [...rows];
+              next[index] = { ...row, name: e.target.value };
+              setRows(next);
+            }}
+            className="flex-1"
+          />
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={row.amount}
+            onChange={(e) => {
+              const next = [...rows];
+              next[index] = { ...row, amount: e.target.value };
+              setRows(next);
+            }}
+            className="w-28"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRows(rows.filter((_, i) => i !== index))}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setRows([...rows, { name: "", amount: "" }])}
+      >
+        <Plus className="h-4 w-4 mr-1" /> Add row
+      </Button>
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            Salary Components — {payroll.staff_name}
+            {payroll.month ? ` (${payroll.month})` : ""}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Basic Salary (NPR)</Label>
+            <Input
+              type="number"
+              value={basicSalary}
+              onChange={(e) => setBasicSalary(e.target.value)}
+              min="0"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Allowances</Label>
+            {renderRows(allowanceRows, setAllowanceRows)}
+          </div>
+          <div className="space-y-2">
+            <Label>Deductions</Label>
+            {renderRows(deductionRows, setDeductionRows)}
+          </div>
+          <div className="rounded-lg bg-muted/40 px-4 py-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Gross Salary</span>
+              <span className="font-medium">Rs. {gross.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Deductions</span>
+              <span className="font-medium text-red-600">
+                Rs. {deductionsTotal.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium">Net Pay</span>
+              <span className="font-bold text-green-700">
+                Rs. {net.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? <Spinner size="sm" className="mr-2" /> : null}
+            Save Components
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

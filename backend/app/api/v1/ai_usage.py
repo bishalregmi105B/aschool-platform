@@ -7,7 +7,7 @@ Endpoints:
   PUT  /ai-usage/quota          — update quota settings
   POST /ai-usage/quota/init     — provision a default quota for the school
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
@@ -125,7 +125,8 @@ def get_stats():
         .all()
     )
 
-    # Daily tokens for last 7 days
+    # Daily tokens for last 7 days — filter to the window BEFORE ordering,
+    # otherwise ascending order + limit(7) returns the OLDEST 7 days ever logged.
     last_7_days = (
         db.session.query(
             func.date_trunc("day", AIUsageLog.created_at).label("day"),
@@ -134,10 +135,10 @@ def get_stats():
         .filter(
             AIUsageLog.school_id == g.school_id,
             AIUsageLog.status == "success",
+            AIUsageLog.created_at >= now - timedelta(days=7),
         )
         .group_by("day")
         .order_by("day")
-        .limit(7)
         .all()
     )
 

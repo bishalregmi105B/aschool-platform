@@ -1,4 +1,5 @@
 /// LMS Models — maps to backend lms.py (Lesson, Topic, StudyMaterial)
+import '../utils/safe_parse.dart';
 
 class Lesson {
   final String id;
@@ -23,18 +24,19 @@ class Lesson {
 
   factory Lesson.fromJson(Map<String, dynamic> json) {
     return Lesson(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
-      classId: json['class_id']?.toString(),
-      sectionId: json['section_id']?.toString(),
-      subjectId: json['subject_id']?.toString(),
-      topics: ((json['topics'] ?? json['topic'] ?? []) as List)
-          .map((t) => Topic.fromJson(Map<String, dynamic>.from(t)))
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      description: safeStringOrNull(json['description']),
+      classId: safeStringOrNull(json['class_id']),
+      sectionId: safeStringOrNull(json['section_id']),
+      subjectId: safeStringOrNull(json['subject_id']),
+      topics: safeMapList(json['topics'] ?? json['topic'])
+          .map(Topic.fromJson)
           .toList(),
-      studyMaterials: ((json['study_materials'] ?? json['file'] ?? []) as List)
-          .map((m) => StudyMaterial.fromJson(Map<String, dynamic>.from(m)))
-          .toList(),
+      studyMaterials:
+          safeMapList(json['study_materials'] ?? json['file'])
+              .map(StudyMaterial.fromJson)
+              .toList(),
     );
   }
 }
@@ -56,13 +58,14 @@ class Topic {
 
   factory Topic.fromJson(Map<String, dynamic> json) {
     return Topic(
-      id: json['id'] as String,
-      lessonId: json['lesson_id']?.toString() ?? '',
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
-      studyMaterials: ((json['study_materials'] ?? json['file'] ?? []) as List)
-          .map((m) => StudyMaterial.fromJson(Map<String, dynamic>.from(m)))
-          .toList(),
+      id: safeString(json['id']),
+      lessonId: safeString(json['lesson_id']),
+      name: safeString(json['name']),
+      description: safeStringOrNull(json['description']),
+      studyMaterials:
+          safeMapList(json['study_materials'] ?? json['file'])
+              .map(StudyMaterial.fromJson)
+              .toList(),
     );
   }
 }
@@ -89,12 +92,13 @@ class StudyMaterial {
 
   factory StudyMaterial.fromJson(Map<String, dynamic> json) {
     return StudyMaterial(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? json['file_name'] as String? ?? '',
-      type: json['type'] as String?,
-      fileUrl: json['file_url'] as String? ?? json['url'] as String? ?? '',
-      thumbnailUrl: json['thumbnail_url'] as String?,
-      description: json['description'] as String?,
+      id: safeString(json['id']),
+      name: safeString(json['name'], fallback: safeString(json['file_name'])),
+      type: safeStringOrNull(json['type']),
+      fileUrl:
+          safeString(json['file_url'], fallback: safeString(json['url'])),
+      thumbnailUrl: safeStringOrNull(json['thumbnail_url']),
+      description: safeStringOrNull(json['description']),
     );
   }
 }

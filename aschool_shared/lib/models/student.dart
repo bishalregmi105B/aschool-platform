@@ -1,4 +1,5 @@
 /// Student model — maps to backend Student (students table) to_dict() output
+import '../utils/safe_parse.dart';
 import 'guardian.dart';
 
 class Student {
@@ -75,40 +76,39 @@ class Student {
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
-      id: json['id'] as String,
-      userId: json['user_id'] as String?,
-      studentId: json['student_id'] as String?,
-      enrollmentNumber: json['enrollment_number'] as String?,
-      firstName: json['first_name'] as String? ?? '',
-      lastName: json['last_name'] as String? ?? '',
-      gender: json['gender'] as String?,
-      dobBs: json['dob_bs'] as String?,
-      dobAd: json['dob_ad'] as String?,
-      bloodGroup: json['blood_group'] as String?,
-      classId: json['class_id'] as String?,
-      className: json['class_name'] as String?,
-      sectionId: json['section_id'] as String?,
-      sectionName: json['section_name'] as String?,
-      academicYearId: json['academic_year_id'] as String?,
-      academicYear: json['academic_year'] as String?,
-      rollNumber: json['roll_number'] as int?,
-      admissionNumber: json['admission_number'] as String?,
-      admissionDateBs: json['admission_date_bs'] as String?,
-      nationality: json['nationality'] as String?,
-      religion: json['religion'] as String?,
-      ethnicity: json['ethnicity'] as String?,
-      address: json['address'] as Map<String, dynamic>?,
-      status: json['status'] as String?,
-      photoUrl: json['photo_url'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      riskScore: (json['risk_score'] as num?)?.toDouble(),
-      riskLevel: json['risk_level'] as String?,
-      totalPoints: json['total_points'] as int? ?? 0,
-      currentStreak: json['current_streak'] as int? ?? 0,
-      guardians: ((json['guardians'] ?? []) as List)
-          .map((g) => Guardian.fromJson(Map<String, dynamic>.from(g)))
-          .toList(),
+      id: safeString(json['id']),
+      userId: safeStringOrNull(json['user_id']),
+      studentId: safeStringOrNull(json['student_id']),
+      enrollmentNumber: safeStringOrNull(json['enrollment_number']),
+      firstName: safeString(json['first_name']),
+      lastName: safeString(json['last_name']),
+      gender: safeStringOrNull(json['gender']),
+      dobBs: safeStringOrNull(json['dob_bs']),
+      dobAd: safeStringOrNull(json['dob_ad']),
+      bloodGroup: safeStringOrNull(json['blood_group']),
+      classId: safeStringOrNull(json['class_id']),
+      className: safeStringOrNull(json['class_name']),
+      sectionId: safeStringOrNull(json['section_id']),
+      sectionName: safeStringOrNull(json['section_name']),
+      academicYearId: safeStringOrNull(json['academic_year_id']),
+      academicYear: safeStringOrNull(json['academic_year']),
+      rollNumber: safeIntOrNull(json['roll_number']),
+      admissionNumber: safeStringOrNull(json['admission_number']),
+      admissionDateBs: safeStringOrNull(json['admission_date_bs']),
+      nationality: safeStringOrNull(json['nationality']),
+      religion: safeStringOrNull(json['religion']),
+      ethnicity: safeStringOrNull(json['ethnicity']),
+      address: safeMapOrNull(json['address']),
+      status: safeStringOrNull(json['status']),
+      photoUrl: safeStringOrNull(json['photo_url']),
+      email: safeStringOrNull(json['email']),
+      phone: safeStringOrNull(json['phone']),
+      riskScore: safeDoubleOrNull(json['risk_score']),
+      riskLevel: safeStringOrNull(json['risk_level']),
+      totalPoints: safeInt(json['total_points']),
+      currentStreak: safeInt(json['current_streak']),
+      guardians:
+          safeMapList(json['guardians']).map(Guardian.fromJson).toList(),
     );
   }
 

@@ -13,6 +13,7 @@ class GuardianDetailsScreen extends ConsumerStatefulWidget {
 class _GuardianDetailsScreenState extends ConsumerState<GuardianDetailsScreen> {
   List<Map<String, dynamic>> _guardians = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,7 +22,10 @@ class _GuardianDetailsScreenState extends ConsumerState<GuardianDetailsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final meRes = await ApiClient.instance.get('/auth/me');
       final me =
@@ -36,7 +40,7 @@ class _GuardianDetailsScreenState extends ConsumerState<GuardianDetailsScreen> {
             ? studentRes.data['data']
             : null;
         if (students is List && students.isNotEmpty) {
-          final sid = (students.first as Map)['id'];
+          final sid = safeMap(students.first)['id'];
           final gRes = await ApiClient.instance.get('/students/$sid/guardians');
           final gData =
               (gRes.data is Map<String, dynamic>) ? gRes.data['data'] : null;
@@ -48,8 +52,10 @@ class _GuardianDetailsScreenState extends ConsumerState<GuardianDetailsScreen> {
               : [];
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('GuardianDetailsScreen load failed: $e\n$st');
       _guardians = [];
+      _error = 'Could not load guardian details.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -60,7 +66,9 @@ class _GuardianDetailsScreenState extends ConsumerState<GuardianDetailsScreen> {
       appBar: const CustomAppBar(title: 'Guardian Details'),
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _guardians.isEmpty
                   ? ListView(

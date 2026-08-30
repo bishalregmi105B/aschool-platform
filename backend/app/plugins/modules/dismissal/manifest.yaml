@@ -21,13 +21,8 @@ frontend:
     label: "Dismissal"
     label_nepali: "विदाई"
     icon: "CalendarOff"
-    subitems:
-      - { label: "Queue", route: "/dashboard/dismissal" }
-      - {
-          label: "Authorized Pickups",
-          route: "/dashboard/dismissal/authorized",
-        }
-      - { label: "History", route: "/dashboard/dismissal/history" }
+    # Single page (queue + verify-QR + records list). No subitems: /authorized
+    # and /history have no pages and rendered as dead sidebar links.
     visible_to: ["school_admin"]
 
 flutter:

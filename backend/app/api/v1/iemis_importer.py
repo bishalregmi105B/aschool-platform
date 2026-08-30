@@ -27,6 +27,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.plugins.decorators import plugin_required
+from app.plugins.entitlements import StudentCapExceededError
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -174,6 +175,64 @@ def _parse_excel(file_bytes: bytes, format_code: str) -> tuple[list[dict], list[
     return parsed_rows, warnings
 
 
+def _parse_csv(file_bytes: bytes, format_code: str) -> tuple[list[dict], list[str]]:
+    """Parse a CSV export using the same FORMAT_MAP headers as the Excel path.
+
+    Added for the Generic CSV Upload page (bulk-uploads/csv): the frontend
+    previously faked the upload because only .xlsx was accepted here.
+    """
+    import csv as _csv
+
+    fmt = FORMAT_MAP.get(format_code)
+    if not fmt:
+        raise ValueError(f"Unknown format: {format_code}")
+
+    col_map = fmt["columns"]
+    warnings: list[str] = []
+
+    try:
+        text = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = file_bytes.decode("latin-1")
+
+    reader = _csv.reader(io.StringIO(text))
+    headers = None
+    for row in reader:
+        if any(str(c).strip() for c in row):
+            headers = [str(c).strip() if c else "" for c in row]
+            break
+
+    if not headers:
+        raise ValueError("CSV file appears empty — no header row found")
+
+    field_map: dict[int, str] = {}
+    for idx, h in enumerate(headers):
+        if h in col_map:
+            field_map[idx] = col_map[h]
+        else:
+            warnings.append(f"Unknown column '{h}' — ignored")
+
+    parsed_rows: list[dict[str, Any]] = []
+    for row in reader:
+        if not row or all(not str(c).strip() for c in row):
+            continue
+        record: dict[str, Any] = {}
+        for idx, val in enumerate(row):
+            fname = field_map.get(idx)
+            if fname and str(val).strip():
+                record[fname] = val.strip()
+        parsed_rows.append(record)
+
+    return parsed_rows, warnings
+
+
+def _parse_tabular(file_bytes: bytes, ext: str, format_code: str) -> tuple[list[dict], list[str]]:
+    """Dispatch parsing by file extension — csv or excel."""
+    if ext == "csv":
+        return _parse_csv(file_bytes, format_code)
+    return _parse_excel(file_bytes, format_code)
+
+
 def _gender_normalize(val: Any) -> str:
     if not val:
         return "other"
@@ -189,6 +248,42 @@ def _safe_str(val: Any, max_len: int = 300) -> str | None:
     if val is None:
         return None
     return str(val).strip()[:max_len] or None
+
+
+# users.phone is NOT NULL (String(20), models/user.py:44) and there is no
+# unique constraint on it, but parent linking looks users up by
+# (school_id, phone) — so placeholders must be deterministic per source row
+# and collision-free within the school.
+PLACEHOLDER_PHONE_PREFIX = "9800000"  # reserved 9800000000–9800999999 block
+
+
+def _placeholder_phone(school_id, unique_key: str) -> str:
+    """Deterministic Nepal-format placeholder phone for an imported user whose
+    source row carries no phone number (users.phone is NOT NULL).
+
+    Format: 9800000xxxx (11 chars). The 4-digit suffix is derived from a keyed
+    hash of (school_id, unique_key) so re-imports of the same row yield the
+    same number, then bumped deterministically until free within the school to
+    avoid stealing a real parent's lookup phone. Callers must mark the user
+    (permissions["placeholder_phone"]=True, phone_verified stays False) so the
+    number is never mistaken for a real contact.
+    """
+    import hashlib
+
+    from app.models.user import User
+
+    digest = hashlib.blake2b(
+        f"{school_id}:{unique_key}".encode("utf-8"), digest_size=8
+    ).digest()
+    base = int.from_bytes(digest, "big") % 10000
+    for offset in range(10000):
+        candidate = f"{PLACEHOLDER_PHONE_PREFIX}{(base + offset) % 10000:04d}"
+        taken = User.query.filter_by(school_id=school_id, phone=candidate).first()
+        if not taken:
+            return candidate
+    # 10k suffixes exhausted for this school (implausible) — fall back to a
+    # collision-safe row-unique number; uniqueness beats realism here.
+    return f"{PLACEHOLDER_PHONE_PREFIX}{int.from_bytes(digest, 'big') % 100000000:08d}"[:20]
 
 
 def _parse_dob(val: Any) -> tuple[str | None, date | None]:
@@ -267,6 +362,41 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
     imported = skipped = errors_count = 0
     error_list = []
     previews = []
+
+    # ── Server-side plan cap (E2): reject the import when the new students it
+    #    would create would push the school past School.max_students
+    #    (NULL/0 = unlimited). Preview/dry-run imports are not capped.
+    if not dry_run:
+        from app.plugins.entitlements import (
+            StudentCapExceededError,
+            student_cap_error,
+        )
+
+        iemis_ids = [
+            iid for iid in (_safe_str(r.get("iemis_student_id"), 100) for r in rows) if iid
+        ]
+        existing_iemis_ids: set = set()
+        if iemis_ids:
+            existing_iemis_ids = {
+                s.student_id
+                for s in Student.query.filter(
+                    Student.school_id == school_id,
+                    Student.student_id.in_(iemis_ids),
+                    Student.is_deleted.is_(False),
+                ).all()
+            }
+        prospective_new = sum(
+            1
+            for row in rows
+            if _safe_str(row.get("full_name"))  # nameless rows never create students
+            and (
+                not _safe_str(row.get("iemis_student_id"), 100)
+                or _safe_str(row.get("iemis_student_id"), 100) not in existing_iemis_ids
+            )
+        )
+        cap_error = student_cap_error(school_id, incoming_count=prospective_new)
+        if cap_error:
+            raise StudentCapExceededError(cap_error)
 
     for i, row in enumerate(rows, start=2):  # row 2 = first data row
         full_name = _safe_str(row.get("full_name"))
@@ -412,14 +542,21 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
                             f"stud.{school_id}.{i}@{school_slug}.import.local"
                         )
 
-                    # Create User account for student
-                    # phone=None avoids unique-constraint conflicts across students
+                    # Create User account for student.
+                    # users.phone is NOT NULL — generate a deterministic
+                    # placeholder (9800000xxxx) when the IEMIS row has no
+                    # contact number, and mark the user so it is never
+                    # mistaken for a real one.
+                    student_phone = _placeholder_phone(
+                        school_id, f"stud:{iemis_id or i}:{full_name}"
+                    )
                     user = User(
                         school_id=school_id,
                         role="student",
                         full_name=f"{first_name} {last_name}".strip(),
-                        phone=None,
+                        phone=student_phone,
                         email=student_email,
+                        permissions={"placeholder_phone": True},
                     )
                     user.set_password(
                         generate_default_password(user, student, school_obj)
@@ -673,7 +810,10 @@ def _import_staff(rows: list[dict], school_id, dry_run: bool = False) -> dict:
                 if gender:
                     existing.gender = gender
 
-                meta = dict(existing.settings or {})
+                # User has no `settings` column — `permissions` (JSONB) is the
+                # de-facto per-user settings bag (auth.py stores totp_secret /
+                # mfa_enabled there), so IEMIS metadata lives under it too.
+                meta = dict(existing.permissions or {})
                 meta.update(
                     {
                         "iemis_teacher_id": iemis_id,
@@ -681,23 +821,32 @@ def _import_staff(rows: list[dict], school_id, dry_run: bool = False) -> dict:
                         "iemis_teaching_subject": subject,
                     }
                 )
-                existing.settings = meta
+                existing.permissions = meta
                 skipped += 1
             else:
+                # users.phone is NOT NULL — same deterministic placeholder rule
+                # as the student import when the row has no contact number.
+                staff_phone = phone or _placeholder_phone(
+                    school_id, f"staff:{iemis_id or i}:{full_name}"
+                )
+                user_permissions = {} if phone else {"placeholder_phone": True}
+                user_permissions.update(
+                    {
+                        "iemis_teacher_id": iemis_id,
+                        "iemis_designation": designation,
+                        "iemis_teaching_subject": subject,
+                    }
+                )
                 user = User(
                     school_id=school_id,
                     role="teacher"
                     if "teacher" in str(designation).lower() or subject
                     else "staff",
                     full_name=full_name,
-                    phone=phone,
+                    phone=staff_phone,
                     email=email,
                     gender=gender,
-                    settings={
-                        "iemis_teacher_id": iemis_id,
-                        "iemis_designation": designation,
-                        "iemis_teaching_subject": subject,
-                    },
+                    permissions=user_permissions,
                 )
                 from app.models.school import School
 
@@ -713,25 +862,30 @@ def _import_staff(rows: list[dict], school_id, dry_run: bool = False) -> dict:
 
                     from app.models.staff import Staff as StaffModel
 
-                    staff_cols = {
-                        c.key for c in sa_inspect(StaffModel).mapper.column_attrs
-                    }
-                    staff_kwargs: dict = {
-                        "school_id": school_id,
-                        "user_id": user.id,
-                    }
-                    if "designation" in staff_cols and designation:
-                        staff_kwargs["designation"] = designation
-                    if "department" in staff_cols and subject:
-                        staff_kwargs["department"] = subject
-                    if "gender" in staff_cols and gender:
-                        staff_kwargs["gender"] = gender
-                    if "phone" in staff_cols and phone:
-                        staff_kwargs["phone"] = phone
-                    if "email" in staff_cols and email:
-                        staff_kwargs["email"] = email
-                    staff_record = StaffModel(**staff_kwargs)
-                    db.session.add(staff_record)
+                    # `Staff` is an alias of User right now — creating one would
+                    # insert a bare second User row (no full_name/role) and fail
+                    # the batch commit. Only proceed for a genuinely separate
+                    # model with its own required columns.
+                    if StaffModel is not User:
+                        staff_cols = {
+                            c.key for c in sa_inspect(StaffModel).mapper.column_attrs
+                        }
+                        staff_kwargs: dict = {
+                            "school_id": school_id,
+                            "user_id": user.id,
+                        }
+                        if "designation" in staff_cols and designation:
+                            staff_kwargs["designation"] = designation
+                        if "department" in staff_cols and subject:
+                            staff_kwargs["department"] = subject
+                        if "gender" in staff_cols and gender:
+                            staff_kwargs["gender"] = gender
+                        if "phone" in staff_cols and phone:
+                            staff_kwargs["phone"] = phone
+                        if "email" in staff_cols and email:
+                            staff_kwargs["email"] = email
+                        staff_record = StaffModel(**staff_kwargs)
+                        db.session.add(staff_record)
                 except (ImportError, Exception):
                     pass  # Staff model may have different schema; User record is sufficient
 
@@ -811,6 +965,77 @@ def list_formats():
     )
 
 
+@iemis_importer_bp.route("/template", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("iemis_importer")
+def download_template():
+    """Download a ready-to-fill IEMIS import template (.xlsx).
+
+    Generates a workbook whose header row exactly matches the IEMIS columns
+    for the requested format, pre-filled with one honest sample row so the
+    validate → import round-trip can be exercised end-to-end.
+    """
+    from flask import Response, send_file
+
+    format_code = (request.args.get("format") or "student_namewise").strip()
+    fmt = FORMAT_MAP.get(format_code)
+    if not fmt:
+        return error_response(
+            f"Unknown format '{format_code}'. Supported: {', '.join(FORMAT_MAP)}", 400
+        )
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return error_response("openpyxl is required: pip install openpyxl", 500)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = fmt["sheet"][:31]  # Excel sheet-name limit
+
+    columns = list(fmt["columns"].keys())
+    ws.append(columns)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    # One honest sample row (values map to the first few ASchool fields).
+    sample_values = {
+        "gender": "Male",
+        "grade": "10",
+        "dob": "2065-04-15",
+        "phone": "98XXXXXXXX",
+        "email": "example@example.com",
+        "school_level": "Secondary",
+        "full_name": "Sample Student",
+        "head_teacher_name": "Sample Principal",
+    }
+    ws.append([
+        sample_values.get(fmt["columns"][col], f"Sample {fmt['columns'][col]}")
+        for col in columns
+    ])
+
+    # Column widths sized to the header text
+    for idx, col in enumerate(columns, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = min(
+            max(len(col) + 2, 12), 40
+        )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"iemis_template_{format_code}.xlsx"
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
 @iemis_importer_bp.route("/validate", methods=["POST"])
 @jwt_required()
 @school_required
@@ -828,8 +1053,8 @@ def validate_import():
         return error_response("Empty filename", 400)
 
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-    if ext not in ("xlsx", "xls"):
-        return error_response("Only .xlsx and .xls files are supported", 415)
+    if ext not in ("xlsx", "xls", "csv"):
+        return error_response("Only .xlsx, .xls and .csv files are supported", 415)
 
     file_bytes = f.read()
     if len(file_bytes) > 20 * 1024 * 1024:
@@ -843,7 +1068,7 @@ def validate_import():
         )
 
     try:
-        rows, warnings = _parse_excel(file_bytes, format_code)
+        rows, warnings = _parse_tabular(file_bytes, ext, format_code)
     except (ValueError, RuntimeError) as exc:
         return error_response(str(exc), 422)
 
@@ -884,8 +1109,8 @@ def run_import():
         if f.filename and "." in f.filename
         else ""
     )
-    if ext not in ("xlsx", "xls"):
-        return error_response("Only .xlsx and .xls files are supported", 415)
+    if ext not in ("xlsx", "xls", "csv"):
+        return error_response("Only .xlsx, .xls and .csv files are supported", 415)
 
     file_bytes = f.read()
     if len(file_bytes) > 20 * 1024 * 1024:
@@ -910,7 +1135,7 @@ def run_import():
     db.session.commit()
 
     try:
-        rows, warnings = _parse_excel(file_bytes, format_code)
+        rows, warnings = _parse_tabular(file_bytes, ext, format_code)
         log.total_rows = len(rows)
 
         if format_code == "student_namewise":
@@ -944,6 +1169,14 @@ def run_import():
         )
 
         return created_response(log.to_dict())
+
+    except StudentCapExceededError as exc:
+        db.session.rollback()
+        log.status = "failed"
+        log.errors = [{"error": str(exc)}]
+        log.completed_at = datetime.now(UTC)
+        db.session.commit()
+        return error_response(str(exc), 403)
 
     except (ValueError, RuntimeError) as exc:
         log.status = "failed"

@@ -1,4 +1,6 @@
 /// Academic year model — maps to backend AcademicYear (academic_years table)
+import '../utils/safe_parse.dart';
+
 class AcademicYear {
   final String id;
   final String name;
@@ -22,14 +24,14 @@ class AcademicYear {
 
   factory AcademicYear.fromJson(Map<String, dynamic> json) {
     return AcademicYear(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      nameNepali: json['name_nepali'] as String?,
-      startDateBs: json['start_date_bs'] as String?,
-      endDateBs: json['end_date_bs'] as String?,
-      startDateAd: json['start_date_ad'] as String?,
-      endDateAd: json['end_date_ad'] as String?,
-      isCurrent: json['is_current'] as bool? ?? false,
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      nameNepali: safeStringOrNull(json['name_nepali']),
+      startDateBs: safeStringOrNull(json['start_date_bs']),
+      endDateBs: safeStringOrNull(json['end_date_bs']),
+      startDateAd: safeStringOrNull(json['start_date_ad']),
+      endDateAd: safeStringOrNull(json['end_date_ad']),
+      isCurrent: safeBool(json['is_current']),
     );
   }
 

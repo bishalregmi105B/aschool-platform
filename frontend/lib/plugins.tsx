@@ -59,7 +59,12 @@ const PLUGIN_SLUG_ALIASES: Record<string, string> = {
   visitors: "visitor_management",
   library: "library_management",
   digital_content: "elibrary",
-  design_studio: "digital_content",
+  // portfolio was a duplicate of student_portfolio (same blueprint/routes);
+  // renamed to the canonical slug, alias kept for legacy installs.
+  portfolio: "student_portfolio",
+  // NOTE: no "design_studio" entry — it is its own published plugin
+  // (growth, NPR 499), unrelated to the e-library pair. Mirrors backend
+  // PLUGIN_SLUG_ALIASES in app/plugins/decorators.py.
 };
 
 function getAcceptablePluginSlugs(slug: string): Set<string> {
@@ -68,23 +73,14 @@ function getAcceptablePluginSlugs(slug: string): Set<string> {
   if (!requested) return accepted;
 
   accepted.add(requested);
-  const frontier: string[] = [requested];
 
-  while (frontier.length) {
-    const current = frontier.pop() as string;
-    const mapped = PLUGIN_SLUG_ALIASES[current];
-    if (mapped && !accepted.has(mapped)) {
-      accepted.add(mapped);
-      frontier.push(mapped);
-    }
-
-    Object.entries(PLUGIN_SLUG_ALIASES).forEach(([from, to]) => {
-      if (to === current && !accepted.has(from)) {
-        accepted.add(from);
-        frontier.push(from);
-      }
-    });
-  }
+  // Single-hop alias expansion (mirrors backend _acceptable_plugin_slugs):
+  // the requested slug plus its direct alias / legacy aliases. No chaining.
+  const mapped = PLUGIN_SLUG_ALIASES[requested];
+  if (mapped) accepted.add(mapped);
+  Object.entries(PLUGIN_SLUG_ALIASES).forEach(([from, to]) => {
+    if (to === requested) accepted.add(from);
+  });
 
   return accepted;
 }
@@ -178,7 +174,17 @@ export function useInstalledPlugins() {
   return context;
 }
 
-// Friendly display names for plugin slugs
+/** Boolean convenience hook: is the given plugin installed?
+ *  (Single source of truth — the duplicate lib/plugin-gate.tsx was removed.) */
+export function usePluginEnabled(pluginSlug: string): boolean {
+  const { isPluginInstalled } = useInstalledPlugins();
+  return isPluginInstalled(pluginSlug);
+}
+
+// Friendly display names for plugin slugs.
+// Labels below match the published marketplace catalog names
+// (Plugin.name in the backend seed, 55 published plugins) so gate
+// prompts never fall back to raw underscored slugs.
 const PLUGIN_LABELS: Record<string, string> = {
   design_studio: "Docs & Designer",
   attendance: "Attendance",
@@ -186,6 +192,7 @@ const PLUGIN_LABELS: Record<string, string> = {
   exams: "Exams",
   lms: "Learning Management",
   library: "Library",
+  library_management: "Library Management",
   hostel: "Hostel",
   transport: "Transport",
   gps_tracking: "Transport",
@@ -194,12 +201,37 @@ const PLUGIN_LABELS: Record<string, string> = {
   whatsapp_bot: "WhatsApp Bot",
   ai_tools: "AI Tools",
   digital_content: "Digital Content",
+  elibrary: "E-Library & Digital Content",
   website_builder: "Website Builder",
   gamification: "Gamification",
   alumni: "Alumni",
   visitor_management: "Visitor Management",
   file_management: "Files",
   iemis_importer: "IEMIS Importer",
+  // Gating slugs that previously fell back to the raw slug:
+  admission: "Admission CRM",
+  assignments: "Assignments & Homework",
+  basic_reports: "Basic Reports",
+  benchmarking: "School Benchmarking",
+  biometric: "Biometric Integration",
+  compliance: "Government Compliance",
+  conferences: "PT Conference Scheduler",
+  disaster_management: "Disaster Management",
+  dismissal: "Student Dismissal/Pickup",
+  emergency: "Emergency Alerts",
+  health_records: "Health Records",
+  incident_management: "Full Incident Management",
+  incidents: "Incident Reporting",
+  inventory: "Inventory & Assets",
+  multi_branch: "Multi-Branch Chain",
+  notices: "Notices & Circulars",
+  social_ads: "Social Ad Boosting",
+  social_hub: "Social Media Hub",
+  student_portfolio: "Student Portfolio",
+  timetable: "Timetable Management",
+  wellbeing: "Student Wellbeing",
+  white_label: "White-Label Branding",
+  ai_adaptive_learning: "AI Adaptive Learning",
 };
 
 /**
@@ -272,7 +304,8 @@ export function PluginGate({
         </p>
         <p className="text-muted-foreground text-sm max-w-xs">
           Enable the <strong>{displayName}</strong> plugin to access this
-          feature. You can install it for free or start a trial.
+          feature. Install it from the marketplace — free plugins activate
+          instantly, paid ones start a trial.
         </p>
       </div>
 
@@ -294,7 +327,7 @@ export function PluginGate({
               Installing…
             </>
           ) : (
-            "Install Now — Free"
+            "Install"
           )}
         </button>
         <a

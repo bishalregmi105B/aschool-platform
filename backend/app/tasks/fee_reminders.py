@@ -44,7 +44,13 @@ def send_fee_reminders(school_id: str):
         student = Student.query.get(fee.student_id)
         if not student:
             continue
-        pending_amount = max(float(fee.amount or 0) - _fee_paid_amount(fee), 0)
+        # E180: pending must be computed on the net payable
+        # (base + late fine − discount), not the raw base — reminders for
+        # discounted students used to demand money they do not owe.
+        payable = _fee_payable_total(fee)
+        pending_amount = max(payable - _fee_paid_amount(fee, payable), 0)
+        if pending_amount <= 0:
+            continue
         period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part) or "your billing period"
         guardian = Guardian.query.filter_by(student_id=student.id, is_primary=True).first()
         if guardian and guardian.phone:
@@ -91,9 +97,24 @@ def send_fee_reminders(school_id: str):
             logger.warning("Fee reminder push failed for student %s: %s", student.id, _e)
 
 
-def _fee_paid_amount(collection) -> float:
+def _fee_payable_total(collection) -> float:
+    """E180: net payable = base + late fine − discount, floored at 0 — the
+    same rule the /fees API uses for dues, summaries and reminders."""
+    base = float(collection.amount or 0)
+    fine = float(collection.late_fine_amount or 0)
+    discount = float(collection.discount_amount or 0)
+    return round(max(base + fine - discount, 0.0), 2)
+
+
+def _fee_paid_amount(collection, payable_total=None) -> float:
+    """Amount already paid against this collection.
+
+    `payable_total` may be passed by callers who have already computed the
+    net payable; a fully-paid collection returns that (not the raw base)."""
     if collection.payment_status == "paid":
-        return float(collection.amount or 0)
+        if payable_total is not None:
+            return float(payable_total)
+        return _fee_payable_total(collection)
 
     notes = collection.notes or ""
     marker = "[partial_paid:"
@@ -123,31 +144,63 @@ def generate_monthly_fee_report(school_id: str, month: int, year: int):
         FeeCollection.is_deleted.is_(False),
     ).all()
 
-    total_expected = sum(float(c.amount or 0) for c in collections)
-    total_collected = sum(
-        float(c.amount or 0) for c in collections if c.payment_status == "paid"
-    )
-    total_pending = sum(
-        float(c.amount or 0) for c in collections if c.payment_status == "pending"
-    )
-    total_partial = sum(
-        float(c.amount or 0) for c in collections if c.payment_status == "partial"
-    )
-    total_waived = sum(
-        float(c.amount or 0) for c in collections if c.payment_status == "waived"
-    )
+    total_expected = 0.0
+    total_collected = 0.0
+    total_pending = 0.0
+    total_partial = 0.0
+    total_waived = 0.0
+    total_records = len(collections)
+    paid_count = 0
+    pending_count = 0
+    for c in collections:
+        # E180: report the same money the /fees API reports — expected is the
+        # net payable (base + fine − discount), collected is what was actually
+        # paid, pending is the remaining due. Counting the raw base by status
+        # overstated expected/collected for discounted students and counted
+        # fully-paid amounts as pending for partial ones.
+        payable = _fee_payable_total(c)
+        paid = min(_fee_paid_amount(c, payable), payable)
+        due = max(payable - paid, 0.0)
+        total_expected += payable
+        total_collected += paid
+        total_pending += due
+        if c.payment_status == "partial":
+            total_partial += payable
+        elif c.payment_status == "waived":
+            total_waived += payable
+        elif c.payment_status == "paid":
+            paid_count += 1
+        elif c.payment_status == "pending":
+            pending_count += 1
+    total_expected = round(total_expected, 2)
+    total_collected = round(total_collected, 2)
+    total_pending = round(total_pending, 2)
+    total_partial = round(total_partial, 2)
+    total_waived = round(total_waived, 2)
     total_scholarships = sum(
         float(c.discount_amount or 0) for c in collections if c.is_scholarship
     )
     total_late_fines = sum(float(c.late_fine_amount or 0) for c in collections)
 
-    # Payment method breakdown
-    method_breakdown = {}
-    for c in collections:
-        if c.payment_status == "paid" and c.payment_method:
-            method_breakdown[c.payment_method] = (
-                method_breakdown.get(c.payment_method, 0) + float(c.amount or 0)
-            )
+    # Payment method breakdown — from receipts (actual recorded payments),
+    # not base amounts of paid-status collections.
+    from app.models.fee import FeeReceipt
+
+    receipt_rows = (
+        db.session.query(FeeReceipt.payment_method, func.coalesce(func.sum(FeeReceipt.amount), 0))
+        .filter(
+            FeeReceipt.school_id == school_id,
+            FeeReceipt.is_deleted.is_(False),
+            FeeReceipt.created_at >= datetime.strptime(f"{month_bs}-01", "%Y-%m-%d").replace(tzinfo=timezone.utc),
+        )
+        .all()
+        if collections
+        else []
+    )
+    method_breakdown = {
+        (method or "unknown"): float(total)
+        for method, total in receipt_rows
+    }
 
     collection_rate = round(total_collected / total_expected * 100, 1) if total_expected else 0
 
@@ -164,9 +217,9 @@ def generate_monthly_fee_report(school_id: str, month: int, year: int):
             "total_scholarships": total_scholarships,
             "total_late_fines": total_late_fines,
             "collection_rate_pct": collection_rate,
-            "total_records": len(collections),
-            "paid_count": sum(1 for c in collections if c.payment_status == "paid"),
-            "pending_count": sum(1 for c in collections if c.payment_status == "pending"),
+            "total_records": total_records,
+            "paid_count": paid_count,
+            "pending_count": pending_count,
         },
         "payment_methods": method_breakdown,
     }
@@ -245,11 +298,15 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
         if not monthly_items:
             continue
 
-        # Students enrolled in this class/structure
+        # Students enrolled in this class/structure. E184: Student has no
+        # is_active column — the old filter_by(is_active=True) raised
+        # InvalidRequestError on EVERY run, so beat-scheduled auto monthly
+        # billing silently generated nothing. Match the API's billing scope
+        # (status == "active") used by /fees/batch-monthly.
         student_query = Student.query.filter_by(
             school_id=school_id,
             is_deleted=False,
-            is_active=True,
+            status="active",
         )
         if structure.class_id:
             student_query = student_query.filter_by(class_id=structure.class_id)
@@ -258,6 +315,7 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
         for student in students:
             for item in monthly_items:
                 item_name = item.get("name", "Tuition Fee")
+                item_amount = float(item.get("amount", 0))
                 marker = (
                     f"[auto_monthly:{structure.id}:{month_bs}:{item_name}]"
                 )
@@ -273,12 +331,21 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
                     skipped_total += 1
                     continue
 
+                # Align with the API generator (/fees structures apply): active
+                # scholarships/discounts for the student are applied additively
+                # on the base amount and capped at the base so the net stays >= 0.
+                discount_amount, is_scholarship = _student_discount_for_item(
+                    school_id, student.id, item_name, item_amount
+                )
+
                 collection = FeeCollection(
                     school_id=school_id,
                     student_id=student.id,
                     academic_year=structure.academic_year or year_bs,
                     fee_item_name=item_name,
-                    amount=float(item.get("amount", 0)),
+                    amount=item_amount,
+                    discount_amount=discount_amount,
+                    is_scholarship=is_scholarship,
                     month_bs=month_bs,
                     year_bs=year_bs,
                     payment_status="pending",
@@ -298,4 +365,57 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
         "created": created_total,
         "skipped": skipped_total,
     }
+
+
+def _student_discount_for_item(school_id, student_id, item_name, base_amount):
+    """Active scholarships for a student, additive on the base amount.
+
+    Mirrors the rule in app/api/v1/fees.py::_apply_fee_structure: percent
+    discounts are computed on the base (not sequentially), fixed discounts
+    add flat NPR, the combined discount is capped at the base, and only
+    currently-valid discounts (BS date window) for this fee item count.
+    Returns (discount_amount, is_scholarship).
+    """
+    from app.models.fee import StudentScholarship
+    from sqlalchemy import or_
+
+    try:
+        import nepali_datetime
+
+        today_bs = nepali_datetime.date.today()
+        today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
+        scholarships = (
+            StudentScholarship.query.filter(
+                StudentScholarship.school_id == school_id,
+                StudentScholarship.student_id == student_id,
+                StudentScholarship.is_active.is_(True),
+                StudentScholarship.is_deleted.is_(False),
+                or_(
+                    StudentScholarship.fee_type.is_(None),
+                    StudentScholarship.fee_type == item_name,
+                ),
+                or_(
+                    StudentScholarship.valid_from_bs.is_(None),
+                    StudentScholarship.valid_from_bs <= today_bs_str,
+                ),
+                or_(
+                    StudentScholarship.valid_until_bs.is_(None),
+                    StudentScholarship.valid_until_bs >= today_bs_str,
+                ),
+            )
+            .order_by(StudentScholarship.created_at.asc())
+            .all()
+        )
+        if not scholarships:
+            return 0.0, False
+        combined = 0.0
+        for sc in scholarships:
+            if sc.discount_type == "percent":
+                combined += float(base_amount) * float(sc.discount_value or 0) / 100
+            else:
+                combined += float(sc.discount_value or 0)
+        return round(min(max(combined, 0.0), float(base_amount)), 2), True
+    except Exception:
+        # A scholarship lookup failure must never abort auto billing.
+        return 0.0, False
 

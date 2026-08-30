@@ -11,6 +11,7 @@ class GuardiansScreen extends StatefulWidget {
 class _GuardiansScreenState extends State<GuardiansScreen> {
   List<Map<String, dynamic>> _guardians = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,7 +20,10 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final response = await ApiClient.instance.get(
         '/users',
@@ -34,8 +38,10 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
               .map((item) => Map<String, dynamic>.from(item))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('GuardiansScreen load failed: $e\n$st');
       _guardians = [];
+      _error = 'Could not load guardians.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -43,6 +49,9 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -65,7 +74,7 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
   }
 
   Widget _guardianTile(Map<String, dynamic> guardian) {
-    final children = (guardian['children'] as List?) ?? [];
+    final children = safeList(guardian['children']);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -90,7 +99,7 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
   }
 
   void _showGuardianDetails(Map<String, dynamic> guardian) {
-    final children = (guardian['children'] as List?) ?? [];
+    final children = safeList(guardian['children']);
     showModalBottomSheet(
       context: context,
       showDragHandle: true,

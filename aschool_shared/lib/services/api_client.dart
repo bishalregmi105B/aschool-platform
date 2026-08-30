@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
 
@@ -97,7 +98,8 @@ class _AuthInterceptor extends Interceptor {
         await _storage.write(key: AppConstants.accessTokenKey, value: newAccess);
         await _storage.write(key: AppConstants.refreshTokenKey, value: newRefresh);
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ApiClient token refresh failed — clearing stored session: $e\n$st');
       await _storage.deleteAll();
     }
 

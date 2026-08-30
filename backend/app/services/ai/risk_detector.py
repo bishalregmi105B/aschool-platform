@@ -38,17 +38,17 @@ Respond in JSON format:
     def bulk_scan(school_id: str) -> list:
         """Scan all students in a school for risk indicators."""
         from app.models.student import Student
-        from app.models.attendance import AttendanceRecord
+        from app.models.attendance import Attendance
         from sqlalchemy import func
 
         students = Student.query.filter_by(school_id=school_id, is_deleted=False).all()
         at_risk = []
 
         for student in students:
-            total = AttendanceRecord.query.filter_by(
+            total = Attendance.query.filter_by(
                 school_id=school_id, student_id=student.id
             ).count()
-            present = AttendanceRecord.query.filter_by(
+            present = Attendance.query.filter_by(
                 school_id=school_id, student_id=student.id, status="present"
             ).count()
 

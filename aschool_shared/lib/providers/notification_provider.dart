@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/in_app_notification.dart';
 import '../repositories/notification_repository.dart';
@@ -78,7 +79,10 @@ class NotificationCenterNotifier extends StateNotifier<NotificationCenterState> 
     try {
       final count = await _repo.getUnreadCount();
       state = state.copyWith(unreadCount: count);
-    } catch (_) {}
+    } catch (e, st) {
+      // Badge refresh only — the notification list surfaces real errors.
+      debugPrint('NotificationProvider.fetchUnreadCount failed: $e\n$st');
+    }
   }
 
   /// Mark a notification as read.

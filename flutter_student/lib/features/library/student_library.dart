@@ -17,6 +17,7 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
   List<dynamic> _issued = [];
   bool _loading = true;
   String _search = '';
+  String? _error;
 
   @override
   void initState() {
@@ -26,15 +27,21 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/library');
       setState(() {
-        final payload = res.data?['data'] as Map?;
-        _catalog = (payload?['catalog'] as List?) ?? [];
-        _issued = (payload?['issued'] as List?) ?? [];
+        final payload = safeMapOrNull(res.data?['data']);
+        _catalog = safeList(payload?['catalog']);
+        _issued = safeList(payload?['issued']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentLibrary load failed: $e\n$st');
+      _error = 'Could not load the library.';
+    }
     setState(() => _loading = false);
   }
 
@@ -50,7 +57,11 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
       pluginSlug: 'library_management',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Library'),
-        body: Column(
+        body: _loading
+            ? const LoadingShimmer()
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
           children: [
             // Search bar
             Padding(
@@ -135,7 +146,7 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final book = filtered[index];
-          final available = (book['available_copies'] as int?) ?? 0;
+          final available = safeIntOrNull(book['available_copies']) ?? 0;
 
           return Card(
             margin: const EdgeInsets.only(bottom: 10),

@@ -43,7 +43,7 @@ interface Assignment {
   total_marks: number;
   status: string;
   attachment_urls?: string[];
-  submission_count?: number;
+  submitted_count?: number;
 }
 
 interface Submission {
@@ -98,12 +98,13 @@ function AssignmentsContent() {
 
   // ── Data queries ──────────────────────────────────────────────────────
 
-  const { data: assignments, isLoading } = useQuery({
+  const { data: assignments, isLoading, isError, refetch } = useQuery({
     queryKey: ["assignments"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/assignments?per_page=200");
       return (res.data.data as Assignment[]) || [];
     },
+    retry: 1,
   });
 
   const { data: classes } = useQuery({
@@ -250,6 +251,22 @@ function AssignmentsContent() {
 
   if (isLoading) return <PageLoader />;
 
+  if (isError)
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Assignments</h1>
+          <p className="text-muted-foreground">Create, distribute, and grade student assignments</p>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-destructive mb-4">Failed to load assignments.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+
   const allAssignments = assignments || [];
   const stats = {
     total: allAssignments.length,
@@ -368,7 +385,7 @@ function AssignmentsContent() {
                         onClick={() => setSubmissionsFor(a)}
                       >
                         <Users className="h-3 w-3 mr-1" />
-                        {a.submission_count ?? "View"}
+                        {a.submitted_count ?? "View"}
                       </Button>
                     </TableCell>
                     <TableCell className="text-right">

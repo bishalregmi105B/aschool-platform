@@ -199,7 +199,10 @@ function AttendanceContent() {
   const leave = studentList.filter(
     (s: any) => records[s.id] === "leave",
   ).length;
-  const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+  // Matches the backend uniform late rule (/attendance/summary): a late
+  // student DID attend, so the rate counts present + late.
+  const percentage =
+    total > 0 ? Math.round(((present + late) / total) * 100) : 0;
 
   // ── Save mutation ─────────────────────────────────────────────────────────
   const saveMutation = useMutation({

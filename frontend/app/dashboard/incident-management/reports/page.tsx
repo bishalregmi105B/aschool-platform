@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { FileText, TrendingDown, AlertOctagon } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
@@ -19,12 +20,21 @@ export default function IncidentReportsPage() {
 function ReportsContent() {
   const [period, setPeriod] = useState("this_month");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["incident-reports", period],
     queryFn: async () => { const r = await api.get("/incidents/management/reports", { params: { period } }); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load incident reports. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const stats = data?.summary ?? {};
   const byType: any[] = data?.by_type ?? [];

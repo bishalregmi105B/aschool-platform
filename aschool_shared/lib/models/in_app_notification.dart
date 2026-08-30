@@ -1,4 +1,8 @@
 /// In-app notification model — maps to backend InAppNotification.
+import 'package:flutter/foundation.dart';
+
+import '../utils/safe_parse.dart';
+
 class InAppNotification {
   final String id;
   final String title;
@@ -26,18 +30,16 @@ class InAppNotification {
 
   factory InAppNotification.fromJson(Map<String, dynamic> json) =>
       InAppNotification(
-        id: json['id'] as String,
-        title: json['title'] as String? ?? '',
-        body: json['body'] as String? ?? '',
-        category: json['category'] as String? ?? 'general',
-        priority: json['priority'] as String? ?? 'normal',
-        data: json['data'] is Map
-            ? Map<String, dynamic>.from(json['data'] as Map)
-            : const {},
-        isRead: json['is_read'] as bool? ?? false,
-        readAt: json['read_at'] as String?,
-        actionUrl: json['action_url'] as String?,
-        createdAt: json['created_at'] as String?,
+        id: safeString(json['id']),
+        title: safeString(json['title']),
+        body: safeString(json['body']),
+        category: safeString(json['category'], fallback: 'general'),
+        priority: safeString(json['priority'], fallback: 'normal'),
+        data: safeMap(json['data']),
+        isRead: safeBool(json['is_read']),
+        readAt: safeStringOrNull(json['read_at']),
+        actionUrl: safeStringOrNull(json['action_url']),
+        createdAt: safeStringOrNull(json['created_at']),
       );
 
   InAppNotification copyWith({bool? isRead, String? readAt}) {
@@ -88,7 +90,8 @@ class InAppNotification {
       if (diff.inHours < 24) return '${diff.inHours}h ago';
       if (diff.inDays < 7) return '${diff.inDays}d ago';
       return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('InAppNotification.timeAgo parse failed: $e');
       return '';
     }
   }

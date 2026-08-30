@@ -17,6 +17,7 @@ class _StudentPortfoliosScreenState
   bool _loading = true;
   String _search = '';
   String _category = '';
+  String? _error;
 
   @override
   void initState() {
@@ -25,7 +26,10 @@ class _StudentPortfoliosScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res =
           await ApiClient.instance.get('/teacher/portfolios', queryParameters: {
@@ -34,9 +38,12 @@ class _StudentPortfoliosScreenState
       });
       final payload = res.data;
       setState(() {
-        _entries = (payload?['entries'] as List?) ?? [];
+        _entries = safeList(payload?['entries']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentPortfoliosScreen load failed: $e\n$st');
+      _error = 'Could not load student portfolios.';
+    }
     setState(() => _loading = false);
   }
 
@@ -89,7 +96,8 @@ class _StudentPortfoliosScreenState
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Feedback added successfully')));
         }
-      } catch (_) {
+      } catch (e, st) {
+        debugPrint('StudentPortfoliosScreen feedback(${entry['id']}) failed: $e\n$st');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Failed to add feedback')));
@@ -160,7 +168,9 @@ class _StudentPortfoliosScreenState
             Expanded(
               child: _loading
                   ? const LoadingShimmer()
-                  : _entries.isEmpty
+                  : _error != null
+                      ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                      : _entries.isEmpty
                       ? const NoDataContainer(
                           title: 'No portfolio entries',
                           subtitle:

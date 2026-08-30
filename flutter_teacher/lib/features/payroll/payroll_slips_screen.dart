@@ -10,8 +10,10 @@ class PayrollSlipsScreen extends ConsumerStatefulWidget {
 }
 
 class _PayrollSlipsScreenState extends ConsumerState<PayrollSlipsScreen> {
-  List<Map<String, dynamic>> _slips = [];
+  final HrRepository _repo = HrRepository();
+  List<PayrollSlip> _slips = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,20 +21,25 @@ class _PayrollSlipsScreenState extends ConsumerState<PayrollSlipsScreen> {
     _load();
   }
 
+  /// Backend: GET /hr/payroll (`api/v1/hr_payroll.py`, prefix `/hr`).
+  /// The endpoint is role-restricted to superadmin/school_admin/accountant,
+  /// so teachers receive a 403 which is surfaced here.
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final r = await ApiClient.instance
-          .get('/hr/payroll/slips', queryParameters: {'per_page': 50});
-      final data = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
-      _slips = (data is List)
-          ? data
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList()
-          : [];
-    } catch (_) {
+      _slips = await _repo.getPayslips();
+    } on ApiException catch (e) {
       _slips = [];
+      _error = e.statusCode == 403
+          ? 'Payroll slips are only visible to admin and accountant roles.'
+          : e.message;
+    } catch (e, st) {
+      debugPrint('PayrollSlipsScreen load failed: $e\n$st');
+      _slips = [];
+      _error = 'Could not load payroll slips.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -46,12 +53,15 @@ class _PayrollSlipsScreenState extends ConsumerState<PayrollSlipsScreen> {
               onRefresh: _load,
               child: _slips.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
+                      children: [
+                        const SizedBox(height: 120),
                         NoDataContainer(
-                          title: 'No payroll slips found',
-                          subtitle: 'Monthly salary slips will appear here.',
-                          icon: Icons.receipt_long_outlined,
+                          title: _error ?? 'No payroll slips found',
+                          subtitle: _error ??
+                              'Monthly salary slips will appear here.',
+                          icon: _error != null
+                              ? Icons.lock_outline
+                              : Icons.receipt_long_outlined,
                         ),
                       ],
                     )
@@ -68,9 +78,11 @@ class _PayrollSlipsScreenState extends ConsumerState<PayrollSlipsScreen> {
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.receipt_long_outlined),
                               title: Text(
-                                  slip['month']?.toString() ?? 'Payroll Slip'),
+                                  slip.month ?? slip.staffName ?? 'Payroll Slip'),
                               subtitle: Text(
-                                  'Net Pay: ${slip['net_pay'] ?? '-'} • Status: ${slip['status'] ?? 'processed'}'),
+                                  'Staff: ${slip.staffName ?? '-'} • '
+                                  'Net Pay: ${slip.netSalary.toStringAsFixed(2)} • '
+                                  'Status: ${slip.status ?? 'processed'}'),
                               trailing: IconButton(
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(

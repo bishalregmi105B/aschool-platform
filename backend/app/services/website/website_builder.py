@@ -22,15 +22,17 @@ class WebsiteBuilderService:
         if not config:
             base = cls._default_config(school_id)
             base["school_name"] = school.name if school else ""
+            base.update(cls._white_label_overrides(school_id))
             return base
 
         customizations = config.customizations or {}
 
-        return {
+        default_theme = cls._default_theme_slug()
+        config_dict = {
             "school_id": school_id,
             "school_name": school.name if school else "",
-            "theme": config.theme_slug or "modern-minimal",
-            "theme_slug": config.theme_slug or "modern-minimal",
+            "theme": config.theme_slug or default_theme,
+            "theme_slug": config.theme_slug or default_theme,
             "primary_color": customizations.get("primary_color", "#1a365d"),
             "secondary_color": customizations.get("secondary_color", "#2563eb"),
             "logo_url": customizations.get("logo_url", ""),
@@ -55,6 +57,20 @@ class WebsiteBuilderService:
             ],
         }
 
+        # White-label overrides (premium): display name / footer / branding-removal
+        # flag apply only while the white_label plugin is active.
+        config_dict.update(cls._white_label_overrides(school_id))
+        return config_dict
+
+    @staticmethod
+    def _white_label_overrides(school_id: str) -> dict:
+        try:
+            from app.services.website.white_label import WhiteLabelService
+
+            return WhiteLabelService.website_config_overrides(school_id)
+        except Exception:  # pragma: no cover — branding must never break config read
+            return {}
+
     @classmethod
     def update_config(cls, school_id: str, data: dict) -> dict:
         """Update website configuration."""
@@ -65,16 +81,39 @@ class WebsiteBuilderService:
             config = SchoolWebsite(school_id=school_id)
             db.session.add(config)
 
-        if "theme" in data or "theme_slug" in data:
+        theme_change = "theme" in data or "theme_slug" in data
+        if theme_change:
             config.theme_slug = data.get("theme_slug") or data.get("theme")
 
         customizations = dict(config.customizations or {})
+        # Keep the palette in sync when only the theme id changes (a stale
+        # template palette would otherwise keep overriding the new theme on
+        # the public site). Explicit "colors" payloads still win.
+        if theme_change and "colors" not in data and config.theme_slug:
+            from app.services.website.theme_engine import ThemeEngineService
+
+            synced = ThemeEngineService.synced_colors(
+                customizations.get("colors"), config.theme_slug, school_id=school_id
+            )
+            if synced:
+                customizations["colors"] = synced
         for field in [
             "primary_color", "secondary_color", "logo_url", "banner_url",
             "tagline", "contact_email", "contact_phone", "address", "social_links",
         ]:
             if field in data:
                 customizations[field] = data[field]
+        if "colors" in data:
+            # Theme applications send the full core palette. Replace the five
+            # core tokens but keep auxiliary keys (e.g. "surface") that other
+            # flows (templates, white-label) may have stored.
+            existing_colors = dict(customizations.get("colors") or {})
+            colors = {
+                k: v for k, v in existing_colors.items()
+                if k not in ("primary", "secondary", "accent", "bg", "text")
+            }
+            colors.update(data["colors"] or {})
+            customizations["colors"] = colors
         config.customizations = customizations
 
         db.session.commit()
@@ -127,11 +166,21 @@ class WebsiteBuilderService:
         db.session.commit()
         return True
 
+    @staticmethod
+    def _default_theme_slug() -> str:
+        """Default theme id shared with the frontend registry (no old ids left)."""
+        try:
+            from app.services.website.theme_engine import ThemeEngineService
+
+            return ThemeEngineService.DEFAULT_THEME_ID
+        except Exception:  # pragma: no cover — never block config reads
+            return "global-elearning"
+
     @classmethod
     def _default_config(cls, school_id: str) -> dict:
         return {
             "school_id": school_id,
-            "theme": "default",
+            "theme": cls._default_theme_slug(),
             "primary_color": "#1a365d",
             "secondary_color": "#2563eb",
             "pages": [

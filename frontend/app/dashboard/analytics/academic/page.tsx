@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
-import { ArrowLeft, Download, BookOpen, Trophy, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowLeft, BookOpen, Trophy, TrendingUp, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default function AcademicAnalyticsPage() {
@@ -19,7 +19,8 @@ export default function AcademicAnalyticsPage() {
     queryFn: async () => { const r = await api.get("/exams"); return r.data?.data || []; },
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["academic-analytics", examId],
     queryFn: async () => { const r = await api.get("/analytics/academic", { params: { exam_id: examId || undefined } }); return r.data?.data; },
   });
@@ -30,6 +31,16 @@ export default function AcademicAnalyticsPage() {
   const atRisk = analytics.at_risk_students || [];
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load academic analytics. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   return (
     <div className="space-y-6">
@@ -40,7 +51,7 @@ export default function AcademicAnalyticsPage() {
           <option value="">All Exams</option>
           {(exams || []).map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
-        <Button variant="outline"><Download className="h-4 w-4 mr-2" /> Export</Button>
+        
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

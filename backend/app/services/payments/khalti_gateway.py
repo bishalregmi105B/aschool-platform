@@ -75,7 +75,9 @@ class KhaltiGateway:
     def verify_payment(cls, pidx: str, secret_key: str) -> dict:
         """Verify/lookup a Khalti payment by pidx.
 
-        Raises ValueError if secret_key is missing.
+        Raises ValueError if secret_key is missing. A network/API failure is
+        reported as {"verified": False, "network_error": True} — the caller
+        must never treat "could not verify" as "not paid".
         """
         if not secret_key:
             raise ValueError("Khalti secret_key is required to verify payment")
@@ -86,13 +88,26 @@ class KhaltiGateway:
             "Content-Type": "application/json",
         }
 
-        resp = requests.post(url, headers=headers, json={"pidx": pidx}, timeout=30)
-        data = resp.json()
+        try:
+            resp = requests.post(url, headers=headers, json={"pidx": pidx}, timeout=30)
+            data = resp.json()
+        except (requests.RequestException, ValueError) as exc:
+            return {
+                "verified": False,
+                "network_error": True,
+                "error": str(exc),
+                "status": "lookup_failed",
+                "pidx": pidx,
+            }
 
         return {
             "verified": data.get("status") == "Completed",
             "status": data.get("status"),
             "pidx": pidx,
+            # Khalti echoes the purchase_order_id the payment was created
+            # with — the callback handler cross-checks it against the local
+            # collection so a pidx from another payment cannot be replayed.
+            "purchase_order_id": data.get("purchase_order_id"),
             "transaction_id": data.get("transaction_id"),
             "amount_paisa": data.get("total_amount"),
             "amount_npr": data.get("total_amount", 0) / 100,

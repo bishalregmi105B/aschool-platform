@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/lib/api";
 
 export function AdmissionForm({ slug }: { slug: string }) {
   const [sending, setSending] = useState(false);
@@ -26,22 +25,12 @@ export function AdmissionForm({ slug }: { slug: string }) {
     };
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/v1/website/public/${slug}/admission-inquiry`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to submit inquiry");
-      } else {
-        setSent(true);
-      }
-    } catch {
-      setError("Network error. Please try again.");
+      // Shared client: relative /api/v1 (same-origin rewrite) + cookie session.
+      await api.post(`/website/public/${slug}/admission-inquiry`, body);
+      setSent(true);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || "Network error. Please try again.");
     } finally {
       setSending(false);
     }

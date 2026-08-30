@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import 'repository_providers.dart';
@@ -36,8 +37,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     List<SliderBanner> banners = [];
     try {
       banners = await noticeRepo.getBanners();
-    } catch (_) {
-      // ignore
+    } catch (e, st) {
+      // Banners are decorative — the dashboard still renders without them.
+      debugPrint('DashboardNotifier getBanners failed: $e\n$st');
     }
 
     return DashboardData(

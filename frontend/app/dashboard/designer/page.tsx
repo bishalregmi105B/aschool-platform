@@ -33,19 +33,32 @@ export default function DesignerPage() {
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
-  const { data: templates = [], isLoading } = useQuery<any>({
+  const { data: templates = [], isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["design-templates"],
     queryFn: async () => {
       const res = await api.get("/design-studio/templates");
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
+    retry: 1,
   });
 
-  const filtered = templates.filter((t: any) => {
+  const filtered = (templates as any[]).filter((t: any) => {
     const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
     const matchCat    = activeTab === "all" || t.category === activeTab;
     return matchSearch && matchCat;
   });
+
+  if (isError) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-6xl">
+        <h1 className="text-2xl font-bold tracking-tight mb-1">Design Studio</h1>
+        <Card className="mt-6"><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load templates. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">

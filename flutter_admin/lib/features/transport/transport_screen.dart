@@ -15,6 +15,7 @@ class _TransportScreenState extends State<TransportScreen>
   List<Map<String, dynamic>> _buses = [];
   List<Map<String, dynamic>> _gpsLogs = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -33,7 +34,10 @@ class _TransportScreenState extends State<TransportScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance
@@ -46,10 +50,12 @@ class _TransportScreenState extends State<TransportScreen>
       _routes = _extractRows(results[0].data);
       _buses = _extractRows(results[1].data);
       _gpsLogs = _extractRows(results[2].data);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TransportScreen load failed: $e\n$st');
       _routes = [];
       _buses = [];
       _gpsLogs = [];
+      _error = 'Could not load transport data.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -98,11 +104,13 @@ class _TransportScreenState extends State<TransportScreen>
           Expanded(
             child: _loading
                 ? const LoadingShimmer()
-                : TabBarView(controller: _tabController, children: [
-                    _RoutesList(routes: _routes, onRefresh: _load),
-                    _VehiclesList(buses: _buses, onRefresh: _load),
-                    _LiveGPSView(logs: _gpsLogs, onRefresh: _load),
-                  ]),
+                : _error != null
+                    ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                    : TabBarView(controller: _tabController, children: [
+                        _RoutesList(routes: _routes, onRefresh: _load),
+                        _VehiclesList(buses: _buses, onRefresh: _load),
+                        _LiveGPSView(logs: _gpsLogs, onRefresh: _load),
+                      ]),
           ),
         ],
       ),

@@ -76,6 +76,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationCenterScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return TeacherShellScreen(navigationShell: navigationShell);

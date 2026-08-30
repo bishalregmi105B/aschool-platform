@@ -6,7 +6,7 @@ price_monthly: 1499
 price_yearly: 14999
 emoji: "🎨"
 icon: "PaintBucket"
-description: "20 premium themes, drag-drop Craft.js editor, custom CSS, AI content generation, SEO tools, contact forms"
+description: "10 open-source school themes, drag-drop Craft.js editor, custom CSS, AI content generation, SEO tools, contact forms"
 
 api_blueprint: "app.api.v1.website_builder"
 models_module: "app.models.website"

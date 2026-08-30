@@ -55,7 +55,14 @@ def cleanup_stale_applications(school_id: str, stale_days: int = 90):
     ).all()
 
     for app in stale:
-        app.status = "archived"
+        # E186: `status` is an Enum column (admission_status) with NO
+        # "archived" value — writing "archived" crashed with DataError on
+        # every run, so stale applications were never cleaned up. Park them
+        # in the closest real state and leave an auditable remark instead.
+        app.status = "rejected"
+        app.remarks = (
+            f"{(app.remarks or '').strip()} [auto-archived: stale >{stale_days} days]".strip()
+        )
 
     db.session.commit()
     current_app.logger.info(f"Archived {len(stale)} stale applications for school {school_id}")
@@ -71,7 +78,7 @@ def dispatch_admission_followups():
 
     active_schools = (
         db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="admissions", active=True)
+        .filter_by(plugin_slug="admission", active=True)
         .all()
     )
     for (school_id,) in active_schools:

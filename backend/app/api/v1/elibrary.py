@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 from app.models.digital_content import DigitalBook, OERResource, PastPaper
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.response import created_response, success_response
+from app.utils.response import created_response, error_response, success_response
 from extensions import db
 
 elibrary_bp = Blueprint("elibrary", __name__, url_prefix="/elibrary")
@@ -67,6 +67,33 @@ def list_papers():
     return success_response([_paper_dict(paper) for paper in papers])
 
 
+@elibrary_bp.route("/papers", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("elibrary")
+@role_required("superadmin", "school_admin", "teacher")
+def create_paper():
+    """Register a past paper — file bytes go through POST /files/upload first,
+    then the returned URL is stored here (the web upload page does both steps)."""
+    data = request.get_json(silent=True) or {}
+    if not (data.get("title") or "").strip():
+        return error_response("title is required", 400)
+    if not (data.get("file_url") or "").strip():
+        return error_response("file_url is required (upload the file via POST /files/upload first)", 400)
+    paper = PastPaper(
+        school_id=g.school_id,
+        title=data["title"],
+        file_url=data["file_url"],
+        exam_type=data.get("exam_type"),
+        year=data.get("year"),
+        answer_key_url=data.get("answer_key_url"),
+        uploaded_by_id=getattr(getattr(g, "current_user", None), "id", None),
+    )
+    db.session.add(paper)
+    db.session.commit()
+    return created_response(_paper_dict(paper))
+
+
 @elibrary_bp.route("/resources", methods=["GET"])
 @jwt_required()
 @school_required
@@ -78,6 +105,36 @@ def list_resources():
         .all()
     )
     return success_response([_resource_dict(resource) for resource in resources])
+
+
+@elibrary_bp.route("/resources", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("elibrary")
+@role_required("superadmin", "school_admin", "teacher")
+def create_resource():
+    """Register an OER resource — file bytes go through POST /files/upload first,
+    then the returned URL is stored here (the web upload page does both steps)."""
+    data = request.get_json(silent=True) or {}
+    if not (data.get("title") or "").strip():
+        return error_response("title is required", 400)
+    if not (data.get("url") or "").strip():
+        return error_response("url is required (upload the file via POST /files/upload first)", 400)
+    tags = data.get("tags")
+    if tags is not None and not isinstance(tags, list):
+        return error_response("tags must be a list of strings", 400)
+    resource = OERResource(
+        school_id=g.school_id,
+        title=data["title"],
+        description=data.get("description"),
+        resource_type=data.get("resource_type"),
+        url=data["url"],
+        tags=tags,
+        is_approved=True,
+    )
+    db.session.add(resource)
+    db.session.commit()
+    return created_response(_resource_dict(resource))
 
 
 def _book_dict(book: DigitalBook) -> dict:

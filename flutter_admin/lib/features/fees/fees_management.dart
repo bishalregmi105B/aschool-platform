@@ -17,6 +17,7 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
   List<Map<String, dynamic>> _recent = [];
   List<Map<String, dynamic>> _outstanding = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -32,7 +33,10 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/fees/summary'),
@@ -47,8 +51,12 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
             results[2].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      debugPrint('FeesManagement load failed: $e');
+      setState(() {
+        _error = 'Could not load fee collection data.';
+        _loading = false;
+      });
     }
   }
 
@@ -58,6 +66,13 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
       children: [
         if (_loading)
           const Expanded(child: LoadingShimmer())
+        else if (_error != null)
+          Expanded(
+            child: ErrorContainer(
+              errorMessage: _error!,
+              onRetry: _load,
+            ),
+          )
         else ...[
           _buildSummaryHeader(),
           TabBar(controller: _tabCtrl, tabs: const [
@@ -118,7 +133,7 @@ class _FeesManagementState extends ConsumerState<FeesManagement>
   }
 
   String _formatAmount(dynamic v) {
-    final n = (v is int) ? v : (v as num).toInt();
+    final n = safeInt(v);
     if (n >= 100000) return '${(n / 100000).toStringAsFixed(1)}L';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return n.toString();

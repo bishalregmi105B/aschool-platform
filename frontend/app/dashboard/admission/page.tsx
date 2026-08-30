@@ -96,6 +96,7 @@ function AdmissionContent() {
       setShowInquiry(false);
       toast.success("Inquiry added");
     },
+    onError: () => toast.error("Failed to add inquiry"),
   });
 
   const statusMut = useMutation({
@@ -107,6 +108,7 @@ function AdmissionContent() {
       queryClient.invalidateQueries({ queryKey: ["admission-applications", "admission-dashboard"] });
       toast.success("Status updated");
     },
+    onError: () => toast.error("Failed to update status"),
   });
 
   const pipeline = dashboard?.pipeline || {};

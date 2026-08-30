@@ -17,6 +17,7 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
   Map<String, dynamic>? _brief;
   List<Map<String, dynamic>> _recentActivity = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -25,12 +26,18 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
   }
 
   Future<void> _loadDashboard() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final responses = await Future.wait([
-        ApiClient.instance.get('/schools/dashboard-stats'),
-        ApiClient.instance.get('/ai-tools/daily-brief'),
-        ApiClient.instance.get('/schools/recent-activity'),
+        // Backend: GET /analytics/overview (analytics.py:288) — real KPI source
+        ApiClient.instance.get('/analytics/overview'),
+        // Backend route: /ai-tools/insights/daily-brief (ai_tools.py:173)
+        ApiClient.instance.get('/ai-tools/insights/daily-brief'),
+        // Recent activity: fee payments feed (verified endpoint)
+        ApiClient.instance.get('/fees/recent'),
       ]);
 
       setState(() {
@@ -40,14 +47,21 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
             List<Map<String, dynamic>>.from(responses[2].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('PrincipalDashboard load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load the dashboard.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: LoadingShimmer());
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _loadDashboard);
+    }
 
     return RefreshIndicator(
       onRefresh: _loadDashboard,
@@ -69,7 +83,23 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
   }
 
   Widget _buildMorningBrief() {
-    final briefText = _brief?['summary'] ?? 'Loading daily brief...';
+    // Backend /ai-tools/insights/daily-brief returns
+    // {date, events: [{title, is_holiday}], total_students} — no `summary`.
+    String briefText;
+    if (_brief == null) {
+      briefText = 'Loading daily brief...';
+    } else {
+      final events = _brief?['events'];
+      final parts = <String>[
+        if (events is List && events.isNotEmpty)
+          'Today: ${events.whereType<Map>().map((e) => e['title']?.toString() ?? '').where((t) => t.isNotEmpty).join(', ')}'
+        else if (events is List)
+          'No events scheduled today',
+        if (_brief?['total_students'] != null)
+          '${_brief?['total_students']} active students',
+      ];
+      briefText = parts.isEmpty ? 'Brief unavailable' : parts.join(' • ');
+    }
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -108,10 +138,11 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
   }
 
   Widget _buildKpiCards() {
-    final attendance = _stats?['today_attendance_pct'] ?? 0;
-    final feeCollected = _stats?['today_fee_collected'] ?? 0;
-    final messages = _stats?['unanswered_messages'] ?? 0;
-    final riskStudents = _stats?['risk_students'] ?? 0;
+    // Real keys from GET /analytics/overview (analytics.py _overview_payload)
+    final attendance = _stats?['attendance_today_percent'] ?? 0;
+    final feeCollected = _stats?['fee_collection_this_month'] ?? 0;
+    final pendingFees = _stats?['pending_fee_amount'] ?? 0;
+    final totalStudents = _stats?['total_students'] ?? 0;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -122,35 +153,39 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
       childAspectRatio: 1.5,
       children: [
         _KpiCard(
-          title: 'Attendance',
+          title: "Today's Attendance",
           value: '$attendance%',
           icon: Icons.people,
           color: ASchoolTheme.success,
         ),
         _KpiCard(
-          title: 'Fee Collected',
+          title: 'Fees This Month',
           value: 'Rs. $feeCollected',
           icon: Icons.payments,
           color: ASchoolTheme.primary,
         ),
         _KpiCard(
-          title: 'Messages',
-          value: '$messages',
+          title: 'Pending Fees',
+          value: 'Rs. $pendingFees',
           icon: Icons.message,
           color: ASchoolTheme.warning,
         ),
         _KpiCard(
-          title: 'Risk Students',
-          value: '$riskStudents',
-          icon: Icons.warning_amber,
-          color: riskStudents > 0 ? ASchoolTheme.danger : ASchoolTheme.success,
+          title: 'Total Students',
+          value: '$totalStudents',
+          icon: Icons.school,
+          color: ASchoolTheme.success,
         ),
       ],
     );
   }
 
   Widget _buildRevenueChart() {
-    final feeData = List<Map<String, dynamic>>.from(_stats?['fee_chart'] ?? []);
+    // fee_summary.by_class: [{class_name, collected, expected}] — per-class bars
+    final feeSummary = _stats?['fee_summary'];
+    final feeData = feeSummary is Map<String, dynamic>
+        ? List<Map<String, dynamic>>.from(feeSummary['by_class'] ?? [])
+        : <Map<String, dynamic>>[];
 
     return Card(
       child: Padding(
@@ -259,12 +294,17 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
                   leading: CircleAvatar(
                     radius: 18,
                     backgroundColor: Colors.blue.withAlpha(30),
-                    child: Icon(_activityIcon(activity['type']),
+                    child: const Icon(Icons.payments,
                         size: 18, color: ASchoolTheme.primary),
                   ),
-                  title: Text(activity['message'] ?? '',
+                  // GET /fees/recent rows: {student_name, fee_type, amount, paid_at, receipt_number}
+                  title: Text(
+                      '${activity['student_name'] ?? ''} — ${activity['fee_type'] ?? 'Payment'}'
+                          .trim(),
                       style: const TextStyle(fontSize: 14)),
-                  subtitle: Text(activity['time_ago'] ?? '',
+                  subtitle: Text(
+                      'Rs. ${activity['amount'] ?? 0} · ${activity['receipt_number'] ?? ''}'
+                          .trim(),
                       style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                 )),
           ],
@@ -273,20 +313,6 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
     );
   }
 
-  IconData _activityIcon(String? type) {
-    switch (type) {
-      case 'fee':
-        return Icons.payments;
-      case 'attendance':
-        return Icons.fact_check;
-      case 'admission':
-        return Icons.person_add;
-      case 'bus':
-        return Icons.directions_bus;
-      default:
-        return Icons.info_outline;
-    }
-  }
 }
 
 class _KpiCard extends StatelessWidget {

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { Bus, Navigation } from "lucide-react";
 import type { BusPosition } from "@/components/transport/LiveBusMap";
 import { connectSocket, disconnectSocket, onGPSUpdate, joinSchoolRoom } from "@/lib/socket";
@@ -71,19 +72,30 @@ function MapContent() {
   }, [busesData]);
 
   // ── Fallback poll (also seeds labels + last known positions) ─────────
-  const { data: logsData, isLoading } = useQuery({
+  const { data: logsData, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["transport-gps-latest"],
     queryFn: async () => (await api.get("/transport/gps-logs")).data?.data || [],
     refetchInterval: 15000,
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load bus locations. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const logs: any[] = logsData || [];
   const buses: any[] = busesData || [];
 
   const labelByBus = Object.fromEntries(
-    buses.map((b) => [b.id, b.number_plate || b.name || "Bus"])
+    buses.map((b) => [b.id, b.vehicle_number || b.name || "Bus"])
   );
 
   const latestByBus: Record<string, any> = {};

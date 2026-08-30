@@ -1,4 +1,5 @@
 import 'api_client.dart';
+import '../utils/safe_parse.dart';
 
 class MobileVersionPolicy {
   final bool forceUpdate;
@@ -16,19 +17,19 @@ class MobileVersionPolicy {
   factory MobileVersionPolicy.fromJson(Map<String, dynamic> json) {
     return MobileVersionPolicy(
       forceUpdate: json['force_update'] == true,
-      message: json['message'] as String? ??
-          'A newer ASchool app version is available.',
+      message: safeString(json['message'],
+          fallback: 'A newer ASchool app version is available.'),
       storeUrls: {
-        'student': json['student_store_url'] as String?,
-        'teacher': json['teacher_store_url'] as String?,
-        'parent': json['parent_store_url'] as String?,
-        'admin': json['admin_store_url'] as String?,
+        'student': safeStringOrNull(json['student_store_url']),
+        'teacher': safeStringOrNull(json['teacher_store_url']),
+        'parent': safeStringOrNull(json['parent_store_url']),
+        'admin': safeStringOrNull(json['admin_store_url']),
       },
       minimumVersions: {
-        'student': json['student_min_version'] as String? ?? '1.0.0',
-        'teacher': json['teacher_min_version'] as String? ?? '1.0.0',
-        'parent': json['parent_min_version'] as String? ?? '1.0.0',
-        'admin': json['admin_min_version'] as String? ?? '1.0.0',
+        'student': safeString(json['student_min_version'], fallback: '1.0.0'),
+        'teacher': safeString(json['teacher_min_version'], fallback: '1.0.0'),
+        'parent': safeString(json['parent_min_version'], fallback: '1.0.0'),
+        'admin': safeString(json['admin_min_version'], fallback: '1.0.0'),
       },
     );
   }
@@ -51,7 +52,7 @@ class MobileVersionService {
       },
     );
     return MobileVersionPolicy.fromJson(
-      Map<String, dynamic>.from(response.data['data'] ?? {}),
+      safeMap(envelopeData(response.data)),
     );
   }
 }

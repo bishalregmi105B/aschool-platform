@@ -25,9 +25,10 @@ function RewardsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", points_required: "100", quantity_available: "" });
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["gamification-rewards"],
     queryFn: async () => (await api.get("/gamification/rewards")).data?.data || [],
+    retry: 1,
   });
 
   const rewards: any[] = data || [];
@@ -50,6 +51,14 @@ function RewardsContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load rewards. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

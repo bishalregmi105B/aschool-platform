@@ -18,6 +18,7 @@ class _TeacherLibraryScreenState extends ConsumerState<TeacherLibraryScreen>
   List<dynamic> _borrowed = [];
   bool _loading = true;
   String _search = '';
+  String? _error;
 
   @override
   void initState() {
@@ -27,16 +28,22 @@ class _TeacherLibraryScreenState extends ConsumerState<TeacherLibraryScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/teacher/library',
           queryParameters: _search.isNotEmpty ? {'search': _search} : null);
       final payload = res.data;
       setState(() {
-        _books = (payload?['books'] as List?) ?? [];
-        _borrowed = (payload?['borrowed'] as List?) ?? [];
+        _books = safeList(payload?['books']);
+        _borrowed = safeList(payload?['borrowed']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('TeacherLibraryScreen load failed: $e\n$st');
+      _error = 'Could not load the library.';
+    }
     setState(() => _loading = false);
   }
 
@@ -54,7 +61,9 @@ class _TeacherLibraryScreenState extends ConsumerState<TeacherLibraryScreen>
         appBar: const CustomAppBar(title: 'Library'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(12),

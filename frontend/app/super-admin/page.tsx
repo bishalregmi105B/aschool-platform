@@ -4,11 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { Building2, DollarSign, Users, Server, AlertTriangle, Activity } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function SuperAdminDashboard() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["superadmin-dashboard"],
     queryFn: async () => {
       const res = await api.get("/analytics/superadmin-dashboard");
@@ -17,6 +19,16 @@ export default function SuperAdminDashboard() {
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load platform analytics. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const stats = [
     { label: "Total Schools", value: String(data?.stats?.total_schools || 0), icon: Building2, color: "text-blue-400" },

@@ -18,6 +18,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
   List<dynamic> _leaderboard = [];
   List<dynamic> _houses = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,17 +28,23 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/gamification');
       final payload = res.data;
       setState(() {
-        _myStats = (payload?['my_stats'] as Map?)?.cast<String, dynamic>();
-        _badges = (payload?['badges'] as List?) ?? [];
-        _leaderboard = (payload?['leaderboard'] as List?) ?? [];
-        _houses = (payload?['houses'] as List?) ?? [];
+        _myStats = safeMapOrNull(payload?['my_stats']);
+        _badges = safeList(payload?['badges']);
+        _leaderboard = safeList(payload?['leaderboard']);
+        _houses = safeList(payload?['houses']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('GamificationScreen load failed: $e\n$st');
+      _error = 'Could not load your badges and points.';
+    }
     setState(() => _loading = false);
   }
 
@@ -57,7 +64,9 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
         appBar: const CustomAppBar(title: 'Achievements & Points'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
                 children: [
                   // Points header
                   if (_myStats != null)
@@ -278,9 +287,9 @@ class _HousesTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final h = houses[index];
         final maxPoints = (houses
-            .map((x) => (x['total_points'] as num?) ?? 0)
+            .map((x) => safeNumOrNull(x['total_points']) ?? 0)
             .reduce((a, b) => a > b ? a : b)).toDouble();
-        final pts = ((h['total_points'] as num?) ?? 0).toDouble();
+        final pts = (safeNumOrNull(h['total_points']) ?? 0).toDouble();
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: Padding(
@@ -306,7 +315,7 @@ class _HousesTab extends StatelessWidget {
                   value: maxPoints > 0 ? pts / maxPoints : 0,
                   backgroundColor: Colors.grey.withAlpha(30),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      _parseColor(h['color'] as String?) ??
+                      _parseColor(safeStringOrNull(h['color'])) ??
                           Theme.of(context).colorScheme.primary),
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(4),

@@ -1,0 +1,28 @@
+slug: plugins_nav
+name: "Installed Plugins"
+name_nepali: "जडित प्लगइनहरू"
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+# Platform navigation page, NOT an installable product — kept out of the
+# marketplace catalog the same way deprecated manifests are (seed.py maps
+# top-level published: false → Plugin.is_published=False). The sidebar entry
+# itself is always available via PluginLoader.BOTTOM_NAV_ALWAYS_SLUGS.
+published: false
+emoji: "🔌"
+icon: "Plug"
+description: "Manage installed plugins — activate, deactivate, configure"
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/plugins"
+  sidebar:
+    label: "Installed Plugins"
+    label_nepali: "जडित प्लगइनहरू"
+    icon: "Plug"
+    section: "bottom_nav"
+    subitems: []
+    visible_to: ["superadmin", "school_admin"]

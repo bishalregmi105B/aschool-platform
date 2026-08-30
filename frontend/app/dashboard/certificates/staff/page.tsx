@@ -30,12 +30,13 @@ export default function StaffIdCardsPage() {
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
-  const { data: staffList, isLoading: isStaffLoading } = useQuery({
+  const { data: staffList, isLoading: isStaffLoading, isError: isStaffError, refetch: refetchStaff } = useQuery({
     queryKey: ["design-studio-staff", search],
     queryFn: async () => {
       const res = await api.get<ApiResponse<StaffRecord[]>>(`/design-studio/data-sources/teacher/records?q=${search}&limit=100`);
       return res.data.data;
     },
+    retry: 1,
   });
 
   const { data: idCardTemplates = [], isLoading: isTemplatesLoading } = useQuery({
@@ -100,7 +101,7 @@ export default function StaffIdCardsPage() {
             </head>
             <body>
               <div class="no-print" style="margin-bottom: 20px; text-align: right; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 4px;">Print ID Cards</button>
+                <button id="print-btn" style="padding: 10px 20px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 4px;">Print ID Cards</button>
               </div>
               <div class="grid-container">
                 ${cards.map((card: any) => `<div class="id-card">${card?.html || '<div style="padding:20px;text-align:center;">Template Error</div>'}</div>`).join("")}
@@ -109,6 +110,10 @@ export default function StaffIdCardsPage() {
           </html>
         `);
         newWin.document.close();
+        newWin.document.getElementById("print-btn")?.addEventListener("click", () => {
+          newWin.focus();
+          newWin.print();
+        });
       }
     },
     onError: () => {
@@ -210,11 +215,18 @@ export default function StaffIdCardsPage() {
               </span>
             </div>
 
+            {isStaffError ? (
+              <div className="text-center py-10 space-y-3">
+                <p className="text-sm text-destructive">Failed to load staff list. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchStaff()}>Retry</Button>
+              </div>
+            ) : (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-2">
               {(staffList || []).map((staff) => {
                 const isSelected = selectedStaffIds.has(staff.id);
                 return (
-                  <div 
+                  <div
                     key={staff.id}
                     onClick={() => toggleStaff(staff.id)}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${
@@ -235,6 +247,8 @@ export default function StaffIdCardsPage() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       </div>

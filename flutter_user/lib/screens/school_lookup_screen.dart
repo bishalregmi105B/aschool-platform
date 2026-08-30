@@ -19,10 +19,10 @@ class _SchoolSearchResult {
 
   factory _SchoolSearchResult.fromJson(Map<String, dynamic> json) {
     return _SchoolSearchResult(
-      name: json['name'] as String? ?? '',
-      slug: json['slug'] as String? ?? '',
-      logoUrl: json['logo_url'] as String?,
-      address: json['address'] as String?,
+      name: safeStringOrNull(json['name']) ?? '',
+      slug: safeStringOrNull(json['slug']) ?? '',
+      logoUrl: safeStringOrNull(json['logo_url']),
+      address: safeStringOrNull(json['address']),
     );
   }
 }
@@ -77,10 +77,10 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen> {
         queryParameters: {'q': query.trim()},
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final data = response.data['data'] as List? ?? [];
+        final data = safeList(response.data['data']);
         setState(() {
           _results = data
-              .map((e) => _SchoolSearchResult.fromJson(e as Map<String, dynamic>))
+              .map((e) => _SchoolSearchResult.fromJson(safeMap(e)))
               .toList();
         });
       } else {
@@ -88,7 +88,8 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen> {
       }
     } on DioException catch (e) {
       setState(() => _errorMessage = 'Search failed: ${e.message}');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('SchoolLookupScreen search failed: $e');
       setState(() => _errorMessage = 'An unexpected error occurred.');
     } finally {
       setState(() => _isSearching = false);

@@ -18,6 +18,7 @@ class _StudentAttendanceScreenState
   Map<String, dynamic>? _stats;
   List<dynamic> _records = [];
   bool _loading = true;
+  String? _error;
   String _selectedMonth = '';
 
   @override
@@ -28,17 +29,23 @@ class _StudentAttendanceScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/attendance',
           queryParameters:
               _selectedMonth.isNotEmpty ? {'month': _selectedMonth} : null);
       final payload = res.data;
       setState(() {
-        _stats = (payload?['stats'] as Map?)?.cast<String, dynamic>();
-        _records = (payload?['records'] as List?) ?? [];
+        _stats = safeMapOrNull(payload?['stats']);
+        _records = safeList(payload?['records']);
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StudentAttendanceScreen load failed: $e');
+      setState(() => _error = 'Could not load your attendance.');
+    }
     setState(() => _loading = false);
   }
 
@@ -71,7 +78,12 @@ class _StudentAttendanceScreenState
       appBar: const CustomAppBar(title: 'My Attendance'),
       body: _loading
           ? const LoadingShimmer()
-          : Column(
+          : _error != null
+              ? ErrorContainer(
+                  errorMessage: _error!,
+                  onRetry: _load,
+                )
+              : Column(
               children: [
                 // Stats banner
                 if (_stats != null)
@@ -130,7 +142,7 @@ class _StudentAttendanceScreenState
                               itemBuilder: (context, index) {
                                 final r = _records[index];
                                 final status =
-                                    (r['status'] as String?) ?? 'unknown';
+                                    safeStringOrNull(r['status']) ?? 'unknown';
                                 return ListTile(
                                   leading: CircleAvatar(
                                     backgroundColor:
@@ -189,8 +201,8 @@ class _StudentAttendanceScreenState
     // Build attendance map: date string → status
     final Map<String, String> dateStatus = {};
     for (final r in _records) {
-      final date = r['date'] as String?;
-      final status = r['status'] as String?;
+      final date = safeStringOrNull(r['date']);
+      final status = safeStringOrNull(r['status']);
       if (date != null && status != null) {
         dateStatus[date] = status;
       }

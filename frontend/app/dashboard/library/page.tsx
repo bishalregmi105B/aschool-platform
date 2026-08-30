@@ -57,7 +57,8 @@ function LibraryContent() {
   const [tab, setTab] = useState<"books" | "issues">(initialTab);
   const queryClient = useQueryClient();
 
-  const { data: books, isLoading } = useQuery({
+  const { data: books, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["library-books", search],
     queryFn: async () => {
       const params = search ? `?search=${encodeURIComponent(search)}` : "";
@@ -85,6 +86,7 @@ function LibraryContent() {
       setShowAddBook(false);
       toast.success("Book added");
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to add book"),
   });
 
   const returnMut = useMutation({
@@ -93,12 +95,25 @@ function LibraryContent() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["library-issues", "library-books"] });
+      // element-wise prefixes: the combined key matched neither query
+      queryClient.invalidateQueries({ queryKey: ["library-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
       toast.success("Book returned");
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to process return"),
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load library overview. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   return (
     <div className="space-y-6">
@@ -177,8 +192,8 @@ function LibraryContent() {
                 {issues?.map((issue) => (
                   <TableRow key={issue.id}>
                     <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
-                    <TableCell>{issue.book_id}</TableCell>
-                    <TableCell>{issue.student_id}</TableCell>
+                    <TableCell>{(issue as any).book_title || issue.book_id}</TableCell>
+                    <TableCell>{(issue as any).student_name || issue.student_id}</TableCell>
                     <TableCell>{displayBS(issue.due_date)}</TableCell>
                     <TableCell><Badge variant={issue.status === "returned" ? "default" : "destructive"}>{issue.status}</Badge></TableCell>
                     <TableCell>

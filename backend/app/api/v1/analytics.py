@@ -79,7 +79,9 @@ def _overview_payload(school_id):
         Attendance.is_deleted.is_(False),
     ).all()
     today_total = len(today_rows)
-    today_present = sum(1 for row in today_rows if row.status == "present")
+    # Uniform late rule: late students DID attend (present + late), matching
+    # /attendance/summary and /attendance/student/<id>/summary.
+    today_present = sum(1 for row in today_rows if row.status in ("present", "late"))
     attendance_today_percent = round((today_present / today_total) * 100, 1) if today_total else 0
 
     attendance_rows = Attendance.query.filter(
@@ -88,7 +90,7 @@ def _overview_payload(school_id):
         Attendance.is_deleted.is_(False),
     ).all()
     attendance_rate = (
-        round(sum(1 for row in attendance_rows if row.status == "present") / len(attendance_rows) * 100, 1)
+        round(sum(1 for row in attendance_rows if row.status in ("present", "late")) / len(attendance_rows) * 100, 1)
         if attendance_rows
         else 0
     )
@@ -116,26 +118,40 @@ def _overview_payload(school_id):
     total_paid_fee = 0.0
     now = datetime.utcnow()
 
+    # Fee math must use the PAYABLE amount (base + late fine − discount), not
+    # the raw `amount` column — the same discount-blind bug class fixed in
+    # reports.py (E120 family). Paid collections under discounted bills were
+    # overstating "collected" by the discount and understating nothing when a
+    # fine applied; pending rows ignored fines. Reuse the canonical fees.py
+    # helpers so /analytics, /reports and /fees/summary agree. Waived rows are
+    # excluded from collected AND pending (nothing to collect, matches
+    # /reports/fees/collection); partial payments count only their recorded
+    # [partial_paid:…] value, leaving the remainder as pending.
+    from app.api.v1.fees import _collection_payable_total, _extract_partial_paid
+
     for row in fee_rows:
-        amount = _safe_float(getattr(row, "amount", 0))
-        total_fee_amount += amount
         created_at = row.created_at or now
         status = getattr(row, "payment_status", None) or getattr(row, "status", "pending")
         month_bucket = monthly_buckets[_month_key(created_at)]
-        if status == "paid":
-            total_paid_fee += amount
-            month_bucket["collected"] += amount
-            if created_at.year == now.year and created_at.month == now.month:
-                fee_collection_this_month += amount
-        else:
-            pending_fee_amount += amount
-            month_bucket["pending"] += amount
-        fee_type_buckets[getattr(row, "fee_item_name", None) or "General"] += amount
+        if status == "waived":
+            continue
+
+        payable = _collection_payable_total(row)
+        collected_amount = min(_extract_partial_paid(row), payable)
+        due_amount = max(payable - collected_amount, 0.0)
+
+        total_fee_amount += payable
+        total_paid_fee += collected_amount
+        pending_fee_amount += due_amount
+        month_bucket["collected"] += collected_amount
+        month_bucket["pending"] += due_amount
+        if created_at.year == now.year and created_at.month == now.month:
+            fee_collection_this_month += collected_amount
+        fee_type_buckets[getattr(row, "fee_item_name", None) or "General"] += payable
         student = student_map.get(str(row.student_id))
         class_name = class_map.get(str(student.class_id), "Unassigned") if student else "Unassigned"
-        fee_class_buckets[class_name]["expected"] += amount
-        if status == "paid":
-            fee_class_buckets[class_name]["collected"] += amount
+        fee_class_buckets[class_name]["expected"] += payable
+        fee_class_buckets[class_name]["collected"] += collected_amount
 
     collection_rate = round((total_paid_fee / total_fee_amount) * 100, 1) if total_fee_amount else 0
 
@@ -149,7 +165,7 @@ def _overview_payload(school_id):
     for row in attendance_rows:
         class_name = class_map.get(str(row.class_id), "Unassigned")
         class_attendance_buckets[class_name]["total"] += 1
-        if row.status == "present":
+        if row.status in ("present", "late"):
             class_attendance_buckets[class_name]["present"] += 1
 
     attendance_by_class = []
@@ -404,12 +420,18 @@ def financial():
         FeeCollection.created_at >= start,
     ).all()
 
-    total_revenue = sum(_safe_float(getattr(row, "amount", 0)) for row in rows)
-    collected = sum(
-        _safe_float(getattr(row, "amount", 0))
-        for row in rows
-        if (getattr(row, "payment_status", None) or getattr(row, "status", "pending")) == "paid"
-    )
+    # Payable-based money math (E170): raw `amount` ignores discount/fine and
+    # partial payments — same helpers as /fees/summary and /reports/fees.
+    from app.api.v1.fees import _collection_payable_total, _extract_partial_paid
+
+    total_revenue = 0.0
+    collected = 0.0
+    for row in rows:
+        if (getattr(row, "payment_status", None) or "pending") == "waived":
+            continue
+        payable = _collection_payable_total(row)
+        total_revenue += payable
+        collected += min(_extract_partial_paid(row), payable)
     outstanding = max(total_revenue - collected, 0)
     collection_rate = round((collected / total_revenue) * 100, 1) if total_revenue else 0
     overview = _overview_payload(g.school_id)

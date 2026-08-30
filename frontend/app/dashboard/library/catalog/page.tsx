@@ -25,18 +25,19 @@ function CatalogContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ title: "", author: "", isbn: "", category: "general", publisher: "", copies: "1", shelf_location: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["library-books", search],
     queryFn: async () => {
       const r = await api.get("/library/books", { params: { search: search || undefined } });
       return r.data;
     },
+    retry: 1,
   });
 
   const books = data?.data || [];
 
   const create = useMutation({
-    mutationFn: async () => (await api.post("/library/books", { ...form, copies: parseInt(form.copies) || 1 })).data,
+    mutationFn: async () => (await api.post("/library/books", { ...form, total_copies: parseInt(form.copies) || 1, available_copies: parseInt(form.copies) || 1 })).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library-books"] });
       setShowDialog(false);
@@ -46,6 +47,14 @@ function CatalogContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load the catalog. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -86,8 +95,8 @@ function CatalogContent() {
                 <TableCell>{b.author || "—"}</TableCell>
                 <TableCell className="text-sm">{b.isbn || "—"}</TableCell>
                 <TableCell><Badge variant="outline">{b.category}</Badge></TableCell>
-                <TableCell>{b.copies || 0}</TableCell>
-                <TableCell><Badge variant={b.available > 0 ? "default" : "destructive"}>{b.available || 0}</Badge></TableCell>
+                <TableCell>{b.total_copies || 0}</TableCell>
+                <TableCell><Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge></TableCell>
                 <TableCell className="text-sm">{b.shelf_location || "—"}</TableCell>
               </TableRow>
             ))}

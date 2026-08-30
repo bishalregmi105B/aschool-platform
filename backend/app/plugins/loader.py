@@ -163,6 +163,7 @@ class PluginLoader:
     # ── Bottom-nav slugs always included ─────────────────────────────────────
     BOTTOM_NAV_ALWAYS_SLUGS: list[str] = [
         "marketplace_nav",
+        "plugins_nav",
         "settings_core",
     ]
 

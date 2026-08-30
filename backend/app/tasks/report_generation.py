@@ -1,8 +1,8 @@
 """Report generation tasks (PDF report cards, compliance exports)."""
 import io
-import csv
 import json
 import logging
+import re
 import zipfile
 from datetime import datetime, timezone
 
@@ -33,25 +33,61 @@ def generate_report_card_pdf(school_id: str, student_id: str, exam_id: str):
 
     klass = Class.query.get(student.class_id) if student.class_id else None
 
-    # Build subject-marks table
+    # Build subject-marks table. Full marks come from the Marks row itself
+    # (what marks-entry resolved for this exam — theory + practical config),
+    # falling back to the subject's configured full marks — NOT the subject
+    # default alone, which diverged from the /exams/<id>/results math when a
+    # subject has a practical component.
     subjects_data = []
     total_obtained = 0
     total_full = 0
     for m in marks:
         subj = Subject.query.get(m.subject_id)
+        theory = float(m.theory_marks) if m.theory_marks else 0
+        practical = float(m.practical_marks) if m.practical_marks else 0
+        if m.full_marks:
+            full_marks = float(m.full_marks)
+        elif subj and subj.full_marks:
+            extra = (
+                float(subj.practical_full_marks)
+                if subj and subj.practical_full_marks and practical > 0
+                else 0
+            )
+            full_marks = float(subj.full_marks) + extra
+        else:
+            full_marks = 100.0
+        total = float(m.total_marks) if m.total_marks else theory + practical
         subjects_data.append({
             "subject": subj.name if subj else "Unknown",
-            "full_marks": float(subj.full_marks) if subj and subj.full_marks else 100,
-            "theory": float(m.theory_marks) if m.theory_marks else 0,
-            "practical": float(m.practical_marks) if m.practical_marks else 0,
-            "total": float(m.total_marks) if m.total_marks else 0,
+            "full_marks": full_marks,
+            "theory": theory,
+            "practical": practical,
+            "total": total,
             "grade": m.grade or "",
             "gpa": float(m.gpa) if m.gpa else 0,
+            "credit_hours": getattr(subj, "credit_hours", None),
         })
-        total_obtained += float(m.total_marks) if m.total_marks else 0
-        total_full += float(subj.full_marks) if subj and subj.full_marks else 100
+        total_obtained += total
+        total_full += full_marks
 
     percentage = round(total_obtained / total_full * 100, 2) if total_full else 0
+
+    # Overall grade/GPA from the same nepal_grading util the results page uses,
+    # so the report card can never disagree with the on-screen results.
+    from app.utils.nepal_grading import calculate_gpa
+
+    overall = calculate_gpa(
+        [
+            {
+                "grade": s["grade"] or "NG",
+                "gpa": s["gpa"],
+                "credit_hours": s["credit_hours"],
+                "total_obtained": s["total"],
+                "total_full": s["full_marks"],
+            }
+            for s in subjects_data
+        ]
+    ) if subjects_data else {"gpa": 0.0, "grade": "NG", "status": "fail"}
 
     # Generate HTML report card
     rows_html = ""
@@ -111,19 +147,53 @@ th {{ background: #2c3e50; color: white; }}
         db.session.add(rc)
 
     rc.total_percentage = percentage
+    rc.percentage = percentage
     rc.total_marks = total_full
+    rc.overall_grade = overall.get("grade")
+    rc.overall_gpa = overall.get("gpa")
     rc.generated_at = datetime.now(timezone.utc)
 
-    # In production, upload pdf_bytes to S3/MinIO and set rc.pdf_url
-    # For now, store the generated HTML inline
-    if pdf_bytes:
-        rc.pdf_url = f"/reports/{school_id}/{student_id}_{exam_id}.pdf"
-    else:
-        rc.pdf_url = f"/reports/{school_id}/{student_id}_{exam_id}.html"
+    # Best-effort personalized remark through the AI token hub (quota + usage
+    # logged there). Failure must NEVER fake content — the remark is simply
+    # left empty and the UI shows an em-dash.
+    if not rc.ai_remarks and subjects_data:
+        try:
+            from app.services.ai.question_paper import QuestionPaperService
+
+            rc.ai_remarks = QuestionPaperService.generate_remark(
+                student_name=f"{student.first_name} {student.last_name}",
+                marks={
+                    s["subject"]: {"obtained": s["total"], "full": s["full_marks"]}
+                    for s in subjects_data
+                },
+                total=total_obtained,
+                percentage=percentage,
+                school_id=str(school_id),
+            )
+        except Exception as exc:  # noqa: BLE001 — remark is optional by design
+            logger.warning("AI remark unavailable for %s/%s: %s", student_id, exam_id, exc)
+
+    # Persist the generated file through the platform's canonical storage
+    # (app.utils.file_upload.upload_file → LOCAL_UPLOAD_DIR locally or R2 in
+    # production) and store the real served URL on the report card.
+    from app.utils.file_upload import upload_file
+
+    ext = "pdf" if pdf_bytes is not None else "html"
+    mime = "application/pdf" if pdf_bytes is not None else "text/html"
+    filename = f"report_card_{student_id}_{exam_id}.{ext}"
+    payload = io.BytesIO(pdf_bytes if pdf_bytes is not None else html.encode("utf-8"))
+    payload.filename = filename
+    payload.content_type = mime
+    rc.pdf_url = upload_file(payload, folder=f"reports/{school_id}", filename=filename)
 
     db.session.commit()
     logger.info(f"Report card generated for student {student_id}, exam {exam_id}")
-    return {"success": True, "report_card_id": str(rc.id), "percentage": percentage}
+    return {
+        "success": True,
+        "report_card_id": str(rc.id),
+        "percentage": percentage,
+        "pdf_url": rc.pdf_url,
+    }
 
 
 @celery.task(name="generate_bulk_report_cards", queue="default")
@@ -141,6 +211,29 @@ def generate_bulk_report_cards(school_id: str, exam_id: str, class_id: str):
         results.append({"student_id": str(student.id), "result": result})
 
     success_count = sum(1 for r in results if r["result"] and r["result"].get("success"))
+
+    # Rank students within the class by percentage (rank 1 = highest) so the
+    # report-cards page and marksheet modal can show a real rank.
+    try:
+        from extensions import db
+        from app.models.exam import ReportCard
+
+        cards = (
+            ReportCard.query.filter_by(school_id=school_id, exam_id=exam_id, is_deleted=False)
+            .filter(ReportCard.student_id.in_([str(s.id) for s in students]))
+            .all()
+        )
+        for rank, card in enumerate(
+            sorted(cards, key=lambda c: (c.total_percentage if c.total_percentage is not None else -1), reverse=True),
+            start=1,
+        ):
+            card.rank_in_class = rank
+            card.rank = rank
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001 — ranking must not fail the export
+        db.session.rollback()
+        logger.warning("Failed to rank report cards for exam %s: %s", exam_id, exc)
+
     logger.info(f"Bulk report cards: {success_count}/{len(students)} for class {class_id}")
     return {
         "success": True,
@@ -188,16 +281,21 @@ def export_emis_data(school_id: str, academic_year_id: str):
             "disabled": sum(1 for s in students if s.disability),
         })
 
-    # Staff summary
+    # Staff summary — query only valid user_role enum values
+    # (superadmin, school_admin, accountant, teacher, staff, parent, student);
+    # "principal"/"admin" are not enum members and crash the query.
     staff = User.query.filter(
         User.school_id == school_id,
-        User.role.in_(["teacher", "staff", "principal", "admin"]),
+        User.role.in_(["teacher", "staff", "school_admin", "accountant"]),
         User.is_deleted.is_(False),
     ).all()
 
     staff_summary = {
         "total_teachers": sum(1 for u in staff if u.role == "teacher"),
-        "total_admin_staff": sum(1 for u in staff if u.role in ("staff", "admin")),
+        "total_admin_staff": sum(
+            1 for u in staff if u.role in ("staff", "school_admin", "accountant")
+        ),
+        # No dedicated "principal" role exists in the user_role enum.
         "principal": sum(1 for u in staff if u.role == "principal"),
     }
 
@@ -215,25 +313,26 @@ def export_emis_data(school_id: str, academic_year_id: str):
         "exported_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Create CSV in-memory
-    csv_buffer = io.StringIO()
-    writer = csv.writer(csv_buffer)
-    writer.writerow([
-        "Class", "Grade", "Total", "Male", "Female", "Other",
-        "Dalit", "Janajati", "Disabled",
-    ])
-    for row in enrollment_data:
-        writer.writerow([
-            row["class_name"], row["grade"], row["total_students"],
-            row["male"], row["female"], row["other"],
-            row["dalit"], row["janajati"], row["disabled"],
-        ])
+    # Serialize the enrollment table as EMIS CSV and persist it through the
+    # platform's canonical storage (upload_file → LOCAL_UPLOAD_DIR / R2).
+    from app.services.compliance.moe_reports import MoEReportService
+    from app.utils.file_upload import upload_file
 
-    # Store export record
+    csv_bytes = MoEReportService.build_emis_csv(enrollment_data)
+    safe_year = re.sub(r"[^A-Za-z0-9_.-]+", "_", ay.name or str(academic_year_id))
+    filename = f"emis_export_{safe_year}.csv"
+    payload = io.BytesIO(csv_bytes)
+    payload.filename = filename
+    payload.content_type = "text/csv"
+    folder = f"compliance/{school_id}"
+    file_url = upload_file(payload, folder=folder, filename=filename)
+
+    # Store export record (file_url points at the downloadable CSV)
     export = EMISExport(
         school_id=school_id,
         academic_year=ay.name,
-        export_data=emis_data,
+        export_data={**emis_data, "file_key": f"{folder}/{filename}"},
+        file_url=file_url,
         generated_at=datetime.now(timezone.utc),
     )
     db.session.add(export)
@@ -243,6 +342,7 @@ def export_emis_data(school_id: str, academic_year_id: str):
     return {
         "success": True,
         "export_id": str(export.id),
+        "file_url": file_url,
         "total_students": sum(r["total_students"] for r in enrollment_data),
         "total_staff": len(staff),
     }

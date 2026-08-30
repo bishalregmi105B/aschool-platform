@@ -192,25 +192,24 @@ def list_source_records(source_type):
             User.is_active == True,
         )
         if q:
-            query = query.filter(
-                db.or_(
-                    User.first_name.ilike(f"%{q}%"),
-                    User.last_name.ilike(f"%{q}%"),
-                )
-            )
-        users = query.order_by(User.first_name).limit(limit).all()
+            query = query.filter(User.full_name.ilike(f"%{q}%"))
+        users = query.order_by(User.full_name).limit(limit).all()
 
         records = []
         for u in users:
+            # User has a single full_name column (no first/last split)
+            full_name = u.full_name or ""
+            first = full_name.split(" ", 1)[0] if full_name else ""
+            last = full_name.split(" ", 1)[1] if " " in full_name else ""
             records.append(
                 {
                     "id": str(u.id),
-                    "label": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+                    "label": full_name,
                     "subtitle": f"{u.role} • {u.email or ''}",
                     "fields": {
-                        "name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
-                        "first_name": u.first_name or "",
-                        "last_name": u.last_name or "",
+                        "name": full_name,
+                        "first_name": first,
+                        "last_name": last,
                         "designation": u.role or "",
                         "department": "",
                         "employee_id": str(u.id)[:8],

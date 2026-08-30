@@ -47,7 +47,6 @@ function blobToDataURL(blob: Blob): Promise<string> {
 async function embedImages(canvasJson: Record<string, any>): Promise<Record<string, any>> {
   const json = JSON.parse(JSON.stringify(canvasJson));
   const objects: any[] = json.objects ?? [];
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
   await Promise.all(
     objects.map(async (obj: any) => {
       if ((obj.type ?? "").toLowerCase() !== "image") return;
@@ -55,7 +54,9 @@ async function embedImages(canvasJson: Record<string, any>): Promise<Record<stri
       if (!src) { obj.src = TRANSPARENT_1PX; return; }
       if (src.startsWith("data:")) return;
       try {
-        const fullUrl = src.startsWith("http") ? src : API_BASE + src;
+        // Keep non-absolute srcs same-origin (root-relative /uploads/... is
+        // proxied to the backend by next.config.js) — never a Docker-internal host.
+        const fullUrl = src;
         // Include auth token if present
         const cookieMatch = document.cookie.match(/(?:^|;\s*)access_token=([^;]+)/);
         const headers: Record<string, string> = cookieMatch

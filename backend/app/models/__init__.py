@@ -4,10 +4,18 @@ from app.models.school import School, SchoolWebsite, SchemeGrade  # noqa: F401
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.student import Student, Guardian, StudentHealthRecord  # noqa: F401
+from app.models.student_transfer import StudentTransfer  # noqa: F401
 from app.models.academic import AcademicYear, Semester, Medium, Stream, Shift, Class, Section, Subject  # noqa: F401
 from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest  # noqa: F401
 from app.models.exam import Exam, Marks, ReportCard, OnlineExam, OnlineExamAttempt  # noqa: F401
-from app.models.fee import FeeStructure, FeeCollection, FeeReceipt  # noqa: F401
+from app.models.fee import (  # noqa: F401
+    FeeStructure,
+    FeeCollection,
+    FeeReceipt,
+    FeeType,
+    PaymentInitiation,
+    StudentScholarship,
+)
 from app.models.notice import Notice, Event  # noqa: F401
 from app.models.chat import ChatThread, ChatMessage  # noqa: F401
 from app.models.slider import SchoolSlider  # noqa: F401
@@ -41,6 +49,8 @@ from app.models.hr_payroll import StaffPayroll, StaffLeave, StaffAppraisal  # no
 from app.models.inventory import Asset, ProcurementRequest, AssetAuditLog  # noqa: F401
 from app.models.file import FileFolder, ManagedFile  # noqa: F401
 from app.models.iemis import IemisImportLog  # noqa: F401
+from app.models.school_chain import SchoolChain, SchoolChainMember  # noqa: F401
+from app.models.adaptive_learning import LearningPath, MasteryRecord  # noqa: F401
 from app.models.staff import Staff, StaffMember  # noqa: F401
 from app.models.communication import Notice as CommunicationNotice  # noqa: F401
 from app.models.health import StudentHealthRecord as LegacyStudentHealthRecord  # noqa: F401
@@ -49,3 +59,6 @@ from app.models.analytics import WeeklyInsightReport as AnalyticsInsightReport  
 from app.models.designer import DesignerDocument as DesignerDocumentAlias  # noqa: F401
 from app.models.ad_campaign import AdCampaign as AdCampaignAlias  # noqa: F401
 from app.models.revoked_token import RevokedToken  # noqa: F401,E402 — must be in metadata for create_all/Alembic autogenerate
+from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog  # noqa: F401
+from app.models.disaster_management import DisasterDrill, DrillParticipation  # noqa: F401
+from app.models.incident_management import IncidentEscalation, IncidentWorkflowEvent  # noqa: F401

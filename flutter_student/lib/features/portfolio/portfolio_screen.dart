@@ -14,6 +14,7 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,23 +23,29 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/portfolio');
       final payload = res.data;
       setState(() {
         _data = payload is Map<String, dynamic>
-            ? (payload['data'] as Map?)?.cast<String, dynamic>() ?? payload
+            ? safeMapOrNull(payload['data']) ?? payload
             : null;
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('PortfolioScreen load failed: $e\n$st');
+      _error = 'Could not load your portfolio.';
+    }
     setState(() => _loading = false);
   }
 
   String _portfolioSummary(String studentName) {
-    final badges = (_data?['badges'] as List?)?.length ?? 0;
-    final awards = (_data?['awards'] as List?)?.length ?? 0;
-    final records = (_data?['academic_records'] as List? ?? [])
+    final badges = safeList(_data?['badges']).length;
+    final awards = safeList(_data?['awards']).length;
+    final records = safeList(_data?['academic_records'])
         .map((record) =>
             '${record['exam_name'] ?? 'Exam'}: ${record['percentage'] ?? '--'}%, GPA ${record['gpa'] ?? '--'}')
         .join('\n');
@@ -75,7 +82,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       pluginSlug: 'student_portfolio',
       child: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -117,11 +126,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               _PortfolioStat(
                                   label: 'Badges',
                                   value:
-                                      '${(_data?['badges'] as List?)?.length ?? 0}'),
+                                      '${safeList(_data?['badges']).length}'),
                               _PortfolioStat(
                                   label: 'Awards',
                                   value:
-                                      '${(_data?['awards'] as List?)?.length ?? 0}'),
+                                      '${safeList(_data?['awards']).length}'),
                             ],
                           ),
                         ],
@@ -159,7 +168,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   if (_data?['ai_summary'] != null) const SizedBox(height: 16),
 
                   // Skill Badges
-                  if ((_data?['badges'] as List?)?.isNotEmpty ?? false) ...[
+                  if (safeList(_data?['badges']).isNotEmpty) ...[
                     Text('Skill Badges',
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold)),
@@ -185,7 +194,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  ...(_data?['academic_records'] as List? ?? []).map((rec) {
+                  ...safeList(_data?['academic_records']).map((rec) {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
@@ -207,12 +216,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   const SizedBox(height: 16),
 
                   // Awards & Achievements
-                  if ((_data?['awards'] as List?)?.isNotEmpty ?? false) ...[
+                  if (safeList(_data?['awards']).isNotEmpty) ...[
                     Text('Awards & Achievements',
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    ...(_data!['awards'] as List).map((award) {
+                    ...safeMapList(_data?['awards']).map((award) {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -238,12 +247,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   ],
 
                   // Extracurricular Activities
-                  if ((_data?['activities'] as List?)?.isNotEmpty ?? false) ...[
+                  if (safeList(_data?['activities']).isNotEmpty) ...[
                     Text('Extracurricular Activities',
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    ...(_data!['activities'] as List).map((act) {
+                    ...safeMapList(_data?['activities']).map((act) {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -261,13 +270,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   ],
 
                   // Teacher Endorsements
-                  if ((_data?['endorsements'] as List?)?.isNotEmpty ??
-                      false) ...[
+                  if (safeList(_data?['endorsements']).isNotEmpty) ...[
                     Text('Teacher Endorsements',
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    ...(_data!['endorsements'] as List).map((end) {
+                    ...safeMapList(_data?['endorsements']).map((end) {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: Padding(

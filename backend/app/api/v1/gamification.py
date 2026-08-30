@@ -3,6 +3,8 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.gamification import Badge, StudentBadge, PointsLog, House, Reward
+from app.models.student import Student
+from app.models.academic import Class
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -32,6 +34,8 @@ def list_badges():
 @role_required("superadmin", "school_admin")
 def create_badge():
     data = request.get_json(silent=True) or {}
+    if not (data.get("name") or "").strip():
+        return error_response("name is required", 400)
     badge = Badge(school_id=g.school_id)
     for key in ("name", "name_nepali", "description", "icon_url", "criteria",
                 "points_value", "is_active"):
@@ -73,7 +77,11 @@ def award_points():
     student_id = data.get("student_id")
     points = data.get("points", 0)
     if not student_id or not points:
-        return error_response("student_id and points are required")
+        return error_response("student_id and points are required", 400)
+    if isinstance(points, bool) or not isinstance(points, int):
+        return error_response("points must be an integer", 400)
+    if not Student.query.filter_by(id=student_id, school_id=g.school_id).first():
+        return error_response("student_id does not match a student at this school", 400)
 
     log = PointsLog(
         school_id=g.school_id,
@@ -125,7 +133,18 @@ def award_badge():
     student_id = data.get("student_id")
     badge_id = data.get("badge_id")
     if not student_id or not badge_id:
-        return error_response("student_id and badge_id are required")
+        return error_response("student_id and badge_id are required", 400)
+    if not Student.query.filter_by(id=student_id, school_id=g.school_id).first():
+        return error_response("student_id does not match a student at this school", 400)
+    if not Badge.query.filter_by(id=badge_id, school_id=g.school_id, is_deleted=False).first():
+        return error_response("badge_id does not match a badge at this school", 400)
+    # dedup guard (E131): the web "Award to student" dialog can be submitted
+    # repeatedly for the same student+badge pair, stacking a duplicate
+    # StudentBadge row in every badge consumer (student/parent badge lists).
+    if StudentBadge.query.filter_by(
+        student_id=student_id, badge_id=badge_id, school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("This student already has this badge", 409)
 
     from datetime import datetime, timezone
     sb = StudentBadge(
@@ -158,16 +177,29 @@ def leaderboard():
         db.session.query(
             PointsLog.student_id,
             func.sum(PointsLog.points).label("total_points"),
+            Student.first_name,
+            Student.last_name,
+            Class.name.label("class_name"),
         )
-        .filter_by(school_id=g.school_id, is_deleted=False)
-        .group_by(PointsLog.student_id)
+        .join(Student, Student.id == PointsLog.student_id)
+        .outerjoin(Class, Class.id == Student.class_id)
+        .filter(PointsLog.school_id == g.school_id, PointsLog.is_deleted.is_(False))
+        .group_by(PointsLog.student_id, Student.first_name, Student.last_name, Class.name)
         .order_by(func.sum(PointsLog.points).desc())
-        .limit(request.args.get("limit", 50, type=int))
+        .limit(request.args.get("limit", request.args.get("top", 50), type=int))
         .all()
     )
     return success_response([
-        {"student_id": str(r.student_id), "total_points": int(r.total_points)}
-        for r in results
+        {
+            "rank": idx + 1,
+            "student_id": str(r.student_id),
+            # frontend leaderboard renders entry.student_name
+            "student_name": f"{r.first_name} {r.last_name}".strip() if r.first_name else None,
+            "total_points": int(r.total_points),
+            # frontend leaderboard renders entry.class_name (real class, "—" if none)
+            "class_name": r.class_name,
+        }
+        for idx, r in enumerate(results)
     ])
 
 
@@ -192,6 +224,8 @@ def list_houses():
 @role_required("superadmin", "school_admin")
 def create_house():
     data = request.get_json(silent=True) or {}
+    if not (data.get("name") or "").strip():
+        return error_response("name is required", 400)
     house = House(school_id=g.school_id)
     for key in ("name", "color", "motto", "logo_url", "captain_id"):
         if key in data:
@@ -220,6 +254,10 @@ def list_rewards():
 @role_required("superadmin", "school_admin")
 def create_reward():
     data = request.get_json(silent=True) or {}
+    if not (data.get("name") or "").strip():
+        return error_response("name is required", 400)
+    if not isinstance(data.get("points_required"), int) or isinstance(data.get("points_required"), bool):
+        return error_response("points_required must be an integer", 400)
     reward = Reward(school_id=g.school_id)
     for key in ("name", "description", "points_required", "icon_url",
                 "quantity_available", "is_active"):

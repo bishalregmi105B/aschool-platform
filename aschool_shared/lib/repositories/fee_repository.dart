@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import '../services/api_client.dart';
 import '../models/models.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 class FeeRepository {
@@ -10,9 +11,11 @@ class FeeRepository {
     try {
       final response = await ApiClient.instance.get('/fees/student/$studentId');
       if (response.data['success'] == true) {
-        return FeeDetails.fromJson(response.data['data']);
+        return FeeDetails.fromJson(
+            envelopeObject(response.data, source: 'FeeRepository.getFeeDetails') ??
+                const {});
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch fee details');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch fee details'));
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(e.toString());
@@ -45,11 +48,11 @@ class FeeRepository {
     try {
       final response = await ApiClient.instance.get('/fees/transactions?student_id=$studentId');
       if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => FeePayment.fromJson(e))
+        return envelopeRows(response.data, source: 'FeeRepository.getTransactions')
+            .map(FeePayment.fromJson)
             .toList();
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch transactions');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch transactions'));
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(e.toString());
@@ -73,9 +76,11 @@ class FeeRepository {
         },
       );
       if (response.data['success'] == true) {
-        return OnlinePaymentResult.fromJson(response.data['data']);
+        return OnlinePaymentResult.fromJson(
+            envelopeObject(response.data, source: 'FeeRepository.initiateOnlinePayment') ??
+                const {});
       }
-      throw ApiException(response.data['error'] ?? 'Failed to initiate payment');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to initiate payment'));
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(e.toString());
@@ -83,18 +88,22 @@ class FeeRepository {
   }
 
   /// Get configured payment methods for the school.
+  ///
+  /// Throws [ApiException] so callers can distinguish "school has no online
+  /// methods" from a failed request.
   Future<List<PaymentMethodConfig>> getPaymentMethods() async {
     try {
       final response = await ApiClient.instance.get('/fees/payment-methods');
       if (response.data['success'] == true) {
         final data = response.data['data'];
-        return (data['methods'] as List? ?? [])
-            .map((e) => PaymentMethodConfig.fromJson(Map<String, dynamic>.from(e)))
+        return safeMapList(data is Map ? data['methods'] : null)
+            .map(PaymentMethodConfig.fromJson)
             .toList();
       }
       return [];
-    } catch (_) {
-      return [];
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Failed to load payment methods: $e');
     }
   }
 }
@@ -117,13 +126,11 @@ class OnlinePaymentResult {
 
   factory OnlinePaymentResult.fromJson(Map<String, dynamic> json) {
     return OnlinePaymentResult(
-      provider: json['provider'] as String? ?? '',
-      redirectUrl: json['redirect_url'] as String?,
-      paymentUrl: json['payment_url'] as String?,
-      success: json['success'] as bool? ?? true,
-      params: json['params'] is Map
-          ? Map<String, dynamic>.from(json['params'] as Map)
-          : null,
+      provider: safeString(json['provider']),
+      redirectUrl: safeStringOrNull(json['redirect_url']),
+      paymentUrl: safeStringOrNull(json['payment_url']),
+      success: safeBool(json['success'], fallback: true),
+      params: safeMapOrNull(json['params']),
     );
   }
 }
@@ -152,14 +159,14 @@ class PaymentMethodConfig {
 
   factory PaymentMethodConfig.fromJson(Map<String, dynamic> json) {
     return PaymentMethodConfig(
-      key: json['key'] as String,
-      label: json['label'] as String? ?? '',
-      enabled: json['enabled'] as bool? ?? true,
-      mode: json['mode'] as String? ?? 'offline',
-      requiresReference: json['requires_reference'] as bool? ?? false,
-      supportsQr: json['supports_qr'] as bool? ?? false,
-      qrImageUrl: json['qr_image_url'] as String?,
-      instructions: json['instructions'] as String?,
+      key: safeString(json['key']),
+      label: safeString(json['label']),
+      enabled: safeBool(json['enabled'], fallback: true),
+      mode: safeString(json['mode'], fallback: 'offline'),
+      requiresReference: safeBool(json['requires_reference']),
+      supportsQr: safeBool(json['supports_qr']),
+      qrImageUrl: safeStringOrNull(json['qr_image_url']),
+      instructions: safeStringOrNull(json['instructions']),
     );
   }
 

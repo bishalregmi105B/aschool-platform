@@ -1,31 +1,31 @@
 import '../services/api_client.dart';
 import '../models/models.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 class ExamRepository {
   List<ExamResult> _parseResultPayload(dynamic responseData) {
-    if (responseData is! Map<String, dynamic>) {
+    if (responseData is! Map) {
       return const [];
     }
     final payload = responseData['data'];
     final results = payload is Map ? payload['exams'] : payload;
-    final rows = (results ?? []) as List;
-    return rows
-        .whereType<Map>()
-        .map((e) => ExamResult.fromJson(Map<String, dynamic>.from(e)))
+    return safeMapList(results)
+        .map(ExamResult.fromJson)
         .toList();
   }
 
   Future<List<Exam>> getExams() async {
     try {
       final response = await ApiClient.instance.get('/exams');
-      if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => Exam.fromJson(e))
+      if (envelopeOk(response.data)) {
+        return envelopeRows(response.data, source: 'ExamRepository.getExams')
+            .map(Exam.fromJson)
             .toList();
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch exams');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch exams'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -52,9 +52,9 @@ class ExamRepository {
         if (response.data['success'] == true) {
           return _parseResultPayload(response.data);
         }
-        throw ApiException(
-            response.data['error'] ?? 'Failed to fetch exam results');
+        throw ApiException(envelopeErrorText(response.data, 'Failed to fetch exam results'));
       } catch (fallbackError) {
+        if (fallbackError is ApiException) rethrow;
         throw ApiException(fallbackError.toString());
       }
     }
@@ -67,14 +67,13 @@ class ExamRepository {
     try {
       final response =
           await ApiClient.instance.get('/exams/$examId/marksheet/$studentId');
-      if (response.data['success'] == true) {
-        final payload = response.data['data'];
-        if (payload is Map<String, dynamic>) {
-          return payload;
-        }
+      if (envelopeOk(response.data)) {
+        return envelopeObject(response.data, source: 'ExamRepository.getMarksheet') ??
+            const {};
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch marksheet');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch marksheet'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -82,14 +81,15 @@ class ExamRepository {
   Future<List<OnlineExam>> getOnlineExams() async {
     try {
       final response = await ApiClient.instance.get('/exams/online');
-      if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => OnlineExam.fromJson(e))
+      if (envelopeOk(response.data)) {
+        return envelopeRows(response.data, source: 'ExamRepository.getOnlineExams')
+            .map(OnlineExam.fromJson)
             .toList();
       }
       throw ApiException(
-          response.data['error'] ?? 'Failed to fetch online exams');
+          envelopeErrorText(response.data, 'Failed to fetch online exams'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }

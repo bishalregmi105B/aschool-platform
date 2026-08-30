@@ -11,6 +11,22 @@ from extensions import db
 
 admission_bp = Blueprint("admission", __name__, url_prefix="/admission")
 
+# E186: statuses accepted by update_inquiry — the column is documented as
+# new/contacted/converted/lost and the follow-up task moves inquiries to
+# "followed_up"; reject free-form garbage.
+VALID_INQUIRY_STATUSES = ("new", "contacted", "followed_up", "converted", "lost")
+
+
+def _parse_uuid(value):
+    """Return a UUID or None — bad uuids in bodies used to surface as
+    unhandled 500s (psycopg2 DataError) instead of 400s."""
+    import uuid as _uuid
+
+    try:
+        return _uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
 
 # ── Inquiries ─────────────────────────────────────────────
 
@@ -51,6 +67,22 @@ def create_inquiry():
 def update_inquiry(inquiry_id):
     inquiry = AdmissionInquiry.query.filter_by(id=inquiry_id, school_id=g.school_id).first_or_404()
     data = request.get_json(silent=True) or {}
+    if "status" in data and data["status"] not in VALID_INQUIRY_STATUSES:
+        return error_response(
+            "Invalid status. Must be one of: " + ", ".join(VALID_INQUIRY_STATUSES),
+            400,
+        )
+    if data.get("assigned_to"):
+        # E186: assigned_to must be a user of this school (FK + tenant check).
+        from app.models.user import User
+
+        assigned_uuid = _parse_uuid(data["assigned_to"])
+        if assigned_uuid is None:
+            return error_response("assigned_to must be a valid UUID", 400)
+        if not User.query.filter_by(
+            id=assigned_uuid, school_id=g.school_id, is_deleted=False
+        ).first():
+            return error_response("assigned_to does not match a user at this school", 400)
     for key in ("status", "notes", "follow_up_date", "assigned_to"):
         if key in data:
             setattr(inquiry, key, data[key])
@@ -83,6 +115,10 @@ def list_applications():
 @plugin_required("admission")
 def create_application():
     data = request.get_json(silent=True) or {}
+    # admission_applications.student_name is NOT NULL — validate up front so a
+    # missing name gets a 400 instead of an unhandled IntegrityError (500).
+    if not str(data.get("student_name") or "").strip():
+        return error_response("student_name is required", 400)
     app = AdmissionApplication(school_id=g.school_id)
     for key in ("student_name", "dob", "gender", "guardian_name", "guardian_phone",
                  "guardian_email", "class_applied", "previous_school", "address", "documents"):
@@ -94,7 +130,18 @@ def create_application():
     if not app.parent_phone:
         return error_response("parent_phone or guardian_phone is required", 400)
     if data.get("inquiry_id"):
-        app.inquiry_id = data["inquiry_id"]
+        # E186: the inquiry link must be (a) a valid uuid and (b) an inquiry
+        # of THIS school — a foreign-school inquiry used to be linked
+        # silently, leaking another tenant's CRM row into this application.
+        inquiry_uuid = _parse_uuid(data["inquiry_id"])
+        if inquiry_uuid is None:
+            return error_response("inquiry_id must be a valid UUID", 400)
+        inquiry = AdmissionInquiry.query.filter_by(
+            id=inquiry_uuid, school_id=g.school_id
+        ).first()
+        if not inquiry:
+            return error_response("inquiry_id does not match an inquiry at this school", 404)
+        app.inquiry_id = inquiry.id
     db.session.add(app)
     db.session.commit()
     return created_response(_app_dict(app))
@@ -110,7 +157,9 @@ def update_application_status(app_id):
     application = AdmissionApplication.query.filter_by(id=app_id, school_id=g.school_id).first_or_404()
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")
-    valid = ["submitted", "under_review", "interview", "accepted", "enrolled", "rejected", "waitlisted"]
+    # E186: "shortlisted" is part of the DB enum (admission_status) but was
+    # missing here, so a legitimate pipeline stage was rejected with 400.
+    valid = ["submitted", "under_review", "shortlisted", "interview", "accepted", "enrolled", "rejected", "waitlisted"]
     if new_status not in valid:
         return error_response(f"Invalid status. Must be one of: {', '.join(valid)}", 400)
     application.status = new_status

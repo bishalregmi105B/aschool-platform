@@ -112,13 +112,14 @@ function MarksContent() {
     enabled: !!classId,
   });
 
-  const { data: students, isLoading: studentsLoading } = useQuery({
+  const { data: students, isLoading: studentsLoading, isError: studentsError, refetch: refetchStudents } = useQuery({
     queryKey: ["students-class", classId],
     queryFn: async () => {
       const res = await api.get(`/students?class_id=${classId}&per_page=200`);
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
     enabled: !!classId,
+    retry: 1,
   });
 
   // Load existing marks when exam/class/subject change
@@ -346,7 +347,12 @@ function MarksContent() {
       {examId && classId && subjectId && (
         <Card>
           <CardContent className="p-0">
-            {studentsLoading ? (
+            {studentsError ? (
+              <div className="flex flex-col items-center py-12 space-y-3">
+                <p className="text-sm text-destructive">Failed to load students. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchStudents()}>Retry</Button>
+              </div>
+            ) : studentsLoading ? (
               <PageLoader />
             ) : studentList.length === 0 ? (
               <p className="text-center py-12 text-muted-foreground">No students found in this class.</p>

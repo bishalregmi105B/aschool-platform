@@ -110,6 +110,20 @@ def update_user(user_id):
         return error_response("User not found", 404)
 
     data = request.get_json(silent=True) or {}
+    # E160: role was silently mass-assigned before — a school_admin could set
+    # role="superadmin" (or any string) on any user in their school, including
+    # themselves, and the claim would take effect on next login. Update
+    # accepts only the same non-privileged roles the create path allows (the
+    # staff/teacher edit dialogs send role as a no-op or a legit staff-role
+    # change); arbitrary strings and platform-only "superadmin" are rejected.
+    if "role" in data and data["role"] != user.role:
+        valid_roles = {"school_admin", "accountant", "teacher", "staff", "parent", "student"}
+        if data["role"] not in valid_roles:
+            return error_response(
+                f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}", 400
+            )
+    if "school_id" in data:
+        return error_response("school_id cannot be changed", 400)
     _populate_user(user, data)
 
     if data.get("password"):

@@ -6,7 +6,6 @@ export 'services/api_client.dart';
 export 'services/auth_service.dart';
 export 'services/academic_data_service.dart';
 export 'services/plugin_provider.dart';
-export 'services/offline_sync.dart';
 export 'services/notification_service.dart';
 export 'services/socket_service.dart';
 export 'services/notices_service.dart';
@@ -53,6 +52,8 @@ export 'widgets/pull_to_refresh.dart';
 export 'widgets/eschool_components.dart';
 export 'widgets/eschool_dialog.dart';
 export 'widgets/attachment_viewer.dart';
+export 'widgets/notification_bell.dart';
+export 'widgets/notification_center_screen.dart';
 
 // Theme
 export 'theme/app_theme.dart';
@@ -60,6 +61,7 @@ export 'theme/app_theme.dart';
 // Utils
 export 'utils/constants.dart';
 export 'utils/nepali_formatter.dart';
+export 'utils/safe_parse.dart';
 
 // Features
 export 'features/emergency_screen.dart';

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -108,6 +109,12 @@ class SocialMessage(SchoolModel):
 class AdCampaign(SchoolModel):
     __tablename__ = "ad_campaigns"
 
+    # Campaign identity + creative (E30: previously the table had no name or
+    # content of its own — an ad campaign was indistinguishable without its
+    # linked SocialPost). Content is stored as sanitized text + a media URL.
+    name = Column(String(200))
+    content = Column(Text)
+    media_url = Column(Text)
     post_id = Column(UUID(as_uuid=True), ForeignKey("social_posts.id"))
     platform = Column(
         Enum("facebook", "instagram", name="ad_platform"), nullable=False
@@ -133,6 +140,37 @@ class AdCampaign(SchoolModel):
 
     post = relationship("SocialPost", foreign_keys=[post_id])
 
+    # Delivery stats (reach/impressions/clicks/spend) stay at their defaults
+    # until real delivery data exists — the API never fabricates them.
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "content": self.content,
+            "media_url": self.media_url,
+            "post_id": str(self.post_id) if self.post_id else None,
+            "platform": self.platform,
+            "objective": self.objective,
+            "status": self.status,
+            "targeting": self.targeting or {},
+            "daily_budget_npr": float(self.daily_budget_npr)
+            if self.daily_budget_npr is not None
+            else None,
+            "budget": float(self.total_budget_npr)
+            if self.total_budget_npr is not None
+            else None,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            # Real delivery counters only (0 until actual delivery is wired).
+            "reach": self.reach or 0,
+            "impressions": self.impressions or 0,
+            "clicks": self.clicks or 0,
+            "spend_npr": float(self.spend_npr) if self.spend_npr else 0,
+            "ai_suggested": bool(self.ai_suggested),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
 
 # ── Internal Social Hub (school-internal posts/comments/groups) ──
 
@@ -146,9 +184,18 @@ class Post(SchoolModel):
     media_urls = Column(JSONB, default=list)
     likes = Column(JSONB, default=list)  # list of user_id strings
     visibility = Column(String(20), default="school")  # school, class, group
+    # E194: moderation state — hidden posts leave every non-admin feed but
+    # keep their data (the audit trail is hidden_by_id, not deletion).
+    is_hidden = Column(Boolean, default=False, index=True)
+    hidden_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    hidden_by = relationship("User", foreign_keys=[hidden_by_id])
+    # E195: group-scoped posts. When set, only group members (plus the
+    # author and school admins) may read, like, or comment.
+    group_id = Column(UUID(as_uuid=True), ForeignKey("hub_groups.id"), index=True)
+    group = relationship("Group", foreign_keys=[group_id])
     is_deleted = Column(Boolean, default=False)
 
-    author = relationship("User", backref="hub_posts")
+    author = relationship("User", backref="hub_posts", foreign_keys=[author_id])
     comments = relationship("Comment", back_populates="post", lazy="dynamic")
 
 
@@ -175,3 +222,31 @@ class Group(SchoolModel):
     is_deleted = Column(Boolean, default=False)
 
     creator = relationship("User")
+    memberships = relationship(
+        "GroupMember", back_populates="group", cascade="all, delete-orphan"
+    )
+
+
+class GroupMember(SchoolModel):
+    """E195: real group membership rows.
+
+    hub_groups.member_count used to be a dead counter nothing incremented,
+    and posts had no way to belong to a group at all — so "group" visibility
+    and member enforcement were both fiction. A GroupMember row per
+    (group, user) makes membership real: joining/leave maintains both this
+    table and the group's member_count, and posting to a group requires it.
+    """
+    __tablename__ = "hub_group_members"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_hub_group_member"),
+    )
+
+    group_id = Column(
+        UUID(as_uuid=True), ForeignKey("hub_groups.id"), nullable=False, index=True
+    )
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    role_in_group = Column(String(20), default="member")  # member, moderator
+
+    group = relationship("Group", back_populates="memberships")

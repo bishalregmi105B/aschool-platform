@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/plugin_manifest.dart';
 import '../utils/constants.dart';
+import '../utils/safe_parse.dart';
 import 'api_client.dart';
 
 /// Plugin state — tracks installed plugins for the current school
@@ -38,11 +40,18 @@ class PluginState {
     return isInstalled(pluginSlug);
   }
 
-  /// Get plugin config by slug
+  /// Get plugin config by slug.
+  ///
+  /// Config comes from the backend `GET /plugins/installed` response (each
+  /// row carries the school's `SchoolPlugin.config` JSON — see
+  /// backend/app/api/v1/plugins.py). It is cached with the plugin list in
+  /// secure storage, so it survives restarts and offline starts. Returns
+  /// null when the plugin is not installed/known; an installed plugin with
+  /// no stored config yields the empty map the API sends.
   Map<String, dynamic>? getConfig(String slug) {
     final plugin = plugins.where((p) => p.slug == slug).firstOrNull;
     if (plugin == null) return null;
-    return const {};
+    return plugin.config ?? const {};
   }
 
   PluginState copyWith({
@@ -81,12 +90,14 @@ class PluginNotifier extends StateNotifier<PluginState> {
     try {
       final cached = await _storage.read(key: AppConstants.pluginsKey);
       if (cached != null) {
-        final list = (jsonDecode(cached) as List)
-            .map((e) => InstalledPlugin.fromJson(e))
+        final list = safeMapList(jsonDecode(cached))
+            .map(InstalledPlugin.fromJson)
             .toList();
         state = state.copyWith(plugins: list);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('PluginProvider.loadCached plugins failed: $e\n$st');
+    }
 
     try {
       final cachedVisibility =
@@ -96,13 +107,13 @@ class PluginNotifier extends StateNotifier<PluginState> {
       final decoded = jsonDecode(cachedVisibility);
       if (decoded is! Map) return;
 
-      final visibility =
-          Map<String, dynamic>.from(decoded['visibility'] as Map? ?? const {});
-      final modules =
-          (decoded['modules'] as List? ?? const []).whereType<String>().toSet();
+      final visibility = safeMap(decoded['visibility']);
+      final modules = safeStringList(decoded['modules']).toSet();
 
       state = state.copyWith(visibility: visibility, visibleModules: modules);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('PluginProvider.loadCached visibility failed: $e\n$st');
+    }
   }
 
   /// Fetch installed plugins from API
@@ -117,38 +128,33 @@ class PluginNotifier extends StateNotifier<PluginState> {
       if (response.statusCode == 200 && response.data['success'] == true) {
         final data = response.data['data'];
         final rawPlugins =
-            data is List ? data : (data['plugins'] as List? ?? []);
-        nextPlugins = rawPlugins
-            .map((e) => InstalledPlugin.fromJson(e as Map<String, dynamic>))
+            data is List ? data : safeMapOrNull(data)?['plugins'];
+        nextPlugins = safeMapList(rawPlugins)
+            .map(InstalledPlugin.fromJson)
             .toList();
       }
-    } catch (_) {
+    } catch (e, st) {
       // Keep cached data on error
+      debugPrint('PluginProvider.fetchPlugins failed: $e\n$st');
     }
 
     try {
       final response = await ApiClient.instance.get('/mobile/bootstrap');
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final data = Map<String, dynamic>.from(
-            response.data['data'] as Map? ?? const {});
-        nextVisibility = Map<String, dynamic>.from(
-            data['visibility'] as Map? ?? const <String, dynamic>{});
-        nextVisibleModules = (nextVisibility['modules'] as List? ?? const [])
-            .whereType<String>()
-            .toSet();
+        final data = safeMap(response.data['data']);
+        nextVisibility = safeMap(data['visibility']);
+        nextVisibleModules = safeStringList(nextVisibility['modules']).toSet();
 
         if (nextPlugins.isEmpty) {
-          final installedSlugs =
-              (data['installed_plugins'] as List? ?? const [])
-                  .whereType<String>()
-                  .toList();
+          final installedSlugs = safeStringList(data['installed_plugins']);
           nextPlugins = installedSlugs
               .map((slug) => InstalledPlugin(slug: slug, name: slug))
               .toList();
         }
       }
-    } catch (_) {
+    } catch (e, st) {
       // Keep existing visibility cache if bootstrap fails.
+      debugPrint('PluginProvider.bootstrap visibility failed: $e\n$st');
     }
 
     state = state.copyWith(

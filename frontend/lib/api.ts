@@ -41,8 +41,29 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const url = originalRequest?.url || "";
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Auth endpoints should not attempt token refresh or force a reload to /login
+    const isAuthEndpoint =
+      url.includes("/auth/login") ||
+      url.includes("/auth/refresh") ||
+      url.includes("/auth/verify-otp") ||
+      url.includes("/auth/send-otp") ||
+      url.includes("/auth/student-login") ||
+      url.includes("/auth/register");
+
+    const isAuthPage =
+      typeof window !== "undefined" &&
+      (window.location.pathname.startsWith("/login") ||
+        window.location.pathname.startsWith("/register") ||
+        window.location.pathname.startsWith("/verify-otp"));
+
+    // Initial session probe (/auth/me) when unauthenticated on auth pages should silently fail
+    if (url.includes("/auth/me") && isAuthPage) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       if (!refreshInFlight) {
@@ -56,8 +77,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       }
 
-      // Refresh failed — session is over
-      if (typeof window !== "undefined") {
+      // Refresh failed — session is over, redirect only if not already on an auth page
+      if (typeof window !== "undefined" && !isAuthPage) {
         window.location.href = "/login";
       }
     }

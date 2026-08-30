@@ -47,7 +47,15 @@ class BaseConfig:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", 2592000))
     )
-    JWT_TOKEN_LOCATION = ["headers"]
+    # Accept tokens from Authorization header (mobile) AND from the
+    # HttpOnly cookies (web dashboard). Cookie name must match ACCESS_COOKIE
+    # in app.api.v1.auth so the same value is read back.
+    JWT_TOKEN_LOCATION = ["headers", "cookies"]
+    JWT_ACCESS_COOKIE_NAME = "access_token"
+    JWT_REFRESH_COOKIE_NAME = "refresh_token"
+    JWT_COOKIE_SECURE = False  # dev uses http; cookie's own Secure flag controls prod
+    JWT_COOKIE_SAMESITE = "Lax"
+    JWT_COOKIE_CSRF_PROTECT = False  # cookies are first-party; SameSite=Lax is enough
 
     # HttpOnly session cookies (web dashboard). JWT_TOKEN_LOCATION stays
     # header-only so mobile Bearer auth is unaffected; cookies are an
@@ -103,6 +111,28 @@ class BaseConfig:
     KHALTI_ENVIRONMENT = os.getenv("KHALTI_ENVIRONMENT", "sandbox")
     FONEPAY_ENVIRONMENT = os.getenv("FONEPAY_ENVIRONMENT", "sandbox")
 
+    # Stripe — SaaS plugin subscription webhooks (audit E5). Only the signing
+    # secret is needed at app level; it is sourced from env with a default-empty
+    # value so dev/test never crash, but /api/v1/webhooks/stripe refuses
+    # requests (400 + logged error) while it is unset, because signature
+    # verification is impossible without it.
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+    # Plugin marketplace — WordPress-style install semantics (plugin-
+    # architecture batch audits E160-E163; FIX_STATUS §14 has the rows —
+    # the E160-E169 band was double-allocated with §11/Slice-1).
+    # PLUGIN_TRIAL_DAYS: trial length granted when a PAID plugin is installed
+    # (platform-level knob; supersedes the per-plugin catalog trial_days so the
+    # policy stays config-controlled). PLUGIN_FREE_TIERS: tier categories that
+    # install instantly with NO trial ever (is_trial=False, active immediately)
+    # — a plugin is "free" when price_monthly == 0 OR its tier is listed here.
+    PLUGIN_TRIAL_DAYS = int(os.getenv("PLUGIN_TRIAL_DAYS", "14"))
+    PLUGIN_FREE_TIERS = [
+        tier.strip().lower()
+        for tier in os.getenv("PLUGIN_FREE_TIERS", "core,add_on").split(",")
+        if tier.strip()
+    ]
+
     # R2 Storage
     R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
     R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
@@ -129,6 +159,15 @@ class BaseConfig:
     # Domain
     BASE_DOMAIN = os.getenv("BASE_DOMAIN", "aschool.com.np")
     CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "Asia/Kathmandu")
+
+    # Next.js ISR on-demand revalidation (E201): the Flask publish/unpublish
+    # (and other website-builder mutations) ping the Next.js /api/revalidate
+    # endpoint so /school/<slug> route + data caches purge immediately.
+    # NEXTJS_INTERNAL_URL is the Docker-internal Next.js origin (compose
+    # service name). Leave ISR_REVALIDATE_SECRET empty when the Next side
+    # does not configure one — both sides must match.
+    NEXTJS_INTERNAL_URL = os.getenv("NEXTJS_INTERNAL_URL", "http://nextjs:3000")
+    ISR_REVALIDATE_SECRET = os.getenv("ISR_REVALIDATE_SECRET", "")
 
 
 class DevelopmentConfig(BaseConfig):

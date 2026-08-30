@@ -16,10 +16,26 @@ export default function InsightsPage() {
 }
 
 function InsightsContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["ai-insights"],
     queryFn: async () => { const r = await api.get("/ai-tools/insights/weekly"); return r.data?.data; },
+    retry: 1,
   });
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/ai-tools"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+          <div><h1 className="text-2xl font-bold">AI School Insights</h1><p className="text-muted-foreground">Weekly intelligence report for school management</p></div>
+        </div>
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load insights. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   const insights = data?.insights || data || [];
   const summary = data?.summary || {};

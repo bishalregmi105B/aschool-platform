@@ -11,6 +11,7 @@ class ReportsHubScreen extends StatefulWidget {
 class _ReportsHubScreenState extends State<ReportsHubScreen> {
   Map<String, dynamic> _data = {};
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,13 +20,18 @@ class _ReportsHubScreenState extends State<ReportsHubScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/reports/dashboard');
       final raw = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
       _data = raw is Map<String, dynamic> ? raw : {};
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ReportsHubScreen load failed: $e\n$st');
       _data = {};
+      _error = 'Could not load reports.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -33,6 +39,11 @@ class _ReportsHubScreenState extends State<ReportsHubScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: LoadingShimmer());
+    if (_error != null) {
+      return Scaffold(
+        body: ErrorContainer(errorMessage: _error!, onRetry: _load),
+      );
+    }
 
     final entries = _data.entries.toList();
     return Scaffold(

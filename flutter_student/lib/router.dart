@@ -93,6 +93,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           onLoginSuccess: () => context.go('/dashboard'),
         ),
       ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationCenterScreen(),
+      ),
       ..._legacyStudentRouteRedirects.entries.map(
         (entry) => GoRoute(
           path: entry.key,

@@ -113,11 +113,11 @@ class _ClassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _colors[index % _colors.length];
-    final name = classData['name'] as String? ?? 'Class';
-    final shortName = (classData['short'] as String?) ??
+    final name = safeStringOrNull(classData['name']) ?? 'Class';
+    final shortName = safeStringOrNull(classData['short']) ??
         (name.length > 3 ? name.substring(0, 3).toUpperCase() : name);
-    final studentCount = classData['student_count'] as int? ?? 0;
-    final isClassTeacher = classData['is_class_teacher'] as bool? ?? false;
+    final studentCount = safeIntOrNull(classData['student_count']) ?? 0;
+    final isClassTeacher = safeBool(classData['is_class_teacher'], fallback: false);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -279,9 +279,9 @@ class _ClassDetailViewState extends ConsumerState<_ClassDetailView>
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.classData['name'] as String? ?? 'Class';
+    final name = safeStringOrNull(widget.classData['name']) ?? 'Class';
     final classId = widget.classData['id']?.toString() ?? '';
-    final studentCount = widget.classData['student_count'] as int? ?? 0;
+    final studentCount = safeIntOrNull(widget.classData['student_count']) ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -391,7 +391,7 @@ class _StudentsTab extends ConsumerWidget {
                   ? students
                   : students
                       .where((s) =>
-                          (s['name'] as String? ?? '')
+                          (safeStringOrNull(s['name']) ?? '')
                               .toLowerCase()
                               .contains(search.toLowerCase()) ||
                           (s['roll_no'] ?? '').toString().contains(search))
@@ -429,10 +429,10 @@ class _StudentListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = student['name'] as String? ?? 'Student';
+    final name = safeStringOrNull(student['name']) ?? 'Student';
     final rollNo = student['roll_no'] ?? student['roll_number'] ?? '';
-    final photoUrl = student['photo_url'] as String?;
-    final attendancePct = student['attendance_percent'] as num?;
+    final photoUrl = safeStringOrNull(student['photo_url']);
+    final attendancePct = safeNumOrNull(student['attendance_percent']);
     final studentId = student['id']?.toString() ?? '';
 
     return Card(
@@ -512,11 +512,11 @@ class _OverviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = classData['name'] as String? ?? 'Class';
-    final studentCount = classData['student_count'] as int? ?? 0;
-    final subjectCount = classData['subject_count'] as int? ?? 0;
-    final isClassTeacher = classData['is_class_teacher'] as bool? ?? false;
-    final academicYear = classData['academic_year'] as String?;
+    final name = safeStringOrNull(classData['name']) ?? 'Class';
+    final studentCount = safeIntOrNull(classData['student_count']) ?? 0;
+    final subjectCount = safeIntOrNull(classData['subject_count']) ?? 0;
+    final isClassTeacher = safeBool(classData['is_class_teacher'], fallback: false);
+    final academicYear = safeStringOrNull(classData['academic_year']);
 
     return ListView(
       padding: const EdgeInsets.all(16),

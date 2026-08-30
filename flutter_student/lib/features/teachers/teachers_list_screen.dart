@@ -12,6 +12,7 @@ class TeachersListScreen extends ConsumerStatefulWidget {
 class _TeachersListScreenState extends ConsumerState<TeachersListScreen> {
   List<Map<String, dynamic>> _teachers = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _TeachersListScreenState extends ConsumerState<TeachersListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/users', queryParameters: {'role': 'teacher', 'per_page': 100});
@@ -31,8 +35,10 @@ class _TeachersListScreenState extends ConsumerState<TeachersListScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TeachersListScreen load failed: $e\n$st');
       _teachers = [];
+      _error = 'Could not load teachers.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -43,7 +49,9 @@ class _TeachersListScreenState extends ConsumerState<TeachersListScreen> {
       appBar: const CustomAppBar(title: 'Teachers'),
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _teachers.isEmpty
                   ? ListView(

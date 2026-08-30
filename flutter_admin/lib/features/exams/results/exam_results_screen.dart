@@ -18,6 +18,7 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
   String? _selectedClassId;
   bool _loadingFilters = true;
   bool _loadingResults = false;
+  String? _filtersError;
 
   @override
   void initState() {
@@ -26,7 +27,10 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
   }
 
   Future<void> _loadFilters() async {
-    setState(() => _loadingFilters = true);
+    setState(() {
+      _loadingFilters = true;
+      _filtersError = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/exams?status=completed&per_page=30'),
@@ -39,8 +43,12 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loadingFilters = false;
       });
-    } catch (_) {
-      setState(() => _loadingFilters = false);
+    } catch (e) {
+      debugPrint('ExamResultsScreen loadFilters failed: $e');
+      setState(() {
+        _filtersError = 'Could not load exams and classes.';
+        _loadingFilters = false;
+      });
     }
   }
 
@@ -56,8 +64,15 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
             List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loadingResults = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ExamResultsScreen loadResults failed: $e');
       setState(() => _loadingResults = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load results for this exam and class.'),
+          backgroundColor: ASchoolTheme.danger,
+        ));
+      }
     }
   }
 
@@ -70,7 +85,7 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
     if (_results.isEmpty) return 0;
     return _results.fold<double>(
           0,
-          (sum, r) => sum + (r['percentage'] as num? ?? 0).toDouble(),
+          (sum, r) => sum + safeNum(r['percentage']).toDouble(),
         ) /
         _results.length;
   }
@@ -81,7 +96,12 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
       appBar: AppBar(title: const Text('Exam Results')),
       body: _loadingFilters
           ? const LoadingShimmer()
-          : Column(
+          : _filtersError != null
+              ? ErrorContainer(
+                  errorMessage: _filtersError!,
+                  onRetry: _loadFilters,
+                )
+              : Column(
               children: [
                 _buildFilters(),
                 if (_loadingResults) const Expanded(child: LoadingShimmer()),
@@ -125,9 +145,9 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
               value: _selectedExamId,
               items: _exams.map((e) {
                 return DropdownMenuItem<String>(
-                  value: e['id'] as String?,
+                  value: safeStringOrNull(e['id']),
                   child: Text(
-                    e['name'] as String? ?? '',
+                    safeStringOrNull(e['name']) ?? '',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13),
                   ),
@@ -156,9 +176,9 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
               value: _selectedClassId,
               items: _classes.map((c) {
                 return DropdownMenuItem<String>(
-                  value: c['id'] as String?,
+                  value: safeStringOrNull(c['id']),
                   child: Text(
-                    c['name'] as String? ?? '',
+                    safeStringOrNull(c['name']) ?? '',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13),
                   ),
@@ -267,10 +287,10 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
       itemBuilder: (_, i) {
         final r = _results[i];
         final isPassed = r['status'] == 'pass';
-        final rank = (r['rank'] as num?)?.toInt() ?? (i + 1);
+        final rank = safeIntOrNull(r['rank']) ?? (i + 1);
         final pct =
-            (r['percentage'] as num?)?.toStringAsFixed(1) ?? '0.0';
-        final grade = r['grade'] as String? ?? '';
+            safeNumOrNull(r['percentage'])?.toStringAsFixed(1) ?? '0.0';
+        final grade = safeStringOrNull(r['grade']) ?? '';
 
         return InkWell(
           onTap: () => _showMarksheet(r),
@@ -307,7 +327,7 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
                 ),
                 Expanded(
                   child: Text(
-                    r['student_name'] as String? ?? '',
+                    safeStringOrNull(r['student_name']) ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -378,7 +398,7 @@ class _ExamResultsScreenState extends ConsumerState<ExamResultsScreen> {
       ),
       builder: (_) => _MarksheetSheet(
         examId: _selectedExamId!,
-        studentId: result['student_id'] as String,
+        studentId: result['student_id']?.toString() ?? '',
       ),
     );
   }
@@ -466,7 +486,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
   Widget _buildContent(ScrollController ctrl) {
     final ms = _ms!;
     final subjects = List<Map<String, dynamic>>.from(
-        ms['subjects'] as List? ?? []);
+        safeList(ms['subjects']));
 
     return ListView(
       controller: ctrl,
@@ -474,7 +494,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
       children: [
         // Header
         Text(
-          ms['student_name'] as String? ?? '',
+          safeStringOrNull(ms['student_name']) ?? '',
           style: Theme.of(context)
               .textTheme
               .titleLarge
@@ -498,7 +518,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
           const SizedBox(width: 8),
           Expanded(
             child: _summaryCard(
-              ms['overall_grade'] as String? ?? '—',
+              safeStringOrNull(ms['overall_grade']) ?? '—',
               'Grade',
               ASchoolTheme.success,
             ),
@@ -522,7 +542,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
           padding: EdgeInsets.only(bottom: 8),
         ),
         ...subjects.map((s) {
-          final isPassed = s['pass'] as bool? ?? true;
+          final isPassed = safeBool(s['pass'], fallback: true);
           return ESchoolCard(
             margin: const EdgeInsets.only(bottom: 8),
             color: isPassed ? null : const Color(0xFFFFF3F3),
@@ -533,7 +553,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        s['subject_name'] as String? ?? '',
+                        safeStringOrNull(s['subject_name']) ?? '',
                         style: const TextStyle(
                             fontWeight: FontWeight.w600),
                       ),
@@ -561,7 +581,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
                 const SizedBox(width: 10),
                 ESchoolInfoPill(
                   icon: Icons.grade_rounded,
-                  label: s['grade'] as String? ?? '',
+                  label: safeStringOrNull(s['grade']) ?? '',
                   color: isPassed
                       ? ASchoolTheme.primary
                       : ASchoolTheme.danger,
@@ -596,7 +616,7 @@ class _MarksheetSheetState extends State<_MarksheetSheet> {
                 ]),
                 const SizedBox(height: 6),
                 Text(
-                  ms['ai_remarks'] as String,
+                  ms['ai_remarks']?.toString() ?? '',
                   style: const TextStyle(fontSize: 13, height: 1.4),
                 ),
               ],

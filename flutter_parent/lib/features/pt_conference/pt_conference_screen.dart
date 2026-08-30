@@ -80,7 +80,7 @@ class _ConferenceCardState extends State<_ConferenceCard> {
   bool _booking = false;
 
   String? get _bookedSlotId {
-    final booked = widget.conference['booked_slot'] as Map?;
+    final booked = safeMapOrNull(widget.conference['booked_slot']);
     return booked?['slot_id']?.toString();
   }
 
@@ -90,20 +90,27 @@ class _ConferenceCardState extends State<_ConferenceCard> {
 
     // Load available slots via direct API call
     List<Map<String, dynamic>> slots = [];
+    var slotsFailed = false;
     try {
       final resp = await ApiClient.instance.get(
         '/conferences/$conferenceId/slots',
         queryParameters: {'available_only': 'true'},
       );
-      final raw = resp.data['data'];
-      if (raw is List) {
-        slots = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-    } catch (_) {
-      // Slot loading failed — show empty picker
+      slots = safeMapList(envelopeData(resp.data));
+    } catch (e, st) {
+      debugPrint('PtConferenceScreen loadSlots failed: $e\n$st');
+      slotsFailed = true;
     }
 
     if (!context.mounted) return;
+
+    if (slotsFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not load slots. Please try again.')),
+      );
+      return;
+    }
 
     if (slots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -211,8 +218,8 @@ class _ConferenceCardState extends State<_ConferenceCard> {
   Widget build(BuildContext context) {
     final conf = widget.conference;
     final isVirtual = conf['is_virtual'] == true;
-    final availableSlots = conf['available_slots'] as int? ?? 0;
-    final bookedSlot = conf['booked_slot'] as Map?;
+    final availableSlots = safeIntOrNull(conf['available_slots']) ?? 0;
+    final bookedSlot = safeMapOrNull(conf['booked_slot']);
     final isBooked = bookedSlot != null;
 
     return ESchoolCard(
@@ -397,7 +404,8 @@ class _ConferenceCardState extends State<_ConferenceCard> {
         'Dec'
       ];
       return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('PtConferenceScreen _formatDate parse failed: $e');
       return iso;
     }
   }
@@ -410,7 +418,8 @@ class _ConferenceCardState extends State<_ConferenceCard> {
       final period = h >= 12 ? 'PM' : 'AM';
       final hour = h % 12 == 0 ? 12 : h % 12;
       return '$hour:$m $period';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('PtConferenceScreen _formatTime parse failed: $e');
       return iso;
     }
   }
