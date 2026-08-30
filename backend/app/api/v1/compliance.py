@@ -1,10 +1,17 @@
 """Government Compliance & Reporting API — EMIS, MoE reports, audit logs."""
-from flask import Blueprint, g, request
+import os
+
+from flask import Blueprint, g, redirect, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.models.compliance import ComplianceReport, EMISExport, AuditLog
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
+from app.utils.file_upload import (
+    _backend as _storage_backend,
+    _local_upload_dir,
+    generate_presigned_url,
+)
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -144,6 +151,58 @@ def generate_emis():
     db.session.add(emis)
     db.session.commit()
     return created_response(_emis_dict(emis))
+
+
+@compliance_bp.route("/emis/<uuid:export_id>/download", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("compliance")
+def download_emis_export(export_id):
+    """Download the persisted EMIS CSV file for an export.
+
+    Streams the stored CSV through this gated, tenant-scoped endpoint on the
+    local storage backend; redirects to a time-limited presigned URL on R2
+    (mirroring the files API presigned pattern).
+    """
+    export = EMISExport.query.filter_by(
+        id=export_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not export or not export.file_url:
+        return error_response("Export not found", 404)
+
+    # Prefer the storage key recorded at generation time; fall back to
+    # deriving it from the stored URL.
+    key = (export.export_data or {}).get("file_key") or _storage_key_from_url(export.file_url)
+    if not key:
+        return error_response("Export file is not available for download", 404)
+
+    if _storage_backend() == "r2":
+        return redirect(generate_presigned_url(key, expires_in=300))
+
+    path = os.path.join(_local_upload_dir(), *key.split("/"))
+    if not os.path.isfile(path):
+        return error_response("Export file missing from storage", 404)
+    return send_file(
+        path,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=key.rsplit("/", 1)[-1],
+    )
+
+
+def _storage_key_from_url(url: str):
+    """Derive a storage key from a stored file URL, or None if unknown."""
+    if not url:
+        return None
+    if url.startswith("/uploads/"):
+        return url[len("/uploads/"):]
+    from flask import current_app
+
+    public_base = (current_app.config.get("R2_PUBLIC_URL")
+                   or os.getenv("R2_PUBLIC_URL", "")).rstrip("/")
+    if public_base and url.startswith(f"{public_base}/"):
+        return url[len(public_base) + 1:]
+    return None
 
 
 # ── Audit Logs ─────────────────────────────────────────────

@@ -9,6 +9,22 @@ from app.models.user import User
 from tests.conftest import get_auth_headers
 
 
+def _install_hostel_plugin(db, school):
+    """The hostel routes are plugin-gated (plugin_required("hostel")); both the
+    owner and the cross-tenant school need an active install so the isolation
+    assertions exercise ownership scoping, not the entitlement gate."""
+    from app.models.plugin import Plugin, SchoolPlugin
+
+    if not Plugin.query.filter_by(slug="hostel").first():
+        db.session.add(Plugin(slug="hostel", name="Hostel Management", category="growth",
+                              price_monthly=0, price_yearly=0, is_free=True, is_published=True))
+        db.session.flush()
+    if not SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="hostel").first():
+        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="hostel",
+                                    active=True, is_trial=False))
+    db.session.commit()
+
+
 def _admin(client, db, school, suffix):
     u = User(
         school_id=school.id,
@@ -61,6 +77,8 @@ def test_hostel_of_other_school_not_readable(client, db, school):
     from app.models.school import School
 
     beta = School.query.filter_by(slug="beta-isolation").first() or _second_school(db)
+    _install_hostel_plugin(db, school)
+    _install_hostel_plugin(db, beta)
     hostel = _hostel(db, school)
 
     beta_headers = _admin(client, db, beta, "beta")
@@ -87,6 +105,8 @@ def test_hostel_list_scoped_to_own_school(client, db, school):
     from app.models.school import School
 
     beta = School.query.filter_by(slug="beta-isolation").first() or _second_school(db)
+    _install_hostel_plugin(db, school)
+    _install_hostel_plugin(db, beta)
     _hostel(db, school)  # belongs to alpha
 
     beta_headers = _admin(client, db, beta, "beta")

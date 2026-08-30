@@ -14,6 +14,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String _search = '';
+  String? _error;
 
   @override
   void initState() {
@@ -22,15 +23,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/inventory?per_page=50');
       setState(() {
         _items = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('InventoryScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load inventory.';
+        _loading = false;
+      });
     }
   }
 
@@ -40,7 +48,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         .where(
           (i) =>
               _search.isEmpty ||
-              (i['name'] as String? ?? '')
+              (safeStringOrNull(i['name']) ?? '')
                   .toLowerCase()
                   .contains(_search.toLowerCase()),
         )
@@ -70,7 +78,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             Expanded(
               child: _loading
                   ? const LoadingShimmer()
-                  : filtered.isEmpty
+                  : _error != null
+                      ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                      : filtered.isEmpty
                       ? const NoDataContainer(
                           title: 'No inventory items',
                           subtitle:
@@ -85,9 +95,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             itemBuilder: (_, i) {
                               final item = filtered[i];
                               final qty =
-                                  (item['quantity'] as num?)?.toInt() ?? 0;
+                                  safeIntOrNull(item['quantity']) ?? 0;
                               final minQty =
-                                  (item['min_quantity'] as num?)?.toInt() ?? 0;
+                                  safeIntOrNull(item['min_quantity']) ?? 0;
                               final isLow = qty <= minQty && minQty > 0;
 
                               return ESchoolAnimatedEntry(
@@ -110,7 +120,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                       ),
                                     ),
                                     title: Text(
-                                      item['name'] as String? ?? '',
+                                      safeStringOrNull(item['name']) ?? '',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w600),
                                     ),
@@ -230,7 +240,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   'unit': unitCtrl.text.trim(),
                 });
                 _load();
-              } catch (_) {
+              } catch (e, st) {
+                debugPrint('InventoryScreen addItem failed: $e\n$st');
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Failed to add item')),

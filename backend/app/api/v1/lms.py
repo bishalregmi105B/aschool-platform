@@ -1,4 +1,6 @@
 """LMS API — courses, lessons, quizzes, progress tracking."""
+from datetime import UTC, datetime
+
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
@@ -8,6 +10,7 @@ from app.models.lms import (
     Lesson,
     Quiz,
     QuizAttempt,
+    StudentProgress,
     StudyMaterial,
     Topic,
 )
@@ -76,7 +79,14 @@ def get_course(course_id):
 @role_required("superadmin", "school_admin", "teacher")
 def create_lesson(course_id):
     data = request.get_json(silent=True) or {}
-    lesson = Lesson(school_id=g.school_id, course_id=course_id)
+    course = Course.query.filter_by(
+        id=course_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not course:
+        return error_response("Course not found", 404)
+    if not (data.get("title") or data.get("name")):
+        return error_response("title is required", 400)
+    lesson = Lesson(school_id=g.school_id, course_id=course.id)
     for key in ("title", "content", "content_type", "video_url", "file_url", "sort_order", "duration_minutes"):
         if key in data:
             setattr(lesson, key, data[key])
@@ -136,7 +146,9 @@ def create_lesson_compat():
 @plugin_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def update_lesson(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
+    lesson = Lesson.query.filter_by(
+        id=lesson_id, school_id=g.school_id, is_deleted=False
+    ).first_or_404()
     data = request.get_json(silent=True) or {}
     for key in ("title", "content", "content_type", "video_url", "file_url", "sort_order", "duration_minutes"):
         if key in data:
@@ -230,7 +242,9 @@ def create_study_material():
 @school_required
 @plugin_required("lms")
 def list_quizzes(course_id):
-    quizzes = Quiz.query.filter_by(course_id=course_id).order_by(Quiz.sort_order).all()
+    quizzes = Quiz.query.filter_by(
+        course_id=course_id, school_id=g.school_id
+    ).order_by(Quiz.sort_order).all()
     return success_response([_quiz_dict(q) for q in quizzes])
 
 
@@ -255,10 +269,15 @@ def create_quiz(course_id):
 @school_required
 @plugin_required("lms")
 def submit_quiz_attempt(quiz_id):
+    quiz = Quiz.query.filter_by(
+        id=quiz_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not quiz:
+        return error_response("Quiz not found", 404)
     data = request.get_json(silent=True) or {}
     attempt = QuizAttempt(
         school_id=g.school_id,
-        quiz_id=quiz_id,
+        quiz_id=quiz.id,
         student_id=_current_user_id(),
         answers=data.get("answers", {}),
         score=data.get("score"),
@@ -276,13 +295,27 @@ def submit_quiz_attempt(quiz_id):
 @plugin_required("lms")
 def enroll_student(course_id):
     data = request.get_json(silent=True) or {}
+    course = Course.query.filter_by(
+        id=course_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not course:
+        return error_response("Course not found", 404)
     student_id = data.get("student_id", _current_user_id())
 
-    existing = Enrollment.query.filter_by(course_id=course_id, student_id=student_id).first()
+    from app.models.user import User
+
+    if not student_id or not User.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("student_id does not match a user at this school", 400)
+
+    existing = Enrollment.query.filter_by(
+        course_id=course.id, student_id=student_id, school_id=g.school_id
+    ).first()
     if existing:
         return error_response("Already enrolled", 409)
 
-    enrollment = Enrollment(course_id=course_id, student_id=student_id)
+    enrollment = Enrollment(course_id=course.id, student_id=student_id)
     enrollment.school_id = g.school_id
     db.session.add(enrollment)
     db.session.commit()
@@ -295,7 +328,9 @@ def enroll_student(course_id):
 @plugin_required("lms")
 def get_progress(course_id):
     student_id = request.args.get("student_id", _current_user_id())
-    enrollment = Enrollment.query.filter_by(course_id=course_id, student_id=student_id).first()
+    enrollment = Enrollment.query.filter_by(
+        course_id=course_id, student_id=student_id, school_id=g.school_id
+    ).first()
     if not enrollment:
         return error_response("Not enrolled", 404)
 
@@ -304,6 +339,114 @@ def get_progress(course_id):
         "student_id": student_id,
         "progress_percentage": enrollment.progress_percentage or 0,
         "completed_lessons": enrollment.completed_lessons or [],
+    })
+
+
+@lms_bp.route("/courses/<course_id>/progress", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("lms")
+def record_progress(course_id):
+    """Mark lesson progress for a student.
+
+    Students self-report; admins/teachers may pass student_id (a user id) to
+    record on behalf of a student. Upserts StudentProgress (the row type the
+    student dashboard reads) and re-derives the Enrollment aggregates so both
+    read paths stay consistent.
+    """
+    data = request.get_json(silent=True) or {}
+    from app.models.student import Student
+    from app.models.user import User
+
+    course = Course.query.filter_by(
+        id=course_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not course:
+        return error_response("Course not found", 404)
+
+    user_id = data.get("student_id", _current_user_id())
+    user = User.query.filter_by(id=user_id, school_id=g.school_id, is_deleted=False).first()
+    if not user:
+        return error_response("student_id does not match a user at this school", 400)
+
+    student = Student.query.filter_by(
+        user_id=user.id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not student:
+        return error_response("No student profile found for this user", 400)
+
+    lesson_id = data.get("lesson_id")
+    if lesson_id:
+        lesson = Lesson.query.filter_by(
+            id=lesson_id, course_id=course.id, school_id=g.school_id, is_deleted=False
+        ).first()
+        if not lesson:
+            return error_response("Lesson not found in this course", 400)
+
+    completed = bool(data.get("completed", True))
+    now = datetime.now(UTC)
+
+    row = StudentProgress.query.filter_by(
+        school_id=g.school_id,
+        student_id=student.id,
+        course_id=course.id,
+        lesson_id=lesson_id,
+        is_deleted=False,
+    ).first()
+    if not row:
+        row = StudentProgress(
+            school_id=g.school_id,
+            student_id=student.id,
+            course_id=course.id,
+            lesson_id=lesson_id,
+        )
+        db.session.add(row)
+    row.completed = completed
+    if completed:
+        row.completed_at = now
+    else:
+        row.completed_at = None
+    if data.get("watch_time_mins") is not None:
+        row.watch_time_mins = int(data["watch_time_mins"])
+    if data.get("last_position_secs") is not None:
+        row.last_position_secs = int(data["last_position_secs"])
+    if data.get("progress_pct") is not None:
+        row.progress_pct = float(data["progress_pct"])
+
+    # Re-derive enrollment aggregates from actual lesson rows.
+    total_lessons = Lesson.query.filter_by(
+        course_id=course.id, school_id=g.school_id, is_deleted=False
+    ).count()
+    completed_ids = [
+        str(p.lesson_id)
+        for p in StudentProgress.query.filter_by(
+            school_id=g.school_id,
+            student_id=student.id,
+            course_id=course.id,
+            completed=True,
+            is_deleted=False,
+        ).all()
+        if p.lesson_id
+    ]
+    completed_ids = list(dict.fromkeys(completed_ids))
+    pct = round(len(completed_ids) / total_lessons * 100, 1) if total_lessons else 0
+
+    enrollment = Enrollment.query.filter_by(
+        course_id=course.id, student_id=user.id, school_id=g.school_id
+    ).first()
+    if enrollment:
+        enrollment.completed_lessons = completed_ids
+        enrollment.progress_percentage = pct
+
+    db.session.commit()
+    return success_response({
+        "course_id": course_id,
+        "student_id": user.id,
+        "lesson_id": lesson_id,
+        "completed": completed,
+        "progress_percentage": pct,
+        "completed_lessons": completed_ids,
+        "total_lessons": total_lessons,
     })
 
 

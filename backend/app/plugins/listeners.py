@@ -570,7 +570,7 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
     """Triggered when an admission application is accepted.
 
     Actions:
-    - Auto-create a student User account + Student profile
+    - Auto-create a student User account + Student profile (plan-cap checked)
     - Send welcome SMS to parent/applicant
     - Push notification to school admin
     """
@@ -582,6 +582,7 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
         from app.models.admission import AdmissionApplication
         from app.models.user import User
         from app.models.student import Student
+        from app.plugins.entitlements import StudentCapExceededError, assert_student_cap
         from app.utils.password import generate_default_password
         from extensions import db
 
@@ -590,7 +591,9 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
             logger.warning("Admission application %s not found", application_id)
             return
 
-        # Skip if student already created
+        # Skip if a student was already auto-created from this application
+        # (re-accepting an accepted/enrolled application re-emits the event;
+        # without this guard the old code created a duplicate User+Student).
         existing = Student.query.filter_by(
             school_id=school_id,
             admission_application_id=application_id,
@@ -599,13 +602,48 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
             logger.info("Student already created for application %s", application_id)
             return
 
-        # Create User account
+        # Server-side plan cap (E2): the admission-created-student path must
+        # respect School.max_students exactly like students.py/iemis import
+        # (NULL/0 = unlimited). Check BEFORE any User/Student row is created.
+        try:
+            assert_student_cap(school_id, incoming_count=1)
+        except StudentCapExceededError as cap_exc:
+            logger.warning(
+                "Admission auto-enrollment blocked for school=%s application=%s: %s",
+                school_id, application_id, cap_exc,
+            )
+            try:
+                _create_school_notifications(
+                    school_id=school_id,
+                    title="⚠️ Student limit reached",
+                    body=f"Admission of {app_obj.student_name} was accepted but the "
+                    f"auto-enrollment was blocked: {cap_exc}",
+                    category="admission",
+                    roles=["school_admin"],
+                    data={"type": "student_cap", "application_id": application_id},
+                )
+            except Exception:
+                logger.exception("Failed to notify admin about student cap block")
+            return
+
+        # Create User account. users.phone is NOT NULL — fall back to the same
+        # deterministic import placeholder when the application has no parent
+        # phone, marked so it is never mistaken for a real contact number.
+        if app_obj.parent_phone:
+            user_phone = app_obj.parent_phone
+            user_permissions = {}
+        else:
+            from app.api.v1.iemis_importer import _placeholder_phone
+
+            user_phone = _placeholder_phone(school_id, f"admission:{application_id}")
+            user_permissions = {"placeholder_phone": True}
         user = User(
             school_id=school_id,
             role="student",
             full_name=app_obj.student_name or "",
             email=app_obj.parent_email or None,
-            phone=app_obj.parent_phone or None,
+            phone=user_phone,
+            permissions=user_permissions,
             is_active=True,
         )
         db.session.add(user)
@@ -615,6 +653,7 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
         student = Student(
             school_id=school_id,
             user_id=user.id,
+            admission_application_id=application_id,
             first_name=(app_obj.student_name or "").split(" ")[0],
             last_name=" ".join((app_obj.student_name or "").split(" ")[1:]) or "",
             class_id=app_obj.class_applied_id if hasattr(app_obj, "class_applied_id") else None,
@@ -627,7 +666,7 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
         # Send welcome SMS to parent
         if app_obj.parent_phone:
             try:
-                from app.services.communications.sms_gateway import SMSGateway
+                from app.services.communications.sms_gateway import SmsGatewayService as SMSGateway
                 SMSGateway.send_sms(
                     app_obj.parent_phone,
                     f"Congratulations! {app_obj.student_name}'s admission has been accepted. "
@@ -755,7 +794,7 @@ def on_incident_created(
                 school_id=school_id, role="school_admin", is_active=True, is_deleted=False
             ).limit(5).all()
             if admins:
-                from app.services.communications.sms_gateway import SMSGateway
+                from app.services.communications.sms_gateway import SmsGatewayService as SMSGateway
                 for admin in admins:
                     if admin.phone:
                         SMSGateway.send_sms(
@@ -818,7 +857,7 @@ def on_emergency_alert(
     # Bulk SMS to all users with phone numbers
     try:
         from app.models.user import User
-        from app.services.communications.sms_gateway import SMSGateway
+        from app.services.communications.sms_gateway import SmsGatewayService as SMSGateway
 
         users_with_phones = User.query.filter(
             User.school_id == school_id,

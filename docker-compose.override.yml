@@ -1,0 +1,11 @@
+services:
+  redis:
+    ports: !override []
+  postgres:
+    ports: !override []
+  flask:
+    ports: !override
+      - "5003:5000"
+  nextjs:
+    ports: !override
+      - "3003:3000"

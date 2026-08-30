@@ -18,6 +18,7 @@ class _StudentHealthScreenState extends ConsumerState<StudentHealthScreen>
   List<dynamic> _vaccinations = [];
   List<dynamic> _allergies = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,16 +28,22 @@ class _StudentHealthScreenState extends ConsumerState<StudentHealthScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/health');
       final payload = res.data;
       setState(() {
-        _records = (payload?['records'] as List?) ?? [];
-        _vaccinations = (payload?['vaccinations'] as List?) ?? [];
-        _allergies = (payload?['allergies'] as List?) ?? [];
+        _records = safeList(payload?['records']);
+        _vaccinations = safeList(payload?['vaccinations']);
+        _allergies = safeList(payload?['allergies']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentHealthScreen load failed: $e\n$st');
+      _error = 'Could not load your health records.';
+    }
     setState(() => _loading = false);
   }
 
@@ -54,7 +61,9 @@ class _StudentHealthScreenState extends ConsumerState<StudentHealthScreen>
         appBar: const CustomAppBar(title: 'Health Records'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
                 children: [
                   TabBar(
                     controller: _tabController,
@@ -188,7 +197,7 @@ class _AllergiesList extends StatelessWidget {
       itemCount: allergies.length,
       itemBuilder: (context, index) {
         final a = allergies[index];
-        final severity = (a['severity'] as String?) ?? 'mild';
+        final severity = safeStringOrNull(a['severity']) ?? 'mild';
         final severityColor = severity == 'severe'
             ? Colors.red
             : severity == 'moderate'

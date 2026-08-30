@@ -2,7 +2,7 @@
 from flask import request
 
 
-def paginate(query, schema=None):
+def paginate(query, schema=None, default_per_page=20):
     """
     Apply pagination to a SQLAlchemy query.
 
@@ -10,7 +10,7 @@ def paginate(query, schema=None):
     Returns: (items, meta) where meta has pagination info.
     """
     page = request.args.get("page", 1, type=int)
-    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    per_page = min(request.args.get("per_page", default_per_page, type=int), 100)
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 

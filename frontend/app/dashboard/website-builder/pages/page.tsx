@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { revalidateSchoolSite } from "@/lib/revalidate";
 
 interface WebPage {
   id: string;
@@ -20,9 +22,10 @@ export default function WebsitePagesManager() {
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
 
-  const { data: pages = [], isLoading } = useQuery<WebPage[]>({
+  const { data: pages = [], isLoading, isError, refetch } = useQuery<WebPage[]>({
     queryKey: ["website-pages"],
     queryFn: () => api.get("/website-builder/pages").then((r) => r.data.data || []),
+    retry: 1,
   });
 
   const createMut = useMutation({
@@ -33,19 +36,52 @@ export default function WebsitePagesManager() {
       setShowCreate(false);
       setNewTitle("");
       setNewSlug("");
+      revalidateSchoolSite();
     },
+    onError: () => toast.error("Failed to create page"),
   });
+
+  // The create-modal form referenced a nonexistent `handleCreate`, so
+  // submitting a new page crashed with a ReferenceError instead of creating it.
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    const slug = (newSlug || newTitle.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")).trim();
+    if (!newTitle.trim() || !slug) return;
+    createMut.mutate({ title: newTitle.trim(), slug });
+  };
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/website-builder/pages/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["website-pages"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["website-pages"] });
+      revalidateSchoolSite();
+    },
   });
 
   const togglePublishMut = useMutation({
     mutationFn: ({ id, published }: { id: string; published: boolean }) =>
       api.put(`/website-builder/pages/${id}`, { is_published: published }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["website-pages"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["website-pages"] });
+      revalidateSchoolSite();
+    },
   });
+
+  if (isError) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <div className="border rounded-lg py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load website pages. Please try again.</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -64,14 +100,14 @@ export default function WebsitePagesManager() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90"
         >
           + Add Page
         </button>
       </div>
 
       {/* Default pages info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+      <div className="bg-mint/20 border border-mint/40 rounded-lg p-4 text-sm text-ocean dark:text-mint">
         Default pages (Home, About, Notices, Contact, Admission, Academics, Teachers, Gallery,
         Results) are auto-generated from your school data. You can add custom pages below.
       </div>
@@ -114,7 +150,7 @@ export default function WebsitePagesManager() {
               </button>
               <a
                 href={`/dashboard/website-builder/editor?page=${page.id}`}
-                className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="text-xs px-3 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
               >
                 Edit
               </a>
@@ -134,25 +170,19 @@ export default function WebsitePagesManager() {
           </div>
         ))}
 
-        {pages.length === 0 && (
-          <div className="p-8 text-center text-gray-400">
-            No custom pages yet. Click &quot;Add Page&quot; to create one.
+        {pages.length === 0 && !isLoading && (
+          <div className="p-8 text-center text-gray-400 text-sm">
+            No pages yet. Click &quot;+ Add Page&quot; to create one.
           </div>
         )}
       </div>
 
-      {/* Create Page Modal */}
+      {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h2 className="text-lg font-bold mb-4">Add New Page</h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                createMut.mutate({ title: newTitle, slug: newSlug || newTitle.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") });
-              }}
-              className="space-y-4"
-            >
+            <h2 className="text-lg font-bold mb-4">Create New Page</h2>
+            <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Page Title</label>
                 <input
@@ -162,9 +192,9 @@ export default function WebsitePagesManager() {
                     setNewTitle(e.target.value);
                     setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
                   }}
-                  placeholder="e.g. Our Facilities"
-                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Principal's Message"
                   required
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -173,8 +203,8 @@ export default function WebsitePagesManager() {
                   type="text"
                   value={newSlug}
                   onChange={(e) => setNewSlug(e.target.value)}
-                  placeholder="our-facilities"
-                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="principals-message"
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -188,7 +218,7 @@ export default function WebsitePagesManager() {
                 <button
                   type="submit"
                   disabled={createMut.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 disabled:opacity-50"
                 >
                   {createMut.isPending ? "Creating..." : "Create Page"}
                 </button>

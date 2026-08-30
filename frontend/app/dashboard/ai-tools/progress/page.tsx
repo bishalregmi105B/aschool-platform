@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { TrendingUp, Brain, Search } from "lucide-react";
 
@@ -20,7 +21,7 @@ function ProgressContent() {
   const [classFilter, setClassFilter] = useState("");
   const [search, setSearch] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["adaptive-progress", classFilter, search],
     queryFn: async () => { const r = await api.get("/lms/adaptive-progress", { params: { class_name: classFilter || undefined, search: search || undefined } }); return r.data?.data ?? r.data; },
   });
@@ -33,24 +34,31 @@ function ProgressContent() {
   const students: any[] = Array.isArray(data) ? data : data?.students ?? [];
   const classes: any[] = Array.isArray(classesData) ? classesData : classesData?.items ?? [];
 
-  if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <Header />
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load student progress. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
-  const levelColor = (level: string) =>
-    level === "advanced" ? "default" : level === "on_track" ? "secondary" : "destructive";
+  const levelColor = (level: string | null) =>
+    level === "advanced" ? "default" : level === "intermediate" ? "secondary" : level === "beginner" ? "destructive" : "outline";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <TrendingUp className="h-6 w-6 text-violet-600" />
-        <div><h1 className="text-2xl font-bold">Student Progress</h1><p className="text-muted-foreground">AI-tracked adaptive learning progress per student</p></div>
-      </div>
+      <Header />
 
       <div className="flex gap-3">
         <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search students..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Select value={classFilter} onValueChange={setClassFilter}>
+        <Select value={classFilter || "all"} onValueChange={(v) => setClassFilter(v === "all" ? "" : v)}>
           <SelectTrigger className="w-40"><SelectValue placeholder="All Classes" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Classes</SelectItem>
+            <SelectItem value="all">All Classes</SelectItem>
             {classes.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -58,15 +66,17 @@ function ProgressContent() {
 
       <Card><CardContent className="pt-6">
         <Table>
-          <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Learning Level</TableHead><TableHead>Paths Assigned</TableHead><TableHead>Paths Completed</TableHead><TableHead>Avg Score</TableHead><TableHead>AI Recommendation</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Mastery Level</TableHead><TableHead>Paths Assigned</TableHead><TableHead>Paths Completed</TableHead><TableHead>Avg Score</TableHead><TableHead>AI Recommendation</TableHead></TableRow></TableHeader>
           <TableBody>
-            {students.length === 0 ? (
+            {isLoading ? (
+              <TableRow><TableCell colSpan={7} className="text-center py-8"><PageLoader /></TableCell></TableRow>
+            ) : students.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No student progress data available</TableCell></TableRow>
             ) : students.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="font-medium">{s.student_name ?? s.name}</TableCell>
                 <TableCell>{s.class_name ?? "—"}</TableCell>
-                <TableCell><Badge variant={levelColor(s.level ?? "on_track")}>{s.level?.replace("_", " ") ?? "on track"}</Badge></TableCell>
+                <TableCell><Badge variant={levelColor(s.level) as any}>{s.level ? s.level.replace("_", " ") : "no data"}</Badge></TableCell>
                 <TableCell>{s.paths_assigned ?? 0}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -83,6 +93,15 @@ function ProgressContent() {
           </TableBody>
         </Table>
       </CardContent></Card>
+    </div>
+  );
+}
+
+function Header() {
+  return (
+    <div className="flex items-center gap-3">
+      <TrendingUp className="h-6 w-6 text-violet-600" />
+      <div><h1 className="text-2xl font-bold">Student Progress</h1><p className="text-muted-foreground">AI-tracked adaptive learning progress per student</p></div>
     </div>
   );
 }

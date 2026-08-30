@@ -48,12 +48,9 @@ class DismissalQrScreen extends ConsumerWidget {
                     data['student_id'] != null)
                   _QrCard(data: data),
                 const SizedBox(height: 16),
-                if ((data['authorized_pickups'] as List?)?.isNotEmpty == true)
+                if (safeMapList(data['authorized_pickups']).isNotEmpty)
                   _AuthorizedPickupsCard(
-                      pickups: List<Map<String, dynamic>>.from(
-                    (data['authorized_pickups'] as List)
-                        .map((e) => Map<String, dynamic>.from(e as Map)),
-                  )),
+                      pickups: safeMapList(data['authorized_pickups'])),
               ],
             ),
           ),
@@ -144,7 +141,8 @@ class _StatusCard extends StatelessWidget {
       final period = h >= 12 ? 'PM' : 'AM';
       final hour = h % 12 == 0 ? 12 : h % 12;
       return '$hour:$m $period';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('DismissalQrScreen _formatTime parse failed: $e');
       return iso;
     }
   }

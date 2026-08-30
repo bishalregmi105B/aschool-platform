@@ -12,6 +12,7 @@ class DiaryReadScreen extends ConsumerStatefulWidget {
 class _DiaryReadScreenState extends ConsumerState<DiaryReadScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _DiaryReadScreenState extends ConsumerState<DiaryReadScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/notices', queryParameters: {
         'target_role': 'student',
@@ -34,8 +38,10 @@ class _DiaryReadScreenState extends ConsumerState<DiaryReadScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('DiaryReadScreen load failed: $e\n$st');
       _items = [];
+      _error = 'Could not load diary entries.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -46,7 +52,9 @@ class _DiaryReadScreenState extends ConsumerState<DiaryReadScreen> {
       appBar: const CustomAppBar(title: 'My Diary'),
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _items.isEmpty
                   ? ListView(

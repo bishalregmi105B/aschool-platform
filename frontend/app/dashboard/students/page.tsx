@@ -136,7 +136,12 @@ export default function StudentsPage() {
   const selectedClass = classes.find((c) => c.id === filterClassId);
   const sections = selectedClass?.sections || [];
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError: listError,
+    refetch: refetchStudents,
+  } = useQuery({
     queryKey: [
       "students",
       page,
@@ -232,6 +237,22 @@ export default function StudentsPage() {
   }
 
   if (isLoading) return <PageLoader />;
+
+  if (listError)
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">
+              Failed to load students. Please try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetchStudents()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -452,8 +473,11 @@ export default function StudentsPage() {
                       {student.enrollment_number || "-"}
                     </TableCell>
                     <TableCell>
+                      {/* E204: class names can already carry the "Class " prefix
+                          (legacy rows store "Class 10") — strip it before
+                          prepending so the cell never shows "Class Class 10". */}
                       {student.class_name
-                        ? `Class ${student.class_name}${student.section_name ? ` - ${student.section_name}` : ""}`
+                        ? `Class ${student.class_name.replace(/^\s*class\s+/i, "")}${student.section_name ? ` - ${student.section_name}` : ""}`
                         : "-"}
                     </TableCell>
                     <TableCell className="capitalize">
@@ -727,8 +751,11 @@ function AddStudentDialog({
             <p className="text-sm font-medium mb-3">Guardian Information</p>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="guardian_name">Guardian Name</Label>
+                <Label htmlFor="guardian_name">Guardian Name *</Label>
                 <Input id="guardian_name" name="guardian_name" required />
+                <p className="text-xs text-muted-foreground">
+                  Creates the parent login
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="guardian_phone">Phone</Label>

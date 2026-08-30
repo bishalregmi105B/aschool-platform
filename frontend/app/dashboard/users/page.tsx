@@ -53,7 +53,7 @@ export default function UsersPage() {
   const [showAdd, setShowAdd] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["users", page, search, roleFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), per_page: "20" });
@@ -62,6 +62,7 @@ export default function UsersPage() {
       const res = await api.get<ApiResponse>(`/users?${params}`);
       return res.data;
     },
+    retry: 1,
   });
 
   const toggleMutation = useMutation({
@@ -70,12 +71,22 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       toast.success("User status updated");
     },
+    onError: () => toast.error("Failed to update user status"),
   });
 
   const users: User[] = Array.isArray(data?.data) ? data.data : [];
   const pagination = data?.meta?.pagination;
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load users. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

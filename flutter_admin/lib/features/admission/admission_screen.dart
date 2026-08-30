@@ -17,6 +17,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
   List<Map<String, dynamic>> _leads = [];
   Map<String, dynamic> _stats = {};
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -32,7 +33,10 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/admission/applications?per_page=20'),
@@ -48,8 +52,12 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
             Map<String, dynamic>.from(results[2].data['data'] ?? {});
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('AdmissionScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load admission data.';
+        _loading = false;
+      });
     }
   }
 
@@ -71,7 +79,9 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
                 controller: _tabCtrl,
                 children: [
                   _buildDashboard(),
@@ -175,7 +185,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
         itemCount: _leads.length,
         itemBuilder: (context, i) {
           final lead = _leads[i];
-          final aiScore = (lead['ai_score'] as num?)?.toInt() ?? 0;
+          final aiScore = safeIntOrNull(lead['ai_score']) ?? 0;
 
           return ESchoolAnimatedEntry(
             index: i,
@@ -191,7 +201,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
                   ),
                 ),
                 title: Text(
-                  lead['name'] as String? ?? '',
+                  safeStringOrNull(lead['name']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -215,7 +225,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Widget _buildAppTile(Map<String, dynamic> app) {
-    final status = app['status'] as String? ?? 'pending';
+    final status = safeStringOrNull(app['status']) ?? 'pending';
     final statusColor = switch (status) {
       'accepted' => ASchoolTheme.success,
       'rejected' => ASchoolTheme.danger,
@@ -227,7 +237,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
       child: ListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(
-          app['applicant_name'] as String? ?? '',
+          safeStringOrNull(app['applicant_name']) ?? '',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(

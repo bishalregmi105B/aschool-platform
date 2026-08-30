@@ -60,13 +60,14 @@ function ReportCardsContent() {
     },
   });
 
-  const { data: reportCards, isLoading } = useQuery({
+  const { data: reportCards, isLoading, isError, refetch } = useQuery({
     queryKey: ["report-cards", examId, classId],
     queryFn: async () => {
       const res = await api.get(`/exams/${examId}/report-cards?class_id=${classId}`);
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
     enabled: !!examId && !!classId,
+    retry: 1,
   });
 
   const generateMutation = useMutation({
@@ -157,7 +158,12 @@ function ReportCardsContent() {
       {examId && classId && (
         <Card>
           <CardContent className="p-0">
-            {isLoading ? (
+            {isError ? (
+              <div className="flex flex-col items-center py-12 space-y-3">
+                <p className="text-sm text-destructive">Failed to load report cards. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            ) : isLoading ? (
               <PageLoader />
             ) : (reportCards || []).length === 0 ? (
               <div className="text-center py-12">

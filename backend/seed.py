@@ -16,9 +16,24 @@ def seed():
     """Seed the database with essential data."""
     app = create_app()
     with app.app_context():
-        # 1. Register all plugins from manifests into Plugin master table
+        # 1. Register all plugins from manifests into Plugin master table.
+        # Manifests are the pricing/tier source of truth and use FLAT keys
+        # (price_monthly / price_yearly / category / is_free) — NOT nested
+        # `pricing.monthly`; the old dead path silently seeded every paid
+        # plugin as price-0/free (audit E6). Existing rows are synced
+        # idempotently so a stale DB self-heals on the next seed.
         manifests = PluginLoader.get_all_manifests()
+        created = synced = 0
         for slug, m in manifests.items():
+            price_monthly = int(m.get("price_monthly") or 0)
+            price_yearly = int(m.get("price_yearly") or 0)
+            is_free = bool(m.get("is_free", price_monthly == 0))
+            category = m.get("category", "core")
+            # Manifests may delist a plugin from the catalog (e.g. the
+            # deprecated digital_content duplicate of elibrary): a top-level
+            # `published: false` maps to Plugin.is_published=False so the
+            # marketplace stops offering it while legacy installs keep working.
+            is_published = bool(m.get("published", True))
             existing = Plugin.query.filter_by(slug=slug).first()
             if not existing:
                 plugin = Plugin(
@@ -27,17 +42,41 @@ def seed():
                     name=m["name"],
                     name_nepali=m.get("name_nepali", ""),
                     description=m.get("description", ""),
-                    category=m["category"],
-                    price_monthly=m.get("pricing", {}).get("monthly", 0),
-                    price_yearly=m.get("pricing", {}).get("yearly", 0),
-                    is_free=m.get("pricing", {}).get("monthly", 0) == 0,
-                    trial_days=m.get("pricing", {}).get("trial_days", 14),
+                    category=category,
+                    price_monthly=price_monthly,
+                    price_yearly=price_yearly,
+                    is_free=is_free,
+                    trial_days=14,  # manifests carry no trial_days; default 14
                     version=m.get("version", "1.0.0"),
-                    is_published=True,
+                    is_published=is_published,
                 )
                 db.session.add(plugin)
+                created += 1
+                continue
+            # Idempotent sync of price/tier/category/published from the manifest.
+            changed = False
+            if float(existing.price_monthly or 0) != price_monthly:
+                existing.price_monthly = price_monthly
+                changed = True
+            if float(existing.price_yearly or 0) != price_yearly:
+                existing.price_yearly = price_yearly
+                changed = True
+            if bool(existing.is_free) != is_free:
+                existing.is_free = is_free
+                changed = True
+            if existing.category != category:
+                existing.category = category
+                changed = True
+            if bool(existing.is_published) != is_published:
+                existing.is_published = is_published
+                changed = True
+            if changed:
+                synced += 1
         db.session.commit()
-        print(f"✓ Registered {len(manifests)} plugins")
+        print(
+            f"✓ Registered {len(manifests)} plugins "
+            f"({created} created, {synced} synced from manifests)"
+        )
 
         # 2. Create demo school
         demo = School.query.filter_by(slug="demo").first()

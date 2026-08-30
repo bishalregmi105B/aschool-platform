@@ -31,6 +31,7 @@ import {
   Plus, FileText, BarChart3, ClipboardList, Calendar, GraduationCap,
   MoreHorizontal, Pencil, Trash2, Eye, BookOpen, Trophy, Printer,
 } from "lucide-react";
+import { formatNepaliDate, displayBS } from "@/lib/nepali_date";
 
 interface Exam {
   id: string;
@@ -103,7 +104,7 @@ function ExamsContent() {
     subject_ids: [] as string[],
   });
 
-  const { data: exams, isLoading } = useQuery({
+  const { data: exams, isLoading, isError, refetch } = useQuery({
     queryKey: ["exams", academicYearFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: "200" });
@@ -113,12 +114,13 @@ function ExamsContent() {
       const res = await api.get<ApiResponse<Exam[]>>(`/exams?${params.toString()}`);
       return res.data.data || [];
     },
+    retry: 1,
   });
 
   const { data: academicYears } = useQuery<AcademicYearOption[]>({
     queryKey: ["academic-years"],
     queryFn: async () => {
-      const res = await api.get("/academics/academic-years");
+      const res = await api.get("/academics/years?per_page=200");
       return Array.isArray(res.data?.data)
         ? (res.data.data as AcademicYearOption[])
         : [];
@@ -161,8 +163,14 @@ function ExamsContent() {
     }));
   }
 
+  // E217: exams stored BS dates ("2082-06-15") as raw opaque strings that were
+  // indistinguishable from AD. Render BS long-form ("15 Ashwin 2082", the same
+  // "14 Bhadra 2083" style as the attendance picker): a stored BS string goes
+  // through formatNepaliDate, an AD-only date is converted with displayBS.
   function displayExamDate(bsDate?: string, adDate?: string) {
-    return bsDate || adDate || "—";
+    if (bsDate) return formatNepaliDate(bsDate);
+    if (adDate) return displayBS(adDate);
+    return "—";
   }
 
   const createMutation = useMutation({
@@ -237,6 +245,17 @@ function ExamsContent() {
       subject_ids: [],
     });
     setCreateOpen(true);
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load exams. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
   }
 
   if (isLoading) return <PageLoader />;

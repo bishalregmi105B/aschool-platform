@@ -4,7 +4,7 @@
 import { useState } from "react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/lib/api";
 
 interface ResultEntry {
   subject: string;
@@ -46,18 +46,14 @@ export default function ResultsPage({ params }: { params: { slug: string } }) {
     setResult(null);
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/v1/website/public/${params.slug}/results?symbol_no=${encodeURIComponent(symbolNo)}&dob=${encodeURIComponent(dob)}`
+      // Shared client: relative /api/v1 (same-origin rewrite) + cookie session.
+      const res = await api.get(
+        `/website/public/${params.slug}/results?symbol_no=${encodeURIComponent(symbolNo)}&dob=${encodeURIComponent(dob)}`
       );
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        setError(json.error || "Result not found. Please check your details.");
-        return;
-      }
-      setResult(json.data);
-    } catch {
-      setError("Unable to fetch results. Please try again later.");
+      setResult(res.data.data);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || "Unable to fetch results. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -121,7 +117,7 @@ export default function ResultsPage({ params }: { params: { slug: string } }) {
       )}
 
       {result && (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto">
           <div className="p-6" style={{ backgroundColor: "var(--color-primary)", color: "white" }}>
             <h2 className="text-xl font-bold">{result.student_name}</h2>
             <p className="text-sm opacity-90">

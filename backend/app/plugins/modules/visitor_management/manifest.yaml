@@ -21,10 +21,9 @@ frontend:
     label: "Visitors"
     label_nepali: "आगन्तुक"
     icon: "UserPlus"
-    subitems:
-      - { label: "Check-In", route: "/dashboard/visitors/checkin" }
-      - { label: "Log", route: "/dashboard/visitors/log" }
-      - { label: "Appointments", route: "/dashboard/visitors/appointments" }
+    # Single page (check-in dialog + log table; appointments API exists, no
+    # web page). No subitems: /checkin, /log and /appointments have no pages
+    # and rendered as dead sidebar links.
     visible_to: ["school_admin", "staff"]
 
 flutter:

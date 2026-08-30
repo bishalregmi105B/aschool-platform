@@ -22,14 +22,24 @@ interface BackupStatus {
 export default function DatabaseBackupPage() {
   const [isTriggering, setIsTriggering] = useState(false);
 
-  const { data: status, isLoading, refetch } = useQuery({
+  const { data: status, isLoading, isError, refetch } = useQuery({
     queryKey: ["database-backup-status"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<BackupStatus>>("/database-backup");
       return res.data.data;
     },
     refetchInterval: 30_000,
+    retry: 1,
   });
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load backup status. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const triggerMutation = useMutation({
     mutationFn: () => api.post("/database-backup/trigger"),

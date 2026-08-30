@@ -63,20 +63,22 @@ function NoticesContent() {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: notices, isLoading: loadingNotices } = useQuery({
+  const { data: notices, isLoading: loadingNotices, isError: errorNotices, refetch: refetchNotices } = useQuery({
     queryKey: ["notices"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<Notice[]>>("/notices");
       return res.data.data || [];
     },
+    retry: 1,
   });
 
-  const { data: events, isLoading: loadingEvents } = useQuery({
+  const { data: events, isLoading: loadingEvents, isError: errorEvents, refetch: refetchEvents } = useQuery({
     queryKey: ["events"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<EventItem[]>>("/notices/events");
       return res.data.data || [];
     },
+    retry: 1,
   });
 
   const createNoticeMutation = useMutation({
@@ -134,7 +136,14 @@ function NoticesContent() {
       </div>
 
       {tab === "notices" && (
-        loadingNotices ? <PageLoader /> : (
+        loadingNotices ? <PageLoader /> : errorNotices ? (
+          <Card>
+            <CardContent className="p-8 text-center space-y-3">
+              <p className="text-sm text-destructive">Failed to load notices. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetchNotices()}>Retry</Button>
+            </CardContent>
+          </Card>
+        ) : (
           <div className="space-y-4">
             {(notices || []).length === 0 && (
               <Card>
@@ -181,7 +190,14 @@ function NoticesContent() {
       )}
 
       {tab === "events" && (
-        loadingEvents ? <PageLoader /> : (
+        loadingEvents ? <PageLoader /> : errorEvents ? (
+          <Card>
+            <CardContent className="p-8 text-center space-y-3">
+              <p className="text-sm text-destructive">Failed to load events. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetchEvents()}>Retry</Button>
+            </CardContent>
+          </Card>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {(events || []).length === 0 && (
               <p className="col-span-3 text-center py-8 text-muted-foreground">

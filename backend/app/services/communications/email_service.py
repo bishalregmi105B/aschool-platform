@@ -22,9 +22,14 @@ class EmailService:
             raise RuntimeError(
                 "MAIL_USERNAME/MAIL_PASSWORD not configured — email sending disabled"
             )
+        # E199: a hard socket timeout so a hung/blackholed SMTP server cannot
+        # hang a request (the /communications/broadcast email path runs this
+        # inline). Applies to connect AND every read/write on the socket.
+        timeout = float(os.getenv("MAIL_TIMEOUT", "10"))
         smtp = smtplib.SMTP(
             os.getenv("MAIL_SERVER", "smtp.gmail.com"),
             int(os.getenv("MAIL_PORT", "587")),
+            timeout=timeout,
         )
         smtp.starttls()
         smtp.login(username, password)
@@ -81,12 +86,24 @@ class EmailService:
     @classmethod
     def send_bulk_email(cls, recipients: list[dict], subject: str, html_body: str) -> dict:
         """Send bulk emails. Each recipient dict has 'email' and optional 'name'."""
+        import logging
+
+        logger = logging.getLogger(__name__)
         sent = 0
         failed = 0
+        failed_addresses: list[str] = []
         for r in recipients:
             success = cls.send_email(r["email"], subject, html_body)
             if success:
                 sent += 1
             else:
                 failed += 1
+                # E199: bulk failures used to be silent — log who was missed
+                # so operators can reconcile broadcasts.
+                failed_addresses.append(r.get("email", "?"))
+        if failed_addresses:
+            logger.error(
+                "Bulk email: %d/%d deliveries failed (first few: %s) subject=%r",
+                failed, len(recipients), ", ".join(failed_addresses[:5]), subject,
+            )
         return {"total": len(recipients), "sent": sent, "failed": failed}

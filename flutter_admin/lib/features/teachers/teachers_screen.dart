@@ -12,6 +12,7 @@ class TeachersScreen extends ConsumerStatefulWidget {
 class _TeachersScreenState extends ConsumerState<TeachersScreen> {
   List<Map<String, dynamic>> _teachers = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/users', queryParameters: {
         'role': 'teacher',
@@ -33,8 +37,10 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TeachersScreen load failed: $e\n$st');
       _teachers = [];
+      _error = 'Could not load teachers.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -42,6 +48,11 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: LoadingShimmer());
+    if (_error != null) {
+      return Scaffold(
+        body: ErrorContainer(errorMessage: _error!, onRetry: _load),
+      );
+    }
 
     return Scaffold(
       body: RefreshIndicator(
@@ -110,14 +121,25 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
               final name = nameCtrl.text.trim();
               final phone = phoneCtrl.text.trim();
               if (name.isEmpty || phone.isEmpty) return;
-              await ApiClient.instance.post('/users', data: {
-                'full_name': name,
-                'phone': phone,
-                'email': emailCtrl.text.trim().isEmpty
-                    ? null
-                    : emailCtrl.text.trim(),
-                'role': 'teacher',
-              });
+              try {
+                await ApiClient.instance.post('/users', data: {
+                  'full_name': name,
+                  'phone': phone,
+                  'email': emailCtrl.text.trim().isEmpty
+                      ? null
+                      : emailCtrl.text.trim(),
+                  'role': 'teacher',
+                });
+              } catch (e) {
+                debugPrint('TeachersScreen create failed: $e');
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Could not create teacher. Please retry.')),
+                );
+                return;
+              }
               if (!context.mounted) return;
               Navigator.pop(context);
               await _load();

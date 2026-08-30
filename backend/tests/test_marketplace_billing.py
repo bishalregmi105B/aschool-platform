@@ -52,15 +52,31 @@ def test_trial_then_subscribe_flow(client, db, school):
     again = client.post("/api/v1/plugins/lms/trial", headers=headers)
     assert again.status_code == 409
 
+    # E5: without payment proof the activation must be refused (402) and the
+    # install must stay a trial — never silently marked paid.
     sub = client.post(
         "/api/v1/plugins/lms/subscribe",
         json={"billing_cycle": "yearly"},
+        headers=headers,
+    )
+    assert sub.status_code == 402
+    sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
+    assert sp.is_trial is True
+
+    # With a payment reference the subscription activates.
+    sub = client.post(
+        "/api/v1/plugins/lms/subscribe",
+        json={
+            "billing_cycle": "yearly",
+            "payment": {"provider": "stripe", "transaction_id": "pi_test_123"},
+        },
         headers=headers,
     )
     assert sub.status_code == 200
     data = sub.get_json()["data"]
     assert data["is_trial"] is False
     assert data["billing_cycle"] == "yearly"
+    assert data["payment_provider"] == "stripe"
 
     sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
     assert sp.is_trial is False

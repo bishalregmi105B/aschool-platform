@@ -58,7 +58,7 @@ class _AITutorScreenState extends ConsumerState<AITutorScreen> {
           'subject': _selectedSubject,
         },
       );
-      final payload = res.data?['data'] as Map?;
+      final payload = safeMapOrNull(res.data?['data']);
       final reply = payload?['response'] ??
           'Sorry, I could not process that.';
       setState(() {

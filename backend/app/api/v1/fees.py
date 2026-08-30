@@ -7,7 +7,7 @@ from io import BytesIO
 
 from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from app.models.fee import FeeCollection, FeeReceipt, FeeStructure, StudentScholarship
 from app.models.school import School
@@ -418,8 +418,6 @@ def get_fees_summary():
     )
 
     # Count by status
-    from sqlalchemy import func
-
     status_counts = (
         db.session.query(
             FeeCollection.payment_status, func.count(FeeCollection.id).label("cnt")
@@ -546,7 +544,9 @@ def get_fees_summary():
 @role_required("superadmin", "school_admin", "accountant")
 def list_recent_fees():
     """Return the most recent fee payment receipts for the school."""
-    limit = min(int(request.args.get("limit", 20)), 100)
+    limit = _coerce_limit(request.args.get("limit"), default=20, maximum=100)
+    if limit is None:
+        return error_response("limit must be a positive integer", 400)
     recent_receipts = (
         FeeReceipt.query.filter_by(school_id=g.school_id, is_deleted=False)
         .order_by(FeeReceipt.created_at.desc())
@@ -578,9 +578,9 @@ def list_recent_fees():
 @role_required("superadmin", "school_admin", "accountant")
 def list_outstanding_fees():
     """Return unpaid / partially-paid fee collections (defaulters)."""
-    from app.models.academic import Class
-
-    limit = min(int(request.args.get("limit", 50)), 200)
+    limit = _coerce_limit(request.args.get("limit"), default=50, maximum=200)
+    if limit is None:
+        return error_response("limit must be a positive integer", 400)
     class_id = request.args.get("class_id")
 
     query = FeeCollection.query.filter(
@@ -589,7 +589,11 @@ def list_outstanding_fees():
         FeeCollection.payment_status.in_(["pending", "partial"]),
     )
     if class_id:
-        query = query.filter_by(class_id=class_id)
+        # FeeCollection has no class_id column — filter through the student.
+        query = (
+            query.join(Student, Student.id == FeeCollection.student_id)
+            .filter(Student.class_id == class_id, Student.is_deleted.is_(False))
+        )
     query = query.order_by(FeeCollection.created_at.asc()).limit(limit)
     collections = query.all()
 
@@ -601,7 +605,7 @@ def list_outstanding_fees():
         if due <= 0:
             continue
         student = Student.query.get(c.student_id) if c.student_id else None
-        klass = Class.query.get(c.class_id) if c.class_id else None
+        klass = student.klass if student else None
         result.append({
             "id": str(c.id),
             "student_id": str(c.student_id) if c.student_id else None,
@@ -648,13 +652,13 @@ def create_fee_structure():
     structure = FeeStructure(school_id=g.school_id)
     fee_name = (data.get("name") or "").strip()
     fee_type = (data.get("fee_type") or "").strip()
-    for key in (
-        "class_id",
-        "academic_year",
-        "fee_items",
-        "total_annual",
-        "total_monthly",
-    ):
+    if data.get("class_id") is not None and str(data["class_id"]) != "":
+        # E181: an invalid uuid must 400, not blow up in the DB layer.
+        class_uuid = _parse_uuid(data["class_id"])
+        if class_uuid is None:
+            return error_response("class_id must be a valid UUID", 400)
+        structure.class_id = class_uuid
+    for key in ("academic_year", "fee_items", "total_annual", "total_monthly"):
         if key in data:
             setattr(structure, key, data[key])
     if not structure.fee_items and (fee_name or fee_type or data.get("amount") is not None):
@@ -813,9 +817,16 @@ def create_scholarship():
     discount_type = data.get("discount_type", "percent")
     if discount_type not in ("percent", "fixed"):
         return error_response("discount_type must be 'percent' or 'fixed'", 400)
-    discount_value = float(data.get("discount_value") or 0)
+    try:
+        discount_value = float(data.get("discount_value") or 0)
+    except (TypeError, ValueError):
+        return error_response("discount_value must be a number", 400)
     if discount_type == "percent" and not (0 < discount_value <= 100):
         return error_response("discount_value must be 1-100 for percent type", 400)
+    # E181: a negative fixed discount stored nonsense that clamped to 0 at
+    # apply time — reject it at the source instead.
+    if discount_type == "fixed" and discount_value <= 0:
+        return error_response("discount_value must be greater than zero for fixed type", 400)
 
     sc = StudentScholarship(
         school_id=g.school_id,
@@ -846,6 +857,20 @@ def update_scholarship(scholarship_id):
     if not sc:
         return error_response("Scholarship not found", 404)
     data = request.get_json(silent=True) or {}
+    # E181: updates previously accepted any discount_type / discount_value
+    # (e.g. percent=400 or -50) — the same validation as POST applies here.
+    if "discount_type" in data and data["discount_type"] not in ("percent", "fixed"):
+        return error_response("discount_type must be 'percent' or 'fixed'", 400)
+    if "discount_value" in data:
+        try:
+            discount_value = float(data["discount_value"] or 0)
+        except (TypeError, ValueError):
+            return error_response("discount_value must be a number", 400)
+        effective_type = data.get("discount_type") or sc.discount_type
+        if effective_type == "percent" and not (0 < discount_value <= 100):
+            return error_response("discount_value must be 1-100 for percent type", 400)
+        if effective_type == "fixed" and discount_value <= 0:
+            return error_response("discount_value must be greater than zero for fixed type", 400)
     for field in ("fee_type", "discount_type", "discount_value", "reason",
                   "valid_from_bs", "valid_until_bs", "is_active"):
         if field in data:
@@ -977,7 +1002,10 @@ def list_defaulters():
     ).all()
     grouped: dict[str, dict[str, object]] = {}
     for collection in collections:
-        total_amount = float(collection.amount or 0)
+        # Payable = base + late fine − discount (same rule as everywhere else);
+        # using the raw base here would overstate dues for discounted students
+        # and understate them when a late fine applies.
+        total_amount = _collection_payable_total(collection)
         paid_amount = _extract_partial_paid(collection)
         due_amount = max(total_amount - paid_amount, 0)
         if due_amount <= 0:
@@ -1023,9 +1051,13 @@ def create_collection():
     student_id = data.get("student_id")
     if not student_id:
         return error_response("student_id is required", 400)
+    # E181: a malformed uuid used to raise a DB DataError (500).
+    student_uuid = _parse_uuid(student_id)
+    if student_uuid is None:
+        return error_response("student_id must be a valid UUID", 400)
 
     student = Student.query.filter_by(
-        id=student_id,
+        id=student_uuid,
         school_id=g.school_id,
         is_deleted=False,
     ).first()
@@ -1173,9 +1205,13 @@ def record_payment(collection_id):
 
     # ── Idempotency check ────────────────────────────────────────
     idempotency_key = data.get("idempotency_key")
+    stored_idempotency_key = idempotency_key
     if idempotency_key:
+        # E182: the lookup MUST be scoped to this school. A global lookup let
+        # school B replaying school A's key receive school A's receipt (and
+        # believe its own payment was recorded).
         existing = FeeReceipt.query.filter_by(
-            idempotency_key=idempotency_key
+            idempotency_key=idempotency_key, school_id=g.school_id
         ).first()
         if existing:
             return success_response(
@@ -1187,6 +1223,15 @@ def record_payment(collection_id):
                 },
                 meta={"message": "Payment already recorded (idempotent)"},
             )
+        # fee_receipts.idempotency_key carries a GLOBAL unique index, so a
+        # key already used by ANOTHER school must be namespaced for this
+        # school's insert — otherwise the retry-safe replay would 500 with
+        # a UniqueViolation instead of recording school B's real payment.
+        foreign = FeeReceipt.query.filter_by(
+            idempotency_key=idempotency_key
+        ).first()
+        if foreign:
+            stored_idempotency_key = f"{g.school_id}:{idempotency_key}"[:100]
 
     amount = float(data.get("amount", 0) or 0)
     if amount <= 0:
@@ -1228,7 +1273,7 @@ def record_payment(collection_id):
         amount=recorded_amount,
         payment_method=method,
         transaction_id=fc.transaction_id,
-        idempotency_key=idempotency_key,
+        idempotency_key=stored_idempotency_key,
     )
     receipt.verified_hash = _receipt_hash(
         receipt.receipt_number, fc.id, recorded_amount
@@ -1378,17 +1423,44 @@ def _initiate_online_payment(collection_id, data):
     if selected_method.get("mode") != "online":
         return error_response(f"Payment provider '{provider}' is not configured for online checkout", 400)
 
-    amount = max(float(fc.amount or 0) - _extract_partial_paid(fc), 0)
+    # Charge the net payable (base + late fine − discount) minus what has
+    # already been paid — the same outstanding figure record_payment uses.
+    # Charging the raw base would overbill discounted students and underbill
+    # when a late fine applies.
+    amount = max(_collection_payable_total(fc) - _extract_partial_paid(fc), 0)
     if amount <= 0:
         return error_response("No outstanding amount to pay")
 
     student = Student.query.get(fc.student_id)
     student_name = f"{student.first_name} {student.last_name}" if student else "Student"
-    base_url = data.get("return_url", request.host_url.rstrip("/"))
+    base_url = str(data.get("return_url") or request.host_url).rstrip("/")
 
     # Per-school credentials — must be configured by the school admin.
     school_merchant_code = (selected_method.get("merchant_code") or "").strip()
     school_secret_key = (selected_method.get("secret_key") or "").strip()
+
+    # The gateway callbacks are registered at /webhooks/* (NOT /api/v1/*) —
+    # pointing success_url/return_url at the wrong prefix made every real
+    # gateway redirect 404 and the money was never recorded (audit E60).
+    initiator = getattr(g, "current_user", None)
+
+    def _persist_initiation(gateway_name, gateway_ref):
+        """Persist the checkout attempt BEFORE the user is redirected so the
+        callback can be anchored (amount cross-check + idempotency)."""
+        from app.models.fee import PaymentInitiation
+
+        row = PaymentInitiation(
+            school_id=fc.school_id,
+            collection_id=fc.id,
+            gateway=gateway_name,
+            gateway_ref=str(gateway_ref),
+            amount=amount,
+            status="initiated",
+            initiated_by_id=getattr(initiator, "id", None),
+        )
+        db.session.add(row)
+        db.session.commit()
+        return row
 
     try:
         if provider == "esewa":
@@ -1397,9 +1469,10 @@ def _initiate_online_payment(collection_id, data):
                 amount=amount,
                 product_code=school_merchant_code,
                 secret_key=school_secret_key,
-                success_url=f"{base_url}/api/v1/webhooks/esewa/callback",
-                failure_url=f"{base_url}/api/v1/webhooks/esewa/callback",
+                success_url=f"{base_url}/webhooks/esewa/callback",
+                failure_url=f"{base_url}/webhooks/esewa/callback",
             )
+            _persist_initiation("esewa", str(collection_id))
             return success_response({"provider": "esewa", **result})
 
         elif provider == "khalti":
@@ -1407,12 +1480,15 @@ def _initiate_online_payment(collection_id, data):
                 purchase_order_id=str(collection_id),
                 purchase_order_name=f"School Fee — {student_name}",
                 amount_paisa=int(amount * 100),
-                return_url=f"{base_url}/api/v1/webhooks/khalti/callback",
+                return_url=f"{base_url}/webhooks/khalti/callback",
                 secret_key=school_secret_key,
                 customer_info={"name": student_name},
             )
             if not result.get("success"):
                 return error_response(result.get("error", "Khalti initiation failed"), 502)
+            if not result.get("pidx"):
+                return error_response("Khalti did not return a payment reference", 502)
+            _persist_initiation("khalti", result["pidx"])
             return success_response({"provider": "khalti", **result})
 
         elif provider == "fonepay":
@@ -1423,12 +1499,13 @@ def _initiate_online_payment(collection_id, data):
                 fee_collection_id=str(collection_id),
                 amount=amount,
                 student_name=student_name,
-                return_url=f"{base_url}/api/v1/webhooks/fonepay/callback",
+                return_url=f"{base_url}/webhooks/fonepay/callback",
                 merchant_code=school_merchant_code,
                 secret_key=school_secret_key,
             )
             if not result.get("success"):
                 return error_response("FonePay initiation failed", 502)
+            _persist_initiation("fonepay", result.get("prn") or "")
             return success_response({"provider": "fonepay", **result})
 
     except ValueError as exc:
@@ -1465,16 +1542,35 @@ def refund_payment(collection_id):
     if fc.payment_method != "khalti":
         return error_response("Refunds are currently supported for Khalti payments only", 422)
 
-    gateway_ref = getattr(fc, "gateway_pidx", None) or getattr(fc, "transaction_id", None)
+    # Khalti's refund API takes the pidx of the original charge. The pidx is
+    # recorded on the PaymentInitiation row at checkout time (audit E60) —
+    # `fc.gateway_pidx` never existed and transaction_id alone is not a pidx.
+    from app.models.fee import PaymentInitiation
+
+    initiation = (
+        PaymentInitiation.query.filter_by(
+            collection_id=fc.id, gateway="khalti", is_deleted=False
+        )
+        .order_by(PaymentInitiation.created_at.desc())
+        .first()
+    )
+    gateway_ref = (initiation.gateway_ref if initiation else None) or getattr(
+        fc, "transaction_id", None
+    )
     if not gateway_ref:
         return error_response("No gateway reference found for this collection", 422)
 
-    # Retrieve school's Khalti secret key from fee config
-    from app.models.school import School
-    school = School.query.get(g.school_id)
-    fee_config = getattr(school, "fee_config", {}) or {}
-    khalti_cfg = fee_config.get("khalti", {})
-    secret_key = khalti_cfg.get("secret_key", "")
+    # Retrieve school's Khalti secret key from the payment_methods config
+    # (the per-gateway credentials live in fee_config["payment_methods"]).
+    khalti_cfg = next(
+        (
+            m
+            for m in _get_configured_payment_methods()
+            if m.get("key") == "khalti"
+        ),
+        {},
+    )
+    secret_key = (khalti_cfg.get("secret_key") or "").strip()
     if not secret_key:
         return error_response("Khalti is not configured for this school", 422)
 
@@ -1633,6 +1729,30 @@ def _coerce_fee_amount(value):
         return round(float(value or 0), 2)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _coerce_limit(raw, default, maximum):
+    """Parse a `limit` query param; None signals invalid input (→ 400)."""
+    if raw in (None, ""):
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    return min(value, maximum)
+
+
+def _parse_uuid(value):
+    """Return a UUID or None — E181: bad uuid strings in JSON bodies used to
+    surface as unhandled 500s (psycopg2 DataError) instead of 400s."""
+    import uuid as _uuid
+
+    try:
+        return _uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 
 def _coerce_due_day(value):
@@ -1795,36 +1915,55 @@ def _apply_fee_structure(structure):
         if due_day is not None:
             notes = f"{notes} [due_day:{due_day}]"
 
-        # Auto-apply student scholarship/discount if one exists
+        # Auto-apply student scholarship/discount if one exists. ALL active
+        # matching discounts stack additively (e.g. sibling 10% + merit 5%
+        # = 15% of the base amount); fixed-NPR discounts add their flat
+        # value. Percentages are always computed on the base amount (not
+        # sequentially on the remainder), and the combined discount is
+        # capped at the base so the net payable can never go negative and
+        # discounts can never waive a late fine.
         discount_amount = 0.0
         is_scholarship = False
         try:
             import nepali_datetime
             today_bs = nepali_datetime.date.today()
             today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
-            sc = StudentScholarship.query.filter(
-                StudentScholarship.school_id == structure.school_id,
-                StudentScholarship.student_id == student.id,
-                StudentScholarship.is_active.is_(True),
-                StudentScholarship.is_deleted.is_(False),
-                or_(
-                    StudentScholarship.fee_type.is_(None),
-                    StudentScholarship.fee_type == item_name,
-                ),
-                or_(
-                    StudentScholarship.valid_from_bs.is_(None),
-                    StudentScholarship.valid_from_bs <= today_bs_str,
-                ),
-                or_(
-                    StudentScholarship.valid_until_bs.is_(None),
-                    StudentScholarship.valid_until_bs >= today_bs_str,
-                ),
-            ).first()
-            if sc:
-                if sc.discount_type == "percent":
-                    discount_amount = round(float(amount) * float(sc.discount_value) / 100, 2)
-                else:
-                    discount_amount = min(float(sc.discount_value), float(amount))
+            # SAVEPOINT: if the discount lookup fails (e.g. table missing in an
+            # un-migrated DB), the error is contained — a bare failure here must
+            # never abort the surrounding billing transaction mid-run.
+            with db.session.begin_nested():
+                scholarships = (
+                    StudentScholarship.query.filter(
+                        StudentScholarship.school_id == structure.school_id,
+                        StudentScholarship.student_id == student.id,
+                        StudentScholarship.is_active.is_(True),
+                        StudentScholarship.is_deleted.is_(False),
+                        or_(
+                            StudentScholarship.fee_type.is_(None),
+                            StudentScholarship.fee_type == item_name,
+                        ),
+                        or_(
+                            StudentScholarship.valid_from_bs.is_(None),
+                            StudentScholarship.valid_from_bs <= today_bs_str,
+                        ),
+                        or_(
+                            StudentScholarship.valid_until_bs.is_(None),
+                            StudentScholarship.valid_until_bs >= today_bs_str,
+                        ),
+                    )
+                    .order_by(StudentScholarship.created_at.asc())
+                    .all()
+                )
+            if scholarships:
+                combined_discount = 0.0
+                for sc in scholarships:
+                    if sc.discount_type == "percent":
+                        combined_discount += float(amount) * float(sc.discount_value or 0) / 100
+                    else:
+                        combined_discount += float(sc.discount_value or 0)
+                discount_amount = round(
+                    min(max(combined_discount, 0.0), float(amount)), 2
+                )
                 is_scholarship = True
         except Exception:
             pass
@@ -2084,7 +2223,26 @@ def _receipt_pdf_html(receipt):
     transaction_id = escape(receipt.transaction_id or "-")
     amount = float(receipt.amount or 0)
     total_amount = _collection_payable_total(collection) if collection else 0
-    paid_amount = _extract_partial_paid(collection) if collection else amount
+    if collection:
+        # "Outstanding after payment" is a point-in-time figure: it must
+        # reflect the balance after THIS receipt's payment, not the
+        # collection's current balance (reprinting an older receipt after
+        # later payments would otherwise show a stale/wrong due amount).
+        # Cumulative paid through this receipt = Σ receipts up to and
+        # including this one (payments are non-negative; refunds never
+        # create receipt rows), capped at the payable total.
+        paid_through = (
+            db.session.query(func.coalesce(func.sum(FeeReceipt.amount), 0))
+            .filter(
+                FeeReceipt.collection_id == collection.id,
+                FeeReceipt.is_deleted.is_(False),
+                FeeReceipt.created_at <= receipt.created_at,
+            )
+            .scalar()
+        )
+        paid_amount = min(float(paid_through or 0), total_amount)
+    else:
+        paid_amount = amount
     due_amount = max(total_amount - paid_amount, 0)
     paid_at = (
         receipt.created_at.strftime("%Y-%m-%d %I:%M %p") if receipt.created_at else "-"

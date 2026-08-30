@@ -5,6 +5,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.health_records import HealthProfile, MedicalVisit, Immunization
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -12,6 +13,26 @@ from app.utils.response import created_response, error_response, success_respons
 from extensions import db
 
 health_records_bp = Blueprint("health_records", __name__, url_prefix="/health-records")
+
+
+@health_records_bp.route("/profiles", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("health_records")
+def list_health_profiles():
+    """List existing health profiles for the school (the Allergies & Conditions
+    registry page lists students from here, not from medical visits)."""
+    query = HealthProfile.query.filter_by(school_id=g.school_id)
+    search = request.args.get("search")
+    items, meta = paginate(query.order_by(HealthProfile.created_at.desc()))
+    results = [_profile_dict(p) for p in items]
+    if search:
+        # case-insensitive: the needle was lowercased but the haystack never
+        # was, so any differently-cased query (e.g. "Aasha") filtered the
+        # registry to zero rows (E130)
+        needle = search.lower()
+        results = [p for p in results if needle in (p.get("student_name") or "").lower()]
+    return success_response(results, meta={"pagination": meta})
 
 
 @health_records_bp.route("/students/<student_id>", methods=["GET"])
@@ -32,6 +53,8 @@ def get_health_profile(student_id):
 @role_required("superadmin", "school_admin", "teacher")
 def update_health_profile(student_id):
     data = request.get_json(silent=True) or {}
+    if not Student.query.filter_by(id=student_id, school_id=g.school_id).first():
+        return error_response("Student not found at this school", 404)
     profile = HealthProfile.query.filter_by(student_id=student_id, school_id=g.school_id).first()
     if not profile:
         profile = HealthProfile(student_id=student_id, school_id=g.school_id)
@@ -71,6 +94,10 @@ def list_medical_visits():
 @role_required("superadmin", "school_admin", "teacher")
 def create_medical_visit():
     data = request.get_json(silent=True) or {}
+    if not data.get("student_id"):
+        return error_response("student_id is required", 400)
+    if not Student.query.filter_by(id=data["student_id"], school_id=g.school_id).first():
+        return error_response("student_id does not match a student at this school", 400)
     visit = MedicalVisit(school_id=g.school_id, recorded_by=g.current_user.id)
     for key in ("student_id", "reason", "diagnosis", "treatment", "referred_to", "notes"):
         if key in data:
@@ -103,6 +130,10 @@ def list_immunizations():
 @role_required("superadmin", "school_admin", "teacher")
 def record_immunization():
     data = request.get_json(silent=True) or {}
+    if data.get("student_id") and not Student.query.filter_by(id=data["student_id"], school_id=g.school_id).first():
+        return error_response("student_id does not match a student at this school", 400)
+    if not (data.get("vaccine_name") or "").strip():
+        return error_response("vaccine_name is required", 400)
     imm = Immunization(school_id=g.school_id)
     for key in ("student_id", "vaccine_name", "dose_number", "administered_by"):
         if key in data:
@@ -115,8 +146,11 @@ def record_immunization():
 
 
 def _profile_dict(p):
+    student = p.student if hasattr(p, "student") else None
     return {
-        "id": str(p.id), "student_id": str(p.student_id) if p.student_id else None, "blood_group": p.blood_group,
+        "id": str(p.id), "student_id": str(p.student_id) if p.student_id else None,
+        "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
+        "blood_group": p.blood_group,
         "height_cm": float(p.height_cm) if p.height_cm is not None else None,
         "weight_kg": float(p.weight_kg) if p.weight_kg is not None else None,
         "allergies": p.allergies, "medical_conditions": p.medical_conditions,
@@ -127,15 +161,21 @@ def _profile_dict(p):
 
 
 def _visit_dict(v):
+    student = v.student if hasattr(v, "student") else None
     return {
-        "id": str(v.id), "student_id": str(v.student_id) if v.student_id else None, "visit_date": str(v.visit_date) if v.visit_date else None,
+        "id": str(v.id), "student_id": str(v.student_id) if v.student_id else None,
+        "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
+        "visit_date": str(v.visit_date) if v.visit_date else None,
         "reason": v.reason, "diagnosis": v.diagnosis, "treatment": v.treatment,
     }
 
 
 def _imm_dict(i):
+    student = i.student if hasattr(i, "student") else None
     return {
-        "id": str(i.id), "student_id": str(i.student_id) if i.student_id else None, "vaccine_name": i.vaccine_name,
+        "id": str(i.id), "student_id": str(i.student_id) if i.student_id else None,
+        "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
+        "vaccine_name": i.vaccine_name,
         "dose_number": i.dose_number,
         "date_administered": str(i.date_administered) if i.date_administered else None,
         "next_due_date": str(i.next_due_date) if i.next_due_date else None,

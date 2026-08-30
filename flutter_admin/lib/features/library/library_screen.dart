@@ -12,6 +12,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<Map<String, dynamic>> _books = [];
   List<Map<String, dynamic>> _issues = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/library/books'),
@@ -34,15 +38,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
         );
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('LibraryScreen load failed: $e\n$st');
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = 'Could not load library data.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     final issued = _issues.where((item) => item['status'] == 'issued').toList();
     final overdue = _issues.where((item) {

@@ -32,6 +32,33 @@ class AuthService:
     OTP_COOLDOWN_SECONDS = 60
 
     @staticmethod
+    def _phone_lookup_variants(phone: str) -> list[str]:
+        """Plausible stored formats for a phone the user typed in the login form.
+
+        The OTP login form accepts ``98XXXXXXXX`` while stored users mix formats
+        (``98XXXXXXXX`` from web registration, ``+977-98XXXXXXXX`` from seeds).
+        Exact-match lookup missed every user whose stored phone carried the
+        ``+977-`` prefix, so the login page's OTP mode could never sign them in.
+        Returns the raw value plus normalized variants; cache keys still use the
+        raw string the user typed so send/verify stay consistent.
+        """
+        raw = (phone or "").strip()
+        if not raw:
+            return []
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        # 977 + 10-digit national number, or 9[678]XXXXXXXX with a stray prefix
+        national = digits[-10:] if len(digits) > 10 else digits
+        variants = {
+            raw,
+            raw.replace(" ", "").replace("-", ""),
+            "+977" + national,
+            "+977-" + national,
+            "977" + national,
+            national,
+        }
+        return [v for v in variants if v]
+
+    @staticmethod
     def generate_otp() -> str:
         """Generate a 6-digit OTP."""
         return "".join(random.choices(string.digits, k=AuthService.OTP_LENGTH))
@@ -53,8 +80,13 @@ class AuthService:
         otp = AuthService.generate_otp()
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=AuthService.OTP_EXPIRY_SECONDS)
 
-        # Store OTP in user record
-        user = User.query.filter_by(phone=phone, is_deleted=False).first()
+        # Store OTP in user record (match any stored phone format)
+        user = (
+            User.query.filter(
+                User.phone.in_(AuthService._phone_lookup_variants(phone)),
+                User.is_deleted.is_(False),
+            ).first()
+        )
         if user:
             user.otp_code = otp
             user.otp_expires_at = expires_at
@@ -82,7 +114,12 @@ class AuthService:
         stored_otp = cache.get(f"otp:{phone}")
         if not stored_otp:
             # Fallback to DB
-            user = User.query.filter_by(phone=phone, is_deleted=False).first()
+            user = (
+                User.query.filter(
+                    User.phone.in_(AuthService._phone_lookup_variants(phone)),
+                    User.is_deleted.is_(False),
+                ).first()
+            )
             if user and user.otp_code and user.otp_expires_at:
                 if user.otp_expires_at > datetime.now(timezone.utc):
                     stored_otp = user.otp_code
@@ -94,7 +131,10 @@ class AuthService:
         cache.delete(f"otp:{phone}")
         cache.delete(f"otp_attempts:{phone}")
 
-        user = User.query.filter_by(phone=phone, is_deleted=False).first()
+        user = User.query.filter(
+            User.phone.in_(AuthService._phone_lookup_variants(phone)),
+            User.is_deleted.is_(False),
+        ).first()
         if not user:
             return {"error": "User not found. Contact your school admin."}
 
@@ -151,6 +191,12 @@ class AuthService:
             ((User.email == email_or_phone) | (User.phone == email_or_phone)),
             User.is_deleted == False
         ).first()
+
+        if not user and "@" in email_or_phone and email_or_phone.endswith(".aschool.com"):
+            user = User.query.filter(
+                User.email == f"{email_or_phone}.np",
+                User.is_deleted == False
+            ).first()
 
         if not user:
             return {"error": "Invalid credentials"}

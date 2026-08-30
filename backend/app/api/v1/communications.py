@@ -15,7 +15,9 @@ from app.models.notice import Notice
 from app.models.student import Guardian, Student
 from app.models.user import User
 from app.services.chat_service import (
+    ChatNotAllowedError,
     contact_payload,
+    can_message,
     list_contact_users,
     list_messages as list_chat_messages,
     message_payload,
@@ -60,6 +62,11 @@ def get_chat_messages(user_id):
     ).first()
     if not target:
         return error_response("Chat contact not found", 404)
+
+    # E190: the contacts role matrix governs thread reads too — a role pair
+    # you could never message is a thread you should never open.
+    if not can_message(getattr(g.current_user, "role", None), target.role):
+        return error_response("You are not allowed to message this user", 403)
 
     try:
         _, messages = list_chat_messages(
@@ -109,6 +116,11 @@ def send_chat_message():
             file_url=file_url,
             file_type=file_type,
         )
+    except ChatNotAllowedError:
+        # E190: role pair outside the directory matrix (e.g. student ->
+        # parent, parent -> student) is a permission problem, not a bad
+        # request.
+        return error_response("You are not allowed to message this user", 403)
     except ValueError as exc:
         return error_response(str(exc), 400)
 
@@ -233,6 +245,18 @@ def send_broadcast():
     channel = data.get("channel", "sms")
     audience = data.get("audience", "all_parents")
     class_id = data.get("class_id")
+    subject = (data.get("subject") or "").strip()
+
+    if channel == "push":
+        return _broadcast_push(
+            subject or "School Announcement", message, audience, class_id
+        )
+    if channel == "email":
+        return _broadcast_email(
+            subject or "School Announcement", message, audience, class_id
+        )
+    if channel == "whatsapp":
+        return _broadcast_whatsapp(message, audience, class_id)
 
     recipients = _phones_for_audience(audience, class_id)
     if not recipients:
@@ -242,17 +266,6 @@ def send_broadcast():
                 "recipients": 0,
                 "channel": channel,
                 "audience": audience,
-            }
-        )
-
-    if channel != "sms":
-        return success_response(
-            {
-                "queued": 0,
-                "recipients": len(recipients),
-                "channel": channel,
-                "audience": audience,
-                "status": "accepted",
             }
         )
 
@@ -269,7 +282,7 @@ def send_broadcast():
         )
         db.session.add(log)
         logs.append(log)
-        payload.append({"phone": phone, "message": message})
+        payload.append({"phone": phone, "message": message, "log_id": str(log.id)})
 
     db.session.commit()
 
@@ -284,6 +297,282 @@ def send_broadcast():
             "channel": channel,
             "audience": audience,
             "log_ids": [str(log.id) for log in logs],
+        }
+    )
+
+
+# ── Non-SMS broadcast channels (E122) ─────────────────────────────────────
+# These used to return `status: accepted` without doing anything (fake
+# success). Each channel now performs its real delivery and reports the
+# honest outcome: push writes in-app notifications, email attempts SMTP
+# delivery with per-recipient failures counted, WhatsApp degrades to
+# `skipped` when the school has no credentials.
+
+
+def _guardian_user_ids(class_id: str | None, defaulters_only: bool = False) -> list:
+    """user_ids of Guardian rows (optionally scoped to a class / to parents of
+    fee defaulters) — the Guardian-linked half of parent audiences."""
+    from app.models.fee import FeeCollection
+    from app.models.student import Guardian, Student
+
+    query = Guardian.query.join(Student, Guardian.student_id == Student.id).filter(
+        Guardian.school_id == g.school_id,
+        Guardian.is_deleted.is_(False),
+        Student.is_deleted.is_(False),
+        Guardian.user_id.isnot(None),
+    )
+    if class_id:
+        parsed = _parse_uuid(class_id)
+        if not parsed:
+            return []
+        query = query.filter(Student.class_id == parsed)
+    if defaulters_only:
+        query = query.join(
+            FeeCollection, FeeCollection.student_id == Student.id
+        ).filter(
+            FeeCollection.is_deleted.is_(False),
+            FeeCollection.payment_status.in_(("pending", "partial")),
+        )
+    return [guardian.user_id for guardian in query.all()]
+
+
+def _users_for_audience(audience: str, class_id: str | None, limit: int = 500):
+    """Active users of this school matching a broadcast audience (push)."""
+    from app.models.user import User
+
+    query = User.query.filter(
+        User.school_id == g.school_id,
+        User.is_deleted.is_(False),
+        User.is_active.is_(True),
+    )
+    if audience == "all_staff":
+        query = query.filter(
+            User.role.in_(("school_admin", "accountant", "teacher", "staff"))
+        )
+    elif audience == "all_students":
+        query = query.filter(User.role == "student")
+    elif audience == "class_parents":
+        # E122: class_parents means ONLY the guardian-linked users of that
+        # class — the same semantics as the SMS audience resolver. Unioning
+        # in every parent-role user of the school would broadcast to parents
+        # whose children are not in the class at all.
+        ids = list(set(_guardian_user_ids(class_id)))
+        if not ids:
+            return []
+        query = query.filter(User.id.in_(ids))
+    elif audience == "fee_defaulters":
+        ids = list(set(_guardian_user_ids(None, defaulters_only=True)))
+        if not ids:
+            return []
+        query = query.filter(User.id.in_(ids))
+    else:  # all_parents (default)
+        parent_ids = {
+            u.id for u in query.filter(User.role == "parent").with_entities(User.id)
+        }
+        guardian_ids = set(_guardian_user_ids(None))
+        ids = list(parent_ids | guardian_ids)
+        if not ids:
+            return []
+        query = query.filter(User.id.in_(ids))
+    return query.limit(limit).all()
+
+
+def _broadcast_push(title: str, message: str, audience: str, class_id: str | None):
+    """In-app broadcast: one notification per matching user, shown in the
+    recipient's /notifications inbox. Single commit — nothing is delivered
+    half-way."""
+    from app.models.notification import InAppNotification
+
+    users = _users_for_audience(audience, class_id)
+    if not users:
+        return success_response(
+            {
+                "queued": 0,
+                "recipients": 0,
+                "channel": "push",
+                "audience": audience,
+                "status": "sent",
+                "note": "no matching users in this audience",
+            }
+        )
+
+    for user in users:
+        db.session.add(
+            InAppNotification(
+                school_id=g.school_id,
+                user_id=str(user.id),
+                title=title[:300],
+                body=message,
+                category="broadcast",
+                priority="normal",
+                data={"channel": "push", "audience": audience},
+            )
+        )
+    db.session.commit()
+    return created_response(
+        {
+            "queued": len(users),
+            "recipients": len(users),
+            "channel": "push",
+            "audience": audience,
+            "status": "sent",
+        }
+    )
+
+
+def _emails_for_audience(audience: str, class_id: str | None) -> list[dict]:
+    """Email addresses matching a broadcast audience (users first, then the
+    denormalized Guardian email — deduplicated, order preserved)."""
+    from app.models.student import Guardian, Student
+    from app.models.user import User
+
+    emails: list[str] = []
+
+    if audience == "all_staff":
+        users = User.query.filter(
+            User.school_id == g.school_id,
+            User.is_deleted.is_(False),
+            User.is_active.is_(True),
+            User.role.in_(("school_admin", "accountant", "teacher", "staff")),
+            User.email.isnot(None),
+        ).all()
+        emails.extend(u.email for u in users if u.email)
+    elif audience == "all_students":
+        users = User.query.filter(
+            User.school_id == g.school_id,
+            User.is_deleted.is_(False),
+            User.is_active.is_(True),
+            User.role == "student",
+            User.email.isnot(None),
+        ).all()
+        emails.extend(u.email for u in users if u.email)
+    else:
+        # parent-flavoured audiences: guardian emails (optionally class- or
+        # defaulter-scoped) + parent-role user emails
+        guardian_query = Guardian.query.join(
+            Student, Guardian.student_id == Student.id
+        ).filter(
+            Guardian.school_id == g.school_id,
+            Guardian.is_deleted.is_(False),
+            Student.is_deleted.is_(False),
+            Guardian.email.isnot(None),
+        )
+        if audience == "class_parents":
+            parsed = _parse_uuid(class_id)
+            if not parsed:
+                return []
+            guardian_query = guardian_query.filter(Student.class_id == parsed)
+        elif audience == "fee_defaulters":
+            from app.models.fee import FeeCollection
+
+            guardian_query = guardian_query.join(
+                FeeCollection, FeeCollection.student_id == Student.id
+            ).filter(
+                FeeCollection.is_deleted.is_(False),
+                FeeCollection.payment_status.in_(("pending", "partial")),
+            )
+        emails.extend(
+            guardian.email for guardian in guardian_query.all() if guardian.email
+        )
+        parent_users = User.query.filter(
+            User.school_id == g.school_id,
+            User.is_deleted.is_(False),
+            User.is_active.is_(True),
+            User.role == "parent",
+            User.email.isnot(None),
+        ).all()
+        emails.extend(u.email for u in parent_users if u.email)
+
+    seen: set[str] = set()
+    cleaned: list[dict] = []
+    for email in emails:
+        value = (email or "").strip().lower()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        cleaned.append({"email": value})
+    return cleaned
+
+
+def _broadcast_email(subject: str, message: str, audience: str, class_id: str | None):
+    """Email broadcast through the SMTP EmailService. Unconfigured SMTP is
+    reported honestly (status failed, reason email_not_configured) — never a
+    fake success."""
+    from markupsafe import escape
+
+    from app.services.communications.email_service import EmailService
+
+    recipients = _emails_for_audience(audience, class_id)
+    if not recipients:
+        return success_response(
+            {
+                "queued": 0,
+                "recipients": 0,
+                "channel": "email",
+                "audience": audience,
+                "status": "sent",
+                "note": "no matching recipients with an email address",
+            }
+        )
+
+    html_body = "<p>" + escape(message).replace("\n", "<br>") + "</p>"
+    result = EmailService.send_bulk_email(recipients, subject, html_body)
+    sent = int(result.get("sent", 0))
+    failed = int(result.get("failed", 0))
+    all_failed = sent == 0 and failed > 0
+    return success_response(
+        {
+            "queued": sent,
+            "recipients": len(recipients),
+            "channel": "email",
+            "audience": audience,
+            "status": "failed" if all_failed else "sent",
+            "reason": "email_not_configured_or_smtp_error" if all_failed else None,
+            "failed": failed,
+        }
+    )
+
+
+def _broadcast_whatsapp(message: str, audience: str, class_id: str | None):
+    """WhatsApp broadcast through the Cloud API service. Without school
+    credentials every send degrades to `skipped` (E32 honesty contract) and
+    the response says so instead of pretending delivery."""
+    from app.services.communications.whatsapp_cloud import WhatsAppCloudService
+
+    phones = _phones_for_audience(audience, class_id)
+    if not phones:
+        return success_response(
+            {
+                "queued": 0,
+                "recipients": 0,
+                "channel": "whatsapp",
+                "audience": audience,
+                "status": "sent",
+                "note": "no matching recipients with a phone number",
+            }
+        )
+
+    results = [WhatsAppCloudService.send_text(phone, message) for phone in phones]
+    skipped = sum(1 for r in results if r.get("skipped"))
+    sent = len(results) - skipped
+    if skipped == len(results):
+        status = "skipped"
+        reason = results[0].get("reason", "whatsapp_not_configured")
+    elif sent == len(results):
+        status = "sent"
+        reason = None
+    else:
+        status = "partial"
+        reason = "some_recipients_skipped"
+    return success_response(
+        {
+            "queued": sent,
+            "recipients": len(phones),
+            "channel": "whatsapp",
+            "audience": audience,
+            "status": status,
+            "reason": reason,
+            "failed": skipped,
         }
     )
 

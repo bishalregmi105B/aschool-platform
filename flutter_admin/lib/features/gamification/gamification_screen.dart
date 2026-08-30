@@ -17,6 +17,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
   List<Map<String, dynamic>> _leaderboard = [];
   List<Map<String, dynamic>> _badges = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -32,7 +33,10 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/gamification/leaderboard?per_page=20'),
@@ -45,8 +49,12 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('GamificationScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load gamification data.';
+        _loading = false;
+      });
     }
   }
 
@@ -67,10 +75,12 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [_buildLeaderboard(), _buildBadges()],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [_buildLeaderboard(), _buildBadges()],
+                  ),
       ),
     );
   }
@@ -100,7 +110,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
             _ => ASchoolTheme.mutedText,
           };
           final points =
-              (entry['total_points'] as num?)?.toInt() ?? 0;
+              safeIntOrNull(entry['total_points']) ?? 0;
 
           return ESchoolAnimatedEntry(
             index: i,
@@ -119,11 +129,11 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
                   ),
                 ),
                 title: Text(
-                  entry['student_name'] as String? ?? '',
+                  safeStringOrNull(entry['student_name']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
-                  entry['class_name'] as String? ?? '',
+                  safeStringOrNull(entry['class_name']) ?? '',
                   style: const TextStyle(
                       fontSize: 12, color: ASchoolTheme.mutedText),
                 ),
@@ -164,7 +174,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
         itemBuilder: (_, i) {
           final badge = _badges[i];
           final awardedCount =
-              (badge['awarded_count'] as num?)?.toInt() ?? 0;
+              safeIntOrNull(badge['awarded_count']) ?? 0;
 
           return ESchoolAnimatedEntry(
             index: i,
@@ -180,7 +190,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    badge['name'] as String? ?? '',
+                    safeStringOrNull(badge['name']) ?? '',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,

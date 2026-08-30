@@ -16,6 +16,8 @@ class SmsGatewayService:
     @classmethod
     def send_sms(cls, to_number: str, message: str, identity: str = "ASchool") -> dict:
         """Send a single SMS via Sparrow SMS."""
+        import logging
+
         url = f"{cls.BASE_URL}/sms/"
         payload = {
             "token": cls._token(),
@@ -24,8 +26,24 @@ class SmsGatewayService:
             "text": message[:480],  # SMS limit
         }
 
-        resp = requests.post(url, json=payload, timeout=30)
-        data = resp.json()
+        # E199: an HTML error page / gateway outage used to crash resp.json()
+        # with a raw JSONDecodeError. Report it as a structured failure so
+        # callers (and the retrying Celery task) see an honest outcome.
+        try:
+            resp = requests.post(url, json=payload, timeout=30)
+            data = resp.json()
+        except ValueError as exc:
+            logging.getLogger(__name__).error(
+                "Sparrow SMS: non-JSON response for %s: %s", to_number, exc
+            )
+            return {"success": False, "message_id": None, "credits_used": 0,
+                    "response": {"error": "provider returned a non-JSON response"}}
+        except requests.RequestException as exc:
+            logging.getLogger(__name__).error(
+                "Sparrow SMS: request to %s failed: %s", to_number, exc
+            )
+            return {"success": False, "message_id": None, "credits_used": 0,
+                    "response": {"error": str(exc)}}
 
         return {
             "success": data.get("response_code") == 200,

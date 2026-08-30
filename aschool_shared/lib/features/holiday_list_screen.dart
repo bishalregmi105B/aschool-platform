@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../utils/nepali_formatter.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/error_container.dart';
 import '../widgets/eschool_components.dart';
 import '../widgets/loading_shimmer.dart';
 import '../widgets/no_data_container.dart';
@@ -34,6 +35,7 @@ class HolidayListScreen extends StatefulWidget {
 class _HolidayListScreenState extends State<HolidayListScreen> {
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -42,7 +44,10 @@ class _HolidayListScreenState extends State<HolidayListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/notices/events', queryParameters: {'per_page': 100});
@@ -53,8 +58,10 @@ class _HolidayListScreenState extends State<HolidayListScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('HolidayListScreen load failed: $e\n$st');
       _events = [];
+      _error = 'Could not load the holiday list.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -65,7 +72,9 @@ class _HolidayListScreenState extends State<HolidayListScreen> {
       appBar: widget.showAppBar ? CustomAppBar(title: widget.title) : null,
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _events.isEmpty
                   ? ListView(

@@ -31,6 +31,9 @@ REQUIRED_PLUGIN_SLUGS = [
     "library_management",
     "exams",
     "iemis_importer",
+    # hostel routes are plugin_required("hostel") since the campus-ops batch
+    # (previously ungated) — the Module-10 simulation needs an active install.
+    "hostel",
 ]
 
 

@@ -12,7 +12,7 @@ from app.models.student import Student
 from app.models.timetable import TimetableSlot
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.response import created_response, success_response
+from app.utils.response import created_response, error_response, success_response
 from app.utils.teacher_scope import teacher_allowed_class_ids, teacher_class_teacher_class_ids
 from extensions import db
 
@@ -127,17 +127,57 @@ def teacher_assignments():
 @plugin_required("assignments")
 @role_required("teacher", "school_admin", "superadmin")
 def create_teacher_assignment():
+    """Create an assignment for one of the teacher's classes."""
+    from app.models.academic import Subject
+
     data = request.get_json(silent=True) or {}
+    # E175: class_id (and subject_id) flowed straight from the payload into
+    # the INSERT — a bogus or other-school id died at commit with an FK
+    # IntegrityError 500. Validate them (and the due date) before any write.
+    class_id = _coerce_uuid(data.get("class_id"))
+    subject_id = _coerce_uuid(data.get("subject_id"))
+    if not class_id:
+        return error_response("class_id is required and must be a valid id", 400)
+    klass = Class.query.filter_by(
+        id=class_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not klass:
+        return error_response("class_id does not match a class at this school", 400)
+    # subject_id is NOT NULL on the model — a missing one was an IntegrityError
+    # 500 at commit; require it up front (same rule as POST /assignments).
+    if not subject_id:
+        return error_response("subject_id is required and must be a valid id", 400)
+    if not Subject.query.filter_by(
+        id=subject_id, school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("subject_id does not match a subject at this school", 400)
+    if g.role == "teacher":
+        allowed = {str(cid) for cid in teacher_allowed_class_ids(g.school_id, g.user_id) if cid}
+        if allowed and str(class_id) not in allowed:
+            return error_response("Not allowed to create assignments for this class", 403)
+
+    due_date = None
+    if data.get("due_date"):
+        due_date = _parse_datetime(data.get("due_date"))
+        if not due_date:
+            return error_response("due_date is not a valid datetime", 400)
+    total_marks = data.get("total_marks") or data.get("max_marks")
+    if total_marks is not None:
+        try:
+            total_marks = float(total_marks)
+        except (TypeError, ValueError):
+            return error_response("total_marks must be a number", 400)
+
     assignment = Assignment(
         school_id=g.school_id,
         teacher_id=g.user_id,
         title=data.get("title") or "Untitled Assignment",
         description=data.get("description"),
-        class_id=data.get("class_id"),
-        section_id=data.get("section_id"),
-        subject_id=data.get("subject_id"),
-        due_date=_parse_datetime(data.get("due_date")) or datetime.now(timezone.utc),
-        total_marks=data.get("total_marks") or data.get("max_marks"),
+        class_id=class_id,
+        section_id=_coerce_uuid(data.get("section_id")),
+        subject_id=subject_id,
+        due_date=due_date or datetime.now(timezone.utc),
+        total_marks=total_marks,
         attachment_urls=data.get("attachment_urls"),
     )
     db.session.add(assignment)
@@ -294,4 +334,19 @@ def _parse_datetime(value):
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
+        return None
+
+
+def _coerce_uuid(value):
+    """Coerce to UUID; None when the value is absent or not a valid UUID
+    (garbage ids would otherwise reach the ORM and die with a DataError 500)."""
+    from uuid import UUID
+
+    if isinstance(value, UUID):
+        return value
+    if not value:
+        return None
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
         return None

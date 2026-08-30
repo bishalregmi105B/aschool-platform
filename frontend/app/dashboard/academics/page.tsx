@@ -253,8 +253,27 @@ function AcademicYearsTab() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<AcademicYear | null>(null);
+  // E219: Start/End are REQUIRED — a year without dates is meaningless
+  // (the seeded "2082" had none). BSDateInput's hidden input always carries a
+  // value (it defaults to today), so "required" is enforced here by only
+  // accepting a submission once the user has actually picked both dates
+  // (edit dialogs start from the stored dates instead).
+  const [pickedDates, setPickedDates] = useState<{ start?: string; end?: string }>({});
 
-  const { data, isLoading } = useQuery({
+  const openYearDialog = (year: AcademicYear | null) => {
+    setPickedDates(
+      year
+        ? { start: getDateInputValue(year.start_date) || undefined, end: getDateInputValue(year.end_date) || undefined }
+        : {}
+    );
+    if (year) {
+      setEditItem(year);
+    } else {
+      setShowAdd(true);
+    }
+  };
+
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["academic-years"],
     queryFn: fetchAcademicYears,
   });
@@ -288,6 +307,15 @@ function AcademicYearsTab() {
     onError: () => toast.error("Failed to delete academic year"),
   });
 
+  if (isError)
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
   if (isLoading) return <PageLoader />;
 
   const years = data || [];
@@ -295,7 +323,7 @@ function AcademicYearsTab() {
   return (
     <>
       <div className="flex justify-end">
-        <Button onClick={() => setShowAdd(true)}>
+        <Button onClick={() => openYearDialog(null)}>
           <Plus className="mr-2 h-4 w-4" /> Add Year
         </Button>
       </div>
@@ -324,7 +352,7 @@ function AcademicYearsTab() {
                   </TableCell>
                   <TableCell className="text-right">
                     <RowActions
-                      onEdit={() => setEditItem(year)}
+                      onEdit={() => openYearDialog(year)}
                       onDelete={() => deleteMutation.mutate(year.id)}
                       deleteLabel={`Delete academic year \"${year.name}\"?`}
                       deleting={deleteMutation.isPending}
@@ -361,11 +389,17 @@ function AcademicYearsTab() {
             key={editItem?.id || "new-year"}
             onSubmit={(event) => {
               event.preventDefault();
+              // E219: a year without Start/End is rejected with feedback
+              // (previously it silently saved, leaving the "N/A" row).
+              if (!pickedDates.start || !pickedDates.end) {
+                toast.error("Start date and End date are both required");
+                return;
+              }
               const formData = new FormData(event.currentTarget);
               const payload = {
                 name: formData.get("name"),
-                start_date: formData.get("start_date"),
-                end_date: formData.get("end_date"),
+                start_date: pickedDates.start,
+                end_date: pickedDates.end,
                 is_current: formData.get("is_current") === "on",
               };
 
@@ -378,25 +412,30 @@ function AcademicYearsTab() {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>Name *</Label>
               <Input name="name" required defaultValue={editItem?.name} placeholder="2082" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>Start Date *</Label>
                 <BSDateInput
                   name="start_date"
-                  value={getDateInputValue(editItem?.start_date) || undefined}
+                  value={pickedDates.start}
+                  onChange={(ad) => setPickedDates((p) => ({ ...p, start: ad }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label>End Date *</Label>
                 <BSDateInput
                   name="end_date"
-                  value={getDateInputValue(editItem?.end_date) || undefined}
+                  value={pickedDates.end}
+                  onChange={(ad) => setPickedDates((p) => ({ ...p, end: ad }))}
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).
+            </p>
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 name="is_current"
@@ -435,7 +474,7 @@ function ClassesTab() {
   const [addSectionFor, setAddSectionFor] = useState<ClassItem | null>(null);
   const [editSection, setEditSection] = useState<{ klass: ClassItem; section: SectionItem } | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["classes"],
     queryFn: fetchClasses,
   });
@@ -522,6 +561,15 @@ function ClassesTab() {
     onError: () => toast.error("Failed to delete section"),
   });
 
+  if (isError)
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
   if (isLoading) return <PageLoader />;
 
   const classes = data || [];
@@ -792,7 +840,7 @@ function SubjectsTab() {
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Subject | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["subjects"],
     queryFn: fetchSubjects,
   });
@@ -826,6 +874,15 @@ function SubjectsTab() {
     onError: () => toast.error("Failed to delete subject"),
   });
 
+  if (isError)
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
   if (isLoading) return <PageLoader />;
 
   const subjects = data || [];

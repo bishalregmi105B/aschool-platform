@@ -18,6 +18,7 @@ class _ELibraryScreenState extends ConsumerState<ELibraryScreen>
   List<dynamic> _resources = [];
   bool _loading = true;
   String _search = '';
+  String? _error;
 
   @override
   void initState() {
@@ -27,16 +28,22 @@ class _ELibraryScreenState extends ConsumerState<ELibraryScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/elibrary');
       setState(() {
-        final payload = res.data?['data'] as Map?;
-        _ebooks = (payload?['ebooks'] as List?) ?? [];
-        _pastPapers = (payload?['past_papers'] as List?) ?? [];
-        _resources = (payload?['resources'] as List?) ?? [];
+        final payload = safeMapOrNull(res.data?['data']);
+        _ebooks = safeList(payload?['ebooks']);
+        _pastPapers = safeList(payload?['past_papers']);
+        _resources = safeList(payload?['resources']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ELibraryScreen load failed: $e\n$st');
+      _error = 'Could not load the e-library.';
+    }
     setState(() => _loading = false);
   }
 
@@ -77,7 +84,9 @@ class _ELibraryScreenState extends ConsumerState<ELibraryScreen>
           Expanded(
             child: _loading
                 ? const LoadingShimmer()
-                : TabBarView(
+                : _error != null
+                    ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                    : TabBarView(
                     controller: _tabController,
                     children: [
                       _buildList(_filterList(_ebooks), Icons.book, Colors.blue),

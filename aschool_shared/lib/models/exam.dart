@@ -1,4 +1,5 @@
 /// Exam models — matches backend exam.py (Exam, ExamSchedule, ExamResult)
+import '../utils/safe_parse.dart';
 import 'subject.dart';
 
 class Exam {
@@ -47,17 +48,21 @@ class Exam {
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
-      examType: json['exam_type'] as String?,
-      startDate: json['start_date'] as String?,
-      endDate: json['end_date'] as String?,
-      status: json['status'] as String? ?? json['exam_status'] as String?,
-      isPublished: json['is_published'] as bool? ?? (json['publish'] == 1),
-      academicYearId: json['academic_year_id'] as String?,
-      timetable: ((json['timetable'] ?? []) as List)
-          .map((t) => ExamTimetableSlot.fromJson(Map<String, dynamic>.from(t)))
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      description: safeStringOrNull(json['description']),
+      examType: safeStringOrNull(json['exam_type']),
+      startDate: safeStringOrNull(json['start_date']),
+      endDate: safeStringOrNull(json['end_date']),
+      status: safeStringOrNull(json['status']) ??
+          safeStringOrNull(json['exam_status']),
+      isPublished: safeBool(
+        json['is_published'],
+        fallback: safeBool(json['publish']),
+      ),
+      academicYearId: safeStringOrNull(json['academic_year_id']),
+      timetable: safeMapList(json['timetable'])
+          .map(ExamTimetableSlot.fromJson)
           .toList(),
     );
   }
@@ -97,17 +102,18 @@ class ExamTimetableSlot {
 
   factory ExamTimetableSlot.fromJson(Map<String, dynamic> json) {
     return ExamTimetableSlot(
-      id: (json['id'] ?? '').toString(),
-      subjectId: json['subject_id']?.toString(),
-      subjectName: json['subject_name'] as String?,
-      date: json['date'] as String?,
-      startTime:
-          json['starting_time'] as String? ?? json['start_time'] as String?,
-      endTime: json['ending_time'] as String? ?? json['end_time'] as String?,
-      totalMarks: json['total_marks'] as int?,
-      passingMarks: (json['passing_marks'] as num?)?.toDouble(),
-      subject: json['subject'] != null
-          ? Subject.fromJson(Map<String, dynamic>.from(json['subject']))
+      id: safeString(json['id']),
+      subjectId: safeStringOrNull(json['subject_id']),
+      subjectName: safeStringOrNull(json['subject_name']),
+      date: safeStringOrNull(json['date']),
+      startTime: safeStringOrNull(json['starting_time']) ??
+          safeStringOrNull(json['start_time']),
+      endTime: safeStringOrNull(json['ending_time']) ??
+          safeStringOrNull(json['end_time']),
+      totalMarks: safeIntOrNull(json['total_marks']),
+      passingMarks: safeDoubleOrNull(json['passing_marks']),
+      subject: json['subject'] is Map
+          ? Subject.fromJson(safeMap(json['subject']))
           : null,
     );
   }
@@ -145,33 +151,30 @@ class ExamResult {
   });
 
   factory ExamResult.fromJson(Map<String, dynamic> json) {
-    final subjects = (json['subjects'] as List?)
-            ?.map((subject) => Map<String, dynamic>.from(subject as Map))
-            .toList() ??
-        [];
-    final marksObtained = (json['marks_obtained'] as num?)?.toDouble();
-    final totalMarks = (json['total_marks'] as num?)?.toDouble();
+    final subjects = safeMapList(json['subjects']);
+    final marksObtained = safeDoubleOrNull(json['marks_obtained']);
+    final totalMarks = safeDoubleOrNull(json['total_marks']);
     final calculatedPercentage =
         totalMarks != null && totalMarks > 0 && marksObtained != null
             ? marksObtained / totalMarks * 100
             : 0.0;
 
     return ExamResult(
-      id: (json['id'] ?? '').toString(),
-      examId: json['exam_id']?.toString(),
-      examName: json['exam_name'] as String? ??
-          json['exam'] as String? ??
+      id: safeString(json['id']),
+      examId: safeStringOrNull(json['exam_id']),
+      examName: safeStringOrNull(json['exam_name']) ??
+          safeStringOrNull(json['exam']) ??
           'Exam Result',
-      subjectId: json['subject_id']?.toString(),
-      subjectName: json['subject_name'] as String?,
+      subjectId: safeStringOrNull(json['subject_id']),
+      subjectName: safeStringOrNull(json['subject_name']),
       marksObtained: marksObtained,
       totalMarks: totalMarks,
       percentage:
-          (json['percentage'] as num?)?.toDouble() ?? calculatedPercentage,
-      grade: json['grade'] as String? ?? 'N/A',
-      gpa: (json['gpa'] as num?)?.toDouble() ?? 0,
-      remarks: json['remarks'] as String?,
-      rank: json['rank'] as int?,
+          safeDoubleOrNull(json['percentage']) ?? calculatedPercentage,
+      grade: safeString(json['grade'], fallback: 'N/A'),
+      gpa: safeDouble(json['gpa']),
+      remarks: safeStringOrNull(json['remarks']),
+      rank: safeIntOrNull(json['rank']),
       subjects: subjects.isNotEmpty
           ? subjects
           : [
@@ -180,14 +183,15 @@ class ExamResult {
                   'subject': subjectNameFor(json),
                   'obtained': marksObtained ?? 0,
                   'full_marks': totalMarks ?? 0,
-                  'grade': json['grade'] as String? ?? 'N/A',
+                  'grade': safeString(json['grade'], fallback: 'N/A'),
                 }
             ],
     );
   }
 
   static String? subjectNameFor(Map<String, dynamic> json) =>
-      json['subject_name'] as String? ?? json['subject'] as String?;
+      safeStringOrNull(json['subject_name']) ??
+      safeStringOrNull(json['subject']);
 }
 
 class OnlineExam {
@@ -222,21 +226,20 @@ class OnlineExam {
 
   factory OnlineExam.fromJson(Map<String, dynamic> json) {
     return OnlineExam(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? json['name'] as String? ?? '',
-      subjectId: json['subject_id']?.toString(),
-      subjectName: json['subject_name'] as String?,
-      duration: json['duration'] as int?,
-      totalQuestions: json['total_questions'] as int?,
-      totalMarks: json['total_marks'] as int?,
-      startDate: json['start_date'] as String?,
-      endDate: json['end_date'] as String?,
-      status: json['status'] as String? ??
-          json['exam_status'] as String? ??
+      id: safeString(json['id']),
+      title: safeString(json['title'], fallback: safeString(json['name'])),
+      subjectId: safeStringOrNull(json['subject_id']),
+      subjectName: safeStringOrNull(json['subject_name']),
+      duration: safeIntOrNull(json['duration']),
+      totalQuestions: safeIntOrNull(json['total_questions']),
+      totalMarks: safeIntOrNull(json['total_marks']),
+      startDate: safeStringOrNull(json['start_date']),
+      endDate: safeStringOrNull(json['end_date']),
+      status: safeStringOrNull(json['status']) ??
+          safeStringOrNull(json['exam_status']) ??
           'upcoming',
-      questions: ((json['questions'] ?? []) as List)
-          .map((q) => Question.fromJson(Map<String, dynamic>.from(q)))
-          .toList(),
+      questions:
+          safeMapList(json['questions']).map(Question.fromJson).toList(),
     );
   }
 }
@@ -260,25 +263,30 @@ class Question {
 
   factory Question.fromJson(Map<String, dynamic> json) {
     return Question(
-      id: (json['id'] ?? '').toString(),
-      question: json['question'] as String? ?? '',
-      image: json['image'] as String?,
-      marks: json['marks'] as int? ?? 1,
-      options: ((json['options'] ?? []) as List).asMap().entries.map((entry) {
-        final option = entry.value;
-        if (option is Map) {
-          return AnswerOption.fromJson(Map<String, dynamic>.from(option));
-        }
-        return AnswerOption(id: option.toString(), text: option.toString());
-      }).toList(),
-      correctAnswers: (json['correct_answers'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [
-            if (json['correct_answer'] != null)
-              json['correct_answer'].toString()
-          ],
+      id: safeString(json['id']),
+      question: safeString(json['question']),
+      image: safeStringOrNull(json['image']),
+      marks: safeInt(json['marks'], fallback: 1),
+      options: _optionsFrom(json['options']),
+      correctAnswers: json['correct_answers'] is List
+          ? safeStringList(json['correct_answers'])
+          : [
+              if (json['correct_answer'] != null)
+                safeString(json['correct_answer'])
+            ],
     );
+  }
+
+  /// Options may arrive as objects ({option/text: ...}) or plain strings.
+  static List<AnswerOption> _optionsFrom(dynamic raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final option in raw)
+        if (option is Map)
+          AnswerOption.fromJson(safeMap(option))
+        else if (option is String || option is num || option is bool)
+          AnswerOption(id: option.toString(), text: option.toString()),
+    ];
   }
 }
 
@@ -291,9 +299,9 @@ class AnswerOption {
 
   factory AnswerOption.fromJson(Map<String, dynamic> json) {
     return AnswerOption(
-      id: (json['id'] ?? '').toString(),
-      text: json['option'] as String? ?? json['text'] as String? ?? '',
-      image: json['image'] as String?,
+      id: safeString(json['id']),
+      text: safeString(json['option'], fallback: safeString(json['text'])),
+      image: safeStringOrNull(json['image']),
     );
   }
 }

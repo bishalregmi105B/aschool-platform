@@ -37,11 +37,9 @@ export default function AIBuilderPage() {
     mutationFn: (variation: DesignVariation) =>
       api.post("/website-builder/themes/apply", {
         theme_slug: variation.theme_slug,
-        customizations: {
-          colors: variation.color_palette,
-          fonts: variation.fonts,
-          hero_style: variation.hero_style,
-        },
+        // themes/apply reads `color_overrides` (not `customizations`) — send
+        // the AI-chosen palette there so the colors reach the public site.
+        color_overrides: variation.color_palette,
       }),
     onSuccess: () => {
       alert("AI design applied! Go to the editor to fine-tune your website.");
@@ -178,14 +176,14 @@ export default function AIBuilderPage() {
                 </div>
 
                 {selectedIdx === idx && (
-                  <div className="p-3 bg-blue-50 border-t border-blue-200">
+                  <div className="p-3 bg-mint/20 border-t border-mint/40">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         applyMut.mutate(v);
                       }}
                       disabled={applyMut.isPending}
-                      className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                      className="w-full py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                     >
                       {applyMut.isPending ? "Applying..." : "🚀 Apply This Design"}
                     </button>
@@ -205,7 +203,7 @@ export default function AIBuilderPage() {
           <li>• Include preferred colors if you have school brand colors</li>
           <li>• Describe what you want to highlight (academics, sports, facilities)</li>
           <li>• Specify if you want Nepali/English bilingual content</li>
-          <li>• The AI will choose the best-matching theme from our 20 options</li>
+          <li>• The AI will choose the best-matching theme from our 10 designs</li>
         </ul>
       </div>
     </div>

@@ -22,22 +22,38 @@ export default function EvacuationPlansPage() {
 function PlansContent() {
   const qc = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ title: "", type: "earthquake", description: "", assembly_point: "", evacuation_route: "", capacity: "" });
+  const [form, setForm] = useState({ title: "", type: "earthquake", description: "", assembly_point: "", evacuation_route: "" });
 
-  const { data, isLoading } = useQuery({
+  // Backend contract: GET/POST /emergency/plans (the old /emergency/evacuation-plans
+  // route never existed). Plan rows: {name, emergency_type, instructions, assembly_points[]}.
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["evacuation-plans"],
-    queryFn: async () => { const r = await api.get("/emergency/evacuation-plans"); return r.data?.data ?? r.data; },
+    queryFn: async () => { const r = await api.get("/emergency/plans"); return r.data?.data ?? r.data; },
   });
 
   const plans: any[] = Array.isArray(data) ? data : data?.items ?? [];
 
   const create = useMutation({
-    mutationFn: async () => (await api.post("/emergency/evacuation-plans", form)).data,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["evacuation-plans"] }); setShowDialog(false); toast.success("Plan created"); setForm({ title: "", type: "earthquake", description: "", assembly_point: "", evacuation_route: "", capacity: "" }); },
+    mutationFn: async () => (await api.post("/emergency/plans", {
+      name: form.title,
+      emergency_type: form.type,
+      instructions: [form.description, form.assembly_point ? `Assembly point: ${form.assembly_point}` : "", form.evacuation_route ? `Evacuation route: ${form.evacuation_route}` : ""].filter(Boolean).join("\n"),
+      assembly_points: form.assembly_point ? [form.assembly_point] : [],
+    })).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["evacuation-plans"] }); setShowDialog(false); toast.success("Plan created"); setForm({ title: "", type: "earthquake", description: "", assembly_point: "", evacuation_route: "" }); },
     onError: () => toast.error("Failed to create plan"),
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load evacuation plans. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -55,14 +71,15 @@ function PlansContent() {
         ) : plans.map((p: any) => (
           <Card key={p.id}>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-base">{p.title}</CardTitle>
-              <Badge variant="outline">{p.type}</Badge>
+              <CardTitle className="text-base">{p.name}</CardTitle>
+              <Badge variant="outline" className="capitalize">{p.emergency_type}</Badge>
             </CardHeader>
             <CardContent className="space-y-2">
-              {p.description && <p className="text-sm text-muted-foreground">{p.description}</p>}
-              <div className="flex items-center gap-2 text-sm"><Map className="h-4 w-4 text-green-600" /><span className="font-medium">Assembly:</span>{p.assembly_point ?? "—"}</div>
-              <div className="flex items-center gap-2 text-sm"><ArrowRight className="h-4 w-4 text-blue-600" /><span className="font-medium">Route:</span>{p.evacuation_route ?? "—"}</div>
-              {p.capacity && <div className="text-sm text-muted-foreground">Capacity: {p.capacity} persons</div>}
+              {p.instructions && <p className="text-sm text-muted-foreground whitespace-pre-line">{p.instructions}</p>}
+              {Array.isArray(p.assembly_points) && p.assembly_points.length > 0 && (
+                <div className="flex items-center gap-2 text-sm"><Map className="h-4 w-4 text-green-600" /><span className="font-medium">Assembly:</span>{p.assembly_points.join(", ")}</div>
+              )}
+              <div className="flex items-center gap-2 text-sm"><ArrowRight className="h-4 w-4 text-blue-600" /><span className="font-medium">Last drilled:</span>{p.last_drilled_at ? new Date(p.last_drilled_at).toLocaleDateString() : "never"}</div>
             </CardContent>
           </Card>
         ))}

@@ -24,7 +24,7 @@ function BusesContent() {
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-  const [form, setForm] = useState({ number_plate: "", model: "", capacity: "40", driver_name: "", driver_phone: "" });
+  const [form, setForm] = useState({ vehicle_number: "", model: "", capacity: "40", gps_device_id: "" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["transport-buses"],
@@ -32,16 +32,16 @@ function BusesContent() {
   });
 
   const buses: any[] = (data || []).filter((b: any) =>
-    b.number_plate?.toLowerCase().includes(search.toLowerCase()) ||
-    b.driver_name?.toLowerCase().includes(search.toLowerCase())
+    b.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
+    b.gps_device_id?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openAdd = () => { setForm({ number_plate: "", model: "", capacity: "40", driver_name: "", driver_phone: "" }); setEditItem(null); setShowDialog(true); };
-  const openEdit = (b: any) => { setForm({ number_plate: b.number_plate || "", model: b.model || "", capacity: String(b.capacity || 40), driver_name: b.driver_name || "", driver_phone: b.driver_phone || "" }); setEditItem(b); setShowDialog(true); };
+  const openAdd = () => { setForm({ vehicle_number: "", model: "", capacity: "40", gps_device_id: "" }); setEditItem(null); setShowDialog(true); };
+  const openEdit = (b: any) => { setForm({ vehicle_number: b.vehicle_number || "", model: b.model || "", capacity: String(b.capacity || 40), gps_device_id: b.gps_device_id || "" }); setEditItem(b); setShowDialog(true); };
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, capacity: parseInt(form.capacity) || 40 };
+      const payload = { ...form, capacity: parseInt(form.capacity) || 40, gps_device_id: form.gps_device_id || undefined };
       if (editItem) return (await api.put(`/transport/buses/${editItem.id}`, payload)).data;
       return (await api.post("/transport/buses", payload)).data;
     },
@@ -77,8 +77,7 @@ function BusesContent() {
               <TableHead>Number Plate</TableHead>
               <TableHead>Model</TableHead>
               <TableHead>Capacity</TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Driver Phone</TableHead>
+              <TableHead>GPS Device</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -87,11 +86,10 @@ function BusesContent() {
               <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No buses found</TableCell></TableRow>
             ) : buses.map((b: any) => (
               <TableRow key={b.id}>
-                <TableCell className="font-medium"><div className="flex items-center gap-2"><Bus className="h-4 w-4 text-muted-foreground" />{b.number_plate}</div></TableCell>
+                <TableCell className="font-medium"><div className="flex items-center gap-2"><Bus className="h-4 w-4 text-muted-foreground" />{b.vehicle_number}</div></TableCell>
                 <TableCell>{b.model || "—"}</TableCell>
                 <TableCell><Badge variant="outline">{b.capacity} seats</Badge></TableCell>
-                <TableCell>{b.driver_name || "—"}</TableCell>
-                <TableCell>{b.driver_phone || "—"}</TableCell>
+                <TableCell>{b.gps_device_id || "—"}</TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
                 </TableCell>
@@ -106,17 +104,14 @@ function BusesContent() {
           <DialogHeader><DialogTitle>{editItem ? "Edit Bus" : "Add Bus"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Number Plate</Label><Input value={form.number_plate} onChange={(e) => setForm({ ...form, number_plate: e.target.value })} placeholder="BA 1 KHA 0001" /></div>
+              <div className="space-y-2"><Label>Number Plate</Label><Input value={form.vehicle_number} onChange={(e) => setForm({ ...form, vehicle_number: e.target.value })} placeholder="BA 1 KHA 0001" /></div>
               <div className="space-y-2"><Label>Model</Label><Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="Tata 407" /></div>
             </div>
             <div className="space-y-2"><Label>Capacity (seats)</Label><Input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Driver Name</Label><Input value={form.driver_name} onChange={(e) => setForm({ ...form, driver_name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Driver Phone</Label><Input value={form.driver_phone} onChange={(e) => setForm({ ...form, driver_phone: e.target.value })} /></div>
-            </div>
+            <div className="space-y-2"><Label>GPS Device ID</Label><Input value={form.gps_device_id} onChange={(e) => setForm({ ...form, gps_device_id: e.target.value })} placeholder="e.g. esp32-001" /></div>
           </div>
           <DialogFooter>
-            <Button onClick={() => save.mutate()} disabled={!form.number_plate || save.isPending}>
+            <Button onClick={() => save.mutate()} disabled={!form.vehicle_number || save.isPending}>
               {save.isPending ? <Spinner className="mr-2" /> : null} {editItem ? "Update" : "Add Bus"}
             </Button>
           </DialogFooter>

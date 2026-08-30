@@ -10,3 +10,4 @@ export 'timetable_provider.dart';
 export 'lessons_provider.dart';
 export 'notices_provider.dart';
 export 'chat_provider.dart';
+export 'notification_provider.dart';

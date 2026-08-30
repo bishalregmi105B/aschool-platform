@@ -22,19 +22,23 @@ export default function ELibraryPage() {
 function ELibraryContent() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ title: "", author: "", category: "textbook", subject: "", class_name: "", isbn: "", description: "", file_url: "" });
+  // DigitalBook only stores title/author/file_url/file_type — the old dialog's
+  // category/subject/class/isbn/description inputs were silently dropped by the
+  // backend (and the category dropdown never filtered: GET /elibrary/books
+  // ignores the param), so only storable fields remain.
+  const [form, setForm] = useState({ title: "", author: "", file_url: "" });
 
-  const { data, isLoading } = useQuery<any>({
-    queryKey: ["elibrary", search, category],
+  const { data, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ["elibrary", search],
     queryFn: async () => {
-      const r = await api.get("/elibrary/books", { params: { search: search || undefined, category: category || undefined } });
+      const r = await api.get("/elibrary/books", { params: { search: search || undefined } });
       return {
         books: r.data?.data || [],
         stats: r.data?.meta?.stats || {},
       };
     },
+    retry: 1,
   });
 
   const books = data?.books || [];
@@ -47,6 +51,18 @@ function ELibraryContent() {
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div><h1 className="text-2xl font-bold">E-Library</h1><p className="text-muted-foreground">Digital resource library and book management</p></div>
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load the e-library. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -63,9 +79,6 @@ function ELibraryContent() {
 
       <div className="flex gap-4">
         <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search books, authors..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <select className="border rounded-md px-3" value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">All Categories</option><option value="textbook">Textbooks</option><option value="ebook">E-Books</option><option value="journal">Journals</option><option value="reference">Reference</option><option value="notes">Notes</option>
-        </select>
       </div>
 
       <Card>
@@ -95,21 +108,12 @@ function ELibraryContent() {
           <DialogHeader><DialogTitle>Add Resource</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <select className="w-full border rounded-md p-2" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  <option value="textbook">Textbook</option><option value="ebook">E-Book</option><option value="journal">Journal</option><option value="reference">Reference</option><option value="notes">Notes</option>
-                </select>
-              </div>
+            <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>File URL / Link</Label>
+              <Input value={form.file_url} onChange={(e) => setForm({ ...form, file_url: e.target.value })} placeholder="https://… or /uploads/… (upload files from the Upload Resources page)" />
+              <p className="text-xs text-muted-foreground">To attach a real file, use Upload Resources — it stores the file and fills this URL for you.</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Subject</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Class</Label><Input value={form.class_name} onChange={(e) => setForm({ ...form, class_name: e.target.value })} /></div>
-            </div>
-            <div className="space-y-2"><Label>ISBN</Label><Input value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} /></div>
-            <div className="space-y-2"><Label>File URL / Link</Label><Input value={form.file_url} onChange={(e) => setForm({ ...form, file_url: e.target.value })} placeholder="https://..." /></div>
           </div>
           <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add</Button></DialogFooter>
         </DialogContent>

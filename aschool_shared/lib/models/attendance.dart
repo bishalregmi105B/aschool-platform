@@ -1,4 +1,6 @@
 /// Attendance models — maps to backend Attendance & TeacherAttendance
+import '../utils/safe_parse.dart';
+
 class AttendanceRecord {
   final String id;
   final String studentId;
@@ -32,17 +34,17 @@ class AttendanceRecord {
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
     return AttendanceRecord(
-      id: json['id'] as String,
-      studentId: json['student_id'] as String? ?? '',
-      classId: json['class_id'] as String? ?? '',
-      sectionId: json['section_id'] as String?,
-      date: json['date'] as String? ?? '',
-      dateBs: json['date_bs'] as String?,
-      status: json['status'] as String? ?? 'absent',
-      checkInTime: json['check_in_time'] as String?,
-      checkOutTime: json['check_out_time'] as String?,
-      markedById: json['marked_by_id'] as String?,
-      remarks: json['remarks'] as String?,
+      id: safeString(json['id']),
+      studentId: safeString(json['student_id']),
+      classId: safeString(json['class_id']),
+      sectionId: safeStringOrNull(json['section_id']),
+      date: safeString(json['date']),
+      dateBs: safeStringOrNull(json['date_bs']),
+      status: safeString(json['status'], fallback: 'absent'),
+      checkInTime: safeStringOrNull(json['check_in_time']),
+      checkOutTime: safeStringOrNull(json['check_out_time']),
+      markedById: safeStringOrNull(json['marked_by_id']),
+      remarks: safeStringOrNull(json['remarks']),
     );
   }
 
@@ -79,13 +81,18 @@ class AttendanceSummary {
 
   factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
     return AttendanceSummary(
-      totalDays: json['total_days'] as int? ?? 0,
-      presentDays: json['present_days'] as int? ?? json['present'] as int? ?? 0,
-      absentDays: json['absent_days'] as int? ?? json['absent'] as int? ?? 0,
-      lateDays: json['late_days'] as int? ?? json['late'] as int? ?? 0,
-      halfDays: json['half_day_days'] as int? ?? 0,
-      leaveDays: json['leave_days'] as int? ?? 0,
-      percentage: (json['percentage'] as num?)?.toDouble() ?? 0.0,
+      totalDays: safeInt(json['total_days']),
+      presentDays: safeIntOrNull(json['present_days']) ??
+          safeIntOrNull(json['present']) ??
+          0,
+      absentDays: safeIntOrNull(json['absent_days']) ??
+          safeIntOrNull(json['absent']) ??
+          0,
+      lateDays:
+          safeIntOrNull(json['late_days']) ?? safeIntOrNull(json['late']) ?? 0,
+      halfDays: safeInt(json['half_day_days']),
+      leaveDays: safeInt(json['leave_days']),
+      percentage: safeDouble(json['percentage']),
     );
   }
 }

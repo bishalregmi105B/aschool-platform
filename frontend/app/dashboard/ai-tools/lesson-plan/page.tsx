@@ -25,7 +25,13 @@ function LessonPlanContent() {
 
   const gen = useMutation({
     mutationFn: async () => {
-      const res = await api.post("/ai-tools/lesson-plan", { ...form, duration_minutes: parseInt(form.duration) });
+      const res = await api.post("/ai-tools/lesson-plan", {
+        subject: form.subject,
+        grade: form.grade,
+        topic: form.topic,
+        duration_minutes: parseInt(form.duration) || 45,
+        learning_objectives: form.objectives || undefined,
+      });
       return res.data;
     },
     onSuccess: (d) => { setResult(d?.data?.content || d?.data?.lesson_plan || JSON.stringify(d?.data, null, 2)); toast.success("Lesson plan generated!"); },

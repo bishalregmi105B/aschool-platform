@@ -26,13 +26,27 @@ export default function HRPage() {
 }
 
 function HRContent() {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["hr-stats"],
     queryFn: async () => {
       const r = await api.get("/hr/stats");
       return r.data?.data || {};
     },
+    retry: 1,
   });
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load HR dashboard. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const s = data || {};
 

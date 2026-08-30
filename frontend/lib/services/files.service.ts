@@ -1,5 +1,12 @@
 
+import type { AxiosProgressEvent } from "axios";
 import { api, type ApiResponse } from "@/lib/api";
+
+// Extract a human-readable message from an axios error (backend error body wins).
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+  return typeof msg === "string" && msg ? msg : fallback;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -109,7 +116,10 @@ export async function listFiles(
     q.set("folder_id", "root");
   }
   type RawFilesResponse = { data: ManagedFile[]; meta?: { pagination?: FilesListResponse["pagination"] } };
-  const res = await api.get<RawFilesResponse>(`/files/?${q.toString()}`);
+  // No trailing slash: "/files/" gets 308-normalized by the Next dev server
+  // to "/files", and the second redirect from Flask used an absolute
+  // Docker-internal Location that broke the browser (E175).
+  const res = await api.get<RawFilesResponse>(`/files?${q.toString()}`);
   return {
     items: res.data.data ?? [],
     pagination: res.data.meta?.pagination ?? {
@@ -135,40 +145,26 @@ export async function uploadFilesToFolder(
     form.append("file", file);
     if (folderId) form.append("folder_id", folderId);
 
-    if (onProgress) {
-      const result = await new Promise<ManagedFile>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/files/upload`);
-        // Cookie-based session auth: credentials ride along automatically.
-        xhr.withCredentials = true;
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const filePct = (e.loaded / e.total) * 100;
-            onProgress(Math.round(((i + filePct / 100) / files.length) * 100));
-          }
-        };
-
-        xhr.onload = () => {
-          let json: { data?: ManagedFile; error?: string } = {};
-          try { json = JSON.parse(xhr.responseText || "{}"); } catch { /* */ }
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(json.data as ManagedFile);
-          } else {
-            reject(new Error((json as { error?: string }).error || `Upload failed (${xhr.status})`));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(form);
+    // Always go through the shared axios client: relative baseURL (/api/v1)
+    // + withCredentials keeps uploads same-origin (the next.config.js rewrite
+    // forwards to the backend) — never a Docker-internal host in the browser.
+    try {
+      const res = await api.post<ApiResponse<ManagedFile>>("/files/upload", form, {
+        headers: { "Content-Type": undefined },
+        ...(onProgress
+          ? {
+              onUploadProgress: (e: AxiosProgressEvent) => {
+                if (e.total) {
+                  const filePct = (e.loaded / e.total) * 100;
+                  onProgress(Math.round(((i + filePct / 100) / files.length) * 100));
+                }
+              },
+            }
+          : {}),
       });
-      results.push(result);
-    } else {
-      const res = await api.post<ApiResponse<ManagedFile>>(
-        "/files/upload",
-        form,
-        { headers: { "Content-Type": undefined } },
-      );
       results.push(res.data.data);
+    } catch (err) {
+      throw new Error(apiErrorMessage(err, "Upload failed"));
     }
 
     if (onProgress) onProgress(Math.round(((i + 1) / files.length) * 100));

@@ -1,4 +1,6 @@
 /// Assignment model — maps to backend Assignment (assignments table)
+import '../utils/safe_parse.dart';
+
 class Assignment {
   final String id;
   final String? classId;
@@ -57,33 +59,29 @@ class Assignment {
       ];
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
+    final attachmentUrls = safeStringList(json['attachment_urls']);
     return Assignment(
-      id: json['id'] as String,
-      classId: json['class_id'] as String?,
-      sectionId: json['section_id'] as String?,
-      subjectId: json['subject_id'] as String?,
-      subjectName:
-          json['subject_name'] as String? ?? json['subject'] as String?,
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String?,
-      dueDate: json['due_date'] as String?,
-      dueDateBs: json['due_date_bs'] as String?,
-      maxMarks: (json['max_marks'] as num?)?.toInt() ??
-          (json['total_marks'] as num?)?.toInt(),
-      attachmentUrl: json['attachment_url'] as String? ??
-          ((json['attachment_urls'] as List?)?.isNotEmpty == true
-              ? (json['attachment_urls'] as List).first?.toString()
-              : null),
-      attachmentUrls: ((json['attachment_urls'] ?? []) as List)
-          .map((e) => e.toString())
-          .toList(),
-      createdById: json['created_by_id'] as String?,
-      createdByName: json['created_by_name'] as String?,
-      isOverdue: json['is_overdue'] as bool? ?? false,
-      submissionStatus: json['submission_status'] as String?,
-      submission: json['submission'] != null
-          ? AssignmentSubmission.fromJson(
-              Map<String, dynamic>.from(json['submission']))
+      id: safeString(json['id']),
+      classId: safeStringOrNull(json['class_id']),
+      sectionId: safeStringOrNull(json['section_id']),
+      subjectId: safeStringOrNull(json['subject_id']),
+      subjectName: safeStringOrNull(json['subject_name']) ??
+          safeStringOrNull(json['subject']),
+      title: safeString(json['title']),
+      description: safeStringOrNull(json['description']),
+      dueDate: safeStringOrNull(json['due_date']),
+      dueDateBs: safeStringOrNull(json['due_date_bs']),
+      maxMarks: safeIntOrNull(json['max_marks']) ??
+          safeIntOrNull(json['total_marks']),
+      attachmentUrl: safeStringOrNull(json['attachment_url']) ??
+          (attachmentUrls.isNotEmpty ? attachmentUrls.first : null),
+      attachmentUrls: attachmentUrls,
+      createdById: safeStringOrNull(json['created_by_id']),
+      createdByName: safeStringOrNull(json['created_by_name']),
+      isOverdue: safeBool(json['is_overdue']),
+      submissionStatus: safeStringOrNull(json['submission_status']),
+      submission: json['submission'] is Map
+          ? AssignmentSubmission.fromJson(safeMap(json['submission']))
           : null,
     );
   }
@@ -128,13 +126,13 @@ class AssignmentSubmission {
 
   factory AssignmentSubmission.fromJson(Map<String, dynamic> json) {
     return AssignmentSubmission(
-      id: json['id'] as String,
-      studentId: json['student_id'] as String?,
-      fileUrl: json['file_url'] as String?,
-      remarks: json['remarks'] as String?,
-      marksObtained: (json['marks_obtained'] as num?)?.toInt(),
-      feedback: json['feedback'] as String?,
-      submittedAt: json['submitted_at'] as String?,
+      id: safeString(json['id']),
+      studentId: safeStringOrNull(json['student_id']),
+      fileUrl: safeStringOrNull(json['file_url']),
+      remarks: safeStringOrNull(json['remarks']),
+      marksObtained: safeIntOrNull(json['marks_obtained']),
+      feedback: safeStringOrNull(json['feedback']),
+      submittedAt: safeStringOrNull(json['submitted_at']),
     );
   }
 }

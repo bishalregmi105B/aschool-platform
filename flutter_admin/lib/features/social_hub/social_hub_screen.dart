@@ -16,6 +16,7 @@ class _SocialHubScreenState extends ConsumerState<SocialHubScreen>
   List<Map<String, dynamic>> _posts = [];
   List<Map<String, dynamic>> _groups = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _SocialHubScreenState extends ConsumerState<SocialHubScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/social/posts'),
@@ -43,8 +47,12 @@ class _SocialHubScreenState extends ConsumerState<SocialHubScreen>
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('SocialHubScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load social hub.';
+        _loading = false;
+      });
     }
   }
 
@@ -61,10 +69,12 @@ class _SocialHubScreenState extends ConsumerState<SocialHubScreen>
           Expanded(
             child: _loading
                 ? const LoadingShimmer()
-                : TabBarView(controller: _tabCtrl, children: [
-                    _buildPosts(),
-                    _buildGroups(),
-                  ]),
+                : _error != null
+                    ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                    : TabBarView(controller: _tabCtrl, children: [
+                        _buildPosts(),
+                        _buildGroups(),
+                      ]),
           ),
         ],
       ),

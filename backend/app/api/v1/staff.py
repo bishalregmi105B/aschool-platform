@@ -74,12 +74,31 @@ def create_staff():
     data = request.get_json(silent=True) or {}
     if data.get("role") not in STAFF_ROLES:
         return error_response("role must be one of teacher, staff, accountant, school_admin")
+    # E126: users.phone is NOT NULL — a missing phone used to surface as an
+    # unhandled IntegrityError 500 instead of a clear 400.
+    if not (data.get("phone") or "").strip():
+        return error_response("phone is required")
+
+    # E160 hardening: mirror users.create_user — reject duplicate phones with
+    # a 409 (the DB has no unique constraint, so it silently created a second
+    # account that login_with_password could not disambiguate) and enforce the
+    # password policy for user-chosen passwords.
+    existing = User.query.filter_by(
+        phone=data["phone"], school_id=g.school_id, is_deleted=False
+    ).first()
+    if existing:
+        return error_response("User with this phone already exists in this school", 409)
 
     user = User(school_id=g.school_id)
     for key in ("full_name", "full_name_nepali", "email", "phone", "role", "avatar_url", "gender"):
         if key in data:
             setattr(user, key, data[key])
     if data.get("password"):
+        from app.utils.validators import validate_password_strength
+
+        ok, pw_error = validate_password_strength(data["password"])
+        if not ok:
+            return error_response(pw_error, 400)
         user.set_password(data["password"])
     else:
         user.set_password(generate_default_password(user))

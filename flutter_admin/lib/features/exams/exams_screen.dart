@@ -13,6 +13,7 @@ class ExamsScreen extends ConsumerStatefulWidget {
 class _ExamsScreenState extends ConsumerState<ExamsScreen> {
   List<Map<String, dynamic>> _exams = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,21 +22,31 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/exams');
       setState(() {
         _exams = List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      debugPrint('ExamsScreen load failed: $e');
+      setState(() {
+        _error = 'Could not load exams.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -107,7 +118,7 @@ class _ExamsScreenState extends ConsumerState<ExamsScreen> {
                   children: [
                     _miniStat(
                         'Subjects',
-                        '${(exam['subject_ids'] as List?)?.length ?? 0}'),
+                        '${safeList(exam['subject_ids']).length}'),
                   ],
                 ),
               ],
@@ -177,6 +188,7 @@ class _ExamDetailSheet extends StatefulWidget {
 class _ExamDetailSheetState extends State<_ExamDetailSheet> {
   List<Map<String, dynamic>>? _subjects;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -196,8 +208,14 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
           _loading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('ExamDetailSheet loadSubjects failed: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load exam subjects.';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -239,6 +257,8 @@ class _ExamDetailSheetState extends State<_ExamDetailSheet> {
           const SizedBox(height: 20),
           if (_loading)
             const Center(child: CircularProgressIndicator())
+          else if (_error != null)
+            ErrorContainer(errorMessage: _error!, onRetry: _loadSubjects)
           else if (_subjects == null || _subjects!.isEmpty)
             const Text('No subjects found for this exam.',
                 style: TextStyle(color: Colors.grey))

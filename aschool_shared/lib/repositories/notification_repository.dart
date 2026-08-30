@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 import '../services/api_client.dart';
 import '../models/in_app_notification.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 /// Repository for the in-app notification center API.
@@ -24,11 +27,11 @@ class NotificationRepository {
         queryParameters: params,
       );
       if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => InAppNotification.fromJson(Map<String, dynamic>.from(e)))
+        return envelopeRows(response.data, source: 'NotificationRepository.getNotifications')
+            .map(InAppNotification.fromJson)
             .toList();
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch notifications');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch notifications'));
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(e.toString());
@@ -40,10 +43,12 @@ class NotificationRepository {
     try {
       final response = await ApiClient.instance.get('/notifications/unread-count');
       if (response.data['success'] == true) {
-        return response.data['data']['unread_count'] as int? ?? 0;
+        final data = response.data['data'];
+        return safeInt(data is Map ? data['unread_count'] : null);
       }
       return 0;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('NotificationRepository.getUnreadCount failed: $e\n$st');
       return 0;
     }
   }
@@ -55,7 +60,8 @@ class NotificationRepository {
         '/notifications/$notificationId/read',
       );
       return response.data['success'] == true;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('NotificationRepository.markRead($notificationId) failed: $e\n$st');
       return false;
     }
   }
@@ -67,10 +73,12 @@ class NotificationRepository {
         '/notifications/mark-all-read',
       );
       if (response.data['success'] == true) {
-        return response.data['data']['marked_read'] as int? ?? 0;
+        final data = response.data['data'];
+        return safeInt(data is Map ? data['marked_read'] : null);
       }
       return 0;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('NotificationRepository.markAllRead failed: $e\n$st');
       return 0;
     }
   }
@@ -82,7 +90,9 @@ class NotificationRepository {
         '/notifications/$notificationId',
       );
       return response.data['success'] == true;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint(
+          'NotificationRepository.deleteNotification($notificationId) failed: $e\n$st');
       return false;
     }
   }

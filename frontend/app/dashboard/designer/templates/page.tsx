@@ -46,15 +46,25 @@ function TemplatesContent() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState(categoryFilter);
 
-  const { data: templates, isLoading } = useQuery<any>({
+  const { data: templates, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["design-templates"],
     queryFn: async () => {
       const res = await api.get("/design-studio/templates");
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load templates. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const filtered = (templates || []).filter((t: Template) => {
     if (activeCategory && t.category !== activeCategory) return false;

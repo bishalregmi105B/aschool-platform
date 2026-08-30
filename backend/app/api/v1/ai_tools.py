@@ -194,3 +194,27 @@ def risk_alerts():
 
     alerts = SchoolInsightsService.calculate_student_risk_scores(str(g.school_id))
     return success_response(alerts)
+
+
+@ai_tools_bp.route("/letter-writer", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def generate_letter():
+    """Generate a school letter/circular draft (web AI Letter Writer)."""
+    from app.services.ai.question_paper import QuestionPaperService
+
+    data = request.get_json(silent=True) or {}
+    subject = (data.get("subject") or "").strip()
+    if not subject:
+        return error_response("subject is required")
+
+    letter = QuestionPaperService.generate_letter(
+        letter_type=data.get("type") or "notice",
+        recipient=(data.get("recipient") or "").strip(),
+        subject=subject,
+        context=(data.get("context") or "").strip(),
+        tone=data.get("tone") or "formal",
+    )
+    return success_response({"content": letter})

@@ -32,8 +32,10 @@ function DismissalContent() {
   const stats = data?.stats || {};
 
   const verify = useMutation({
+    // The QR encodes "aschool:pickup:<parent_user_id>:<student_id>" (parent
+    // app) — the backend resolves the active pickup authorization from it.
     mutationFn: async (code: string) => (await api.post("/dismissal/verify-qr", { qr_code: code })).data,
-    onSuccess: (d) => { queryClient.invalidateQueries({ queryKey: ["dismissals"] }); toast.success(`${d?.data?.student_name || "Student"} released to ${d?.data?.guardian_name || "guardian"}`); setQrCode(""); },
+    onSuccess: (d) => { queryClient.invalidateQueries({ queryKey: ["dismissals"] }); toast.success(`${d?.data?.student_name || "Student"} released to ${d?.data?.picked_up_by || "guardian"}`); setQrCode(""); },
     onError: () => toast.error("Verification failed — invalid or expired QR"),
   });
 
@@ -67,11 +69,12 @@ function DismissalContent() {
             <TableBody>
               {queue.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No dismissal records today</TableCell></TableRow> : queue.map((q: any) => (
                 <TableRow key={q.id}>
-                  <TableCell className="font-medium">{q.student_name}</TableCell>
+                  <TableCell className="font-medium">{q.student_name || "—"}</TableCell>
                   <TableCell>{q.class_name || "—"}</TableCell>
-                  <TableCell>{q.guardian_name || "—"}</TableCell>
-                  <TableCell>{q.time || (q.released_at ? new Date(q.released_at).toLocaleTimeString() : "—")}</TableCell>
-                  <TableCell><Badge variant={q.status === "released" ? "default" : "secondary"}>{q.status}</Badge></TableCell>
+                  <TableCell>{q.picked_up_by || "—"}</TableCell>
+                  <TableCell>{q.dismissed_at ? new Date(q.dismissed_at).toLocaleTimeString() : "—"}</TableCell>
+                  {/* A DismissalRecord only exists once the student has been released */}
+                  <TableCell><Badge variant="default">released</Badge></TableCell>
                 </TableRow>
               ))}
             </TableBody>

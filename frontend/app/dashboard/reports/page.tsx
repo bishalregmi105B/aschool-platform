@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -60,16 +61,25 @@ export default function ReportsPage() {
 }
 
 function ReportsContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["reports-dashboard"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ReportDashboard>>("/analytics/overview");
       return res.data.data;
     },
-    retry: false,
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load reports. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const attendanceByClass = data?.attendance_summary?.by_class ?? [];
   const feeByMonth = data?.fee_summary?.by_month ?? [];

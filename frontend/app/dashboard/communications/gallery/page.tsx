@@ -24,7 +24,10 @@ type GalleryFile = {
 
 export default function GalleryPage() {
   return (
-    <PluginGate slug="notices">
+    // E125: every /files/* endpoint is gated by the file_management plugin
+    // (files.py @plugin_required("file_management")) — gating this page by
+    // `notices` let schools with notices-but-no-file-management hit a raw 403.
+    <PluginGate slug="file_management">
       <GalleryContent />
     </PluginGate>
   );
@@ -32,7 +35,8 @@ export default function GalleryPage() {
 
 function GalleryContent() {
   const [year, setYear] = useState<string>("all");
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["gallery-files", year],
     queryFn: async () => {
       const params = new URLSearchParams({ type: "image" });
@@ -64,6 +68,16 @@ function GalleryContent() {
   const files = data || [];
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load gallery images. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   return (
     <div className="space-y-6">

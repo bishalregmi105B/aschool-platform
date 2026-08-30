@@ -13,6 +13,7 @@ class ParentTeachersScreen extends ConsumerStatefulWidget {
 class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
   List<Map<String, dynamic>> _teachers = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,7 +22,10 @@ class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/users', queryParameters: {'role': 'teacher', 'per_page': 100});
@@ -32,8 +36,10 @@ class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ParentTeachersScreen load failed: $e\n$st');
       _teachers = [];
+      _error = 'Could not load teachers.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -41,6 +47,9 @@ class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
     return RefreshIndicator(
       onRefresh: _load,
       child: _teachers.isEmpty

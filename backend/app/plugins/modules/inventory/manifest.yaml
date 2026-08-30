@@ -21,10 +21,8 @@ frontend:
     label: "Inventory"
     label_nepali: "सामग्री"
     icon: "Package"
-    subitems:
-      - { label: "Assets", route: "/dashboard/inventory/assets" }
-      - { label: "Procurement", route: "/dashboard/inventory/procurement" }
-      - { label: "QR Scanner", route: "/dashboard/inventory/scan" }
+    # Single page (asset registry). No subitems: /assets, /procurement and
+    # /scan have no pages and rendered as dead sidebar links.
     visible_to: ["school_admin", "staff"]
 
 flutter:

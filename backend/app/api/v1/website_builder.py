@@ -46,7 +46,7 @@ def _normalize_sections(raw_sections):
 @jwt_required()
 @school_required
 def list_themes():
-    """List all 20 available website themes."""
+    """List all available website themes (real open-source school designs)."""
     from app.services.website.theme_engine import ThemeEngineService
 
     themes = ThemeEngineService.list_themes()
@@ -93,6 +93,7 @@ def apply_theme():
 def get_website_status():
     """Return a dashboard-friendly status overview for the website builder."""
     from app.models.school import School
+    from app.services.website.theme_engine import ThemeEngineService
 
     school = School.query.get(g.school_id)
     website = _get_school_website()
@@ -101,7 +102,7 @@ def get_website_status():
 
     return success_response({
         "is_published": website.is_published,
-        "theme_slug": website.theme_slug or "modern-minimal",
+        "theme_slug": website.theme_slug or ThemeEngineService.DEFAULT_THEME_ID,
         "subdomain": subdomain,
         "default_domain": f"{subdomain}.aschool.com.np" if subdomain else None,
         "custom_domain": school.custom_domain if school else None,
@@ -472,6 +473,56 @@ def update_seo_settings():
 
 # ── Publish / Unpublish ───────────────────────────────────
 
+def _resolve_target_school(data):
+    """Resolve the school a publish/unpublish targets (E202).
+
+    Empty/absent ``school_slug`` → the caller's own school (unchanged
+    behavior). A provided slug that is NOT the caller's school is rejected
+    upstream with 403 instead of being silently ignored — previously the
+    body param was accepted and discarded, so a caller could believe they
+    published/unpublished a different school.
+    """
+    from app.models.school import School
+
+    slug = str(data.get("school_slug") or "").strip().lower()
+    caller = School.query.get(g.school_id)
+    if not slug:
+        return caller
+    if caller is None or (caller.slug or "").lower() != slug:
+        return None
+    return caller
+
+
+def _revalidate_public_site(slug: str) -> None:
+    """Fire-and-forget on-demand ISR revalidation of /school/<slug>/* (E201).
+
+    Correctness of the unpublish GUARD no longer depends on this (the Next.js
+    public layout checks publish status with a no-store fetch at request
+    time), but pinging /api/revalidate purges the ISR route + data caches so
+    a (re)published site's heavy content is fresh within seconds instead of
+    the 5-minute window. Best-effort: failures fall back to the ISR window.
+    """
+    import requests as _requests
+    from flask import current_app
+
+    sub_pages = (
+        "", "/about", "/academics", "/teachers", "/notices", "/gallery",
+        "/contact", "/admission", "/results", "/events", "/facilities",
+        "/alumni", "/news",
+    )
+    base_url = (current_app.config.get("NEXTJS_INTERNAL_URL") or "http://nextjs:3000").rstrip("/")
+    secret = current_app.config.get("ISR_REVALIDATE_SECRET") or ""
+    for sub in sub_pages:
+        try:
+            _requests.post(
+                f"{base_url}/api/revalidate",
+                json={"path": f"/school/{slug}{sub}", "secret": secret},
+                timeout=2,
+            )
+        except Exception:  # noqa: BLE001 — never fail the mutation on revalidate
+            current_app.logger.warning("ISR revalidation failed for /school/%s%s", slug, sub)
+
+
 @website_builder_bp.route("/publish", methods=["POST"])
 @jwt_required()
 @school_required
@@ -482,11 +533,18 @@ def publish_website():
     from app.models.school import SchoolWebsite
     from datetime import datetime, timezone
 
+    data = request.get_json(silent=True) or {}
+    school = _resolve_target_school(data)
+    if school is None:
+        return error_response("school_slug does not match your school", 403)
+
     website = _get_school_website()
 
     website.is_published = True
     website.published_at = datetime.now(timezone.utc)
     db.session.commit()
+
+    _revalidate_public_site(school.slug)
 
     return success_response({"published": True, "published_at": str(website.published_at)})
 
@@ -500,10 +558,18 @@ def unpublish_website():
     """Unpublish the school website."""
     from app.models.school import SchoolWebsite
 
+    data = request.get_json(silent=True) or {}
+    school = _resolve_target_school(data)
+    if school is None:
+        return error_response("school_slug does not match your school", 403)
+
     website = _get_school_website()
 
     website.is_published = False
     db.session.commit()
+
+    _revalidate_public_site(school.slug)
+
     return success_response({"published": False})
 
 

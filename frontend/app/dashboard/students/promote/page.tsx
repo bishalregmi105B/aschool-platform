@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ interface StudentPreview {
 }
 
 export default function PromotePage() {
+  const queryClient = useQueryClient();
   const [fromClass, setFromClass] = useState("");
   const [toClass, setToClass] = useState("");
   const [previewStudents, setPreviewStudents] = useState<StudentPreview[]>([]);
@@ -134,6 +135,26 @@ export default function PromotePage() {
       toast.error("Could not load students for preview.");
       setPreviewReady(false);
       setPreviewStudents([]);
+    },
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post("/students/promote", {
+        from_class_id: fromClass,
+        to_class_id: toClass,
+      });
+      return res.data?.data || res.data;
+    },
+    onSuccess: (data: { promoted?: number }) => {
+      toast.success(`Promoted ${data?.promoted ?? 0} student(s) to ${toClassName}.`);
+      setPreviewReady(false);
+      setPreviewStudents([]);
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error || "Failed to promote students.");
     },
   });
 
@@ -260,6 +281,26 @@ export default function PromotePage() {
                 Showing first 12 students.
               </p>
             )}
+            <Button
+              className="w-full max-w-xs"
+              disabled={promoteMutation.isPending}
+              onClick={() => {
+                if (
+                  confirm(
+                    `Move ${previewStudents.length} student(s) from ${fromClassName} to ${toClassName}? This cannot be undone automatically.`,
+                  )
+                )
+                  promoteMutation.mutate();
+              }}
+            >
+              {promoteMutation.isPending ? (
+                "Promoting..."
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4 mr-2" /> Finalize Promotion
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       )}

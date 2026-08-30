@@ -16,6 +16,7 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
   List<Map<String, dynamic>> _courses = [];
   List<Map<String, dynamic>> _liveClasses = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/lms/courses?created_by=me&per_page=30'),
@@ -48,7 +52,10 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
           liveRaw['data'] ?? liveRaw['items'] ?? [],
         );
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('TeacherLmsOverviewScreen load failed: $e\n$st');
+      _error = 'Could not load your LMS content.';
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -72,13 +79,15 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _CoursesTab(courses: _courses, onRefresh: _load),
-                  _LiveClassesTab(liveClasses: _liveClasses, onRefresh: _load),
-                ],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _CoursesTab(courses: _courses, onRefresh: _load),
+                      _LiveClassesTab(liveClasses: _liveClasses, onRefresh: _load),
+                    ],
+                  ),
       ),
     );
   }
@@ -335,7 +344,8 @@ class _LiveClassCard extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LmsOverviewScreen _formatDate parse failed: $e');
       return iso;
     }
   }

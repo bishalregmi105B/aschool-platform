@@ -27,13 +27,14 @@ function RecordsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ student_id: "", visit_date: "", reason: "", diagnosis: "", treatment: "" });
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["health-visits"],
     queryFn: async () => (await api.get("/health-records/visits")).data?.data || [],
+    retry: 1,
   });
 
   const visits: any[] = (Array.isArray(data) ? data : []).filter((v: any) =>
-    v.student?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    v.student_name?.toLowerCase().includes(search.toLowerCase()) ||
     v.reason?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -48,6 +49,14 @@ function RecordsContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load medical visits. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -82,7 +91,7 @@ function RecordsContent() {
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No visit records found</TableCell></TableRow>
             ) : visits.map((v: any) => (
               <TableRow key={v.id}>
-                <TableCell className="font-medium">{v.student?.name || v.student_id}</TableCell>
+                <TableCell className="font-medium">{v.student_name || v.student_id}</TableCell>
                 <TableCell className="text-sm">{v.visit_date ? displayBS(v.visit_date) : "—"}</TableCell>
                 <TableCell className="text-sm">{v.reason || "—"}</TableCell>
                 <TableCell className="text-sm">{v.diagnosis || "—"}</TableCell>

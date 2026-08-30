@@ -5,6 +5,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
@@ -32,16 +33,25 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { installedPlugins } = useInstalledPlugins();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<DashboardData>>("/analytics/overview");
       return res.data.data;
     },
-    retry: false,
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load dashboard. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const stats = data || {
     total_students: 0,
@@ -59,43 +69,43 @@ export default function DashboardPage() {
       title: "Total Students",
       value: stats.total_students,
       icon: GraduationCap,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "text-ocean dark:text-mint",
+      bg: "bg-ocean/10 dark:bg-mint/20",
     },
     {
       title: "Teachers & Staff",
       value: stats.total_teachers + stats.total_staff,
       icon: Users,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
+      color: "text-emerald-700 dark:text-emerald-300",
+      bg: "bg-emerald-50 dark:bg-emerald-950/40",
     },
     {
       title: "Fee Collection (Month)",
       value: formatCurrency(stats.fee_collection_this_month),
       icon: DollarSign,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
+      color: "text-amber-700 dark:text-amber-300",
+      bg: "bg-amber-50 dark:bg-amber-950/40",
     },
     {
       title: "Attendance Today",
       value: `${stats.attendance_today_percent}%`,
       icon: ClipboardList,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
+      color: "text-ocean dark:text-mint",
+      bg: "bg-mint/30 dark:bg-mint/20",
     },
     {
       title: "Pending Fees",
       value: formatCurrency(stats.pending_fee_amount),
       icon: TrendingUp,
-      color: "text-red-600",
-      bg: "bg-red-50",
+      color: "text-red-700 dark:text-red-300",
+      bg: "bg-red-50 dark:bg-red-950/40",
     },
     {
       title: "Upcoming Events",
       value: stats.upcoming_events,
       icon: Calendar,
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
+      color: "text-ocean-light dark:text-mint",
+      bg: "bg-ocean/10 dark:bg-mint/15",
     },
   ];
 

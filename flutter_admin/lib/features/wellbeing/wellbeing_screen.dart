@@ -16,6 +16,7 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
   List<Map<String, dynamic>> _classSummaries = [];
   List<Map<String, dynamic>> _alerts = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/wellbeing/dashboard'),
@@ -46,8 +50,12 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
         );
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('WellbeingScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load wellbeing data.';
+        _loading = false;
+      });
     }
   }
 
@@ -69,8 +77,10 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
                 children: [
                   _buildDashboard(),
                   _buildAlerts(),
@@ -98,8 +108,8 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
         itemCount: _classSummaries.length,
         itemBuilder: (context, i) {
           final c = _classSummaries[i];
-          final avg = (c['avg_mood'] as num?)?.toDouble() ?? 0.0;
-          final atRisk = (c['at_risk_count'] as int?) ?? 0;
+          final avg = safeDoubleOrNull(c['avg_mood']) ?? 0.0;
+          final atRisk = safeIntOrNull(c['at_risk_count']) ?? 0;
 
           return ESchoolAnimatedEntry(
             index: i,
@@ -112,7 +122,7 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
                     children: [
                       Expanded(
                         child: Text(
-                          c['class_name'] as String? ?? '',
+                          safeStringOrNull(c['class_name']) ?? '',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
@@ -166,7 +176,7 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
         itemCount: _alerts.length,
         itemBuilder: (context, i) {
           final a = _alerts[i];
-          final severity = a['severity'] as String? ?? 'low';
+          final severity = safeStringOrNull(a['severity']) ?? 'low';
           final severityColor = _severityColor(severity);
 
           return ESchoolAnimatedEntry(
@@ -183,9 +193,9 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
                     size: 20,
                   ),
                 ),
-                title: Text(a['student_name'] as String? ?? '',
+                title: Text(safeStringOrNull(a['student_name']) ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(a['message'] as String? ?? ''),
+                subtitle: Text(safeStringOrNull(a['message']) ?? ''),
                 trailing: ESchoolInfoPill(
                   icon: Icons.circle,
                   label: severity.toUpperCase(),
@@ -246,9 +256,9 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
                       itemBuilder: (context, i) {
                         final s = surveys[i];
                         final responseCount =
-                            (s['response_count'] as num?)?.toInt() ?? 0;
+                            safeIntOrNull(s['response_count']) ?? 0;
                         final targetCount =
-                            (s['target_count'] as num?)?.toInt() ?? 1;
+                            safeIntOrNull(s['target_count']) ?? 1;
                         final completion = responseCount / targetCount;
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),

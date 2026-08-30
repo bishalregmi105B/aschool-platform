@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_client.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/error_container.dart';
 import '../widgets/loading_shimmer.dart';
 import '../widgets/no_data_container.dart';
 
@@ -34,6 +35,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   List<Map<String, dynamic>> _files = [];
   bool _loading = true;
   String _selectedYear = 'all';
+  String? _error;
 
   @override
   void initState() {
@@ -42,7 +44,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final response = await ApiClient.instance.get(
         '/files/',
@@ -58,8 +63,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
               .map((item) => Map<String, dynamic>.from(item))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('GalleryScreen load failed: $e\n$st');
       _files = [];
+      _error = 'Could not load the gallery.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -86,8 +93,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       if (presigned != null && presigned.isNotEmpty) {
         return presigned;
       }
-    } catch (_) {
+    } catch (e, st) {
       // Fallback to direct URL when presigned fetch fails.
+      debugPrint('GalleryScreen presigned($fileId) failed: $e\n$st');
     }
     return directUrl;
   }
@@ -253,7 +261,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           : null,
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
                 slivers: [

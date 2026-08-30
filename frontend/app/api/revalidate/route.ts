@@ -5,7 +5,11 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { path, secret } = body;
 
-  if (secret !== process.env.ISR_REVALIDATE_SECRET) {
+  // E201: normalize both sides to "" so an UNCONFIGURED secret (env unset)
+  // matches the empty secret the backend sends — the strict `!==` on
+  // undefined vs "" 401'd every server-side revalidation ping. When a real
+  // secret is configured, the check remains strict on both sides.
+  if ((secret ?? "") !== (process.env.ISR_REVALIDATE_SECRET ?? "")) {
     return NextResponse.json({ message: "Invalid secret" }, { status: 401 });
   }
 

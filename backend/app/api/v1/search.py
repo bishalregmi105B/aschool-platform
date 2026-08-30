@@ -17,7 +17,12 @@ search_bp = Blueprint("search", __name__, url_prefix="/search")
 def unified_search():
     """Search students, users, and notices by query string."""
     q = (request.args.get("q") or "").strip()
-    limit = min(int(request.args.get("limit", 8)), 25)
+    # E168: int(request.args["limit"]) 500ed on non-numeric values and the
+    # negative value slipped through to SQL LIMIT. Clamp to [1, 25].
+    try:
+        limit = min(max(int(request.args.get("limit", 8)), 1), 25)
+    except (TypeError, ValueError):
+        limit = 8
 
     if len(q) < 2:
         return success_response([])

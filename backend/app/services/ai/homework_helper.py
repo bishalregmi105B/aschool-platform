@@ -1,18 +1,16 @@
-"""AI Homework Helper — Socratic tutoring chatbot for students."""
+"""AI Homework Helper — Socratic tutoring chatbot for students.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 
 import json
-from flask import current_app
+
+from app.services.ai.token_hub import AITokenHub
 
 
 class HomeworkHelperService:
     """Student-facing AI tutor that uses Socratic method (guides, doesn't give answers)."""
-
-    MODEL = "claude-haiku-4-5-20241022"
-
-    @staticmethod
-    def _get_client():
-        import anthropic
-        return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
 
     @classmethod
     def get_help(
@@ -22,8 +20,14 @@ class HomeworkHelperService:
         grade_level: int | None = None,
         conversation_history: list[dict] | None = None,
         student_attempt: str | None = None,
+        school_id=None,
+        user_id=None,
     ) -> dict:
-        """Provide Socratic tutoring help — guide without giving direct answers."""
+        """Provide Socratic tutoring help — guide without giving direct answers.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
+        """
         subject_label = subject or "their subject"
         grade_label = f"Grade {grade_level}" if grade_level else "school"
         system_prompt = f"""You are a friendly, patient tutor helping a {grade_label} student in Nepal with {subject_label}.
@@ -46,7 +50,7 @@ Respond in JSON:
   "next_step_suggestion": "what the student should try next"
 }}"""
 
-        messages = []
+        messages = [{"role": "system", "content": system_prompt}]
         if conversation_history:
             messages.extend(conversation_history[-10:])  # Keep last 10 messages
 
@@ -56,22 +60,25 @@ Respond in JSON:
 
         messages.append({"role": "user", "content": user_msg})
 
-        client = cls._get_client()
-        response = client.messages.create(
-            model=cls.MODEL,
-            max_tokens=800,
-            system=system_prompt,
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="homework-helper:tutor",
             messages=messages,
-        )
+            model="fast",  # haiku-class model via hub routing
+            max_tokens=800,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"subject": subject, "grade_level": grade_level},
+        )["text"]
 
         try:
-            text = response.content[0].text
             start = text.index("{")
             end = text.rindex("}") + 1
             result = json.loads(text[start:end])
         except (ValueError, json.JSONDecodeError):
             result = {
-                "response": response.content[0].text,
+                "response": text,
                 "hint_level": 1,
                 "concept_involved": subject,
                 "next_step_suggestion": "Try breaking the problem into smaller parts.",

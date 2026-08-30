@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tag, Palette, Globe, CheckCircle } from "lucide-react";
+import { Tag, Palette, Globe, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function WhiteLabelPage() {
@@ -15,12 +15,25 @@ export default function WhiteLabelPage() {
 }
 
 function WhiteLabelContent() {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["white-label-overview"],
     queryFn: async () => { const r = await api.get("/schools/white-label/overview"); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card className="border-destructive/40">
+        <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">Failed to load white-label status. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const checklist = [
     { label: "School Logo Uploaded", done: data?.has_logo ?? false },

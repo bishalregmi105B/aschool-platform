@@ -13,6 +13,7 @@ class VisitorScreen extends ConsumerStatefulWidget {
 class _VisitorScreenState extends ConsumerState<VisitorScreen> {
   List<Map<String, dynamic>> _visitors = [];
   bool _loading = true;
+  String? _error;
 
   // Form state for check-in bottom sheet
   final _nameCtrl = TextEditingController();
@@ -34,7 +35,10 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res =
           await ApiClient.instance.get('/visitors?per_page=30&date=today');
@@ -42,8 +46,12 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
         _visitors = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('VisitorScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load visitors.';
+        _loading = false;
+      });
     }
   }
 
@@ -59,7 +67,14 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
       _purposeCtrl.clear();
       _meetingCtrl.clear();
       await _load();
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('VisitorScreen check-in failed: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not check in visitor. Please retry.')),
+      );
+    }
   }
 
   @override
@@ -87,7 +102,9 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
         ),
         body: _loading
             ? const LoadingShimmer()
-            : _visitors.isEmpty
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : _visitors.isEmpty
                 ? const NoDataContainer(
                     title: 'No visitors today',
                     subtitle: 'Tap + to check in a new visitor',
@@ -145,7 +162,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
                                       ),
                                     ),
                                     title: Text(
-                                      v['name'] as String? ?? '',
+                                      safeStringOrNull(v['name']) ?? '',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w600),
                                     ),
@@ -162,7 +179,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
                                           CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          v['checked_in_at'] as String? ?? '',
+                                          safeStringOrNull(v['checked_in_at']) ?? '',
                                           style: const TextStyle(
                                               fontSize: 11,
                                               color: ASchoolTheme.mutedText),
@@ -318,7 +335,8 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
           ),
         );
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('VisitorScreen QR lookup($code) failed: $e\n$st');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No visitor found for code: $code')),

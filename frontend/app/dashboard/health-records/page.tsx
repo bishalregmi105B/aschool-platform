@@ -54,7 +54,7 @@ function HealthRecordsContent() {
   const [showVisit, setShowVisit] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: visits, isLoading } = useQuery<any>({
+  const { isError, refetch, data: visits, isLoading } = useQuery<any>({
     queryKey: ["health-visits"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/health-records/visits");
@@ -85,6 +85,15 @@ function HealthRecordsContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
@@ -142,7 +151,7 @@ function HealthRecordsContent() {
               <TableBody>
                 {visits?.map((v: any) => (
                   <TableRow key={v.id}>
-                    <TableCell>{v.student_id}</TableCell>
+                    <TableCell>{v.student_name || v.student_id}</TableCell>
                     <TableCell>{displayBS(v.visit_date)}</TableCell>
                     <TableCell>{v.reason}</TableCell>
                     <TableCell>{v.diagnosis}</TableCell>
@@ -170,7 +179,7 @@ function HealthRecordsContent() {
               <TableBody>
                 {immunizations?.map((imm: any) => (
                   <TableRow key={imm.id}>
-                    <TableCell>{imm.student_id}</TableCell>
+                    <TableCell>{imm.student_name || imm.student_id}</TableCell>
                     <TableCell className="font-medium">{imm.vaccine_name}</TableCell>
                     <TableCell><Badge variant="outline">Dose {imm.dose_number}</Badge></TableCell>
                     <TableCell>{imm.date_administered}</TableCell>

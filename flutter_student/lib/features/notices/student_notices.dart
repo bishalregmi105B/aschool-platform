@@ -27,7 +27,8 @@ class _StudentNoticesState extends ConsumerState<StudentNotices> {
     });
     try {
       _notices = await NoticesService.fetchNotices(targetRole: 'student');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('StudentNoticesScreen load failed: $e\n$st');
       _error = 'Unable to load notices right now.';
     }
     if (mounted) {

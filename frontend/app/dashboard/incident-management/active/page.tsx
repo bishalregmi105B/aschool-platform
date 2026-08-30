@@ -28,9 +28,10 @@ function ActiveCasesContent() {
   const [showWitnessDialog, setShowWitnessDialog] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", type: "behavior", severity: "medium", student_id: "", description: "", witnesses: "", parent_notified: false });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["active-cases", search],
     queryFn: async () => { const r = await api.get("/incidents/management/active", { params: { search: search || undefined } }); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   const cases: any[] = Array.isArray(data) ? data : data?.items ?? [];
@@ -48,6 +49,14 @@ function ActiveCasesContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load active cases. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

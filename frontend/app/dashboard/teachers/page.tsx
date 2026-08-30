@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, UserCog, Mail, Phone, Search, Upload, Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 type Teacher = TeacherDto;
 
@@ -33,7 +34,12 @@ export default function TeachersPage() {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["teachers"],
     queryFn: fetchTeachers,
   });
@@ -78,6 +84,22 @@ export default function TeachersPage() {
 
   if (isLoading) return <PageLoader />;
 
+  if (isError)
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">
+              Failed to load teachers. Please try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+
   const teachers = (data || []).filter((t: Teacher) =>
     t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     t.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -94,9 +116,11 @@ export default function TeachersPage() {
           <p className="text-muted-foreground">Manage school teaching staff</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" /> Bulk Upload
-          </Button>
+          <Link href="/dashboard/teachers/bulk-upload">
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+            </Button>
+          </Link>
           <Button onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4 mr-2" /> Add Teacher
           </Button>

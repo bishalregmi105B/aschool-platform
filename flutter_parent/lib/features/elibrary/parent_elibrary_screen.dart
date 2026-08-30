@@ -18,6 +18,7 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
   List<dynamic> _pastPapers = [];
   bool _loading = true;
   String _searchQuery = '';
+  String? _error;
 
   @override
   void initState() {
@@ -27,15 +28,23 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/parent/elibrary');
-      final payload = res.data;
+      // ApiClient returns the raw envelope {success, data, error}; unwrap it
+      // before reading payload keys (previously read off the envelope -> always null).
+      final payload = res.data is Map ? (res.data['data'] as Map<String, dynamic>?) : res.data;
       setState(() {
-        _resources = (payload?['resources'] as List?) ?? [];
-        _pastPapers = (payload?['past_papers'] as List?) ?? [];
+        _resources = safeList(payload?['resources']);
+        _pastPapers = safeList(payload?['past_papers']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ParentELibraryScreen load failed: $e\n$st');
+      _error = 'Could not load the digital library.';
+    }
     setState(() => _loading = false);
   }
 
@@ -53,7 +62,9 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
         appBar: const CustomAppBar(title: 'Digital Library'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -84,7 +95,7 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
                           resources: _resources
                               .where((r) =>
                                   _searchQuery.isEmpty ||
-                                  (r['title'] as String? ?? '')
+                                  (safeStringOrNull(r['title']) ?? '')
                                       .toLowerCase()
                                       .contains(_searchQuery.toLowerCase()))
                               .toList(),
@@ -93,7 +104,7 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
                           resources: _pastPapers
                               .where((r) =>
                                   _searchQuery.isEmpty ||
-                                  (r['title'] as String? ?? '')
+                                  (safeStringOrNull(r['title']) ?? '')
                                       .toLowerCase()
                                       .contains(_searchQuery.toLowerCase()))
                               .toList(),

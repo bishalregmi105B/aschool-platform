@@ -28,7 +28,8 @@ interface SchoolSettings {
   logo_url: string;
   banner_url: string;
   established_year_bs: string;
-  config: Record<string, unknown>;
+  /** JSONB blob persisted by PUT /schools/:id (column `settings`). */
+  settings: Record<string, unknown>;
 }
 
 interface WebsiteStatus {
@@ -44,12 +45,13 @@ export default function SettingsPage() {
   const { isPluginInstalled } = useInstalledPlugins();
   const hasWebsiteBuilder = isPluginInstalled("website_builder");
 
-  const { data: school, isLoading } = useQuery({
+  const { data: school, isLoading, isError, refetch } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/schools/current");
       return res.data.data as SchoolSettings;
     },
+    retry: 1,
   });
 
   const [form, setForm] = useState<Partial<SchoolSettings>>({});
@@ -72,7 +74,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (school) {
       setForm(school);
-      setConfigJson(JSON.stringify(school.config || {}, null, 2));
+      setConfigJson(JSON.stringify(school.settings || {}, null, 2));
     }
   }, [school]);
 
@@ -84,11 +86,11 @@ export default function SettingsPage() {
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      let config = school?.config || {};
+      let settings = school?.settings || {};
       try {
-        config = JSON.parse(configJson);
+        settings = JSON.parse(configJson);
       } catch {
-        // keep existing config on invalid JSON
+        // keep existing settings on invalid JSON
       }
       const res = await api.put<ApiResponse>(`/schools/${school?.id}`, {
         name: form.name,
@@ -99,7 +101,7 @@ export default function SettingsPage() {
         municipality: form.municipality,
         logo_url: form.logo_url,
         banner_url: form.banner_url,
-        config,
+        settings,
       });
       return res.data;
     },
@@ -111,6 +113,15 @@ export default function SettingsPage() {
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load school settings. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
   if (!school) return <p className="text-center py-8 text-muted-foreground">Unable to load settings</p>;
 
   const previewUrl = `${origin || ""}/school/${school.slug}`;

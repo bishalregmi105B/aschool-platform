@@ -6,6 +6,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Bell, AlertTriangle, Info } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -14,15 +15,25 @@ export default function SeismicAlertsPage() {
 }
 
 function AlertsContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["seismic-alerts"],
     queryFn: async () => { const r = await api.get("/emergency/seismic-alerts"); return r.data?.data ?? r.data; },
     refetchInterval: 60000, // refresh every minute
+    retry: 1,
   });
 
   const alerts: any[] = Array.isArray(data) ? data : data?.alerts ?? [];
+  const meta = Array.isArray(data) ? {} : data ?? {};
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load seismic alerts. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const getSeverity = (m: number) => {
     if (m >= 7) return { label: "Major", color: "text-red-700", bg: "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800" };
@@ -39,8 +50,21 @@ function AlertsContent() {
           <Bell className="h-6 w-6 text-red-600" />
           <div><h1 className="text-2xl font-bold">Seismic Alerts</h1><p className="text-muted-foreground">Real-time earthquake monitoring from NSC/USGS API</p></div>
         </div>
-        <Badge variant="outline" className="text-green-600 border-green-300">Live Monitoring</Badge>
+        {meta.unavailable ? (
+          <Badge variant="outline" className="text-amber-600 border-amber-300">Feed Unreachable</Badge>
+        ) : (
+          <Badge variant="outline" className="text-green-600 border-green-300">Live Monitoring</Badge>
+        )}
       </div>
+
+      {meta.unavailable && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="pt-4 flex items-center gap-3">
+            <Info className="h-5 w-5 text-amber-600 shrink-0" />
+            <p className="text-sm">The seismic feed could not be reached just now ({meta.reason ?? "network error"}). The empty list below is real — no events are being shown rather than stale data.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
         <CardContent className="pt-4 flex items-center gap-3">

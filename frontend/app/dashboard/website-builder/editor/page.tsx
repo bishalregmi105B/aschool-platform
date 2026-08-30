@@ -4,11 +4,14 @@ import { useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { revalidateSchoolSite } from "@/lib/revalidate";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { sanitizeCss } from "@/lib/sanitize";
 import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/lib/school-website/registry";
 import { SectionRenderer } from "@/components/website/SectionRenderer";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
-import { generateThemeCSS, getThemeById } from "@/themes/registry";
+import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
 
 type ContentState = Record<string, unknown>;
 
@@ -51,8 +54,8 @@ function WidgetPalette({ onAdd }: { onAdd: (def: SchoolWidgetDef) => void }) {
               onClick={() => setActiveCategory(cat.key)}
               className={`flex-shrink-0 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                 activeCategory === cat.key
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted hover:bg-muted/80 text-foreground"
               }`}
             >
               {cat.icon} {cat.label}
@@ -304,7 +307,7 @@ function PropertiesPanel({
       </div>
 
       <div className="p-4 border-t flex-shrink-0">
-        <button onClick={onSave} disabled={saving} className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        <button onClick={onSave} disabled={saving} className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
@@ -334,7 +337,7 @@ function EditableSectionBlock({
       <div
         className={`absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm transition-all pointer-events-none ${
           isSelected
-            ? "opacity-100 bg-blue-600 text-white"
+            ? "opacity-100 bg-primary text-primary-foreground"
             : "opacity-0 group-hover:opacity-100 bg-white/90 text-gray-700 border border-gray-200"
         }`}
       >
@@ -360,10 +363,11 @@ export default function WebsiteEditor() {
   const [localSections, setLocalSections] = useState<SchoolSection[] | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, { title?: string; content?: ContentState }>>({});
 
-  const { data: pageData, isLoading } = useQuery<PageData>({
+  const { data: pageData, isLoading, isError: pageError, refetch: refetchPage } = useQuery<PageData>({
     queryKey: ["website-page-sections", pageId],
     queryFn: () => api.get(`/website-builder/pages/${pageId}`).then((r) => r.data.data),
     enabled: !!pageId,
+    retry: 1,
   });
 
   // Fetch website config for theme CSS injection in the preview canvas
@@ -374,8 +378,8 @@ export default function WebsiteEditor() {
   });
 
   const previewThemeCss = (() => {
-    const themeSlug = websiteConfig?.theme_slug || "modern-minimal";
-    const activeTheme = getThemeById(themeSlug) || getThemeById("modern-minimal");
+    const themeSlug = websiteConfig?.theme_slug || DEFAULT_THEME_ID;
+    const activeTheme = getThemeById(themeSlug) || getThemeById(DEFAULT_THEME_ID);
     const colorOverrides = websiteConfig?.customizations?.colors || {};
     if (!activeTheme) return "";
     // sanitizeCss defends against custom_css smuggled through the config row;
@@ -413,6 +417,7 @@ export default function WebsiteEditor() {
         setLocalSections((prev) => [...(prev ?? []), newSection]);
       }
       qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
+      revalidateSchoolSite();
     },
   });
 
@@ -422,6 +427,7 @@ export default function WebsiteEditor() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
       setPendingChanges({});
+      revalidateSchoolSite();
     },
   });
 
@@ -430,13 +436,17 @@ export default function WebsiteEditor() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
       setSelectedSectionId(null);
+      revalidateSchoolSite();
     },
   });
 
   const moveSectionMut = useMutation({
     mutationFn: ({ sectionId, direction }: { sectionId: string; direction: "up" | "down" }) =>
       api.put(`/website-builder/pages/${pageId}/sections/${sectionId}/reorder`, { direction }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
+      revalidateSchoolSite();
+    },
   });
 
   const handleAddWidget = useCallback(
@@ -494,6 +504,17 @@ export default function WebsiteEditor() {
     return (
       <div className="p-8 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load the page content. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetchPage()}>Retry</Button>
+        </CardContent></Card>
       </div>
     );
   }
@@ -573,7 +594,7 @@ export default function WebsiteEditor() {
             <p className="text-4xl mb-3">🏫</p>
             <p className="text-gray-400 text-lg font-medium mb-1">No sections yet</p>
             <p className="text-gray-400 text-sm mb-4">Use the panel on the left to add sections to your page</p>
-            <button onClick={() => setLeftTab("widgets")} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">+ Add First Section</button>
+            <button onClick={() => setLeftTab("widgets")} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90">+ Add First Section</button>
           </div>
         ) : (
           <div className="bg-white shadow-lg mx-auto" style={{ maxWidth: "900px", minHeight: "100%" }}>

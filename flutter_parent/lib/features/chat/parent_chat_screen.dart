@@ -13,6 +13,7 @@ class ParentChatScreen extends ConsumerStatefulWidget {
 class _ParentChatScreenState extends ConsumerState<ParentChatScreen> {
   List<Map<String, dynamic>> _threads = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,21 +22,31 @@ class _ParentChatScreenState extends ConsumerState<ParentChatScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/parent/chat-threads');
       setState(() {
         _threads = List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('ParentChatScreen loadThreads failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load conversations.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -169,8 +180,13 @@ class _ChatDetailState extends ConsumerState<_ChatDetailScreen> {
         _loading = false;
       });
       _scrollToBottom();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ParentChatScreen loadMessages failed: $e\n$st');
       setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not load messages. Pull to retry.')));
+      }
     }
   }
 
@@ -188,18 +204,27 @@ class _ChatDetailState extends ConsumerState<_ChatDetailScreen> {
     if (text.isEmpty) return;
     _msgCtrl.clear();
     // Optimistic add
-    setState(() => _messages.add({
-          'content': text,
-          'is_mine': true,
-          'time': 'Just now',
-        }));
+    final pending = {
+      'content': text,
+      'is_mine': true,
+      'time': 'Just now',
+    };
+    setState(() => _messages.add(pending));
     _scrollToBottom();
     try {
       await ApiClient.instance
           .post('/parent/chat/${widget.threadId}/messages', data: {
         'content': text,
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ParentChatScreen send failed: $e\n$st');
+      // Roll back the optimistic bubble so the failure is visible.
+      if (mounted) {
+        setState(() => _messages.remove(pending));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Message not sent. Please try again.')));
+      }
+    }
   }
 
   @override

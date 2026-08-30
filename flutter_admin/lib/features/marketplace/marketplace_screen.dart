@@ -11,9 +11,11 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 }
 
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
+  final PluginRepository _repo = PluginRepository();
   List<PluginManifest> _plugins = [];
   String _filter = 'all';
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,17 +24,22 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final resp = await ApiClient.instance.get('/plugins/marketplace');
+      final plugins = await _repo.loadMarketplace();
       setState(() {
-        _plugins = List<Map<String, dynamic>>.from(resp.data['data'] ?? [])
-            .map((e) => PluginManifest.fromJson(e))
-            .toList();
+        _plugins = plugins;
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('MarketplaceScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load the marketplace.';
+        _loading = false;
+      });
     }
   }
 
@@ -65,7 +72,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         Expanded(
           child: _loading
               ? LoadingShimmer.cards()
-              : RefreshIndicator(
+              : _error != null
+                  ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                  : RefreshIndicator(
                   onRefresh: _load,
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),
@@ -202,6 +211,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   }
 
   void _showDetail(PluginManifest p) {
+    // Per-school plugin config fetched/cached via pluginProvider
+    // (SchoolPlugin.config on the backend).
+    final config = ref.read(pluginProvider).getConfig(p.slug);
+    final lastPayment = config?['last_payment'];
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -238,6 +251,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: ASchoolTheme.success)),
+            if (lastPayment is Map) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Paid via ${lastPayment['provider'] ?? 'unknown'}'
+                ' · txn ${lastPayment['transaction_id'] ?? '-'}',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -261,16 +286,30 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     );
   }
 
+  /// Backend contract (`api/v1/plugins.py`): POST /plugins/install and
+  /// POST /plugins/uninstall both take {"plugin_slug": ...} in the body —
+  /// there is no /plugins/{slug}/install or DELETE .../uninstall.
   Future<void> _togglePlugin(PluginManifest p, bool install) async {
     Navigator.pop(context);
     try {
       if (install) {
-        await ApiClient.instance.post('/plugins/${p.slug}/install');
+        await _repo.install(p.slug);
       } else {
-        await ApiClient.instance.delete('/plugins/${p.slug}/uninstall');
+        await _repo.uninstall(p.slug);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text(install ? '${p.name} installed' : '${p.name} uninstalled')));
       }
       _load();
-    } catch (_) {
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e, st) {
+      debugPrint('MarketplaceScreen ${install ? 'install' : 'uninstall'}(${p.slug}) failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Operation failed')));

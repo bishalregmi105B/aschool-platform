@@ -6,7 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 class PostSchedulerService:
-    """Manages scheduling and publishing of social media posts."""
+    """Manages scheduling and publishing of social media posts.
+
+    E199: this service referenced columns that do not exist on SocialPost
+    (`content`, `image_url`) — any call raised TypeError — and wrote a
+    `cancelled` status that is not in the post_status enum (DataError). It
+    now uses the real columns (content_en, media_urls) and cancels by
+    returning a scheduled post to `draft`.
+    """
 
     @staticmethod
     def schedule_post(school_id: str, content: str, platforms: list,
@@ -15,11 +22,12 @@ class PostSchedulerService:
         from extensions import db
         from app.models.social import SocialPost
 
+        media_urls = [image_url] if image_url else []
         post = SocialPost(
             school_id=school_id,
-            content=content,
+            content_en=content,
             platforms=platforms,
-            image_url=image_url,
+            media_urls=media_urls,
             scheduled_at=scheduled_at,
             status="scheduled",
         )
@@ -30,13 +38,14 @@ class PostSchedulerService:
 
     @staticmethod
     def cancel_scheduled(post_id: str) -> bool:
-        """Cancel a scheduled post."""
+        """Cancel a scheduled post (back to draft — the only reversible
+        state in the post_status enum)."""
         from extensions import db
         from app.models.social import SocialPost
 
-        post = SocialPost.query.get(post_id)
+        post = SocialPost.query.filter_by(id=post_id, is_deleted=False).first()
         if post and post.status == "scheduled":
-            post.status = "cancelled"
+            post.status = "draft"
             db.session.commit()
             return True
         return False

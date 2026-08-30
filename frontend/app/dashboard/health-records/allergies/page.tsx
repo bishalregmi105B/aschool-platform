@@ -34,10 +34,11 @@ function AllergiesContent() {
   const [profileData, setProfileData] = useState<any>(null);
   const [lookupId, setLookupId] = useState("");
 
-  // Fetch all visits to list students with health profiles
-  const { data: allVisits, isLoading } = useQuery<any>({
-    queryKey: ["health-allergy-visits"],
-    queryFn: async () => (await api.get("/health-records/visits")).data?.data || [],
+  // The registry lists students from their health profiles (GET
+  // /health-records/profiles) — visits don't carry allergy data.
+  const { data: profiles, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ["health-profiles", search],
+    queryFn: async () => (await api.get("/health-records/profiles", { params: { search: search || undefined } })).data?.data || [],
   });
 
   const lookupProfile = useMutation({
@@ -47,9 +48,18 @@ function AllergiesContent() {
   });
 
   const saveProfile = useMutation({
-    mutationFn: async () => (await api.put(`/health-records/students/${lookupId}`, profileData)).data,
+    mutationFn: async () => {
+      // allergies / medical_conditions are text[] columns — send arrays
+      const toList = (v: string) =>
+        Array.isArray(v) ? v : (v || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return (await api.put(`/health-records/students/${lookupId}`, {
+        ...profileData,
+        allergies: toList(profileData.allergies),
+        medical_conditions: toList(profileData.medical_conditions),
+      })).data;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["health-allergy-visits"] });
+      queryClient.invalidateQueries({ queryKey: ["health-profiles"] });
       setShowDialog(false);
       toast.success("Allergy info updated");
     },
@@ -58,11 +68,18 @@ function AllergiesContent() {
 
   if (isLoading) return <PageLoader />;
 
-  // Extract unique students with allergy info from visits
-  const visitList: any[] = Array.isArray(allVisits) ? allVisits : [];
-  const seen = new Set<string>();
-  const students = visitList.filter((v) => { if (seen.has(v.student_id)) return false; seen.add(v.student_id); return true; });
-  const filtered = students.filter((s) => s.student?.name?.toLowerCase().includes(search.toLowerCase()));
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load health profiles. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
+  const students: any[] = Array.isArray(profiles) ? profiles : [];
+  const filtered = students.filter((s) =>
+    (s.student_name || "").toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -96,10 +113,10 @@ function AllergiesContent() {
               <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No health profiles found</TableCell></TableRow>
             ) : filtered.map((v: any) => (
               <TableRow key={v.student_id}>
-                <TableCell className="font-medium">{v.student?.name || v.student_id}</TableCell>
-                <TableCell><Badge variant="outline">{v.student?.blood_group || "—"}</Badge></TableCell>
-                <TableCell className="text-sm">{v.student?.allergies || "None recorded"}</TableCell>
-                <TableCell className="text-sm">{v.student?.medical_conditions || "None recorded"}</TableCell>
+                <TableCell className="font-medium">{v.student_name || v.student_id}</TableCell>
+                <TableCell><Badge variant="outline">{v.blood_group || "—"}</Badge></TableCell>
+                <TableCell className="text-sm">{Array.isArray(v.allergies) && v.allergies.length ? v.allergies.join(", ") : "None recorded"}</TableCell>
+                <TableCell className="text-sm">{Array.isArray(v.medical_conditions) && v.medical_conditions.length ? v.medical_conditions.join(", ") : "None recorded"}</TableCell>
               </TableRow>
             ))}
           </TableBody>

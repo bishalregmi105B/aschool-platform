@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/lib/api";
 
 export default function VerifyOtpPage() {
   return (
@@ -40,17 +39,13 @@ function VerifyOtpContent() {
     if (otp.length !== 6) { toast.error("Please enter 6-digit OTP"); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp }),
-      });
-      const json = await res.json();
-      if (!res.ok) { toast.error(json.error || "Invalid OTP"); return; }
+      // Shared client: relative /api/v1 (same-origin rewrite) + cookie session.
+      await api.post("/auth/verify-otp", { phone, otp });
       toast.success("Phone verified successfully!");
       router.push("/login");
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (err) {
+      const resp = (err as { response?: { data?: { error?: string } } })?.response;
+      toast.error(resp?.data?.error || (resp ? "Invalid OTP" : "Network error. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -58,22 +53,13 @@ function VerifyOtpContent() {
 
   const handleResend = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/auth/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        const newDevOtp = json.data?.otp;
-        toast.success(newDevOtp ? `OTP resent — Dev OTP: ${newDevOtp}` : "OTP resent");
-        setResendTimer(60);
-        if (newDevOtp) setOtp(newDevOtp);
-      } else {
-        toast.error("Failed to resend OTP");
-      }
+      const res = await api.post<{ data?: { otp?: string } | null }>("/auth/send-otp", { phone });
+      const newDevOtp = res.data.data?.otp;
+      toast.success(newDevOtp ? `OTP resent — Dev OTP: ${newDevOtp}` : "OTP resent");
+      setResendTimer(60);
+      if (newDevOtp) setOtp(newDevOtp);
     } catch {
-      toast.error("Network error");
+      toast.error("Failed to resend OTP");
     }
   };
 

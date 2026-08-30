@@ -6,7 +6,7 @@ import 'package:aschool_shared/aschool_shared.dart';
 final teacherDashboardProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final resp = await ApiClient.instance.get('/teacher/dashboard');
-  return resp.data['data'] as Map<String, dynamic>;
+  return safeMap(envelopeData(resp.data));
 });
 
 /// Teacher dashboard — today's classes, quick attendance, stats
@@ -28,11 +28,9 @@ class TeacherDashboard extends ConsumerWidget {
           onRetry: () => ref.refresh(teacherDashboardProvider.future),
         ),
         data: (data) {
-          final classes =
-              List<Map<String, dynamic>>.from(data['today_classes'] ?? []);
-          final stats = data['stats'] as Map<String, dynamic>? ?? {};
-          final notices =
-              List<Map<String, dynamic>>.from(data['recent_notices'] ?? []);
+          final classes = safeMapList(data['today_classes']);
+          final stats = safeMap(data['stats']);
+          final notices = safeMapList(data['recent_notices']);
 
           return ListView(
             padding: const EdgeInsets.all(16),

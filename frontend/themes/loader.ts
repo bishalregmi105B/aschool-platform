@@ -25,21 +25,30 @@ import { THEMES as REGISTRY_THEMES, type SchoolTheme as RegistryTheme } from "./
 import vidyalaya from "./vidyalaya";
 import himalSchool from "./himal-school";
 
+const COLORFUL_THEMES = ["kids-campus-playful", "blossom-montessori"];
+const PROFESSIONAL_THEMES = ["collegiate-heritage", "university-azure", "institute-industrial"];
+const BOARDING_THEMES = ["boarding-crimson"];
+
 function mapCategory(theme: RegistryTheme): SchoolThemeDefinition["category"] {
-  if (["government", "nepal-heritage", "religious", "language-school"].includes(theme.id)) {
-    return "nepal-traditional";
-  }
-  if (["montessori", "primary-colorful", "arts-school", "festival-auto"].includes(theme.id)) {
-    return "colorful-vibrant";
-  }
-  if (["boarding"].includes(theme.id)) {
-    return "boarding-school";
-  }
-  if (["college", "dark-premium", "science-school", "secondary-professional"].includes(theme.id)) {
-    return "professional";
-  }
+  if (COLORFUL_THEMES.includes(theme.id)) return "colorful-vibrant";
+  if (BOARDING_THEMES.includes(theme.id)) return "boarding-school";
+  if (PROFESSIONAL_THEMES.includes(theme.id)) return "professional";
   return "modern-minimal";
 }
+
+/** Hero treatment matching each source design (see THEMES_CREDITS.md). */
+const HERO_STYLES: Record<string, SchoolThemeDefinition["hero"]["style"]> = {
+  "collegiate-heritage": "fullscreen",
+  "university-azure": "slideshow",
+  "educenter-bright": "slideshow",
+  "kids-campus-playful": "slideshow",
+  "blossom-montessori": "split",
+  "community-skyline": "static",
+  "global-elearning": "gradient",
+  "boarding-crimson": "fullscreen",
+  "institute-industrial": "gradient",
+  "campus-warm": "fullscreen",
+};
 
 function registryThemeToDefinition(theme: RegistryTheme): SchoolThemeDefinition {
   const navItems = [
@@ -114,7 +123,7 @@ function registryThemeToDefinition(theme: RegistryTheme): SchoolThemeDefinition 
       textColor: "#ffffff",
     },
     hero: {
-      style: theme.id === "festival-auto" ? "slideshow" : "fullscreen",
+      style: HERO_STYLES[theme.id] || "fullscreen",
       height: "78vh",
       overlay: true,
       overlayOpacity: 0.35,

@@ -16,6 +16,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
   List<Map<String, dynamic>> _alumni = [];
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/alumni?per_page=20'),
@@ -44,8 +48,12 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('AlumniScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load alumni data.';
+        _loading = false;
+      });
     }
   }
 
@@ -67,14 +75,16 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _buildDirectory(),
-                  _buildEvents(),
-                  _buildDonations(),
-                ],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _buildDirectory(),
+                      _buildEvents(),
+                      _buildDonations(),
+                    ],
+                  ),
       ),
     );
   }
@@ -103,7 +113,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
                 leading: CircleAvatar(
                   backgroundColor: ASchoolTheme.primary.withAlpha(20),
                   child: Text(
-                    (a['name'] as String? ?? 'A').substring(0, 1).toUpperCase(),
+                    (safeStringOrNull(a['name']) ?? 'A').substring(0, 1).toUpperCase(),
                     style: const TextStyle(
                       color: ASchoolTheme.primary,
                       fontWeight: FontWeight.bold,
@@ -111,7 +121,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
                   ),
                 ),
                 title: Text(
-                  a['name'] as String? ?? '',
+                  safeStringOrNull(a['name']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -160,7 +170,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
                   ),
                 ),
                 title: Text(
-                  ev['title'] as String? ?? '',
+                  safeStringOrNull(ev['title']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -200,7 +210,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
         }
         double totalAmount = donations.fold(
           0,
-          (sum, d) => sum + ((d['amount'] as num?) ?? 0),
+          (sum, d) => sum + (safeNumOrNull(d['amount']) ?? 0),
         );
         return Column(
           children: [

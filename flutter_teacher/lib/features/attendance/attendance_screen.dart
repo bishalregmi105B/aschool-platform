@@ -69,6 +69,7 @@ class _TeacherAttendanceNotifier
             .toList(),
       });
     } catch (e) {
+      debugPrint('Attendance submit failed for class $classId: $e');
       throw Exception('Failed to submit attendance');
     }
   }
@@ -186,16 +187,21 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
           _selectedClassName = null;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AttendanceScreen submit failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Saved offline — will sync when connected.'),
-          backgroundColor: Colors.orange,
+        // Keep the class + marks selected so the teacher can retry; there is
+        // no offline queue — the submission was NOT saved.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text(
+              'Attendance could not be submitted. Please check your connection and try again.'),
+          backgroundColor: ASchoolTheme.danger,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _submit,
+          ),
         ));
-        setState(() {
-          _selectedClassId = null;
-          _selectedClassName = null;
-        });
       }
     } finally {
       if (mounted) setState(() => _submitting = false);

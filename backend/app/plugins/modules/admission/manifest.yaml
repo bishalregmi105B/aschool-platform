@@ -26,12 +26,9 @@ frontend:
     label: "Admission"
     label_nepali: "भर्ना"
     icon: "ClipboardList"
-    subitems:
-      - { label: "Dashboard", route: "/dashboard/admission" }
-      - { label: "Applications", route: "/dashboard/admission/applications" }
-      - { label: "Leads", route: "/dashboard/admission/leads" }
-      - { label: "Form Builder", route: "/dashboard/admission/forms" }
-      - { label: "Merit List", route: "/dashboard/admission/merit" }
+    # Single page with internal tabs (Dashboard / Inquiries / Applications).
+    # No subitems: the previously listed /applications, /leads, /forms and
+    # /merit routes have no pages and rendered as dead sidebar links.
     visible_to: ["school_admin"]
 
 flutter:

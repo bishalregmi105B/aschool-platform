@@ -8,6 +8,12 @@ emoji: "🎨"
 icon: "Palette"
 description: "Digital student portfolios, achievement tracking, micro-credentials, project showcases"
 
+# DEPRECATED duplicate of `student_portfolio` (growth, NPR 299) — see
+# modules/portfolio/manifest.yaml. Unpublished from the catalog;
+# portfolio→student_portfolio gating alias kept for legacy installs.
+published: false
+deprecated: true
+
 api_blueprint: "app.api.v1.portfolio"
 models_module: "app.models.portfolio"
 

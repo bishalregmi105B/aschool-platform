@@ -18,27 +18,41 @@ import { Button } from "@/components/ui/button";
 
 interface ImportLog {
   id: string;
-  format: string;
+  /** serializer key — the FE previously read `format`, which does not exist */
+  format_code: string;
   status: string;
-  total_processed: number;
-  successful: number;
-  failed: number;
-  errors: any[];
+  total_rows: number;
+  imported_rows: number;
+  error_rows: number;
+  errors: Array<Record<string, unknown> | string>;
   created_at: string;
+  filename?: string;
 }
 
 export default function ImportHistoryPage() {
   const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["import-history"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ImportLog[]>>("/iemis/history");
       return res.data.data;
     },
+    retry: 1,
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load import history. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   const logs = data || [];
 
@@ -74,20 +88,20 @@ export default function ImportHistoryPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                      <span className="capitalize">{log.format.replace(/_/g, " ")}</span>
+                      <span className="capitalize">{(log.format_code || "").replace(/_/g, " ")}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={
-                      log.status === "completed" ? "success" : 
+                      log.status === "completed" ? "success" :
                       log.status === "failed" ? "destructive" : "secondary"
                     }>
                       {log.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-medium">{log.total_processed}</TableCell>
-                  <TableCell className="text-right text-green-600 font-semibold">{log.successful}</TableCell>
-                  <TableCell className="text-right text-red-600 font-semibold">{log.failed}</TableCell>
+                  <TableCell className="text-right font-medium">{log.total_rows ?? 0}</TableCell>
+                  <TableCell className="text-right text-green-600 font-semibold">{log.imported_rows ?? 0}</TableCell>
+                  <TableCell className="text-right text-red-600 font-semibold">{log.error_rows ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}>
                       <Eye className="h-4 w-4 mr-2" /> Details
@@ -119,7 +133,7 @@ export default function ImportHistoryPage() {
               <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-muted/30">
                 <div>
                   <span className="text-sm text-muted-foreground block">Format</span>
-                  <span className="font-medium capitalize">{selectedLog.format.replace(/_/g, " ")}</span>
+                  <span className="font-medium capitalize">{(selectedLog.format_code || "").replace(/_/g, " ")}</span>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground block">Date</span>
@@ -135,13 +149,13 @@ export default function ImportHistoryPage() {
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground block">Total Processed</span>
-                  <span className="font-medium">{selectedLog.total_processed}</span>
+                  <span className="font-medium">{selectedLog.total_rows ?? 0}</span>
                 </div>
               </div>
 
               {selectedLog.errors && selectedLog.errors.length > 0 && (
                 <div>
-                  <h3 className="font-semibold text-red-600 mb-2">Error Log ({selectedLog.failed} failed items)</h3>
+                  <h3 className="font-semibold text-red-600 mb-2">Error Log ({selectedLog.error_rows ?? selectedLog.errors.length} failed items)</h3>
                   <div className="bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 p-4 rounded-lg text-sm max-h-60 overflow-y-auto">
                     <ul className="list-disc pl-4 space-y-1">
                       {selectedLog.errors.map((err, i) => {
@@ -153,9 +167,9 @@ export default function ImportHistoryPage() {
                 </div>
               )}
 
-              {selectedLog.failed === 0 && (
+              {(selectedLog.imported_rows ?? 0) > 0 && (selectedLog.error_rows ?? 0) === 0 && (
                 <div className="bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 p-4 rounded-lg text-center">
-                  All {selectedLog.successful} records were imported successfully. No errors found.
+                  All {selectedLog.imported_rows} records were imported successfully. No errors found.
                 </div>
               )}
             </div>

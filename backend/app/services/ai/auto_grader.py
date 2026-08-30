@@ -1,18 +1,16 @@
-"""AI Auto-Grading Service — Grade assignments with step-by-step feedback."""
+"""AI Auto-Grading Service — Grade assignments with step-by-step feedback.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 
 import json
-from flask import current_app
+
+from app.services.ai.token_hub import AITokenHub
 
 
 class AutoGraderService:
     """AI-powered homework/assignment grading with detailed feedback."""
-
-    MODEL = "claude-sonnet-4-20250514"
-
-    @staticmethod
-    def _get_client():
-        import anthropic
-        return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
 
     @classmethod
     def grade_submission(
@@ -23,8 +21,14 @@ class AutoGraderService:
         rubric: str | None = None,
         subject: str = "",
         grade_level: int = 10,
+        school_id=None,
+        user_id=None,
     ) -> dict:
-        """Grade a student's answer with detailed feedback."""
+        """Grade a student's answer with detailed feedback.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
+        """
 
         rubric_text = f"\nGrading Rubric: {rubric}" if rubric else ""
 
@@ -56,15 +60,19 @@ Grade this answer and return JSON:
 
 Be fair, constructive, and specific. Consider Nepal curriculum standards."""
 
-        client = cls._get_client()
-        response = client.messages.create(
-            model=cls.MODEL,
-            max_tokens=1500,
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="auto-grader:grade",
             messages=[{"role": "user", "content": prompt}],
-        )
+            model="smart",  # quality tier (sonnet-class model via hub routing)
+            max_tokens=1500,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"subject": subject, "grade_level": grade_level},
+        )["text"]
 
         try:
-            text = response.content[0].text
             start = text.index("{")
             end = text.rindex("}") + 1
             return json.loads(text[start:end])

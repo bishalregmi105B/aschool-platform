@@ -14,6 +14,7 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,15 +23,22 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/analytics/overview');
       setState(() {
         _data = resp.data['data'];
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('AnalyticsScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load analytics.';
+        _loading = false;
+      });
     }
   }
 
@@ -40,7 +48,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       pluginSlug: 'basic_reports',
       child: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -59,7 +69,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildKpiRow() {
-    final kpis = _data?['kpis'] as Map<String, dynamic>? ?? {};
+    final kpis = safeMapOrNull(_data?['kpis']) ?? const {};
     return Row(children: [
       _kpi('Students', '${kpis['total_students'] ?? 0}', Icons.people,
           ASchoolTheme.primary),

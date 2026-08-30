@@ -1,18 +1,16 @@
-"""AI Question Paper Generator — Bloom's taxonomy-aware exam generation."""
+"""AI Question Paper Generator — Bloom's taxonomy-aware exam generation.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 
 import json
-from flask import current_app
+
+from app.services.ai.token_hub import AITokenHub
 
 
 class QuestionPaperService:
-    """Generate exam papers using Claude AI with curriculum alignment."""
-
-    MODEL = "claude-sonnet-4-20250514"
-
-    @staticmethod
-    def _get_client():
-        import anthropic
-        return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
+    """Generate exam papers using AI with curriculum alignment."""
 
     @classmethod
     def generate_paper(
@@ -26,12 +24,18 @@ class QuestionPaperService:
         include_answer_key: bool = True,
         question_types: list[str] | None = None,
         language: str = "english",
+        school_id=None,
+        user_id=None,
     ) -> dict:
-        """Generate a complete exam paper with optional answer key."""
+        """Generate a complete exam paper with optional answer key.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
+        """
 
         q_types = question_types or ["mcq", "short_answer", "long_answer"]
 
-        prompt = f"""You are an expert exam paper creator for schools in Nepal. 
+        prompt = f"""You are an expert exam paper creator for schools in Nepal.
 Create a well-structured exam paper with these specifications:
 
 Subject: {subject}
@@ -81,15 +85,19 @@ Return a JSON object:
   "marks_distribution": {{"Section A": 10, "Section B": 20, ...}}
 }}"""
 
-        client = cls._get_client()
-        response = client.messages.create(
-            model=cls.MODEL,
-            max_tokens=4096,
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="question-paper:generate",
             messages=[{"role": "user", "content": prompt}],
-        )
+            model="smart",  # quality tier (sonnet-class model via hub routing)
+            max_tokens=4096,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"subject": subject, "grade": grade, "difficulty": difficulty},
+        )["text"]
 
         try:
-            text = response.content[0].text
             start = text.index("{")
             end = text.rindex("}") + 1
             paper = json.loads(text[start:end])
@@ -105,11 +113,16 @@ Return a JSON object:
         return paper
 
     @classmethod
-    def generate_remark(cls, student_name: str, marks: dict, total: float, percentage: float) -> str:
+    def generate_remark(
+        cls,
+        student_name: str,
+        marks: dict,
+        total: float,
+        percentage: float,
+        school_id=None,
+        user_id=None,
+    ) -> str:
         """Generate a personalized report card remark."""
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
         prompt = f"""Write a brief, encouraging report card remark (2-3 sentences) for:
 Student: {student_name}
 Subject Marks: {json.dumps(marks)}
@@ -117,9 +130,51 @@ Total: {total}, Percentage: {percentage}%
 
 Be specific about strengths/areas for improvement. Appropriate for Nepal school context."""
 
-        response = client.messages.create(
-            model="claude-haiku-4-5-20241022",
-            max_tokens=200,
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="question-paper:remark",
             messages=[{"role": "user", "content": prompt}],
-        )
-        return response.content[0].text.strip()
+            model="fast",  # haiku-class model via hub routing
+            max_tokens=200,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"student_name": student_name},
+        )["text"]
+        return text.strip()
+
+    @classmethod
+    def generate_letter(
+        cls,
+        letter_type: str,
+        recipient: str,
+        subject: str,
+        context: str = "",
+        tone: str = "formal",
+        school_id=None,
+        user_id=None,
+    ) -> str:
+        """Generate a school letter/circular/notice draft (web Letter Writer)."""
+        prompt = f"""Write a {tone} school {letter_type.replace('_', ' ')} letter.
+
+Recipient: {recipient or 'Parents / Students'}
+Subject: {subject}
+Context / instructions: {context or 'None provided'}
+
+Requirements:
+- Complete, ready-to-send letter body (no placeholders like [Your Name]).
+- Professional tone appropriate for a Nepali school context.
+- Include a subject line when the format calls for one, and a natural sign-off."""
+
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="letter-writer:generate",
+            messages=[{"role": "user", "content": prompt}],
+            model="fast",  # haiku-class model via hub routing
+            max_tokens=900,
+            temperature=0.7,
+            metadata={"letter_type": letter_type},
+        )["text"]
+        return text.strip()

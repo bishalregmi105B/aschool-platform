@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { PluginGate } from "@/lib/plugins";
+import { revalidateSchoolSite } from "@/lib/revalidate";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface WebsiteStatus {
   is_published: boolean;
@@ -17,22 +21,39 @@ interface WebsiteStatus {
 }
 
 export default function WebsiteBuilderPage() {
+  // website_builder is a paid premium plugin — gate the page like the other
+  // premium plugin pages (it was previously reachable ungated).
+  return (
+    <PluginGate slug="website_builder">
+      <WebsiteBuilderContent />
+    </PluginGate>
+  );
+}
+
+function WebsiteBuilderContent() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"overview" | "quick-actions">("overview");
 
-  const { data: status, isLoading } = useQuery<WebsiteStatus>({
+  const { data: status, isLoading, isError, refetch } = useQuery<WebsiteStatus>({
     queryKey: ["website-status"],
     queryFn: () => api.get("/website-builder/status").then((r) => r.data.data),
+    retry: 1,
   });
 
   const publishMut = useMutation({
     mutationFn: () => api.post("/website-builder/publish"),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["website-status"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["website-status"] });
+      revalidateSchoolSite(status?.subdomain);
+    },
   });
 
   const unpublishMut = useMutation({
     mutationFn: () => api.post("/website-builder/unpublish"),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["website-status"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["website-status"] });
+      revalidateSchoolSite(status?.subdomain);
+    },
   });
 
   if (isLoading) {
@@ -40,6 +61,15 @@ export default function WebsiteBuilderPage() {
       <div className="p-8 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load website status. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
     );
   }
 

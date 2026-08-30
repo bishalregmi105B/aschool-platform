@@ -24,15 +24,23 @@ function CounselorContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ student_id: "", note: "", session_type: "individual", action_taken: "" });
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["counselor-notes"],
     queryFn: async () => (await api.get("/wellbeing/counselor-notes")).data?.data || [],
+    retry: 1,
   });
 
   const notes: any[] = Array.isArray(data) ? data : [];
 
   const create = useMutation({
-    mutationFn: async () => (await api.post("/wellbeing/counselor-notes", form)).data,
+    // Backend contract (POST /wellbeing/counselor-notes): {student_id, type,
+    // content, is_confidential} — the old `note`/`session_type`/`action_taken`
+    // keys are not read by the backend, so notes were saved with empty content.
+    mutationFn: async () => (await api.post("/wellbeing/counselor-notes", {
+      student_id: form.student_id.trim(),
+      type: form.session_type,
+      content: form.note,
+    })).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["counselor-notes"] });
       setShowDialog(false);
@@ -42,6 +50,14 @@ function CounselorContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load counselor notes. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -60,21 +76,19 @@ function CounselorContent() {
           <TableHeader>
             <TableRow>
               <TableHead>Student</TableHead>
-              <TableHead>Session Type</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Note</TableHead>
-              <TableHead>Action Taken</TableHead>
               <TableHead>Date</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notes.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No counselor notes yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No counselor notes yet</TableCell></TableRow>
             ) : notes.map((n: any) => (
               <TableRow key={n.id}>
-                <TableCell className="font-medium">{n.student?.name || n.student_id}</TableCell>
-                <TableCell className="capitalize text-sm">{n.session_type || "individual"}</TableCell>
-                <TableCell className="text-sm max-w-xs truncate">{n.note || "—"}</TableCell>
-                <TableCell className="text-sm max-w-xs truncate">{n.action_taken || "—"}</TableCell>
+                <TableCell className="font-medium">{n.student_name || n.student_id}</TableCell>
+                <TableCell className="capitalize text-sm">{n.note_type || "general"}</TableCell>
+                <TableCell className="text-sm max-w-xs truncate">{n.content || "—"}</TableCell>
                 <TableCell className="text-sm">{n.created_at ? new Date(n.created_at).toLocaleDateString() : "—"}</TableCell>
               </TableRow>
             ))}

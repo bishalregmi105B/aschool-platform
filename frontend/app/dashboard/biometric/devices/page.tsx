@@ -23,6 +23,10 @@ function DevicesContent() {
   const qc = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", ip_address: "", port: "4370", location: "", serial_number: "" });
+  // The backend returns the device API key exactly once (only its SHA-256
+  // hash is stored) — surface it for copy-paste or the device can never
+  // authenticate against /ingest + /heartbeat (E141).
+  const [newKey, setNewKey] = useState<{ name: string; apiKey: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["biometric-devices"],
@@ -33,7 +37,18 @@ function DevicesContent() {
 
   const create = useMutation({
     mutationFn: async () => (await api.post("/attendance/biometric/devices", form)).data,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["biometric-devices"] }); setShowDialog(false); toast.success("Device added"); setForm({ name: "", ip_address: "", port: "4370", location: "", serial_number: "" }); },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["biometric-devices"] });
+      setShowDialog(false);
+      setForm({ name: "", ip_address: "", port: "4370", location: "", serial_number: "" });
+      const created = res?.data ?? res;
+      if (created?.api_key) {
+        setNewKey({ name: created.name ?? "Device", apiKey: created.api_key });
+        toast.success("Device added — copy the API key now, it is shown only once");
+      } else {
+        toast.success("Device added");
+      }
+    },
     onError: () => toast.error("Failed to add device"),
   });
 
@@ -72,6 +87,34 @@ function DevicesContent() {
           </TableBody>
         </Table>
       </CardContent></Card>
+
+      {/* One-time API key dialog (E141) */}
+      <Dialog open={!!newKey} onOpenChange={(open) => { if (!open) setNewKey(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Device API Key — shown once</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Copy the key for <strong>{newKey?.name}</strong> now. It is stored only as a hash and
+              cannot be viewed again — the device authenticates with the{" "}
+              <code className="font-mono text-xs">X-Device-Key</code> header on ingest and heartbeat.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={newKey?.apiKey ?? ""} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+              <Button
+                variant="outline"
+                onClick={() => { if (newKey) { navigator.clipboard?.writeText(newKey.apiKey); toast.success("API key copied"); } }}
+              >
+                Copy
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setNewKey(null)}>I&apos;ve stored the key</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>

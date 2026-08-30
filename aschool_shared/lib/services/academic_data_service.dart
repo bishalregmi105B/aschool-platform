@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../utils/safe_parse.dart';
 import 'api_client.dart';
 
 class AcademicDataService {
@@ -35,8 +36,7 @@ class AcademicDataService {
   static Future<List<Map<String, dynamic>>>
       fetchSubjectsForCurrentStudent() async {
     final meResponse = await ApiClient.instance.get('/auth/me');
-    final me =
-        (meResponse.data['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final me = safeMap(envelopeData(meResponse.data));
     final userId = me['id']?.toString();
     if (userId == null || userId.isEmpty) {
       return const [];
@@ -69,8 +69,7 @@ class AcademicDataService {
   static Future<List<Map<String, dynamic>>>
       fetchChildSubjectsForCurrentParent() async {
     final meResponse = await ApiClient.instance.get('/auth/me');
-    final me =
-        (meResponse.data['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final me = safeMap(envelopeData(meResponse.data));
     final userId = me['id']?.toString();
     if (userId == null || userId.isEmpty) {
       return const [];

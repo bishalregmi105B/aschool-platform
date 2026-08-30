@@ -26,23 +26,51 @@ function AlumniContent() {
   const [search, setSearch] = useState("");
   const [batch, setBatch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", batch_year: "", current_occupation: "", organization: "", address: "" });
+  // Backend contract (POST /alumni): first_name + last_name required,
+  // graduation_year/batch (strings), designation, current_organization, location.
+  const [form, setForm] = useState({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" });
 
-  const { data, isLoading } = useQuery({
+  // Backend filter param is `batch` (Alumni.batch) — the old `batch_year`
+  // param was silently ignored, so the batch filter never filtered.
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["alumni", search, batch],
-    queryFn: async () => { const r = await api.get("/alumni", { params: { search: search || undefined, batch_year: batch || undefined } }); return r.data; },
+    queryFn: async () => { const r = await api.get("/alumni", { params: { search: search || undefined, batch: batch || undefined } }); return r.data; },
+    retry: 1,
   });
 
   const alumni = data?.data || [];
-  const stats = data?.stats || {};
+  const stats = data?.meta?.stats || {};
 
   const create = useMutation({
-    mutationFn: async () => (await api.post("/alumni", { ...form, batch_year: parseInt(form.batch_year) || undefined })).data,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["alumni"] }); setShowDialog(false); toast.success("Alumni added"); },
+    mutationFn: async () => {
+      const [first_name = "", ...rest] = form.name.trim().split(/\s+/);
+      const payload = {
+        first_name,
+        last_name: rest.join(" ") || first_name,
+        email: form.email || undefined,
+        phone: form.phone || undefined,
+        graduation_year: form.batch_year || undefined,
+        batch: form.batch_year || undefined,
+        designation: form.designation || undefined,
+        current_organization: form.organization || undefined,
+        location: form.location || undefined,
+      };
+      return (await api.post("/alumni", payload)).data;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["alumni"] }); setShowDialog(false); setForm({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" }); toast.success("Alumni added"); },
     onError: () => toast.error("Failed to add alumni"),
   });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load alumni directory. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   const currentYear = new Date().getFullYear();
   const batchYears = Array.from({ length: 30 }, (_, i) => currentYear - i);
@@ -71,29 +99,32 @@ function AlumniContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {alumni.length === 0 ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">No alumni found</div>
-        ) : alumni.map((a: any) => (
+        ) : alumni.map((a: any) => {
+          const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ") || "Alumni";
+          return (
           <Card key={a.id} className="hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
                 <Avatar
-                  name={a.name || "Alumni"}
+                  name={fullName}
                   size="lg"
                   className="h-12 w-12"
                 />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate">{a.name}</h3>
-                  <p className="text-sm text-muted-foreground">{a.current_occupation || "—"}{a.organization ? ` at ${a.organization}` : ""}</p>
-                  <Badge variant="outline" className="mt-1"><GraduationCap className="h-3 w-3 mr-1" />Batch {a.batch_year}</Badge>
+                  <h3 className="font-semibold truncate">{fullName}</h3>
+                  <p className="text-sm text-muted-foreground">{a.designation || "—"}{a.current_organization ? ` at ${a.current_organization}` : ""}</p>
+                  <Badge variant="outline" className="mt-1"><GraduationCap className="h-3 w-3 mr-1" />Batch {a.batch || a.graduation_year || "—"}</Badge>
                   <div className="mt-3 space-y-1 text-sm text-muted-foreground">
                     {a.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{a.email}</div>}
                     {a.phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{a.phone}</div>}
-                    {a.address && <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{a.address}</div>}
+                    {a.location && <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{a.location}</div>}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -107,10 +138,10 @@ function AlumniContent() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Batch Year</Label><Input type="number" value={form.batch_year} onChange={(e) => setForm({ ...form, batch_year: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Current Occupation</Label><Input value={form.current_occupation} onChange={(e) => setForm({ ...form, current_occupation: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Current Role</Label><Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} /></div>
             </div>
             <div className="space-y-2"><Label>Organization</Label><Input value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
           </div>
           <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add Alumni</Button></DialogFooter>
         </DialogContent>

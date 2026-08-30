@@ -87,17 +87,15 @@ class _AnnouncementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = data['title'] as String? ?? 'Announcement';
-    final message =
-        data['message'] as String? ?? data['content'] as String? ?? '';
-    final createdByName = data['created_by_name'] as String?;
-    final createdAt = data['created_at'] as String? ?? '';
-    final attachmentUrls = (data['attachment_urls'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        (data['file_url'] != null && (data['file_url'] as String).isNotEmpty
-            ? [data['file_url'] as String]
-            : []);
+    final title = safeString(data['title'], fallback: 'Announcement');
+    final message = safeString(data['message'] ?? data['content']);
+    final createdByName = safeStringOrNull(data['created_by_name']);
+    final createdAt = safeString(data['created_at']);
+    final fileUrl = safeStringOrNull(data['file_url']);
+    final urls = safeStringList(data['attachment_urls']);
+    final attachmentUrls = urls.isNotEmpty
+        ? urls
+        : (fileUrl != null && fileUrl.isNotEmpty ? [fileUrl] : <String>[]);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -191,7 +189,8 @@ class _AnnouncementCard extends StatelessWidget {
     try {
       final dt = DateTime.parse(raw).toLocal();
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AnnouncementScreen _formatDate parse failed: $e');
       return raw;
     }
   }
@@ -256,7 +255,8 @@ class _CreateAnnouncementSheetState
           'attachment_urls': [_uploadedFileUrl],
       });
       widget.onSuccess();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AnnouncementScreen post failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

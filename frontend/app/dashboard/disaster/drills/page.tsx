@@ -26,9 +26,10 @@ function DrillsContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ title: "", drill_type: "earthquake", scheduled_date: "", duration_minutes: "30", notes: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["disaster-drills"],
     queryFn: async () => { const r = await api.get("/emergency/drills"); return r.data?.data ?? r.data; },
+    retry: 1,
   });
 
   const drills: any[] = Array.isArray(data) ? data : data?.items ?? [];
@@ -42,9 +43,18 @@ function DrillsContent() {
   const markComplete = useMutation({
     mutationFn: async (id: string) => (await api.patch(`/emergency/drills/${id}`, { status: "completed" })).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["disaster-drills"] }); toast.success("Drill marked complete"); },
+    onError: () => toast.error("Failed to update drill"),
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load drills. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

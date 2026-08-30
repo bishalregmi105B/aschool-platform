@@ -59,7 +59,7 @@ function WellbeingContent() {
   const [tab, setTab] = useState<"overview" | "check-in" | "entries">("overview");
   const queryClient = useQueryClient();
 
-  const { data: summary, isLoading } = useQuery<any>({
+  const { isError, refetch, data: summary, isLoading } = useQuery<any>({
     queryKey: ["wellbeing-summary"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/wellbeing/mood/summary?days=7");
@@ -77,18 +77,34 @@ function WellbeingContent() {
   });
 
   const submitMoodMut = useMutation({
-    mutationFn: async (data: { mood: string; energy_level: number; notes: string }) => {
+    mutationFn: async (data: { mood: string; energy_level: number; notes: string; student_id?: string }) => {
       const res = await api.post<ApiResponse>("/wellbeing/mood", data);
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wellbeing-summary", "wellbeing-entries"] });
+      // NOTE: invalidateQueries matches element-wise prefixes — the combined
+      // key ["wellbeing-summary", "wellbeing-entries"] matches NEITHER query,
+      // so the overview silently kept showing stale counts after a check-in.
+      queryClient.invalidateQueries({ queryKey: ["wellbeing-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["wellbeing-entries"] });
       setTab("overview");
       toast.success("Mood check-in recorded!");
     },
+    // admins/teachers have no student profile, so the backend requires an
+    // on-behalf student_id — surface the 400 instead of failing silently
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to record check-in"),
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
 
   const distribution = summary?.mood_distribution || {};
 
@@ -136,9 +152,7 @@ function WellbeingContent() {
         </div>
       )}
 
-      {tab === "check-in" && <MoodCheckIn onSubmit={(data) => submitMoodMut.mutate(data)} loading={submitMoodMut.isPending} />}
-
-      {tab === "entries" && (
+      {tab === "check-in" && <MoodCheckIn onSubmit={(data) => submitMoodMut.mutate(data)} loading={submitMoodMut.isPending} />}      {tab === "entries" && (
         <div className="space-y-3">
           {entries?.map((entry: any) => (
             <Card key={entry.id}>
@@ -161,15 +175,38 @@ function WellbeingContent() {
   );
 }
 
-function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; energy_level: number; notes: string }) => void; loading: boolean }) {
+function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; energy_level: number; notes: string; student_id?: string }) => void; loading: boolean }) {
   const [mood, setMood] = useState("");
   const [energy, setEnergy] = useState(3);
   const [notes, setNotes] = useState("");
+  // staff (admin/teacher) have no student profile of their own — the backend
+  // 400s without an on-behalf student_id, so the check-in records for the
+  // selected student.
+  const { data: students } = useQuery({
+    queryKey: ["wellbeing-checkin-students"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/students?per_page=200");
+      return (res.data.data as Array<{ id: string; first_name: string; last_name: string }>) || [];
+    },
+    retry: 1,
+  });
+  const [studentId, setStudentId] = useState("");
 
   return (
     <Card>
       <CardHeader><CardTitle>How are you feeling today?</CardTitle></CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Log on behalf of</label>
+          <select className="w-full border rounded-md p-2" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+            <option value="">Select student…</option>
+            {(students || []).map((s) => (
+              <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">Wellbeing check-ins are recorded per student.</p>
+        </div>
+
         <div className="flex gap-3 justify-center">
           {(["happy", "neutral", "sad", "anxious", "angry"] as const).map((m: any) => (
             <button key={m} onClick={() => setMood(m)}
@@ -187,7 +224,7 @@ function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; e
 
         <Textarea placeholder="Any thoughts you'd like to share? (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
 
-        <Button onClick={() => onSubmit({ mood, energy_level: energy, notes })} disabled={!mood || loading} className="w-full">
+        <Button onClick={() => onSubmit({ mood, energy_level: energy, notes, student_id: studentId || undefined })} disabled={!mood || !studentId || loading} className="w-full">
           {loading ? "Submitting..." : "Submit Check-in"}
         </Button>
       </CardContent>

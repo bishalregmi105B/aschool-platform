@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,16 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { FileQuestion, Printer, Sparkles, Copy, Check } from "lucide-react";
 
 export default function OnlineExamQuestionsPage() {
+  return (
+    // The generator endpoint (/design-studio/ai/question-paper) is gated by the
+    // e-library plugin on the backend (canonical slug elibrary).
+    <PluginGate slug="elibrary">
+      <QuestionsContent />
+    </PluginGate>
+  );
+}
+
+function QuestionsContent() {
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
@@ -52,13 +63,17 @@ export default function OnlineExamQuestionsPage() {
           </head>
           <body>
             <div class="no-print" style="margin-bottom: 20px; text-align: right;">
-              <button onclick="window.print()" style="padding: 10px 20px;">Print Paper</button>
+              <button id="print-btn" style="padding: 10px 20px;">Print Paper</button>
             </div>
             ${result.html}
           </body>
         </html>
       `);
       newWin.document.close();
+      newWin.document.getElementById("print-btn")?.addEventListener("click", () => {
+        newWin.focus();
+        newWin.print();
+      });
     } else {
       toast.error("HTML formatting not available for this output.");
     }

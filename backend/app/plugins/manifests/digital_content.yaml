@@ -8,6 +8,12 @@ emoji: "📖"
 icon: "BookOpen"
 description: "E-books, past papers, OER resources, digital library, AI-curated reading lists"
 
+# DEPRECATED duplicate of `elibrary` (starter, NPR 299) — see
+# modules/digital_content/manifest.yaml. Unpublished from the catalog;
+# digital_content→elibrary gating alias kept for legacy installs.
+published: false
+deprecated: true
+
 api_blueprint: "app.api.v1.elibrary"
 models_module: "app.models.digital_content"
 

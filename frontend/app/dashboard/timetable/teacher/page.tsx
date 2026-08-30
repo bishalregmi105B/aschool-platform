@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Calendar, Clock } from "lucide-react";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 
 export default function TeacherTimetablePage() {
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
 
-  const { data: staff, isLoading } = useQuery({
+  const { data: staff, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["teachers-list"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>("/design-studio/data-sources/teacher/records?limit=100");
@@ -39,6 +41,16 @@ export default function TeacherTimetablePage() {
   const periods = periodNumbers.length > 0 ? periodNumbers : [1, 2, 3, 4, 5, 6];
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load teacher list. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   return (
     <div className="space-y-6">

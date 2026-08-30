@@ -199,8 +199,34 @@ def _reset_database():
         _cache.clear()
     except Exception:
         pass
-    _db.session.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
-    _db.session.execute(text("CREATE SCHEMA public"))
-    _db.session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    _db.session.commit()
-    _db.create_all()
+
+    from sqlalchemy import inspect as _sa_inspect
+
+    if not _sa_inspect(_db.engine).get_table_names():
+        # First (re)build: fresh schema. Done on a dedicated connection with
+        # pool recycling — pooled connections keep pre-drop catalog snapshots,
+        # which intermittently fails CREATE TYPE with "duplicate key value
+        # violates unique constraint pg_type_typname_nsp_index".
+        _db.engine.dispose()
+        with _db.engine.connect() as _conn:
+            _conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            _conn.execute(text("CREATE SCHEMA public"))
+            _conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            _conn.commit()
+        _db.engine.dispose()
+        _db.create_all()
+        return
+
+    # Subsequent resets: truncate everything instead of DROP/CREATE schema.
+    # Repeated drop+recreate of the ENUM types trips Postgres' pg_type
+    # catalog cache (unique violation on pg_type_typname_nsp_index), and
+    # truncate is also much faster than rebuilding 140+ tables per test.
+    _db.engine.dispose()
+    with _db.engine.connect() as _conn:
+        _conn.execute(text(
+            "DO $$ DECLARE _r record; BEGIN "
+            "FOR _r IN (SELECT tablename FROM pg_tables WHERE schemaname='public') LOOP "
+            "EXECUTE 'TRUNCATE TABLE public.' || quote_ident(_r.tablename) || ' CASCADE'; "
+            "END LOOP; END $$;"
+        ))
+        _conn.commit()

@@ -4,7 +4,7 @@ import os
 import zipfile
 
 from flask import Blueprint, g, request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.models.student import Guardian, Student
 from app.utils.decorators import role_required, school_required
@@ -108,6 +108,7 @@ def get_student(student_id):
 
 from app.models.student import Guardian, Student
 from app.models.user import User
+from app.plugins.entitlements import student_cap_error
 from app.utils.password import generate_default_password
 
 @students_bp.route("", methods=["POST"])
@@ -121,6 +122,11 @@ def create_student():
     missing = [f for f in required if not data.get(f)]
     if missing:
         return error_response(f"Missing required fields: {', '.join(missing)}", 400)
+
+    # Server-side plan cap (E2): reject enrollment beyond School.max_students.
+    cap_error = student_cap_error(g.school_id, incoming_count=1)
+    if cap_error:
+        return error_response(cap_error, 403)
 
     # Duplicate roll number guard
     roll_number = data.get("roll_number")
@@ -207,8 +213,12 @@ def update_student(student_id):
     if student.user_id:
         user = User.query.get(student.user_id)
         if user:
+            # users.phone is NOT NULL: the web edit dialogs send `phone: null`
+            # whenever the phone field is left blank (the common case — student
+            # users are enrolled without one), and storing None here violated
+            # the constraint and 500ed the whole profile edit (E100).
             if "phone" in data:
-                user.phone = data.get("phone") or None
+                user.phone = data.get("phone") or ""
             if "email" in data:
                 user.email = data.get("email") or None
 
@@ -266,11 +276,20 @@ def batch_roll_numbers():
         roll = item.get("roll_number")
         if not sid:
             continue
+        # E163: int(roll) used to raise an unhandled ValueError (500) for
+        # non-numeric strings like "abc"; validate up-front instead.
+        if roll not in (None, ""):
+            try:
+                roll = int(roll)
+            except (TypeError, ValueError):
+                return error_response(
+                    f"Invalid roll_number {roll!r} — must be a whole number", 400
+                )
         student = Student.query.filter_by(
             id=sid, school_id=g.school_id, is_deleted=False
         ).first()
         if student:
-            student.roll_number = int(roll) if roll not in (None, "") else None
+            student.roll_number = roll
             updated += 1
 
     db.session.commit()
@@ -363,6 +382,188 @@ def bulk_profile_images():
 
 
 # ── Guardians ──────────────────────────────────────────────
+
+
+@students_bp.route("/promote", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def promote_students():
+    """Move every active student of one class to another class (promotion).
+
+    Single transaction: any invalid target class or a from-class with no
+    students leaves the DB untouched. Roll numbers are kept (re-seat via
+    /students/batch-roll-numbers afterwards).
+    """
+    from app.models.academic import Class
+
+    data = request.get_json(silent=True) or {}
+    from_class_id = data.get("from_class_id")
+    to_class_id = data.get("to_class_id")
+    if not from_class_id or not to_class_id:
+        return error_response("from_class_id and to_class_id are required", 400)
+    if str(from_class_id) == str(to_class_id):
+        return error_response("Source and target class must differ", 400)
+
+    source = Class.query.filter_by(
+        id=from_class_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    target = Class.query.filter_by(
+        id=to_class_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not source or not target:
+        return error_response("Source and target class must belong to this school", 404)
+
+    students = Student.query.filter_by(
+        school_id=g.school_id, class_id=from_class_id, is_deleted=False
+    ).all()
+    if not students:
+        return error_response("No students found in the source class", 400)
+
+    try:
+        for student in students:
+            student.class_id = to_class_id
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return error_response("Promotion failed and was rolled back", 500)
+
+    return success_response({"promoted": len(students), "to_class_id": str(to_class_id)})
+
+
+@students_bp.route("/bulk-reset-passwords", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def bulk_reset_passwords():
+    """Reset login passwords for the given students to the school default.
+
+    Uses the same system default formula as enrollment
+    (generate_default_password → {EMIS_ID}@{StudentID}); system defaults are
+    exempt from the user-chosen password policy. Returns the generated
+    passwords so the admin can hand them out.
+    """
+    from app.utils.password import generate_default_password
+
+    data = request.get_json(silent=True) or {}
+    ids = data.get("student_ids", [])
+    if not ids or not isinstance(ids, list):
+        return error_response("student_ids list is required", 400)
+
+    results = []
+    for sid in ids:
+        student = Student.query.filter_by(
+            id=sid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if not student or not student.user_id:
+            continue
+        user = User.query.get(student.user_id)
+        if not user or not user.is_active:
+            continue
+        password = generate_default_password(user, student)
+        user.set_password(password)
+        results.append(
+            {
+                "student_id": student.student_id or str(student.id),
+                "full_name": f"{student.first_name or ''} {student.last_name or ''}".strip(),
+                "password": password,
+            }
+        )
+
+    if not results:
+        return error_response("No matching active students found", 400)
+
+    db.session.commit()
+    return success_response({"reset": len(results), "passwords": results})
+
+
+@students_bp.route("/transfers", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin", "staff")
+def list_transfers():
+    """List transfer certificates / withdrawals for the current school."""
+    from app.models.student_transfer import StudentTransfer
+
+    query = StudentTransfer.query.filter_by(
+        school_id=g.school_id, is_deleted=False
+    ).order_by(StudentTransfer.created_at.desc())
+
+    search = request.args.get("search")
+    if search:
+        query = query.join(Student).filter(
+            db.or_(
+                Student.first_name.ilike(f"%{search}%"),
+                Student.last_name.ilike(f"%{search}%"),
+                Student.student_id.ilike(f"%{search}%"),
+            )
+        )
+
+    items, meta = paginate(query)
+    return success_response(
+        [_transfer_dict(t) for t in items], meta={"pagination": meta}
+    )
+
+
+@students_bp.route("/transfers", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def create_transfer():
+    """Issue a transfer certificate / withdrawal / migration for a student.
+
+    Marks the student transferred_out in the same transaction; an unknown
+    student leaves no row behind.
+    """
+    from app.models.student_transfer import StudentTransfer
+
+    data = request.get_json(silent=True) or {}
+    student_id = data.get("student_id")
+    if not student_id:
+        return error_response("student_id is required", 400)
+
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not student:
+        return error_response("student_id does not match a student at this school", 404)
+
+    transfer_type = data.get("transfer_type") or "tc"
+    if transfer_type not in ("tc", "withdrawal", "migration"):
+        return error_response("transfer_type must be tc, withdrawal or migration", 400)
+
+    transfer = StudentTransfer(
+        school_id=g.school_id,
+        student_id=student.id,
+        transfer_type=transfer_type,
+        reason=data.get("reason"),
+        destination_school=data.get("destination_school"),
+        status="completed",
+        created_by_id=get_jwt_identity(),
+    )
+    student.status = "transferred_out"
+    db.session.add(transfer)
+    db.session.commit()
+    return created_response(_transfer_dict(transfer))
+
+
+def _transfer_dict(t) -> dict:
+    student = t.student
+    return {
+        "id": str(t.id),
+        "student_id": str(t.student_id),
+        "student_name": (
+            f"{student.first_name or ''} {student.last_name or ''}".strip()
+            if student
+            else None
+        ),
+        "student_code": student.student_id if student else None,
+        "transfer_type": t.transfer_type,
+        "reason": t.reason,
+        "destination_school": t.destination_school,
+        "status": t.status,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
 
 
 @students_bp.route("/<uuid:student_id>/guardians", methods=["GET"])

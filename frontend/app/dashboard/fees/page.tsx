@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { displayBS } from "@/lib/nepali_date";
+import { formatNepaliCurrency } from "@/lib/nepali-utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface FeesSummary {
@@ -53,13 +54,37 @@ export default function FeesPage() {
 }
 
 function FeeOverviewContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["fees-overview"],
     queryFn: async () => {
       const res = await api.get("/fees/summary");
       return res.data?.data as FeesSummary | null;
     },
+    retry: 1,
   });
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Fee Management</h1>
+          <p className="text-muted-foreground">
+            Overview of fee collection status for your school
+          </p>
+        </div>
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">
+              Failed to load the fee summary. Please try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const s = data;
   const collectionRate = s?.collection_rate ?? 0;
@@ -128,7 +153,8 @@ function FeeOverviewContent() {
         {[
           {
             label: "Total Collected",
-            value: `Rs. ${((s?.total_collected ?? 0) / 1000).toFixed(0)}K`,
+            // E205: exact NPR with Nepali 2-2-3 digit grouping — no "12K" abbr.
+            value: formatNepaliCurrency(s?.total_collected ?? 0),
             icon: CheckCircle2,
             color: "text-green-600",
             bg: "bg-green-50",
@@ -136,7 +162,7 @@ function FeeOverviewContent() {
           },
           {
             label: "Outstanding",
-            value: `Rs. ${((s?.total_outstanding ?? 0) / 1000).toFixed(0)}K`,
+            value: formatNepaliCurrency(s?.total_outstanding ?? 0),
             icon: AlertTriangle,
             color: "text-amber-600",
             bg: "bg-amber-50",
@@ -144,7 +170,7 @@ function FeeOverviewContent() {
           },
           {
             label: "Overdue",
-            value: `Rs. ${((s?.total_overdue ?? 0) / 1000).toFixed(0)}K`,
+            value: formatNepaliCurrency(s?.total_overdue ?? 0),
             icon: Calendar,
             color: "text-red-600",
             bg: "bg-red-50",
@@ -152,7 +178,7 @@ function FeeOverviewContent() {
           },
           {
             label: "This Month",
-            value: `Rs. ${((s?.this_month_collected ?? 0) / 1000).toFixed(0)}K`,
+            value: formatNepaliCurrency(s?.this_month_collected ?? 0),
             icon: Receipt,
             color: "text-blue-600",
             bg: "bg-blue-50",
@@ -203,12 +229,8 @@ function FeeOverviewContent() {
               />
             </div>
             <div className="flex justify-between mt-1.5 text-xs text-muted-foreground">
-              <span>
-                Collected: Rs. {(s?.total_collected ?? 0).toLocaleString()}
-              </span>
-              <span>
-                Expected: Rs. {(s?.total_expected ?? 0).toLocaleString()}
-              </span>
+              <span>Collected: {formatNepaliCurrency(s?.total_collected ?? 0)}</span>
+              <span>Expected: {formatNepaliCurrency(s?.total_expected ?? 0)}</span>
             </div>
           </CardContent>
         </Card>
@@ -256,7 +278,7 @@ function FeeOverviewContent() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-green-700">
-                        Rs. {(p.amount || 0).toLocaleString()}
+                        {formatNepaliCurrency(p.amount || 0)}
                       </p>
                       {p.receipt_number && (
                         <p className="text-[10px] text-muted-foreground">
@@ -296,8 +318,8 @@ function FeeOverviewContent() {
                     <div className="flex justify-between text-xs mb-1">
                       <span className="font-medium">{c.class_name}</span>
                       <span className="text-muted-foreground">
-                        Rs. {(c.collected / 1000).toFixed(0)}K /{" "}
-                        {(c.expected / 1000).toFixed(0)}K
+                        {formatNepaliCurrency(c.collected)} /{" "}
+                        {formatNepaliCurrency(c.expected)}
                       </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
@@ -324,7 +346,7 @@ function FeeOverviewContent() {
                 {s!.overdue_count} students have overdue fees
               </p>
               <p className="text-xs text-red-600">
-                Total overdue: Rs. {s!.total_overdue.toLocaleString()}
+                Total overdue: {formatNepaliCurrency(s!.total_overdue)}
               </p>
             </div>
           </div>

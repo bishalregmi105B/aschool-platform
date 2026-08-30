@@ -14,6 +14,7 @@ class _StudentTransportScreenState
     extends ConsumerState<StudentTransportScreen> {
   List<Map<String, dynamic>> _routes = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,7 +23,10 @@ class _StudentTransportScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/transport/routes', queryParameters: {'per_page': 100});
@@ -33,8 +37,10 @@ class _StudentTransportScreenState
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('StudentTransportScreen load failed: $e\n$st');
       _routes = [];
+      _error = 'Could not load transport routes.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -45,7 +51,9 @@ class _StudentTransportScreenState
       appBar: const CustomAppBar(title: 'Transport'),
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _routes.isEmpty
                   ? ListView(

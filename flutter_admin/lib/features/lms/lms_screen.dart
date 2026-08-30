@@ -16,6 +16,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
   List<Map<String, dynamic>> _courses = [];
   List<Map<String, dynamic>> _liveClasses = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +32,10 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/lms/courses?per_page=20'),
@@ -44,8 +48,12 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
             List<Map<String, dynamic>>.from(results[1].data['data'] ?? []);
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('LmsScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load LMS content.';
+        _loading = false;
+      });
     }
   }
 
@@ -74,14 +82,16 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _buildCourses(),
-                  _buildLiveClasses(),
-                  _buildRecordings(),
-                ],
-              ),
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _buildCourses(),
+                      _buildLiveClasses(),
+                      _buildRecordings(),
+                    ],
+                  ),
       ),
     );
   }
@@ -103,7 +113,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
         itemCount: _courses.length,
         itemBuilder: (context, i) {
           final c = _courses[i];
-          final status = c['status'] as String? ?? 'active';
+          final status = safeStringOrNull(c['status']) ?? 'active';
 
           return ESchoolAnimatedEntry(
             index: i,
@@ -114,7 +124,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
                 leading: CircleAvatar(
                   backgroundColor: ASchoolTheme.primary.withAlpha(20),
                   child: Text(
-                    (c['title'] as String? ?? 'C')
+                    (safeStringOrNull(c['title']) ?? 'C')
                         .substring(0, 1)
                         .toUpperCase(),
                     style: const TextStyle(
@@ -124,7 +134,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
                   ),
                 ),
                 title: Text(
-                  c['title'] as String? ?? '',
+                  safeStringOrNull(c['title']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
@@ -178,7 +188,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
                   ),
                 ),
                 title: Text(
-                  lc['title'] as String? ?? '',
+                  safeStringOrNull(lc['title']) ?? '',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(

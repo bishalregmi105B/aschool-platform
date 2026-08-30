@@ -47,19 +47,19 @@ Compare against typical Nepal school benchmarks."""
     @staticmethod
     def rank_departments(school_id: str) -> list:
         """Rank academic departments by performance."""
-        from app.models.exam import ExamResult
+        from app.models.exam import Marks
         from sqlalchemy import func
         from extensions import db
 
         dept_stats = (
             db.session.query(
-                ExamResult.subject,
-                func.avg(ExamResult.marks_obtained).label("avg_marks"),
-                func.count(ExamResult.id).label("total"),
+                Marks.subject_id,
+                func.avg(Marks.obtained_marks).label("avg_marks"),
+                func.count(Marks.id).label("total"),
             )
             .filter_by(school_id=school_id)
-            .group_by(ExamResult.subject)
-            .order_by(func.avg(ExamResult.marks_obtained).desc())
+            .group_by(Marks.subject_id)
+            .order_by(func.avg(Marks.obtained_marks).desc())
             .all()
         )
 

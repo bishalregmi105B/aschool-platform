@@ -36,6 +36,13 @@ STATICALLY_MOUNTED_MODULES = {
     "app.api.v1.faqs",
     "app.api.v1.db_backup_api",
     "app.api.v1.hostel",
+    "app.api.v1.white_label",
+    "app.api.v1.multi_branch",
+    "app.api.v1.biometric",
+    "app.api.v1.adaptive_learning",
+    "app.api.v1.disaster_management",
+    "app.api.v1.incident_management",
+    "app.api.v1.social_ads",
 }
 
 # Core routes (always available, not plugin-gated)
@@ -116,3 +123,44 @@ api_v1_bp.register_blueprint(db_backup_api_bp)
 # Hostel management — rooms, allocations, occupancy
 from app.api.v1.hostel import hostel_bp
 api_v1_bp.register_blueprint(hostel_bp)
+
+# White-Label Branding — custom domain + branding overrides (premium plugin;
+# routes self-gate via @plugin_required("white_label"))
+from app.api.v1.white_label import white_label_bp
+api_v1_bp.register_blueprint(white_label_bp)
+
+# Multi-Branch Chain — org/branch registry + cross-branch analytics (premium
+# plugin; routes self-gate via @plugin_required("multi_branch"))
+from app.api.v1.multi_branch import multi_branch_bp
+api_v1_bp.register_blueprint(multi_branch_bp)
+
+# Biometric Integration — ZKTeco-style fingerprint device management, keyed
+# punch ingestion, health monitoring (premium plugin; routes self-gate via
+# @plugin_required("biometric"); device endpoints auth via X-Device-Key)
+from app.api.v1.biometric import biometric_bp
+api_v1_bp.register_blueprint(biometric_bp)
+
+# AI Adaptive Learning — per-student learning paths + mastery records
+# (premium plugin; routes self-gate via @plugin_required("ai_adaptive_learning");
+# LLM calls go through AITokenHub with a labeled deterministic fallback)
+from app.api.v1.adaptive_learning import adaptive_learning_bp
+api_v1_bp.register_blueprint(adaptive_learning_bp)
+
+# Social Ads — ad campaign CRUD + honest in-school audience estimates
+# (growth plugin; routes self-gate via @plugin_required("social_ads");
+# no Meta Ads wiring — reach/impressions stay real (0) until delivery exists)
+from app.api.v1.social_ads import social_ads_bp
+api_v1_bp.register_blueprint(social_ads_bp)
+
+# Disaster Management — drills + participation + overview + seismic alerts
+# (premium plugin; premium tier of `emergency`. Routes mount under
+# /emergency to match the frontend calls and self-gate via
+# @plugin_required("disaster_management"); emergency models reused)
+from app.api.v1.disaster_management import disaster_management_bp
+api_v1_bp.register_blueprint(disaster_management_bp)
+
+# Incident Management — assignment/workflow/escalation/analytics on top of
+# the base incidents plugin (growth plugin; routes self-gate via
+# @plugin_required("incident_management"); no base /incidents route duplicated)
+from app.api.v1.incident_management import incident_management_bp
+api_v1_bp.register_blueprint(incident_management_bp)

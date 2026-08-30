@@ -18,6 +18,7 @@ class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
   List<dynamic> _alerts = [];
   Map<String, dynamic>? _summary;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,16 +28,22 @@ class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/teacher/wellbeing');
       final payload = res.data;
       setState(() {
-        _checkins = (payload?['checkins'] as List?) ?? [];
-        _alerts = (payload?['alerts'] as List?) ?? [];
-        _summary = (payload?['summary'] as Map?)?.cast<String, dynamic>();
+        _checkins = safeList(payload?['checkins']);
+        _alerts = safeList(payload?['alerts']);
+        _summary = safeMapOrNull(payload?['summary']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentWellbeingScreen load failed: $e\n$st');
+      _error = 'Could not load wellbeing check-ins.';
+    }
     setState(() => _loading = false);
   }
 
@@ -86,7 +93,9 @@ class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
         appBar: const CustomAppBar(title: 'Student Wellbeing'),
         body: _loading
             ? const LoadingShimmer()
-            : Column(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
                 children: [
                   // Summary
                   if (_summary != null)
@@ -144,7 +153,7 @@ class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
                                 itemBuilder: (context, index) {
                                   final c = _checkins[index];
                                   final mood =
-                                      (c['mood'] as String?) ?? 'neutral';
+                                      safeStringOrNull(c['mood']) ?? 'neutral';
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor:

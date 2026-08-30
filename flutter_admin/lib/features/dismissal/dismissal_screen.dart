@@ -15,6 +15,7 @@ class _DismissalScreenState extends State<DismissalScreen>
   Map<String, dynamic> _summary = {};
   List<Map<String, dynamic>> _recentDismissals = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -30,7 +31,10 @@ class _DismissalScreenState extends State<DismissalScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/dismissal/summary'),
@@ -38,12 +42,13 @@ class _DismissalScreenState extends State<DismissalScreen>
       ]);
       if (!mounted) return;
       setState(() {
-        _summary = Map<String, dynamic>.from(results[0].data['data'] ?? {});
-        _recentDismissals = List<Map<String, dynamic>>.from(
-          results[1].data['data'] ?? [],
-        );
+        _summary = safeMap(envelopeData(results[0].data));
+        _recentDismissals = safeMapList(envelopeData(results[1].data));
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('DismissalScreen load failed: $e\n$st');
+      _error = 'Could not load dismissal data.';
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -68,7 +73,9 @@ class _DismissalScreenState extends State<DismissalScreen>
         ),
         body: _loading
             ? const LoadingShimmer()
-            : TabBarView(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : TabBarView(
                 controller: _tabCtrl,
                 children: [
                   _OverviewTab(summary: _summary),
@@ -93,6 +100,7 @@ class _OverviewTab extends StatelessWidget {
     final pending = summary['pending'] ?? (total - dismissed);
     final percentDismissed =
         total > 0 ? (dismissed / total * 100).toStringAsFixed(1) : '0';
+    final classBreakdown = safeMapList(summary['class_breakdown']);
 
     return RefreshIndicator(
       onRefresh: () async {},
@@ -147,13 +155,11 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // Class-wise breakdown
-          if ((summary['class_breakdown'] as List?)?.isNotEmpty == true) ...[
+          if (classBreakdown.isNotEmpty) ...[
             const Text('By Class',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
-            ...((summary['class_breakdown'] as List)
-                .cast<Map<String, dynamic>>()
-                .map((c) => _ClassBreakdownRow(classData: c))),
+            ...classBreakdown.map((c) => _ClassBreakdownRow(classData: c)),
           ],
         ],
       ),
@@ -262,7 +268,8 @@ class _RecordsTab extends StatelessWidget {
     try {
       final dt = DateTime.parse(iso).toLocal();
       return '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('DismissalScreen _time parse failed: $e');
       return iso;
     }
   }

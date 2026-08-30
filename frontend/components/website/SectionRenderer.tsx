@@ -5,13 +5,15 @@
  * Used by both the website builder editor preview and optionally the public site.
  */
 
+import { useState, type FormEvent } from "react";
+
 import { HeroSlideshow } from "@/components/website/HeroSlideshow";
 import { SchoolStats } from "@/components/website/SchoolStats";
 import { ProgramCards } from "@/components/website/ProgramCards";
 import { PrincipalMessage } from "@/components/website/PrincipalMessage";
 import { AdmissionCTA } from "@/components/website/AdmissionCTA";
 import { Testimonials } from "@/components/website/Testimonials";
-import { sanitizeHtml } from "@/lib/sanitize";
+// import removed
 import type { SchoolSection } from "@/lib/school-website/types";
 
 type C = Record<string, any>;
@@ -21,6 +23,7 @@ const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 export interface LiveData {
   school?: {
+    slug?: string;
     name?: string;
     name_nepali?: string;
     phone?: string;
@@ -144,7 +147,10 @@ function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
           {school?.about_us ? (
             <div
               className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(school?.about_us) }}
+              // about_us is sanitized server-side (app/school/[slug]/page.tsx) before it
+              // crosses the client boundary — importing sanitizeHtml (isomorphic-dompurify →
+              // jsdom) here broke the client bundle and 500-ed every public site render.
+              dangerouslySetInnerHTML={{ __html: str(school?.about_us) }}
             />
           ) : (
             <p className="text-gray-600 leading-relaxed">
@@ -555,8 +561,75 @@ function SlideshowSection({ c }: { c: C }) {
 
 // ─── Contact ─────────────────────────────────────────────────────────────────
 
+/** Live contact form — POSTs to the public contact endpoint. On the website
+ *  builder editor canvas (no school slug in liveData) it renders as an honest
+ *  disabled preview instead of a form that goes nowhere. */
+function ContactFormSection({ slug }: { slug: string }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setSending(true);
+    const fd = new FormData(e.currentTarget);
+    try {
+      const res = await fetch(`/api/v1/website/public/${slug}/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fd.get("name"),
+          phone: fd.get("phone"),
+          email: fd.get("email"),
+          message: fd.get("message"),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to send message");
+      } else {
+        setSent(true);
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="border rounded-lg p-6 text-center" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+        <div className="text-3xl mb-2">✅</div>
+        <p className="font-semibold text-sm">Message Sent!</p>
+        <p className="text-gray-500 text-xs mt-1">Thank you — the school will get back to you soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form className="space-y-3" onSubmit={handleSubmit}>
+      <input name="name" type="text" required placeholder="Your Name" className="w-full border rounded-lg px-4 py-3 text-sm" />
+      <input name="email" type="email" placeholder="Email Address" className="w-full border rounded-lg px-4 py-3 text-sm" />
+      <input name="phone" type="tel" placeholder="Phone (optional)" className="w-full border rounded-lg px-4 py-3 text-sm" />
+      <textarea name="message" required rows={4} placeholder="Your message..." className="w-full border rounded-lg px-4 py-3 text-sm resize-none" />
+      {error && <p className="text-red-600 text-xs">{error}</p>}
+      <button
+        type="submit"
+        disabled={sending}
+        className="w-full py-3 rounded-lg font-semibold text-white disabled:opacity-50"
+        style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
+      >
+        {sending ? "Sending..." : "Send Message"}
+      </button>
+    </form>
+  );
+}
+
 function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const school = liveData?.school;
+  const slug = school?.slug;
   const phone = school?.phone || str(c.phone, "+977-XX-XXXXXXX");
   const email = school?.email || str(c.email, "info@school.edu.np");
   const address = school
@@ -587,13 +660,20 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
               <div><p className="font-semibold text-sm">Email</p><p className="text-sm text-gray-500">{email}</p></div>
             </div>
           </div>
-          <div className="space-y-3">
-            <input type="text" placeholder="Your Name" className="w-full border rounded-lg px-4 py-3 text-sm" readOnly />
-            <input type="email" placeholder="Email Address" className="w-full border rounded-lg px-4 py-3 text-sm" readOnly />
-            <textarea rows={4} placeholder="Your message..." className="w-full border rounded-lg px-4 py-3 text-sm resize-none" readOnly />
-            <button className="w-full py-3 rounded-lg font-semibold text-white" style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}>
-              Send Message
-            </button>
+          <div>
+            {slug ? (
+              <ContactFormSection slug={slug} />
+            ) : (
+              <div className="space-y-3" aria-hidden>
+                <input type="text" placeholder="Your Name" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
+                <input type="email" placeholder="Email Address" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
+                <textarea rows={4} placeholder="Your message..." className="w-full border rounded-lg px-4 py-3 text-sm resize-none bg-gray-50" disabled />
+                <button type="button" disabled className="w-full py-3 rounded-lg font-semibold text-white bg-gray-300 cursor-not-allowed">
+                  Send Message (preview)
+                </button>
+                <p className="text-xs text-gray-400 text-center">Form preview — visitors on your live site can send real messages.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

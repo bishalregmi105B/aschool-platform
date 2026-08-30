@@ -22,9 +22,8 @@ frontend:
     label_nepali: "गृहकार्य"
     icon: "FileText"
     subitems:
+      # Create/Submissions UI lives on the main page — dead links removed.
       - { label: "All Assignments", route: "/assignments" }
-      - { label: "Create", route: "/assignments/create" }
-      - { label: "Submissions", route: "/assignments/submissions" }
     visible_to: ["school_admin", "teacher"]
 
 flutter:

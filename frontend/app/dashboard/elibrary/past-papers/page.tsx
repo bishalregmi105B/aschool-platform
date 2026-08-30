@@ -18,18 +18,42 @@ export default function PastPapersPage() {
 }
 
 function PastPapersContent() {
+  // Radix Select forbids empty-string item values — the old
+  // <SelectItem value="">All …</SelectItem> threw
+  // "A <Select.Item /> must have a value prop that is not an empty string"
+  // and crashed the whole page (React error boundary). Use an "all" sentinel.
   const [search, setSearch] = useState("");
-  const [subject, setSubject] = useState("");
-  const [classFilter, setClassFilter] = useState("");
+  const [subject, setSubject] = useState("all");
+  const [classFilter, setClassFilter] = useState("all");
 
-  const { data, isLoading } = useQuery<any>({
-    queryKey: ["past-papers", search, subject, classFilter],
-    queryFn: async () => { const r = await api.get("/elibrary/past-papers", { params: { search: search || undefined, subject: subject || undefined, class_name: classFilter || undefined } }); return r.data?.data ?? r.data; },
+  // Backend route is GET /elibrary/papers (no query filters) — search/subject
+  // are applied client-side. The old path /elibrary/past-papers was a 404.
+  const { data, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ["past-papers"],
+    queryFn: async () => { const r = await api.get("/elibrary/papers"); return r.data?.data ?? r.data; },
   });
 
-  const papers: any[] = Array.isArray(data) ? data : data?.items ?? [];
+  const allPapers: any[] = Array.isArray(data) ? data : data?.items ?? [];
+  const papers: any[] = allPapers.filter((p) => {
+    if (search && !String(p.title || "").toLowerCase().includes(search.toLowerCase())) return false;
+    if (subject !== "all" && p.subject !== subject) return false;
+    if (classFilter !== "all" && p.class_name !== classFilter) return false;
+    return true;
+  });
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3"><BookOpen className="h-6 w-6 text-blue-600" /><div><h1 className="text-2xl font-bold">Past Papers</h1><p className="text-muted-foreground">Previous exam papers and answer sheets</p></div></div>
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load past papers. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -42,7 +66,7 @@ function PastPapersContent() {
         <Select value={subject} onValueChange={setSubject}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Subject" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="all">All Subjects</SelectItem>
             <SelectItem value="Mathematics">Mathematics</SelectItem>
             <SelectItem value="Science">Science</SelectItem>
             <SelectItem value="English">English</SelectItem>
@@ -53,7 +77,7 @@ function PastPapersContent() {
         <Select value={classFilter} onValueChange={setClassFilter}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Class" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Classes</SelectItem>
+            <SelectItem value="all">All Classes</SelectItem>
             {["1","2","3","4","5","6","7","8","9","10","11","12"].map((c) => <SelectItem key={c} value={`Class ${c}`}>Class {c}</SelectItem>)}
           </SelectContent>
         </Select>

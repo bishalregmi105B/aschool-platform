@@ -3,14 +3,14 @@ import { displayBS } from "@/lib/nepali_date";
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, { next: { revalidate: 300 } });
+  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, { next: { revalidate: 300, tags: [`school-${slug}`] } });
   if (!res.ok) return null;
   return (await res.json()).data;
 }
 
 async function getNews(slug: string) {
   try {
-    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}/news`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}/news`, { next: { revalidate: 300, tags: [`school-${slug}`] } });
     if (!res.ok) return [];
     return (await res.json()).data?.articles || [];
   } catch { return []; }

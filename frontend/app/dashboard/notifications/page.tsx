@@ -21,9 +21,11 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeCategory, setActiveCategory] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadNotifications = useCallback(async (category?: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const params: Record<string, unknown> = { per_page: 100 };
       if (category) params.category = category;
@@ -32,7 +34,9 @@ export default function NotificationsPage() {
       const count = await fetchUnreadCount();
       setUnreadCount(count);
     } catch {
-      // Handle error silently
+      // Show an explicit error state — never render an empty list as if
+      // the user simply has no notifications.
+      setError("Could not load notifications. Please try again.");
     }
     setIsLoading(false);
   }, []);
@@ -122,6 +126,14 @@ export default function NotificationsPage() {
             </Card>
           ))}
         </div>
+      ) : error ? (
+        <Card className="py-12 text-center border-destructive/30">
+          <Bell className="h-12 w-12 mx-auto mb-3 text-destructive/40" />
+          <p className="text-destructive mb-4">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => loadNotifications(activeCategory || undefined)}>
+            Retry
+          </Button>
+        </Card>
       ) : notifications.length === 0 ? (
         <Card className="py-16 text-center">
           <Bell className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />

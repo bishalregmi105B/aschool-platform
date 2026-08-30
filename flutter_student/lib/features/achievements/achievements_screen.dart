@@ -15,6 +15,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   late TabController _tabController;
   Map<String, dynamic>? _data;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -24,16 +25,22 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/achievements');
       final payload = res.data;
       setState(() {
         _data = payload is Map<String, dynamic>
-            ? (payload['data'] as Map?)?.cast<String, dynamic>() ?? payload
+            ? safeMapOrNull(payload['data']) ?? payload
             : null;
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('AchievementsScreen load failed: $e\n$st');
+      _error = 'Could not load your achievements.';
+    }
     setState(() => _loading = false);
   }
 
@@ -51,7 +58,11 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
       pluginSlug: 'student_portfolio',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Achievements'),
-        body: Column(
+        body: _loading
+            ? const LoadingShimmer()
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
           children: [
             // Points summary
             if (_data != null)
@@ -83,7 +94,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
                     Container(width: 1, height: 40, color: Colors.white24),
                     _PointsStat(
                       label: 'Badges',
-                      value: '${(_data?['badges'] as List?)?.length ?? 0}',
+                      value: '${safeList(_data?['badges']).length}',
                       icon: Icons.military_tech,
                     ),
                   ],
@@ -118,8 +129,8 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   }
 
   Widget _buildBadges() {
-    final badges = (_data?['badges'] as List?) ?? [];
-    final lockedBadges = (_data?['locked_badges'] as List?) ?? [];
+    final badges = safeList(_data?['badges']);
+    final lockedBadges = safeList(_data?['locked_badges']);
 
     if (badges.isEmpty && lockedBadges.isEmpty) {
       return const Center(child: Text('No badges yet. Keep going! 💪'));
@@ -177,7 +188,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   }
 
   Widget _buildLeaderboard() {
-    final leaderboard = (_data?['leaderboard'] as List?) ?? [];
+    final leaderboard = safeList(_data?['leaderboard']);
 
     if (leaderboard.isEmpty) {
       return const NoDataContainer(
@@ -245,7 +256,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   }
 
   Widget _buildHistory() {
-    final history = (_data?['history'] as List?) ?? [];
+    final history = safeList(_data?['history']);
 
     if (history.isEmpty) {
       return const NoDataContainer(
@@ -262,7 +273,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
         itemCount: history.length,
         itemBuilder: (context, index) {
           final item = history[index];
-          final points = (item['points'] as int?) ?? 0;
+          final points = safeIntOrNull(item['points']) ?? 0;
           final positive = points >= 0;
 
           return Card(

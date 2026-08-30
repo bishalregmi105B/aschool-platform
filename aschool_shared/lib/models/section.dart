@@ -1,4 +1,6 @@
 /// Section model — maps to backend Section (sections table)
+import '../utils/safe_parse.dart';
+
 class Section {
   final String id;
   final String name;
@@ -18,12 +20,12 @@ class Section {
 
   factory Section.fromJson(Map<String, dynamic> json) {
     return Section(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      nameNepali: json['name_nepali'] as String?,
-      classId: json['class_id'] as String? ?? '',
-      capacity: json['capacity'] as int?,
-      classTeacherId: json['class_teacher_id'] as String?,
+      id: safeString(json['id']),
+      name: safeString(json['name']),
+      nameNepali: safeStringOrNull(json['name_nepali']),
+      classId: safeString(json['class_id']),
+      capacity: safeIntOrNull(json['capacity']),
+      classTeacherId: safeStringOrNull(json['class_teacher_id']),
     );
   }
 

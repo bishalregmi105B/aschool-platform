@@ -4,6 +4,8 @@ from flask_jwt_extended import jwt_required
 
 from app.extensions import db
 from app.models.hostel import Hostel, HostelRoom, HostelAllocation
+from app.models.student import Student
+from app.plugins.decorators import plugin_required
 from app.utils.response import success_response, created_response, no_content_response, error_response
 from app.utils.decorators import school_required, role_required
 
@@ -45,9 +47,14 @@ def _room_dict(r: HostelRoom) -> dict:
 
 def _alloc_dict(a: HostelAllocation) -> dict:
     student = a.student
+    room = a.room
     return {
         "id": str(a.id),
         "room_id": str(a.room_id),
+        "room_number": room.room_number if room else None,
+        "hostel_id": str(room.hostel_id) if room else None,
+        "hostel_name": room.hostel.name if room and room.hostel else None,
+        "monthly_fee": float(room.monthly_fee) if room and room.monthly_fee else 0,
         "student_id": str(a.student_id),
         "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
         "student_roll": getattr(student, "roll_number", None) if student else None,
@@ -63,6 +70,7 @@ def _alloc_dict(a: HostelAllocation) -> dict:
 @hostel_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 def list_hostels():
     """List all hostels for the school."""
     hostels = Hostel.query.filter_by(school_id=g.school_id, is_deleted=False).all()
@@ -72,6 +80,7 @@ def list_hostels():
 @hostel_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def create_hostel():
     data = request.get_json() or {}
@@ -94,6 +103,7 @@ def create_hostel():
 @hostel_bp.route("/<uuid:hostel_id>", methods=["PUT"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def update_hostel(hostel_id):
     hostel = Hostel.query.filter_by(id=hostel_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -108,6 +118,7 @@ def update_hostel(hostel_id):
 @hostel_bp.route("/<uuid:hostel_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def delete_hostel(hostel_id):
     hostel = Hostel.query.filter_by(id=hostel_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -120,6 +131,7 @@ def delete_hostel(hostel_id):
 @hostel_bp.route("/rooms", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 def list_rooms():
     """List all rooms, optionally filtered by hostel."""
     hostel_id = request.args.get("hostel_id")
@@ -133,6 +145,7 @@ def list_rooms():
 @hostel_bp.route("/rooms", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def create_room():
     data = request.get_json() or {}
@@ -157,6 +170,7 @@ def create_room():
 @hostel_bp.route("/rooms/<uuid:room_id>", methods=["PUT"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def update_room(room_id):
     room = HostelRoom.query.filter_by(id=room_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -171,6 +185,7 @@ def update_room(room_id):
 @hostel_bp.route("/rooms/<uuid:room_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def delete_room(room_id):
     room = HostelRoom.query.filter_by(id=room_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -183,6 +198,7 @@ def delete_room(room_id):
 @hostel_bp.route("/allocations", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 def list_allocations():
     """List all active hostel allocations."""
     status = request.args.get("status", "active")
@@ -199,6 +215,7 @@ def list_allocations():
 @hostel_bp.route("/allocations", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def create_allocation():
     """Allocate a student to a room."""
@@ -208,22 +225,31 @@ def create_allocation():
             return error_response(f"{req_field} is required", 422)
 
     room = HostelRoom.query.filter_by(id=data["room_id"], school_id=g.school_id, is_deleted=False).first_or_404()
+
+    student = Student.query.filter_by(id=data["student_id"], school_id=g.school_id).first()
+    if not student:
+        return error_response("student_id does not match a student at this school", 400)
+
     if room.is_full:
         return error_response("Room is full — no available beds", 422)
 
-    # Check for existing active allocation for this student
+    # Check for existing active allocation for this student (school-scoped)
     existing = HostelAllocation.query.filter_by(
-        student_id=data["student_id"], status="active", is_deleted=False
+        school_id=g.school_id, student_id=data["student_id"], status="active", is_deleted=False
     ).first()
     if existing:
         return error_response("Student is already allocated to a hostel room", 422)
 
     from datetime import date
+    try:
+        check_in = date.fromisoformat(str(data["check_in_date"])[:10])
+    except (TypeError, ValueError):
+        return error_response("check_in_date must be an ISO date (YYYY-MM-DD)", 400)
     alloc = HostelAllocation(
         school_id=g.school_id,
         room_id=data["room_id"],
         student_id=data["student_id"],
-        check_in_date=date.fromisoformat(data["check_in_date"]),
+        check_in_date=check_in,
         notes=data.get("notes"),
         status="active",
     )
@@ -235,14 +261,19 @@ def create_allocation():
 @hostel_bp.route("/allocations/<uuid:alloc_id>/checkout", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 @role_required("school_admin")
 def checkout_allocation(alloc_id):
     """Mark a student as checked out from hostel."""
     alloc = HostelAllocation.query.filter_by(id=alloc_id, school_id=g.school_id, is_deleted=False).first_or_404()
     data = request.get_json() or {}
     from datetime import date
+    try:
+        check_out = date.fromisoformat(str(data.get("check_out_date") or date.today().isoformat())[:10])
+    except (TypeError, ValueError):
+        return error_response("check_out_date must be an ISO date (YYYY-MM-DD)", 400)
     alloc.status = "checked_out"
-    alloc.check_out_date = date.fromisoformat(data.get("check_out_date", date.today().isoformat()))
+    alloc.check_out_date = check_out
     alloc.notes = data.get("notes", alloc.notes)
     db.session.commit()
     return success_response(_alloc_dict(alloc))
@@ -252,6 +283,7 @@ def checkout_allocation(alloc_id):
 @hostel_bp.route("/summary", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("hostel")
 def hostel_summary():
     """Return occupancy summary for all hostels."""
     hostels = Hostel.query.filter_by(school_id=g.school_id, is_deleted=False, is_active=True).all()

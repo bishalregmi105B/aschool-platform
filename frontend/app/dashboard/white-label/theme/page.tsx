@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
@@ -9,7 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Palette, Save } from "lucide-react";
+import { AlertCircle, Palette, Save } from "lucide-react";
+
+const DEFAULT_FORM = {
+  mode: "light",
+  sidebar_style: "default",
+  card_style: "rounded",
+  density: "comfortable",
+  accent_color: "#2563EB",
+  sidebar_color: "#1e293b",
+  sidebar_text_color: "#f8fafc",
+};
 
 export default function ThemePage() {
   return <PluginGate slug="white_label"><ThemeContent /></PluginGate>;
@@ -19,31 +29,47 @@ function ThemeContent() {
   const qc = useQueryClient();
   const [form, setForm] = useState<any>(null);
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["white-label-theme"],
     queryFn: async () => { const r = await api.get("/schools/white-label/theme"); return r.data?.data ?? r.data; },
-    onSuccess: (d: any) => {
-      if (form === null) {
-        setForm({
-          mode: d?.mode ?? "light",
-          sidebar_style: d?.sidebar_style ?? "default",
-          card_style: d?.card_style ?? "rounded",
-          density: d?.density ?? "comfortable",
-          accent_color: d?.accent_color ?? "#2563EB",
-          sidebar_color: d?.sidebar_color ?? "#1e293b",
-          sidebar_text_color: d?.sidebar_text_color ?? "#f8fafc",
-        });
-      }
-    },
-  } as any);
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (data && form === null) {
+      setForm({
+        mode: data?.mode ?? DEFAULT_FORM.mode,
+        sidebar_style: data?.sidebar_style ?? DEFAULT_FORM.sidebar_style,
+        card_style: data?.card_style ?? DEFAULT_FORM.card_style,
+        density: data?.density ?? DEFAULT_FORM.density,
+        accent_color: data?.accent_color ?? DEFAULT_FORM.accent_color,
+        sidebar_color: data?.sidebar_color ?? DEFAULT_FORM.sidebar_color,
+        sidebar_text_color: data?.sidebar_text_color ?? DEFAULT_FORM.sidebar_text_color,
+      });
+    }
+  }, [data, form]);
 
   const save = useMutation({
     mutationFn: async () => (await api.patch("/schools/white-label/theme", form)).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["white-label-theme"] }); toast.success("Theme saved"); },
-    onError: () => toast.error("Failed to save theme"),
+    onError: (err: any) => toast.error(err?.response?.data?.error || "Failed to save theme"),
   });
 
-  if (isLoading || !form) return <PageLoader />;
+  if (isLoading || (isError && !form)) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card className="border-destructive/40">
+        <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">Failed to load theme settings. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!form) return <PageLoader />;
 
   const ColorField = ({ label, field }: { label: string; field: string }) => (
     <div className="space-y-2">

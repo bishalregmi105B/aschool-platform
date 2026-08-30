@@ -12,6 +12,7 @@ class DiaryWriteScreen extends ConsumerStatefulWidget {
 class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
   List<Map<String, dynamic>> _entries = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/communications/diary', queryParameters: {'per_page': 100});
@@ -31,8 +35,10 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('DiaryWriteScreen load failed: $e\n$st');
       _entries = [];
+      _error = 'Could not load diary entries.';
     }
     if (mounted) {
       setState(() => _loading = false);
@@ -44,7 +50,9 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
     return Scaffold(
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _entries.isEmpty
                   ? ListView(

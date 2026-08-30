@@ -7,6 +7,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, BarChart3, Award } from "lucide-react";
 
@@ -17,12 +18,23 @@ export default function ChainAnalyticsPage() {
 function ChainAnalyticsContent() {
   const [period, setPeriod] = useState("this_year");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["chain-analytics", period],
     queryFn: async () => { const r = await api.get("/schools/chain/analytics", { params: { period } }); return r.data?.data ?? r.data; },
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load multi-branch analytics. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const rankings: any[] = data?.branch_rankings ?? [];
   const metrics: any[] = data?.metrics ?? [];

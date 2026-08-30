@@ -8,6 +8,40 @@ logger = logging.getLogger(__name__)
 class MoEReportService:
     """Generate Ministry of Education Flash Reports and EMIS data."""
 
+    # Header row of the per-class enrollment table in the Nepal EMIS CSV format.
+    EMIS_CSV_HEADER = [
+        "Class", "Grade", "Total", "Male", "Female", "Other",
+        "Dalit", "Janajati", "Disabled",
+    ]
+
+    @staticmethod
+    def build_emis_csv(enrollment_rows: list) -> bytes:
+        """Serialize per-class enrollment rows into EMIS CSV bytes.
+
+        Each row dict is expected to carry the keys produced by
+        tasks.report_generation.export_emis_data: class_name, grade,
+        total_students, male, female, other, dalit, janajati, disabled.
+        """
+        import csv
+        import io
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(MoEReportService.EMIS_CSV_HEADER)
+        for row in enrollment_rows:
+            writer.writerow([
+                row.get("class_name", ""),
+                row.get("grade", ""),
+                row.get("total_students", 0),
+                row.get("male", 0),
+                row.get("female", 0),
+                row.get("other", 0),
+                row.get("dalit", 0),
+                row.get("janajati", 0),
+                row.get("disabled", 0),
+            ])
+        return buf.getvalue().encode("utf-8")
+
     @staticmethod
     def generate_flash_report(school_id: str, report_type: str = "flash_1") -> dict:
         """Generate MoE Flash Report I or II."""

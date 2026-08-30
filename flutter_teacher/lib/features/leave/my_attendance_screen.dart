@@ -12,6 +12,7 @@ class MyAttendanceScreen extends ConsumerStatefulWidget {
 class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
   List<Map<String, dynamic>> _records = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -20,7 +21,10 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance
           .get('/attendance/me', queryParameters: {'per_page': 60});
@@ -31,8 +35,10 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e) {
+      debugPrint('MyAttendanceScreen load failed: $e');
       _records = [];
+      _error = 'Could not load your attendance records.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -46,13 +52,15 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
               onRefresh: _load,
               child: _records.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
+                      children: [
+                        const SizedBox(height: 120),
                         NoDataContainer(
-                          title: 'No attendance records found',
-                          subtitle:
+                          title: _error ?? 'No attendance records found',
+                          subtitle: _error ??
                               'Your recent attendance logs will appear here.',
-                          icon: Icons.fingerprint_outlined,
+                          icon: _error != null
+                              ? Icons.cloud_off_outlined
+                              : Icons.fingerprint_outlined,
                         ),
                       ],
                     )

@@ -57,6 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           onLoginSuccess: () => context.go('/dashboard'),
         ),
       ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationCenterScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (_, __, navigationShell) =>
             ParentShellScreen(navigationShell: navigationShell),

@@ -14,8 +14,8 @@ final lessonTopicsProvider = FutureProvider.autoDispose
   final resp = await ApiClient.instance
       .get('/lms/topics?lesson_id=$lessonId');
   if (resp.data['success'] == true) {
-    return (resp.data['data'] as List)
-        .map((e) => Topic.fromJson(Map<String, dynamic>.from(e)))
+    return envelopeRows(resp.data, source: 'lessonTopicsProvider')
+        .map(Topic.fromJson)
         .toList();
   }
   return [];
@@ -26,8 +26,8 @@ final lessonMaterialsProvider = FutureProvider.autoDispose
   final resp = await ApiClient.instance
       .get('/lms/materials?lesson_id=$lessonId');
   if (resp.data['success'] == true) {
-    return (resp.data['data'] as List)
-        .map((e) => StudyMaterial.fromJson(Map<String, dynamic>.from(e)))
+    return envelopeRows(resp.data, source: 'lessonMaterialsProvider')
+        .map(StudyMaterial.fromJson)
         .toList();
   }
   return [];
@@ -89,7 +89,8 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen>
               backgroundColor: Colors.green),
         );
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('LessonDetailScreen uploadMaterial failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -354,7 +355,9 @@ class _MaterialTile extends StatelessWidget {
             try {
               // ignore: deprecated_member_use
               // Using url_launcher to open file
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('LessonDetailScreen open(${uri.path}) failed: $e');
+            }
           },
         ),
       ),
@@ -424,7 +427,8 @@ class _AddTopicSheetState extends State<_AddTopicSheet> {
         'description': _descCtrl.text.trim(),
       });
       widget.onSuccess();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('LessonDetailScreen addTopic failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

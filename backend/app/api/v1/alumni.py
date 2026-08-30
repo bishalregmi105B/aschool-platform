@@ -3,8 +3,10 @@ from datetime import datetime
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
+from sqlalchemy import distinct, func, or_
 
 from app.models.alumni import Alumni, AlumniDonation, AlumniEvent
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -28,8 +30,36 @@ def list_alumni():
         query = query.filter_by(batch=batch)
     if request.args.get("mentors_only"):
         query = query.filter_by(is_mentor=True)
+    # The web directory's search box sends ?search= — filter name/email/org.
+    search = (request.args.get("search") or "").strip()
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(
+                Alumni.first_name.ilike(like),
+                Alumni.last_name.ilike(like),
+                Alumni.email.ilike(like),
+                Alumni.current_organization.ilike(like),
+            )
+        )
     items, meta = paginate(query.order_by(Alumni.graduation_year.desc(), Alumni.first_name))
-    return success_response([_alumni_dict(a) for a in items], meta={"pagination": meta})
+    # Directory stat cards (web reads data.meta.stats; falls back to list length).
+    base = Alumni.query.filter_by(school_id=g.school_id, is_deleted=False)
+    current_year = datetime.now().year
+    stats = {
+        "total": base.count(),
+        "this_year": base.filter(
+            Alumni.graduation_year.in_([str(current_year), str(current_year - 1)])
+        ).count(),
+        # "Active Network" card: mentors are the engaged/active members.
+        "active": base.filter_by(is_mentor=True).count(),
+        "organizations": base.filter(Alumni.current_organization.isnot(None)).with_entities(
+            func.count(distinct(Alumni.current_organization))
+        ).scalar(),
+    }
+    return success_response(
+        [_alumni_dict(a) for a in items], meta={"pagination": meta, "stats": stats}
+    )
 
 
 @alumni_bp.route("", methods=["POST"])
@@ -39,6 +69,12 @@ def list_alumni():
 @role_required("superadmin", "school_admin")
 def create_alumni():
     data = request.get_json(silent=True) or {}
+    if not (data.get("first_name") or "").strip() or not (data.get("last_name") or "").strip():
+        return error_response("first_name and last_name are required", 400)
+    if data.get("student_id") and not Student.query.filter_by(
+        id=data["student_id"], school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("student_id does not match a student at this school", 400)
     alum = Alumni(school_id=g.school_id)
     for key in ("student_id", "first_name", "last_name", "email", "phone",
                 "graduation_year", "batch", "current_organization", "designation",
@@ -113,13 +149,18 @@ def list_events():
 @role_required("superadmin", "school_admin")
 def create_event():
     data = request.get_json(silent=True) or {}
+    if not (data.get("title") or "").strip():
+        return error_response("title is required", 400)
+    event_date = _parse_datetime(data.get("event_date"))
+    if not event_date:
+        return error_response("event_date is required (ISO format)", 400)
     claims = get_jwt()
     event = AlumniEvent(school_id=g.school_id, created_by_id=claims.get("sub"))
     for key in ("title", "description", "location", "event_type",
                 "max_attendees", "registration_open"):
         if key in data:
             setattr(event, key, data[key])
-    event.event_date = _parse_datetime(data.get("event_date"))
+    event.event_date = event_date
     db.session.add(event)
     db.session.commit()
     return created_response(_event_dict(event))
@@ -142,7 +183,10 @@ def update_event(event_id):
         if key in data:
             setattr(event, key, data[key])
     if "event_date" in data:
-        event.event_date = _parse_datetime(data.get("event_date"))
+        parsed = _parse_datetime(data.get("event_date"))
+        if not parsed:
+            return error_response("event_date must use ISO format", 400)
+        event.event_date = parsed
     db.session.commit()
     return success_response(_event_dict(event))
 
@@ -171,6 +215,16 @@ def list_donations():
 @role_required("superadmin", "school_admin", "accountant")
 def create_donation():
     data = request.get_json(silent=True) or {}
+    if not data.get("alumni_id") or not Alumni.query.filter_by(
+        id=data["alumni_id"], school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("alumni_id does not match an alumni record at this school", 400)
+    try:
+        amount = float(data.get("amount"))
+    except (TypeError, ValueError):
+        amount = 0
+    if amount <= 0:
+        return error_response("amount must be a positive number", 400)
     donation = AlumniDonation(school_id=g.school_id)
     for key in ("alumni_id", "amount", "currency", "purpose", "payment_method",
                 "transaction_ref", "receipt_url", "status"):

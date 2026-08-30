@@ -1,4 +1,10 @@
 /// Plugin manifest model — represents an installed/available plugin
+import '../utils/safe_parse.dart';
+
+/// Coerce a JSON price (int, double — backend serializes via float() —
+/// numeric string, null) to int without throwing.
+int _priceToInt(dynamic v) => safeInt(v);
+
 class PluginManifest {
   final String slug;
   final String name;
@@ -26,16 +32,16 @@ class PluginManifest {
 
   factory PluginManifest.fromJson(Map<String, dynamic> json) {
     return PluginManifest(
-      slug: json['slug'] as String,
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
-      tier: json['tier'] as String? ?? 'free',
-      priceMonthly: json['price_monthly'] as int? ?? 0,
-      priceYearly: json['price_yearly'] as int? ?? 0,
-      icon: json['icon'] as String?,
-      category: json['category'] as String?,
-      isInstalled: json['is_installed'] as bool? ?? false,
-      config: json['config'] as Map<String, dynamic>?,
+      slug: safeString(json['slug']),
+      name: safeString(json['name']),
+      description: safeStringOrNull(json['description']),
+      tier: safeString(json['tier'], fallback: 'free'),
+      priceMonthly: _priceToInt(json['price_monthly']),
+      priceYearly: _priceToInt(json['price_yearly']),
+      icon: safeStringOrNull(json['icon']),
+      category: safeStringOrNull(json['category']),
+      isInstalled: safeBool(json['is_installed']),
+      config: safeMapOrNull(json['config']),
     );
   }
 
@@ -63,6 +69,12 @@ class InstalledPlugin {
   final DateTime? installedAt;
   final DateTime? expiresAt;
 
+  /// Per-school plugin configuration as stored on SchoolPlugin.config
+  /// (backend: GET /plugins/installed returns `config` per row; admins edit
+  /// it via PUT /plugins/<slug>/config, e.g. the `last_payment` audit trail
+  /// written on subscribe). Null when the API didn't include one.
+  final Map<String, dynamic>? config;
+
   const InstalledPlugin({
     required this.slug,
     required this.name,
@@ -71,23 +83,19 @@ class InstalledPlugin {
     this.isActive = true,
     this.installedAt,
     this.expiresAt,
+    this.config,
   });
 
   factory InstalledPlugin.fromJson(Map<String, dynamic> json) {
     return InstalledPlugin(
-      slug: json['slug'] as String? ?? json['plugin_slug'] as String? ?? '',
-      name: json['name'] as String? ?? json['plugin_slug'] as String? ?? '',
-      category: json['category'] as String?,
-      tier: json['tier'] as String? ?? 'free',
-      isActive: json['is_active'] as bool? ?? json['active'] as bool? ?? true,
-      installedAt: json['installed_at'] != null
-          ? DateTime.tryParse(json['installed_at'] as String)
-          : null,
-      expiresAt: json['expires_at'] != null
-          ? DateTime.tryParse(json['expires_at'] as String)
-          : json['trial_ends_at'] != null
-              ? DateTime.tryParse(json['trial_ends_at'] as String)
-              : null,
+      slug: safeString(json['slug'] ?? json['plugin_slug']),
+      name: safeString(json['name'] ?? json['plugin_slug']),
+      category: safeStringOrNull(json['category']),
+      tier: safeString(json['tier'], fallback: 'free'),
+      isActive: safeBool(json['is_active'] ?? json['active'], fallback: true),
+      installedAt: safeDateTime(json['installed_at']),
+      expiresAt: safeDateTime(json['expires_at'] ?? json['trial_ends_at']),
+      config: safeMapOrNull(json['config']),
     );
   }
 
@@ -99,5 +107,6 @@ class InstalledPlugin {
         'is_active': isActive,
         'installed_at': installedAt?.toIso8601String(),
         'expires_at': expiresAt?.toIso8601String(),
+        'config': config,
       };
 }

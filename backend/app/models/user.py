@@ -60,6 +60,10 @@ class User(BaseModel):
     failed_login_count = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime, nullable=True)  # UTC; None means not locked
 
+    # Tokens issued before this UTC timestamp are rejected by the blocklist
+    # loader (logout-all / password change). None means no global invalidation.
+    tokens_invalid_before = Column(DateTime, nullable=True)
+
     # Push notifications
     fcm_tokens = Column(ARRAY(Text))
 

@@ -1,18 +1,16 @@
-"""AI Lesson Plan Generator."""
+"""AI Lesson Plan Generator.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 
 import json
-from flask import current_app
+
+from app.services.ai.token_hub import AITokenHub
 
 
 class LessonPlanService:
     """Generate lesson plans aligned with Nepal's CDC curriculum."""
-
-    MODEL = "claude-sonnet-4-20250514"
-
-    @staticmethod
-    def _get_client():
-        import anthropic
-        return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
 
     @classmethod
     def generate_lesson_plan(
@@ -24,8 +22,14 @@ class LessonPlanService:
         learning_objectives: list[str] | None = None,
         teaching_method: str = "interactive",
         language: str = "english",
+        school_id=None,
+        user_id=None,
     ) -> dict:
-        """Generate a structured lesson plan."""
+        """Generate a structured lesson plan.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
+        """
 
         prompt = f"""Create a detailed lesson plan for a school in Nepal:
 
@@ -68,15 +72,19 @@ Return JSON:
 
 Align with Nepal's CDC curriculum framework. Include practical, locally relevant examples."""
 
-        client = cls._get_client()
-        response = client.messages.create(
-            model=cls.MODEL,
-            max_tokens=2048,
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="lesson-plan:generate",
             messages=[{"role": "user", "content": prompt}],
-        )
+            model="smart",  # quality tier (sonnet-class model via hub routing)
+            max_tokens=2048,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"subject": subject, "grade": grade, "language": language},
+        )["text"]
 
         try:
-            text = response.content[0].text
             start = text.index("{")
             end = text.rindex("}") + 1
             return json.loads(text[start:end])

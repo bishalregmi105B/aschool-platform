@@ -29,12 +29,14 @@ interface SmsTemplate {
 }
 
 interface SmsLog {
+  // Matches GET /sms/history serializer: one row per recipient phone.
   id: string;
-  to: string[];
+  to_phone: string;
   message: string;
-  status: "sent" | "failed" | "pending";
-  sent_count: number;
-  failed_count: number;
+  status: "sent" | "failed" | "queued";
+  provider?: string;
+  cost?: number;
+  sent_at?: string | null;
   created_at: string;
 }
 
@@ -394,7 +396,7 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : templates && templates.length > 0 ? (
-        <div className="border rounded-xl overflow-hidden">
+        <div className="border rounded-xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
@@ -466,13 +468,13 @@ function HistoryTab() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : data && data.length > 0 ? (
-        <div className="border rounded-xl overflow-hidden">
+        <div className="border rounded-xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Date</th>
                 <th className="text-left px-4 py-3 font-medium">Message</th>
-                <th className="text-left px-4 py-3 font-medium">Recipients</th>
+                <th className="text-left px-4 py-3 font-medium">Recipient</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
@@ -487,7 +489,7 @@ function HistoryTab() {
                   </td>
                   <td className="px-4 py-3 max-w-xs truncate">{log.message}</td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {log.sent_count + log.failed_count}
+                    {log.to_phone}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={log.status} />
@@ -508,17 +510,21 @@ function HistoryTab() {
   );
 }
 
-function StatusBadge({ status }: { status: "sent" | "failed" | "pending" }) {
-  const config = {
+function StatusBadge({ status }: { status: SmsLog["status"] }) {
+  // "queued" is the state every /sms/send row starts in (Celery flips it to
+  // sent/failed) — a missing entry here crashed the whole history table.
+  const config: Record<string, { label: string; cls: string }> = {
     sent: { label: "Sent", cls: "bg-green-100 text-green-700" },
     failed: { label: "Failed", cls: "bg-red-100 text-red-700" },
+    queued: { label: "Queued", cls: "bg-yellow-100 text-yellow-700" },
     pending: { label: "Pending", cls: "bg-yellow-100 text-yellow-700" },
-  }[status];
+  };
+  const badge = config[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.cls}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}
     >
-      {config.label}
+      {badge.label}
     </span>
   );
 }

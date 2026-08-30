@@ -199,10 +199,10 @@ class _ExamResultCard extends StatelessWidget {
                     ...result.subjects.asMap().entries.map((entry) {
                       final i = entry.key;
                       final sub = entry.value;
-                      final got = (sub['obtained'] as num?) ??
-                          (sub['obtained_marks'] as num?) ??
+                      final got = safeNumOrNull(sub['obtained']) ??
+                          safeNumOrNull(sub['obtained_marks']) ??
                           0;
-                      final full = (sub['full_marks'] as num?) ?? 100;
+                      final full = safeNumOrNull(sub['full_marks']) ?? 100;
                       final pct = full > 0 ? (got / full * 100) : 0;
                       final failed = pct < 40;
                       final grade = sub['grade']?.toString() ?? 'N/A';

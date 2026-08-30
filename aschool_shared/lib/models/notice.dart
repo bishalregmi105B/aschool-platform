@@ -1,4 +1,5 @@
 /// Communication & UI Models
+import '../utils/safe_parse.dart';
 
 class Notice {
   final String id;
@@ -21,13 +22,14 @@ class Notice {
 
   factory Notice.fromJson(Map<String, dynamic> json) {
     return Notice(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      content: json['content'] as String? ?? '',
-      date: json['date'] as String? ?? json['created_at'] as String? ?? '',
-      type: json['type'] as String?,
-      fileUrl: json['file_url'] as String?,
-      targetRoles: (json['target_roles'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      id: safeString(json['id']),
+      title: safeString(json['title']),
+      content: safeString(json['content']),
+      date:
+          safeString(json['date'], fallback: safeString(json['created_at'])),
+      type: safeStringOrNull(json['type']),
+      fileUrl: safeStringOrNull(json['file_url']),
+      targetRoles: safeStringList(json['target_roles']),
     );
   }
 }
@@ -57,15 +59,16 @@ class Announcement {
 
   factory Announcement.fromJson(Map<String, dynamic> json) {
     return Announcement(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      message: json['message'] as String? ?? json['description'] as String? ?? '',
-      classId: json['class_id']?.toString(),
-      sectionId: json['section_id']?.toString(),
-      fileUrl: json['file_url'] as String?,
-      createdById: json['created_by_id']?.toString(),
-      createdByName: json['created_by_name'] as String?,
-      createdAt: json['created_at'] as String? ?? '',
+      id: safeString(json['id']),
+      title: safeString(json['title']),
+      message: safeString(json['message'],
+          fallback: safeString(json['description'])),
+      classId: safeStringOrNull(json['class_id']),
+      sectionId: safeStringOrNull(json['section_id']),
+      fileUrl: safeStringOrNull(json['file_url']),
+      createdById: safeStringOrNull(json['created_by_id']),
+      createdByName: safeStringOrNull(json['created_by_name']),
+      createdAt: safeString(json['created_at']),
     );
   }
 }
@@ -87,11 +90,12 @@ class SliderBanner {
 
   factory SliderBanner.fromJson(Map<String, dynamic> json) {
     return SliderBanner(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      imageUrl: json['image_url'] as String? ?? json['image'] as String? ?? '',
-      linkUrl: json['link_url'] as String?,
-      isActive: json['is_active'] as bool? ?? true,
+      id: safeString(json['id']),
+      title: safeString(json['title']),
+      imageUrl: safeString(json['image_url'],
+          fallback: safeString(json['image'])),
+      linkUrl: safeStringOrNull(json['link_url']),
+      isActive: safeBool(json['is_active'], fallback: true),
     );
   }
 }

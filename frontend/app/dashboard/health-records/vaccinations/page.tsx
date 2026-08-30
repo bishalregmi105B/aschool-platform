@@ -24,11 +24,12 @@ export default function VaccinationsPage() {
 function VaccinationsContent() {
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ student_id: "", vaccine_name: "", dose_number: "1", administered_date: "", administered_by: "", next_due_date: "" });
+  const [form, setForm] = useState({ student_id: "", vaccine_name: "", dose_number: "1", date_administered: "", administered_by: "", next_due_date: "" });
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["health-immunizations"],
     queryFn: async () => (await api.get("/health-records/immunizations")).data?.data || [],
+    retry: 1,
   });
 
   const records: any[] = Array.isArray(data) ? data : [];
@@ -47,6 +48,14 @@ function VaccinationsContent() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load vaccination records. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -55,7 +64,7 @@ function VaccinationsContent() {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Syringe className="h-6 w-6" /> Vaccinations</h1>
           <p className="text-muted-foreground">Student immunization and vaccination records</p>
         </div>
-        <Button onClick={() => { setForm({ student_id: "", vaccine_name: "", dose_number: "1", administered_date: "", administered_by: "", next_due_date: "" }); setShowDialog(true); }}>
+        <Button onClick={() => { setForm({ student_id: "", vaccine_name: "", dose_number: "1", date_administered: "", administered_by: "", next_due_date: "" }); setShowDialog(true); }}>
           <Plus className="h-4 w-4 mr-2" /> Record Vaccination
         </Button>
       </div>
@@ -77,10 +86,10 @@ function VaccinationsContent() {
               <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No vaccination records found</TableCell></TableRow>
             ) : records.map((r: any) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.student?.name || r.student_id}</TableCell>
+                <TableCell className="font-medium">{r.student_name || r.student_id}</TableCell>
                 <TableCell>{r.vaccine_name}</TableCell>
                 <TableCell><Badge variant="outline">Dose {r.dose_number}</Badge></TableCell>
-                <TableCell className="text-sm">{r.administered_date ? displayBS(r.administered_date) : "—"}</TableCell>
+                <TableCell className="text-sm">{r.date_administered ? displayBS(r.date_administered) : "—"}</TableCell>
                 <TableCell className="text-sm">{r.administered_by || "—"}</TableCell>
                 <TableCell className="text-sm">{r.next_due_date ? displayBS(r.next_due_date) : "—"}</TableCell>
               </TableRow>
@@ -102,7 +111,7 @@ function VaccinationsContent() {
               <div className="space-y-2"><Label>Administered By</Label><Input value={form.administered_by} onChange={(e) => setForm({ ...form, administered_by: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Date Given</Label><BSDateInput value={form.administered_date} onChange={(v) => setForm({ ...form, administered_date: v })} /></div>
+              <div className="space-y-2"><Label>Date Given</Label><BSDateInput value={form.date_administered} onChange={(v) => setForm({ ...form, date_administered: v })} /></div>
               <div className="space-y-2"><Label>Next Due Date</Label><BSDateInput value={form.next_due_date} onChange={(v) => setForm({ ...form, next_due_date: v })} /></div>
             </div>
           </div>

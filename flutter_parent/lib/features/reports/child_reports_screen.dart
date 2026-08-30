@@ -206,7 +206,7 @@ class _ReportCard extends StatelessWidget {
                 dense: true,
                 title: Text(subject['subject']?.toString() ?? 'Subject'),
                 subtitle: Text(
-                    '${(((subject['obtained'] as num?)?.toDouble()) ?? 0).toStringAsFixed(0)} / ${(((subject['full_marks'] as num?)?.toDouble()) ?? 0).toStringAsFixed(0)}'),
+                    '${((safeDoubleOrNull(subject['obtained'])) ?? 0).toStringAsFixed(0)} / ${((safeDoubleOrNull(subject['full_marks'])) ?? 0).toStringAsFixed(0)}'),
                 trailing: Text(
                   '${_subjectPercentage(subject).toStringAsFixed(1)}%',
                   style: TextStyle(
@@ -373,8 +373,8 @@ class _SubjectTrend {
 }
 
 double _subjectPercentage(Map<String, dynamic> subject) {
-  final obtained = (subject['obtained'] as num?)?.toDouble() ?? 0;
-  final fullMarks = (subject['full_marks'] as num?)?.toDouble() ?? 0;
+  final obtained = safeDoubleOrNull(subject['obtained']) ?? 0;
+  final fullMarks = safeDoubleOrNull(subject['full_marks']) ?? 0;
   return fullMarks == 0 ? 0 : (obtained / fullMarks) * 100;
 }
 

@@ -11,6 +11,7 @@ class CertificatesScreen extends StatefulWidget {
 class _CertificatesScreenState extends State<CertificatesScreen> {
   List<Map<String, dynamic>> _templates = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,7 +20,10 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/design-studio/templates');
       final data = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
@@ -29,8 +33,10 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('CertificatesScreen load failed: $e\n$st');
       _templates = [];
+      _error = 'Could not load certificate templates.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -38,6 +44,11 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: LoadingShimmer());
+    if (_error != null) {
+      return Scaffold(
+        body: ErrorContainer(errorMessage: _error!, onRetry: _load),
+      );
+    }
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,

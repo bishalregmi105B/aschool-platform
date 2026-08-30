@@ -29,7 +29,8 @@ class _ChildSubjectsScreenState extends ConsumerState<ChildSubjectsScreen> {
     try {
       _childBundles =
           await AcademicDataService.fetchChildSubjectsForCurrentParent();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ChildSubjectsScreen load failed: $e\n$st');
       _error = 'Unable to load child subjects right now.';
     }
     if (mounted) {
@@ -81,7 +82,7 @@ class _ChildSubjectsScreenState extends ConsumerState<ChildSubjectsScreen> {
         final bundle = entry.value;
         final studentName = bundle['student_name']?.toString() ?? 'Student';
         final className = bundle['class_name']?.toString() ?? '-';
-        final subjects = (bundle['subjects'] as List?) ?? const [];
+        final subjects = safeMapList(bundle['subjects']);
 
         return ESchoolAnimatedEntry(
           index: entry.key,
@@ -105,8 +106,7 @@ class _ChildSubjectsScreenState extends ConsumerState<ChildSubjectsScreen> {
                 if (subjects.isEmpty)
                   const Text('No subjects assigned yet.')
                 else
-                  ...subjects.map((item) {
-                    final subject = (item as Map).cast<String, dynamic>();
+                  ...subjects.map((subject) {
                     final name =
                         subject['subject_name'] ?? subject['name'] ?? 'Subject';
                     final teacher = subject['teacher_name'] ?? 'Not assigned';

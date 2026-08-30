@@ -1,18 +1,20 @@
 import '../services/api_client.dart';
 import '../models/models.dart';
+import '../utils/safe_parse.dart';
 import 'exceptions.dart';
 
 class TransportRepository {
   Future<List<TransportRoute>> getRoutes() async {
     try {
       final response = await ApiClient.instance.get('/transport/routes');
-      if (response.data['success'] == true) {
-        return (response.data['data'] as List)
-            .map((e) => TransportRoute.fromJson(e))
+      if (envelopeOk(response.data)) {
+        return envelopeRows(response.data, source: 'TransportRepository.getRoutes')
+            .map(TransportRoute.fromJson)
             .toList();
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch transport routes');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch transport routes'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }
@@ -20,11 +22,14 @@ class TransportRepository {
   Future<Map<String, dynamic>> getLiveLocation(String vehicleId) async {
     try {
       final response = await ApiClient.instance.get('/transport/live/$vehicleId');
-      if (response.data['success'] == true) {
-        return response.data['data'] as Map<String, dynamic>;
+      if (envelopeOk(response.data)) {
+        return envelopeObject(response.data, source: 'TransportRepository.getLiveLocation')
+                ??
+            const {};
       }
-      throw ApiException(response.data['error'] ?? 'Failed to fetch live location');
+      throw ApiException(envelopeErrorText(response.data, 'Failed to fetch live location'));
     } catch (e) {
+      if (e is ApiException) rethrow;
       throw ApiException(e.toString());
     }
   }

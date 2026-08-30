@@ -204,6 +204,9 @@ class FonePayGateway:
                 logger.error("FonePay verify failed: %s %s", resp.status_code, resp.text)
                 return {"verified": False, "error": f"HTTP {resp.status_code}"}
 
+        except requests.RequestException as exc:
+            logger.exception("FonePay server verify failed: %s", exc)
+            return {"verified": False, "network_error": True, "error": str(exc)}
         except Exception as exc:
             logger.exception("FonePay server verify failed: %s", exc)
             return {"verified": False, "error": str(exc)}

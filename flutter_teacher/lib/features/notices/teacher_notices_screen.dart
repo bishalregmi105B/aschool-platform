@@ -29,7 +29,8 @@ class _TeacherNoticesScreenState extends ConsumerState<TeacherNoticesScreen> {
     });
     try {
       _notices = await NoticesService.fetchNotices(targetRole: 'teacher');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TeacherNoticesScreen load failed: $e\n$st');
       _error = 'Unable to load notices right now.';
     }
     if (mounted) {

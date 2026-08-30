@@ -14,6 +14,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   Map<String, List<Map<String, dynamic>>> _schedule = {};
   bool _loading = true;
   int _selectedDay = DateTime.now().weekday - 1; // 0-indexed (Mon=0)
+  String? _error;
 
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -24,23 +25,32 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await ApiClient.instance.get('/teacher/timetable');
-      final data = resp.data['data'] as Map<String, dynamic>? ?? {};
+      final data = safeMapOrNull(envelopeData(resp.data)) ?? const {};
       setState(() {
-        _schedule = data.map(
-            (k, v) => MapEntry(k, List<Map<String, dynamic>>.from(v as List)));
+        _schedule = data.map((k, v) => MapEntry(k, safeMapList(v)));
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('TimetableScreen load failed: $e\n$st');
+      setState(() {
+        _error = 'Could not load your timetable.';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingShimmer();
+    if (_error != null) {
+      return ErrorContainer(errorMessage: _error!, onRetry: _load);
+    }
 
     final dayKey = _days[_selectedDay].toLowerCase();
     final periods = _schedule[dayKey] ?? [];

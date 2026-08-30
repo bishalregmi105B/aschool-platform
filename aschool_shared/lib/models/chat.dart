@@ -1,4 +1,6 @@
 /// Chat & Communication Models
+import '../utils/safe_parse.dart';
+
 class ChatMessage {
   final String id;
   final String? conversationId;
@@ -28,17 +30,18 @@ class ChatMessage {
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
-      id: (json['id'] ?? '').toString(),
-      conversationId: json['conversation_id']?.toString(),
-      senderId: json['sender_id']?.toString() ?? '',
-      senderName: json['sender_name'] as String?,
-      senderRole: json['sender_role'] as String?,
-      receiverId: json['receiver_id']?.toString(),
-      message: json['message'] as String? ?? '',
-      fileUrl: json['file_url'] as String?,
-      fileType: json['file_type'] as String?,
-      timestamp: json['timestamp'] as String? ?? json['created_at'] as String? ?? '',
-      isRead: json['is_read'] as bool? ?? false,
+      id: safeString(json['id']),
+      conversationId: safeStringOrNull(json['conversation_id']),
+      senderId: safeString(json['sender_id']),
+      senderName: safeStringOrNull(json['sender_name']),
+      senderRole: safeStringOrNull(json['sender_role']),
+      receiverId: safeStringOrNull(json['receiver_id']),
+      message: safeString(json['message']),
+      fileUrl: safeStringOrNull(json['file_url']),
+      fileType: safeStringOrNull(json['file_type']),
+      timestamp: safeString(json['timestamp'],
+          fallback: safeString(json['created_at'])),
+      isRead: safeBool(json['is_read']),
     );
   }
 }
@@ -66,14 +69,14 @@ class ChatContact {
 
   factory ChatContact.fromJson(Map<String, dynamic> json) {
     return ChatContact(
-      id: (json['id'] ?? json['user_id'] ?? '').toString(),
-      name: json['name'] as String? ?? '',
-      avatarUrl: json['avatar_url'] as String?,
-      role: json['role'] as String? ?? 'student',
-      lastMessage: json['last_message'] as String?,
-      lastMessageTime: json['last_message_time'] as String?,
-      unreadCount: json['unread_count'] as int? ?? 0,
-      isOnline: json['is_online'] as bool? ?? false,
+      id: safeString(json['id'], fallback: safeString(json['user_id'])),
+      name: safeString(json['name']),
+      avatarUrl: safeStringOrNull(json['avatar_url']),
+      role: safeString(json['role'], fallback: 'student'),
+      lastMessage: safeStringOrNull(json['last_message']),
+      lastMessageTime: safeStringOrNull(json['last_message_time']),
+      unreadCount: safeInt(json['unread_count']),
+      isOnline: safeBool(json['is_online']),
     );
   }
 }

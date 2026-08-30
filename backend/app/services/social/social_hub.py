@@ -61,7 +61,13 @@ class SocialHubService:
         return profiles
 
     def publish_to_all(self, message: str, image_url: str = None, platforms: list = None) -> dict:
-        """Cross-post to all (or selected) platforms."""
+        """Cross-post to all (or selected) platforms.
+
+        E199: `tiktok` used to be an accepted target that was silently
+        dropped (the TikTok wrapper is read-only — no publish endpoint),
+        making the result look like a full delivery. It now produces a loud,
+        honest per-platform error entry instead of vanishing.
+        """
         results = {}
         target = platforms or ["facebook", "instagram", "tiktok"]
 
@@ -69,31 +75,54 @@ class SocialHubService:
             try:
                 results["facebook"] = self.facebook.publish_post(message, image_url=image_url)
             except Exception as e:
+                logger.exception("Facebook publish failed for school %s", self.school.id)
                 results["facebook"] = {"error": str(e)}
 
         if "instagram" in target and self.facebook and image_url:
             try:
                 results["instagram"] = self.facebook.ig_publish_photo(image_url, message)
             except Exception as e:
+                logger.exception("Instagram publish failed for school %s", self.school.id)
                 results["instagram"] = {"error": str(e)}
+
+        if "tiktok" in target:
+            # Read-only API wrapper: publishing is genuinely not implemented.
+            if "tiktok" not in results:
+                if not self.tiktok:
+                    results["tiktok"] = {"error": "TikTok not connected"}
+                else:
+                    logger.error(
+                        "TikTok publish requested for school %s but the TikTok "
+                        "integration is read-only (no publish API) — not sent",
+                        self.school.id,
+                    )
+                    results["tiktok"] = {
+                        "error": "TikTok publishing is not supported (read-only integration)"
+                    }
 
         return results
 
     def get_unified_feed(self, limit: int = 10) -> list:
-        """Get recent posts from all platforms in a unified feed."""
+        """Get recent posts from all platforms in a unified feed.
+
+        E199: bare `except: pass` swallowed every platform failure (auth
+        expiry, rate limits, outages) so an empty feed looked like "no
+        posts". Failures are now logged with platform and reason; the feed
+        still degrades gracefully.
+        """
         feed = []
         if self.facebook:
             try:
                 posts = self.facebook.get_page_posts(limit=limit)
                 for p in posts.get("data", []):
                     feed.append({"platform": "facebook", "data": p})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.exception("Facebook feed fetch failed for school %s: %s", self.school.id, e)
         if self.facebook and self.school.instagram_account_id:
             try:
                 media = self.facebook.ig_get_media(limit=limit)
                 for m in media.get("data", []):
                     feed.append({"platform": "instagram", "data": m})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.exception("Instagram feed fetch failed for school %s: %s", self.school.id, e)
         return feed

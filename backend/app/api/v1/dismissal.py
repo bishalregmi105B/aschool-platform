@@ -5,6 +5,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.dismissal import AuthorizedPickup, DismissalRecord
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -38,6 +39,11 @@ def list_authorized():
 def create_authorized():
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
+    student_id = data.get("student_id")
+    if not student_id:
+        return error_response("student_id is required", 400)
+    if not _student_exists(student_id):
+        return error_response("student_id does not match a student at this school", 400)
     pickup = AuthorizedPickup(
         school_id=g.school_id,
         authorized_by_id=claims.get("sub"),
@@ -99,6 +105,17 @@ def list_records():
     date = request.args.get("date")
     if date:
         query = query.filter(db.func.date(DismissalRecord.dismissed_at) == date)
+    # The web dashboard's search box sends ?search= — match it against the
+    # student's name via the relationship.
+    search = (request.args.get("search") or "").strip()
+    if search:
+        like = f"%{search}%"
+        query = query.join(Student, DismissalRecord.student_id == Student.id).filter(
+            db.or_(
+                Student.first_name.ilike(like),
+                Student.last_name.ilike(like),
+            )
+        )
     items, meta = paginate(query.order_by(DismissalRecord.dismissed_at.desc()))
     return success_response([_record_dict(r) for r in items], meta={"pagination": meta})
 
@@ -119,6 +136,8 @@ def create_record():
     for key in ("student_id", "picked_up_by", "pickup_id", "qr_verified", "notes"):
         if key in data:
             setattr(record, key, data[key])
+    if not _student_exists(record.student_id):
+        return error_response("student_id does not match a student at this school", 400)
     db.session.add(record)
     db.session.commit()
     return created_response(_record_dict(record))
@@ -129,10 +148,55 @@ def create_record():
 @school_required
 @plugin_required("dismissal")
 def verify_qr():
-    """Verify a QR code for pickup and auto-create dismissal record."""
+    """Verify a QR code for pickup and auto-create dismissal record.
+
+    Accepts either:
+      {"pickup_id": ..., "student_id": ...} — an explicit authorization id, or
+      {"qr_code": "aschool:pickup:<parent_user_id>:<student_id>"} — the exact
+      string encoded by the parent app's Pickup QR (dismissal_qr_screen.dart),
+      which carries no pickup id: the active AuthorizedPickup row for that
+      student is resolved server-side (preferring one the parent authorized).
+    """
     data = request.get_json(silent=True) or {}
     pickup_id = data.get("pickup_id")
     student_id = data.get("student_id")
+    qr_code = data.get("qr_code")
+
+    if qr_code and not (pickup_id and student_id):
+        parts = str(qr_code).strip().split(":")
+        if len(parts) == 4 and parts[0] == "aschool" and parts[1] == "pickup":
+            _, _, qr_parent_user_id, qr_student_id = parts
+            if not _student_exists(qr_student_id):
+                return error_response(
+                    "QR student does not match a student at this school", 403
+                )
+            pickups = AuthorizedPickup.query.filter_by(
+                school_id=g.school_id,
+                student_id=qr_student_id,
+                is_active=True,
+                is_deleted=False,
+            ).all()
+            if not pickups:
+                return error_response(
+                    "Invalid or inactive pickup authorization", 403
+                )
+            preferred = next(
+                (
+                    p
+                    for p in pickups
+                    if str(p.authorized_by_id or "") == qr_parent_user_id
+                ),
+                None,
+            )
+            pickup = preferred or pickups[0]
+            pickup_id = str(pickup.id)
+            student_id = qr_student_id
+        else:
+            return error_response(
+                "qr_code must be in the format aschool:pickup:<parent_user_id>:<student_id>",
+                400,
+            )
+
     if not pickup_id or not student_id:
         return error_response("pickup_id and student_id are required")
     pickup = AuthorizedPickup.query.filter_by(
@@ -158,6 +222,23 @@ def verify_qr():
 # ── Serializers ────────────────────────────────────────────
 
 
+def _student_exists(student_id) -> bool:
+    """The student FK columns are NOT NULL + FK; validate up front so bad
+    ids get a 400 instead of an unhandled IntegrityError (500)."""
+    import uuid as _uuid
+
+    if not student_id:
+        return False
+    try:
+        _uuid.UUID(str(student_id))
+    except (ValueError, AttributeError):
+        return False
+    return (
+        Student.query.filter_by(id=str(student_id), school_id=g.school_id).first()
+        is not None
+    )
+
+
 def _pickup_dict(p):
     return {
         "id": str(p.id),
@@ -172,9 +253,13 @@ def _pickup_dict(p):
 
 
 def _record_dict(r):
+    student = r.student
     return {
         "id": str(r.id),
         "student_id": str(r.student_id),
+        "student_name": f"{student.first_name} {student.last_name or ''}".strip()
+        if student
+        else None,
         "picked_up_by": r.picked_up_by,
         "pickup_id": str(r.pickup_id) if r.pickup_id else None,
         "qr_verified": r.qr_verified,

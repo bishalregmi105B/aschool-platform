@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, TrendingUp, BookOpen, DollarSign } from "lucide-react";
 
@@ -13,12 +14,23 @@ export default function ChainDashboardPage() {
 }
 
 function ChainDashboardContent() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["chain-dashboard"],
     queryFn: async () => { const r = await api.get("/schools/chain/dashboard"); return r.data?.data ?? r.data; },
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load multi-branch dashboard. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const branches: any[] = data?.branches ?? [];
 

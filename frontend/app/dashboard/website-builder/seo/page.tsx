@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { revalidateSchoolSite } from "@/lib/revalidate";
 
 interface SeoSettings {
   meta_title: string;
@@ -17,9 +20,10 @@ interface SeoSettings {
 export default function SeoPage() {
   const qc = useQueryClient();
 
-  const { data: seo, isLoading } = useQuery<SeoSettings>({
+  const { data: seo, isLoading, isError, refetch } = useQuery<SeoSettings>({
     queryKey: ["website-seo"],
     queryFn: () => api.get("/website-builder/seo").then((r) => r.data.data),
+    retry: 1,
   });
 
   const [form, setForm] = useState<SeoSettings | null>(null);
@@ -33,9 +37,21 @@ export default function SeoPage() {
     mutationFn: (data: SeoSettings) => api.put("/website-builder/seo", data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-seo"] });
+      revalidateSchoolSite();
       alert("SEO settings saved!");
     },
   });
+
+  if (isError) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load SEO settings. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   if (isLoading || !form) {
     return (
@@ -185,7 +201,7 @@ export default function SeoPage() {
           <button
             type="submit"
             disabled={saveMut.isPending}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
           >
             {saveMut.isPending ? "Saving..." : "Save SEO Settings"}
           </button>

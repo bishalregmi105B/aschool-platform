@@ -14,6 +14,7 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
   Map<String, dynamic>? _data;
   bool _loading = true;
   bool _requestingCounselor = false;
+  String? _error;
 
   static const _moods = [
     ('😊', 'Happy', Colors.green),
@@ -31,16 +32,22 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/wellbeing');
       final payload = res.data;
       setState(() {
         _data = payload is Map<String, dynamic>
-            ? (payload['data'] as Map?)?.cast<String, dynamic>() ?? payload
+            ? safeMapOrNull(payload['data']) ?? payload
             : null;
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentWellbeing load failed: $e\n$st');
+      _error = 'Could not load wellbeing.';
+    }
     setState(() => _loading = false);
   }
 
@@ -54,7 +61,9 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
         appBar: const CustomAppBar(title: 'Wellbeing'),
         body: _loading
             ? const LoadingShimmer()
-            : RefreshIndicator(
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
                   padding: const EdgeInsets.all(16),
@@ -114,8 +123,7 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
                     const SizedBox(height: 16),
 
                     // Weekly mood trend
-                    if ((_data?['weekly_moods'] as List?)?.isNotEmpty ??
-                        false) ...[
+                    if (safeList(_data?['weekly_moods']).isNotEmpty) ...[
                       Text('This Week',
                           style: theme.textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold)),
@@ -127,7 +135,7 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               for (final entry
-                                  in (_data!['weekly_moods'] as List))
+                                  in safeMapList(_data?['weekly_moods']))
                                 Column(
                                   children: [
                                     Text(_moodEmoji(entry['mood'] ?? ''),
@@ -210,14 +218,13 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
                     ),
 
                     // Previous check-ins
-                    if ((_data?['recent_entries'] as List?)?.isNotEmpty ??
-                        false) ...[
+                    if (safeMapList(_data?['recent_entries']).isNotEmpty) ...[
                       const SizedBox(height: 16),
                       Text('Recent Check-ins',
                           style: theme.textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      ...(_data!['recent_entries'] as List).map((entry) {
+                      ...safeMapList(_data?['recent_entries']).map((entry) {
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(

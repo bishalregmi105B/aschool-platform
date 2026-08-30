@@ -1,10 +1,15 @@
-"""Student Portfolio API — portfolios, items, micro-credentials."""
+"""Student Portfolio API — portfolios, items, micro-credentials.
+
+Routes are gated on the canonical slug `student_portfolio`; legacy
+`portfolio` installs still pass via the alias in app/plugins/decorators.py.
+"""
 from datetime import datetime
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.portfolio import StudentPortfolio, PortfolioItem, MicroCredential
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -14,10 +19,16 @@ from extensions import db
 portfolio_bp = Blueprint("portfolio", __name__, url_prefix="/portfolio")
 
 
+def _student_or_none(student_id):
+    """E134: student must exist at THIS school before any portfolio write —
+    an unknown/foreign uuid previously died at commit (FK violation → 500)."""
+    return Student.query.filter_by(id=student_id, school_id=g.school_id).first()
+
+
 @portfolio_bp.route("/students/<uuid:student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 def get_portfolio(student_id):
     portfolio = StudentPortfolio.query.filter_by(
         student_id=student_id, school_id=g.school_id, is_deleted=False
@@ -30,10 +41,12 @@ def get_portfolio(student_id):
 @portfolio_bp.route("/students/<uuid:student_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 @role_required("superadmin", "school_admin", "teacher")
 def update_portfolio(student_id):
     data = request.get_json(silent=True) or {}
+    if not _student_or_none(student_id):
+        return error_response("Student not found at this school", 404)
     portfolio = StudentPortfolio.query.filter_by(
         student_id=student_id, school_id=g.school_id
     ).first()
@@ -53,7 +66,7 @@ def update_portfolio(student_id):
 @portfolio_bp.route("/students/<uuid:student_id>/items", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 def list_items(student_id):
     portfolio = StudentPortfolio.query.filter_by(
         student_id=student_id, school_id=g.school_id
@@ -70,10 +83,12 @@ def list_items(student_id):
 @portfolio_bp.route("/students/<uuid:student_id>/items", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 @role_required("superadmin", "school_admin", "teacher")
 def add_item(student_id):
     data = request.get_json(silent=True) or {}
+    if not _student_or_none(student_id):
+        return error_response("Student not found at this school", 404)
     portfolio = StudentPortfolio.query.filter_by(
         student_id=student_id, school_id=g.school_id
     ).first()
@@ -97,7 +112,7 @@ def add_item(student_id):
 @portfolio_bp.route("/students/<uuid:student_id>/credentials", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 def list_credentials(student_id):
     query = MicroCredential.query.filter_by(
         student_id=student_id, school_id=g.school_id, is_deleted=False
@@ -109,10 +124,14 @@ def list_credentials(student_id):
 @portfolio_bp.route("/students/<uuid:student_id>/credentials", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("portfolio")
+@plugin_required("student_portfolio")
 @role_required("superadmin", "school_admin")
 def add_credential(student_id):
     data = request.get_json(silent=True) or {}
+    if not _student_or_none(student_id):
+        return error_response("Student not found at this school", 404)
+    if not (data.get("title") or "").strip():
+        return error_response("title is required", 400)
     cred = MicroCredential(student_id=student_id, school_id=g.school_id)
     for key in ("title", "description", "issuer",
                 "credential_url", "verification_hash", "badge_url"):

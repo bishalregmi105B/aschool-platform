@@ -12,6 +12,7 @@ class ClassmatesScreen extends ConsumerStatefulWidget {
 class _ClassmatesScreenState extends ConsumerState<ClassmatesScreen> {
   bool _loading = true;
   List<Map<String, dynamic>> _classmates = [];
+  String? _error;
 
   @override
   void initState() {
@@ -20,15 +21,20 @@ class _ClassmatesScreenState extends ConsumerState<ClassmatesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance
           .get('/students', queryParameters: {'per_page': 100});
       if (res.data != null && res.data['data'] != null) {
         _classmates = List<Map<String, dynamic>>.from(res.data['data']);
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ClassmatesScreen load failed: $e\n$st');
       _classmates = [];
+      _error = 'Could not load your classmates.';
     }
     if (mounted) {
       setState(() => _loading = false);
@@ -41,7 +47,9 @@ class _ClassmatesScreenState extends ConsumerState<ClassmatesScreen> {
       appBar: const CustomAppBar(title: 'My Classmates'),
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: _classmates.isEmpty
                   ? ListView(

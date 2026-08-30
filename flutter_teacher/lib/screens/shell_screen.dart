@@ -38,7 +38,6 @@ class _TeacherShellScreenState extends ConsumerState<TeacherShellScreen> {
     final user = ref.watch(authProvider).user;
     final plugins = ref.watch(pluginProvider);
     final drawerSections = _buildDrawerSections(plugins);
-    final showNoticesAction = plugins.isModuleVisible('notices');
 
     return Scaffold(
       key: _scaffoldKey,
@@ -49,11 +48,10 @@ class _TeacherShellScreenState extends ConsumerState<TeacherShellScreen> {
               showBackButton: canPop,
               onBackPressed: canPop ? () => context.pop() : null,
               actions: [
-                if (showNoticesAction)
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () => context.push('/notices'),
-                  ),
+                NotificationBell(
+                  tooltip: 'Notifications',
+                  onTap: () => context.push('/notifications'),
+                ),
               ],
             ),
       drawer: AppDrawer(

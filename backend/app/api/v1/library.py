@@ -1,10 +1,11 @@
 """Library Management API — books, issues, returns, reservations."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.library import Book, BookIssue
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
@@ -40,6 +41,8 @@ def list_books():
 @role_required("superadmin", "school_admin", "teacher")
 def create_book():
     data = request.get_json(silent=True) or {}
+    if not (data.get("title") or "").strip():
+        return error_response("title is required", 400)
     book = Book(school_id=g.school_id)
     for key in ("title", "author", "isbn", "category", "publisher", "total_copies", "available_copies", "shelf_location"):
         if key in data:
@@ -87,6 +90,14 @@ def list_issues():
     status = request.args.get("status")
     if status:
         query = query.filter_by(status=status)
+    # the web checkout page looks up the active issue for a book+student pair
+    # to drive POST /library/issues/<id>/return
+    book_id = request.args.get("book_id")
+    if book_id:
+        query = query.filter_by(book_id=book_id)
+    student_id = request.args.get("student_id")
+    if student_id:
+        query = query.filter_by(student_id=student_id)
     query = query.order_by(BookIssue.issued_date.desc())
     items, meta = paginate(query)
     return success_response([_issue_dict(i) for i in items], meta={"pagination": meta})
@@ -103,14 +114,23 @@ def issue_book():
     if not book or (book.available_copies or 0) <= 0:
         return error_response("Book not available for issue", 400)
 
+    student_id = data.get("student_id")
+    if student_id:
+        student = Student.query.filter_by(id=student_id, school_id=g.school_id).first()
+        if not student:
+            return error_response("student_id does not match a student at this school", 400)
+
+    issued_date = _parse_date(data.get("issued_date")) or date.today()
     issue = BookIssue(
         school_id=g.school_id,
         book_id=data["book_id"],
-        student_id=data.get("student_id"),
+        student_id=student_id,
         user_id=data.get("user_id"),
         issued_by=g.current_user.id,
-        issued_date=_parse_date(data.get("issued_date")) or date.today(),
-        due_date=_parse_date(data.get("due_date")),
+        issued_date=issued_date,
+        # book_issues.due_date is NOT NULL — default to a 14-day loan when the
+        # client omits it (previously a raw 500 on the not-null violation).
+        due_date=_parse_date(data.get("due_date")) or issued_date + timedelta(days=14),
     )
     book.available_copies = (book.available_copies or 0) - 1
     db.session.add(issue)

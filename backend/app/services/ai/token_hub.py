@@ -52,9 +52,46 @@ class QuotaExceededError(Exception):
         )
 
 
+class AIProviderError(Exception):
+    """Raised when no AI provider is configured or every configured provider
+    fails (bad key, network outage, provider 5xx). The API layer converts this
+    to an honest 502 — never a fake result, never an opaque 500."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_user_id(school_id):
+    """Best-effort user attribution when the caller has no user context
+    (e.g. Celery tasks). AIUsageLog.user_id is NOT NULL — without this the
+    usage row would silently fail to persist and quota usage would never
+    accumulate for system-triggered calls."""
+    if school_id is None:
+        return None
+    try:
+        from extensions import db
+        from app.models.school import School
+        from app.models.user import User
+
+        school = db.session.get(School, school_id)
+        if school is not None and school.owner_id:
+            return school.owner_id
+        admin = (
+            User.query.filter_by(
+                school_id=school_id,
+                role="school_admin",
+                is_active=True,
+                is_deleted=False,
+            )
+            .first()
+        )
+        return admin.id if admin else None
+    except Exception as exc:
+        logger.warning("Could not resolve fallback user for AI usage log: %s", exc)
+        return None
+
 
 def _get_groq_client():
     """Return a Groq client; raise ImportError if groq is not installed."""
@@ -183,7 +220,15 @@ def _get_usage_month(school_id) -> int:
 
 
 def _check_quota(school_id) -> None:
-    """Raise QuotaExceededError if the school is over limit."""
+    """Raise QuotaExceededError if the school is over limit.
+
+    NOTE on the default path: a MISSING AISchoolQuota row (or an inactive one)
+    is treated as BLOCKED ("inactive"), not unlimited — there is no
+    None=unlimited fallback. Schools therefore must have a quota row before
+    their first AI call; registration provisions one eagerly via
+    AITokenHub.ensure_quota_exists() (app/api/v1/auth.py register_school),
+    with POST /api/v1/ai-usage/quota/init as the manual fallback.
+    """
     # If enforcement is disabled (dev mode), skip
     if not current_app.config.get("AI_QUOTA_ENFORCEMENT", True):
         return
@@ -278,6 +323,10 @@ class AITokenHub:
         Execute one AI call, enforce quota, log result. Returns dict:
           { text, tokens_used, model, provider, latency_ms }
         """
+        # 0. Attribution fallback so every usage row has a user (NOT NULL col)
+        if user_id is None:
+            user_id = _resolve_user_id(school_id)
+
         # 1. Quota check
         try:
             _check_quota(school_id)
@@ -318,7 +367,7 @@ class AITokenHub:
                 fallback_fn = _call_anthropic  # Anthropic available as fallback
 
         if provider_fn is None:
-            raise RuntimeError(
+            raise AIProviderError(
                 "No AI provider configured. Set GROQ_API_KEY (primary) "
                 "or ANTHROPIC_API_KEY (fallback)."
             )
@@ -361,7 +410,7 @@ class AITokenHub:
                         error_message=f"Primary: {primary_exc}; Fallback: {fallback_exc}",
                         metadata=metadata,
                     )
-                    raise fallback_exc
+                    raise AIProviderError(f"AI providers failed: {fallback_exc}") from fallback_exc
             else:
                 _log_call(
                     school_id=school_id,
@@ -377,7 +426,7 @@ class AITokenHub:
                     error_message=str(primary_exc),
                     metadata=metadata,
                 )
-                raise primary_exc
+                raise AIProviderError(f"AI provider call failed: {primary_exc}") from primary_exc
 
         # 4. Log success
         _log_call(
@@ -401,6 +450,31 @@ class AITokenHub:
             "provider":    result["provider"],
             "latency_ms":  result["latency_ms"],
         }
+
+    # ------------------------------------------------------------------
+    # Context resolution for services whose callers don't pass school/user
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def resolve_context(school_id=None, user_id=None) -> tuple:
+        """Fill in missing school/user ids from the active request context.
+
+        Service functions keep their original signatures (callers unchanged);
+        when the optional school_id/user_id kwargs are omitted the values from
+        Flask's request-scoped ``g`` are used. Safe outside a request context
+        (e.g. Celery) — returns whatever was passed in.
+        """
+        if school_id is not None and user_id is not None:
+            return school_id, user_id
+        try:
+            from flask import g
+            if school_id is None:
+                school_id = getattr(g, "school_id", None)
+            if user_id is None:
+                user_id = getattr(g, "current_user_id", None)
+        except Exception:
+            pass
+        return school_id, user_id
 
     # ------------------------------------------------------------------
     # Simple prompt -> text helper used by the service modules
@@ -457,7 +531,15 @@ class AITokenHub:
 
     @staticmethod
     def ensure_quota_exists(school_id, daily: int = None, monthly: int = None) -> None:
-        """Upsert a quota record for the school using env-level defaults if omitted."""
+        """Upsert a quota record for the school using env-level defaults if omitted.
+
+        This is the provisioning entry-point for the product mandate "AI quota
+        exists from account creation": because _check_quota() BLOCKS schools
+        without a quota row (no unlimited-by-default), register_school()
+        (app/api/v1/auth.py) calls this eagerly with the env defaults
+        AI_DEFAULT_DAILY_LIMIT (10,000/day) and AI_DEFAULT_MONTHLY_LIMIT
+        (100,000/month). Idempotent — an existing row is left untouched.
+        """
         from extensions import db
         from app.models.ai_token import AISchoolQuota
 

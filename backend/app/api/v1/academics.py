@@ -360,11 +360,31 @@ def list_classes():
 @role_required("superadmin", "school_admin")
 def create_class():
     data = request.get_json(silent=True) or {}
+    numeric_error = _validate_class_integers(data)
+    if numeric_error:
+        return error_response(numeric_error, 400)
     cls = Class(school_id=g.school_id)
     _apply_class_payload(cls, data)
     if cls.sort_order is None and cls.numeric_grade is not None:
         cls.sort_order = cls.numeric_grade
     db.session.add(cls)
+    db.session.flush()
+
+    # The web Add-Class dialog collects an optional initial section
+    # (initial_section_name / initial_section_capacity) — honor it instead of
+    # silently dropping it and leaving every new class without a section (E101).
+    initial_section_name = (data.get("initial_section_name") or "").strip()
+    if initial_section_name:
+        capacity = _coerce_int(data.get("initial_section_capacity"))
+        db.session.add(
+            Section(
+                class_id=cls.id,
+                school_id=g.school_id,
+                name=initial_section_name,
+                capacity=capacity,
+            )
+        )
+
     db.session.commit()
     return created_response(_class_dict(cls))
 
@@ -378,6 +398,9 @@ def update_class(class_id):
     if not cls or cls.is_deleted or str(cls.school_id) != str(g.school_id):
         return error_response("Class not found", 404)
     data = request.get_json(silent=True) or {}
+    numeric_error = _validate_class_integers(data)
+    if numeric_error:
+        return error_response(numeric_error, 400)
     _apply_class_payload(cls, data)
     db.session.commit()
     return success_response(_class_dict(cls))
@@ -760,14 +783,46 @@ def _shift_dict(shift):
     }
 
 
+def _coerce_int(value):
+    """Best-effort int coercion; None when absent, (None-marker) when garbage.
+    E179: numeric_grade / initial_section_capacity were assigned raw — a
+    non-integer string died at commit with a DataError 500."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_class_integers(data):
+    """Return an error message when numeric_grade/grade_number/sort_order are
+    non-integer garbage (E179) — they are integer DB columns."""
+    for key in ("numeric_grade", "grade_number", "sort_order"):
+        if key in data and data[key] not in (None, "") and _coerce_int(data[key]) is None:
+            return f"{key} must be an integer"
+    if (
+        data.get("initial_section_capacity") not in (None, "")
+        and _coerce_int(data.get("initial_section_capacity")) is None
+    ):
+        return "initial_section_capacity must be an integer"
+    return None
+
+
 def _apply_class_payload(cls, data):
-    for key in ("name", "name_nepali", "sort_order"):
+    for key in ("name", "name_nepali"):
         if key in data:
             setattr(cls, key, data[key])
+    if "sort_order" in data:
+        cls.sort_order = _coerce_int(data["sort_order"])
     if "numeric_grade" in data:
-        cls.numeric_grade = data["numeric_grade"]
+        cls.numeric_grade = _coerce_int(data["numeric_grade"])
     elif "grade_number" in data:
-        cls.numeric_grade = data["grade_number"]
+        cls.numeric_grade = _coerce_int(data["grade_number"])
     for key in ("academic_year_id", "medium_id", "stream_id"):
         if key in data:
             setattr(cls, key, _parse_uuid_value(data.get(key)))

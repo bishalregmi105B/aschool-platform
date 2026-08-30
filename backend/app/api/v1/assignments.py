@@ -1,9 +1,11 @@
 """Assignments API — create, submit, grade assignments."""
+import uuid as uuid_mod
 from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
+from app.models.academic import Class, Section, Subject
 from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
@@ -14,6 +16,18 @@ from app.utils.response import created_response, error_response, no_content_resp
 from extensions import db
 
 assignments_bp = Blueprint("assignments", __name__, url_prefix="/assignments")
+
+
+def _safe_ad_to_bs(ad_date):
+    """ad_to_bs that degrades to None instead of OverflowError — dates beyond
+    the nepali_datetime conversion range (e.g. far-future due dates) used to
+    500 the response AFTER the row was committed."""
+    if not ad_date:
+        return None
+    try:
+        return ad_to_bs(ad_date)
+    except (OverflowError, ValueError, TypeError):
+        return None
 
 
 @assignments_bp.route("", methods=["GET"])
@@ -40,14 +54,32 @@ def list_assignments():
 @role_required("superadmin", "school_admin", "teacher")
 def create_assignment():
     data = request.get_json(silent=True) or {}
+    # class_id/subject_id/teacher_id are NOT NULL on the model — validate them
+    # (and their school scope) up front so a bad payload is a 400, not an
+    # IntegrityError 500 at commit.
+    class_id = _coerce_uuid(data.get("class_id"))
+    subject_id = _coerce_uuid(data.get("subject_id"))
+    if not g.user_id:
+        return error_response("Only school users can create assignments", 403)
+    if not class_id or not subject_id:
+        return error_response("class_id and subject_id are required and must be valid ids", 400)
+    if not Class.query.filter_by(id=class_id, school_id=g.school_id, is_deleted=False).first():
+        return error_response("class_id does not match a class at this school", 400)
+    if not Subject.query.filter_by(id=subject_id, school_id=g.school_id, is_deleted=False).first():
+        return error_response("subject_id does not match a subject at this school", 400)
+    section_id = _coerce_uuid(data.get("section_id"))
+    if section_id and not Section.query.filter_by(
+        id=section_id, school_id=g.school_id, is_deleted=False
+    ).first():
+        return error_response("section_id does not match a section at this school", 400)
     a = Assignment(
         school_id=g.school_id,
         teacher_id=g.user_id,
         title=data.get("title") or "Untitled Assignment",
         description=data.get("description"),
-        class_id=data.get("class_id"),
-        section_id=data.get("section_id"),
-        subject_id=data.get("subject_id"),
+        class_id=class_id,
+        section_id=section_id,
+        subject_id=subject_id,
         due_date=_parse_datetime(data.get("due_date")) or datetime.now(timezone.utc),
         total_marks=data.get("total_marks") or data.get("max_marks"),
         attachment_urls=data.get("attachment_urls") or ([data["attachment_url"]] if data.get("attachment_url") else None),
@@ -76,7 +108,14 @@ def create_assignment():
 @school_required
 @plugin_required("assignments")
 def get_assignment(assignment_id):
-    a = Assignment.query.filter_by(id=assignment_id, school_id=g.school_id).first_or_404()
+    aid = _coerce_uuid(assignment_id)
+    a = (
+        Assignment.query.filter_by(id=aid, school_id=g.school_id).first()
+        if aid
+        else None
+    )
+    if not a:
+        return error_response("Assignment not found", 404)
     return success_response(_assignment_dict(a))
 
 
@@ -86,7 +125,14 @@ def get_assignment(assignment_id):
 @plugin_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def update_assignment(assignment_id):
-    a = Assignment.query.filter_by(id=assignment_id, school_id=g.school_id).first_or_404()
+    aid = _coerce_uuid(assignment_id)
+    a = (
+        Assignment.query.filter_by(id=aid, school_id=g.school_id).first()
+        if aid
+        else None
+    )
+    if not a:
+        return error_response("Assignment not found", 404)
     data = request.get_json(silent=True) or {}
     for key in ("title", "description", "total_marks"):
         if key in data:
@@ -105,7 +151,14 @@ def update_assignment(assignment_id):
 @plugin_required("assignments")
 @role_required("superadmin", "school_admin")
 def delete_assignment(assignment_id):
-    a = Assignment.query.filter_by(id=assignment_id, school_id=g.school_id).first_or_404()
+    aid = _coerce_uuid(assignment_id)
+    a = (
+        Assignment.query.filter_by(id=aid, school_id=g.school_id).first()
+        if aid
+        else None
+    )
+    if not a:
+        return error_response("Assignment not found", 404)
     a.is_deleted = True
     db.session.commit()
     return no_content_response()
@@ -118,11 +171,18 @@ def delete_assignment(assignment_id):
 @school_required
 @plugin_required("assignments")
 def list_submissions(assignment_id):
-    Assignment.query.filter_by(
-        id=assignment_id,
-        school_id=g.school_id,
-        is_deleted=False,
-    ).first_or_404()
+    aid = _coerce_uuid(assignment_id)
+    assignment = (
+        Assignment.query.filter_by(
+            id=aid,
+            school_id=g.school_id,
+            is_deleted=False,
+        ).first()
+        if aid
+        else None
+    )
+    if not assignment:
+        return error_response("Assignment not found", 404)
     query = AssignmentSubmission.query.filter_by(
         assignment_id=assignment_id,
         school_id=g.school_id,
@@ -139,16 +199,50 @@ def list_submissions(assignment_id):
 def submit_assignment(assignment_id):
     data = request.get_json(silent=True) or {}
     student = _current_student()
-    student_id = data.get("student_id") or (student.id if student else None)
+    student_id = _coerce_uuid(data.get("student_id")) or (student.id if student else None)
     if not student_id:
-        return error_response("student_id is required", 400)
+        return error_response("student_id is required and must be a valid id", 400)
+    # Students may only submit their own work — otherwise a student token can
+    # impersonate a classmate by passing their student_id.
+    if g.role == "student" and (not student or student_id != student.id):
+        return error_response("You can only submit your own assignment", 403)
+    aid = _coerce_uuid(assignment_id)
+    # The assignment must exist in the submitting school (prevents writing a
+    # submission that points at another tenant's assignment).
+    assignment = (
+        Assignment.query.filter_by(
+            id=aid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if aid
+        else None
+    )
+    if not assignment:
+        return error_response("Assignment not found", 404)
+    # The student must exist in the same school (valid-UUID foreign student
+    # used to pass validation and die at commit with an FK IntegrityError 500).
+    student_row = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not student_row:
+        return error_response(
+            "student_id does not match a student at this school", 400
+        )
+    submitted_at = datetime.now(timezone.utc)
+    due = (
+        assignment.due_date.replace(tzinfo=timezone.utc)
+        if assignment.due_date and assignment.due_date.tzinfo is None
+        else assignment.due_date
+    )
     sub = AssignmentSubmission(
         school_id=g.school_id,
         assignment_id=assignment_id,
         student_id=student_id,
         content=data.get("content") or data.get("remarks") or data.get("note") or "",
         attachment_urls=data.get("attachment_urls") or ([data["file_url"]] if data.get("file_url") else None),
-        submitted_at=datetime.now(timezone.utc),
+        submitted_at=submitted_at,
+        # The model's is_late column was never populated — compute it from the
+        # assignment's due date (late = submitted after the deadline).
+        is_late=bool(due and submitted_at > due),
     )
     db.session.add(sub)
     db.session.commit()
@@ -171,9 +265,21 @@ def submit_assignment(assignment_id):
 @plugin_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def grade_submission(assignment_id, sub_id):
-    sub = AssignmentSubmission.query.filter_by(id=sub_id, assignment_id=assignment_id).first_or_404()
+    aid = _coerce_uuid(assignment_id)
+    sid = _coerce_uuid(sub_id)
+    sub = (
+        AssignmentSubmission.query.filter_by(
+            id=sid,
+            assignment_id=aid,
+            school_id=g.school_id,
+        ).first()
+        if aid and sid
+        else None
+    )
+    if not sub:
+        return error_response("Submission not found", 404)
     data = request.get_json(silent=True) or {}
-    sub.marks = data.get("marks") or data.get("marks_obtained")
+    sub.marks = data["marks"] if "marks" in data else data.get("marks_obtained")
     sub.feedback = data.get("feedback", "")
     sub.graded_by_id = g.user_id
     sub.graded_at = datetime.now(timezone.utc)
@@ -189,9 +295,16 @@ def grade_submission(assignment_id, sub_id):
 @role_required("superadmin", "school_admin", "teacher")
 def grade_submission_compat(sub_id):
     """Compatibility route used by Flutter shared repository."""
-    sub = AssignmentSubmission.query.filter_by(id=sub_id, school_id=g.school_id).first_or_404()
+    sid = _coerce_uuid(sub_id)  # E178: garbage id used to 500 (DataError)
+    sub = (
+        AssignmentSubmission.query.filter_by(id=sid, school_id=g.school_id).first()
+        if sid
+        else None
+    )
+    if not sub:
+        return error_response("Submission not found", 404)
     data = request.get_json(silent=True) or {}
-    sub.marks = data.get("marks") or data.get("marks_obtained")
+    sub.marks = data["marks"] if "marks" in data else data.get("marks_obtained")
     sub.feedback = data.get("feedback", "")
     sub.graded_by_id = g.user_id
     sub.graded_at = datetime.now(timezone.utc)
@@ -211,7 +324,20 @@ def ai_grade_submission(assignment_id):
 
     data = request.get_json(silent=True) or {}
     a = Assignment.query.filter_by(id=assignment_id, school_id=g.school_id).first_or_404()
-    sub = AssignmentSubmission.query.filter_by(id=data.get("submission_id"), assignment_id=assignment_id).first_or_404()
+    # E178: garbage submission_id 500ed (DataError) and the lookup skipped the
+    # school_id filter — resolve inside this school only.
+    sub_id = _coerce_uuid(data.get("submission_id"))
+    sub = (
+        AssignmentSubmission.query.filter_by(
+            id=sub_id,
+            assignment_id=assignment_id,
+            school_id=g.school_id,
+        ).first()
+        if sub_id
+        else None
+    )
+    if not sub:
+        return error_response("Submission not found", 404)
 
     result = AutoGraderService.grade_submission(
         question=a.description or a.title,
@@ -242,7 +368,7 @@ def _assignment_dict(a):
         "subject_name": a.subject.name if a.subject else None,
         "subject": a.subject.name if a.subject else None,
         "due_date": str(a.due_date) if a.due_date else None,
-        "due_date_bs": ad_to_bs(a.due_date) if a.due_date else None,
+        "due_date_bs": _safe_ad_to_bs(a.due_date),
         "max_marks": a.total_marks,
         "total_marks": a.total_marks,
         "attachment_url": (a.attachment_urls or [None])[0],
@@ -279,8 +405,22 @@ def _submission_dict(s):
         "graded_by_name": s.graded_by.full_name if s.graded_by else None,
         "graded_at": str(s.graded_at) if s.graded_at else None,
         "status": s.status,
+        "is_late": bool(s.is_late),
         "submitted_at": str(s.submitted_at or s.created_at) if hasattr(s, "created_at") else None,
     }
+
+
+def _coerce_uuid(value):
+    """Coerce to UUID; None when the value is absent or not a valid UUID
+    (garbage ids would otherwise reach the ORM and die with a DataError 500)."""
+    if isinstance(value, uuid_mod.UUID):
+        return value
+    if not value:
+        return None
+    try:
+        return uuid_mod.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 
 def _current_student():

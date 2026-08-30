@@ -9,18 +9,31 @@ from app.models.exam import Marks, ReportCard
 from app.models.academic import Subject
 from app.models.fee import FeeCollection
 from app.models.library import Book, BookIssue
-from app.models.lms import Course, Quiz, QuizAttempt, StudentProgress
+from app.models.lms import Course, Lesson, Quiz, QuizAttempt, StudentProgress
 from app.models.notice import Notice
 from app.models.portfolio import StudentPortfolio, PortfolioItem
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
 from app.models.wellbeing import MoodEntry
+from app.plugins.decorators import plugin_required
 from app.utils.decorators import school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import success_response, error_response
 from extensions import db
 
 student_app_bp = Blueprint("student_app", __name__, url_prefix="/student")
+
+
+def _safe_ad_to_bs(ad_date):
+    """ad_to_bs that degrades to None instead of OverflowError — dates beyond
+    the nepali_datetime conversion range (far-future due dates) 500ed the
+    whole /student/assignments response (same fix as assignments.py)."""
+    if not ad_date:
+        return None
+    try:
+        return ad_to_bs(ad_date)
+    except (OverflowError, ValueError, TypeError):
+        return None
 
 
 def _current_student():
@@ -211,7 +224,7 @@ def student_assignments():
             "subject": a.subject.name if a.subject else None,
             "teacher": a.teacher.full_name if a.teacher else None,
             "due_date": a.due_date.isoformat() if a.due_date else None,
-            "due_date_bs": ad_to_bs(a.due_date) if a.due_date else None,
+            "due_date_bs": _safe_ad_to_bs(a.due_date),
             "is_overdue": bool(a.due_date and a.due_date.date() < date.today()),
             "attachments": a.attachment_urls or [],
             "attachment_urls": a.attachment_urls or [],
@@ -404,6 +417,7 @@ def student_timetable():
 @student_app_bp.route("/library", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("library_management")
 def student_library():
     student = _current_student()
     if not student:
@@ -441,6 +455,7 @@ def student_library():
 @student_app_bp.route("/library/request", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("library_management")
 def student_library_request():
     student = _current_student()
     if not student:
@@ -461,6 +476,7 @@ def student_library_request():
 @student_app_bp.route("/elibrary", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("elibrary")
 def student_elibrary():
     books = Book.query.filter_by(school_id=g.school_id, is_deleted=False).order_by(Book.title.asc()).all()
     payload = [
@@ -519,11 +535,32 @@ def student_lms():
     for p in progress_rows:
         progress_by_course.setdefault(str(p.course_id), []).append(p)
 
+    # Derive the denominator from ACTUAL lesson rows (same rule as the
+    # canonical POST /lms/courses/<id>/progress re-derivation). The
+    # denormalized Course.total_lessons column is never maintained when
+    # lessons are added, so using it alone made every course read 0% here
+    # even with completed lessons. One grouped COUNT query — no N+1.
+    lesson_counts: dict = {}
+    if course_ids:
+        from sqlalchemy import func as _func
+
+        rows = (
+            db.session.query(Lesson.course_id, _func.count(Lesson.id))
+            .filter(
+                Lesson.school_id == g.school_id,
+                Lesson.course_id.in_(course_ids),
+                Lesson.is_deleted.is_(False),
+            )
+            .group_by(Lesson.course_id)
+            .all()
+        )
+        lesson_counts = {str(cid): cnt for cid, cnt in rows}
+
     course_payload = []
     for c in courses:
         course_progress = progress_by_course.get(str(c.id), [])
         completed_lessons = len([p for p in course_progress if p.completed])
-        total_lessons = c.total_lessons or 0
+        total_lessons = lesson_counts.get(str(c.id)) or c.total_lessons or 0
         pct = round((completed_lessons / total_lessons) * 100, 1) if total_lessons > 0 else 0
         course_payload.append(
             {
@@ -615,14 +652,143 @@ def student_portfolio():
 @jwt_required()
 @school_required
 def student_achievements():
+    """The student's real points, badges, leaderboard and history.
+
+    E176: this endpoint returned a hardcoded all-zero payload even though the
+    gamification models (PointsLog / StudentBadge / Badge) were fully
+    populated by /gamification admin actions — the mobile achievements screen
+    always showed 0 points, no badges and an empty leaderboard.
+    """
+    from app.models.gamification import Badge, PointsLog, StudentBadge
+
+    student = _current_student()
+    if not student:
+        return error_response("Student profile not found", 404)
+
+    my_total = (
+        db.session.query(db.func.coalesce(db.func.sum(PointsLog.points), 0))
+        .filter(
+            PointsLog.school_id == g.school_id,
+            PointsLog.student_id == student.id,
+            PointsLog.is_deleted.is_(False),
+        )
+        .scalar()
+        or 0
+    )
+
+    logs = (
+        PointsLog.query.filter_by(
+            school_id=g.school_id,
+            student_id=student.id,
+            is_deleted=False,
+        )
+        .order_by(PointsLog.awarded_at.desc(), PointsLog.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    history = [
+        {
+            "id": str(log.id),
+            "reason": log.reason,
+            "category": log.category,
+            "points": int(log.points or 0),
+            "date": (log.awarded_at or log.created_at).isoformat()
+            if (log.awarded_at or log.created_at)
+            else None,
+        }
+        for log in logs
+    ]
+
+    earned = (
+        StudentBadge.query.filter_by(
+            school_id=g.school_id, student_id=student.id, is_deleted=False
+        )
+        .all()
+    )
+    earned_by_badge = {str(row.badge_id): row for row in earned}
+    badges_payload = []
+    for row in earned:
+        badge = row.badge
+        if not badge:
+            continue
+        badges_payload.append(
+            {
+                "id": str(badge.id),
+                "name": badge.name,
+                "description": badge.description,
+                "emoji": "🏅",
+                "earned_at": row.awarded_at.isoformat() if row.awarded_at else None,
+            }
+        )
+
+    locked_badges_payload = []
+    if earned_by_badge:
+        all_badges = Badge.query.filter_by(
+            school_id=g.school_id, is_deleted=False, is_active=True
+        ).all()
+        for badge in all_badges:
+            if str(badge.id) in earned_by_badge:
+                continue
+            locked_badges_payload.append(
+                {
+                    "id": str(badge.id),
+                    "name": badge.name,
+                    "description": badge.description,
+                    "requirement": (badge.criteria or {}).get("description") or badge.description,
+                    "points_value": badge.points_value,
+                    "emoji": "🔒",
+                }
+            )
+
+    # Leaderboard: top 10 students of the school by total points.
+    rows = (
+        db.session.query(
+            PointsLog.student_id,
+            db.func.sum(PointsLog.points).label("total"),
+        )
+        .filter(
+            PointsLog.school_id == g.school_id,
+            PointsLog.is_deleted.is_(False),
+        )
+        .group_by(PointsLog.student_id)
+        .order_by(db.func.sum(PointsLog.points).desc())
+        .limit(10)
+        .all()
+    )
+    leaderboard = []
+    rank = None
+    student_ids = [row.student_id for row in rows]
+    students_by_id = {}
+    if student_ids:
+        from app.models.student import Student as _Student
+
+        for s in _Student.query.filter(_Student.id.in_(student_ids)).all():
+            students_by_id[s.id] = s
+    for index, row in enumerate(rows, 1):
+        s = students_by_id.get(row.student_id)
+        is_me = row.student_id == student.id
+        if is_me:
+            rank = index
+        leaderboard.append(
+            {
+                "student_id": str(row.student_id),
+                "name": f"{s.first_name or ''} {s.last_name or ''}".strip() if s else "Student",
+                "class_name": s.klass.name if s and s.klass else None,
+                "points": int(row.total or 0),
+                "is_me": is_me,
+            }
+        )
+    if rank is None and my_total:
+        rank = None  # not in top 10 — total still shown in the header card
+
     return success_response(
         {
-            "total_points": 0,
-            "rank": None,
-            "badges": [],
-            "locked_badges": [],
-            "leaderboard": [],
-            "history": [],
+            "total_points": int(my_total),
+            "rank": rank,
+            "badges": badges_payload,
+            "locked_badges": locked_badges_payload,
+            "leaderboard": leaderboard,
+            "history": history,
         }
     )
 
@@ -630,6 +796,7 @@ def student_achievements():
 @student_app_bp.route("/wellbeing", methods=["GET"])
 @jwt_required()
 @school_required
+@plugin_required("wellbeing")
 def student_wellbeing():
     student = _current_student()
     if not student:
@@ -667,6 +834,7 @@ def student_wellbeing():
 @student_app_bp.route("/wellbeing/mood", methods=["POST"])
 @jwt_required()
 @school_required
+@plugin_required("wellbeing")
 def submit_student_mood():
     student = _current_student()
     if not student:
@@ -688,21 +856,21 @@ def submit_student_mood():
     return success_response({"saved": True})
 
 
-def _student_partial_paid(collection) -> float:
-    """Paid amount for a collection, mirroring parent_app._extract_partial_paid."""
-    if collection.payment_status == "paid":
-        return float(collection.amount or 0)
+def _student_money(collection) -> tuple[float, float]:
+    """(payable, paid) for a collection using the canonical fees helpers.
 
-    notes = collection.notes or ""
-    marker = "[partial_paid:"
-    if marker not in notes:
-        return 0
+    E172: the local `_student_partial_paid` returned the raw `amount` column
+    for fully-paid rows — a paid bill with a discount overstated the student's
+    "paid" total (and its own per-invoice amount) by the discount, diverging
+    from /fees (parent app) and /reports. payable = base + fine − discount;
+    paid = the recorded payment (full payable when paid, [partial_paid:…]
+    note value otherwise), capped at payable.
+    """
+    from app.api.v1.fees import _collection_payable_total, _extract_partial_paid
 
-    try:
-        value = notes.split(marker, 1)[1].split("]", 1)[0]
-        return min(max(float(value), 0), float(collection.amount or 0))
-    except (ValueError, IndexError):
-        return 0
+    payable = _collection_payable_total(collection)
+    paid = min(_extract_partial_paid(collection), payable)
+    return payable, paid
 
 
 @student_app_bp.route("/fees", methods=["GET"])
@@ -728,12 +896,13 @@ def student_fees():
     paid = 0.0
     invoices = []
     for c in collections:
-        amount = float(c.amount or 0)
-        paid_amount = _student_partial_paid(c)
-        due_amount = max(amount - paid_amount, 0)
-        total_fees += amount
-        paid += paid_amount
         status = c.payment_status or "pending"
+        if status == "waived":
+            continue
+        payable, paid_amount = _student_money(c)
+        due_amount = max(payable - paid_amount, 0)
+        total_fees += payable
+        paid += paid_amount
         if due_amount <= 0 and status in (None, "pending", "partial"):
             status = "paid"
         month_parts = [part for part in [c.month_bs, c.year_bs] if part]
@@ -743,7 +912,9 @@ def student_fees():
                 "title": c.fee_item_name or "Fee",
                 "fee_type": c.fee_item_name or "Fee",
                 "month": " ".join(month_parts) if month_parts else None,
-                "amount": round(due_amount if due_amount > 0 else amount, 2),
+                # Due invoices show the outstanding balance; settled ones show
+                # the payable total that was actually billed (discount-aware).
+                "amount": round(due_amount if due_amount > 0 else payable, 2),
                 "status": status,
             }
         )

@@ -4,6 +4,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../repositories/attendance_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/error_container.dart';
 import '../widgets/shimmer_loading_list.dart';
 
 /// Student attendance view — monthly calendar with color-coded status.
@@ -25,6 +26,7 @@ class _StudentAttendanceScreenState
   DateTime? _selectedDay;
   Map<DateTime, String> _attendanceMap = {};
   bool _isLoading = true;
+  String? _error;
   int _totalPresent = 0;
   int _totalAbsent = 0;
   int _totalLate = 0;
@@ -76,7 +78,11 @@ class _StudentAttendanceScreenState
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('StudentAttendanceScreen load failed: $e');
+      setState(() {
+        _error = 'Could not load attendance.';
+        _isLoading = false;
+      });
     }
   }
 
@@ -88,7 +94,12 @@ class _StudentAttendanceScreenState
       appBar: const CustomAppBar(title: 'My Attendance'),
       body: _isLoading
           ? const ShimmerLoadingList()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(
+                  errorMessage: _error!,
+                  onRetry: _loadAttendance,
+                )
+              : RefreshIndicator(
               onRefresh: _loadAttendance,
               child: ListView(
                 padding: const EdgeInsets.all(16),

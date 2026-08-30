@@ -56,9 +56,10 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [form, setForm] = useState<StaffForm>(EMPTY_FORM);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["staff", search],
     queryFn: async () => { const r = await api.get("/staff", { params: { search: search || undefined } }); return r.data; },
+    retry: 1,
   });
 
   const staff: Staff[] = data?.data || [];
@@ -132,6 +133,15 @@ export default function StaffPage() {
   }
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load staff. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -11,6 +11,7 @@ class TimetableScreen extends StatefulWidget {
 class _TimetableScreenState extends State<TimetableScreen> {
   List<Map<String, dynamic>> _slots = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,7 +20,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await ApiClient.instance.get('/timetable');
       final data = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
@@ -29,8 +33,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('TimetableScreen load failed: $e\n$st');
       _slots = [];
+      _error = 'Could not load the timetable.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -38,6 +44,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: LoadingShimmer());
+    if (_error != null) {
+      return Scaffold(
+        body: ErrorContainer(errorMessage: _error!, onRetry: _load),
+      );
+    }
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,

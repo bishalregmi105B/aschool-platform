@@ -46,16 +46,19 @@ function AnnouncementsContent() {
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({
-    title: "", content: "", notice_type: "announcement",
+    // E127: notice_type is a Postgres enum (general|academic|event|holiday|
+    // urgent) — the old hardcoded "announcement" 500ed on every publish.
+    title: "", content: "", notice_type: "general",
     target_audience: ["all"], is_pinned: false,
   });
 
-  const { data: announcements, isLoading } = useQuery({
+  const { data: announcements, isLoading, isError, refetch } = useQuery({
     queryKey: ["announcements"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<unknown>>("/notices", {
-        params: { type: "announcement" },
-      });
+      // E127: no type filter — "announcement" is not a valid notice_type
+      // enum value (general|academic|event|holiday|urgent); fetching all
+      // notices keeps this view honest instead of 500ing server-side.
+      const res = await api.get<ApiResponse<unknown>>("/notices");
       const raw = res.data.data;
       if (Array.isArray(raw)) return raw as Notice[];
       if (raw && typeof raw === "object" && "data" in (raw as object)) {
@@ -63,6 +66,7 @@ function AnnouncementsContent() {
       }
       return [] as Notice[];
     },
+    retry: 1,
   });
 
   const createMutation = useMutation({
@@ -73,7 +77,7 @@ function AnnouncementsContent() {
       queryClient.invalidateQueries({ queryKey: ["announcements"] });
       toast.success("Announcement published");
       setShowDialog(false);
-      setForm({ title: "", content: "", notice_type: "announcement", target_audience: ["all"], is_pinned: false });
+      setForm({ title: "", content: "", notice_type: "general", target_audience: ["all"], is_pinned: false });
     },
     onError: () => toast.error("Failed to publish announcement"),
   });
@@ -96,6 +100,17 @@ function AnnouncementsContent() {
   };
 
   if (isLoading) return <PageLoader />;
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load announcements. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

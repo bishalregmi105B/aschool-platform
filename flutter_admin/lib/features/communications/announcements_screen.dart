@@ -11,6 +11,7 @@ class AnnouncementsScreen extends StatefulWidget {
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -19,7 +20,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/notices', queryParameters: {
         'is_published': 'true',
@@ -32,8 +36,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList()
           : [];
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AnnouncementsScreen load failed: $e\n$st');
       _items = [];
+      _error = 'Could not load announcements.';
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -43,7 +49,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     return Scaffold(
       body: _loading
           ? const LoadingShimmer()
-          : RefreshIndicator(
+          : _error != null
+              ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),

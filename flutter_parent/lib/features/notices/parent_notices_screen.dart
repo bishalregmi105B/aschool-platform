@@ -29,7 +29,8 @@ class _ParentNoticesScreenState extends ConsumerState<ParentNoticesScreen> {
     });
     try {
       _notices = await NoticesService.fetchNotices(targetRole: 'parent');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ParentNoticesScreen load failed: $e\n$st');
       _error = 'Unable to load notices right now.';
     }
     if (mounted) {

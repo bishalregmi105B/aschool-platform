@@ -73,3 +73,8 @@ Mighty School Pro v1.6/
 
 # local build logs
 *.log
+
+# live browser-test evidence + agent probe scripts
+gui-test-screenshots/
+backend/tmp_*_verify.py
+.playwright-mcp/

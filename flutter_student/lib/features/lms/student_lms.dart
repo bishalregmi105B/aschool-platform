@@ -18,6 +18,7 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
   List<dynamic> _courses = [];
   List<dynamic> _quizzes = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,15 +28,21 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.instance.get('/student/lms');
-      final payload = res.data?['data'] as Map?;
+      final payload = safeMapOrNull(res.data?['data']);
       setState(() {
-        _courses = (payload?['courses'] as List?) ?? [];
-        _quizzes = (payload?['quizzes'] as List?) ?? [];
+        _courses = safeList(payload?['courses']);
+        _quizzes = safeList(payload?['quizzes']);
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('StudentLMS load failed: $e\n$st');
+      _error = 'Could not load your courses.';
+    }
     setState(() => _loading = false);
   }
 
@@ -51,7 +58,11 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
       pluginSlug: 'lms',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'LMS'),
-        body: Column(
+        body: _loading
+            ? const LoadingShimmer()
+            : _error != null
+                ? ErrorContainer(errorMessage: _error!, onRetry: _load)
+                : Column(
           children: [
             TabBar(
               controller: _tabController,
@@ -93,9 +104,9 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
         itemCount: _courses.length,
         itemBuilder: (context, index) {
           final course = _courses[index];
-          final progress = (course['progress'] as num?)?.toDouble() ?? 0;
-          final totalLessons = (course['total_lessons'] as int?) ?? 0;
-          final completedLessons = (course['completed_lessons'] as int?) ?? 0;
+          final progress = safeDoubleOrNull(course['progress']) ?? 0;
+          final totalLessons = safeIntOrNull(course['total_lessons']) ?? 0;
+          final completedLessons = safeIntOrNull(course['completed_lessons']) ?? 0;
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -287,7 +298,7 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
 
   void _showCourseDetail(Map<String, dynamic> course) {
     final theme = Theme.of(context);
-    final lessons = (course['lessons'] as List?) ?? [];
+    final lessons = safeList(course['lessons']);
 
     showModalBottomSheet(
       context: context,
@@ -395,12 +406,15 @@ class _QuizPlayerState extends State<_QuizPlayer> {
   late int _remainingSeconds;
   bool _submitting = false;
 
-  List<dynamic> get _questions => (widget.quiz['questions'] as List?) ?? [];
+  List<dynamic> get _questions {
+    final questions = widget.quiz['questions'];
+    return questions is List ? questions : const [];
+  }
 
   @override
   void initState() {
     super.initState();
-    final minutes = (widget.quiz['time_limit_minutes'] as num?)?.toInt() ?? 0;
+    final minutes = safeIntOrNull(widget.quiz['time_limit_minutes']) ?? 0;
     _remainingSeconds = minutes * 60;
     if (_remainingSeconds > 0) {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -477,8 +491,9 @@ class _QuizPlayerState extends State<_QuizPlayer> {
           else
             ..._questions.asMap().entries.map((entry) {
               final index = entry.key;
-              final question = Map<String, dynamic>.from(entry.value as Map);
-              final options = (question['options'] as List?) ?? [];
+              final question = safeMap(entry.value);
+              final options =
+                  question['options'] is List ? safeList(question['options']) : const [];
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -567,8 +582,8 @@ class _QuizPlayerState extends State<_QuizPlayer> {
     var earned = 0.0;
     var total = 0.0;
     for (final entry in _questions.asMap().entries) {
-      final question = Map<String, dynamic>.from(entry.value as Map);
-      final marks = (question['marks'] as num?)?.toDouble() ?? 1.0;
+      final question = safeMap(entry.value);
+      final marks = safeDouble(question['marks'], fallback: 1.0);
       total += marks;
       if (_answers[entry.key] == _correctAnswer(question)) {
         earned += marks;

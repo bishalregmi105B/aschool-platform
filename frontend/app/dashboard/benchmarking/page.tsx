@@ -6,6 +6,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, TrendingDown, Award, Target } from "lucide-react";
 
 export default function BenchmarkingPage() {
@@ -17,7 +18,8 @@ export default function BenchmarkingPage() {
 }
 
 function BenchmarkingContent() {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<any>({
+    retry: 1,
     queryKey: ["benchmarking"],
     queryFn: async () => {
       const res = await api.get("/benchmarking/overview");
@@ -26,6 +28,16 @@ function BenchmarkingContent() {
   });
 
   if (isLoading) return <PageLoader />;
+    if (isError) {
+      return (
+        <div className="max-w-2xl mx-auto p-6">
+          <Card><CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load benchmarking data. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent></Card>
+        </div>
+      );
+    }
 
   const metrics = [
     { label: "Pass Rate", school: data?.school?.pass_rate || 0, district: data?.district?.pass_rate || 0, national: data?.national?.pass_rate || 0, icon: Award, suffix: "%" },

@@ -1,4 +1,6 @@
 /// Guardian model — maps to backend Guardian (guardians table)
+import '../utils/safe_parse.dart';
+
 class Guardian {
   final String id;
   final String studentId;
@@ -30,18 +32,18 @@ class Guardian {
 
   factory Guardian.fromJson(Map<String, dynamic> json) {
     return Guardian(
-      id: json['id'] as String,
-      studentId: json['student_id'] as String? ?? '',
-      userId: json['user_id'] as String?,
-      fullName: json['full_name'] as String? ?? '',
-      fullNameNepali: json['full_name_nepali'] as String?,
-      phone: json['phone'] as String?,
-      phone2: json['phone_2'] as String?,
-      email: json['email'] as String?,
-      relation: json['relation'] as String? ?? 'guardian',
-      isPrimary: json['is_primary'] as bool? ?? false,
-      occupation: json['occupation'] as String?,
-      educationLevel: json['education_level'] as String?,
+      id: safeString(json['id']),
+      studentId: safeString(json['student_id']),
+      userId: safeStringOrNull(json['user_id']),
+      fullName: safeString(json['full_name']),
+      fullNameNepali: safeStringOrNull(json['full_name_nepali']),
+      phone: safeStringOrNull(json['phone']),
+      phone2: safeStringOrNull(json['phone_2']),
+      email: safeStringOrNull(json['email']),
+      relation: safeString(json['relation'], fallback: 'guardian'),
+      isPrimary: safeBool(json['is_primary']),
+      occupation: safeStringOrNull(json['occupation']),
+      educationLevel: safeStringOrNull(json['education_level']),
     );
   }
 

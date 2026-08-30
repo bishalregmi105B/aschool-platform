@@ -1,24 +1,20 @@
-"""AI School Insights Service — Claude-powered weekly intelligence reports."""
+"""AI School Insights Service — AI-powered weekly intelligence reports.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 
 import json
 from datetime import datetime, timedelta
 
-from flask import current_app, g
 from sqlalchemy import func
 
+from app.services.ai.token_hub import AITokenHub
 from extensions import db, cache
 
 
 class SchoolInsightsService:
-    """Generate weekly school intelligence reports using Claude AI."""
-
-    MODEL_FAST = "claude-haiku-4-5-20241022"
-    MODEL_QUALITY = "claude-sonnet-4-20250514"
-
-    @staticmethod
-    def _get_client():
-        import anthropic
-        return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
+    """Generate weekly school intelligence reports using AI."""
 
     @staticmethod
     def _fee_paid_amount(collection) -> float:
@@ -36,8 +32,13 @@ class SchoolInsightsService:
             return 0
 
     @classmethod
-    def generate_weekly_report(cls, school_id: str) -> dict:
-        """Generate a comprehensive weekly school intelligence report."""
+    def generate_weekly_report(cls, school_id: str, user_id=None) -> dict:
+        """Generate a comprehensive weekly school intelligence report.
+
+        ``user_id`` is optional — resolved from the request context (``g``)
+        when omitted (Celery-triggered calls are attributed to the school
+        owner by the hub), so existing callers work unchanged.
+        """
         from app.models.attendance import Attendance
         from app.models.fee import FeeCollection
         from app.models.student import Student
@@ -108,15 +109,18 @@ Return JSON with:
 
 Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
 
-        client = cls._get_client()
-        response = client.messages.create(
-            model=cls.MODEL_FAST,
-            max_tokens=1024,
+        text = AITokenHub.request(
+            school_id=school_id,
+            user_id=user_id,
+            feature="school-insights:weekly",
             messages=[{"role": "user", "content": prompt}],
-        )
+            model="fast",  # haiku-class model via hub routing
+            max_tokens=1024,
+            temperature=1.0,  # matches the previous direct Anthropic default
+            metadata={"school_id": str(school_id)},
+        )["text"]
 
         try:
-            text = response.content[0].text
             # Extract JSON from response
             start = text.index("{")
             end = text.rindex("}") + 1
@@ -184,8 +188,7 @@ Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
             recent_incidents = Incident.query.filter(
                 Incident.school_id == school_id,
                 Incident.created_at >= thirty_days,
-            ).filter(
-                Incident.students_involved.contains(str(student.id))
+                Incident.involved_student_ids.any(student.id),
             ).count()
 
             if recent_incidents > 0:

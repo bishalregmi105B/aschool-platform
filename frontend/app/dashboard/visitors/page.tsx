@@ -63,6 +63,7 @@ function VisitorsContent() {
   const checkOut = useMutation({
     mutationFn: async (id: string) => (await api.post(`/visitors/${id}/checkout`)).data,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["visitors"] }); toast.success("Visitor checked out"); },
+    onError: () => toast.error("Check-out failed"),
   });
 
   if (isLoading) return <PageLoader />;

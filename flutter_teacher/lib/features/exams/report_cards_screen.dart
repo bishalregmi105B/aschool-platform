@@ -154,8 +154,8 @@ class _TeacherReportCardsScreenState
             itemCount: cards.length,
             itemBuilder: (_, index) {
               final card = cards[index];
-              final pct = (card['percentage'] as num?)?.toDouble() ??
-                  (card['total_percentage'] as num?)?.toDouble() ??
+              final pct = safeDoubleOrNull(card['percentage']) ??
+                  safeDoubleOrNull(card['total_percentage']) ??
                   0;
               final grade = card['grade']?.toString() ??
                   card['overall_grade']?.toString() ??
@@ -163,7 +163,7 @@ class _TeacherReportCardsScreenState
               final rank = card['rank']?.toString() ??
                   card['rank_in_class']?.toString() ??
                   '-';
-              final gpa = (card['overall_gpa'] as num?)?.toDouble();
+              final gpa = safeDoubleOrNull(card['overall_gpa']);
 
               return ESchoolAnimatedEntry(
                 index: index,

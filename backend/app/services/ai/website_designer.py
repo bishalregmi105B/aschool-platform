@@ -1,10 +1,11 @@
-"""AI Website Designer — generates school websites from prompts using Claude."""
+"""AI Website Designer — generates school websites from prompts using AI.
+
+All LLM calls route through AITokenHub — per-school quota enforcement and
+usage logging happen there (E7: no direct Anthropic calls).
+"""
 import json
-import os
 
-import anthropic
-
-CLAUDE_MODEL = os.getenv("CLAUDE_QUALITY_MODEL", "claude-sonnet-4-20250514")
+from app.services.ai.token_hub import AITokenHub
 
 
 class SchoolWebsiteDesigner:
@@ -19,14 +20,19 @@ class SchoolWebsiteDesigner:
         language: str = "en",
         key_strengths: list | None = None,
         logo_description: str | None = None,
+        school_id=None,
+        user_id=None,
     ) -> dict:
         """Generate 3 website design variations for a school.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
 
         Returns:
             {
                 "variations": [
                     {
-                        "theme_slug": "modern-minimal",
+                        "theme_slug": "global-elearning",
                         "style_label": "Clean & Modern",
                         "why_this_fits": "...",
                         "color_palette": {"primary": "#...", "secondary": "#...", ...},
@@ -51,10 +57,9 @@ Style preference: {style_preference} (traditional/modern/vibrant/minimal)
 Key strengths: {strengths_text}
 Language: {language}{logo_context}
 
-Available themes: government, private-classic, modern-minimal, montessori, tech-school,
-international, boarding, nepal-heritage, community, college, primary-colorful,
-secondary-professional, sports-school, arts-school, religious, girls-school,
-science-school, language-school, dark-premium, festival-auto
+Available themes: collegiate-heritage, university-azure, educenter-bright,
+kids-campus-playful, blossom-montessori, community-skyline, global-elearning,
+boarding-crimson, institute-industrial, campus-warm
 
 For each variation, return a JSON object with:
 - theme_slug: best matching theme from the list above
@@ -69,23 +74,28 @@ For each variation, return a JSON object with:
 
 Respond ONLY with a JSON object: {{"variations": [...]}}"""
 
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
         try:
-            client = anthropic.Anthropic()
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=2000,
+            text = AITokenHub.request(
+                school_id=school_id,
+                user_id=user_id,
+                feature="website-designer:generate-design",
                 messages=[{"role": "user", "content": prompt}],
-            )
-            text = response.content[0].text.strip()
+                model="smart",  # quality tier (sonnet-class model via hub routing)
+                max_tokens=2000,
+                temperature=1.0,  # matches the previous direct Anthropic default
+                metadata={"school_name": school_name, "style_preference": style_preference},
+            )["text"]
+            text = text.strip()
             if text.startswith("```"):
                 text = text.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(text)
         except Exception as e:
             return {
                 "variations": [
-                    _default_variation("modern-minimal", "Clean & Modern", school_name),
-                    _default_variation("nepal-heritage", "Nepal Heritage", school_name),
-                    _default_variation("private-classic", "Classic Elegance", school_name),
+                    _default_variation("global-elearning", "Clean & Modern", school_name),
+                    _default_variation("collegiate-heritage", "Traditional Elegance", school_name),
+                    _default_variation("educenter-bright", "Classic Elegance", school_name),
                 ],
                 "error": str(e),
             }
@@ -96,8 +106,14 @@ Respond ONLY with a JSON object: {{"variations": [...]}}"""
         school_type: str = "private",
         level: str = "secondary",
         existing_data: dict | None = None,
+        school_id=None,
+        user_id=None,
     ) -> dict:
-        """Generate full website copy for all pages."""
+        """Generate full website copy for all pages.
+
+        school_id/user_id are optional — resolved from the request context
+        (``g``) when omitted, so existing callers work unchanged.
+        """
         data_context = ""
         if existing_data:
             data_context = f"\nExisting school data: {json.dumps(existing_data, default=str)[:2000]}"
@@ -120,14 +136,19 @@ Return ONLY a JSON: {{
   "contact_intro": {{"en": "...", "ne": "..."}}
 }}"""
 
+        school_id, user_id = AITokenHub.resolve_context(school_id, user_id)
         try:
-            client = anthropic.Anthropic()
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=3000,
+            text = AITokenHub.request(
+                school_id=school_id,
+                user_id=user_id,
+                feature="website-designer:generate-copy",
                 messages=[{"role": "user", "content": prompt}],
-            )
-            text = response.content[0].text.strip()
+                model="smart",  # quality tier (sonnet-class model via hub routing)
+                max_tokens=3000,
+                temperature=1.0,  # matches the previous direct Anthropic default
+                metadata={"school_name": school_name},
+            )["text"]
+            text = text.strip()
             if text.startswith("```"):
                 text = text.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(text)
@@ -177,16 +198,16 @@ Return ONLY a JSON: {{
 
 def _default_variation(theme_slug: str, label: str, school_name: str) -> dict:
     palettes = {
-        "modern-minimal": {"primary": "#2563EB", "secondary": "#F8FAFC", "accent": "#F59E0B", "background": "#FFFFFF", "text": "#1E293B"},
-        "nepal-heritage": {"primary": "#B91C1C", "secondary": "#FEF3C7", "accent": "#D97706", "background": "#FFFBEB", "text": "#451A03"},
-        "private-classic": {"primary": "#1E3A5F", "secondary": "#F5F0EB", "accent": "#C9A94E", "background": "#FFFFFF", "text": "#1A1A2E"},
+        "global-elearning": {"primary": "#027abb", "secondary": "#269bd1", "accent": "#1e7ba6", "background": "#fafafa", "text": "#16181a"},
+        "collegiate-heritage": {"primary": "#294a70", "secondary": "#ffab1f", "accent": "#15305b", "background": "#ffffff", "text": "#333333"},
+        "educenter-bright": {"primary": "#004a8d", "secondary": "#e74c3c", "accent": "#014b8d", "background": "#f9f9f9", "text": "#222222"},
     }
     return {
         "theme_slug": theme_slug,
         "style_label": label,
         "why_this_fits": f"A {label.lower()} design that works well for {school_name}.",
-        "color_palette": palettes.get(theme_slug, palettes["modern-minimal"]),
-        "fonts": {"heading": "Inter", "body": "Inter"},
+        "color_palette": palettes.get(theme_slug, palettes["global-elearning"]),
+        "fonts": {"heading": "DM Sans", "body": "Inter"},
         "hero_style": "image_right",
         "ai_generated_copy": {
             "headline_en": f"Welcome to {school_name}",

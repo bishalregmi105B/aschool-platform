@@ -36,6 +36,7 @@ nepali-datetime==1.0.*
 
 # Payments
 requests==2.32.*
+stripe>=5.0,<6.0
 
 # PDF
 WeasyPrint==63.*

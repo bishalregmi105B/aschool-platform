@@ -3,10 +3,11 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.wellbeing import MoodEntry, CounselorNote, WellbeingSurvey
+from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
-from app.utils.response import created_response, success_response
+from app.utils.response import created_response, error_response, success_response
 from extensions import db
 
 wellbeing_bp = Blueprint("wellbeing", __name__, url_prefix="/wellbeing")
@@ -35,11 +36,31 @@ def list_mood_entries():
 def submit_mood():
     """Students submit daily mood check-in."""
     data = request.get_json(silent=True) or {}
+    if not data.get("mood"):
+        return error_response("mood is required", 400)
+    energy_level = data.get("energy_level")
+    if energy_level is not None:
+        try:
+            energy_level = int(energy_level)
+        except (TypeError, ValueError):
+            return error_response("energy_level must be an integer (1-5)", 400)
+    student_id = data.get("student_id")
+    if student_id:
+        # admins/teachers may log on behalf of a student — must belong to school
+        if not Student.query.filter_by(id=student_id, school_id=g.school_id).first():
+            return error_response("student_id does not match a student at this school", 400)
+    else:
+        # default: the logged-in user's own student profile (a User id is NOT a
+        # student_id — inserting it used to violate the FK and 500)
+        student = Student.query.filter_by(user_id=g.current_user.id, school_id=g.school_id).first()
+        if not student:
+            return error_response("student_id is required (current user has no student profile)", 400)
+        student_id = str(student.id)
     entry = MoodEntry(
         school_id=g.school_id,
-        student_id=data.get("student_id", g.current_user.id),
-        mood=data.get("mood"),  # happy, neutral, sad, anxious, angry
-        energy_level=data.get("energy_level"),  # 1-5
+        student_id=student_id,
+        mood=data.get("mood"),  # happy, okay, neutral, sad, anxious, angry
+        energy_level=energy_level,  # 1-5
         notes=data.get("notes", ""),
     )
     db.session.add(entry)
@@ -97,6 +118,10 @@ def list_counselor_notes():
 @role_required("superadmin", "school_admin", "teacher")
 def create_counselor_note():
     data = request.get_json(silent=True) or {}
+    if not data.get("student_id"):
+        return error_response("student_id is required", 400)
+    if not Student.query.filter_by(id=data["student_id"], school_id=g.school_id).first():
+        return error_response("student_id does not match a student at this school", 400)
     note = CounselorNote(
         school_id=g.school_id,
         student_id=data["student_id"],
@@ -143,17 +168,22 @@ def create_survey():
 
 
 def _mood_dict(m):
+    student = m.student if hasattr(m, "student") else None
     return {
         "id": str(m.id), "student_id": str(m.student_id) if m.student_id else None, "mood": m.mood,
+        # web mood tracker renders the student's name, not the raw uuid
+        "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
         "energy_level": m.energy_level, "notes": m.notes,
         "created_at": str(m.created_at) if m.created_at else None,
     }
 
 
 def _note_dict(n):
+    student = n.student if hasattr(n, "student") else None
     return {
         "id": str(n.id),
         "student_id": str(n.student_id) if n.student_id else None,
+        "student_name": f"{student.first_name} {student.last_name}".strip() if student else None,
         "counselor_id": str(n.counselor_id) if n.counselor_id else None,
         "note_type": n.note_type, "content": n.content, "is_confidential": n.is_confidential,
         "created_at": str(n.created_at) if n.created_at else None,

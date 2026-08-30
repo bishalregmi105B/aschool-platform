@@ -30,7 +30,8 @@ frontend:
       - { label: "Enter Marks", route: "/exams/marks" }
       - { label: "Results", route: "/exams/results" }
       - { label: "Report Cards", route: "/exams/report-cards" }
-      - { label: "AI Paper Generator", route: "/exams/ai-paper" }
+      # AI paper generation lives under AI Tools; /exams/ai-paper never existed.
+      - { label: "AI Paper Generator", route: "/dashboard/ai-tools/question-paper" }
     visible_to: ["school_admin", "teacher"]
 
 flutter:

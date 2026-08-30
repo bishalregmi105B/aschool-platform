@@ -87,7 +87,7 @@ class TimetableSlot {
       teacherId: resolvedTeacherId,
       teacherName: resolvedTeacherName,
       roomId: json['room_id']?.toString(),
-      roomName: json['room_name'] as String?,
+      roomName: _asString(json['room_name']),
       subject: subject,
     );
   }
