@@ -250,6 +250,23 @@ export default function Home() {
                     >
                       View Dashboard
                     </Link>
+                    <a
+                      href="/downloads/aschool-user.apk"
+                      download
+                      className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/20 transition-all backdrop-blur-sm"
+                    >
+                      <Smartphone size={14} /> Download App (Android)
+                    </a>
+                  </div>
+
+                  {/* App downloads */}
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-white/70">
+                    <span className="text-white/50">Mobile apps:</span>
+                    <a href="/downloads/aschool-user.apk" download className="underline hover:text-white">All-in-One (Admin · Teacher · Parent · Student)</a>
+                    <span className="text-white/30">|</span>
+                    <a href="/downloads/aschool-admin.apk" download className="underline hover:text-white">Admin App</a>
+                    <span className="text-white/30">|</span>
+                    <a href="https://app.brighternepal.com" className="underline hover:text-white">Web App</a>
                   </div>
 
                   {/* Trust stats row */}

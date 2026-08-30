@@ -5,7 +5,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /var/www/app.aschool.com.np:/var/www/app.aschool.com.np:ro
+      - ./nginx/app-web:/var/www/app.brighternepal.com:ro
       - nginx_cache:/var/cache/nginx
     depends_on:
       - flask

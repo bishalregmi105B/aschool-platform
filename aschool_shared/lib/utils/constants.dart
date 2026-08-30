@@ -5,11 +5,10 @@ class AppConstants {
   static const String appName = 'ASchool';
 
   /// Resolved at build time via --dart-define=API_BASE_URL=https://...
-  /// Release builds: flutter build apk --dart-define=API_BASE_URL=https://api.aschool.com.np
-  /// Dev builds fall back to the LAN address.
+  /// Defaults to production; pass --dart-define to override for dev.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:5001',
+    defaultValue: 'https://api.brighternepal.com',
   );
   static const String apiVersion = '/api/v1';
 
