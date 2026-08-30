@@ -77,8 +77,18 @@ api.interceptors.response.use(
         return api(originalRequest);
       }
 
-      // Refresh failed — session is over, redirect only if not already on an auth page
+      // Refresh failed — session is over, redirect only if not already on an auth page.
+      // Clear the dead auth cookies first: middleware treats a present refresh
+      // cookie as "maybe authenticated", so without this every guarded nav
+      // bounces /dashboard → /login forever (stale-server cookie scenario).
       if (typeof window !== "undefined" && !isAuthPage) {
+        try {
+          await api.post("/auth/logout");
+        } catch {
+          /* ignore — best-effort cookie clear */
+        }
+        document.cookie = "access_token=; Max-Age=0; path=/";
+        document.cookie = "refresh_token=; Max-Age=0; path=/";
         window.location.href = "/login";
       }
     }
