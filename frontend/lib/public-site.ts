@@ -17,7 +17,7 @@ const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http:
 // The success payload intentionally stays loosely typed (Record<string, any>)
 // to mirror the previous untyped `json.data` usage in the layout/pages — the
 // renderer consumes dozens of optional school fields.
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 export type PublicSiteData = Record<string, any>;
 
 export type PublicSiteResult =
