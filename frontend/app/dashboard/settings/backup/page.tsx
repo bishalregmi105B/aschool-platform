@@ -32,15 +32,7 @@ export default function DatabaseBackupPage() {
     retry: 1,
   });
 
-  if (isError) {
-    return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load backup status. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
-    );
-  }
-
+  // Hooks must run unconditionally — before any early return below.
   const triggerMutation = useMutation({
     mutationFn: () => api.post("/database-backup/trigger"),
     onMutate: () => setIsTriggering(true),
@@ -56,6 +48,15 @@ export default function DatabaseBackupPage() {
       setIsTriggering(false);
     },
   });
+
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center space-y-3">
+        <p className="text-sm text-destructive">Failed to load backup status. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
