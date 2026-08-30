@@ -287,7 +287,8 @@ export function Sidebar() {
       }
     }
     // Any unrecognised sections appended at end
-    for (const [key, items] of bySection) {
+    // (Array.from: Map iteration needs downlevelIteration — not set in tsconfig)
+    for (const [key, items] of Array.from(bySection.entries())) {
       if (key !== null && !PLUGIN_SECTION_ORDER.includes(key)) {
         sections.push({ header: key, items });
       }
