@@ -3,9 +3,9 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:aschool_shared/aschool_shared.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../theme/app_theme.dart';
 
 class AttachmentViewerWidget extends StatelessWidget {
   final List<String> attachmentUrls;
@@ -21,7 +21,7 @@ class AttachmentViewerWidget extends StatelessWidget {
 
   String _resolveUrl(String url) {
     if (url.startsWith('http')) return url;
-    return '${baseUrl ?? 'http://localhost:5001'}$url';
+    return '${baseUrl ?? AppConstants.baseUrl}$url';
   }
 
   bool _isImage(String url) {

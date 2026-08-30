@@ -165,7 +165,7 @@ class _AnnouncementCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     AttachmentViewerWidget(
                         attachmentUrls: attachmentUrls,
-                        baseUrl: 'http://localhost:5001'),
+                        baseUrl: AppConstants.baseUrl),
                   ],
                   if (createdAt.isNotEmpty) ...[
                     const SizedBox(height: 12),
