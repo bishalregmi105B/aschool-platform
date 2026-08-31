@@ -1,40 +1,25 @@
 "use client";
 
 /**
- * GraphicsPanel — QR generator, watermark stamps, and a curated icon library
- * (Tabler icons, MIT) that insert as colorable canvas objects.
+ * GraphicsPanel — Canva-style elements browser (search + category rail +
+ * thumbnail grid with accent recolor), plus the QR generator and watermark
+ * stamps from the original panel.
+ *
+ * Element library lives in lib/designer/elements.ts. Clicking a thumbnail
+ * bakes the accent color into the SVG string and hands it to onAddIcon,
+ * which CanvasEditor wires to canvas.addSVG(svg, {}, color) — a colorable
+ * fabric Group.
  */
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { QrCode, Stamp, Sparkles } from "lucide-react";
+import { QrCode, Stamp, Search, Shapes } from "lucide-react";
+import {
+  ELEMENT_CATEGORIES, ELEMENT_PRESET_COLORS, ELEMENT_TOTAL, searchElements,
+} from "@/lib/designer/elements";
 
-const ICON_COLOR = "#1e293b";
-
-/** Curated Tabler icons (MIT) — school-relevant set, inline SVG paths (24x24, stroke-based). */
-const ICONS: Array<{ name: string; body: string }> = [
-  { name: "Book", body: `<path d="M6 4h10a4 4 0 0 1 4 4v11a1 1 0 0 1 -1 1h-10a4 4 0 0 1 -4 -4v-11a1 1 0 0 1 1 -1" /><path d="M6 4a2 2 0 0 0 -2 2v3h3" /><path d="M20 19h-9" /><path d="M6 20a2 2 0 0 1 -2 -2" />` },
-  { name: "School", body: `<path d="M17 18a2 2 0 0 0 -2 -2h-9a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2h9a2 2 0 0 1 2 2v9a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-1" /><path d="M9 21h6" /><path d="M9 13l3 -3l3 3" />` },
-  { name: "Backpack", body: `<path d="M5 18v-8a5 5 0 0 1 10 0v8a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2" /><path d="M10 6v-2a2 2 0 0 1 4 0v2" /><path d="M5 14h10" />` },
-  { name: "Certificate", body: `<circle cx="15" cy="15" r="3" /><path d="M13 17.5v4.5l2 -1.5l2 1.5v-4.5" /><path d="M10 19h-5a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v4" /><path d="M9 8h6" />` },
-  { name: "Trophy", body: `<path d="M8 21h8" /><path d="M12 17v4" /><path d="M7 4h10v5a5 5 0 0 1 -10 0z" /><path d="M17 5h3v2a3 3 0 0 1 -3 3" /><path d="M7 5h-3v2a3 3 0 0 0 3 3" />` },
-  { name: "Star", body: `<path d="M12 3l2.6 5.3 5.9.9 -4.2 4.1 1 5.8 -5.3 -2.8 -5.3 2.8 1 -5.8 -4.2 -4.1 5.9 -.9z" />` },
-  { name: "Clock", body: `<circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />` },
-  { name: "Calendar", body: `<rect x="4" y="5" width="16" height="16" rx="2" /><path d="M16 3v4M8 3v4M4 11h16" />` },
-  { name: "Phone", body: `<path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2" />` },
-  { name: "Mail", body: `<rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6l9 -6" />` },
-  { name: "MapPin", body: `<path d="M12 21s-7 -5.5 -7 -11a7 7 0 0 1 14 0c0 5.5 -7 11 -7 11z" /><circle cx="12" cy="10" r="2.5" />` },
-  { name: "Bus", body: `<rect x="4" y="4" width="16" height="12" rx="2" /><path d="M4 10h16M10 4v6" /><circle cx="7.5" cy="18.5" r="1.5" /><circle cx="16.5" cy="18.5" r="1.5" />` },
-  { name: "Flask", body: `<path d="M9 3v7l-5 8a2 2 0 0 0 1.7 3h12.6a2 2 0 0 0 1.7 -3l-5 -8v-7" /><path d="M8 3h8" />` },
-  { name: "Palette", body: `<path d="M12 21a9 9 0 1 1 9 -9c0 2 -1.5 3 -3 3h-2a2 2 0 0 0 -2 2c0 1 -.5 4 -2 4z" /><circle cx="7.5" cy="10.5" r="1" /><circle cx="12" cy="7.5" r="1" /><circle cx="16.5" cy="10.5" r="1" />` },
-  { name: "Check", body: `<path d="M5 12l5 5l9 -10" />` },
-  { name: "Heart", body: `<path d="M12 20s-8 -5.5 -8 -11a4.5 4.5 0 0 1 8 -2.8a4.5 4.5 0 0 1 8 2.8c0 5.5 -8 11 -8 11z" />` },
-];
-
-function toSvg(body: string, color: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
-}
+const ICON_COLOR = "#64748b";
 
 interface Props {
   onAddQr: (value: string) => void;
@@ -42,13 +27,68 @@ interface Props {
   onAddIcon: (svg: string, color: string) => void;
 }
 
+/** Canva-style swatch row: preset colors + native free color input. */
+function ColorRow({ color, onChange }: { color: string; onChange: (c: string) => void }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {ELEMENT_PRESET_COLORS.map((c) => (
+        <button
+          key={c}
+          title={c}
+          onClick={() => onChange(c)}
+          style={{ background: c }}
+          className={`w-6 h-6 rounded-full border transition-transform hover:scale-110 ${
+            color.toLowerCase() === c.toLowerCase()
+              ? "ring-2 ring-offset-1 ring-primary border-transparent"
+              : "border-border"
+          }`}
+        />
+      ))}
+      <label
+        title="Custom color"
+        className="w-6 h-6 rounded-full border border-border cursor-pointer relative overflow-hidden hover:scale-110 transition-transform"
+        style={{
+          background:
+            "conic-gradient(#ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ec4899, #ef4444)",
+        }}
+      >
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+      </label>
+    </div>
+  );
+}
+
 export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Props) {
   const [qrValue, setQrValue] = useState("");
   const [wmText, setWmText] = useState("DRAFT");
-  const [iconColor, setIconColor] = useState(ICON_COLOR);
+
+  // elements browser state
+  const [accent, setAccent] = useState(ICON_COLOR);
+  const [activeCat, setActiveCat] = useState(ELEMENT_CATEGORIES[0].id);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  /** color baked into the svg string so canvas.addSVG inserts it pre-colored
+   *  (fabric keeps `currentColor` literal, so fill AND stroke must be baked) */
+  const insert = (svg: string) => onAddIcon(svg.replace(/currentColor/g, accent), accent);
+
+  /** items for the active category, or search hits across all categories */
+  const listing = useMemo(() => {
+    const q = query.trim();
+    if (q) {
+      return { mode: "search" as const, groups: [{ id: "__search", label: "Results", icon: "🔎", items: searchElements(q).map((r) => r.item) }] };
+    }
+    const cat = ELEMENT_CATEGORIES.find((c) => c.id === activeCat) ?? ELEMENT_CATEGORIES[0];
+    return { mode: "browse" as const, groups: [cat] };
+  }, [query, activeCat]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 flex flex-col min-h-0">
       {/* QR */}
       <div>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
@@ -96,24 +136,86 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
 
       <Separator />
 
-      {/* Icons */}
-      <div>
+      {/* ── Elements browser (Canva-style) ─────────────────────── */}
+      <div className="min-h-0">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-          <Sparkles className="h-3 w-3" /> Icons
+          <Shapes className="h-3 w-3" /> Elements
+          <span className="font-normal normal-case tracking-normal">({ELEMENT_TOTAL})</span>
         </p>
+
+        {/* search */}
+        <div className="relative mb-2">
+          <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={searchRef}
+            placeholder={`Search ${ELEMENT_TOTAL} elements…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-8 text-xs pl-8"
+          />
+        </div>
+
+        {/* accent color row */}
         <div className="flex items-center gap-2 mb-2">
-          <label className="text-xs">Color:</label>
-          <input type="color" value={iconColor} onChange={(e) => setIconColor(e.target.value)}
-            className="w-7 h-7 rounded border cursor-pointer" />
+          <span className="text-[10px] text-muted-foreground shrink-0">Color</span>
+          <ColorRow color={accent} onChange={setAccent} />
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {ICONS.map((icon) => (
-            <button key={icon.name} title={icon.name}
-              onClick={() => onAddIcon(toSvg(icon.body, iconColor), iconColor)}
-              className="aspect-square flex items-center justify-center border rounded-lg hover:bg-primary/5 hover:border-primary transition-all"
-              dangerouslySetInnerHTML={{ __html: toSvg(icon.body, "currentColor").replace("<svg ", '<svg width="20" height="20" ') }} />
-          ))}
+
+        <div className="flex gap-2 min-h-0">
+          {/* left category rail */}
+          <div className="flex flex-col gap-1 shrink-0 overflow-y-auto pr-0.5 max-h-[340px]">
+            {ELEMENT_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                title={cat.label}
+                onClick={() => { setActiveCat(cat.id); setQuery(""); }}
+                className={`w-9 h-9 rounded-lg text-base flex items-center justify-center transition-colors ${
+                  activeCat === cat.id && !query.trim()
+                    ? "bg-primary/15 ring-1 ring-primary/40"
+                    : "hover:bg-muted"
+                }`}
+              >
+                {cat.icon}
+              </button>
+            ))}
+          </div>
+
+          {/* items grid */}
+          <div className="flex-1 min-w-0 overflow-y-auto max-h-[340px] pr-0.5">
+            {listing.groups.map((group) => (
+              <div key={group.id} className="mb-2">
+                {query.trim() && (
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-1">
+                    {group.label} · {group.items.length} found
+                  </p>
+                )}
+                {group.items.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground py-3">
+                    No elements match “{query.trim()}”. Try shapes, star, arrow, bubble…
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.id}
+                        title={item.label}
+                        onClick={() => insert(item.svg)}
+                        className="aspect-square flex items-center justify-center border rounded-lg p-1.5
+                          text-muted-foreground hover:text-foreground hover:bg-primary/5 hover:border-primary
+                          transition-all [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-9 [&>svg]:max-w-9"
+                        dangerouslySetInnerHTML={{ __html: item.svg }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+
+        <p className="text-[10px] text-muted-foreground mt-1.5">
+          Click an element to insert it with the selected color. Recolor later from the Properties panel.
+        </p>
       </div>
     </div>
   );
