@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { schoolSiteHost } from "@/lib/site-domain";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -69,7 +70,7 @@ export default function DomainPage() {
         <h3 className="font-medium text-sm mb-2">Default Subdomain</h3>
         <div className="flex items-center gap-2 bg-gray-50 rounded p-3">
           <span className="text-sm font-mono">
-            {settings?.subdomain || "your-school"}.aschool.com.np
+            {schoolSiteHost(settings?.subdomain || "your-school")}
           </span>
           <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
             Always Active
@@ -128,7 +129,7 @@ export default function DomainPage() {
                             <td className="py-1 font-mono">CNAME</td>
                             <td className="py-1 font-mono">www</td>
                             <td className="py-1 font-mono text-blue-700">
-                              {settings.subdomain}.aschool.com.np
+                              {schoolSiteHost(settings.subdomain)}
                             </td>
                           </tr>
                         )}

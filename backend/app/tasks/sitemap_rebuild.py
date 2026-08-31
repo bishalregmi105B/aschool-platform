@@ -14,6 +14,7 @@ def rebuild_all_sitemaps():
     from extensions import db
     from app.models.plugin import SchoolPlugin
     from app.models.school import School, SchoolWebsite
+    from app.utils.tenant_url import school_site_url
 
     active_schools = (
         db.session.query(SchoolPlugin.school_id)
@@ -40,7 +41,7 @@ def rebuild_all_sitemaps():
                 continue
 
             # Build sitemap entries
-            base_url = f"https://{school.slug}.aschool.com.np"
+            base_url = school_site_url(school.slug)
             pages = [
                 {"url": base_url, "priority": "1.0"},
                 {"url": f"{base_url}/about", "priority": "0.8"},

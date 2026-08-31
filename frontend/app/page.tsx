@@ -26,6 +26,7 @@ import {
   Trophy,
   Fingerprint,
 } from "lucide-react";
+import { SCHOOL_SITE_DOMAIN } from "@/lib/site-domain";
 
 const sora = Sora({ subsets: ["latin"], variable: "--font-sora", display: "swap" });
 const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space", display: "swap" });
@@ -308,7 +309,7 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div className="rounded-2xl border border-black/8 p-3 float">
                         <p className="text-[10px] text-[color:var(--muted)]">School Website</p>
-                        <p className="text-xs font-semibold mt-0.5 text-[color:var(--ink)]">your-school.aschool.com.np</p>
+                        <p className="text-xs font-semibold mt-0.5 text-[color:var(--ink)]">{"your-school." + SCHOOL_SITE_DOMAIN}</p>
                         <p className="text-[10px] text-green-600 mt-0.5">✓ Live</p>
                       </div>
                       <div className="rounded-2xl border border-black/8 p-3 float" style={{ animationDelay: "1s" }}>
@@ -631,7 +632,7 @@ export default function Home() {
                     {[
                       { icon: Phone, label: "Call Us", value: "01-XXXXXXX / 98XXXXXXXX" },
                       { icon: MessageCircle, label: "WhatsApp", value: "98XXXXXXXX" },
-                      { icon: Mail, label: "Email", value: "info@aschool.com.np" },
+                      { icon: Mail, label: "Email", value: "info@brighternepal.com" },
                       { icon: MapPin, label: "Office", value: "Kathmandu, Nepal" },
                       { icon: Clock, label: "Hours", value: "Sun–Fri: 9AM – 5PM" },
                     ].map(({ icon: Icon, label, value }) => (

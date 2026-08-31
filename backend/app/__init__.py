@@ -98,7 +98,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     # Build allowed CORS origins from environment so the Authorization header
     # is permitted and wildcard '*' is not used (required for credentialed requests).
-    _base = app.config.get("BASE_DOMAIN", "aschool.com.np")
+    _base = app.config.get("BASE_DOMAIN", "brighternepal.com")
     _frontend = os.getenv("FRONTEND_URL", f"https://{_base}")
     _cors_origins = [
         _frontend,
@@ -328,7 +328,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
         # 1. Try subdomain resolution
         host = request.host.split(":")[0]
-        base = app.config.get("BASE_DOMAIN", "aschool.com.np")
+        base = app.config.get("BASE_DOMAIN", "brighternepal.com")
         if host.endswith(base) and host != base and host != f"www.{base}":
             slug = host.replace(f".{base}", "")
             school = School.query.filter_by(slug=slug, is_active=True).first()

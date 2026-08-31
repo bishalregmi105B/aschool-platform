@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { SCHOOL_SITE_DOMAIN } from "@/lib/site-domain";
 
 const PUBLIC_PATHS = ["/", "/login", "/register", "/verify-otp", "/_next", "/favicon.ico", "/api"];
 
@@ -7,12 +8,13 @@ const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http:
 
 /**
  * Main domains — requests on these go through normal dashboard routing.
- * Anything else is treated as a school subdomain.
+ * Anything else is treated as a school subdomain (or a custom domain that
+ * gets resolved via the backend public-domain lookup below).
  */
 const MAIN_HOSTS = new Set([
-  "aschool.com.np",
-  "www.aschool.com.np",
-  "app.aschool.com.np",
+  SCHOOL_SITE_DOMAIN,
+  `www.${SCHOOL_SITE_DOMAIN}`,
+  `app.${SCHOOL_SITE_DOMAIN}`,
   "localhost:3000",
   "localhost:3001",
   "localhost:3003",
@@ -23,7 +25,7 @@ const MAIN_HOSTS = new Set([
   "127.0.0.1",
 ]);
 
-const SCHOOL_BASE_DOMAINS = ["aschool.com.np"];
+const SCHOOL_BASE_DOMAINS = [SCHOOL_SITE_DOMAIN];
 
 function normalizeHost(host: string) {
   return host.split(":")[0].toLowerCase();
@@ -65,7 +67,7 @@ export async function middleware(request: NextRequest) {
   const hostname = normalizeHost(rawHost);
 
   // ─── Subdomain routing ───────────────────────────────
-  // If the request is on a subdomain (e.g. greenvalley.aschool.com.np),
+  // If the request is on a subdomain (e.g. greenvalley.brighternepal.com),
   // rewrite to /school/[slug]/... internally.
   const isMain = checkIsMainHost(rawHost, hostname);
   const baseDomain = SCHOOL_BASE_DOMAINS.find((domain) => hostname.endsWith(`.${domain}`));

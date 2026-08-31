@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 
 from extensions import celery
+from app.utils.tenant_url import school_site_domain
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ def send_fee_reminders(school_id: str):
             msg = (
                 f"Fee Reminder: Rs.{pending_amount:.2f} pending for "
                 f"{student.first_name} ({period}). "
-                f"Pay via eSewa/Khalti at aschool.com.np"
+                f"Pay via eSewa/Khalti at {school_site_domain()}"
             )
             send_sms.delay(guardian.phone, msg, school_id)
 

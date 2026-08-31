@@ -157,7 +157,7 @@ class BaseConfig:
     SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 
     # Domain
-    BASE_DOMAIN = os.getenv("BASE_DOMAIN", "aschool.com.np")
+    BASE_DOMAIN = os.getenv("BASE_DOMAIN", "brighternepal.com")
     CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "Asia/Kathmandu")
 
     # Next.js ISR on-demand revalidation (E201): the Flask publish/unpublish

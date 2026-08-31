@@ -9,6 +9,7 @@ from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
+from app.utils.tenant_url import school_site_host, school_site_url
 from extensions import db
 
 website_builder_bp = Blueprint("website_builder", __name__, url_prefix="/website-builder")
@@ -104,7 +105,7 @@ def get_website_status():
         "is_published": website.is_published,
         "theme_slug": website.theme_slug or ThemeEngineService.DEFAULT_THEME_ID,
         "subdomain": subdomain,
-        "default_domain": f"{subdomain}.aschool.com.np" if subdomain else None,
+        "default_domain": school_site_host(subdomain),
         "custom_domain": school.custom_domain if school else None,
         "domain_verified": bool(school.domain_verified) if school else False,
         "pages_count": pages_count,
@@ -112,7 +113,7 @@ def get_website_status():
         "public_url": (
             f"https://{school.custom_domain}"
             if school and school.custom_domain and school.domain_verified
-            else f"https://{subdomain}.aschool.com.np" if subdomain else None
+            else school_site_url(subdomain)
         ),
     })
 
@@ -366,16 +367,16 @@ def get_domain_config():
     school = School.query.get(g.school_id)
     return success_response({
         "subdomain": school.slug if school else None,
-        "default_domain": f"{school.slug}.aschool.com.np" if school else None,
+        "default_domain": school_site_host(school.slug) if school else None,
         "custom_domain": school.custom_domain if hasattr(school, "custom_domain") and school.custom_domain else None,
         "domain_verified": school.domain_verified if hasattr(school, "domain_verified") else False,
         "ssl_active": True,
-        "cname_target": f"{school.slug}.aschool.com.np" if school else None,
+        "cname_target": school_site_host(school.slug) if school else None,
         "dns_records": [
             {
                 "type": "CNAME",
                 "name": "www",
-                "value": f"{school.slug}.aschool.com.np",
+                "value": school_site_host(school.slug),
             }
         ] if school else [],
     })
