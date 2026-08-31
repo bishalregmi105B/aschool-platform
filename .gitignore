@@ -78,3 +78,4 @@ Mighty School Pro v1.6/
 gui-test-screenshots/
 backend/tmp_*_verify.py
 .playwright-mcp/
+nginx/app-web/
