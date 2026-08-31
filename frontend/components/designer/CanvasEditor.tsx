@@ -1,17 +1,22 @@
 "use client";
 /**
- * CanvasEditor — Canva-like canvas designer
- * Layout: [Icon Bar 64px] | [Sliding Panel 280px] | [Canvas] | [Properties 280px]
+ * CanvasEditor v2 — Canva-like canvas designer.
+ * Layout: [Icon Bar 64px] | [Sliding Panel 280px] | [Canvas + pages] | [Properties 256px]
+ * v2: store-driven panels, real viewport zoom + wheel, pink snap guides,
+ * layers panel, graphics (QR/watermark/icons), keyboard shortcuts, context
+ * menu, page duplicate/reorder, save-as-template.
  */
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { useCanvas, PAGE_SIZES } from "@/lib/hooks/useCanvas";
 import { useExport } from "@/lib/hooks/useExport";
+import { useDesignerStore, type DesignerPanel } from "@/lib/designer/store";
+import { attachShortcuts } from "@/lib/designer/shortcuts";
 
 import { Button }   from "@/components/ui/button";
 import { FilePicker } from "@/components/files/FilePicker";
@@ -24,19 +29,19 @@ import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  ArrowLeft, Save, Download, Undo2, Redo2, ZoomIn, ZoomOut,
-  Sparkles, ChevronDown, Plus, FileJson, X,
-  LayoutTemplate, Shapes, Type, Image as ImageIcon,
-  Palette, Upload, Search, Copy, Trash2,
-  ArrowUp, ArrowDown, FlipHorizontal, FlipVertical,
+  ArrowLeft, Save, Download, Undo2, Redo2, ZoomIn, ZoomOut, Maximize,
+  Sparkles, ChevronDown, Plus, FileJson, X, Copy, Trash2, FileOutput,
+  LayoutTemplate, Upload, Search, Grid3x3, Magnet, Layers, MoreVertical,
 } from "lucide-react";
 
 import PropertiesPanel from "./PropertiesPanel";
 import AIAssistPanel   from "./AIAssistPanel";
 import DataFillPanel   from "./DataFillPanel";
+import LayersPanel     from "./LayersPanel";
+import GraphicsPanel   from "./GraphicsPanel";
 
 const SHAPE_GROUPS = [
   { label: "Basic",    shapes: [{ id:"rect",label:"Rectangle",emoji:"⬜"},{ id:"circle",label:"Circle",emoji:"⭕"},{ id:"triangle",label:"Triangle",emoji:"🔺"},{ id:"line",label:"Line",emoji:"➖"},{ id:"arrow",label:"Arrow",emoji:"➡"}] },
@@ -49,36 +54,52 @@ const BG_PRESETS = [
   "#dbeafe","#fee2e2","#fdf4ff","#f0fdf4","#1e293b","#0f172a","#18181b","#7c2d12",
 ];
 
-type PanelId = "templates"|"elements"|"text"|"media"|"background"|"data"|null;
-
-const SIDEBAR_ICONS = [
-  { id:"templates" as PanelId, icon:"📄", label:"Templates" },
-  { id:"elements"  as PanelId, icon:"⬜", label:"Shapes"    },
-  { id:"text"      as PanelId, icon:"T",  label:"Text"      },
-  { id:"media"     as PanelId, icon:"🖼", label:"Media"     },
-  { id:"background"as PanelId, icon:"🎨", label:"Background"},
-  { id:"data"      as PanelId, icon:"📋", label:"Data Fill" },
+const SIDEBAR_ICONS: Array<{ id: DesignerPanel; icon: string; label: string }> = [
+  { id:"templates",  icon:"📄", label:"Templates"  },
+  { id:"shapes",     icon:"⬜", label:"Shapes"     },
+  { id:"text",       icon:"T",  label:"Text"       },
+  { id:"media",      icon:"🖼", label:"Media"      },
+  { id:"graphics",   icon:"✨", label:"Graphics"   },
+  { id:"background", icon:"🎨", label:"Background" },
+  { id:"data",       icon:"📋", label:"Data Fill"  },
+  { id:"layers",     icon:"🧱", label:"Layers"     },
 ];
+
+interface ContextMenuState { x: number; y: number }
+const CTX_NULL: ContextMenuState | null = null;
 
 export default function CanvasEditor() {
   const router       = useRouter();
   const searchParams = useSearchParams();
+  const queryClient  = useQueryClient();
   const docId        = searchParams.get("doc");
   const templateId   = searchParams.get("template");
   const bulkSessionId = searchParams.get("bulk_session");
 
-  const canvasRef      = useRef<HTMLCanvasElement>(null);
-  const canvas         = useCanvas(canvasRef);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const overlayRef   = useRef<HTMLCanvasElement>(null);
+  const canvas       = useCanvas(canvasRef, overlayRef);
   const { exportPDF, exportPNG } = useExport();
 
+  // store-driven ui state
+  const activePanel = useDesignerStore((s) => s.activePanel);
+  const setActivePanel = useDesignerStore((s) => s.setActivePanel);
+  const zoom = useDesignerStore((s) => s.zoom);
+  const setZoom = useDesignerStore((s) => s.setZoom);
+  const snapping = useDesignerStore((s) => s.snapping);
+  const toggleSnapping = useDesignerStore((s) => s.toggleSnapping);
+  const showGrid = useDesignerStore((s) => s.showGrid);
+  const setDirty = useDesignerStore((s) => s.setDirty);
+  const canUndo = useDesignerStore((s) => s.canUndo);
+  const canRedo = useDesignerStore((s) => s.canRedo);
+
   const [docName, setDocName]         = useState("Untitled Design");
-  const [activePanel, setActivePanel] = useState<PanelId>(null);
+  const [templateIdState, setTemplateIdState] = useState<string | null>(templateId);
   const [showAI, setShowAI]           = useState(false);
   const [bgColor, setBgColor]         = useState("#ffffff");
   const [imgUrlInput, setImgUrlInput] = useState("");
   const [tplSearch, setTplSearch]     = useState("");
-  const [unsplashQ, setUnsplashQ]     = useState("");
-  const [unsplashResults, setUnsplashResults] = useState<string[]>([]);
+  const [ctxMenu, setCtxMenu]         = useState<ContextMenuState | null>(null);
   const [showImagePicker, setShowImagePicker] = useState(false);
 
   const templateLoadedRef = useRef(false);
@@ -108,8 +129,8 @@ export default function CanvasEditor() {
   });
 
   useEffect(() => {
-    if (!templateId || docId || templateLoadedRef.current || !allTemplates?.length || !canvas.isReady) return;
-    const tpl = allTemplates.find((t: any) => t.id === templateId);
+    if (!templateIdState || docId || templateLoadedRef.current || !allTemplates?.length || !canvas.isReady) return;
+    const tpl = allTemplates.find((t: any) => t.id === templateIdState);
     if (!tpl) return;
     templateLoadedRef.current = true;
     setDocName(tpl.name);
@@ -120,14 +141,14 @@ export default function CanvasEditor() {
         canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
       }
     } else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
-  }, [templateId, docId, allTemplates, canvas, canvas.isReady]);
+  }, [templateIdState, docId, allTemplates, canvas, canvas.isReady]);
 
   useEffect(() => {
     if (!bulkSessionId || docLoadedRef.current || !canvas.isReady) return;
     const globalData = (window as any).__bulkSessionData;
     const key = `bulk_${bulkSessionId}`;
     const dataStr = sessionStorage.getItem(key);
-    
+
     if (globalData || dataStr) {
       docLoadedRef.current = true;
       setDocName("Bulk Generation");
@@ -145,16 +166,66 @@ export default function CanvasEditor() {
     mutationFn: async () => {
       const fullJSON = canvas.toFullJSON();
       const thumb = (() => { try { const fc = (window as any).__activeCanvas; return fc ? fc.toDataURL({ format:"jpeg", quality:0.4, multiplier:0.3 }) : ""; } catch { return ""; } })();
-      const payload: any = { name: docName, template_type: templateId || "custom", canvas_state: fullJSON, thumbnail_url: thumb };
+      const payload: any = { name: docName, template_type: templateIdState || "custom", canvas_state: fullJSON, thumbnail_url: thumb };
       if (docId) payload.id = docId;
       const r = await api.post("/design-studio/documents", payload);
       return r.data?.data;
     },
     onSuccess: (data) => {
       toast.success("Design saved");
+      setDirty(false);
       if (!docId && data?.id) router.replace(`/dashboard/designer/editor?doc=${data.id}`);
     },
     onError: () => toast.error("Failed to save"),
+  });
+
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const fullJSON = canvas.toFullJSON();
+      const page = fullJSON.pages?.[0] ?? {};
+      return (
+        await api.post("/design-studio/templates", {
+          name: docName,
+          category: "custom",
+          editor_type: "designer",
+          description: `Custom template saved from "${docName}"`,
+          page_size: "Custom",
+          width: page.width ?? 794,
+          height: page.height ?? 1123,
+          thumbnail_emoji: "🧩",
+          is_default: false,
+          fields: [],
+          canvas_json: page.json ?? {},
+        })
+      ).data;
+    },
+    onSuccess: () => {
+      toast.success("Saved as school template — find it under Templates");
+      queryClient.invalidateQueries({ queryKey: ["design-templates"] });
+    },
+    onError: () => toast.error("Could not save as template"),
+  });
+
+  const serverPdfMutation = useMutation({
+    mutationFn: async () => {
+      // Saved documents render server-side from their stored JSON.
+      if (!docId) throw new Error("save-first");
+      const r = await api.post("/design-studio/export/pdf", { document_id: docId }, { responseType: "blob" });
+      return r.data as Blob;
+    },
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${docName.replace(/\s+/g, "_").toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF downloaded (print-ready, Nepali-safe)");
+    },
+    onError: (e: any) => {
+      if (e?.message === "save-first") toast.info("Save your design first, then export server PDF");
+      else toast.error("Server PDF failed — try Export as PDF (browser)");
+    },
   });
 
   const handleExport = useCallback(async (format: "pdf"|"png"|"json") => {
@@ -188,19 +259,58 @@ export default function CanvasEditor() {
     map[id]?.();
   };
 
-  const searchUnsplash = () => {
-    if (!unsplashQ.trim()) return;
-    setUnsplashResults(Array.from({ length: 9 }, (_, i) =>
-      `https://source.unsplash.com/200x200/?${encodeURIComponent(unsplashQ)}&sig=${Date.now() + i}`
-    ));
-  };
+  // ── keyboard shortcuts ─────────────────────────────────────────
+  useEffect(() => {
+    if (!canvas.isReady) return;
+    return attachShortcuts({
+      undo: canvas.undo,
+      redo: canvas.redo,
+      copy: canvas.copySelected,
+      paste: canvas.pasteClipboard,
+      duplicate: canvas.duplicateSelected,
+      delete: canvas.deleteSelected,
+      escape: () => { (window as any).__activeCanvas?.discardActiveObject?.(); (window as any).__activeCanvas?.requestRenderAll?.(); setCtxMenu(null); },
+      nudge: canvas.nudgeSelected,
+      group: canvas.groupSelected,
+      ungroup: canvas.ungroupSelected,
+      bringToFront: canvas.bringToFront,
+      sendToBack: canvas.sendToBack,
+      save: () => saveMutation.mutate(),
+      zoomIn: () => canvas.zoomAt(zoom + 0.1),
+      zoomOut: () => canvas.zoomAt(zoom - 0.1),
+      zoomFit: canvas.zoomToFit,
+      togglePanel: (p) => setActivePanel(p),
+      nextPage: () => canvas.goToPage(Math.min(canvas.currentPageIdx + 1, canvas.pages.length - 1)),
+      prevPage: () => canvas.goToPage(Math.max(canvas.currentPageIdx - 1, 0)),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.isReady, zoom, canvas.currentPageIdx, canvas.pages.length]);
 
-  const zoom = canvas.zoom;
-  const currentSizeName = Object.entries(PAGE_SIZES).find(
-    ([, v]) => v.width === canvas.currentPageSettings?.width && v.height === canvas.currentPageSettings?.height
-  )?.[0] ?? "Custom";
-  const filteredTemplates = allTemplates.filter((t: any) => !tplSearch || t.name.toLowerCase().includes(tplSearch.toLowerCase()));
+  // ── ctrl+wheel zoom on canvas area ─────────────────────────────
+  const onCanvasWheel = useCallback((e: React.WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const fc = (window as any).__activeCanvas;
+    if (!fc) return;
+    const vt = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+    const cx = e.clientX - rect.left - vt[4];
+    const cy = e.clientY - rect.top - vt[5];
+    canvas.zoomAt(zoom * (e.deltaY < 0 ? 1.1 : 0.9), { x: cx / zoom, y: cy / zoom });
+  }, [canvas, zoom]);
 
+  // ── context menu ───────────────────────────────────────────────
+  const onCanvasContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const filteredTemplates = useMemo(
+    () => allTemplates.filter((t: any) => !tplSearch || t.name.toLowerCase().includes(tplSearch.toLowerCase())),
+    [allTemplates, tplSearch],
+  );
+
+  // ── data fill (tokens → textboxes + image placeholders) ──────────
   const applyDataFields = useCallback((fields: Record<string, string>) => {
     const fc = (window as any).__activeCanvas;
     if (!fc || !fields || Object.keys(fields).length === 0) {
@@ -280,6 +390,12 @@ export default function CanvasEditor() {
     }
   }, [canvas]);
 
+  const currentSizeName = Object.entries(PAGE_SIZES).find(
+    ([, v]) => v.width === canvas.currentPageSettings?.width && v.height === canvas.currentPageSettings?.height
+  )?.[0] ?? "Custom";
+
+  const hasSelection = !!canvas.selectedObject;
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-muted/20">
@@ -297,6 +413,37 @@ export default function CanvasEditor() {
           }}
         />
 
+        {/* CONTEXT MENU */}
+        {ctxMenu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+            <div className="fixed z-50 min-w-44 bg-background border rounded-lg shadow-lg py-1 text-sm"
+              style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 300) }}>
+              {[
+                { label: "Duplicate", action: canvas.duplicateSelected, hint: "Ctrl+D" },
+                { label: "Copy", action: canvas.copySelected, hint: "Ctrl+C" },
+                { label: "Paste here", action: canvas.pasteClipboard, hint: "Ctrl+V" },
+              ].map((i) => (
+                <button key={i.label} className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between"
+                  onClick={() => { i.action(); setCtxMenu(null); }}>
+                  {i.label}<span className="text-muted-foreground text-xs">{i.hint}</span>
+                </button>
+              ))}
+              <DropdownMenuSeparator />
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between" onClick={() => { canvas.bringToFront(); setCtxMenu(null); }}>
+                Bring to front<span className="text-muted-foreground text-xs">Ctrl+]</span>
+              </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between" onClick={() => { canvas.sendToBack(); setCtxMenu(null); }}>
+                Send to back<span className="text-muted-foreground text-xs">Ctrl+[</span>
+              </button>
+              <DropdownMenuSeparator />
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted text-destructive" onClick={() => { canvas.deleteSelected(); setCtxMenu(null); }}>
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+
         {/* TOP BAR */}
         <div className="flex items-center gap-1.5 px-3 h-12 border-b bg-background shrink-0 z-10">
           <Link href="/dashboard/designer">
@@ -312,23 +459,27 @@ export default function CanvasEditor() {
             {canvas.currentPageSettings?.orientation === "portrait" ? "Portrait" : "Landscape"}
           </Button>
           <Separator orientation="vertical" className="h-6 shrink-0" />
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.undo} disabled={!canvas.canUndo}><Undo2 className="h-3.5 w-3.5" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.redo} disabled={!canvas.canRedo}><Redo2 className="h-3.5 w-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.undo} disabled={!canUndo} title="Undo (Ctrl+Z)"><Undo2 className="h-3.5 w-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.redo} disabled={!canRedo} title="Redo (Ctrl+⇧+Z)"><Redo2 className="h-3.5 w-3.5" /></Button>
           <Separator orientation="vertical" className="h-6 shrink-0" />
           <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.setZoomLevel(Math.max(zoom - 0.1, 0.2))}><ZoomOut className="h-3.5 w-3.5" /></Button>
-            <button className="text-xs w-12 text-center hover:bg-muted rounded px-1 py-0.5" onClick={() => canvas.setZoomLevel(1)}>{Math.round(zoom * 100)}%</button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.setZoomLevel(Math.min(zoom + 0.1, 4))}><ZoomIn className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.zoomAt(zoom - 0.1)} title="Zoom out"><ZoomOut className="h-3.5 w-3.5" /></Button>
+            <button className="text-xs w-12 text-center hover:bg-muted rounded px-1 py-0.5" onClick={() => canvas.zoomAt(1)}>{Math.round(zoom * 100)}%</button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.zoomAt(zoom + 0.1)} title="Zoom in"><ZoomIn className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.zoomToFit} title="Zoom to fit (Ctrl+0)"><Maximize className="h-3.5 w-3.5" /></Button>
           </div>
-          {canvas.selectedObject && (
+          <Separator orientation="vertical" className="h-6 shrink-0" />
+          <Button variant={snapping ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={toggleSnapping} title="Smart snapping (magnet)">
+            <Magnet className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant={showGrid ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => useDesignerStore.getState().toggleGrid()} title="Grid overlay">
+            <Grid3x3 className="h-3.5 w-3.5" />
+          </Button>
+          {hasSelection && (
             <>
               <Separator orientation="vertical" className="h-6 shrink-0" />
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.duplicateSelected}><Copy className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.bringToFront}><ArrowUp className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.sendToBack}><ArrowDown className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.flipHorizontal}><FlipHorizontal className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.flipVertical}><FlipVertical className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={canvas.deleteSelected}><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.duplicateSelected} title="Duplicate (Ctrl+D)"><Copy className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={canvas.deleteSelected} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
             </>
           )}
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -343,8 +494,14 @@ export default function CanvasEditor() {
                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExport("pdf")}>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("png")}>Export as PNG</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => serverPdfMutation.mutate()}>
+                  <FileOutput className="h-4 w-4 mr-2" /> PDF — Print-ready (server)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF — quick (browser)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("png")}>PNG (300 DPI)</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => saveAsTemplateMutation.mutate()}>Save as school template</DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleExport("json")}><FileJson className="h-4 w-4 mr-2" />Save as .aschool-design</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => importFileRef.current?.click()}>Open .aschool-design File</DropdownMenuItem>
               </DropdownMenuContent>
@@ -355,13 +512,13 @@ export default function CanvasEditor() {
         {/* BODY */}
         <div className="flex flex-1 min-h-0">
           {/* Icon bar */}
-          <div className="flex flex-col items-center gap-1 py-3 w-16 border-r bg-background shrink-0">
+          <div className="flex flex-col items-center gap-1 py-3 w-16 border-r bg-background shrink-0 overflow-y-auto">
             {SIDEBAR_ICONS.map((item) => (
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => { setActivePanel(prev => prev === item.id ? null : item.id); setShowAI(false); }}
-                    className={`flex flex-col items-center justify-center gap-0.5 w-12 h-14 rounded-xl text-[9px] font-medium transition-all
+                    onClick={() => { setActivePanel(item.id); setShowAI(false); }}
+                    className={`flex flex-col items-center justify-center gap-0.5 w-12 h-14 rounded-xl text-[9px] font-medium transition-all shrink-0
                       ${activePanel === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                   >
                     <span className="text-lg leading-none">{item.icon}</span>
@@ -377,8 +534,8 @@ export default function CanvasEditor() {
           {activePanel && (
             <div className="w-72 border-r bg-background shrink-0 flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-150">
               <div className="flex items-center justify-between px-3 py-2.5 border-b shrink-0">
-                <span className="font-semibold text-sm capitalize">{activePanel}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActivePanel(null)}><X className="h-3.5 w-3.5" /></Button>
+                <span className="font-semibold text-sm capitalize">{activePanel === "shapes" ? "Shapes" : activePanel === "data" ? "Data Fill" : activePanel}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActivePanel(activePanel)}><X className="h-3.5 w-3.5" /></Button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-4">
 
@@ -396,10 +553,10 @@ export default function CanvasEditor() {
                           <button key={tpl.id}
                             onClick={() => {
                               setDocName(tpl.name);
+                              setTemplateIdState(tpl.id);
                               if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0)
                                 canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
                               else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
-                              setActivePanel(null);
                             }}
                             className="group relative border rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all bg-muted/30"
                             style={{ paddingTop:"75%" }}
@@ -416,7 +573,7 @@ export default function CanvasEditor() {
                   </>
                 )}
 
-                {activePanel === "elements" && (
+                {activePanel === "shapes" && (
                   <>
                     {SHAPE_GROUPS.map((group) => (
                       <div key={group.label}>
@@ -475,25 +632,18 @@ export default function CanvasEditor() {
                       </div>
                     </div>
                     <Separator />
-                    <p className="text-xs font-medium">Search Stock Photos</p>
-                    <div className="flex gap-1.5">
-                      <Input placeholder="Search Unsplash…" value={unsplashQ} onChange={(e) => setUnsplashQ(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && searchUnsplash()} className="h-8 text-xs" />
-                      <Button size="sm" className="h-8 px-2 shrink-0 text-xs" onClick={searchUnsplash}>
-                        <Search className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    {unsplashResults.length > 0 && (
-                      <div className="grid grid-cols-3 gap-1">
-                        {unsplashResults.map((url, i) => (
-                          <button key={i} onClick={() => canvas.addImage(url)}
-                            className="aspect-square rounded overflow-hidden border hover:border-primary hover:scale-105 transition-all">
-                            <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Tip: uploaded school assets appear here from the Brand panel (Media library coming together).
+                    </p>
                   </>
+                )}
+
+                {activePanel === "graphics" && (
+                  <GraphicsPanel
+                    onAddQr={(v) => canvas.addQR(v)}
+                    onAddWatermark={(t) => canvas.addWatermark(t)}
+                    onAddIcon={(svg, color) => canvas.addSVG(svg, {}, color)}
+                  />
                 )}
 
                 {activePanel === "background" && (
@@ -513,22 +663,48 @@ export default function CanvasEditor() {
                         className="w-8 h-8 rounded border cursor-pointer" />
                       <span className="text-xs font-mono text-muted-foreground">{bgColor}</span>
                     </div>
-                    <Separator />
-                    <p className="text-xs font-medium">Gradients</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[["#6366f1","#8b5cf6"],["#3b82f6","#06b6d4"],["#f59e0b","#ef4444"],["#10b981","#3b82f6"],["#ec4899","#8b5cf6"],["#1e293b","#334155"]].map(([c1,c2]) => (
-                        <button key={`${c1}${c2}`}
-                          onClick={() => canvas.updatePageSettings({ background: `linear-gradient(135deg, ${c1}, ${c2})` })}
-                          className="h-10 rounded-lg border hover:scale-105 transition-transform"
-                          style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }} />
-                      ))}
-                    </div>
+                    <Button variant="outline" size="sm" className="w-full h-7 text-xs"
+                      onClick={() => canvas.updatePageSettings({ background: bgColor }, true)}>
+                      Apply to all pages
+                    </Button>
                   </>
                 )}
 
                 {activePanel === "data" && (
-                  <DataFillPanel onApply={applyDataFields} />
+                  <DataFillPanel
+                    onApply={applyDataFields}
+                    onInsertToken={(token) => {
+                      const fc = (window as any).__activeCanvas;
+                      const obj = fc?.getActiveObject();
+                      if (!fc || !obj || !["textbox", "text", "i-text"].includes(String(obj.type).toLowerCase())) {
+                        // no text selected → add a new token text layer
+                        canvas.addText(token, { fontSize: 14 });
+                        toast.info(`Added ${token} as a new text layer`);
+                        return;
+                      }
+                      if (obj.isEditing) {
+                        // insert at the textarea cursor
+                        const ta = obj.hiddenTextarea;
+                        if (ta) {
+                          const start = ta.selectionStart ?? obj.text.length;
+                          const end = ta.selectionEnd ?? obj.text.length;
+                          obj.set({ text: obj.text.slice(0, start) + token + obj.text.slice(end) });
+                          obj.fire("changed");
+                        } else {
+                          obj.set({ text: obj.text + token });
+                        }
+                      } else {
+                        obj.set({ text: obj.text + token });
+                        obj.fire("changed");
+                      }
+                      fc.requestRenderAll();
+                      canvas.snapshot();
+                      toast.success(`Inserted ${token}`);
+                    }}
+                  />
                 )}
+
+                {activePanel === "layers" && <LayersPanel canvas={canvas} />}
 
               </div>
             </div>
@@ -538,32 +714,59 @@ export default function CanvasEditor() {
           <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-background overflow-x-auto shrink-0">
               {canvas.pages.map((pg, idx) => (
-                <button key={pg.id} onClick={() => canvas.goToPage(idx)}
-                  className={`relative flex-shrink-0 flex items-center justify-center rounded border text-xs font-medium transition-all
-                    ${canvas.currentPageIdx === idx ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-border bg-background hover:bg-muted"}`}
-                  style={{ width:38, height:50 }}>
-                  {idx+1}
+                <span key={pg.id} className="relative shrink-0">
+                  <button onClick={() => canvas.goToPage(idx)}
+                    onDoubleClick={() => canvas.duplicatePage(idx)}
+                    title={canvas.currentPageIdx === idx ? "Current page" : "Click to open · double-click to duplicate"}
+                    className={`relative flex-shrink-0 flex items-center justify-center rounded border text-xs font-medium transition-all
+                      ${canvas.currentPageIdx === idx ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-border bg-background hover:bg-muted"}`}
+                    style={{ width:38, height:50 }}>
+                    {idx+1}
+                  </button>
                   {canvas.pages.length > 1 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-white text-[9px] flex items-center justify-center"
-                      onClick={(e) => { e.stopPropagation(); canvas.removePage(idx); }}>×</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-background border text-muted-foreground hover:text-foreground flex items-center justify-center"
+                          onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="h-2.5 w-2.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => canvas.duplicatePage(idx)}>Duplicate</DropdownMenuItem>
+                        {idx !== canvas.currentPageIdx && (
+                          <DropdownMenuItem onClick={() => canvas.movePage(idx, canvas.currentPageIdx)}>Move here</DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem className="text-destructive" onClick={() => canvas.removePage(idx)}>Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                </button>
+                </span>
               ))}
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 border border-dashed" onClick={canvas.addPage}><Plus className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 border border-dashed" onClick={canvas.addPage} title="Add page"><Plus className="h-3.5 w-3.5" /></Button>
               <span className="text-xs text-muted-foreground ml-auto shrink-0">{canvas.currentPageIdx+1} / {canvas.pages.length}</span>
             </div>
-            <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center bg-[#f0f0f0] dark:bg-zinc-800 p-8">
+            <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center bg-[#f0f0f0] p-8"
+              onWheel={onCanvasWheel} onContextMenu={onCanvasContextMenu}>
               <div
+                className="relative shadow-2xl shrink-0"
                 style={{
-                  width: canvas.currentPageSettings?.width ?? 794,
-                  height: canvas.currentPageSettings?.height ?? 1123,
-                  transform: `scale(${zoom})`,
-                  transformOrigin: "top left",
-                  transition: "transform 0.12s ease",
-                  flexShrink: 0,
+                  width: (canvas.currentPageSettings?.width ?? 794),
+                  height: (canvas.currentPageSettings?.height ?? 1123),
                 }}
               >
-                <canvas ref={canvasRef} id="fabric-canvas" className="block shadow-2xl" />
+                {/* fabric v6 keeps the element at page size; zoom is viewport-internal */}
+                <canvas ref={canvasRef} id="fabric-canvas" className="block" />
+                {showGrid && (
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)",
+                      backgroundSize: "50px 50px",
+                    }} />
+                )}
+                <canvas ref={overlayRef} className="absolute left-0 top-0 pointer-events-none"
+                  width={canvas.currentPageSettings?.width ?? 794}
+                  height={canvas.currentPageSettings?.height ?? 1123}
+                  style={{ width: canvas.currentPageSettings?.width ?? 794, height: canvas.currentPageSettings?.height ?? 1123 }} />
               </div>
             </div>
           </div>
@@ -582,10 +785,11 @@ export default function CanvasEditor() {
               </>
             ) : (
               <>
-                <div className="px-3 py-2 border-b shrink-0">
+                <div className="px-3 py-2 border-b shrink-0 flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">
                     {canvas.selectedObject ? "Properties" : "Page Settings"}
                   </span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" />{activePanel === "layers" ? "Layers panel left" : ""}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto"><PropertiesPanel canvas={canvas} /></div>
               </>

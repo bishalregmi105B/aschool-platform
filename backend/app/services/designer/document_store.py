@@ -39,6 +39,7 @@ class DocumentStoreService:
         thumbnail_url: str,
     ) -> dict:
         from app.models.designer_document import DesignerDocument
+        from app.models.designer_document_revision import DesignerDocumentRevision
 
         if doc_id:
             doc = DesignerDocument.query.filter_by(
@@ -50,6 +51,28 @@ class DocumentStoreService:
         else:
             doc = DesignerDocument(school_id=school_id, created_by_id=user_id)
             db.session.add(doc)
+
+        # Snapshot the previous state for version history (keep last 10, FIFO).
+        if doc.id is not None and doc.canvas_state:
+            revision = DesignerDocumentRevision(
+                school_id=school_id,
+                document_id=doc.id,
+                created_by_id=user_id,
+                name=doc.name,
+                canvas_state=doc.canvas_state,
+                thumbnail_url=doc.thumbnail_url,
+            )
+            db.session.add(revision)
+            db.session.flush()
+            kept = (
+                DesignerDocumentRevision.query.filter_by(
+                    document_id=doc.id, school_id=school_id, is_deleted=False
+                )
+                .order_by(DesignerDocumentRevision.created_at.desc())
+                .all()
+            )
+            for stale in kept[10:]:
+                stale.soft_delete()
 
         doc.name          = name
         doc.template_type = template_type
@@ -69,3 +92,30 @@ class DocumentStoreService:
             return False
         doc.soft_delete()
         return True
+
+    @staticmethod
+    def list_revisions(school_id, doc_id: str) -> list[dict]:
+        from app.models.designer_document_revision import DesignerDocumentRevision
+
+        revisions = (
+            DesignerDocumentRevision.query.filter_by(
+                document_id=doc_id, school_id=school_id, is_deleted=False
+            )
+            .order_by(DesignerDocumentRevision.created_at.desc())
+            .limit(10)
+            .all()
+        )
+        return [r.to_dict() for r in revisions]
+
+    @staticmethod
+    def get_revision(school_id, revision_id: str) -> dict | None:
+        from app.models.designer_document_revision import DesignerDocumentRevision
+
+        rev = DesignerDocumentRevision.query.filter_by(
+            id=revision_id, school_id=school_id, is_deleted=False
+        ).first()
+        if not rev:
+            return None
+        out = rev.to_dict()
+        out["canvas_state"] = rev.canvas_state
+        return out

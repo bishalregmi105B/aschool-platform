@@ -1061,6 +1061,79 @@ TEMPLATES: dict = {
         "fields": ["name", "class", "roll_no", "dob", "exam_name", "symbol_no"],
         "canvas_json": _admit_card_hall_ticket(),
     },
+    # ── Registered 2026-08-31: builders existed but were never in the registry ──
+    "report_card": {
+        "name": "Report Card",
+        "category": "reports",
+        "editor_type": "designer",
+        "description": "Terminal report card with subject table, attendance and remarks",
+        "page_size": "A4",
+        "thumbnail_emoji": "📋",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["name", "class", "section", "roll_no", "exam_name"],
+        "canvas_json": _report_card(),
+    },
+    "notice": {
+        "name": "Notice",
+        "category": "notices",
+        "editor_type": "writer",
+        "description": "Official school notice with header band and signature block",
+        "page_size": "A4",
+        "thumbnail_emoji": "📢",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["school_name", "date", "title"],
+        "writer_json": _writer_notice(),
+    },
+    "circular": {
+        "name": "Parent Circular",
+        "category": "notices",
+        "editor_type": "writer",
+        "description": "Circular to parents with header, body placeholders and signatures",
+        "page_size": "A4",
+        "thumbnail_emoji": "📨",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["school_name", "date", "class", "section"],
+        "writer_json": _writer_circular(),
+    },
+    "letterhead_official": {
+        "name": "Official Letterhead",
+        "category": "letterheads",
+        "editor_type": "writer",
+        "description": "Formal letterhead — logo band, reference line, signature block",
+        "page_size": "A4",
+        "thumbnail_emoji": "📜",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["school_name", "school_address", "school_phone", "school_website"],
+        "writer_json": _writer_letterhead_official(),
+    },
+    "letterhead_informal": {
+        "name": "Informal Letterhead",
+        "category": "letterheads",
+        "editor_type": "writer",
+        "description": "Lightweight letterhead for internal memos and notes",
+        "page_size": "A4",
+        "thumbnail_emoji": "🗒️",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["school_name", "date"],
+        "writer_json": _writer_letterhead_informal(),
+    },
+    "report_card_writer": {
+        "name": "Report Card (Document)",
+        "category": "reports",
+        "editor_type": "writer",
+        "description": "Editable report card document with subject rows and grading legend",
+        "page_size": "A4",
+        "thumbnail_emoji": "📝",
+        "is_default": True,
+        "width": 794, "height": 1123,
+        "fields": ["name", "class", "section", "roll_no", "exam_name"],
+        "writer_json": _writer_report_card(),
+    },
 }
 
 
@@ -2001,6 +2074,64 @@ class TemplateEngineService:
                     body_parts.append("".join(parts))
                 else:
                     body_parts.append("<p style='color:#64748b;font-style:italic;'>No subject marks data available.</p>")
+                continue
+
+            if block_type == "fee_rows":
+                # Fee bill table: Particulars | Billed | Paid | Due (fee_rows data
+                # comes as list of {particular, billed, paid, due} or fee dict rows)
+                fee_rows_data = merged_data.get("fee_rows") or merged_data.get("fees") or []
+                if fee_rows_data and isinstance(fee_rows_data, list):
+                    hdr = "border:1px solid #0e7490;padding:6px 10px;background:#0e7490;color:#fff;font-weight:600;text-align:center;"
+                    bw = "border:1px solid #e2e8f0;padding:6px 10px;"
+                    parts = [
+                        "<table style='border-collapse:collapse;width:100%;margin:8px 0;font-size:9.5pt;'>",
+                        "<thead><tr>",
+                        f"<th style='{hdr}text-align:left;'>Particulars</th>",
+                        f"<th style='{hdr}width:110px;'>Billed (Rs.)</th>",
+                        f"<th style='{hdr}width:110px;'>Paid (Rs.)</th>",
+                        f"<th style='{hdr}width:110px;'>Due (Rs.)</th>",
+                        "</tr></thead><tbody>",
+                    ]
+                    total_billed = total_paid = total_due = 0.0
+
+                    def _amt(v):
+                        try:
+                            return float(v or 0)
+                        except (TypeError, ValueError):
+                            return 0.0
+
+                    for row in fee_rows_data:
+                        if isinstance(row, dict):
+                            name = esc(row.get("particular") or row.get("name") or row.get("fee_type") or "")
+                            billed = _amt(row.get("billed") or row.get("amount") or row.get("total"))
+                            paid = _amt(row.get("paid") or row.get("paid_amount"))
+                        else:
+                            name, billed, paid = esc(str(row)), 0.0, 0.0
+                        due = billed - paid
+                        total_billed += billed
+                        total_paid += paid
+                        total_due += due
+                        due_style = f"{bw}text-align:right;color:{'#dc2626' if due > 0 else '#16a34a'};font-weight:600;"
+                        parts.append(
+                            "<tr>"
+                            f"<td style='{bw}'>{name}</td>"
+                            f"<td style='{bw}text-align:right;'>{billed:,.0f}</td>"
+                            f"<td style='{bw}text-align:right;'>{paid:,.0f}</td>"
+                            f"<td style='{due_style}'>{due:,.0f}</td>"
+                            "</tr>"
+                        )
+                    parts.append(
+                        f"<tr style='background:#ecfeff;font-weight:700;border-top:2px solid #0e7490;'>"
+                        f"<td style='{bw}'>TOTAL</td>"
+                        f"<td style='{bw}text-align:right;'>{total_billed:,.0f}</td>"
+                        f"<td style='{bw}text-align:right;'>{total_paid:,.0f}</td>"
+                        f"<td style='{bw}text-align:right;color:{'#dc2626' if total_due > 0 else '#16a34a'};'>{total_due:,.0f}</td>"
+                        "</tr>"
+                    )
+                    parts.append("</tbody></table>")
+                    body_parts.append("".join(parts))
+                else:
+                    body_parts.append("<p style='color:#64748b;font-style:italic;'>No fee data available.</p>")
                 continue
 
         return (

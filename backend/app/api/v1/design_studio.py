@@ -1,6 +1,6 @@
 """Design Studio API — ID cards, certificates, bulk document generation."""
 
-from flask import Blueprint, g, request
+from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.plugins.decorators import plugin_required
@@ -122,12 +122,16 @@ def list_source_records(source_type):
 
     q = request.args.get("q", "").strip().lower()
     class_filter = request.args.get("class_id")
+    section_filter = request.args.get("section_id")
+    offset = int(request.args.get("offset", 0))
     limit = min(int(request.args.get("limit", 50)), 200)
 
     if source_type == "student":
         query = Student.query.filter_by(school_id=g.school_id, status="active")
         if class_filter:
             query = query.filter_by(class_id=class_filter)
+        if section_filter:
+            query = query.filter_by(section_id=section_filter)
         if q:
             query = query.filter(
                 db.or_(
@@ -136,7 +140,7 @@ def list_source_records(source_type):
                     Student.student_id.ilike(f"%{q}%"),
                 )
             )
-        students = query.order_by(Student.roll_number).limit(limit).all()
+        students = query.order_by(Student.roll_number).offset(offset).limit(limit).all()
 
         records = []
         for s in students:
@@ -770,3 +774,155 @@ def ai_suggest():
             "provider": result["provider"],
         }
     )
+
+# ── Server-side PDF export (WeasyPrint) ──────────────────────────────────────
+
+
+@design_studio_bp.route("/export/pdf", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def export_document_pdf():
+    """Render a saved designer document (or template+data) to print-ready PDF.
+
+    Body: {document_id} or {template_id, data}. Uses the server renderer so
+    Nepali/Devanagari text is shaped correctly (html2canvas cannot).
+    """
+    from io import BytesIO
+
+    from app.services.designer.document_renderer import document_pdf
+    from app.services.designer.document_store import DocumentStoreService
+    from app.services.designer.template_engine import TemplateEngineService
+
+    payload = request.get_json(silent=True) or {}
+    document_id = payload.get("document_id")
+    template_id = payload.get("template_id")
+
+    try:
+        if document_id:
+            doc = DocumentStoreService.get_document(g.school_id, document_id)
+            if not doc:
+                return error_response("Document not found", 404)
+            state = doc.get("canvas_state") or {}
+            # saved documents embed absolute image URLs client-side; fields
+            # merge is a no-op pass-through for saved designs
+            pdf_bytes = document_pdf(state, fields={}, school_config={})
+        elif template_id:
+            html_str = TemplateEngineService.render_html(
+                template_id,
+                data=payload.get("data") or {},
+                school_id=g.school_id,
+            )
+            from weasyprint import HTML
+
+            from app.services.designer.pdf_css import wrap_pdf_html
+
+            pdf_bytes = HTML(string=wrap_pdf_html(html_str)).write_pdf()
+        else:
+            return error_response("document_id or template_id is required", 400)
+    except ImportError:
+        return error_response("PDF export is unavailable on this server", 501)
+    except ValueError as exc:
+        return error_response(str(exc), 404)
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="design.pdf",
+    )
+
+
+@design_studio_bp.route("/export/bulk-pdf", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def export_bulk_pdf():
+    """One print-ready PDF from pre-generated bulk items.
+
+    Body: {items: [{html?, canvas_json?, data?, template_width?, template_height?}], page_size?}.
+    Items come from /bulk/* generation — html is used when present (writer
+    templates), otherwise canvas_json is rendered by the document renderer.
+    """
+    from io import BytesIO
+
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("items") or []
+    if not items:
+        return error_response("items is required", 400)
+
+    try:
+        from weasyprint import HTML
+
+        from app.services.designer.document_renderer import document_to_html
+    except ImportError:
+        return error_response("PDF export is unavailable on this server", 501)
+
+    pages_html = []
+    for item in items:
+        if item.get("html"):
+            pages_html.append(item["html"])
+        elif item.get("canvas_json"):
+            width = int(item.get("template_width", 794))
+            height = int(item.get("template_height", 1123))
+            state = item["canvas_json"] if isinstance(item["canvas_json"], dict) else {}
+            state.setdefault("width", width)
+            state.setdefault("height", height)
+            pages_html.append(document_to_html(state, fields=item.get("data") or {}, school_config={}))
+
+    if not pages_html:
+        return error_response("No renderable pages in items", 400)
+
+    from app.services.designer.pdf_css import wrap_pdf_html
+
+    orientation = payload.get("page_size", "portrait")
+    combined = wrap_pdf_html("".join(pages_html), page_size=orientation)
+    pdf_bytes = HTML(string=combined).write_pdf()
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="bulk.pdf",
+    )
+
+@design_studio_bp.route("/documents/<doc_id>/revisions", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def list_document_revisions(doc_id):
+    """Version history — last 10 saves of a designer document."""
+    from app.services.designer.document_store import DocumentStoreService
+
+    return success_response(DocumentStoreService.list_revisions(g.school_id, doc_id))
+
+
+@design_studio_bp.route("/documents/revisions/<revision_id>/restore", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def restore_document_revision(revision_id):
+    """Restore a revision: the document's current state is snapshotted first,
+    then the revision becomes the live state."""
+    from flask_jwt_extended import get_jwt
+
+    from app.services.designer.document_store import DocumentStoreService
+
+    claims = get_jwt()
+    rev = DocumentStoreService.get_revision(g.school_id, revision_id)
+    if not rev:
+        return error_response("Revision not found", 404)
+    doc = DocumentStoreService.save_document(
+        school_id=g.school_id,
+        user_id=claims.get("sub"),
+        doc_id=str(rev["document_id"]),
+        name=rev.get("name") or "Restored document",
+        template_type="custom",
+        canvas_state=rev.get("canvas_state") or {},
+        thumbnail_url=rev.get("thumbnail_url") or "",
+    )
+    return success_response(doc)
