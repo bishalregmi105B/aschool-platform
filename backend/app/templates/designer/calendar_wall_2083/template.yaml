@@ -1,0 +1,21 @@
+template_key: calendar_wall_2083
+name: Wall Calendar 2083 (Single Sheet)
+name_nepali: भित्ते क्यालेन्डर 2083
+category: calendars
+editor_type: designer
+description: "SM-style A2 wall calendar — all 12 months of BS 2083 pre-filled in Devanagari numerals around a central photo strip, scalloped orange ribbon header, year badge, red Saturdays."
+page_size: A2
+thumbnail_emoji: "🧾"
+is_default: true
+size: {width: 1191, height: 1684}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+  - school_website
+  - school_logo
+autofill:
+  sources: [school]
+  notes: >
+    Every date of BS 2083 is a real editable textbox. Replace the three
+    SCHOOL PHOTO slots with school event photos; header/footer autofill.

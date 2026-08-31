@@ -1847,7 +1847,9 @@ class TemplateEngineService:
         if isinstance(pages, list) and pages:
             rendered_pages = []
             for index, page in enumerate(pages):
-                page_canvas = page if isinstance(page, dict) else {}
+                # page dicts wrap the fabric canvas under "json" (matching the
+                # editor's multi-page shape); older rows may store objects flat
+                page_canvas = (page.get("json") if isinstance(page, dict) and isinstance(page.get("json"), dict) else page) or {}
                 page_width = int(cls._num(page_canvas.get("width"), width))
                 page_height = int(cls._num(page_canvas.get("height"), height))
                 rendered_pages.append(cls._render_canvas_page_html(page_canvas, page_width, page_height, is_last=index == len(pages) - 1))

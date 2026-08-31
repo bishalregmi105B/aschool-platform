@@ -1,0 +1,35 @@
+template_key: calendar_monthly_2083
+name: Monthly Calendar 2083 (Pre-filled)
+name_nepali: महिना क्यालेन्डर 2083 — मिति भरिएको
+category: calendars
+editor_type: designer
+description: "Pathshala-style monthly calendar — 12 pages, every BS date of 2083 pre-filled as its own editable text (Devanagari numeral + tiny AD date + event slot). Twelve accent colours, holiday legend, dashed Holidays/Activities panels."
+page_size: A4
+thumbnail_emoji: "🗓️"
+is_default: true
+size: {width: 794, height: 1123}
+pages:
+  - {size: {width: 794, height: 1123}, name: "वैशाख"}
+  - {size: {width: 794, height: 1123}, name: "ज्येष्ठ"}
+  - {size: {width: 794, height: 1123}, name: "असार"}
+  - {size: {width: 794, height: 1123}, name: "श्रावण"}
+  - {size: {width: 794, height: 1123}, name: "भाद्र"}
+  - {size: {width: 794, height: 1123}, name: "आश्विन"}
+  - {size: {width: 794, height: 1123}, name: "कार्तिक"}
+  - {size: {width: 794, height: 1123}, name: "मार्ग"}
+  - {size: {width: 794, height: 1123}, name: "पौष"}
+  - {size: {width: 794, height: 1123}, name: "माघ"}
+  - {size: {width: 794, height: 1123}, name: "फाल्गुन"}
+  - {size: {width: 794, height: 1123}, name: "चैत"}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+  - school_website
+  - school_email
+  - school_logo
+autofill:
+  sources: [school]
+  notes: >
+    Dates are baked in — restyle or annotate any day cell directly.
+    Holidays/Activities are plain editable bullet text; header autofills.
