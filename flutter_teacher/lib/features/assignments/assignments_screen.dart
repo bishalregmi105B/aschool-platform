@@ -193,7 +193,11 @@ class _AssignmentCard extends ConsumerWidget {
       color: Colors.white,
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
@@ -231,7 +235,7 @@ class _AssignmentCard extends ConsumerWidget {
                           '${assignment['subject'] ?? ''} • ${assignment['class_name'] ?? ''}',
                           style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey.shade600,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -272,7 +276,7 @@ class _AssignmentCard extends ConsumerWidget {
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade600)),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   Text('$submitted / $total',
                       style: const TextStyle(
                           fontSize: 12, fontWeight: FontWeight.bold)),
@@ -465,7 +469,11 @@ class _SubmissionTile extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -504,7 +512,7 @@ class _SubmissionTile extends ConsumerWidget {
                           _formatDate(submission['submitted_at']),
                         ].where((item) => item.isNotEmpty).join(' • '),
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -528,7 +536,7 @@ class _SubmissionTile extends ConsumerWidget {
               Row(
                 children: [
                   Icon(Icons.attach_file_rounded,
-                      size: 16, color: Colors.grey.shade600),
+                      size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     '${attachments.length} attachment${attachments.length == 1 ? '' : 's'}',

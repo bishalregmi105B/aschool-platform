@@ -1,4 +1,10 @@
 slug: ai_adaptive_learning
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `ai_suite`.
+# published: false removes it from the marketplace/catalog mirror; the
+# ai_adaptive_learning→ai_suite gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "AI Adaptive Learning"
 name_nepali: "AI अनुकूली शिक्षा"
 category: premium
@@ -21,14 +27,14 @@ conflicts_with: []
 frontend:
   route: "/dashboard/ai-tools"
   sidebar:
-    section: "AI & Analytics"
+    section: "Insights"
     label: "Adaptive Learning"
     label_nepali: "अनुकूली शिक्षा"
     icon: "Sparkles"
     subitems:
       - { label: "Learning Paths", route: "/dashboard/ai-tools/learning-paths" }
       - { label: "Student Progress", route: "/dashboard/ai-tools/progress" }
-    visible_to: ["school_admin", "teacher"]
+    visible_to: []
 
 flutter:
   teacher_app:

@@ -91,7 +91,11 @@ class _OfflineExamCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(5),
@@ -131,7 +135,7 @@ class _OfflineExamCard extends StatelessWidget {
                   '${exam.startDate} - ${exam.endDate}',
                   style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500),
                 ),
               ],
@@ -150,7 +154,11 @@ class _OfflineExamCard extends StatelessWidget {
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.separated(
@@ -178,7 +186,7 @@ class _OfflineExamCard extends StatelessWidget {
                           child: Text(
                             '${sub['date'] ?? ''} • ${sub['time'] ?? ''}',
                             style: TextStyle(
-                                color: Colors.grey.shade600, fontSize: 12),
+                                color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                           ),
                         ),
                         Container(
@@ -273,13 +281,13 @@ class _OnlineExamCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text('${exam.durationMinutes} mins',
                     style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(width: 12),
                 Icon(Icons.rule_rounded, size: 14, color: Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text('FM: ${exam.totalMarks}',
                     style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
           ],
@@ -307,7 +315,7 @@ class _OnlineExamCard extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
       ),

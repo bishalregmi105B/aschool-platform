@@ -2,8 +2,8 @@ slug: disaster_management
 name: "Disaster Management"
 name_nepali: "विपद व्यवस्थापन"
 category: premium
-price_monthly: 999
-price_yearly: 9999
+price_monthly: 299
+price_yearly: 2990
 emoji: "🆘"
 icon: "Shield"
 description: "Earthquake API, evacuation plans, drill scheduling"
@@ -20,6 +20,7 @@ conflicts_with: []
 frontend:
   route: "/disaster"
   sidebar:
+    section: "Safety & Compliance"
     label: "Disaster Mgmt"
     label_nepali: "विपद व्यवस्थापन"
     icon: "Shield"
@@ -27,7 +28,7 @@ frontend:
       - { label: "Evacuation Plans", route: "/disaster/plans" }
       - { label: "Drill Schedule", route: "/disaster/drills" }
       - { label: "Seismic Alerts", route: "/disaster/alerts" }
-    visible_to: []
+    visible_to: ["school_admin"]
 
 flutter:
   admin_app: { feature_folder: "disaster", tabs: ["Plans", "Drills", "Alerts"] }

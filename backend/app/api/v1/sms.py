@@ -151,7 +151,10 @@ def create_template():
 @school_required
 @plugin_required("sms_notifications")
 def sms_stats():
+    from datetime import date as _date
+
     from sqlalchemy import func
+
     total = db.session.query(func.count(SMSLog.id)).filter_by(
         school_id=g.school_id, is_deleted=False
     ).scalar()
@@ -169,9 +172,50 @@ def sms_stats():
     credits_used = db.session.query(func.coalesce(func.sum(SMSLog.cost), 0)).filter_by(
         school_id=g.school_id, is_deleted=False, status="sent"
     ).scalar()
+
+    # E236: the web Credits tab renders credits_available / this_month_sent /
+    # total_sent / total_failed — none of which this response carried, so
+    # every card showed "—". Remaining credits = purchased top-ups (plugin
+    # config key "credits_topup") minus credits spent on sent messages; a
+    # live Sparrow gateway balance wins when the integration is configured.
+    from app.models.plugin import SchoolPlugin
+
+    sp = SchoolPlugin.query.filter_by(
+        school_id=g.school_id, plugin_slug="sms_notifications"
+    ).first()
+    topup = float((sp.config or {}).get("credits_topup") or 0) if sp else 0.0
+    credits_available = max(0.0, topup - float(credits_used or 0))
+
+    gateway = None
+    try:
+        from flask import current_app
+
+        if current_app.config.get("SPARROW_SMS_TOKEN"):
+            from app.services.communications.sms_gateway import SmsGatewayService
+
+            gateway = SmsGatewayService.check_credits()
+            if gateway and gateway.get("credits_available") is not None:
+                credits_available = float(gateway["credits_available"])
+    except Exception:  # noqa: BLE001 — a gateway outage must not break stats
+        gateway = None
+
+    month_start = _date.today().replace(day=1)
+    this_month_sent = db.session.query(func.count(SMSLog.id)).filter(
+        SMSLog.school_id == g.school_id,
+        SMSLog.is_deleted.is_(False),
+        SMSLog.status == "sent",
+        SMSLog.created_at >= month_start,
+    ).scalar()
+
     return success_response({
         "total": total, "sent": sent, "failed": failed, "queued": queued,
         "credits_used": int(credits_used),
+        # Fields the web Credits tab renders (E236):
+        "credits_available": int(credits_available),
+        "credits_source": "gateway" if gateway else "config",
+        "this_month_sent": this_month_sent,
+        "total_sent": sent,
+        "total_failed": failed,
     })
 
 

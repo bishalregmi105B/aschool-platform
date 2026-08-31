@@ -2,8 +2,8 @@ slug: gamification
 name: "Student Gamification"
 name_nepali: "विद्यार्थी गेमिफिकेसन"
 category: growth
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🏆"
 icon: "Trophy"
 description: "Points, badges, streaks, leaderboards, house system, rewards for attendance, grades, and behavior"
@@ -18,7 +18,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/gamification"
   sidebar:
-    section: "Student Wellbeing"
+    section: "Student Life"
     label: "Gamification"
     label_nepali: "गेमिफिकेसन"
     icon: "Trophy"

@@ -1,4 +1,5 @@
 export 'repository_providers.dart';
+export 'theme_provider.dart';
 export 'current_student_provider.dart';
 export 'dashboard_provider.dart';
 export 'academic_provider.dart';

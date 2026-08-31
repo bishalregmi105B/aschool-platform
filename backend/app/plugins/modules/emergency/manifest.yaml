@@ -2,8 +2,8 @@ slug: emergency
 name: "Emergency Management"
 name_nepali: "आपतकालीन व्यवस्थापन"
 category: premium
-price_monthly: 999
-price_yearly: 9999
+price_monthly: 299
+price_yearly: 2990
 emoji: "🆘"
 icon: "Siren"
 description: "Emergency alerts, evacuation plans, headcount tracking, safe status confirmation, drill management"
@@ -19,15 +19,12 @@ conflicts_with: []
 frontend:
   route: "/dashboard/emergency"
   sidebar:
-    section: "Compliance"
+    section: "Safety & Compliance"
     label: "Emergency"
     label_nepali: "आपतकालीन"
     icon: "ShieldCheck"
-    subitems:
-      - { label: "Dashboard", route: "/dashboard/emergency" }
-      - { label: "Alert", route: "/dashboard/emergency/alert" }
-      - { label: "Evacuation Plans", route: "/dashboard/emergency/plans" }
-      - { label: "Drills", route: "/dashboard/emergency/drills" }
+    # E236: single-page feature — alert/plans/drills child routes were 404s.
+    subitems: []
     visible_to: ["school_admin"]
 
 flutter:

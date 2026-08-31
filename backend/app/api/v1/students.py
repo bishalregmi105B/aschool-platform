@@ -109,6 +109,7 @@ def get_student(student_id):
 from app.models.student import Guardian, Student
 from app.models.user import User
 from app.plugins.entitlements import student_cap_error
+from app.services.student_numbers import ensure_student_numbers
 from app.utils.password import generate_default_password
 
 @students_bp.route("", methods=["POST"])
@@ -144,6 +145,11 @@ def create_student():
 
     student = Student(school_id=g.school_id)
     _populate_student(student, data)
+    # E235: auto-assign the enrollment (admission) number and the next free
+    # class roll when the caller did not provide them. Generation takes a
+    # SELECT … FOR UPDATE lock on the School row inside this same
+    # transaction, so concurrent enrollments can never mint the same number.
+    ensure_student_numbers(student)
     db.session.add(student)
     db.session.flush()
 
@@ -610,6 +616,7 @@ def _populate_student(student: Student, data: dict):
         "religion", "ethnicity", "caste", "mother_tongue",
         "disability", "disability_type", "nationality", "photo_url", "address",
         "previous_school", "status", "admission_date_bs",
+        "admission_number",
     }
     for key in allowed:
         if key in data:

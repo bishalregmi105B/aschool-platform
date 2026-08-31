@@ -2,8 +2,8 @@ slug: dismissal
 name: "Student Dismissal & Pickup"
 name_nepali: "विद्यार्थी विदाई"
 category: premium
-price_monthly: 999
-price_yearly: 9999
+price_monthly: 299
+price_yearly: 2990
 emoji: "🚗"
 icon: "CarFront"
 description: "QR code pickup verification, authorized pickup management, dismissal queue, parent notification"

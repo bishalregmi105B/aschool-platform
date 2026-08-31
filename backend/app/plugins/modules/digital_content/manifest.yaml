@@ -27,7 +27,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/elibrary"
   sidebar:
-    section: "Library & Learning"
+    section: "Learning"
     label: "Digital Content"
     label_nepali: "डिजिटल सामग्री"
     icon: "BookOpenCheck"

@@ -2,8 +2,8 @@ slug: lms
 name: "Learning Management System"
 name_nepali: "शिक्षण व्यवस्थापन प्रणाली"
 category: growth
-price_monthly: 799
-price_yearly: 7999
+price_monthly: 149
+price_yearly: 1490
 emoji: "📹"
 icon: "MonitorPlay"
 description: "Live classes via Jitsi, recorded class library, course builder, AI adaptive learning paths, student watch analytics"
@@ -24,16 +24,13 @@ conflicts_with: []
 frontend:
   route: "/dashboard/lms"
   sidebar:
-    section: "Library & Learning"
+    section: "Learning"
     label: "LMS"
     label_nepali: "एल.एम.एस"
     icon: "MonitorPlay"
-    subitems:
-      - { label: "Dashboard", route: "/dashboard/lms" }
-      - { label: "Courses", route: "/dashboard/lms/courses" }
-      - { label: "Live Classes", route: "/dashboard/lms/live-classes" }
-      - { label: "Recordings", route: "/dashboard/lms/recordings" }
-      - { label: "AI Tutor", route: "/dashboard/lms/ai-tutor" }
+    # E236: single-page feature — courses/live-classes/recordings/ai-tutor
+    # child routes were 404s.
+    subitems: []
     visible_to: ["school_admin", "teacher"]
 
 flutter:

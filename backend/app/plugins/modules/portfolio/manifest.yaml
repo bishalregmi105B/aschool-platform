@@ -29,7 +29,7 @@ conflicts_with: []
 frontend:
   route: "/portfolio"
   sidebar:
-    section: null
+    section: "Learning"
     label: "Portfolio"
     label_nepali: "पोर्टफोलियो"
     icon: "Palette"

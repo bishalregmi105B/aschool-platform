@@ -2,8 +2,8 @@ slug: alumni
 name: "Alumni Network"
 name_nepali: "पूर्व विद्यार्थी नेटवर्क"
 category: growth
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🎓"
 icon: "Users"
 description: "Alumni portal, mentoring, events, donation tracking"
@@ -21,10 +21,9 @@ frontend:
     label: "Alumni"
     label_nepali: "पूर्व विद्यार्थी"
     icon: "GraduationCap"
-    subitems:
-      - { label: "Directory", route: "/dashboard/alumni/directory" }
-      - { label: "Events", route: "/dashboard/alumni/events" }
-      - { label: "Donations", route: "/dashboard/alumni/donations" }
+    # E236: single-page feature — the directory/events/donations child
+    # routes never existed as pages (404). No subitems → direct link.
+    subitems: []
     visible_to: ["school_admin"]
 
 flutter:

@@ -168,7 +168,7 @@ class _QrCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Show this QR code to school staff when picking up your child.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -177,7 +177,11 @@ class _QrCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.04),
@@ -268,7 +272,7 @@ class _AuthorizedPickupsCard extends StatelessWidget {
                                 p['relation'].toString(),
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                           ],

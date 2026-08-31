@@ -204,7 +204,7 @@ class _ClassCard extends StatelessWidget {
                     _StatPill(
                         icon: Icons.menu_book_rounded,
                         label: '${classData['subject_count'] ?? 0} Subjects',
-                        color: Colors.grey.shade600),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ],
                 ),
               ),
@@ -608,7 +608,7 @@ class _InfoRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14)),
           Text(value,
               style: const TextStyle(
                   fontWeight: FontWeight.w600, fontSize: 14)),

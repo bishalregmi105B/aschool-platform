@@ -1,4 +1,10 @@
 slug: benchmarking
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `ai_suite`.
+# published: false removes it from the marketplace/catalog mirror; the
+# benchmarking→ai_suite gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "School Benchmarking"
 name_nepali: "विद्यालय बेन्चमार्किङ"
 category: premium
@@ -17,14 +23,14 @@ conflicts_with: []
 frontend:
   route: "/dashboard/benchmarking"
   sidebar:
-    section: "Reports"
+    section: "Insights"
     label: "Benchmarking"
     label_nepali: "बेन्चमार्किङ"
     icon: "TrendingUp"
     subitems:
       - { label: "Rankings", route: "/dashboard/benchmarking/rankings" }
       - { label: "Compare", route: "/dashboard/benchmarking/compare" }
-    visible_to: ["school_admin"]
+    visible_to: []
 
 flutter:
   admin_app: { feature_folder: "benchmarking", tabs: ["Rankings", "Compare"] }

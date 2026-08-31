@@ -2,8 +2,8 @@ slug: timetable
 name: "Timetable Management"
 name_nepali: "समय तालिका"
 category: starter
-price_monthly: 199
-price_yearly: 1999
+price_monthly: 99
+price_yearly: 990
 emoji: "🕐"
 icon: "Clock"
 description: "Class scheduling, teacher allocation, room management, AI timetable generator, substitution management"
@@ -20,7 +20,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/timetable"
   sidebar:
-    section: "Academic Management"
+    section: "Academics"
     label: "Timetable"
     label_nepali: "समय तालिका"
     icon: "Calendar"

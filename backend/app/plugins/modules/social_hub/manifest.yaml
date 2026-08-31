@@ -1,4 +1,10 @@
 slug: social_hub
+# REMOVED from the catalog (2026-08-31, E230): social hub is withdrawn
+# (unused, moderation liability). published: false delists it; its routes
+# stay mounted and gated so existing installs do not break. No alias —
+# the feature is not replaced by another plugin.
+published: false
+deprecated: true
 name: "Social Media Hub"
 name_nepali: "सामाजिक सञ्जाल केन्द्र"
 category: growth
@@ -38,7 +44,7 @@ frontend:
       - { label: "AI Content", route: "/dashboard/social-hub/ai-content" }
       - { label: "Analytics", route: "/dashboard/social-hub/analytics" }
       - { label: "Ad Campaigns", route: "/dashboard/social-hub/ads" }
-    visible_to: ["school_admin"]
+    visible_to: []
 
 flutter:
   admin_app:

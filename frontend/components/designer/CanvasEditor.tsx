@@ -218,24 +218,65 @@ export default function CanvasEditor() {
       return out;
     };
 
+    // Templates may reference the same image under legacy token names.
+    const imageField = (key: string) => {
+      if (key === "photo") return fields.photo || fields.photo_url || fields.student_photo || "";
+      if (key === "photo_url") return fields.photo_url || fields.photo || "";
+      return fields[key] || "";
+    };
+
     let changed = 0;
+    const pendingImages: Promise<void>[] = [];
     fc.getObjects().forEach((obj: any) => {
-      if (!["textbox", "text", "i-text"].includes(obj.type) || typeof obj.text !== "string") {
+      const type = String(obj.type || "").toLowerCase();
+      if (["textbox", "text", "i-text"].includes(type) && typeof obj.text === "string") {
+        const next = replaceTokens(obj.text);
+        if (next !== obj.text) {
+          obj.set({ text: next });
+          changed += 1;
+        }
         return;
       }
-      const next = replaceTokens(obj.text);
-      if (next !== obj.text) {
-        obj.set({ text: next });
-        changed += 1;
+      if (type === "image") {
+        // placeholders survive as data.token when src was sanitized to ""
+        const tokenSrc: string = obj.data?.token
+          || (typeof obj.src === "string" && obj.src.includes("{") ? obj.src : "");
+        const tokenMatch = tokenSrc.match(/\{\{?(\w+)\}?\}/);
+        if (tokenMatch) {
+          const next = imageField(tokenMatch[1]);
+          if (next && next !== obj.src) {
+            const target = obj;
+            const frame = { width: target.width, height: target.height, scaleX: target.scaleX ?? 1, scaleY: target.scaleY ?? 1 };
+            pendingImages.push(
+              target.setSrc(next, { crossOrigin: "anonymous" })
+                .then(() => {
+                  // setSrc adopts the image's natural size — restore the template frame
+                  target.set({ ...frame, dirty: true });
+                  target.setCoords();
+                  fc.renderAll();
+                })
+                .then(() => { target.data = { ...(target.data ?? {}), token: undefined }; })
+                .catch(() => { /* image unavailable — leave placeholder slot */ })
+            );
+            changed += 1;
+          }
+        }
       }
     });
 
+    if (pendingImages.length > 0) {
+      Promise.allSettled(pendingImages).then(() => {
+        fc.requestRenderAll();
+        canvas.snapshot();
+      });
+    }
+
     if (changed > 0) {
       fc.renderAll();
-      canvas.snapshot();
-      toast.success(`Applied data to ${changed} text layer${changed > 1 ? "s" : ""}`);
+      if (pendingImages.length === 0) canvas.snapshot();
+      toast.success(`Applied data to ${changed} layer${changed > 1 ? "s" : ""}`);
     } else {
-      toast.info("No placeholders found. Use {field_name} tokens in text layers.");
+      toast.info("No placeholders found. Use {field_name} tokens in text or image layers.");
     }
   }, [canvas]);
 

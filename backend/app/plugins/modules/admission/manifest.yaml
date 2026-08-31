@@ -2,8 +2,8 @@ slug: admission
 name: "Admission Management"
 name_nepali: "भर्ना व्यवस्थापन"
 category: growth
-price_monthly: 599
-price_yearly: 5999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🎓"
 icon: "UserPlus"
 description: "Online admission forms, document collection, admission tests, merit lists, AI lead scoring from social inquiries"
@@ -22,7 +22,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/admission"
   sidebar:
-    section: "Growth"
+    section: "Money"
     label: "Admission"
     label_nepali: "भर्ना"
     icon: "ClipboardList"

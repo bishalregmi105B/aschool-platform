@@ -127,7 +127,7 @@ class _GuardiansScreenState extends State<GuardiansScreen> {
               const SizedBox(height: 8),
               if (children.isEmpty)
                 Text('No linked students',
-                    style: TextStyle(color: Colors.grey.shade600))
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))
               else
                 for (final child in children.whereType<Map>())
                   ListTile(

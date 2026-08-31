@@ -209,7 +209,7 @@ class _CourseCard extends StatelessWidget {
                           .where((s) => s.isNotEmpty)
                           .join(' • '),
                       style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                   const SizedBox(height: 8),
@@ -252,7 +252,7 @@ class _CountChip extends StatelessWidget {
         Icon(icon, size: 14, color: Colors.grey.shade500),
         const SizedBox(width: 3),
         Text('$count $label',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
     );
   }

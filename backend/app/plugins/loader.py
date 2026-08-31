@@ -382,75 +382,96 @@ class PluginLoader:
     ]
 
     # ── Fallback section mapping (used when manifest has no explicit section) ─
+    # E232 (2026-08-31): user-approved sidebar information architecture.
+    # The sidebar reads top-to-bottom in the order the frontend's
+    # PLUGIN_SECTION_ORDER renders: Dashboard / Academics / Learning /
+    # Money / Operations / Communication / Design & Web / Insights /
+    # Student Life / Safety & Compliance / Growth / Admin. Everything here
+    # matches the `section:` values now written into the manifests; this map
+    # remains the fallback for manifests without an explicit section.
     SLUG_SECTION_MAP: dict[str, str | None] = {
         # null section = no header (Dashboard)
         "dashboard": None,
-        # Academic Management
-        "academics": "Academic Management",
-        "students": "Academic Management",
-        "teachers": "Academic Management",
-        "users": "Academic Management",
-        "attendance": "Academic Management",
-        "timetable": "Academic Management",
-        "admission": "Academic Management",
-        # Exam & Performance
-        "exams": "Exam & Performance",
-        "assignments": "Exam & Performance",
-        "ai_grading": "Exam & Performance",
-        # Communication & Media
-        "notices": "Communication & Media",
-        "sms_notifications": "Communication & Media",
-        "whatsapp_bot": "Communication & Media",
-        "conferences": "Communication & Media",
-        # Library & Learning
-        "library_management": "Library & Learning",
-        "library": "Library & Learning",
-        "digital_content": "Library & Learning",
-        "elibrary": "Library & Learning",
-        "lms": "Library & Learning",
-        # Personnel Management
-        "hr_payroll": "Personnel Management",
-        # Institutional Finance
-        "fees": "Institutional Finance",
-        # Transportation
-        "gps_tracking": "Transportation",
+        # Academics
+        "students": "Academics",
+        "teachers": "Academics",
+        "academics": "Academics",
+        "timetable": "Academics",
+        "attendance": "Academics",
+        # Learning
+        "lms": "Learning",
+        "elibrary": "Learning",
+        "digital_content": "Learning",  # deprecated dup of elibrary
+        "library": "Learning",  # deprecated dup of library_management
+        "library_management": "Learning",
+        "assignments": "Learning",
+        "exams": "Learning",
+        "student_portfolio": "Learning",
+        "portfolio": "Learning",  # deprecated dup of student_portfolio
+        # Money
+        "fees": "Money",
+        "hr_payroll": "Money",
+        "admission": "Money",
         # Operations
-        "hostel": "Operations",
-        "visitor_management": "Operations",
         "inventory": "Operations",
+        "visitor_management": "Operations",
         "dismissal": "Operations",
+        "gps_tracking": "Operations",
         "biometric": "Operations",
-        "multi_branch": "Operations",
-        # Reporting & Analytics
-        "basic_reports": "Reporting & Analytics",
-        "advanced_analytics": "Reporting & Analytics",
-        # AI & Analytics
-        "ai_insights": "AI & Analytics",
-        "ai_tools": "AI & Analytics",
-        "ai_adaptive_learning": "AI & Analytics",
-        "ai_tutor": "AI & Analytics",
-        # Student Wellbeing
-        "wellbeing": "Student Wellbeing",
-        "health_records": "Student Wellbeing",
-        # Digital & Design
-        "design_studio": "Digital & Design",
-        "website_builder": "Digital & Design",
-        "basic_website": "Digital & Design",
-        "white_label": "Digital & Design",
+        "conferences": "Operations",
+        "hostel": "Operations",
+        # Communication
+        "notices": "Communication",
+        "sms_notifications": "Communication",
+        "whatsapp_bot": "Communication",
+        # Design & Web
+        "design_studio": "Design & Web",
+        "website_builder": "Design & Web",
+        "basic_website": "Design & Web",
+        "white_label": "Design & Web",
+        # Insights
+        "basic_reports": "Insights",
+        "ai_suite": "Insights",
+        # Admin
+        "users": "Admin",
+        "multi_branch": "Admin",
+        "file_management": "Admin",
+        # Student Life
+        "gamification": "Student Life",
+        "wellbeing": "Student Life",
+        "health_records": "Student Life",
+        # Safety & Compliance
+        "incidents": "Safety & Compliance",
+        "incident_management": "Safety & Compliance",
+        "emergency": "Safety & Compliance",
+        "disaster_management": "Safety & Compliance",
+        "compliance": "Safety & Compliance",
         # Growth
-        "gamification": "Growth",
         "alumni": "Growth",
-        "benchmarking": "Growth",
-        "social_hub": "Growth",
-        "portfolio": "Growth",
-        "student_portfolio": "Growth",
         "social_ads": "Growth",
-        # Compliance
-        "compliance": "Compliance",
-        "emergency": "Compliance",
-        "disaster_management": "Compliance",
-        "incident_management": "Compliance",
-        "incidents": "Compliance",
+        "social_hub": "Growth",  # withdrawn plugin — sidebar hidden anyway
+        # AI plugins merged into ai_suite (manifests carry section "Insights",
+        # sidebar hidden via visible_to: [] — entries kept for completeness)
+        "advanced_analytics": "Insights",
+        "ai_grading": "Insights",
+        "ai_tutor": "Insights",
+        "ai_tools": "Insights",
+        "ai_adaptive_learning": "Insights",
+        "ai_insights": "Insights",
+        "benchmarking": "Insights",
+    }
+
+    # ── Sidebar supersede map (E238, 2026-08-31) ─────────────────────────────
+    # Two-tier plugin chains that share ONE frontend route (base tier +
+    # paid upgrade, e.g. basic_website free → website_builder premium, which
+    # depends_on the base). Both plugins stay PUBLISHED (same verdict as
+    # incidents/incident_management — distinct tiers of one chain, not
+    # duplicates), but when the upgrade is installed+active the base tier's
+    # sidebar entry is SUPERSEDED so Design & Web shows a single "Website"
+    # entry instead of two nav items pointing at /dashboard/website-builder.
+    # value = the upgrade slug whose acceptable-slug family supersedes the key.
+    SIDEBAR_SUPERSEDED_BY: dict[str, str] = {
+        "basic_website": "website_builder",
     }
 
     @classmethod
@@ -462,16 +483,50 @@ class PluginLoader:
         - Routes normalized to /dashboard/ prefix
         - Section info for grouping in the frontend (manifest field, else SLUG_SECTION_MAP)
         - Icon name string (maps to Lucide component on frontend)
+
+        Visibility rules (E230/E231/E232, 2026-08-31):
+        - `coming_soon: true` manifests NEVER render a sidebar item (the
+          feature is in final testing — routes stay gated+mounted, but the
+          nav entry is hidden until release).
+        - Alias-aware: an item renders when ANY acceptable slug (itself, its
+          alias target, or legacy aliases of it — the same single-hop
+          expansion used by @plugin_required) is installed. This is what
+          surfaces the single "AI Suite" nav entry for schools that installed
+          one of the deprecated individual AI plugins, and canonical entries
+          for schools still holding legacy duplicate installs.
+        - Role scoping via `visible_to` is unchanged.
         """
+        from app.plugins.decorators import _acceptable_plugin_slugs
+
         # Merge core + installed, preserving order and deduplicating
         all_slugs: list[str] = list(
             dict.fromkeys([*cls.CORE_ALWAYS_SLUGS, *installed_slugs])
         )
+        installed_set = {str(s) for s in installed_slugs}
+
+        # Bundle slugs are never the installed slug of legacy schools (a
+        # school that installed ai_tools does not have an ai_suite row), so
+        # also consider every manifest whose ACCEPTABLE slug family (itself
+        # + alias target + legacy aliases) intersects the installs — that is
+        # what surfaces the single "AI Suite" entry for legacy AI installs.
+        for slug in sorted(cls._plugins):
+            if slug not in all_slugs and _acceptable_plugin_slugs(slug) & installed_set:
+                all_slugs.append(slug)
 
         sidebar = []
         for slug in all_slugs:
             manifest = cls._plugins.get(slug)
             if not manifest:
+                continue
+
+            # Coming-soon plugins are hidden from navigation entirely.
+            if manifest.get("coming_soon"):
+                continue
+
+            # Deprecated manifests (merged/withdrawn plugins) never render a
+            # sidebar entry — their canonical successor's entry shows instead
+            # via the alias family above, and the routes stay gated.
+            if manifest.get("deprecated"):
                 continue
 
             fe = manifest.get("frontend")
@@ -485,6 +540,12 @@ class PluginLoader:
             visible_to = sb.get("visible_to", [])
             # Show if: visible_to is empty (open), contains "all", or matches role
             if visible_to and "all" not in visible_to and user_role not in visible_to:
+                continue
+
+            # Installed+active check with single-hop alias expansion — the
+            # same acceptable-slug set @plugin_required accepts.
+            acceptable = _acceptable_plugin_slugs(slug)
+            if not acceptable & installed_set:
                 continue
 
             section = sb.get("section")
@@ -544,6 +605,8 @@ class PluginLoader:
             manifest = cls._plugins.get(slug)
             if not manifest:
                 continue
+            if manifest.get("coming_soon"):
+                continue  # E231: coming-soon plugins are hidden from nav
             fe = manifest.get("frontend") or {}
             sb = fe.get("sidebar") or {}
             if sb.get("section") != "bottom_nav":

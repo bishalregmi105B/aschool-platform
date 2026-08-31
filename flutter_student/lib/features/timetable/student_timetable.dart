@@ -213,12 +213,12 @@ class _TimetableSlotCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(Icons.person_outline,
-                          size: 14, color: Colors.grey.shade600),
+                          size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(width: 4),
                       Text(
                         slot.teacherLabel,
                         style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 13),
+                            color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
                       ),
                     ],
                   ),

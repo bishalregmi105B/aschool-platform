@@ -42,7 +42,7 @@ storage:
 frontend:
   route: "/dashboard/files"
   sidebar:
-    section: "Operations"
+    section: "Admin"
     label: "File Manager"
     label_nepali: "फाइल व्यवस्थापन"
     icon: "FolderOpen"

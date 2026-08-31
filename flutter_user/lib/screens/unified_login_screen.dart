@@ -98,19 +98,9 @@ class _UnifiedLoginScreenState extends ConsumerState<UnifiedLoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white,
-                    _loginFlow.accent.withValues(alpha: 0.08),
-                  ],
-                ),
-              ),
-            ),
+          // flat background — no gradient (simpler look)
+          const Positioned.fill(
+            child: ColoredBox(color: Colors.white),
           ),
           SafeArea(
             child: Center(

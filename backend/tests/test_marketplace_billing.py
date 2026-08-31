@@ -83,13 +83,18 @@ def test_trial_then_subscribe_flow(client, db, school):
 
 
 def test_unpublished_stub_plugins_cannot_be_installed(client, db, school):
-    """multi_branch/biometric are unimplemented — they must be delisted and
-    uninstallable-proof (install refuses unpublished plugins)."""
+    """multi_branch/biometric were the original 'unimplemented stub' probes;
+    both are REAL published plugins today (E234 premium band, NPR 299), so
+    the delisting half of this test now uses withdrawn/unpublished slugs.
+    E230 (2026-08-31): social_hub is withdrawn from the catalog and ai_grading
+    is folded into the ai_suite bundle — manifests say published: false, and
+    the registry-backed marketplace must not offer them even if a stale
+    mirror row exists."""
     headers = _admin(client, db, school)
-    _seed_plugin(db, slug="multi_branch", name="Multi-Branch Chain", is_published=False)
-    _seed_plugin(db, slug="biometric", name="Biometric Integration", is_published=False)
+    _seed_plugin(db, slug="social_hub", name="Social Media Hub", is_published=False)
+    _seed_plugin(db, slug="ai_grading", name="AI Grading", is_published=False)
 
-    for slug in ("multi_branch", "biometric"):
+    for slug in ("social_hub", "ai_grading"):
         resp = client.post(
             "/api/v1/plugins/install",
             json={"plugin_slug": slug},

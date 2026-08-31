@@ -52,7 +52,9 @@ class CustomBottomSheet extends StatelessWidget {
             border: Border.all(color: theme.dividerColor.withAlpha(40)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(14),
+                color: Colors.black.withAlpha(
+                  theme.brightness == Brightness.dark ? 70 : 14,
+                ),
                 blurRadius: 18,
                 offset: const Offset(0, -4),
               ),

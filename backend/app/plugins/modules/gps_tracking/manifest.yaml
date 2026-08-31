@@ -2,8 +2,9 @@ slug: gps_tracking
 name: "GPS Bus Tracking"
 name_nepali: "जीपीएस बस ट्र्याकिङ"
 category: premium
-price_monthly: 1999
-price_yearly: 19999
+price_monthly: 299
+price_yearly: 2990
+coming_soon: true  # in final testing — not installable yet (E231): marketplace card disabled, sidebar hidden, routes stay gated
 emoji: "🚌"
 icon: "Bus"
 description: "Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route management, stop notifications, speed alerts"
@@ -22,7 +23,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/transport"
   sidebar:
-    section: "Transportation"
+    section: "Operations"
     label: "Bus Tracking"
     label_nepali: "बस ट्र्याकिङ"
     icon: "Bus"

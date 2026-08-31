@@ -163,8 +163,18 @@ class AuthService:
     @staticmethod
     def _check_lockout(user: User) -> str | None:
         """Return an error string if the user is currently locked, else None."""
-        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-            remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds() / 60) + 1
+        locked_until = user.locked_until
+        if not locked_until:
+            return None
+        # E237: users.locked_until is a timezone-naive column while
+        # datetime.now(timezone.utc) is offset-aware — comparing them raised
+        # TypeError and 500ed EVERY login for any user with a lockout row
+        # (the seed data ships one). Normalize the stored value to UTC first.
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if locked_until > now:
+            remaining = int((locked_until - now).total_seconds() / 60) + 1
             return f"Account locked due to too many failed login attempts. Try again in {remaining} minute(s)."
         return None
 

@@ -2,8 +2,8 @@ slug: exams
 name: "Examination Management"
 name_nepali: "परीक्षा व्यवस्थापन"
 category: starter
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 99
+price_yearly: 990
 emoji: "📝"
 icon: "ClipboardList"
 description: "Exam scheduling, marks entry, result publishing, report cards, grade sheets, AI question paper generator"
@@ -22,7 +22,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/exams"
   sidebar:
-    section: "Exam & Performance"
+    section: "Learning"
     label: "Exams"
     label_nepali: "परीक्षा"
     icon: "FileText"

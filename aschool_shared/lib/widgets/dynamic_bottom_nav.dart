@@ -40,15 +40,17 @@ class DynamicBottomNav extends ConsumerWidget {
             ),
           ];
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          top: BorderSide(color: Colors.black.withAlpha(18)),
+          top: BorderSide(color: scheme.outline.withAlpha(60)),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(15),
+            color: Colors.black.withAlpha(theme.brightness == Brightness.dark ? 90 : 15),
             blurRadius: 18,
             offset: const Offset(0, -4),
           ),
@@ -76,7 +78,7 @@ class DynamicBottomNav extends ConsumerWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? ASchoolTheme.primary.withAlpha(18)
+                        ? scheme.primary.withAlpha(theme.brightness == Brightness.dark ? 40 : 18)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(999),
                   ),
@@ -86,8 +88,10 @@ class DynamicBottomNav extends ConsumerWidget {
                       Icon(
                         tab.icon,
                         color: isSelected
-                            ? ASchoolTheme.primary
-                            : ASchoolTheme.mutedText,
+                            ? scheme.primary
+                            : theme.brightness == Brightness.dark
+                                ? ASchoolTheme.darkTextMuted
+                                : ASchoolTheme.mutedText,
                         size: 22,
                       ),
                       if (isSelected) ...[
@@ -95,7 +99,7 @@ class DynamicBottomNav extends ConsumerWidget {
                         Text(
                           tab.label,
                           style: TextStyle(
-                            color: ASchoolTheme.primary,
+                            color: scheme.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                           ),

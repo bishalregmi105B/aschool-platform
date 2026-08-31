@@ -35,6 +35,36 @@ export const PAGE_SIZES: Record<string, { width: number; height: number }> = {
 
 const DEFAULT_MARGINS: PageMargins = { top: 72, right: 72, bottom: 72, left: 72 };
 
+/**
+ * fabric v6 `loadFromJSON` rejects as a whole when any embedded Image object
+ * has an unresolvable src — templates ship image placeholders like
+ * "{photo_url}"/"{qr_code}" as src, which would otherwise blank the canvas.
+ * Strip those to empty src (renders as empty slot) before handing to fabric.
+ */
+function sanitizeTemplateImages(json: Record<string, any>): Record<string, any> {
+  const clone = JSON.parse(JSON.stringify(json ?? {}));
+  const walk = (obj: Record<string, any>) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) { obj.forEach(walk); return; }
+    const isImage = obj.type?.toLowerCase() === "image";
+    if (isImage && (typeof obj.src !== "string" || obj.src.includes("{") || obj.src === "")) {
+      // keep the placeholder token in `data` so data-fill can resolve it later
+      const token = typeof obj.src === "string" ? obj.src : "";
+      obj.src = "";
+      obj.srcOrigin = null;
+      obj.crossOrigin = null;
+      if (token.includes("{")) obj.data = { ...(obj.data ?? {}), token };
+    }
+    if (isImage && typeof obj.src === "string" && obj.src.startsWith("/")) {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1\/?$/, "");
+      obj.src = `${apiBase || window.location.origin}${obj.src}`;
+    }
+    Object.values(obj).forEach(walk);
+  };
+  walk(clone);
+  return clone;
+}
+
 function mkPage(w = 794, h = 1123): PageState {
   return {
     id: Math.random().toString(36).slice(2, 10),
@@ -65,7 +95,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
   const snapshot = useCallback(() => {
     const fc = fabricRef.current;
     if (!fc) return;
-    const json = JSON.stringify(fc.toJSON());
+    const json = JSON.stringify(fc.toJSON(["data"]));
     const idx  = histIdxRef.current;
     historyRef.current = historyRef.current.slice(0, idx + 1);
     historyRef.current.push(json);
@@ -129,7 +159,8 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
     fc.setDimensions({ width: page.width, height: page.height });
     fc.backgroundColor = page.background ?? "#ffffff";
     if (page.json && Object.keys(page.json).length > 0) {
-      fc.loadFromJSON(page.json, () => fc.renderAll());
+      fc.loadFromJSON(sanitizeTemplateImages(page.json), () => fc.renderAll())
+        .catch(() => fc.renderAll());
     } else {
       fc.clear();
       fc.backgroundColor = page.background ?? "#ffffff";
@@ -402,7 +433,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
     setZoom(z);
   }, []);
 
-  const toJSON = useCallback(() => fabricRef.current?.toJSON() ?? {}, []);
+  const toJSON = useCallback(() => fabricRef.current?.toJSON(["data"]) ?? {}, []);
 
   /** Full multi-page JSON for saving */
   const toFullJSON = useCallback(() => {
@@ -410,7 +441,7 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
     if (!fc) return { version: "multi-page", pages: [] };
     const updatedPages = [...pages];
     if (updatedPages[currentPageIdx]) {
-      updatedPages[currentPageIdx] = { ...updatedPages[currentPageIdx], json: fc.toJSON() };
+      updatedPages[currentPageIdx] = { ...updatedPages[currentPageIdx], json: fc.toJSON(["data"]) };
     }
     return { version: "multi-page", pages: updatedPages };
   }, [pages, currentPageIdx]);
@@ -425,7 +456,8 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
     } else {
       const fc = fabricRef.current;
       if (!fc) return;
-      fc.loadFromJSON(json, () => fc.renderAll());
+      fc.loadFromJSON(sanitizeTemplateImages(json), () => fc.renderAll())
+        .catch(() => fc.renderAll());
     }
   }, [loadPageToCanvas]);
 
@@ -441,7 +473,8 @@ export function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement>) {
     fc.setDimensions({ width, height });
     fc.backgroundColor = background;
     if (canvasJson && Object.keys(canvasJson).length > 0) {
-      fc.loadFromJSON(canvasJson, () => { fc.renderAll(); snapshot(); });
+      fc.loadFromJSON(sanitizeTemplateImages(canvasJson), () => { fc.renderAll(); snapshot(); })
+        .catch(() => { fc.renderAll(); snapshot(); });
     } else {
       fc.clear();
       fc.backgroundColor = background;

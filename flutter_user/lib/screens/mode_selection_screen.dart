@@ -2,7 +2,6 @@ import 'package:aschool_shared/aschool_shared.dart';
 import 'package:flutter/material.dart';
 
 import '../state/auth_flow_controller.dart';
-import '../widgets/glow_orb.dart';
 
 class ModeSelectionScreen extends StatefulWidget {
   final ValueChanged<LoginFlow> onModeSelected;
@@ -97,37 +96,11 @@ class _ModeSelectionBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return const Stack(
       children: [
-        const Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF8FAFC),
-                  Color(0xFFEFF6FF),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: -70,
-          right: -50,
-          child: GlowOrb(
-            size: 220,
-            color: const Color(0xFF93C5FD).withValues(alpha: 0.28),
-          ),
-        ),
-        Positioned(
-          bottom: -80,
-          left: -40,
-          child: GlowOrb(
-            size: 200,
-            color: const Color(0xFFA7F3D0).withValues(alpha: 0.24),
-          ),
+        // flat background — no gradient (simpler look)
+        Positioned.fill(
+          child: ColoredBox(color: Color(0xFFF8FAFC)),
         ),
       ],
     );

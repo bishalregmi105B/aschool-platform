@@ -18,7 +18,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/website-builder"
   sidebar:
-    section: "Digital & Design"
+    section: "Design & Web"
     label: "Website"
     label_nepali: "वेबसाइट"
     icon: "Globe"

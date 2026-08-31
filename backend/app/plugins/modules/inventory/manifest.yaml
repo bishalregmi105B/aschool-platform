@@ -2,8 +2,8 @@ slug: inventory
 name: "Inventory & Assets"
 name_nepali: "सामग्री व्यवस्थापन"
 category: growth
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 149
+price_yearly: 1490
 emoji: "📦"
 icon: "Package"
 description: "QR asset tracking, procurement, depreciation"

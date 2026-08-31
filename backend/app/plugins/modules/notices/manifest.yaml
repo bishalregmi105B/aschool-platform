@@ -18,14 +18,13 @@ conflicts_with: []
 frontend:
   route: "/dashboard/notices"
   sidebar:
-    section: "Communication & Media"
+    section: "Communication"
     label: "Notices"
     label_nepali: "सूचना"
     icon: "Bell"
-    subitems:
-      - { label: "All Notices", route: "/dashboard/notices" }
-      - { label: "Create Notice", route: "/dashboard/notices/create" }
-      - { label: "Events", route: "/dashboard/notices/events" }
+    # E236: single-page feature (create is in-page) — create/events child
+    # routes were 404s.
+    subitems: []
     visible_to: ["school_admin", "teacher"]
 
 flutter:

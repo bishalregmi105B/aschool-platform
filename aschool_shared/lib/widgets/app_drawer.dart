@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends ConsumerWidget {
   final String userFullName;
   final String userSubtitle;
   final String userRole;
@@ -19,7 +21,8 @@ class AppDrawer extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return Drawer(
       child: Column(
         children: [
@@ -48,6 +51,7 @@ class AppDrawer extends StatelessWidget {
                   for (final item in section.items) _DrawerTile(item: item),
                 ],
                 const Divider(height: 32),
+                _ThemeModeTile(themeMode: themeMode, onSet: ref.read(themeModeProvider.notifier).setMode),
                 ListTile(
                   leading: const Icon(Icons.logout_rounded, color: Colors.red),
                   title: const Text(
@@ -111,16 +115,7 @@ class _DrawerHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topInset + 24, 20, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            ASchoolTheme.primary,
-            ASchoolTheme.primary.withAlpha(210),
-          ],
-        ),
-      ),
+      color: ASchoolTheme.primary,
       child: Row(
         children: [
           CircleAvatar(
@@ -201,6 +196,50 @@ class _DrawerTile extends StatelessWidget {
               Navigator.of(context).pop();
               context.go(item.path);
             },
+    );
+  }
+}
+
+/// Light/Dark/System switcher shown in the drawer. Cycles through the three
+/// modes on tap; the icon + subtitle reflect the current choice.
+class _ThemeModeTile extends StatelessWidget {
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onSet;
+
+  const _ThemeModeTile({required this.themeMode, required this.onSet});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, label) = switch (themeMode) {
+      ThemeMode.light => (Icons.light_mode_rounded, 'Light'),
+      ThemeMode.dark => (Icons.dark_mode_rounded, 'Dark'),
+      _ => (Icons.brightness_auto_rounded, 'System'),
+    };
+
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+      leading: Icon(icon, color: scheme.primary),
+      title: Text(
+        'Theme: $label',
+        style: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        'Tap to switch light / dark / system',
+        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+      ),
+      onTap: () {
+        final next = switch (themeMode) {
+          ThemeMode.system => ThemeMode.light,
+          ThemeMode.light => ThemeMode.dark,
+          _ => ThemeMode.system,
+        };
+        onSet(next);
+      },
     );
   }
 }

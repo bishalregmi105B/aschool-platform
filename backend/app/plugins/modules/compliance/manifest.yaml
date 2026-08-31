@@ -2,8 +2,8 @@ slug: compliance
 name: "Compliance & EMIS"
 name_nepali: "अनुपालन र ईएमआईएस"
 category: growth
-price_monthly: 399
-price_yearly: 3999
+price_monthly: 149
+price_yearly: 1490
 emoji: "📋"
 icon: "ShieldCheck"
 description: "Government EMIS reporting, compliance checklists, audit trails, regulatory document management"
@@ -19,14 +19,12 @@ conflicts_with: []
 frontend:
   route: "/dashboard/compliance"
   sidebar:
-    section: "Compliance"
+    section: "Safety & Compliance"
     label: "Compliance"
     label_nepali: "अनुपालन"
     icon: "ShieldCheck"
-    subitems:
-      - { label: "Dashboard", route: "/dashboard/compliance" }
-      - { label: "EMIS Export", route: "/dashboard/compliance/emis" }
-      - { label: "Audit Trail", route: "/dashboard/compliance/audit" }
+    # E236: single-page feature — emis/audit child routes were 404s.
+    subitems: []
     visible_to: ["school_admin"]
 
 flutter:

@@ -123,8 +123,15 @@ export default function NewStudentPage() {
       };
       return (await api.post("/students", payload)).data;
     },
-    onSuccess: () => {
-      toast.success("Student enrolled!");
+    onSuccess: (res) => {
+      const s = res?.data ?? res;
+      const enr = s?.enrollment_number || s?.admission_number;
+      const roll = s?.roll_number;
+      const assigned = [
+        enr ? `Enrollment No. ${enr}` : null,
+        roll ? `Roll No. ${roll}` : null,
+      ].filter(Boolean).join(", ");
+      toast.success(assigned ? `Student enrolled! ${assigned} auto-assigned.` : "Student enrolled!");
       router.push("/dashboard/students");
     },
     onError: () => toast.error("Failed to enroll student"),
@@ -321,11 +328,13 @@ export default function NewStudentPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Admission / Enrollment No.</Label>
-                  <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder="e.g. ADM1023" />
+                  <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder="Auto-generated" />
+                  <p className="text-xs text-muted-foreground">Leave blank to auto-assign the next number.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Roll Number</Label>
-                  <Input value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder="e.g. 12" />
+                  <Input type="number" value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder="Auto-assigned" />
+                  <p className="text-xs text-muted-foreground">Leave blank to auto-assign within the class.</p>
                 </div>
               </div>
               <div className="space-y-2">

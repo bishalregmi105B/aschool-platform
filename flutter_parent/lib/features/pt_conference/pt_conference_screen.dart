@@ -261,7 +261,7 @@ class _ConferenceCardState extends State<_ConferenceCard> {
                           child: Text(
                             conf['description'].toString(),
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
+                                fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),

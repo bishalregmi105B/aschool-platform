@@ -82,6 +82,15 @@ def install_plugin(school_id: str, plugin_slug: str, billing_cycle: str = "month
     if not plugin:
         return {"error": f"Plugin '{plugin_slug}' not found or not available"}
 
+    # E230: coming-soon plugins are not installable yet (final testing).
+    # Checked at the deepest shared entry-point so API installs, seeds and
+    # plan grants all refuse consistently; existing install rows are
+    # untouched and the plugin's routes remain gated+mounted.
+    from app.plugins.loader import PluginLoader
+
+    if (PluginLoader.get_manifest(plugin_slug) or {}).get("coming_soon"):
+        return {"error": f"Plugin '{plugin_slug}' is in final testing — releasing soon"}
+
     existing = SchoolPlugin.query.filter_by(
         school_id=school_id, plugin_slug=plugin_slug
     ).first()

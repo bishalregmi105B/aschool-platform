@@ -42,7 +42,7 @@ class NoDataContainer extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: ASchoolTheme.secondary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -51,7 +51,7 @@ class NoDataContainer extends StatelessWidget {
                 Text(
                   subtitle!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: ASchoolTheme.mutedText,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.35,
                       ),
                   textAlign: TextAlign.center,

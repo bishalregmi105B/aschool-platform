@@ -1,15 +1,18 @@
 import 'package:aschool_shared/aschool_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ASchoolTheme.light,
       darkTheme: ASchoolTheme.dark,
+      themeMode: themeMode,
       home: const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),

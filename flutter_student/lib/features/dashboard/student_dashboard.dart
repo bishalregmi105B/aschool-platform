@@ -198,11 +198,14 @@ class _ClassCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: isNow
             ? Border.all(color: primaryColor.withAlpha(100), width: 1.5)
-            : Border.all(color: Colors.grey.shade200),
+            : Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? ASchoolTheme.darkBorder
+                    : Colors.grey.shade200),
         boxShadow: [
           if (isNow)
             BoxShadow(
@@ -234,7 +237,7 @@ class _ClassCard extends StatelessWidget {
               ),
               Text(
                 cls['end_time'] ?? '',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -245,7 +248,7 @@ class _ClassCard extends StatelessWidget {
         ),
         subtitle: Text(
           cls['teacher'] ?? '',
-          style: TextStyle(color: Colors.grey.shade600),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         trailing: isNow
             ? Container(
@@ -278,9 +281,13 @@ class _HomeworkTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
       ),
       child: ListTile(
         leading: Container(
@@ -632,7 +639,9 @@ class _QuickAction extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: color.withAlpha(20),
+              color: color.withAlpha(
+                Theme.of(context).brightness == Brightness.dark ? 52 : 20,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: color, size: 28),
@@ -641,10 +650,10 @@ class _QuickAction extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.onSurface,
                 height: 1.1,
               ),
               textAlign: TextAlign.center,
@@ -677,9 +686,13 @@ class _ResultCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
       ),
       child: ListTile(
         leading: Container(
@@ -699,7 +712,7 @@ class _ResultCard extends StatelessWidget {
         title: Text(r['exam_name'] ?? '',
             style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text('GPA: ${r['gpa'] ?? '--'}',
-            style: TextStyle(color: Colors.grey.shade600)),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -724,9 +737,13 @@ class _NoticeCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
       ),
       child: ListTile(
         leading: Container(
@@ -747,7 +764,7 @@ class _NoticeCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text((n['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(n['date']!) ?? DateTime.now()) : '',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
         trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       ),
     );

@@ -122,7 +122,11 @@ class _StudentCard extends StatelessWidget {
       color: Colors.white,
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: InkWell(
@@ -168,7 +172,7 @@ class _StudentCard extends StatelessWidget {
                       Text(
                         'Roll: ${student['roll_no']}  •  ${student['class_name'] ?? ''}',
                         style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 13,
                             fontWeight: FontWeight.w500),
                       ),

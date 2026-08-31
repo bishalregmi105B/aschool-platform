@@ -24,6 +24,28 @@ PLUGIN_SLUG_ALIASES = {
     # student_portfolio). Renamed to the canonical slug; alias KEPT so
     # legacy portfolio installs still pass student_portfolio-gated routes.
     "portfolio": "student_portfolio",
+    # ── AI Suite bundle (E230 catalog consolidation, 2026-08-31) ─────────
+    # The seven AI/analytics plugins were merged into ONE licensing bundle
+    # (`ai_suite`, premium, NPR 399/mo — backend/app/plugins/modules/
+    # ai_suite/manifest.yaml). Their blueprints stay mounted exactly as
+    # today; the aliases below make an ai_suite install satisfy every
+    # ai_* / benchmarking / advanced_analytics gated route. The aliases are
+    # KEPT pointing at ai_suite (not removed) so legacy installs of the
+    # individual plugins keep passing their own gates — same mechanism as
+    # the digital_content→elibrary and portfolio→student_portfolio merges.
+    "ai_grading": "ai_suite",
+    "ai_tutor": "ai_suite",
+    "ai_tools": "ai_suite",
+    "ai_adaptive_learning": "ai_suite",
+    "ai_insights": "ai_suite",
+    "benchmarking": "ai_suite",
+    "advanced_analytics": "ai_suite",
+    # NOTE: no "social_hub" entry — the plugin was WITHDRAWN from the catalog
+    # (E230: unpublished + deprecated, unused, moderation liability). Its
+    # routes stay mounted and gated @plugin_required("social_hub") so the
+    # schools that already installed it keep working off their own
+    # SchoolPlugin row; the feature is not replaced by any other plugin, so
+    # aliasing it would silently hand its routes to another product.
     # NOTE: no "design_studio" entry — it is its own published plugin
     # (growth, NPR 499), a different feature from the e-library pair.
     # Aliasing it to digital_content let an elibrary (starter, NPR 299)

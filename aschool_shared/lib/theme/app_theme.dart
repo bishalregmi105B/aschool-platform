@@ -4,6 +4,15 @@ import 'package:google_fonts/google_fonts.dart';
 class ASchoolTheme {
   ASchoolTheme._();
 
+  // Semantic dark palette — mirrors the light tokens above. Raw access is
+  // allowed for places that cannot read BuildContext (rare).
+  static const Color darkPageBackground = Color(0xFF121417);
+  static const Color darkSurface = Color(0xFF1B1E22);
+  static const Color darkElevatedSurface = Color(0xFF23272C);
+  static const Color darkTextPrimary = Color(0xFFF2F4F6);
+  static const Color darkTextMuted = Color(0xFF9AA4AE);
+  static const Color darkBorder = Color(0xFF2E343A);
+
   // eSchool-inspired color tokens
   static const Color primary = Color(0xFF22577A);
   static const Color primaryDark = Color(0xFF16344A);
@@ -140,34 +149,137 @@ class ASchoolTheme {
   static ThemeData get dark {
     final base = ThemeData(useMaterial3: true, brightness: Brightness.dark);
     final textTheme = GoogleFonts.poppinsTextTheme(base.textTheme);
+    const darkSurface = ASchoolTheme.darkSurface;
+    const darkPage = ASchoolTheme.darkPageBackground;
     final scheme = ColorScheme.fromSeed(
-      seedColor: primary,
+      seedColor: accent,
       brightness: Brightness.dark,
     ).copyWith(
-      primary: primary,
+      primary: accent,
+      onPrimary: const Color(0xFF0B1F17),
       secondary: accent,
+      onSecondary: const Color(0xFF0B1F17),
+      tertiary: ASchoolTheme.darkElevatedSurface,
+      onTertiary: ASchoolTheme.darkTextPrimary,
       error: danger,
+      onError: Colors.white,
+      surface: darkSurface,
+      onSurface: ASchoolTheme.darkTextPrimary,
+      onSurfaceVariant: ASchoolTheme.darkTextMuted,
+      outline: ASchoolTheme.darkBorder,
     );
 
     return base.copyWith(
       colorScheme: scheme,
       textTheme: textTheme,
+      scaffoldBackgroundColor: darkPage,
+      canvasColor: darkPage,
       appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
-        backgroundColor: primaryDark,
-        foregroundColor: Colors.white,
+        scrolledUnderElevation: 0,
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        foregroundColor: ASchoolTheme.darkTextPrimary,
         titleTextStyle: textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: ASchoolTheme.darkTextPrimary,
+          fontSize: 18,
         ),
       ),
       cardTheme: CardThemeData(
+        color: darkSurface,
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          side: const BorderSide(color: ASchoolTheme.darkBorder),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: ASchoolTheme.darkElevatedSurface,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: ASchoolTheme.darkBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: ASchoolTheme.darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: accent),
+        ),
+        hintStyle: const TextStyle(color: ASchoolTheme.darkTextMuted),
+        labelStyle: const TextStyle(color: ASchoolTheme.darkTextMuted),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: accent,
+          foregroundColor: const Color(0xFF0B1F17),
+          minimumSize: const Size(0, 46),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSm),
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          minimumSize: const Size(0, 46),
+          backgroundColor: accent,
+          foregroundColor: const Color(0xFF0B1F17),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSm),
+          ),
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        selectedItemColor: accent,
+        unselectedItemColor: ASchoolTheme.darkTextMuted,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        indicatorColor: accent.withAlpha(46),
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+              color: states.contains(WidgetState.selected)
+                  ? accent
+                  : ASchoolTheme.darkTextMuted,
+            )),
+      ),
+      dividerColor: ASchoolTheme.darkBorder,
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        labelStyle: const TextStyle(color: ASchoolTheme.darkTextPrimary),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: const BorderSide(color: ASchoolTheme.darkBorder),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusMd),
         ),
       ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        modalBackgroundColor: ASchoolTheme.darkElevatedSurface,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ASchoolTheme.darkElevatedSurface,
+        contentTextStyle: const TextStyle(color: ASchoolTheme.darkTextPrimary),
+        behavior: SnackBarBehavior.floating,
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: ASchoolTheme.darkTextMuted,
+        textColor: ASchoolTheme.darkTextPrimary,
+      ),
+      iconTheme: const IconThemeData(color: ASchoolTheme.darkTextPrimary),
     );
   }
 }

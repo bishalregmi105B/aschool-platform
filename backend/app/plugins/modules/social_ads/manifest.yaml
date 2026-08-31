@@ -1,4 +1,10 @@
 slug: social_ads
+# REMOVED from the catalog (2026-08-31): social hub feature set withdrawn —
+# ad boosting depended on social_hub (now unpublished) and shared its UI.
+# published: false delists it; routes stay mounted and gated so existing
+# installs do not break.
+published: false
+deprecated: true
 name: "Social Ad Boosting"
 name_nepali: "विज्ञापन बुस्टिङ"
 category: growth
