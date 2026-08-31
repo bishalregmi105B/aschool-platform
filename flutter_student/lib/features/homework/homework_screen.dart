@@ -126,7 +126,7 @@ class _HomeworkCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(5),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(5),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -209,7 +209,7 @@ class _HomeworkCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(Icons.person_outline,
-                      size: 16, color: Colors.grey.shade500),
+                      size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(hw.teacher,
                       style:
@@ -219,7 +219,7 @@ class _HomeworkCard extends StatelessWidget {
                       size: 16,
                       color: (isOverdue && isPending)
                           ? Colors.red
-                          : Colors.grey.shade500),
+                          : Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     'Due: $_dueDateText',
@@ -227,7 +227,7 @@ class _HomeworkCard extends StatelessWidget {
                       fontSize: 13,
                       color: (isOverdue && isPending)
                           ? Colors.red
-                          : Colors.grey.shade600,
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: (isOverdue && isPending)
                           ? FontWeight.w600
                           : FontWeight.normal,
@@ -449,7 +449,7 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
             Icon(Icons.person_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(widget.hw.teacher,
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 6),
@@ -459,14 +459,14 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
                 size: 16,
                 color: (isOverdue && widget.isPending)
                     ? Colors.red
-                    : Colors.grey.shade600),
+                    : Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(
               'Due: $dueDateText',
               style: TextStyle(
                 color: (isOverdue && widget.isPending)
                     ? Colors.red
-                    : Colors.grey.shade700,
+                    : Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: (isOverdue && widget.isPending)
                     ? FontWeight.w600
@@ -485,8 +485,10 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
         const SizedBox(height: 8),
         Text(
           widget.hw.description ?? 'No description provided.',
-          style:
-              const TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+          style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Theme.of(context).colorScheme.onSurface),
         ),
         if (attachments.isNotEmpty) ...[
           const SizedBox(height: 16),

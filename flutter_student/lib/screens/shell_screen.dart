@@ -208,7 +208,7 @@ class StudentShellScreen extends ConsumerWidget {
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: theme.colorScheme.onPrimary, width: 2),
                       color: theme.colorScheme.primaryContainer,
                       image: user?.avatarUrl != null
                           ? DecorationImage(
@@ -238,8 +238,8 @@ class StudentShellScreen extends ConsumerWidget {
                       children: [
                         Text(
                           user?.fullName ?? 'Student',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -251,7 +251,7 @@ class StudentShellScreen extends ConsumerWidget {
                           Text(
                             user!.email!,
                             style: TextStyle(
-                              color: Colors.white.withAlpha(200),
+                              color: theme.colorScheme.onPrimary.withAlpha(200),
                               fontSize: 13,
                             ),
                             maxLines: 1,
@@ -364,7 +364,8 @@ class StudentShellScreen extends ConsumerWidget {
   Widget _buildDrawerItem(BuildContext context, _Tab item) {
     final location = GoRouterState.of(context).matchedLocation;
     final selected = location.startsWith(item.path);
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -375,13 +376,17 @@ class StudentShellScreen extends ConsumerWidget {
         leading: Icon(
           item.icon,
           size: 22,
-          color: selected ? primaryColor : Colors.grey.shade700,
+          color: selected
+                ? primaryColor
+                : theme.colorScheme.onSurfaceVariant,
         ),
         title: Text(
           item.label,
           style: TextStyle(
             fontSize: 14,
-            color: selected ? primaryColor : Colors.black87,
+            color: selected
+                ? primaryColor
+                : theme.colorScheme.onSurface,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),

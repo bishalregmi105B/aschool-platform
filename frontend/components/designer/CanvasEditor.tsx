@@ -134,14 +134,32 @@ export default function CanvasEditor() {
     if (!tpl) return;
     templateLoadedRef.current = true;
     setDocName(tpl.name);
+    loadTemplate(tpl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateIdState, docId, allTemplates, canvas, canvas.isReady]);
+
+  /** Route a template into the right surface: writer docs open the writer,
+   *  multi-page canvas JSON loads as pages, single-page into the canvas. */
+  const loadTemplate = useCallback((tpl: any) => {
+    setDocName(tpl.name);
+    setTemplateIdState(tpl.id);
+    if (tpl.editor_type === "writer" && (!tpl.canvas_json || Object.keys(tpl.canvas_json).length === 0)) {
+      // document-style template — belongs in the writer
+      router.replace(`/dashboard/designer/writer?template=${tpl.id}`);
+      toast.info(`${tpl.name} opens in the Writer`);
+      return;
+    }
     if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0) {
       if (tpl.canvas_json.version === "multi-page") {
         canvas.loadJSON(tpl.canvas_json as any);
       } else {
         canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
       }
-    } else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
-  }, [templateIdState, docId, allTemplates, canvas, canvas.isReady]);
+    } else {
+      canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
+      toast.info(`${tpl.page_size ?? "Custom"} canvas ready — build from the left panels`);
+    }
+  }, [canvas, router]);
 
   useEffect(() => {
     if (!bulkSessionId || docLoadedRef.current || !canvas.isReady) return;
@@ -551,13 +569,7 @@ export default function CanvasEditor() {
                       <div className="grid grid-cols-2 gap-2">
                         {filteredTemplates.map((tpl: any) => (
                           <button key={tpl.id}
-                            onClick={() => {
-                              setDocName(tpl.name);
-                              setTemplateIdState(tpl.id);
-                              if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0)
-                                canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
-                              else canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
-                            }}
+                            onClick={() => loadTemplate(tpl)}
                             className="group relative border rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all bg-muted/30"
                             style={{ paddingTop:"75%" }}
                           >

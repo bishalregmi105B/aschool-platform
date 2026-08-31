@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class FilterChipRow extends StatelessWidget {
   final List<String> filters;
@@ -17,6 +16,7 @@ class FilterChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: padding,
@@ -33,12 +33,14 @@ class FilterChipRow extends StatelessWidget {
                   onFilterChanged(filter);
                 }
               },
-              selectedColor: ASchoolTheme.primary,
+              selectedColor: theme.colorScheme.primary,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.black87,
+                color: isSelected
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
-              backgroundColor: Colors.grey.shade100,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
               side: BorderSide.none,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),

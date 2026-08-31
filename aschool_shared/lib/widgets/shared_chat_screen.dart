@@ -171,7 +171,11 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
       padding: const EdgeInsets.only(top: 8),
       itemCount: contacts.length,
       separatorBuilder: (_, __) =>
-          Divider(height: 1, indent: 72, color: Colors.grey.shade100),
+          Divider(
+                    height: 1,
+                    indent: 72,
+                    color: Theme.of(context).dividerColor,
+                  ),
       itemBuilder: (context, index) {
         final contact = contacts[index];
         final selected = _selectedContact?.id == contact.id;
@@ -199,9 +203,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
-            border:
-                Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            color: Theme.of(context).cardColor,
+            border: Border(
+                bottom: BorderSide(color: Theme.of(context).dividerColor)),
           ),
           child: Row(
             children: [
@@ -236,8 +240,8 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                         decoration: BoxDecoration(
                           color: Colors.green,
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: Colors.white, width: 2),
+                          border: Border.all(
+                              color: Theme.of(context).cardColor, width: 2),
                         ),
                       ),
                     ),
@@ -258,7 +262,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                       style: TextStyle(
                         color: contact.isOnline
                             ? Colors.green
-                            : Colors.grey.shade600,
+                            : Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -271,7 +277,10 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
         // Messages
         Expanded(
           child: Container(
-            color: Colors.grey.shade50,
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withAlpha(80),
             child: _loadingMessages
                 ? const LoadingShimmer()
                 : _messages.isEmpty
@@ -294,9 +303,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             decoration: BoxDecoration(
-              color: Colors.white,
-              border:
-                  Border(top: BorderSide(color: Colors.grey.shade200)),
+              color: Theme.of(context).cardColor,
+              border: Border(
+                  top: BorderSide(color: Theme.of(context).dividerColor)),
             ),
             child: Row(
               children: [
@@ -308,7 +317,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2))
                       : Icon(Icons.attach_file_rounded,
-                          color: Colors.grey.shade600),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant),
                   onPressed: _uploadingFile ? null : _sendFile,
                   tooltip: 'Attach',
                 ),
@@ -317,7 +328,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
@@ -396,12 +409,16 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                   child: Text(message.senderName!,
                       style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade500,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                           fontWeight: FontWeight.w600)),
                 ),
               Container(
                 decoration: BoxDecoration(
-                  color: mine ? ASchoolTheme.primary : Colors.white,
+                  color: mine
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),
@@ -410,7 +427,10 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withAlpha(12),
+                        color: Colors.black.withAlpha(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? 50
+                                : 12),
                         blurRadius: 4,
                         offset: const Offset(0, 1))
                   ],
@@ -442,10 +462,12 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(
                                 height: 200,
-                                color: Colors.grey.shade200),
+                                color: Theme.of(context)
+                                    .dividerColor),
                             errorWidget: (_, __, ___) => Container(
                                 height: 200,
-                                color: Colors.grey.shade200,
+                                color: Theme.of(context)
+                                    .dividerColor,
                                 child: const Icon(Icons.broken_image)),
                           ),
                         ),
@@ -466,7 +488,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                           decoration: BoxDecoration(
                             color: mine
                                 ? Colors.white.withAlpha(30)
-                                : Colors.grey.shade100,
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
@@ -476,7 +500,9 @@ class _SharedChatScreenState extends ConsumerState<SharedChatScreen> {
                                   Icons.insert_drive_file_rounded,
                                   color: mine
                                       ? Colors.white70
-                                      : Colors.grey.shade600,
+                                      : Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                                   size: 20),
                               const SizedBox(width: 8),
                               Flexible(
@@ -710,7 +736,9 @@ class _ContactTile extends StatelessWidget {
                         child: Text(
                           contact.lastMessage ?? '',
                           style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 12),
+                              color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

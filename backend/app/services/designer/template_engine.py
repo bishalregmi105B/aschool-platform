@@ -1006,7 +1006,7 @@ TEMPLATES: dict = {
         "category": "id_cards",
         "editor_type": "designer",
         "description": "Vertical staff ID card with photo, designation and school contacts",
-        "page_size": "ID Card",
+        "page_size": "ID Card Portrait",
         "thumbnail_emoji": "🪪",
         "is_default": True,
         "width": 300, "height": 480,

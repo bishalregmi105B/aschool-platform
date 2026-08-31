@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,7 @@ export default function StudentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Fetch classes for proper class/section filter
   const { data: classesData } = useQuery({
@@ -263,7 +265,7 @@ export default function StudentsPage() {
             {pagination?.total || 0} students enrolled
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)}>
+        <Button onClick={() => router.push("/dashboard/students/new")}>
           <Plus className="h-4 w-4 mr-2" />
           Add Student
         </Button>

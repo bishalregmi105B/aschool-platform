@@ -38,8 +38,11 @@ class ParentDashboard extends ConsumerWidget {
                   selected: _childId(child) ==
                       ref.watch(selectedChildIdForApiProvider),
                   onTap: () {
+                    // Selecting a child opens their full profile breakdown;
+                    // it also updates the active-child selection for APIs.
                     ref.read(selectedChildIdProvider.notifier).state =
                         _childId(child);
+                    context.push('/child-profile');
                   },
                 ),
               ),

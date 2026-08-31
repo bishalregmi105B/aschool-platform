@@ -192,7 +192,7 @@ class _TimetableSlotCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: isCurrent ? Colors.white : Colors.black87,
+                    color: isCurrent ? Colors.white : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -206,7 +206,7 @@ class _TimetableSlotCard extends StatelessWidget {
                     subject,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: isCurrent ? ASchoolTheme.primary : Colors.black87,
+                      color: isCurrent ? ASchoolTheme.primary : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -233,14 +233,14 @@ class _TimetableSlotCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
-                    color: isCurrent ? ASchoolTheme.primary : Colors.black87,
+                    color: isCurrent ? ASchoolTheme.primary : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   slot.endTime,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade500,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 if (isCurrent) ...[

@@ -98,7 +98,7 @@ class _OfflineExamCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(5),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(5),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -200,7 +200,7 @@ class _OfflineExamCard extends StatelessWidget {
                             'FM: ${sub['full_marks'] ?? ''}',
                             style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade700,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -271,19 +271,19 @@ class _OnlineExamCard extends StatelessWidget {
             Text(
               exam.subject,
               style: TextStyle(
-                  color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                  color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 4),
             Row(
               children: [
                 Icon(Icons.access_time_rounded,
-                    size: 14, color: Colors.grey.shade500),
+                    size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text('${exam.durationMinutes} mins',
                     style:
                         TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(width: 12),
-                Icon(Icons.rule_rounded, size: 14, color: Colors.grey.shade500),
+                Icon(Icons.rule_rounded, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text('FM: ${exam.totalMarks}',
                     style:

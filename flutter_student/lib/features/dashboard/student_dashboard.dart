@@ -220,7 +220,9 @@ class _ClassCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isNow ? primaryColor.withAlpha(20) : Colors.grey.shade100,
+            color: isNow
+                ? primaryColor.withAlpha(20)
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -232,7 +234,7 @@ class _ClassCard extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: isNow ? primaryColor : Colors.black87,
+                  color: isNow ? primaryColor : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               Text(
@@ -264,7 +266,9 @@ class _ClassCard extends StatelessWidget {
                         fontWeight: FontWeight.bold)),
               )
             : Text('Period ${cls['period'] ?? ''}',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12)),
       ),
     );
   }
@@ -306,7 +310,9 @@ class _HomeworkTile extends StatelessWidget {
         subtitle: Text(
           '${hw['subject'] ?? ''} • Due: $dueDate',
           style: TextStyle(
-              color: isOverdue ? Colors.red.shade700 : Colors.grey.shade600),
+              color: isOverdue
+                  ? Colors.red.shade400
+                  : Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         trailing: isOverdue
             ? Container(

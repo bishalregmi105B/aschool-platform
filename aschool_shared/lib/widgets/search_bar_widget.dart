@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class SearchBarWidget extends StatelessWidget {
   final String hintText;
   final ValueChanged<String>? onChanged;
@@ -16,14 +18,17 @@ class SearchBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(25),
+        border: isDark ? Border.all(color: ASchoolTheme.darkBorder) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(10),
+            color: Colors.black.withAlpha(isDark ? 60 : 10),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -31,17 +36,18 @@ class SearchBarWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 16, right: 8),
-            child: Icon(Icons.search, color: Colors.grey),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 8),
+            child: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
           ),
           Expanded(
             child: TextField(
               controller: controller,
               onChanged: onChanged,
+              style: TextStyle(color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle: TextStyle(color: Colors.grey.shade400),
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 border: InputBorder.none,
                 isDense: true,
               ),
@@ -49,7 +55,7 @@ class SearchBarWidget extends StatelessWidget {
           ),
           if (onFilterTap != null)
             IconButton(
-              icon: const Icon(Icons.tune, color: Colors.grey),
+              icon: Icon(Icons.tune, color: theme.colorScheme.onSurfaceVariant),
               onPressed: onFilterTap,
             ),
         ],

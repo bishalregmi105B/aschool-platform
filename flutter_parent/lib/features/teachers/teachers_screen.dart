@@ -27,9 +27,23 @@ class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
       _error = null;
     });
     try {
-      final r = await ApiClient.instance
-          .get('/users', queryParameters: {'role': 'teacher', 'per_page': 100});
-      final data = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
+      // Parents may not list raw users (403) — the chat contacts endpoint
+      // returns the same teachers with proper role-matrix filtering.
+      dynamic data;
+      try {
+        final r = await ApiClient.instance
+            .get('/users', queryParameters: {'role': 'teacher', 'per_page': 100});
+        data = (r.data is Map<String, dynamic>) ? r.data['data'] : null;
+        // normalize pagination wrapper
+        if (data is Map<String, dynamic> && data['items'] is List) {
+          data = data['items'];
+        }
+      } catch (_) {
+        data = null;
+      }
+      data ??= await ApiClient.instance.get('/communications/contacts').then(
+            (r) => (r.data is Map<String, dynamic>) ? r.data['data'] : null,
+          );
       _teachers = (data is List)
           ? data
               .whereType<Map>()
@@ -75,9 +89,14 @@ class _ParentTeachersScreenState extends ConsumerState<ParentTeachersScreen> {
                     padding: EdgeInsets.zero,
                     child: ListTile(
                       leading: const Icon(Icons.person_outline),
-                      title: Text(t['full_name']?.toString() ?? 'Teacher'),
+                      title: Text(
+                          (t['full_name'] ?? t['name'])?.toString() ??
+                              'Teacher'),
                       subtitle: Text(
-                        t['email']?.toString() ?? t['phone']?.toString() ?? '',
+                        t['email']?.toString() ??
+                            t['phone']?.toString() ??
+                            t['role']?.toString() ??
+                            '',
                       ),
                     ),
                   ),

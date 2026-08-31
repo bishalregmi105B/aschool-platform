@@ -1234,3 +1234,131 @@ def parent_dismissal_status():
         "authorized_pickups": pickups_data,
         "parent_user_id": str(parent_user_id) if parent_user_id else None,
     })
+
+@parent_app_bp.route("/child-profile", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+def parent_child_profile():
+    """Full profile breakdown for one of the parent's children.
+
+    Aggregates personal, academic, attendance, fee, guardian and teacher
+    info so the parent app can show a dedicated profile screen.
+    """
+    parent_user_id = _current_parent_user_id()
+    wards = _wards_for_parent(parent_user_id)
+    selected = _pick_students(wards, request.args.get("student_id"))
+    if not selected:
+        return error_response("Student not linked to this parent", 404)
+    student = selected[0]
+
+    # ── attendance summary ─────────────────────────────────────────
+    rows = Attendance.query.filter(
+        Attendance.school_id == g.school_id,
+        Attendance.student_id == student.id,
+        Attendance.is_deleted.is_(False),
+    ).all()
+    total_days = len(rows)
+    present_like = len([r for r in rows if r.status in ("present", "late")])
+    absent = len([r for r in rows if r.status == "absent"])
+    late = len([r for r in rows if r.status == "late"])
+    attendance_pct = round((present_like / total_days) * 100, 1) if total_days else 0
+
+    # ── fees ───────────────────────────────────────────────────────
+    fees_due = _student_fee_due(student.id)
+    collections = FeeCollection.query.filter_by(
+        school_id=g.school_id, student_id=student.id, is_deleted=False
+    ).all()
+    fees_paid = sum(float(c.amount_paid or 0) for c in collections)
+
+    # ── guardians ──────────────────────────────────────────────────
+    guardians = []
+    for gd in Guardian.query.filter_by(
+        student_id=student.id, is_deleted=False
+    ).all():
+        guardians.append(
+            {
+                "name": gd.full_name,
+                "relation": gd.relation,
+                "phone": gd.phone,
+                "email": gd.email,
+            }
+        )
+
+    # ── class teachers (from timetable) ────────────────────────────
+    teacher_names: list[str] = []
+    if student.class_id:
+        slots = TimetableSlot.query.filter_by(
+            school_id=g.school_id,
+            class_id=student.class_id,
+            section_id=student.section_id,
+            is_deleted=False,
+        ).all()
+        for slot in slots:
+            if slot.teacher and slot.teacher.full_name not in teacher_names:
+                teacher_names.append(slot.teacher.full_name)
+
+    # ── results snapshot (latest exam) ─────────────────────────────
+    latest_card = (
+        ReportCard.query.filter_by(
+            school_id=g.school_id, student_id=student.id, is_deleted=False
+        )
+        .order_by(ReportCard.created_at.desc())
+        .first()
+    )
+
+    # ── homework pending count ─────────────────────────────────────
+    from app.models.assignment import Assignment
+
+    pending_assignments = (
+        Assignment.query.filter(
+            Assignment.school_id == g.school_id,
+            Assignment.class_id == student.class_id,
+            Assignment.is_deleted.is_(False),
+        ).count()
+        if student.class_id
+        else 0
+    )
+
+    return success_response(
+        {
+            "id": str(student.id),
+            "student_id": str(student.id),
+            "name": _student_display_name(student),
+            "admission_number": student.admission_number,
+            "enrollment_number": student.admission_number,
+            "roll_no": student.roll_number,
+            "class_name": student.klass.name if student.klass else None,
+            "section_name": student.section.name if student.section else None,
+            "academic_year": student.academic_year,
+            "dob_bs": student.dob_bs,
+            "dob_ad": student.dob_ad.isoformat() if student.dob_ad else None,
+            "gender": (student.gender or "").capitalize() or None,
+            "blood_group": student.blood_group,
+            "address": student.address.get("permanent", "") if isinstance(student.address, dict) else str(student.address or ""),
+            "phone": student.phone,
+            "email": student.email,
+            "photo_url": student.photo_url,
+            "status": student.status,
+            "attendance": {
+                "percentage": attendance_pct,
+                "total_days": total_days,
+                "present": present_like - late,
+                "absent": absent,
+                "late": late,
+            },
+            "fees": {
+                "due": fees_due,
+                "paid": fees_paid,
+            },
+            "guardians": guardians,
+            "teachers": teacher_names[:8],
+            "results": {
+                "latest_exam": latest_card.exam.name if latest_card and latest_card.exam else None,
+                "gpa": getattr(latest_card, "gpa", None),
+                "grade": getattr(latest_card, "grade", None),
+                "rank": getattr(latest_card, "rank", None),
+            },
+            "pending_assignments": pending_assignments,
+        }
+    )
