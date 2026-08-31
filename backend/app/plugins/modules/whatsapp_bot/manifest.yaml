@@ -2,8 +2,9 @@ slug: whatsapp_bot
 name: "WhatsApp Bot"
 name_nepali: "व्हाट्सएप बोट"
 category: starter
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 99
+price_yearly: 990
+coming_soon: true  # in final testing — not installable yet (E231): marketplace card disabled, sidebar hidden, routes stay gated
 emoji: "💬"
 icon: "MessageCircle"
 description: "Two-way WhatsApp chatbot for parents — attendance, fees, results, bus tracking, AI chat in Nepali/English"
@@ -21,7 +22,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/communications/whatsapp"
   sidebar:
-    section: "Communication & Media"
+    section: "Communication"
     label: "WhatsApp Bot"
     label_nepali: "व्हाट्सएप बोट"
     icon: "MessageCircle"

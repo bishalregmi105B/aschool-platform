@@ -2,8 +2,8 @@ slug: library_management
 name: "Library Management"
 name_nepali: "पुस्तकालय व्यवस्थापन"
 category: starter
-price_monthly: 199
-price_yearly: 1999
+price_monthly: 99
+price_yearly: 990
 emoji: "📚"
 icon: "Library"
 description: "Book catalog, issue/return, overdue tracking"
@@ -17,7 +17,7 @@ conflicts_with: []
 frontend:
   route: "/library"
   sidebar:
-    section: null
+    section: "Learning"
     label: "Library"
     label_nepali: "पुस्तकालय"
     icon: "Library"

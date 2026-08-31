@@ -2,8 +2,8 @@ slug: assignments
 name: "Assignment Management"
 name_nepali: "गृहकार्य व्यवस्थापन"
 category: starter
-price_monthly: 199
-price_yearly: 1999
+price_monthly: 99
+price_yearly: 990
 emoji: "📋"
 icon: "FileText"
 description: "Create, distribute, submit, and grade assignments with file uploads and AI feedback"
@@ -18,7 +18,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/assignments"
   sidebar:
-    section: "Exam & Performance"
+    section: "Learning"
     label: "Assignments"
     label_nepali: "गृहकार्य"
     icon: "PenTool"

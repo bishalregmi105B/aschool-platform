@@ -62,9 +62,21 @@ const PLUGIN_SLUG_ALIASES: Record<string, string> = {
   // portfolio was a duplicate of student_portfolio (same blueprint/routes);
   // renamed to the canonical slug, alias kept for legacy installs.
   portfolio: "student_portfolio",
-  // NOTE: no "design_studio" entry — it is its own published plugin
-  // (growth, NPR 499), unrelated to the e-library pair. Mirrors backend
+  // ── AI Suite bundle (E230 catalog consolidation, 2026-08-31) ──
+  // The individual AI plugins are deprecated catalog items; one ai_suite
+  // install satisfies every ai_* / benchmarking / advanced_analytics gated
+  // page. Aliases KEPT so legacy installs keep working. Mirrors the backend
   // PLUGIN_SLUG_ALIASES in app/plugins/decorators.py.
+  ai_grading: "ai_suite",
+  ai_tutor: "ai_suite",
+  ai_tools: "ai_suite",
+  ai_adaptive_learning: "ai_suite",
+  ai_insights: "ai_suite",
+  benchmarking: "ai_suite",
+  advanced_analytics: "ai_suite",
+  // NOTE: no "social_hub" entry — the plugin was withdrawn (unpublished +
+  // deprecated); its gates stay satisfied by existing installs of the slug
+  // itself. No "design_studio" entry either — it is its own plugin.
 };
 
 function getAcceptablePluginSlugs(slug: string): Set<string> {
@@ -200,6 +212,7 @@ const PLUGIN_LABELS: Record<string, string> = {
   sms_notifications: "Communications",
   whatsapp_bot: "WhatsApp Bot",
   ai_tools: "AI Tools",
+  ai_suite: "AI Suite",
   digital_content: "Digital Content",
   elibrary: "E-Library & Digital Content",
   website_builder: "Website Builder",
@@ -225,8 +238,6 @@ const PLUGIN_LABELS: Record<string, string> = {
   inventory: "Inventory & Assets",
   multi_branch: "Multi-Branch Chain",
   notices: "Notices & Circulars",
-  social_ads: "Social Ad Boosting",
-  social_hub: "Social Media Hub",
   student_portfolio: "Student Portfolio",
   timetable: "Timetable Management",
   wellbeing: "Student Wellbeing",

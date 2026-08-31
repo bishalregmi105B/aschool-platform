@@ -18,13 +18,13 @@ conflicts_with: []
 frontend:
   route: "/dashboard/academics"
   sidebar:
-    section: "Academic Management"
+    section: "Academics"
     label: "Academics"
     label_nepali: "शैक्षिक"
     icon: "BookOpen"
     subitems:
       - { label: "Classes", route: "/dashboard/academics/classes" }
-      - { label: "Sections", route: "/dashboard/academics/sections" }
+      - { label: "Class Sections", route: "/dashboard/academics/class-sections" }
       - { label: "Subjects", route: "/dashboard/academics/subjects" }
       - { label: "Academic Year", route: "/dashboard/academics/year" }
     # visible_to: [] disables sidebar — handled by CORE_SECTIONS in frontend

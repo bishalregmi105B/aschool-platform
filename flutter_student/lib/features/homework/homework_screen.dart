@@ -119,7 +119,11 @@ class _HomeworkCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(5),
@@ -209,7 +213,7 @@ class _HomeworkCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(hw.teacher,
                       style:
-                          TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                          TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(width: 16),
                   Icon(Icons.calendar_today,
                       size: 16,
@@ -442,7 +446,7 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
         const SizedBox(height: 8),
         Row(
           children: [
-            Icon(Icons.person_outline, size: 16, color: Colors.grey.shade600),
+            Icon(Icons.person_outline, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(widget.hw.teacher,
                 style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
@@ -584,7 +588,7 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
               _attachmentUrl!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
           const SizedBox(height: 16),

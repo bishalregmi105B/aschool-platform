@@ -2,8 +2,8 @@ slug: wellbeing
 name: "Student Wellbeing"
 name_nepali: "विद्यार्थी कल्याण"
 category: growth
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 149
+price_yearly: 1490
 emoji: "😊"
 icon: "Smile"
 description: "Daily mood check-ins, wellbeing surveys, counselor sessions, mental health tracking, early intervention alerts"
@@ -19,7 +19,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/wellbeing"
   sidebar:
-    section: "Student Wellbeing"
+    section: "Student Life"
     label: "Wellbeing"
     label_nepali: "कल्याण"
     icon: "Smile"

@@ -296,7 +296,7 @@ class _QrScanTab extends StatelessWidget {
             Text(
               'Scan the QR code from the parent\'s app to authorise student dismissal.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -341,7 +341,7 @@ class _StatCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(label,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       ),

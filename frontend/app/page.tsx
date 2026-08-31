@@ -105,7 +105,7 @@ const pricingPlans = [
   },
   {
     name: "Starter",
-    price: "NPR 2,999",
+    price: "NPR 399",
     period: "per month",
     badge: "Most Popular",
     description: "For growing schools that need full operations management.",
@@ -124,7 +124,7 @@ const pricingPlans = [
   },
   {
     name: "Pro",
-    price: "NPR 7,999",
+    price: "NPR 999",
     period: "per month",
     badge: null,
     description: "For large schools and multi-branch institutions.",
@@ -171,7 +171,7 @@ export default function Home() {
         .float { animation: float 6s ease-in-out infinite; }
         .feature-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(14,59,46,0.12); }
         .feature-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-        .stat-pill { background: linear-gradient(135deg, #0e3b2e 0%, #155a44 100%); }
+        .stat-pill { background: #0e3b2e; }
         @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }

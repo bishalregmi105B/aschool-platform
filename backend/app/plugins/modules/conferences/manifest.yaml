@@ -2,8 +2,9 @@ slug: conferences
 name: "Parent-Teacher Conferences"
 name_nepali: "अभिभावक-शिक्षक भेटघाट"
 category: growth
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 199
+price_yearly: 1990
+coming_soon: true  # in final testing — not installable yet (E231): marketplace card disabled, sidebar hidden, routes stay gated
 emoji: "🤝"
 icon: "Users"
 description: "Online booking for PT conferences, time slot management, video calls, notes, follow-up tracking"

@@ -1,7 +1,6 @@
 import 'package:aschool_shared/aschool_shared.dart';
 import 'package:flutter/material.dart';
 
-import '../widgets/glow_orb.dart';
 
 class _OnboardingSlide {
   final String title;
@@ -153,53 +152,11 @@ class _OnboardingBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topColor = Color.lerp(
-      const Color(0xFFF7FBFF),
-      const Color(0xFFF7FFF7),
-      progress,
-    );
-    final bottomColor = Color.lerp(
-      const Color(0xFFDDEBFF),
-      const Color(0xFFFFF0DC),
-      progress,
-    );
-
-    return Stack(
+    // Flat backdrop — gradient + glow orbs removed for a simpler look.
+    return const Stack(
       children: [
         Positioned.fill(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 600),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  topColor ?? const Color(0xFFF7FBFF),
-                  bottomColor ?? const Color(0xFFDDEBFF),
-                ],
-              ),
-            ),
-          ),
-        ),
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-          top: 44 + (32 * progress),
-          left: -34 + (20 * progress),
-          child: GlowOrb(
-            size: 180,
-            color: const Color(0xFF60A5FA).withValues(alpha: 0.24),
-          ),
-        ),
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-          bottom: -32 + (36 * progress),
-          right: -16 + (14 * progress),
-          child: GlowOrb(
-            size: 200,
-            color: const Color(0xFF34D399).withValues(alpha: 0.22),
-          ),
+          child: ColoredBox(color: Color(0xFFF7FBFF)),
         ),
       ],
     );
@@ -256,14 +213,9 @@ class _OnboardingCard extends StatelessWidget {
                     height: 96,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          slide.color.withValues(alpha: 0.2),
-                          slide.color.withValues(alpha: 0.1),
-                        ],
-                      ),
+                      color: slide.color.withValues(alpha: 0.1),
                       border: Border.all(
-                        color: slide.color.withValues(alpha: 0.4),
+                        color: slide.color.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Icon(slide.icon, size: 46, color: slide.color),

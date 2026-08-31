@@ -2,8 +2,8 @@ slug: design_studio
 name: "Design Studio"
 name_nepali: "डिजाइन स्टुडियो"
 category: growth
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🎨"
 icon: "Palette"
 description: "Canva-like designer — certificates, ID cards, flyers"
@@ -20,14 +20,14 @@ conflicts_with: []
 frontend:
   route: "/dashboard/designer"
   sidebar:
-    section: "Digital & Design"
+    section: "Design & Web"
     label: "Design Studio"
     label_nepali: "डिजाइन स्टुडियो"
     icon: "Palette"
     subitems:
       - { label: "Templates", route: "/dashboard/designer/templates" }
-      - { label: "My Designs", route: "/dashboard/designer/my-designs" }
-      - { label: "ID Cards", route: "/dashboard/designer/id-cards" }
+      - { label: "Editor", route: "/dashboard/designer/editor" }
+      - { label: "Bulk ID Cards", route: "/dashboard/designer/bulk" }  # E236: id-cards child route never existed
     visible_to: ["school_admin", "teacher"]
 
 flutter:

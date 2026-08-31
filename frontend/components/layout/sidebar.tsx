@@ -187,26 +187,53 @@ interface SidebarSection {
 }
 
 // ── Section Display Order ──────────────────────────────────────────────────
-// Plugin items are grouped into these sections (in this order).
-// Core sections (Academic Management, Personnel Management, etc.) always appear;
-// plugin sections are inserted after the corresponding core section if it exists,
-// or appended at the end if new.
+// User-approved information architecture (E232, 2026-08-31) — matches the
+// section values written into the backend manifests / SLUG_SECTION_MAP:
+// Dashboard (null) → Academics → Learning → Money → Operations →
+// Communication → Design & Web → Insights → Student Life → Safety &
+// Compliance → Growth → Admin. Only INSTALLED+ACTIVE plugins render (the
+// backend filters by install state + aliases before this list is built).
 const PLUGIN_SECTION_ORDER: string[] = [
-  "Academic Management",
-  "Exam & Performance",
-  "Communication & Media",
-  "Library & Learning",
-  "Personnel Management",
-  "Institutional Finance",
-  "Transportation",
-  "Reporting & Analytics",
-  "Digital & Design",
-  "AI & Analytics",
-  "Student Wellbeing",
+  "Academics",
+  "Learning",
+  "Money",
   "Operations",
+  "Communication",
+  "Design & Web",
+  "Insights",
+  "Student Life",
+  "Safety & Compliance",
   "Growth",
-  "Compliance",
+  "Admin",
 ];
+
+// ── Within-section item order (E232) ───────────────────────────────────────
+// User-approved reading order inside each section. Slugs not listed keep
+// their backend order after the ranked ones (stable sort). Sections not
+// listed use pure backend order.
+const PLUGIN_SECTION_ITEM_ORDER: Record<string, string[]> = {
+  Academics: ["students", "teachers", "academics", "timetable", "attendance"],
+  Learning: ["lms", "elibrary", "library_management", "assignments", "exams"],
+  Money: ["fees", "hr_payroll", "admission"],
+  Operations: [
+    "inventory",
+    "visitor_management",
+    "dismissal",
+    "gps_tracking",
+    "biometric",
+    "conferences",
+  ],
+  Communication: ["notices", "sms_notifications", "whatsapp_bot"],
+  "Design & Web": ["design_studio", "website_builder", "white_label"],
+  Insights: ["basic_reports", "ai_suite"],
+  Admin: ["users", "settings_core", "iemis_importer", "marketplace_nav"],
+};
+
+function rankInSection(section: string | null, slug: string): number {
+  const order = section ? PLUGIN_SECTION_ITEM_ORDER[section] : undefined;
+  const i = order?.indexOf(slug) ?? -1;
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+}
 
 
 // ── Helper — convert a PluginSidebarItem to NavItem ───────────────────────
@@ -273,6 +300,21 @@ export function Sidebar() {
       const sec = (item.section as string | null) ?? null;
       if (!bySection.has(sec)) bySection.set(sec, []);
       bySection.get(sec)!.push(pluginToNavItem(item));
+    }
+
+    // E232: stable within-section ordering (user-approved reading order);
+    // unlisted slugs keep backend order after the ranked ones.
+    for (const [sec, items] of Array.from(bySection.entries())) {
+      const withIdx = items.map((item, i) => ({
+        rank: rankInSection(sec, item.pluginSlug ?? ""),
+        i,
+        item,
+      }));
+      withIdx.sort((a, b) => a.rank - b.rank || a.i - b.i);
+      bySection.set(
+        sec,
+        withIdx.map((w) => w.item),
+      );
     }
 
     const sections: SidebarSection[] = [];

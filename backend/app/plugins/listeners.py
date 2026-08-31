@@ -15,6 +15,7 @@ Event flow:
 import logging
 
 from app.plugins.events import on
+from app.services.student_numbers import ensure_student_numbers
 
 logger = logging.getLogger(__name__)
 
@@ -649,6 +650,29 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
         db.session.add(user)
         db.session.flush()
 
+        # Resolve the applied-for class ("Class 6", "6", exact name) so the
+        # auto-enrolled student lands in a class and receives a roll number.
+        # AdmissionApplication only stores the free-text `class_applied`.
+        class_id = None
+        applied = str(app_obj.class_applied or "").strip()
+        if applied:
+            from app.models.academic import Class
+
+            cls = Class.query.filter_by(school_id=school_id, name=applied).first()
+            if cls is None:
+                digits = "".join(ch for ch in applied if ch.isdigit())
+                if digits:
+                    cls = (
+                        Class.query.filter_by(
+                            school_id=school_id, name=f"Class {int(digits)}"
+                        ).first()
+                        or Class.query.filter_by(
+                            school_id=school_id, numeric_grade=int(digits)
+                        ).first()
+                    )
+            if cls is not None:
+                class_id = cls.id
+
         # Create Student profile
         student = Student(
             school_id=school_id,
@@ -656,8 +680,13 @@ def on_admission_accepted(school_id: str, application_id: str, **kwargs):
             admission_application_id=application_id,
             first_name=(app_obj.student_name or "").split(" ")[0],
             last_name=" ".join((app_obj.student_name or "").split(" ")[1:]) or "",
-            class_id=app_obj.class_applied_id if hasattr(app_obj, "class_applied_id") else None,
+            class_id=class_id,
         )
+        # E235: the admission funnel must produce a fully-numbered student —
+        # auto-assign the enrollment (admission) number and the next free
+        # class roll inside this same transaction (School-row FOR UPDATE
+        # lock serializes concurrent issuance).
+        ensure_student_numbers(student)
         db.session.add(student)
         db.session.commit()
 

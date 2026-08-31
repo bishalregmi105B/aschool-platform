@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
@@ -531,7 +532,7 @@ function StatusBadge({ status }: { status: SmsLog["status"] }) {
 
 // ── Credits Tab ────────────────────────────────────────────────────────────
 function CreditsTab() {
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["sms-stats"],
     queryFn: async () => {
       const res = await api.get<{ success: boolean; data: SmsStats }>(
@@ -539,7 +540,31 @@ function CreditsTab() {
       );
       return res.data.data;
     },
+    retry: 1,
   });
+
+  if (isError) {
+    return (
+      <div className="space-y-4 max-w-xl">
+        <div className="border border-destructive/30 bg-destructive/5 rounded-lg p-4 space-y-2">
+          <p className="text-sm font-medium text-destructive">
+            Couldn&apos;t load SMS credits
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {error instanceof axios.AxiosError && error.response?.status === 403
+              ? "The SMS Notifications plugin is not active for your school. Activate it under Installed Plugins."
+              : "The SMS service didn't respond. Check your connection and try again."}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 border px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-xl">

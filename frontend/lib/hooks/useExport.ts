@@ -13,6 +13,28 @@ type ExportPage = {
   background?: string;
 };
 
+/** Same guard as useCanvas.sanitizeTemplateImages — a token/relative image src
+ *  would make fabric v6 loadFromJSON reject and hang the export. */
+function sanitizePageJson(json: Record<string, any>): Record<string, any> {
+  const clone = JSON.parse(JSON.stringify(json ?? {}));
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1\/?$/, "");
+  const walk = (obj: Record<string, any>) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) { obj.forEach(walk); return; }
+    if (obj.type?.toLowerCase() === "image") {
+      if (typeof obj.src !== "string" || obj.src.includes("{") || obj.src === "") {
+        obj.src = "";
+        obj.srcOrigin = null;
+      } else if (obj.src.startsWith("/")) {
+        obj.src = `${apiBase || window.location.origin}${obj.src}`;
+      }
+    }
+    Object.values(obj).forEach(walk);
+  };
+  walk(clone);
+  return clone;
+}
+
 export function useExport() {
   const renderPageDataUrl = useCallback(async (page: ExportPage, multiplier = 3) => {
     const { Canvas } = await import("fabric");
@@ -29,7 +51,10 @@ export function useExport() {
 
     await new Promise<void>((resolve) => {
       if (page.json && Object.keys(page.json).length > 0) {
-        canvas.loadFromJSON(page.json, () => {
+        canvas.loadFromJSON(sanitizePageJson(page.json), () => {
+          canvas.renderAll();
+          resolve();
+        }).catch(() => {
           canvas.renderAll();
           resolve();
         });
@@ -93,7 +118,7 @@ export function useExport() {
     if (!fabricCanvas) return;
     const { jsPDF }  = await import("jspdf");
     const pages = Array.isArray(doc?.pages) ? doc.pages : [];
-    const pageList = pages.length > 0 ? pages : [{ width: fabricCanvas.getWidth(), height: fabricCanvas.getHeight(), background: fabricCanvas.backgroundColor || "#ffffff", json: fabricCanvas.toJSON() }];
+    const pageList = pages.length > 0 ? pages : [{ width: fabricCanvas.getWidth(), height: fabricCanvas.getHeight(), background: fabricCanvas.backgroundColor || "#ffffff", json: fabricCanvas.toJSON(["data"]) }];
 
     const firstPage = pageList[0];
     const firstWidth = firstPage.width || fabricCanvas.getWidth();

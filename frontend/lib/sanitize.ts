@@ -102,15 +102,17 @@ export function sanitizeCss(css: string | null | undefined): string {
   if (!css) return "";
   const cleaned = css.replace(_CSS_COMMENT_RE, "");
   const safeBlocks: string[] = [];
-  for (const match of cleaned.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  const blockRe = /([^{}]+)\{([^{}]*)\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(cleaned)) !== null) {
     const selector = match[1].trim();
     const body = match[2];
     if (!selector || !_CSS_SAFE_SELECTOR_RE.test(selector)) continue;
     if (_CSS_URL_RE.test(body) || _CSS_DANGER_RE.test(body)) continue;
     const decls = body
       .split(";")
-      .map((d) => d.trim())
-      .filter((d) => d && _CSS_SAFE_DECL_RE.test(d));
+      .map((d: string) => d.trim())
+      .filter((d: string) => d && _CSS_SAFE_DECL_RE.test(d));
     if (decls.length) safeBlocks.push(`${selector} { ${decls.join("; ")}; }`);
   }
   return safeBlocks.join("\n");

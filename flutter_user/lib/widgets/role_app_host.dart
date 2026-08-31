@@ -42,17 +42,18 @@ class ASchoolUnifiedUserApp extends ConsumerWidget {
   }
 }
 
-class _UserLoginApp extends StatelessWidget {
+class _UserLoginApp extends ConsumerWidget {
   const _UserLoginApp();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       title: 'ASchool User',
       debugShowCheckedModeBanner: false,
       theme: ASchoolTheme.light,
       darkTheme: ASchoolTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: const _UserEntryFlow(),
     );
   }

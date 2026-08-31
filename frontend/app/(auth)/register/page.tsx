@@ -47,7 +47,7 @@ const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    price: "NPR 2,999",
+    price: "NPR 399",
     period: "/month",
     description: "Complete operations for growing schools & colleges.",
     features: [
@@ -63,7 +63,7 @@ const PLANS = [
   {
     id: "pro",
     name: "Pro",
-    price: "NPR 7,999",
+    price: "NPR 999",
     period: "/month",
     description: "Advanced multi-branch tools for large institutions.",
     features: [

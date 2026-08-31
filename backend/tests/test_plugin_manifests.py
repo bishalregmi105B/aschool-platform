@@ -36,8 +36,9 @@ class TestManifestDiscovery:
         assert len(ALL_MANIFESTS) > 0, "No YAML manifests found"
 
     def test_minimum_manifest_count(self):
-        # We expect at least 25 manifests (29 currently exist)
-        assert len(ALL_MANIFESTS) >= 25, f"Expected 25+ manifests, found {len(ALL_MANIFESTS)}"
+        # Legacy manifests overridden by modules/ packages were pruned (2026-08-31);
+        # the 8 remaining flat manifests are legacy-only slugs (core nav, hostel).
+        assert len(ALL_MANIFESTS) >= 8, f"Expected 8+ manifests, found {len(ALL_MANIFESTS)}"
 
 
 class TestManifestStructure:

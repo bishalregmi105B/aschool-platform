@@ -1,4 +1,10 @@
 slug: advanced_analytics
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `ai_suite`.
+# published: false removes it from the marketplace/catalog mirror; the
+# advanced_analytics→ai_suite gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "Advanced Analytics"
 name_nepali: "उन्नत विश्लेषण"
 category: premium
@@ -22,7 +28,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/analytics"
   sidebar:
-    section: "Reports"
+    section: "Insights"
     label: "Analytics"
     label_nepali: "विश्लेषण"
     icon: "BarChart3"
@@ -30,7 +36,7 @@ frontend:
       - { label: "Weekly Insights", route: "/dashboard/analytics/weekly" }
       - { label: "At-Risk Students", route: "/dashboard/analytics/at-risk" }
       - { label: "Predictions", route: "/dashboard/analytics/predictions" }
-    visible_to: ["school_admin"]
+    visible_to: []
 
 flutter:
   admin_app:

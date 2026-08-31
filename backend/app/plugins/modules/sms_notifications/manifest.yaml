@@ -2,8 +2,8 @@ slug: sms_notifications
 name: "SMS Notifications"
 name_nepali: "एसएमएस सूचना"
 category: starter
-price_monthly: 199
-price_yearly: 1999
+price_monthly: 99
+price_yearly: 990
 emoji: "📱"
 icon: "MessageSquare"
 description: "Bulk SMS via Sparrow SMS, attendance alerts, fee reminders, exam notifications, custom templates"
@@ -21,7 +21,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/sms"
   sidebar:
-    section: "Communication & Media"
+    section: "Communication"
     label: "SMS Notifications"
     label_nepali: "एसएमएस सूचना"
     icon: "MessageSquare"

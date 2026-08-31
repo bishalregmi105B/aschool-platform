@@ -12,20 +12,24 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Palette, FileText, Search, Plus, ArrowRight,
-  LayoutTemplate, ImageIcon,
+  LayoutTemplate, ImageIcon, WalletCards,
 } from "lucide-react";
 
 const CATEGORIES = [
-  { id: "all",       label: "All" },
-  { id: "id_cards",  label: "ID Cards" },
-  { id: "calendars", label: "Calendar" },
-  { id: "reports",   label: "Reports" },
+  { id: "all",          label: "All" },
+  { id: "id_cards",     label: "ID Cards" },
+  { id: "certificates", label: "Certificates" },
+  { id: "admit_cards",  label: "Admit Cards" },
+  { id: "reports",      label: "Reports" },
+  { id: "calendars",    label: "Calendar" },
 ];
 
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
-  id_cards:  <ImageIcon className="h-4 w-4" />,
-  calendars: <LayoutTemplate className="h-4 w-4" />,
-  reports:   <FileText className="h-4 w-4" />,
+  id_cards:     <ImageIcon className="h-4 w-4" />,
+  calendars:    <LayoutTemplate className="h-4 w-4" />,
+  reports:      <FileText className="h-4 w-4" />,
+  certificates: <FileText className="h-4 w-4" />,
+  admit_cards:  <WalletCards className="h-4 w-4" />,
 };
 
 export default function DesignerPage() {
@@ -69,7 +73,28 @@ export default function DesignerPage() {
           Create school documents, certificates, ID cards, and more.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {/* Bulk ID Cards — most common task */}
+          <Card
+            className="cursor-pointer border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all group"
+            onClick={() => router.push("/dashboard/designer/bulk")}
+          >
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                <WalletCards className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-semibold text-base flex items-center gap-1">
+                  Bulk ID Cards
+                  <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Pick a class — ID cards auto-filled with photos, ready to export
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* New Canvas Design */}
           <Card
             className="cursor-pointer border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all group"

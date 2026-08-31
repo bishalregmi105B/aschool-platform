@@ -1,9 +1,15 @@
 slug: library
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `library_management`.
+# published: false removes it from the marketplace/catalog mirror; the
+# library→library_management gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "Library Management"
 name_nepali: "पुस्तकालय व्यवस्थापन"
 category: starter
-price_monthly: 199
-price_yearly: 1999
+price_monthly: 99
+price_yearly: 990
 emoji: "📚"
 icon: "Library"
 description: "Book catalog, issue/return tracking, fine management, barcode scanning, overdue alerts"
@@ -17,7 +23,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/library"
   sidebar:
-    section: "Library & Learning"
+    section: "Learning"
     label: "Library"
     label_nepali: "पुस्तकालय"
     icon: "Library"
@@ -25,7 +31,7 @@ frontend:
       - { label: "Catalog", route: "/dashboard/library/catalog" }
       - { label: "Issue/Return", route: "/dashboard/library/transactions" }
       - { label: "Overdue", route: "/dashboard/library/overdue" }
-    visible_to: ["school_admin", "teacher"]
+    visible_to: []
 
 flutter:
   admin_app:

@@ -1,4 +1,10 @@
 slug: ai_tutor
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `ai_suite`.
+# published: false removes it from the marketplace/catalog mirror; the
+# ai_tutor→ai_suite gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "AI Tutor"
 name_nepali: "एआई ट्युटर"
 category: premium
@@ -21,7 +27,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/ai-tools"
   sidebar:
-    section: "AI & Analytics"
+    section: "Insights"
     label: "AI Tutor"
     label_nepali: "एआई ट्युटर"
     icon: "Sparkles"
@@ -29,7 +35,7 @@ frontend:
       - { label: "Dashboard", route: "/dashboard/ai-tools" }
       - { label: "Usage", route: "/dashboard/ai-tools/usage" }
       - { label: "Settings", route: "/dashboard/ai-tools/settings" }
-    visible_to: ["school_admin"]
+    visible_to: []
 
 flutter:
   admin_app:

@@ -1,4 +1,10 @@
 slug: ai_grading
+# DEPRECATED (2026-08-31 catalog consolidation, E230): folded into `ai_suite`.
+# published: false removes it from the marketplace/catalog mirror; the
+# ai_grading→ai_suite gating alias in app/plugins/decorators.py (and the
+# frontend mirror) is KEPT so existing installs keep working.
+published: false
+deprecated: true
 name: "AI Auto-Grading"
 name_nepali: "AI स्वचालित ग्रेडिङ"
 category: growth
@@ -21,14 +27,14 @@ conflicts_with: []
 frontend:
   route: "/dashboard/ai-tools"
   sidebar:
-    section: "AI & Analytics"
+    section: "Insights"
     label: "AI Grading"
     label_nepali: "AI ग्रेडिङ"
     icon: "Sparkles"
     subitems:
       - { label: "Grade Queue", route: "/dashboard/ai-tools/grade-queue" }
       - { label: "Plagiarism Check", route: "/dashboard/ai-tools/plagiarism" }
-    visible_to: ["school_admin", "teacher"]
+    visible_to: []
 
 flutter:
   teacher_app:

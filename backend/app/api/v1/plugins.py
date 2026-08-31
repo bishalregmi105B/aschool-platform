@@ -40,6 +40,22 @@ PLUGIN_CONFIG_MAX_BYTES = 16 * 1024
 PLUGIN_CONFIG_RESERVED_KEYS = {"last_payment"}
 
 
+def _coming_soon_guard(slug: str) -> str | None:
+    """E230: refuse install/trial/subscribe for coming-soon plugins.
+
+    The routes stay gated+mounted and existing install rows keep working —
+    only NEW activations are blocked while the plugin is in final testing.
+    Returns the user-facing message, or None when the plugin is installable.
+    """
+    manifest = PluginLoader.get_manifest(slug) or {}
+    if manifest.get("coming_soon"):
+        return (
+            f"'{manifest.get('name', slug)}' is in final testing — releasing "
+            "soon. It cannot be installed yet."
+        )
+    return None
+
+
 def _run_plugin_hook(plugin_slug: str, hook_name: str) -> None:
     """Run a plugin's lifecycle hook (activate/deactivate/uninstall) if present.
 
@@ -139,6 +155,9 @@ def _catalog_entries() -> list[dict]:
                     ((row.avg_rating if row else None) or 0)
                 ),
                 "install_count": (row.install_count if row else None) or 0,
+                # E230: manifest-only catalog flags (no mirror columns needed)
+                "coming_soon": bool(m.get("coming_soon")),
+                "deprecated": bool(m.get("deprecated")),
             }
         )
 
@@ -168,6 +187,8 @@ def _catalog_entries() -> list[dict]:
                 "is_featured": bool(row.is_featured),
                 "avg_rating": float(row.avg_rating or 0),
                 "install_count": row.install_count or 0,
+                "coming_soon": False,
+                "deprecated": False,
             }
         )
 
@@ -265,6 +286,11 @@ def marketplace():
                 "depends_on": e["depends_on"],
                 "conflicts_with": e["conflicts_with"],
                 "version": e["version"],
+                # E230: coming-soon plugins show a "Coming Soon" card with a
+                # disabled install button; deprecated ones are legacy slugs
+                # kept for alias compatibility (canonical successor exists).
+                "coming_soon": e["coming_soon"],
+                "deprecated": e["deprecated"],
             }
         )
 
@@ -339,6 +365,12 @@ def install():
     if not plugin_slug:
         return error_response("plugin_slug is required", 400)
 
+    # E230: coming-soon plugins cannot be activated yet (409 — the plugin
+    # exists in the catalog, the request is understood, but is not allowed).
+    coming_soon = _coming_soon_guard(str(plugin_slug))
+    if coming_soon:
+        return error_response(coming_soon, 409)
+
     result = install_plugin(str(g.school_id), plugin_slug, billing_cycle)
     if "error" in result:
         status = (
@@ -370,6 +402,10 @@ def start_trial(slug):
     ).first()
     if not plugin:
         return error_response(f"Plugin '{slug}' not found or not available", 404)
+
+    coming_soon = _coming_soon_guard(slug)
+    if coming_soon:
+        return error_response(coming_soon, 409)
 
     existing = SchoolPlugin.query.filter_by(
         school_id=g.school_id, plugin_slug=slug
@@ -474,6 +510,10 @@ def subscribe(slug):
         return error_response(f"Plugin '{slug}' not found or not available", 404)
     if plugin.is_free:
         return error_response(f"Plugin '{slug}' is free and needs no subscription", 400)
+
+    coming_soon = _coming_soon_guard(slug)
+    if coming_soon:
+        return error_response(coming_soon, 409)
 
     # E5: never mark paid without payment proof.
     payment = data.get("payment") or {}

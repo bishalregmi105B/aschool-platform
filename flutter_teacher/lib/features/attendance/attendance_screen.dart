@@ -455,7 +455,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                   title: Text(c['name'] ?? '',
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('${c['student_count'] ?? 0} students enrolled',
-                      style: TextStyle(color: Colors.grey.shade600)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   trailing: isMarked
                       ? Container(
                           padding: const EdgeInsets.symmetric(

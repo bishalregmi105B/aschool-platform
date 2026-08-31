@@ -103,15 +103,10 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
+          const Positioned.fill(
             child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.white, accent.withValues(alpha: 0.06)],
-                ),
-              ),
+              // flat background — no gradient (simpler look)
+              decoration: BoxDecoration(color: Colors.white),
             ),
           ),
           SafeArea(

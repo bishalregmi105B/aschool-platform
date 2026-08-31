@@ -1,0 +1,49 @@
+slug: ai_suite
+name: "AI Suite"
+name_nepali: "एआई सुइट"
+category: premium
+price_monthly: 399
+price_yearly: 3990
+emoji: "🤖"
+icon: "Sparkles"
+description: >-
+  One bundle for every AI feature: auto-grading, AI tutor, AI tools
+  (lesson plans / question papers / homework help), adaptive learning paths,
+  school intelligence insights, advanced analytics and school benchmarking.
+  Installing AI Suite unlocks all ai_* / benchmarking / advanced_analytics
+  gated routes (gating aliases in app/plugins/decorators.py).
+
+# BUNDLE PLUGIN (2026-08-31 catalog consolidation, E230): this manifest is a
+# LICENSING GATE, not a new feature. The individual AI plugins below keep
+# their blueprints mounted exactly as today — they are deprecated/unpublished
+# as separate catalog items and their gated routes are satisfied by an
+# ai_suite install through PLUGIN_SLUG_ALIASES (same mechanism as the
+# digital_content→elibrary and portfolio→student_portfolio merges, aliases
+# KEPT so existing installs keep working):
+#   ai_grading, ai_tutor, ai_tools, ai_adaptive_learning, ai_insights,
+#   benchmarking, advanced_analytics  →  ai_suite
+
+# No api_blueprint of its own: every AI route stays mounted from its owning
+# blueprint (app.api.v1.ai_tools / assignments / reports / design_studio /
+# ai_adaptive_learning.routes). The bundle only gates access.
+
+depends_on: []
+conflicts_with: []
+
+frontend:
+  route: "/dashboard/ai-tools"
+  sidebar:
+    section: "Insights"
+    label: "AI Suite"
+    label_nepali: "एआई सुइट"
+    icon: "Sparkles"
+    subitems:
+      - { label: "AI Tools", route: "/dashboard/ai-tools" }
+      - { label: "Analytics", route: "/dashboard/analytics" }
+      - { label: "Benchmarking", route: "/dashboard/benchmarking" }
+      - { label: "Reports", route: "/dashboard/reports" }
+    visible_to: ["school_admin", "teacher"]
+
+flutter:
+  teacher_app: { feature_folder: "ai_suite", tabs: ["Tools", "Grading", "Insights"] }
+  student_app: { feature_folder: "ai_suite", tabs: ["Tutor", "Practice"] }

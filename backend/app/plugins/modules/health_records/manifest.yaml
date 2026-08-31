@@ -2,8 +2,8 @@ slug: health_records
 name: "Student Health Records"
 name_nepali: "विद्यार्थी स्वास्थ्य अभिलेख"
 category: growth
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🏥"
 icon: "Heart"
 description: "Medical records, vaccination tracking, allergy alerts, health checkup logs, BMI tracking"
@@ -17,7 +17,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/health-records"
   sidebar:
-    section: "Student Wellbeing"
+    section: "Student Life"
     label: "Health Records"
     label_nepali: "स्वास्थ्य अभिलेख"
     icon: "HeartPulse"

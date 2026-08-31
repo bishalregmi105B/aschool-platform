@@ -2,8 +2,8 @@ slug: incidents
 name: "Incident Management"
 name_nepali: "घटना व्यवस्थापन"
 category: premium
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 299  # E234: premium band (was 499 — the only out-of-band straggler)
+price_yearly: 2990
 emoji: "⚠️"
 icon: "AlertTriangle"
 description: "Incident reporting, witness statements, action logs, bullying tracking, disciplinary records"
@@ -17,14 +17,12 @@ conflicts_with: []
 frontend:
   route: "/dashboard/incidents"
   sidebar:
-    section: "Compliance"
+    section: "Safety & Compliance"
     label: "Incidents"
     label_nepali: "घटना"
     icon: "ShieldCheck"
-    subitems:
-      - { label: "Reports", route: "/dashboard/incidents" }
-      - { label: "New Report", route: "/dashboard/incidents/create" }
-      - { label: "Actions", route: "/dashboard/incidents/actions" }
+    # E236: single-page feature — create/actions child routes were 404s.
+    subitems: []
     visible_to: ["school_admin", "teacher"]
 
 flutter:

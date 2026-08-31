@@ -48,6 +48,10 @@ interface MarketplacePlugin {
   can_subscribe?: boolean;
   version?: string;
   features?: string[];
+  /** E230: in final testing — card disabled, not installable yet */
+  coming_soon?: boolean;
+  /** E230: legacy slug kept for alias compatibility (canonical successor exists) */
+  deprecated?: boolean;
 }
 
 interface MarketplaceData {
@@ -144,6 +148,10 @@ export default function MarketplacePage() {
 
   const [subscribeSlug, setSubscribeSlug] = useState<string | null>(null);
   const [checkoutPkg, setCheckoutPkg] = useState<string | null>(null);
+  // E233: Individual Plugins tab — show what is active for THIS school.
+  const [installFilter, setInstallFilter] = useState<
+    "all" | "active" | "not_installed"
+  >("all");
 
   if (isLoading) return <PageLoader />;
 
@@ -152,9 +160,23 @@ export default function MarketplacePage() {
     plugins.map((p) => ({ ...p, category: cat }))
   );
 
-  const filtered = search
-    ? allPlugins.filter((plugin) => matchesMarketplacePluginSearch(plugin, search))
-    : null;
+  const activeCount = allPlugins.filter((p) => p.install_state === "active").length;
+  const deactivatedCount = allPlugins.filter(
+    (p) => p.install_state === "inactive"
+  ).length;
+
+  const filtered = (
+    search
+      ? allPlugins.filter((plugin) => matchesMarketplacePluginSearch(plugin, search))
+      : allPlugins
+  ).filter((plugin) =>
+    installFilter === "all"
+      ? true
+      : installFilter === "active"
+        ? plugin.install_state === "active"
+        : plugin.install_state !== "active"
+  );
+  const isSearching = Boolean(search);
 
   const subscribingPlugin =
     allPlugins.find((p) => p.slug === subscribeSlug) || null;
@@ -189,17 +211,60 @@ export default function MarketplacePage() {
         </TabsContent>
 
         <TabsContent value="plugins" className="space-y-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search plugins..."
-              className="pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* E233: what is ACTIVE for this school — count summary + filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative max-w-md flex-1 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search plugins..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                onClick={() => setInstallFilter("all")}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                  installFilter === "all"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "hover:bg-muted"
+                }`}
+              >
+                All ({allPlugins.length})
+              </button>
+              <button
+                onClick={() => setInstallFilter("active")}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                  installFilter === "active"
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "hover:bg-muted"
+                }`}
+              >
+                Installed &amp; Active ({activeCount})
+              </button>
+              <button
+                onClick={() => setInstallFilter("not_installed")}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                  installFilter === "not_installed"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "hover:bg-muted"
+                }`}
+              >
+                Not installed ({allPlugins.length - activeCount - deactivatedCount})
+              </button>
+            </div>
           </div>
+          <p className="text-sm text-muted-foreground -mt-2">
+            <span className="font-medium text-foreground">{activeCount}</span>{" "}
+            plugin{activeCount === 1 ? "" : "s"} active for your school
+            {deactivatedCount > 0
+              ? ` · ${deactivatedCount} deactivated (enable them from Installed Plugins)`
+              : ""}
+            .
+          </p>
 
-          {filtered ? (
+          {isSearching || installFilter !== "all" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filtered.map((plugin) => (
                 <PluginCard
@@ -277,22 +342,53 @@ export default function MarketplacePage() {
   );
 }
 
-/** SaaS package price = sum of the live catalog's monthly prices for the plan's
- *  cumulative tiers (PLAN_PLUGIN_TIERS mirror: starter ⊃ starter tier; growth
- *  ⊃ +growth; premium/enterprise ⊃ +premium). Features are the tier's plugin
- *  names — derived from the API, never hardcoded. */
-function buildPackages(allPlugins: MarketplacePlugin[]) {
-  const byTier = (tiers: string[]) =>
-    allPlugins.filter((p) => tiers.includes(p.category));
-  const monthlySum = (plugins: MarketplacePlugin[]) =>
-    plugins.reduce((sum, p) => sum + (p.price_monthly || 0), 0);
-  const coreAndAddOn = byTier(["core", "add_on"]);
+/** SaaS package = a curated, realistic selection of catalog plugins (E233).
+ *  Membership is fixed below; the PRICE is still derived live from the
+ *  catalog — the sum of the selected plugins' monthly prices, no local
+ *  price literals. Coming-soon plugins are never part of a package.
+ *
+ *  Bands (with every starter plugin at NPR 99, growth 149-199, premium 299):
+ *    Starter      = fees + exams + timetable + sms_notifications     → 396
+ *    Professional = Starter + admission + lms                        → 694
+ *    Enterprise   = Professional + assignments + elibrary +
+ *                   library_management                                → 991
+ *  Summing EVERY plugin in a tier cannot land in these bands (the catalog
+ *  has ~35 paid plugins), so packages are selections, not tier dumps —
+ *  see WP_PLUGIN_ARCHITECTURE_DESIGN.md §17 for the rationale. */
+const PACKAGE_PLUGIN_SELECTIONS: Record<string, string[]> = {
+  starter: ["fees", "exams", "timetable", "sms_notifications"],
+  growth: [
+    "fees",
+    "exams",
+    "timetable",
+    "sms_notifications",
+    "admission",
+    "lms",
+  ],
+  premium: [
+    "fees",
+    "exams",
+    "timetable",
+    "sms_notifications",
+    "admission",
+    "lms",
+    "assignments",
+    "elibrary",
+    "library_management",
+  ],
+};
 
-  const make = (key: string, title: string, tiers: string[], description: string, icon: React.ElementType, isPopular: boolean) => {
-    const tierPlugins = byTier(tiers);
-    const included = [...coreAndAddOn, ...tierPlugins];
+function buildPackages(allPlugins: MarketplacePlugin[]) {
+  const bySlug = new Map(allPlugins.map((p) => [p.slug, p]));
+  const selection = (key: string): MarketplacePlugin[] =>
+    (PACKAGE_PLUGIN_SELECTIONS[key] || [])
+      .map((slug) => bySlug.get(slug))
+      .filter((p): p is MarketplacePlugin => Boolean(p));
+
+  const make = (key: string, title: string, description: string, icon: React.ElementType, isPopular: boolean) => {
+    const tierPlugins = selection(key);
     const names = tierPlugins
-      .filter((p) => !p.installed)
+      .filter((p) => p.install_state !== "active")
       .slice(0, 4)
       .map((p) => p.name);
     return {
@@ -301,20 +397,19 @@ function buildPackages(allPlugins: MarketplacePlugin[]) {
       description,
       icon,
       isPopular,
-      price: monthlySum([...coreAndAddOn, ...tierPlugins]),
-      pluginCount: included.length,
+      price: tierPlugins.reduce((sum, p) => sum + (p.price_monthly || 0), 0),
+      pluginCount: tierPlugins.length,
       highlights: [
-        `${included.length} plugins included`,
-        ...(tierPlugins.length ? [`${tierPlugins.length} ${title.toLowerCase()}-tier plugins`] : []),
+        `${tierPlugins.length} plugins included`,
         ...names,
       ],
     };
   };
 
   return [
-    make("starter", "Starter", ["starter"], "Perfect for small schools just getting started.", Zap, false),
-    make("growth", "Professional", ["starter", "growth"], "Full-suite academics and advanced plugins for growing schools.", Crown, true),
-    make("premium", "Enterprise", ["starter", "growth", "premium"], "Complete digital transformation for large institutions.", Building2, false),
+    make("starter", "Starter", "Perfect for small schools just getting started.", Zap, false),
+    make("growth", "Professional", "Full-suite academics and advanced plugins for growing schools.", Crown, true),
+    make("premium", "Enterprise", "Complete digital transformation for large institutions.", Building2, false),
   ];
 }
 
@@ -385,13 +480,11 @@ function PackageCheckout({
 }) {
   const packages = useMemo(() => buildPackages(allPlugins), [allPlugins]);
   const selected = packages.find((p) => p.key === pkg);
-  const pluginsInPlan = allPlugins.filter((p) =>
-    pkg === "starter"
-      ? ["core", "add_on", "starter"].includes(p.category)
-      : pkg === "growth"
-        ? ["core", "add_on", "starter", "growth"].includes(p.category)
-        : true
-  );
+  const bySlug = new Map(allPlugins.map((p) => [p.slug, p]));
+  // E233: the checkout mirrors the package's curated selection.
+  const pluginsInPlan = (PACKAGE_PLUGIN_SELECTIONS[pkg] || [])
+    .map((slug) => bySlug.get(slug))
+    .filter((p): p is MarketplacePlugin => Boolean(p));
   const notInstalled = pluginsInPlan.filter((p) => p.install_state !== "active");
 
   return (
@@ -469,6 +562,7 @@ function PluginCard({
   const isInactive = state === "inactive";
   const isPaid = !plugin.is_free && plugin.price_monthly > 0;
   const onTrial = isActive && plugin.is_trial === true;
+  const isComingSoon = plugin.coming_soon === true;
 
   const ring =
     isActive
@@ -507,6 +601,11 @@ function PluginCard({
               Trial{typeof plugin.trial_days_left === "number" ? ` · ${plugin.trial_days_left}d left` : ""}
             </Badge>
           )}
+          {isComingSoon && (
+            <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-none">
+              Coming Soon
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex-1">
@@ -523,73 +622,82 @@ function PluginCard({
         )}
       </CardContent>
       <CardFooter className="pt-4 border-t bg-muted/20 gap-2">
-        {state === "not_installed" && isPaid && (
-          <Button className="w-full" onClick={onInstall} disabled={busy}>
-            {busy ? <Spinner size="sm" /> : `Start ${plugin.trial_days || 14}-Day Free Trial`}
+        {isComingSoon ? (
+          // E230: in final testing — install disabled with an explanatory tooltip
+          <Button className="w-full" disabled title="In final testing — releasing soon">
+            Coming Soon
           </Button>
-        )}
-        {state === "not_installed" && !isPaid && (
-          <Button className="w-full" onClick={onInstall} disabled={busy}>
-            {busy ? <Spinner size="sm" /> : "Install"}
-          </Button>
-        )}
-        {isInactive && (
+        ) : (
           <>
-            <Button className="flex-1" onClick={onActivate} disabled={busy}>
-              {busy ? <Spinner size="sm" /> : "Activate"}
-            </Button>
-            <Button
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-              onClick={onUninstall}
-              disabled={busy}
-              title="Uninstall (removes the plugin, data preserved)"
-            >
-              Uninstall
-            </Button>
+            {state === "not_installed" && isPaid && (
+              <Button className="w-full" onClick={onInstall} disabled={busy}>
+                {busy ? <Spinner size="sm" /> : `Start ${plugin.trial_days || 14}-Day Free Trial`}
+              </Button>
+            )}
+            {state === "not_installed" && !isPaid && (
+              <Button className="w-full" onClick={onInstall} disabled={busy}>
+                {busy ? <Spinner size="sm" /> : "Install"}
+              </Button>
+            )}
+            {isInactive && (
+              <>
+                <Button className="flex-1" onClick={onActivate} disabled={busy}>
+                  {busy ? <Spinner size="sm" /> : "Activate"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={onUninstall}
+                  disabled={busy}
+                  title="Uninstall (removes the plugin, data preserved)"
+                >
+                  Uninstall
+                </Button>
+              </>
+            )}
+            {isActive && isPaid && !onTrial && (
+              <>
+                <Button asChild variant="outline" className="flex-1">
+                  <Link href={`/dashboard/plugins/${plugin.slug}/settings`}>
+                    <Settings className="h-4 w-4 mr-1" />
+                    Manage
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={onUninstall}
+                  disabled={busy}
+                >
+                  {busy ? <Spinner size="sm" /> : "Uninstall"}
+                </Button>
+              </>
+            )}
+            {isActive && onTrial && (
+              <>
+                <Button className="flex-1" onClick={onSubscribe} disabled={busy}>
+                  {busy ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    `Trial · ${plugin.trial_days_left ?? 0} days left — Subscribe`
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={onUninstall}
+                  disabled={busy}
+                >
+                  {busy ? <Spinner size="sm" /> : "Uninstall"}
+                </Button>
+              </>
+            )}
+            {isActive && !isPaid && (
+              <Button variant="outline" className="w-full" onClick={onDeactivate} disabled={busy}>
+                {busy ? <Spinner size="sm" /> : "Deactivate"}
+              </Button>
+            )}
           </>
-        )}
-        {isActive && isPaid && !onTrial && (
-          <>
-            <Button asChild variant="outline" className="flex-1">
-              <Link href={`/dashboard/plugins/${plugin.slug}/settings`}>
-                <Settings className="h-4 w-4 mr-1" />
-                Manage
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-              onClick={onUninstall}
-              disabled={busy}
-            >
-              {busy ? <Spinner size="sm" /> : "Uninstall"}
-            </Button>
-          </>
-        )}
-        {isActive && onTrial && (
-          <>
-            <Button className="flex-1" onClick={onSubscribe} disabled={busy}>
-              {busy ? (
-                <Spinner size="sm" />
-              ) : (
-                `Trial · ${plugin.trial_days_left ?? 0} days left — Subscribe`
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-              onClick={onUninstall}
-              disabled={busy}
-            >
-              {busy ? <Spinner size="sm" /> : "Uninstall"}
-            </Button>
-          </>
-        )}
-        {isActive && !isPaid && (
-          <Button variant="outline" className="w-full" onClick={onDeactivate} disabled={busy}>
-            {busy ? <Spinner size="sm" /> : "Deactivate"}
-          </Button>
         )}
       </CardFooter>
     </Card>

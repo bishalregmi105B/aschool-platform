@@ -46,7 +46,7 @@ class ErrorContainer extends StatelessWidget {
                 'Something went wrong',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: ASchoolTheme.secondary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -54,7 +54,7 @@ class ErrorContainer extends StatelessWidget {
               Text(
                 errorMessage,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: ASchoolTheme.mutedText,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -65,8 +65,8 @@ class ErrorContainer extends StatelessWidget {
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Retry'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: ASchoolTheme.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     minimumSize: const Size(120, 44),
                   ),
                 ),

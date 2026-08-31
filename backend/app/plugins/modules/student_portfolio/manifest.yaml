@@ -2,8 +2,8 @@ slug: student_portfolio
 name: "Student Portfolio"
 name_nepali: "विद्यार्थी पोर्टफोलियो"
 category: growth
-price_monthly: 299
-price_yearly: 2999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🎒"
 icon: "Backpack"
 description: "Digital achievement portfolio, badges, PDF export"
@@ -17,7 +17,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/portfolio"
   sidebar:
-    section: "Student Wellbeing"
+    section: "Learning"
     label: "Portfolio"
     label_nepali: "पोर्टफोलियो"
     icon: "Award"

@@ -2,8 +2,8 @@ slug: website_builder
 name: "Advanced Website Builder"
 name_nepali: "उन्नत वेबसाइट निर्माता"
 category: premium
-price_monthly: 1499
-price_yearly: 14999
+price_monthly: 299
+price_yearly: 2990
 emoji: "🎨"
 icon: "PaintBucket"
 description: "10 open-source school themes, drag-drop Craft.js editor, custom CSS, AI content generation, SEO tools, contact forms"
@@ -21,7 +21,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/website-builder"
   sidebar:
-    section: "Digital & Design"
+    section: "Design & Web"
     label: "Website Builder"
     label_nepali: "वेबसाइट निर्माता"
     icon: "Globe"
@@ -30,7 +30,7 @@ frontend:
       - { label: "Themes", route: "/dashboard/website-builder/themes" }
       - { label: "Pages", route: "/dashboard/website-builder/pages" }
       - { label: "SEO", route: "/dashboard/website-builder/seo" }
-      - { label: "AI Content", route: "/dashboard/website-builder/ai-content" }
+      - { label: "AI Builder", route: "/dashboard/website-builder/ai-builder" }
     visible_to: ["school_admin"]
 
 flutter:

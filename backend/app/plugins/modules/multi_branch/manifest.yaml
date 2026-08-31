@@ -2,8 +2,8 @@ slug: multi_branch
 name: "Multi-Branch Chain"
 name_nepali: "बहु-शाखा चेन"
 category: premium
-price_monthly: 2999
-price_yearly: 29999
+price_monthly: 299
+price_yearly: 2990
 emoji: "🏢"
 icon: "Building2"
 description: "Cross-school unified dashboard, chain analytics"
@@ -17,6 +17,7 @@ conflicts_with: []
 frontend:
   route: "/multi-branch"
   sidebar:
+    section: "Admin"
     label: "Multi-Branch"
     label_nepali: "बहु-शाखा"
     icon: "Building2"
@@ -24,7 +25,7 @@ frontend:
       - { label: "Branches", route: "/multi-branch/branches" }
       - { label: "Unified Dashboard", route: "/multi-branch/dashboard" }
       - { label: "Chain Analytics", route: "/multi-branch/analytics" }
-    visible_to: []
+    visible_to: ["school_admin"]
 
 flutter:
   admin_app:

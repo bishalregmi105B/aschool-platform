@@ -25,7 +25,12 @@ class StatCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: ASchoolTheme.elevatedBox(),
+        decoration: ASchoolTheme.elevatedBox(
+          color: Theme.of(context).cardColor,
+          borderColor: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : null,
+        ),
         child: Row(
           children: [
             Container(
@@ -47,14 +52,16 @@ class StatCard extends StatelessWidget {
                     value,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: ASchoolTheme.secondary,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ASchoolTheme.mutedText,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? ASchoolTheme.darkTextMuted
+                              : ASchoolTheme.mutedText,
                           fontWeight: FontWeight.w500,
                         ),
                     maxLines: 1,

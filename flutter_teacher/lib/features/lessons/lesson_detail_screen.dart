@@ -231,7 +231,11 @@ class _TopicCard extends ConsumerWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.all(16),
@@ -265,7 +269,7 @@ class _TopicCard extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(topic.description!,
                           style: TextStyle(
-                              color: Colors.grey.shade600, fontSize: 13),
+                              color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
                     ],

@@ -18,14 +18,16 @@ conflicts_with: []
 frontend:
   route: "/dashboard/reports"
   sidebar:
-    section: "Reports"
+    section: "Insights"
     label: "Reports"
     label_nepali: "प्रतिवेदन"
     icon: "BarChart3"
+    # E236: only exam/expense/teacher report pages exist — the
+    # attendance/fees/students child routes were 404s.
     subitems:
-      - { label: "Attendance", route: "/dashboard/reports/attendance" }
-      - { label: "Fee Collection", route: "/dashboard/reports/fees" }
-      - { label: "Student Stats", route: "/dashboard/reports/students" }
+      - { label: "Exam Reports", route: "/dashboard/reports/exam" }
+      - { label: "Expense Reports", route: "/dashboard/reports/expense" }
+      - { label: "Teacher Reports", route: "/dashboard/reports/teacher" }
     visible_to: ["school_admin"]
 
 flutter:

@@ -64,7 +64,7 @@ class TeacherDashboard extends ConsumerWidget {
                         const SizedBox(height: 2),
                         NepaliDateDisplay(
                             style: TextStyle(
-                                color: Colors.grey.shade600,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500)),
                       ],
@@ -153,7 +153,11 @@ class TeacherDashboard extends ConsumerWidget {
                       color: Colors.white,
                       child: Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade200),
+                          border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: ListTile(
@@ -173,7 +177,7 @@ class TeacherDashboard extends ConsumerWidget {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text((n['date'] ?? '').isNotEmpty ? adToBsString(DateTime.tryParse(n['date']!) ?? DateTime.now()) : '',
                                 style: TextStyle(
-                                    color: Colors.grey.shade600, fontSize: 12)),
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                           ),
                         ),
                       ),
@@ -195,7 +199,11 @@ class TeacherDashboard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withAlpha(5),
@@ -242,7 +250,7 @@ class TeacherDashboard extends ConsumerWidget {
                       '${c['class_name'] ?? ''} • ${c['time'] ?? ''}',
                       style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500),
                     ),
                   ],

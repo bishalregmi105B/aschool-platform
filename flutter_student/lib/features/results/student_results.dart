@@ -133,7 +133,11 @@ class _ExamResultCard extends StatelessWidget {
             // Subject-wise results table
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? ASchoolTheme.darkBorder
+              : Colors.grey.shade200,
+        ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -248,7 +252,7 @@ class _ExamResultCard extends StatelessWidget {
                                 '$full',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 13, color: Colors.grey.shade600),
+                                    fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                               ),
                             ),
                             Expanded(

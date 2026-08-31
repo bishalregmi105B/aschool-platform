@@ -2,8 +2,8 @@ slug: hr_payroll
 name: "HR & Payroll"
 name_nepali: "कर्मचारी तथा तलब"
 category: growth
-price_monthly: 699
-price_yearly: 6999
+price_monthly: 199
+price_yearly: 1990
 emoji: "👔"
 icon: "Briefcase"
 description: "Staff payroll, leave management, appraisal, PF/SSF"
@@ -17,7 +17,7 @@ conflicts_with: []
 frontend:
   route: "/dashboard/hr"
   sidebar:
-    section: "Personnel Management"
+    section: "Money"
     label: "HR & Payroll"
     label_nepali: "कर्मचारी तलब"
     icon: "Briefcase"

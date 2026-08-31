@@ -28,6 +28,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.plugins.decorators import plugin_required
 from app.plugins.entitlements import StudentCapExceededError
+from app.services.student_numbers import ensure_student_numbers
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -510,6 +511,9 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
                         existing.address = existing_addr
 
                     student = existing
+                    # E235: re-imports of pre-existing rows also backfill a
+                    # missing enrollment number / roll ("if not present").
+                    ensure_student_numbers(student)
                     skipped += 1
                 else:
                     student = Student(
@@ -528,6 +532,12 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
                             "temporary": temp_address,
                         },
                     )
+                    # E235: IEMIS rows carry the external EMIS id in
+                    # student_id; the school's own enrollment number and
+                    # class roll are auto-assigned here when missing
+                    # (School-row FOR UPDATE lock serializes issuance across
+                    # concurrent imports/creations).
+                    ensure_student_numbers(student)
                     db.session.add(student)
                     db.session.flush()  # get student.id
 

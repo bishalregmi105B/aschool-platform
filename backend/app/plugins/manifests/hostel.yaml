@@ -2,8 +2,8 @@ slug: hostel
 name: "Hostel Management"
 name_nepali: "छात्रावास व्यवस्थापन"
 category: growth
-price_monthly: 499
-price_yearly: 4999
+price_monthly: 149
+price_yearly: 1490
 emoji: "🏠"
 icon: "Building"
 description: "Hostel rooms, student allocations, occupancy tracking, warden management, hostel fee collection"
@@ -21,10 +21,11 @@ frontend:
     label_nepali: "छात्रावास"
     icon: "Building"
     section: "Operations"
+    # Single-page feature (E236 sweep): the /hostel page has internal tabs
+    # (Hostels / Rooms / Allocations) — the old rooms/allocations subitems
+    # pointed at FE pages that do not exist (404) and are dropped.
     subitems:
       - { label: "Overview", route: "/hostel" }
-      - { label: "Manage Rooms", route: "/hostel/rooms" }
-      - { label: "Allocations", route: "/hostel/allocations" }
     visible_to: ["school_admin"]
 
 flutter:

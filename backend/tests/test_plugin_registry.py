@@ -27,7 +27,25 @@ MOVED_MODULES = [
 ]
 
 # Delisted from the catalog by their manifests (published: false).
-DELISTED_SLUGS = {"digital_content", "plugins_nav", "portfolio"}
+# E230 (2026-08-31) catalog consolidation: the seven AI plugins folded into
+# the `ai_suite` bundle, the `library` duplicate folded into
+# `library_management`, and `social_hub` withdrawn — all unpublished exactly
+# like the digital_content→elibrary and portfolio→student_portfolio merges
+# (gating aliases KEPT so legacy installs still pass).
+DELISTED_SLUGS = {
+    "digital_content",
+    "plugins_nav",
+    "portfolio",
+    "ai_grading",
+    "ai_tutor",
+    "ai_tools",
+    "ai_adaptive_learning",
+    "ai_insights",
+    "benchmarking",
+    "advanced_analytics",
+    "social_hub",
+    "library",
+}
 
 
 # ── Registry: directory scan + catalog mirror ──────────────────────────────

@@ -105,11 +105,7 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl border border-black/5 bg-card grid grid-cols-1 md:grid-cols-12 min-h-[600px] auth-accent">
       {/* ── Left Hero / Branding Panel (Desktop) ── */}
-      <div className="hidden md:flex md:col-span-5 bg-gradient-to-br from-ocean via-ocean-light to-ocean text-white p-8 lg:p-10 flex-col justify-between relative overflow-hidden">
-        {/* Background decorative glow */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-mint/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-sun/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-
+      <div className="hidden md:flex md:col-span-5 bg-ocean text-white p-8 lg:p-10 flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
             <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-md grid place-items-center text-white font-black text-lg shadow-sm border border-white/20 group-hover:scale-105 transition-transform">
