@@ -1,0 +1,28 @@
+template_key: calendar_two_month_2083
+name: Dual-Month Calendar 2083 (Pre-filled)
+name_nepali: जोडी क्यालेन्डर 2083
+category: calendars
+editor_type: designer
+description: "Rising-Star style — 6 A4-landscape pages, two months side by side, gold dashed frame, scalloped header, every BS date of 2083 pre-filled (Devanagari + AD corner) with per-month Activities panels."
+page_size: A4
+thumbnail_emoji: "📅"
+is_default: true
+size: {width: 1123, height: 794}
+pages:
+  - {size: {width: 1123, height: 794}, name: "वैशाख + ज्येष्ठ"}
+  - {size: {width: 1123, height: 794}, name: "असार + श्रावण"}
+  - {size: {width: 1123, height: 794}, name: "भाद्र + आश्विन"}
+  - {size: {width: 1123, height: 794}, name: "कार्तिक + मार्ग"}
+  - {size: {width: 1123, height: 794}, name: "पौष + माघ"}
+  - {size: {width: 1123, height: 794}, name: "फाल्गुन + चैत"}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+  - school_website
+  - school_logo
+autofill:
+  sources: [school]
+  notes: >
+    All {year} dates baked in as editable text; school header autofills;
+    Activities panels are plain editable bullet text.

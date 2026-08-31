@@ -1,0 +1,27 @@
+template_key: hiring_poster
+name: Hiring Announcement Poster
+name_nepali: सूचना — शिक्षक/कर्मचारी आवश्यकता
+category: notices
+editor_type: designer
+description: "Square social-media hiring post — logo ring with dashed halo, WE'RE HIRING headline, Qualifications / How To Apply columns, contact block, illustration slot on blue waves."
+page_size: Square 1080
+thumbnail_emoji: "📢"
+is_default: true
+size: {width: 1080, height: 1080}
+fields:
+  - school_name
+  - school_address
+  - school_logo
+  - position_title
+  - position_level
+  - qualifications
+  - how_to_apply
+  - contact_phone_1
+  - contact_phone_2
+autofill:
+  sources: [school]
+  notes: >
+    {school_name}/{school_address}/{school_logo} autofill from school info.
+    {position_title} e.g. "English Teacher"; {position_level} e.g. "Primary Level";
+    {qualifications} and {how_to_apply} are bullet text — one point per line.
+    Replace SCHOOL PHOTO with a teacher/classroom illustration.
