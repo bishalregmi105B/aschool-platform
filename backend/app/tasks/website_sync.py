@@ -23,13 +23,15 @@ def generate_sitemap(school_id: str, school_slug: str):
     """Generate sitemap.xml for a school's website."""
     from flask import current_app
     from app.services.website.website_builder import WebsiteBuilderService
+    from app.utils.tenant_url import school_site_url
 
     config = WebsiteBuilderService.get_website_config(school_id)
     pages = config.get("pages", [])
 
-    urls = [f"https://{school_slug}.aschool.com.np/"]
+    base = school_site_url(school_slug)
+    urls = [f"{base}/"]
     for page in pages:
-        urls.append(f"https://{school_slug}.aschool.com.np/{page['slug']}")
+        urls.append(f"{base}/{page['slug']}")
 
     current_app.logger.info(f"Sitemap generated for {school_slug}: {len(urls)} URLs")
     return {"school_id": school_id, "urls": urls}

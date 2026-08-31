@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { revalidateSchoolSite } from "@/lib/revalidate";
+import { schoolSiteHost, schoolSiteUrl } from "@/lib/site-domain";
 
 interface SeoSettings {
   meta_title: string;
@@ -137,7 +138,7 @@ export default function SeoPage() {
             <p className="text-blue-700 text-lg hover:underline cursor-pointer">
               {form.meta_title || "Your School Name"}
             </p>
-            <p className="text-green-700 text-sm">yourschool.aschool.com.np</p>
+            <p className="text-green-700 text-sm">{schoolSiteHost("yourschool")}</p>
             <p className="text-gray-600 text-sm mt-1">
               {form.meta_description || "Add a meta description to control how your school appears in search results."}
             </p>
@@ -191,7 +192,7 @@ export default function SeoPage() {
               value={form.robots_txt}
               onChange={(e) => updateField("robots_txt", e.target.value)}
               rows={4}
-              placeholder={`User-agent: *\nAllow: /\nSitemap: https://yourschool.aschool.com.np/sitemap.xml`}
+              placeholder={`User-agent: *\nAllow: /\nSitemap: ${schoolSiteUrl("yourschool", "/sitemap.xml")}`}
               className="w-full border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

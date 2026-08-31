@@ -75,7 +75,7 @@ def _pwreset_store_delete(token: str) -> None:
 def _cookie_params():
     """Cookie attributes: HttpOnly always; Secure + Domain configurable.
 
-    COOKIE_DOMAIN (e.g. ".aschool.com.np") makes the session visible to the
+    COOKIE_DOMAIN (e.g. ".brighternepal.com") makes the session visible to the
     app. subdomain middleware; unset -> host-only cookie (dev/single host).
     COOKIE_SECURE forces the Secure attribute; "auto" (default) enables it
     only outside development/testing so the Flask test client still works.

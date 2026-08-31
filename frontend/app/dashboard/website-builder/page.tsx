@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { revalidateSchoolSite } from "@/lib/revalidate";
+import { schoolSiteUrl } from "@/lib/site-domain";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -86,7 +87,7 @@ function WebsiteBuilderContent() {
           {status?.is_published ? (
             <>
               <a
-                href={status.public_url || `https://${status.subdomain}.aschool.com.np`}
+                href={status.public_url || schoolSiteUrl(status.subdomain)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"

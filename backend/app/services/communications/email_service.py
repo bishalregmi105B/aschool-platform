@@ -6,6 +6,8 @@ import smtplib
 
 from flask import current_app, render_template_string
 
+from app.utils.tenant_url import school_site_domain as _platform_domain
+
 
 class EmailService:
     """Send transactional and notification emails."""
@@ -40,7 +42,9 @@ class EmailService:
         """Send a single email."""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = current_app.config.get("MAIL_DEFAULT_SENDER", "noreply@aschool.com.np")
+        msg["From"] = current_app.config.get(
+            "MAIL_DEFAULT_SENDER", f"noreply@{_platform_domain()}"
+        )
         msg["To"] = to
 
         if text_body:

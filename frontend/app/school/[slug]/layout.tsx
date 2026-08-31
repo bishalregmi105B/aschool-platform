@@ -2,10 +2,11 @@
 import { Metadata } from "next";
 import { sanitizeCss } from "@/lib/sanitize";
 import { getPublicSite, getPublicSiteStatus } from "@/lib/public-site";
+import { SCHOOL_SITE_DOMAIN } from "@/lib/site-domain";
 import { generateThemeCSS, getThemeById, THEMES, DEFAULT_THEME_ID } from "@/themes/registry";
 import { SchoolNavbar } from "@/components/website/SchoolNavbar";
 
-const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || "aschool.com.np";
+const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || SCHOOL_SITE_DOMAIN;
 const FONT_NAMES = Array.from(
   new Set(THEMES.flatMap((theme) => [theme.fonts.heading, theme.fonts.body])),
 );

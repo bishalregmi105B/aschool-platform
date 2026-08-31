@@ -12,6 +12,7 @@ from celery import shared_task
 
 from app.extensions import db, redis_client
 from app.models import Notice, School, SchoolWebsite, WebsitePage
+from app.utils.tenant_url import school_site_url
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +208,7 @@ def _trigger_revalidation(slug: str, trigger: str):
 def _rebuild_sitemap(school):
     """Rebuild sitemap data in Redis for the school."""
     slug = school.slug
-    base_url = f"https://{slug}.aschool.com.np"
+    base_url = school_site_url(slug)
 
     urls = []
     for page_path in ALL_PUBLIC_PAGES:

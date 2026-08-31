@@ -24,6 +24,8 @@ import re
 
 from flask import current_app
 
+from app.utils.tenant_url import school_site_domain
+
 logger = logging.getLogger(__name__)
 
 _HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
@@ -76,7 +78,7 @@ def _validate_domain(domain: str) -> str | None:
         return "Enter a valid domain, e.g. school.yourschool.edu.np"
     if len(domain) > 253:
         return "Domain is too long"
-    base = current_app.config.get("BASE_DOMAIN", "aschool.com.np")
+    base = school_site_domain()
     if domain == base or domain.endswith(f".{base}"):
         return f"Domains under {base} are platform subdomains — use your own domain"
     return None
@@ -338,7 +340,7 @@ class WhiteLabelService:
 
     @classmethod
     def get_domain_status(cls, school) -> dict:
-        base = current_app.config.get("BASE_DOMAIN", "aschool.com.np")
+        base = school_site_domain()
         subdomain = school.slug if school else None
         cname_target = f"{subdomain}.{base}" if subdomain else None
         custom_domain = (school.custom_domain or "") if school else ""
@@ -403,7 +405,7 @@ class WhiteLabelService:
         if not school.custom_domain:
             raise ValueError("No custom domain configured")
 
-        base = current_app.config.get("BASE_DOMAIN", "aschool.com.np")
+        base = school_site_domain()
         expected_cname = f"{school.slug}.{base}".lower()
         platform_ip = (os.getenv("PLATFORM_IP") or "").strip()
 
