@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDesignerStore, type HistoryEntry } from "../designer/store";
 import { collectTargets, computeSnap, GuideRenderer } from "../designer/snapping";
+import { preloadCanvasImages } from "../designer/canvasImages";
 
 export type FabricCanvas = any;
 export type FabricObject = any;
@@ -114,8 +115,28 @@ export function useCanvas(
   const setZoom = store((s) => s.setZoom);
   const setStoreDirty = store((s) => s.setDirty);
 
+  /** Current canvas logical size (fabric element is logical×zoom) */
+  const [canvasSize, setCanvasSize] = useState({ width: 794, height: 1123 });
+  const canvasSizeRef = useRef({ width: 794, height: 1123 });
+
   pagesRef.current = pages;
   pageIdxRef.current = currentPageIdx;
+
+  /** Track the logical page size; re-apply the viewport zoom so the fabric
+   *  element stays at logical×zoom (call after every setDimensions). */
+  const syncElementSize = useCallback((w: number, h: number) => {
+    canvasSizeRef.current = { width: w, height: h };
+    setCanvasSize({ width: w, height: h });
+    const fc = fabricRef.current;
+    if (!fc) return;
+    const z = Math.min(4, Math.max(0.2, store.getState().zoom || 1));
+    fc.setViewportTransform([z, 0, 0, z, 0, 0]);
+    fc.setDimensions({
+      width: Math.max(1, Math.round(w * z)),
+      height: Math.max(1, Math.round(h * z)),
+    });
+    fc.calcOffset();
+  }, [store]);
 
   // ── history capture (debounced, store-based) ────────────────────
   const captureHistory = useCallback(() => {
@@ -195,31 +216,74 @@ export function useCanvas(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── viewport zoom (real fabric zoom — pointer-safe) ─────────────
-  const zoomAt = useCallback((next: number, point?: { x: number; y: number }) => {
+  // ── viewport zoom (real canvas: element resizes with zoom) ──────
+  // The fabric element is sized to logical×zoom with a matching viewport
+  // transform, so rendering is 1:1 crisp at every level and the scroll
+  // container gets real scrollbars when zoomed past the viewport (Canva).
+  const applyViewportZoom = useCallback((fc: FabricCanvas, z: number) => {
+    const clamped = Math.min(4, Math.max(0.2, z));
+    fc.setViewportTransform([clamped, 0, 0, clamped, 0, 0]);
+    fc.setDimensions({
+      width: Math.max(1, Math.round(canvasSizeRef.current.width * clamped)),
+      height: Math.max(1, Math.round(canvasSizeRef.current.height * clamped)),
+    });
+    fc.calcOffset();
+    fc.requestRenderAll();
+    setZoom(clamped);
+    return clamped;
+  }, [setZoom]);
+
+  /** Zoom to `next`, keeping the content point under the SCROLL CONTAINER
+   *  coordinates in `containerPoint` stable (cursor-anchored zoom). */
+  const zoomAtPointInContainer = useCallback((
+    next: number,
+    container: HTMLElement,
+    containerPoint: { x: number; y: number },
+  ) => {
     const fc = fabricRef.current;
     if (!fc) return;
-    const z = Math.min(4, Math.max(0.2, next));
-    import("fabric").then(({ Point }) => {
-      const p = new Point(point?.x ?? fc.getWidth() / 2, point?.y ?? fc.getHeight() / 2);
-      fc.zoomToPoint(p, z);
-      fc.requestRenderAll();
-      setZoom(z);
-    });
-  }, [setZoom]);
+    const el = fc.getElement();
+    const prev = store.getState().zoom || 1;
+
+    // content point (logical page coords) under that container point, and the
+    // element's position in CONTENT space (rect + scroll) before the zoom
+    const rectBefore = el.getBoundingClientRect();
+    const contentX = (containerPoint.x - rectBefore.left) / prev;
+    const contentY = (containerPoint.y - rectBefore.top) / prev;
+
+    const z = applyViewportZoom(fc, next);
+
+    // layout re-centered the (resized) element — measure its new content-space
+    // origin, then scroll so the same content point sits under the cursor
+    const rectAfter = el.getBoundingClientRect();
+    const elLeft = rectAfter.left + container.scrollLeft;
+    const elTop = rectAfter.top + container.scrollTop;
+    const wantX = elLeft + contentX * z - containerPoint.x;
+    const wantY = elTop + contentY * z - containerPoint.y;
+    const maxX = Math.max(0, container.scrollWidth - container.clientWidth);
+    const maxY = Math.max(0, container.scrollHeight - container.clientHeight);
+    container.scrollLeft = Math.min(maxX, Math.max(0, wantX));
+    container.scrollTop = Math.min(maxY, Math.max(0, wantY));
+  }, [applyViewportZoom, store]);
+
+  const zoomAt = useCallback((next: number) => {
+    const fc = fabricRef.current;
+    if (!fc) return;
+    applyViewportZoom(fc, next);
+  }, [applyViewportZoom]);
 
   const zoomToFit = useCallback(() => {
     const fc = fabricRef.current;
     if (!fc) return;
-    const wrap = fc.getElement()?.parentElement;
+    const wrap = fc.getElement()?.closest("[data-canvas-scroll]") as HTMLElement | null;
     if (!wrap) return;
-    const availableW = wrap.clientWidth - 48;
-    const availableH = wrap.clientHeight - 48;
-    const z = Math.min(availableW / fc.getWidth(), availableH / fc.getHeight(), 1);
-    // reset pan then fit
-    fc.setViewportTransform([1, 0, 0, 1, 0, 0]);
-    zoomAt(z);
-  }, [zoomAt]);
+    const availableW = wrap.clientWidth - 64;
+    const availableH = wrap.clientHeight - 64;
+    const z = Math.min(availableW / canvasSizeRef.current.width, availableH / canvasSizeRef.current.height, 1);
+    applyViewportZoom(fc, Math.max(0.2, z));
+    // let flexbox re-center, then nudge scroll to top-left of the page
+    requestAnimationFrame(() => { wrap.scrollTo({ top: 0, behavior: "auto" }); });
+  }, [applyViewportZoom]);
 
   // ── page helpers ────────────────────────────────────────────────
   const saveCurrentPageJSON = useCallback(() => {
@@ -237,10 +301,16 @@ export function useCanvas(
   const loadPageToCanvas = useCallback((page: PageState, pageIdx = 0, allPages?: PageState[]) => {
     const fc = fabricRef.current;
     if (!fc) return;
-    fc.setDimensions({ width: page.width, height: page.height });
+    const w = Math.max(1, Number(page.width) || 794);
+    const h = Math.max(1, Number(page.height) || 1123);
+    fc.setDimensions({ width: w, height: h });
+    syncElementSize(w, h);
     fc.backgroundColor = page.background ?? "#ffffff";
     if (page.json && Object.keys(page.json).length > 0) {
-      fc.loadFromJSON(sanitizeTemplateImages(page.json), () => fc.requestRenderAll())
+      // preload image srcs into data-URIs so one broken photo can't reject
+      // the whole loadFromJSON (fabric v6 rejects all-or-nothing)
+      preloadCanvasImages(sanitizeTemplateImages(page.json))
+        .then((safe) => fc.loadFromJSON(safe, () => fc.requestRenderAll()))
         .catch(() => fc.requestRenderAll());
     } else {
       fc.clear();
@@ -328,6 +398,7 @@ export function useCanvas(
       if (settings.orientation === "portrait"  && w > h) [w, h] = [h, w];
       merged.width = w; merged.height = h;
       fc.setDimensions({ width: w, height: h });
+      syncElementSize(w, h);
     }
     if ("background" in settings) {
       fc.backgroundColor = settings.background!;
@@ -751,7 +822,8 @@ export function useCanvas(
     } else {
       const fc = fabricRef.current;
       if (!fc) return;
-      fc.loadFromJSON(sanitizeTemplateImages(json), () => fc.requestRenderAll())
+      preloadCanvasImages(sanitizeTemplateImages(json))
+        .then((safe) => fc.loadFromJSON(safe, () => fc.requestRenderAll()))
         .catch(() => fc.requestRenderAll());
     }
   }, [loadPageToCanvas, resetHistory]);
@@ -764,11 +836,15 @@ export function useCanvas(
   ) => {
     const fc = fabricRef.current;
     if (!fc) return;
-    fc.setDimensions({ width, height });
+    const tw = Math.max(1, Number(width) || 794);
+    const th = Math.max(1, Number(height) || 1123);
+    fc.setDimensions({ width: tw, height: th });
+    syncElementSize(tw, th);
     fc.backgroundColor = background;
     const finish = () => { fc.requestRenderAll(); resetHistory(); };
     if (canvasJson && Object.keys(canvasJson).length > 0) {
-      fc.loadFromJSON(sanitizeTemplateImages(canvasJson), finish)
+      preloadCanvasImages(sanitizeTemplateImages(canvasJson))
+        .then((safe) => fc.loadFromJSON(safe, finish))
         .catch(finish);
     } else {
       fc.clear();
@@ -778,8 +854,8 @@ export function useCanvas(
     }
     const p: PageState = {
       id: Math.random().toString(36).slice(2, 10),
-      json: canvasJson, width, height,
-      orientation: width > height ? "landscape" : "portrait",
+      json: canvasJson, width: tw, height: th,
+      orientation: tw > th ? "landscape" : "portrait",
       margins: { ...DEFAULT_MARGINS }, background,
     };
     setCurrentPageSettings(p);
@@ -794,6 +870,7 @@ export function useCanvas(
     const fc = fabricRef.current;
     if (!fc) return;
     fc.setDimensions({ width: size.width, height: size.height });
+    syncElementSize(size.width, size.height);
     fc.clear();
     fc.backgroundColor = "#ffffff";
     fc.requestRenderAll();
@@ -805,6 +882,7 @@ export function useCanvas(
     isReady,
     selectedObject,
     zoom,
+    canvasSize,
     pages, currentPageIdx, currentPageSettings,
     pageSize: { width: currentPageSettings.width, height: currentPageSettings.height },
     // elements
@@ -820,7 +898,7 @@ export function useCanvas(
     // history
     undo, redo, snapshot: snapshotNow, resetHistory,
     // zoom
-    zoomAt, zoomToFit, setZoomLevel: setZoom,
+    zoomAt, zoomToFit, zoomAtPointInContainer, setZoomLevel: setZoom,
     // serialization
     toJSON, toFullJSON, loadJSON, loadPreset, loadFromTemplateJson,
     // page management

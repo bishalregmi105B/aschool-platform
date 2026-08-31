@@ -1,0 +1,25 @@
+template_key: id_card_standard
+name: Student ID Card
+category: id_cards
+editor_type: designer
+description: Horizontal student ID card with photo, name, class, roll and contacts
+page_size: ID Card
+thumbnail_emoji: 🪪
+is_default: true
+size:
+  width: 300
+  height: 189
+fields:
+- photo
+- name
+- class
+- section
+- roll_no
+- blood_group
+- phone
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

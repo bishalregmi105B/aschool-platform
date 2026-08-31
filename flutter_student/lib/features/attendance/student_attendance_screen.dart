@@ -3,6 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 /// Student Attendance — View personal attendance record and statistics
+///
+/// Uses the real backend routes:
+/// - GET /attendance/student/{studentId} (records, optional ?month=MM&year=YYYY)
+/// - GET /attendance/student/{studentId}/summary (present/absent/late counts)
+/// The student id comes from the shared currentStudentProvider (resolved from
+/// /students?user_id=...); there is no /student/attendance endpoint.
 class StudentAttendanceScreen extends ConsumerStatefulWidget {
   const StudentAttendanceScreen({super.key});
 
@@ -34,13 +40,29 @@ class _StudentAttendanceScreenState
       _error = null;
     });
     try {
-      final res = await ApiClient.instance.get('/student/attendance',
-          queryParameters:
-              _selectedMonth.isNotEmpty ? {'month': _selectedMonth} : null);
-      final payload = res.data;
+      // Resolve the student profile first — attendance routes are keyed by
+      // student id, not by the logged-in user id.
+      final student = await ref.read(currentStudentProvider.future);
+      final studentId = student?.id;
+      if (studentId == null || studentId.isEmpty) {
+        setState(() => _error = 'Could not find your student profile.');
+        setState(() => _loading = false);
+        return;
+      }
+      final month = _selectedMonth.isNotEmpty ? _selectedMonth : null;
+      final recordsRes = await ApiClient.instance.get(
+          '/attendance/student/$studentId',
+          queryParameters: month != null ? {'month': month} : null);
+      final summaryRes =
+          await ApiClient.instance.get('/attendance/student/$studentId/summary');
+      final summary = safeMap(envelopeData(summaryRes.data));
       setState(() {
-        _stats = safeMapOrNull(payload?['stats']);
-        _records = safeList(payload?['records']);
+        _records = safeList(envelopeData(recordsRes.data));        _stats = {
+          'present': summary['present_days'] ?? 0,
+          'absent': summary['absent_days'] ?? 0,
+          'late': summary['late_days'] ?? 0,
+          'attendance_rate': summary['percentage'] ?? 0,
+        };
       });
     } catch (e) {
       debugPrint('StudentAttendanceScreen load failed: $e');

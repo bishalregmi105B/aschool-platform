@@ -329,7 +329,7 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
     school_obj = School.query.get(school_id)
 
     def _resolve_or_create_parent_user(
-        name: str | None, phone: str | None
+        name: str | None, phone: str | None, student=None
     ) -> User | None:
         phone_clean = (phone or "").strip()
         if not phone_clean:
@@ -353,8 +353,11 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
             full_name=name or "Parent/Guardian",
             phone=phone_clean,
         )
+        # Pass the child row so the parent default is derived from the
+        # child's identity (p{roll}.{first}{last4}); falls back to the
+        # parent's own name when no child is available yet.
         parent_user.set_password(
-            generate_default_password(parent_user, None, school_obj)
+            generate_default_password(parent_user, student, school_obj)
         )
         db.session.add(parent_user)
         db.session.flush()
@@ -616,7 +619,9 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
                     if is_primary:
                         guardian.is_primary = True
 
-                    parent_user = _resolve_or_create_parent_user(name, phone)
+                    parent_user = _resolve_or_create_parent_user(
+                        name, phone, student
+                    )
                     if parent_user:
                         guardian.user_id = parent_user.id
 

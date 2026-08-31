@@ -1,0 +1,26 @@
+template_key: fee_bill
+name: Student Fee Bill
+category: reports
+editor_type: writer
+description: Student fee bill / payment receipt with itemised fee table
+page_size: A4
+thumbnail_emoji: 🧾
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- student_name
+- class_name
+- roll_no
+- bill_no
+- bill_date
+- due_date
+- fee_items
+- total_amount
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

@@ -1,0 +1,29 @@
+template_key: attendance_ledger
+name: Attendance Ledger
+name_nepali: हाजिरी खाता
+category: registers
+editor_type: designer
+description: "Monthly class attendance register — 20 roll-wise student rows × 31 day columns with P/A/L marks and present/absent totals. Bulk-generate per class + BS month with real attendance records (one page per 20 students)."
+page_size: A4
+thumbnail_emoji: "📋"
+is_default: true
+size: {width: 794, height: 1123}
+fields:
+  - school_name
+  - school_address
+  - class_name
+  - section_name
+  - month_name
+  - year_bs
+  - roll_list          # {roll_1}..{roll_20}
+  - name_list          # {name_1}..{name_20}
+  - attendance_marks   # {m_1_1}..{m_20_31} — per-day P/A/L/H/Lv grid
+  - attendance_totals  # {total_p_1}..{total_p_20}, {total_a_1}..{total_a_20}
+autofill:
+  sources: [school, class_roster, attendance]
+  notes: >
+    Roll/name rows map to {roll_N}/{name_N}; the day grid fills each
+    {m_<row>_<day>} with P, A, L (late), H (half-day), Lv (leave) or blank
+    when no attendance record exists, and {total_p_N}/{total_a_N} carry the
+    row totals. Bulk: pick class + BS month — 20 students per A4 page,
+    attendance marks come from the month's attendance records.

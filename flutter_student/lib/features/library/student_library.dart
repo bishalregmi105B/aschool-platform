@@ -291,8 +291,10 @@ class _StudentLibraryState extends ConsumerState<StudentLibrary>
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
+          // The backend stub only acknowledges the request ({"requested": true})
+          // — do not claim the book was reserved or issued.
           const SnackBar(
-            content: Text('Book request sent! 📚'),
+            content: Text('Request sent to the library desk'),
             backgroundColor: Colors.green,
           ),
         );

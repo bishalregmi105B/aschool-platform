@@ -1,0 +1,166 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Arial",
+    "fontSize": 11
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "YOUR SCHOOL NAME",
+      "subtitle": "School Address | Phone | www.school.edu",
+      "tagline": "ACADEMIC PROGRESS REPORT",
+      "bg": "#1e40af",
+      "color": "#ffffff"
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Student: ___________________",
+          "align": "left"
+        },
+        {
+          "text": "Class: _____  Section: _____",
+          "align": "center"
+        },
+        {
+          "text": "Roll No: ______",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Year: __________",
+          "align": "left"
+        },
+        {
+          "text": "TERM:  ☐ First   ☐ Second   ☐ Third   ☐ Annual",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Subject",
+        "Max Marks",
+        "Obtained",
+        "Grade",
+        "Remarks"
+      ],
+      "rows": [
+        [
+          "Subject 1",
+          "100",
+          "___",
+          "___",
+          "Good"
+        ],
+        [
+          "Subject 2",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 3",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 4",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 5",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 6",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 7",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "Subject 8",
+          "100",
+          "___",
+          "___",
+          ""
+        ],
+        [
+          "**TOTAL**",
+          "**800**",
+          "**___**",
+          "**___**",
+          "**___**"
+        ]
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "Attendance:  Present: ___  Absent: ___  Total: ___  Percentage: ____%",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "Class Teacher Remark: _________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Class Teacher",
+        "Parent Signature",
+        "Principal"
+      ]
+    }
+  ]
+}

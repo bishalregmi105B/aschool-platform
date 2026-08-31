@@ -27,6 +27,11 @@ import { Search, Check, ShoppingCart, Zap, Crown, Building2, Layers, Settings } 
  *   PAID  not installed        → Start {trial_days}-Day Free Trial
  *   PAID  trial active         → Trial · N days left — Subscribe
  *   PAID  subscribed           → Manage (settings) + Uninstall
+ *
+ * Core-category plugins are provisioned ACTIVE for every school
+ * automatically (backend ensure_free_plugins) and cannot be deactivated or
+ * uninstalled (backend returns 400) — they show the ACTIVE badge with no
+ * lifecycle buttons at all ("Included with your plan").
  */
 
 interface MarketplacePlugin {
@@ -563,6 +568,9 @@ function PluginCard({
   const isPaid = !plugin.is_free && plugin.price_monthly > 0;
   const onTrial = isActive && plugin.is_trial === true;
   const isComingSoon = plugin.coming_soon === true;
+  // Core plugins are part of the school's base plan — always active, never
+  // deactivatable/uninstallable (the backend enforces this with a 400 too).
+  const isCore = plugin.category === "core";
 
   const ring =
     isActive
@@ -626,6 +634,13 @@ function PluginCard({
           // E230: in final testing — install disabled with an explanatory tooltip
           <Button className="w-full" disabled title="In final testing — releasing soon">
             Coming Soon
+          </Button>
+        ) : isCore && isActive ? (
+          // Core plugins are provisioned for every school and cannot be
+          // turned off — no lifecycle CTA at all.
+          <Button variant="outline" className="w-full" disabled>
+            <Check className="h-4 w-4 mr-1" />
+            Included with your plan
           </Button>
         ) : (
           <>

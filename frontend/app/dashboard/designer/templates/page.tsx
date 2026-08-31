@@ -20,6 +20,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   reports: "Report Cards",
   notices: "Notices & Posters",
   letterheads: "Letterheads",
+  calendars: "Calendars",
+  registers: "Registers",
+  bills: "Bills",
+  custom: "Custom",
 };
 
 interface Template {

@@ -23,7 +23,7 @@ frontend:
     icon: "Library"
     subitems:
       - { label: "Catalog", route: "/library/catalog" }
-      - { label: "Issue/Return", route: "/library/transactions" }
+      - { label: "Issue/Return", route: "/library/checkout" }
       - { label: "Overdue", route: "/library/overdue" }
     visible_to: []
 

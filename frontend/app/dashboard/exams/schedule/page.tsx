@@ -67,13 +67,23 @@ function ExamScheduleContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Exam Schedule</h1>
-        <p className="text-muted-foreground">View exam timetables and schedules</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Exam Schedule</h1>
+          <p className="text-muted-foreground">View exam timetables and schedules</p>
+        </div>
+        <a href="/dashboard/exams" className="text-sm font-medium text-primary hover:underline">
+          Create / manage exams →
+        </a>
       </div>
 
       {(exams || []).length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">No exams scheduled yet.</div>
+        <div className="text-center py-16 space-y-3">
+          <p className="text-muted-foreground">No exams scheduled yet.</p>
+          <a href="/dashboard/exams" className="text-sm font-medium text-primary hover:underline">
+            Create your first exam on the Exams overview →
+          </a>
+        </div>
       ) : (
         (exams || []).map((exam: Exam) => (
           <ExamCard key={exam.id} exam={exam} />

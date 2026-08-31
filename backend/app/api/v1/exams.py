@@ -191,6 +191,8 @@ def _mark_is_pass(mark, subject=None, exam=None):
 
 @exams_bp.route("/grade-table", methods=["GET"])
 @jwt_required()
+@school_required
+@plugin_required("exams")
 def get_grade_table():
     """Return Nepal NEB grading scale for reference."""
     return success_response(GRADE_TABLE)

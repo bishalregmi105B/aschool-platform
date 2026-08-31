@@ -3,6 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 /// Student Health Records — View own health records and vaccination history
+///
+/// Backed by real endpoints (there is no /student/health route):
+/// - GET /health-records/students/{studentId}      → profile (allergies list, conditions)
+/// - GET /health-records/visits?student_id=...     → medical visits
+/// - GET /health-records/immunizations?student_id= → vaccination history
+/// Rows are mapped into the shapes the tab UIs below already render.
 class StudentHealthScreen extends ConsumerStatefulWidget {
   const StudentHealthScreen({super.key});
 
@@ -33,12 +39,52 @@ class _StudentHealthScreenState extends ConsumerState<StudentHealthScreen>
       _error = null;
     });
     try {
-      final res = await ApiClient.instance.get('/student/health');
-      final payload = res.data;
+      // Resolve the student profile first — health-records routes are keyed
+      // by student id, not by the logged-in user id.
+      final student = await ref.read(currentStudentProvider.future);
+      final studentId = student?.id;
+      if (studentId == null || studentId.isEmpty) {
+        setState(() => _error = 'Could not find your student profile.');
+        setState(() => _loading = false);
+        return;
+      }
+      final profileRes = await ApiClient.instance
+          .get('/health-records/students/$studentId');
+      final visitsRes = await ApiClient.instance.get('/health-records/visits',
+          queryParameters: {'student_id': studentId});
+      final immRes = await ApiClient.instance.get(
+          '/health-records/immunizations',
+          queryParameters: {'student_id': studentId});
+      final profile = safeMap(envelopeData(profileRes.data));
+      final visits = safeList(envelopeData(visitsRes.data));
+      final immunizations = safeList(envelopeData(immRes.data));
       setState(() {
-        _records = safeList(payload?['records']);
-        _vaccinations = safeList(payload?['vaccinations']);
-        _allergies = safeList(payload?['allergies']);
+        // Medical visits render as "records" (condition → reason, date).
+        _records = visits
+            .map((v) => {
+                  'condition': v['reason'] ?? v['diagnosis'] ?? 'Health Visit',
+                  'notes': v['treatment'] ?? v['notes'],
+                  'date': v['visit_date'],
+                })
+            .toList();
+        // Allergies are plain strings on the health profile.
+        _allergies = safeList(profile['allergies'])
+            .map((a) => {
+                  'allergen':
+                      a is Map ? (a['allergen'] ?? a['name']) : a?.toString(),
+                  'reaction': a is Map ? a['reaction'] : null,
+                  'severity': a is Map ? a['severity'] : null,
+                })
+            .toList();
+        // Immunizations render as vaccinations (vaccine_name + date).
+        // Only date_administered counts as "Given" — next_due_date is a
+        // schedule, not a completed dose.
+        _vaccinations = immunizations
+            .map((i) => {
+                  'vaccine_name': i['vaccine_name'],
+                  'date': i['date_administered'],
+                })
+            .toList();
       });
     } catch (e, st) {
       debugPrint('StudentHealthScreen load failed: $e\n$st');

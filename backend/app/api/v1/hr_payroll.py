@@ -192,6 +192,45 @@ def generate_payroll():
         User.role.in_(("school_admin", "accountant", "teacher", "staff")),
     ).all()
 
+    # Default salary structure configured by the payroll settings page
+    # (saved into school.settings.payroll via PUT /schools/<id>):
+    #   settings.payroll = {
+    #     "basicSalaryPercentage": 100, "taxRate": 1, "paymentDay": 1,
+    #     "allowances": [{"name": "Transport", "percentage": 5} | {"amount": n}, ...],
+    #     "deductions": [...same shapes...],
+    #   }
+    # The hr_payroll plugin's own per-school config (SchoolPlugin.config,
+    # readable via app.plugins.config_store) overrides that block when it
+    # carries a non-empty "payroll" section, so plugin-level settings win.
+    from app.models.school import School
+
+    from app.plugins.config_store import get_plugin_config
+
+    school = School.query.get(g.school_id)
+    payroll_settings = {}
+    if school and isinstance(school.settings, dict):
+        payroll_settings = school.settings.get("payroll") or {}
+    plugin_cfg = get_plugin_config(str(g.school_id), "hr_payroll")
+    if isinstance(plugin_cfg.get("payroll"), dict) and plugin_cfg["payroll"]:
+        payroll_settings = plugin_cfg["payroll"]
+    if not isinstance(payroll_settings, dict):
+        payroll_settings = {}
+    has_settings = bool(payroll_settings)
+    default_basic = 0.0
+    for key in ("defaultBasicSalary", "basicSalary", "default_basic_salary"):
+        value = _setting_number(payroll_settings.get(key))
+        if value and value > 0:
+            default_basic = value
+            break
+    tax_rate = _setting_number(payroll_settings.get("taxRate")) or 0.0
+    # basicSalaryPercentage (payroll settings page: "What percentage of Gross
+    # Salary is considered Basic Salary"). Applied when a staff member's basic
+    # is carried forward from their most recent payslip: the previous GROSS is
+    # scaled by the percentage so lowering it (e.g. 100 -> 60, moving the rest
+    # into configured allowances) re-derives basic instead of repeating last
+    # month's basic. 100/absent keeps the plain carry-forward behavior.
+    basic_pct = _setting_number(payroll_settings.get("basicSalaryPercentage"))
+
     created = 0
     for user in staff_members:
         exists = StaffPayroll.query.filter_by(
@@ -203,15 +242,60 @@ def generate_payroll():
         if exists:
             continue
 
+        # Zero-salary drafts remain the fallback when nothing is configured.
+        basic = 0
+        allowances = {}
+        deductions = {}
+        if has_settings:
+            # Base for percentage components: an absolute default basic
+            # salary from settings wins; otherwise carry the staff member's
+            # most recent previous basic forward so percentages resolve to
+            # real amounts instead of 0.
+            base_basic = default_basic
+            if base_basic <= 0:
+                last_row = (
+                    StaffPayroll.query.filter(
+                        StaffPayroll.school_id == g.school_id,
+                        StaffPayroll.user_id == user.id,
+                        StaffPayroll.is_deleted.is_(False),
+                        StaffPayroll.month < month,
+                    )
+                    .order_by(StaffPayroll.month.desc())
+                    .first()
+                )
+                if last_row is not None:
+                    if (
+                        basic_pct is not None
+                        and 0 < basic_pct < 100
+                        and last_row.gross_salary is not None
+                    ):
+                        # Scale the previous gross down to the configured
+                        # basic-salary percentage (see comment above).
+                        base_basic = (
+                            float(last_row.gross_salary) * basic_pct / 100.0
+                        )
+                    else:
+                        base_basic = float(last_row.basic_salary or 0)
+            basic = round(base_basic, 2)
+            allowances = _components_from_settings(
+                payroll_settings.get("allowances"), base_basic
+            )
+            deductions = _components_from_settings(
+                payroll_settings.get("deductions"), base_basic
+            )
+            if tax_rate > 0 and base_basic > 0:
+                deductions["Tax"] = round(base_basic * tax_rate / 100.0, 2)
+        gross, net = _compute_payroll_totals(basic, allowances, deductions)
+
         payroll = StaffPayroll(
             school_id=g.school_id,
             user_id=user.id,
             month=month,
-            basic_salary=0,
-            allowances={},
-            deductions={},
-            gross_salary=0,
-            net_salary=0,
+            basic_salary=basic,
+            allowances=allowances,
+            deductions=deductions,
+            gross_salary=gross,
+            net_salary=net,
             status="draft",
         )
         db.session.add(payroll)
@@ -461,6 +545,87 @@ def mark_paid(payroll_id):
     return success_response(_payroll_dict(payroll))
 
 
+@hr_payroll_bp.route("/payroll/bulk-action", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("hr_payroll")
+@role_required("superadmin", "school_admin")
+def bulk_payroll_action():
+    """Bulk approve / mark-paid for one month's payroll rows.
+
+    Body: {"action": "approve"|"mark_paid", "month": "YYYY-MM",
+           "ids": ["<payroll-id>", ...]?}
+    When ids is omitted or empty, every row of the month eligible for the
+    action is targeted. Reuses the per-row handlers' rules: approve applies
+    to draft rows only (a paid row is never regressed), mark_paid requires
+    the approved status exactly like POST /payroll/<id>/pay.
+    """
+    from datetime import datetime
+
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+    month = data.get("month")
+    if action not in ("approve", "mark_paid"):
+        return error_response("action must be 'approve' or 'mark_paid'", 400)
+    if not month:
+        return error_response("month is required", 400)
+
+    requested_ids = data.get("ids") or []
+    id_uuids = []
+    if requested_ids:
+        import uuid as _uuid
+
+        if not isinstance(requested_ids, (list, tuple)):
+            return error_response("ids must be a list of payroll UUIDs", 400)
+        for raw_id in requested_ids:
+            try:
+                id_uuids.append(_uuid.UUID(str(raw_id)))
+            except (ValueError, AttributeError, TypeError):
+                return error_response(
+                    "ids must be a list of valid payroll UUIDs", 400
+                )
+
+    query = StaffPayroll.query.filter_by(
+        school_id=g.school_id, is_deleted=False, month=month
+    )
+    if id_uuids:
+        query = query.filter(StaffPayroll.id.in_(id_uuids))
+    # Status gate mirrors the per-row endpoints: approve targets draft rows,
+    # mark_paid requires approved.
+    query = query.filter(
+        StaffPayroll.status == ("draft" if action == "approve" else "approved")
+    )
+    rows = query.all()
+
+    claims = get_jwt()
+    now = datetime.utcnow()
+    updated_ids = []
+    for payroll in rows:
+        if action == "approve":
+            payroll.status = "approved"
+            payroll.approved_by_id = claims.get("sub")
+        else:
+            payroll.status = "paid"
+            payroll.paid_at = now
+            if data.get("payment_method"):
+                payroll.payment_method = data.get("payment_method")
+        updated_ids.append(str(payroll.id))
+
+    db.session.commit()
+    # Rows excluded by the status gate (or unknown ids) are reported as
+    # skipped so the UI can explain partial results.
+    skipped = max(len(requested_ids) - len(updated_ids), 0) if requested_ids else 0
+    return success_response(
+        {
+            "action": action,
+            "month": month,
+            "updated": len(updated_ids),
+            "skipped": skipped,
+            "ids": updated_ids,
+        }
+    )
+
+
 # ── Leave Management ──────────────────────────────────────
 
 
@@ -585,6 +750,140 @@ def update_leave_status(leave_id):
     leave.notes = data.get("notes", leave.notes)
     db.session.commit()
     return success_response(_leave_dict(leave))
+
+
+@hr_payroll_bp.route("/leave-report", methods=["GET"])
+@hr_payroll_bp.route("/leaves/report", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("hr_payroll")
+@role_required("superadmin", "school_admin", "accountant")
+def leave_report():
+    """Per-staff leave aggregates for a month or a whole year.
+
+    Query params:
+      year  (int, default current year) — the report period
+      month (int 1-12, optional)        — restrict to a single month
+      status (optional)                 — filter by leave status
+      user_id (optional)                — a single staff member
+      format=csv                        — download the aggregate as CSV
+
+    Returns one row per staff member with days summed per leave type
+    (JSON) or a CSV with one column per leave type present in the period.
+    A leave is attributed to the month/year of its start_date; the row's
+    own `days` value wins, otherwise days are computed inclusive of both
+    endpooints.
+    """
+    from datetime import date as _date, timedelta as _timedelta
+
+    year = request.args.get("year", type=int) or _date.today().year
+    month = request.args.get("month", type=int)
+    if month is not None and not 1 <= month <= 12:
+        return error_response("month must be an integer between 1 and 12", 400)
+    status = request.args.get("status")
+    if status and status not in VALID_LEAVE_STATUSES:
+        return error_response(
+            "Invalid status. Must be one of: " + ", ".join(VALID_LEAVE_STATUSES),
+            400,
+        )
+
+    query = StaffLeave.query.filter_by(school_id=g.school_id, is_deleted=False)
+    if month:
+        start_bound = _date(year, month, 1)
+        if month == 12:
+            end_bound = _date(year, 12, 31)
+        else:
+            end_bound = _date(year, month + 1, 1) - _timedelta(days=1)
+    else:
+        start_bound = _date(year, 1, 1)
+        end_bound = _date(year, 12, 31)
+    query = query.filter(
+        StaffLeave.start_date >= start_bound,
+        StaffLeave.start_date <= end_bound,
+    )
+    if status:
+        query = query.filter_by(status=status)
+    user_id = _parse_uuid_or_none(request.args.get("user_id"))
+    if user_id is not None:
+        query = query.filter_by(user_id=user_id)
+    leaves = query.all()
+
+    def _leave_days(leave):
+        if leave.days:
+            return int(leave.days)
+        start = _parse_date_value(leave.start_date)
+        end = _parse_date_value(leave.end_date)
+        if start and end and end >= start:
+            return (end - start).days + 1
+        return 1
+
+    by_staff: dict = {}
+    leave_types: set = set()
+    for leave in leaves:
+        key = str(leave.user_id)
+        entry = by_staff.setdefault(
+            key,
+            {
+                "user_id": key,
+                "staff_name": leave.user.full_name
+                if getattr(leave, "user", None)
+                else "Unknown Staff",
+                "by_type": {},
+                "total_days": 0,
+                "requests": 0,
+            },
+        )
+        leave_type = (leave.leave_type or "unknown").lower()
+        leave_types.add(leave_type)
+        bucket = entry["by_type"].setdefault(
+            leave_type, {"days": 0, "requests": 0}
+        )
+        days = _leave_days(leave)
+        bucket["days"] += days
+        bucket["requests"] += 1
+        entry["total_days"] += days
+        entry["requests"] += 1
+
+    staff_rows = sorted(by_staff.values(), key=lambda e: e["staff_name"] or "")
+
+    if request.args.get("format") == "csv":
+        import csv as _csv
+        from io import StringIO
+
+        buffer = StringIO()
+        writer = _csv.writer(buffer)
+        types = sorted(leave_types)
+        writer.writerow(
+            ["Staff Name", *[t.capitalize() for t in types], "Total Days", "Requests"]
+        )
+        for row in staff_rows:
+            writer.writerow(
+                [row["staff_name"]]
+                + [row["by_type"].get(t, {}).get("days", 0) for t in types]
+                + [row["total_days"], row["requests"]]
+            )
+        if not staff_rows:
+            writer.writerow(["No leave records", *[0] * (len(types) + 2)])
+        period = f"{year}-{month:02d}" if month else str(year)
+        from flask import make_response
+
+        response = make_response(buffer.getvalue())
+        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename=leave_report_{period}.csv"
+        )
+        return response
+
+    return success_response(
+        {
+            "year": year,
+            "month": month,
+            "status": status,
+            "leave_types": sorted(leave_types),
+            "staff": staff_rows,
+            "total_requests": len(leaves),
+        }
+    )
 
 
 # ── Appraisals ─────────────────────────────────────────────
@@ -921,6 +1220,18 @@ def _school_user_or_none(user_id):
     ).first()
 
 
+def _parse_uuid_or_none(value):
+    """UUID of a client-supplied id, or None when unparseable/absent."""
+    import uuid as _uuid
+
+    if value is None or value == "":
+        return None
+    try:
+        return _uuid.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 def _parse_date_value(value):
     """Parse a client-supplied date/datetime; None when unparseable."""
     from datetime import date as _date, datetime as _dt
@@ -935,6 +1246,57 @@ def _parse_date_value(value):
         return _date.fromisoformat(str(value)[:10])
     except (TypeError, ValueError):
         return None
+
+
+def _setting_number(value):
+    """Numeric value of a settings entry (None for non-numeric values)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and value.replace(".", "", 1).isdigit():
+        return float(value)
+    return None
+
+
+def _components_from_settings(entries, base_basic):
+    """Flatten settings.payroll.allowances/deductions into {name: amount}.
+
+    Shapes handled (the settings page saves {"name", "percentage"}; absolute
+    amounts and legacy flat dicts are also accepted):
+      [{"name": "Transport", "amount": 1500}]   -> {"Transport": 1500.0}
+      [{"name": "Transport", "percentage": 5}]  -> {"Transport": base*5/100}
+      {"Transport": 1500}                       -> {"Transport": 1500.0}
+    Components resolving to <= 0 are dropped so percentage-only setups with
+    no salary base fall back to the previous zero-component behavior.
+    """
+    components = {}
+    if isinstance(entries, dict):
+        pairs = [(str(name), value) for name, value in entries.items()]
+    elif isinstance(entries, list):
+        pairs = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or "").strip()
+            if not name:
+                continue
+            amount = _setting_number(entry.get("amount"))
+            if amount is None:
+                percentage = _setting_number(entry.get("percentage"))
+                if percentage is not None:
+                    amount = base_basic * percentage / 100.0
+            pairs.append((name, amount))
+    else:
+        pairs = []
+    for name, amount in pairs:
+        value = _setting_number(amount)
+        if not name or value is None:
+            continue
+        rounded = round(value, 2)
+        if rounded > 0:
+            components[name] = rounded
+    return components
 
 
 def _payroll_dict(p):

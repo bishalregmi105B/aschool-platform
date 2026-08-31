@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import {
   Plus, FileText, BarChart3, ClipboardList, Calendar, GraduationCap,
   MoreHorizontal, Pencil, Trash2, Eye, BookOpen, Trophy, Printer,
@@ -83,6 +84,8 @@ export default function ExamsPage() {
 
 function ExamsContent() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "school_admin";
   const [createOpen, setCreateOpen] = useState(false);
   const [editExam, setEditExam] = useState<Exam | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
@@ -211,11 +214,17 @@ function ExamsContent() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) =>
-      api.put(`/exams/${id}`, { status }),
-    onSuccess: () => {
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (status === "result_published") {
+        // dedicated publish endpoint — emits results.published so students
+        // and parents get notified (PUT alone does not)
+        return api.post(`/exams/${id}/publish`);
+      }
+      return api.put(`/exams/${id}`, { status });
+    },
+    onSuccess: (_res, vars) => {
       queryClient.invalidateQueries({ queryKey: ["exams"] });
-      toast.success("Status updated");
+      toast.success(vars.status === "result_published" ? "Results published — students and parents notified" : "Status updated");
     },
   });
 
@@ -242,7 +251,7 @@ function ExamsContent() {
       is_practical: exam.is_practical || false,
       practical_marks: String(exam.practical_marks || 25),
       description: exam.description || "",
-      subject_ids: [],
+      subject_ids: (exam as any).subject_ids || [],
     });
     setCreateOpen(true);
   }
@@ -284,9 +293,13 @@ function ExamsContent() {
           <h1 className="text-2xl font-bold">Examinations</h1>
           <p className="text-muted-foreground">Manage exams, marks entry, results & report cards (NEB grading)</p>
         </div>
-        <Button onClick={() => { resetForm(); setEditExam(null); setCreateOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Create Exam
-        </Button>
+        {isAdmin ? (
+          <Button onClick={() => { resetForm(); setEditExam(null); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> Create Exam
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">Only admins can create exams</p>
+        )}
       </div>
 
       {/* Stats */}
@@ -486,9 +499,11 @@ function ExamsContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(exam)}>
-                              <Pencil className="h-4 w-4 mr-2" /> Edit
-                            </DropdownMenuItem>
+                            {isAdmin && (
+                              <DropdownMenuItem onClick={() => openEdit(exam)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                            )}
                             <Link href={`/dashboard/exams/marks?exam=${exam.id}`}>
                               <DropdownMenuItem>
                                 <ClipboardList className="h-4 w-4 mr-2" /> Enter Marks
@@ -504,29 +519,31 @@ function ExamsContent() {
                                 <Printer className="h-4 w-4 mr-2" /> Report Cards
                               </DropdownMenuItem>
                             </Link>
-                            {exam.status === "scheduled" && (
+                            {isAdmin && exam.status === "scheduled" && (
                               <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "ongoing" })}>
                                 <Eye className="h-4 w-4 mr-2" /> Mark Ongoing
                               </DropdownMenuItem>
                             )}
-                            {exam.status === "ongoing" && (
+                            {isAdmin && exam.status === "ongoing" && (
                               <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "completed" })}>
                                 <Trophy className="h-4 w-4 mr-2" /> Mark Completed
                               </DropdownMenuItem>
                             )}
-                            {exam.status === "completed" && (
+                            {isAdmin && exam.status === "completed" && (
                               <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "result_published" })}>
                                 <BarChart3 className="h-4 w-4 mr-2" /> Publish Results
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => {
-                                if (confirm("Delete this exam?")) deleteMutation.mutate(exam.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
+                            {isAdmin && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (confirm("Delete this exam?")) deleteMutation.mutate(exam.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

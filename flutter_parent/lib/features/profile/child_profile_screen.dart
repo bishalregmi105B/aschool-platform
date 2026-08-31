@@ -8,7 +8,9 @@ import '../../providers/parent_providers.dart' show selectedChildIdProvider;
 final childProfileProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final studentId = ref.watch(selectedChildIdProvider);
-  final res = await ApiClient.instance.get('/parent-app/child-profile',
+  // Backend exposes this under /parent (parent_app_bp url_prefix),
+  // not /parent-app.
+  final res = await ApiClient.instance.get('/parent/child-profile',
       queryParameters: studentId != null ? {'student_id': studentId} : null);
   final data = res.data is Map<String, dynamic> ? res.data['data'] : null;
   return data is Map<String, dynamic> ? data : <String, dynamic>{};

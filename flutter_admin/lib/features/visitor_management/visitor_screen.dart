@@ -58,7 +58,8 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
   Future<void> _checkIn() async {
     if (_nameCtrl.text.trim().isEmpty) return;
     try {
-      await ApiClient.instance.post('/visitors/check-in', data: {
+      // Backend route is /visitors/checkin (no hyphen) — see visitor.py.
+      await ApiClient.instance.post('/visitors/checkin', data: {
         'name': _nameCtrl.text.trim(),
         'purpose': _purposeCtrl.text.trim(),
         'meeting_person': _meetingCtrl.text.trim(),

@@ -33,6 +33,8 @@ import {
   Loader2,
   Download,
   History,
+  Printer,
+  Plus,
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -42,7 +44,14 @@ import {
   Wallet,
 } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
-import { displayBS } from "@/lib/nepali_date";
+import { adToBS, displayBS, formatBSMonth } from "@/lib/nepali_date";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   EMPTY_PAYMENT_METHODS_RESPONSE,
   fetchPaymentMethods,
@@ -412,6 +421,25 @@ function CollectContent() {
     }
   }, []);
 
+  const printStatement = useCallback(async (account: StudentAccountSummary) => {
+    try {
+      const response = await api.get(
+        `/fees/students/${account.student_id}/statement/pdf`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `statement_${account.student_name || account.student_id}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not generate statement PDF");
+    }
+  }, []);
+
   const clearFilters = () => {
     setSearch("");
     setClassId("all");
@@ -655,6 +683,7 @@ function CollectContent() {
           classId={classId}
           sectionId={sectionId}
           onDownloadReceipt={downloadReceipt}
+          onPrintStatement={printStatement}
           onStudentFocus={setSelectedStudentId}
         />
       </div>
@@ -667,12 +696,14 @@ function StudentAccountWorkbench({
   classId,
   sectionId,
   onDownloadReceipt,
+  onPrintStatement,
   onStudentFocus,
 }: {
   account: StudentAccountSummary | null;
   classId: string;
   sectionId: string;
   onDownloadReceipt: (fee: FeeCollection) => void;
+  onPrintStatement: (account: StudentAccountSummary) => void;
   onStudentFocus: (studentId: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -689,6 +720,11 @@ function StudentAccountWorkbench({
     createBillFormState(),
   );
   const [showAdjustForm, setShowAdjustForm] = useState(false);
+  const [billDialogOpen, setBillDialogOpen] = useState(false);
+  const [billDialogMode, setBillDialogMode] = useState<"create" | "adjust">(
+    "create",
+  );
+  const [statementPending, setStatementPending] = useState(false);
 
   const { data: paymentMethodData } = useQuery({
     queryKey: ["fee-payment-methods"],
@@ -814,6 +850,45 @@ function StudentAccountWorkbench({
     );
   }, [account, selectedFee]);
 
+  const openBillDialog = (mode: "create" | "adjust") => {
+    if (mode === "create") {
+      // Fresh bill: default the BS cycle to the CURRENT BS month so the
+      // accountant never has to type "2083-05" by hand.
+      const todayBs = adToBS(new Date());
+      setBillForm(
+        createBillFormState({
+          monthBs: `${todayBs.year}-${String(todayBs.month).padStart(2, "0")}`,
+          yearBs: String(todayBs.year),
+        }),
+      );
+    } else {
+      setBillForm(
+        createBillFormState({
+          academicYear: selectedFee?.academic_year || "",
+          monthBs: selectedFee?.month_bs || "",
+          yearBs: selectedFee?.year_bs || "",
+          feeType: selectedFee?.fee_type || "",
+          baseAmount:
+            selectedFee && selectedFee.base_amount != null
+              ? String(selectedFee.base_amount)
+              : "",
+          discountAmount:
+            selectedFee && selectedFee.discount_amount != null
+              ? String(selectedFee.discount_amount)
+              : "",
+          lateFineAmount:
+            selectedFee && selectedFee.late_fine_amount != null
+              ? String(selectedFee.late_fine_amount)
+              : "",
+          isScholarship: Boolean(selectedFee?.is_scholarship),
+          notes: selectedFee?.notes || "",
+        }),
+      );
+    }
+    setBillDialogMode(mode);
+    setBillDialogOpen(true);
+  };
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!account) {
@@ -837,6 +912,7 @@ function StudentAccountWorkbench({
       queryClient.invalidateQueries({ queryKey: ["fee-desk-student-search"] });
       setBillForm(createBillFormState());
       setShowAdjustForm(false);
+      setBillDialogOpen(false);
       const created = response?.data;
       toast.success(
         created?.fee_type
@@ -868,6 +944,7 @@ function StudentAccountWorkbench({
       });
       queryClient.invalidateQueries({ queryKey: ["fee-desk-student-search"] });
       toast.success("Bill adjusted successfully");
+      setBillDialogOpen(false);
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.error || error?.message || "Could not adjust bill");
@@ -1013,9 +1090,51 @@ function StudentAccountWorkbench({
               <CardTitle className="text-base">{account.student_name}</CardTitle>
               <CardDescription>{formatStudentMeta(account)}</CardDescription>
             </div>
-            {isFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : null}
+            <div className="flex items-center gap-2">
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1"
+                onClick={() => openBillDialog("create")}
+              >
+                <Plus className="h-3 w-3" />
+                New Bill
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 gap-1"
+                disabled={!selectedFee}
+                onClick={() => openBillDialog("adjust")}
+              >
+                Adjust Bill
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1"
+                disabled={statementPending}
+                onClick={() => {
+                  setStatementPending(true);
+                  Promise.resolve(onPrintStatement(account)).finally(() =>
+                    setStatementPending(false),
+                  );
+                }}
+              >
+                {statementPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Printer className="h-3 w-3" />
+                )}
+                Print Statement
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1107,7 +1226,11 @@ function StudentAccountWorkbench({
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-xs xl:min-w-[280px]">
+                      <div className="grid grid-cols-5 gap-2 text-xs xl:min-w-[380px]">
+                        <div className="rounded-lg bg-muted/40 px-3 py-2">
+                          <p className="text-muted-foreground">Period</p>
+                          <p className="font-semibold">{formatBSMonth(fee.month_bs, fee.year_bs)}</p>
+                        </div>
                         <div className="rounded-lg bg-muted/40 px-3 py-2">
                           <p className="text-muted-foreground">Total</p>
                           <p className="font-semibold">{formatCurrency(fee.amount || 0)}</p>
@@ -1129,6 +1252,10 @@ function StudentAccountWorkbench({
                           <p className="font-semibold">
                             {formatCurrency(fee.due_amount || 0)}
                           </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 px-3 py-2">
+                          <p className="text-muted-foreground">Due Date</p>
+                          <p className="font-semibold">{fee.due_date ? displayBS(fee.due_date) : "—"}</p>
                         </div>
                       </div>
                     </div>
@@ -1200,7 +1327,11 @@ function StudentAccountWorkbench({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="rounded-lg bg-background px-3 py-2">
+                      <p className="text-muted-foreground">Period</p>
+                      <p className="font-semibold">{formatBSMonth(selectedFee.month_bs, selectedFee.year_bs)}</p>
+                    </div>
                     <div className="rounded-lg bg-background px-3 py-2">
                       <p className="text-muted-foreground">Total</p>
                       <p className="font-semibold">
@@ -1379,6 +1510,142 @@ function StudentAccountWorkbench({
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {billDialogMode === "create"
+                  ? `New Bill — ${account.student_name}`
+                  : `Adjust Bill — ${selectedFee?.fee_type || ""}`}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Fee name</Label>
+                <Input
+                  value={billForm.feeType}
+                  onChange={(e) =>
+                    setBillForm({ ...billForm, feeType: e.target.value })
+                  }
+                  placeholder="e.g. Exam Fee"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Amount (NPR)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={billForm.baseAmount}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, baseAmount: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Discount</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={billForm.discountAmount}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, discountAmount: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Late fine</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={billForm.lateFineAmount}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, lateFineAmount: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Academic year</Label>
+                  <Input
+                    value={billForm.academicYear}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, academicYear: e.target.value })
+                    }
+                    placeholder="2083"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>BS month</Label>
+                  <Input
+                    value={billForm.monthBs}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, monthBs: e.target.value })
+                    }
+                    placeholder="2083-05"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>BS year</Label>
+                  <Input
+                    value={billForm.yearBs}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, yearBs: e.target.value })
+                    }
+                    placeholder="2083"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Billing cycle: {formatBSMonth(billForm.monthBs, billForm.yearBs)}
+              </p>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={billForm.isScholarship}
+                  onCheckedChange={(checked) =>
+                    setBillForm({ ...billForm, isScholarship: checked })
+                  }
+                />
+                <Label>Scholarship-funded bill</Label>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea
+                  value={billForm.notes}
+                  onChange={(e) =>
+                    setBillForm({ ...billForm, notes: e.target.value })
+                  }
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (billDialogMode === "create") {
+                    createMutation.mutate();
+                  } else {
+                    adjustMutation.mutate();
+                  }
+                }}
+                disabled={
+                  createMutation.isPending ||
+                  adjustMutation.isPending ||
+                  !billForm.feeType.trim() ||
+                  parseMoneyValue(billForm.baseAmount) <= 0
+                }
+              >
+                {(createMutation.isPending || adjustMutation.isPending) ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {billDialogMode === "create" ? "Create Bill" : "Save Adjustments"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

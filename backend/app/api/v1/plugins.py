@@ -18,6 +18,7 @@ from app.plugins.billing import (
     plugin_is_free,
     uninstall_plugin,
 )
+from app.plugins.entitlements import ensure_free_plugins
 
 from datetime import datetime, timedelta, timezone
 from app.plugins.loader import PluginLoader
@@ -52,6 +53,29 @@ def _coming_soon_guard(slug: str) -> str | None:
         return (
             f"'{manifest.get('name', slug)}' is in final testing — releasing "
             "soon. It cannot be installed yet."
+        )
+    return None
+
+
+def _core_plugin_guard(slug: str) -> str | None:
+    """Refuse deactivate/uninstall of CORE plugins (base toolset).
+
+    Core-category plugins (dashboard, marketplace nav, students, teachers…)
+    ship with every plan and the school's dashboard/sidebar depends on them —
+    an admin deactivating one bricks the school shell. Returns the 400
+    message when `slug` is core (manifest category first, mirror row
+    fallback), or None when the plugin is freely manageable.
+    """
+    manifest = PluginLoader.get_manifest(slug) or {}
+    category = manifest.get("category")
+    if not category:
+        row = Plugin.query.filter_by(slug=slug, is_deleted=False).first()
+        category = row.category if row else None
+    if (category or "").lower() == "core":
+        name = manifest.get("name") or slug
+        return (
+            f"'{name}' is a core plugin included with every plan — it cannot "
+            "be deactivated or uninstalled"
         )
     return None
 
@@ -196,6 +220,25 @@ def _catalog_entries() -> list[dict]:
     return entries
 
 
+def _ensure_provisioned() -> None:
+    """Lazy backfill of plan-tier plugins for EXISTING schools.
+
+    Runs the idempotent entitlements.ensure_free_plugins pass before the
+    marketplace / installed-plugins listing is built, so schools created
+    before auto-provisioning (or whose grants failed at signup) get every
+    free-tier plugin ACTIVE on first load — nobody hand-installs the core
+    plugins. Cheap when already provisioned: 1-2 SELECTs, zero writes, no
+    commit. Never runs without a school context, and failures are logged,
+    not raised — the listing must keep working.
+    """
+    if not g.get("school_id"):
+        return
+    try:
+        ensure_free_plugins(g.school_id)
+    except Exception as e:  # noqa: BLE001 — backfill is best-effort
+        logger.warning("Plugin lazy-provisioning failed: %s", e)
+
+
 @plugins_bp.route("/marketplace", methods=["GET"])
 @jwt_required()
 def marketplace():
@@ -203,10 +246,13 @@ def marketplace():
 
     Reads the plugin REGISTRY (directory scan) merged with per-school
     SchoolPlugin state; the DB `plugins` table is only a mirror/fallback.
+    Lazily backfills missing plan-tier plugins first so pre-existing
+    schools see their free plugins as ACTIVE without hand-installing.
     """
     category = request.args.get("category")
     search = request.args.get("search")
 
+    _ensure_provisioned()
     entries = _catalog_entries()
     if category:
         entries = [e for e in entries if e["category"] == category]
@@ -324,6 +370,9 @@ def get_sidebar_config():
 @school_required
 def installed_plugins():
     """Get all installed plugins for the current school."""
+    # Lazy backfill first (idempotent, no-op when fully provisioned) so
+    # pre-existing schools get their plan-tier plugins ACTIVE on first load.
+    _ensure_provisioned()
     installed = SchoolPlugin.query.filter_by(
         school_id=g.school_id, active=True, is_deleted=False
     ).all()
@@ -653,6 +702,12 @@ def uninstall():
     if not plugin_slug:
         return error_response("plugin_slug is required", 400)
 
+    # Core plugins ship with every plan and the dashboard/sidebar depends on
+    # them — uninstalling one would break the school shell.
+    core_guard = _core_plugin_guard(str(plugin_slug))
+    if core_guard:
+        return error_response(core_guard, 400)
+
     result = uninstall_plugin(str(g.school_id), plugin_slug)
     if "error" in result:
         return error_response(result["error"], 400)
@@ -698,7 +753,16 @@ def deactivate(slug):
     The install row (config, trial state, billing) is preserved; the plugin
     disappears from g.installed_plugins so its gated routes 403 immediately.
     Idempotent on already-deactivated installs; 404 when never installed.
+    CORE-category plugins cannot be deactivated (400) — they are the base
+    toolset every school's dashboard and sidebar depends on.
     """
+    # Core guard before the existence checks: a core plugin is provisioned
+    # for every school, so refusing by category (not by install row) keeps
+    # the message stable even if the row was somehow never created.
+    core_guard = _core_plugin_guard(slug)
+    if core_guard:
+        return error_response(core_guard, 400)
+
     result = deactivate_plugin(str(g.school_id), slug)
     if "error" in result:
         sp = SchoolPlugin.query.filter_by(

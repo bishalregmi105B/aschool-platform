@@ -1,0 +1,26 @@
+template_key: transfer_certificate
+name: Transfer Certificate
+category: certificates
+editor_type: designer
+description: School leaving / transfer certificate with numbered leaving-record fields
+page_size: A4
+thumbnail_emoji: 📤
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- name
+- father_name
+- mother_name
+- class
+- section
+- dob
+- leaving_reason
+- leaving_date
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

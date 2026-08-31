@@ -210,7 +210,7 @@ export default function ResetPasswordPage() {
       </Card>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-        <strong>Password Format:</strong> new passwords are generated as <code className="bg-blue-100 px-1 rounded">{`{EMIS ID}@{Student ID}`}</code> — the same school default issued at enrollment. Hand the new password to the student after resetting.
+        <strong>Password Format:</strong> new passwords are generated as <code className="bg-blue-100 px-1 rounded">{`{class}{section}{roll}.{first}`}</code> (e.g. 7a12.ram — built from the student&apos;s class, section, roll and first name, never from EMIS) — the same school default issued at enrollment. Hand the new password to the student after resetting.
       </div>
     </div>
   );

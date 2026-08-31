@@ -5,7 +5,7 @@
  * Used by both the website builder editor preview and optionally the public site.
  */
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 
 import { HeroSlideshow } from "@/components/website/HeroSlideshow";
 import { SchoolStats } from "@/components/website/SchoolStats";
@@ -17,9 +17,33 @@ import { Testimonials } from "@/components/website/Testimonials";
 import type { SchoolSection } from "@/lib/school-website/types";
 
 type C = Record<string, any>;
-const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+const str = (v: unknown, fallback = "") => (typeof v === "string" && v ? v : typeof v === "number" ? String(v) : fallback);
 const bool = (v: unknown, fallback = true) => (typeof v === "boolean" ? v : fallback);
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const int = (v: unknown, fallback: number) => {
+  const n = typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+};
+
+/** "520px" | 520 | "50vh" → css min-height string. */
+const cssSize = (v: unknown, fallback: string) => {
+  if (typeof v === "number" && Number.isFinite(v)) return `${v}px`;
+  if (typeof v === "string" && v.trim()) return /^\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()}px` : v.trim();
+  return fallback;
+};
+
+/** Registry "columns" select stores strings ("2"|"3"|"4") or numbers. */
+const gridCols = (v: unknown, fallback: number) => {
+  const n = int(v, fallback);
+  return Math.min(4, Math.max(1, n));
+};
+
+const colClass: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2",
+  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  4: "grid-cols-2 sm:grid-cols-2 lg:grid-cols-4",
+};
 
 export interface LiveData {
   school?: {
@@ -38,6 +62,8 @@ export interface LiveData {
     vision?: string;
   };
   notices?: Array<{ id: string; title: string; content?: string; created_at: string }>;
+  teachers?: Array<{ id: string; name: string; subject?: string; photo?: string; designation?: string }>;
+  gallery?: Array<{ id: string; url: string; caption?: string }>;
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
@@ -130,6 +156,8 @@ function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const location = school ? `${school.municipality || ""}, ${school.district || ""}`.replace(/^, |, $/, "") || "Location" : "Location";
   const phone = school?.phone || "Contact Number";
   const estYear = school?.established_year_bs;
+  const showVision = bool(c.show_vision, true);
+  const showMission = bool(c.show_mission, false);
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-14">
@@ -157,11 +185,25 @@ function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
               {str(c.body, "We are a reputed educational institution dedicated to excellence in education and holistic development of students.")}
             </p>
           )}
-          {(school?.vision || c.vision) && (
+          {showVision && (school?.vision || c.vision) && (
             <div className="p-4 rounded-lg border-l-4" style={{ borderColor: "var(--color-accent, #f59e0b)", backgroundColor: "var(--color-bg, #f9f9f9)" }}>
               <p className="font-semibold text-sm mb-1" style={{ color: "var(--color-primary, #1e3a5f)" }}>Our Vision</p>
               <p className="text-sm text-gray-600">{school?.vision || str(c.vision)}</p>
             </div>
+          )}
+          {showMission && str(c.mission) && (
+            <div className="p-4 rounded-lg border-l-4" style={{ borderColor: "var(--color-secondary, #2e6da4)", backgroundColor: "var(--color-bg, #f9f9f9)" }}>
+              <p className="font-semibold text-sm mb-1" style={{ color: "var(--color-primary, #1e3a5f)" }}>Our Mission</p>
+              <p className="text-sm text-gray-600">{str(c.mission)}</p>
+            </div>
+          )}
+          {str(c.cta_text) && (
+            <span
+              className="inline-block px-6 py-2.5 rounded-lg font-semibold text-white text-sm mt-2"
+              style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
+            >
+              {str(c.cta_text)}
+            </span>
           )}
         </div>
         <div>
@@ -223,11 +265,12 @@ function PrincipalSection({ c }: { c: C }) {
 
 function ProgramsSection({ c }: { c: C }) {
   const items = arr<{ icon: string; name: string; desc: string; grade?: string }>(c.items);
-  const display = items.length > 0 ? items : [
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
+  const display = (items.length > 0 ? items : [
     { icon: "📚", name: "Primary Level", desc: "Grades 1–5, strong foundations", grade: "1–5" },
     { icon: "🔬", name: "Secondary Level", desc: "Grades 9–10, NEB curriculum", grade: "9–10" },
     { icon: "🎓", name: "Higher Secondary", desc: "Grades 11–12, Science & Management", grade: "11–12" },
-  ];
+  ]).slice(0, maxItems);
 
   return (
     <section className="py-14" style={{ backgroundColor: "var(--color-surface, #f3f4f6)" }}>
@@ -241,7 +284,7 @@ function ProgramsSection({ c }: { c: C }) {
           </h2>
           <div className="w-12 h-1 rounded mx-auto mt-3" style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`grid gap-6 ${colClass[gridCols(c.columns, 3)]}`}>
           {display.map((prog, i) => (
             <div key={i} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-100">
               <div
@@ -267,14 +310,15 @@ function ProgramsSection({ c }: { c: C }) {
 
 function FacilitiesSection({ c }: { c: C }) {
   const items = arr<{ icon: string; name: string; desc: string }>(c.items);
-  const display = items.length > 0 ? items : [
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
+  const display = (items.length > 0 ? items : [
     { icon: "🖥️", name: "Computer Lab", desc: "Modern computers with high-speed internet" },
     { icon: "📚", name: "Library", desc: "Well-stocked library with digital resources" },
     { icon: "🔬", name: "Science Lab", desc: "Physics, chemistry and biology labs" },
     { icon: "🏆", name: "Sports", desc: "Indoor and outdoor sports facilities" },
     { icon: "🚌", name: "Transport", desc: "Safe transport covering all major routes" },
     { icon: "🎨", name: "Arts & Culture", desc: "Arts, music and cultural programs" },
-  ];
+  ]).slice(0, maxItems);
 
   return (
     <section className="py-14 bg-white">
@@ -288,7 +332,7 @@ function FacilitiesSection({ c }: { c: C }) {
           </h2>
           <div className="w-12 h-1 rounded mx-auto mt-3" style={{ backgroundColor: "var(--color-accent, #f59e0b)" }} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`grid gap-6 ${colClass[gridCols(c.columns, 3)]}`}>
           {display.map((item, i) => (
             <div key={i} className="flex gap-4 p-5 rounded-xl border hover:shadow-md transition-shadow" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
               <div
@@ -312,6 +356,9 @@ function FacilitiesSection({ c }: { c: C }) {
 // ─── Notices ─────────────────────────────────────────────────────────────────
 
 function NoticesSection({ c, liveData }: { c: C; liveData?: LiveData }) {
+  const layout = str(c.layout, "grid"); // grid | list | sidebar
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
+  const showViewAll = bool(c.show_view_all, true);
   const liveNotices = liveData?.notices;
   const placeholders = [
     { title: "Annual Examination Schedule 2082/2083", date: "2 days ago", cat: "Academic" },
@@ -321,6 +368,20 @@ function NoticesSection({ c, liveData }: { c: C; liveData?: LiveData }) {
     { title: "Scholarship Applications Now Open", date: "1 month ago", cat: "Academic" },
     { title: "New Library Books Available", date: "1 month ago", cat: "Facility" },
   ];
+
+  const source = liveNotices && liveNotices.length > 0
+    ? liveNotices.map((n) => {
+        const d = new Date(n.created_at);
+        return {
+          title: n.title,
+          date: isNaN(d.getTime())
+            ? ""
+            : d.toLocaleDateString("en", { month: "short", day: "2-digit", year: "numeric" }),
+          cat: str((n as { category?: string }).category, "Notice"),
+        };
+      })
+    : placeholders;
+  const display = source.slice(0, maxItems);
 
   return (
     <section className="py-14" style={{ backgroundColor: "var(--color-surface, #f3f4f6)" }}>
@@ -334,32 +395,50 @@ function NoticesSection({ c, liveData }: { c: C; liveData?: LiveData }) {
               {str(c.heading, "Latest Notices")}
             </h2>
           </div>
-          <span className="text-sm font-semibold" style={{ color: "var(--color-accent, #f59e0b)" }}>View All</span>
+          {showViewAll && liveData?.school?.slug && (
+            <a href={`/school/${liveData.school.slug}/notices`} className="text-sm font-semibold hover:underline" style={{ color: "var(--color-accent, #f59e0b)" }}>View All</a>
+          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {liveNotices && liveNotices.length > 0
-            ? liveNotices.slice(0, 6).map((n) => {
-                const d = new Date(n.created_at);
-                const ago = isNaN(d.getTime())
-                  ? ""
-                  : d.toLocaleDateString("en", { month: "short", day: "2-digit", year: "numeric" });
-                return (
-                  <div key={n.id} className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
-                    <h3 className="font-semibold text-sm mb-2" style={{ color: "var(--color-primary, #1e3a5f)" }}>{n.title}</h3>
-                    {ago && <p className="text-xs text-gray-400">{ago}</p>}
-                  </div>
-                );
-              })
-            : placeholders.map((n, i) => (
-                <div key={i} className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+
+        {layout === "list" || layout === "sidebar" ? (
+          <div className={`grid gap-8 ${layout === "sidebar" ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1"}`}>
+            <div className={`bg-white border rounded-xl divide-y ${layout === "sidebar" ? "lg:col-span-2" : ""}`} style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+              {display.map((n, i) => (
+                <div key={i} className="px-5 py-4 flex items-start justify-between gap-4">
+                  <h3 className="font-semibold text-sm" style={{ color: "var(--color-primary, #1e3a5f)" }}>{n.title}</h3>
+                  <span className="text-xs text-gray-400 flex-shrink-0">{n.date}</span>
+                </div>
+              ))}
+            </div>
+            {layout === "sidebar" && (
+              <div className="bg-white border rounded-xl p-5" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                <p className="font-bold text-sm mb-3" style={{ color: "var(--color-primary, #1e3a5f)" }}>Notice Categories</p>
+                <div className="space-y-2 text-sm text-gray-500">
+                  {display.slice(0, 4).map((n, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--color-accent, #f59e0b)" }} />
+                      {n.cat}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {display.map((n, i) => (
+              <div key={i} className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                {n.cat && (
                   <span className="text-xs px-2 py-0.5 rounded-full mb-2 inline-block" style={{ backgroundColor: "var(--color-surface, #f3f4f6)", color: "var(--color-primary, #1e3a5f)" }}>
                     {n.cat}
                   </span>
-                  <h3 className="font-semibold text-sm mt-2 mb-2" style={{ color: "var(--color-primary, #1e3a5f)" }}>{n.title}</h3>
-                  <p className="text-xs text-gray-400">{n.date}</p>
-                </div>
-              ))}
-        </div>
+                )}
+                <h3 className="font-semibold text-sm mt-2 mb-2" style={{ color: "var(--color-primary, #1e3a5f)" }}>{n.title}</h3>
+                <p className="text-xs text-gray-400">{n.date}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -367,8 +446,14 @@ function NoticesSection({ c, liveData }: { c: C; liveData?: LiveData }) {
 
 // ─── Teachers ─────────────────────────────────────────────────────────────────
 
-function TeachersSection({ c }: { c: C }) {
-  const placeholders = ["Ram Prasad Sharma", "Sita Devi Thapa", "Hari Bahadur KC", "Gita Kumari Shrestha"];
+function TeachersSection({ c, liveData }: { c: C; liveData?: LiveData }) {
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 4)));
+  const showViewAll = bool(c.show_view_all, true);
+  const liveTeachers = liveData?.teachers;
+  const source = liveTeachers && liveTeachers.length > 0
+    ? liveTeachers.map((t) => ({ name: t.name, role: t.designation || t.subject || "Teacher", photo: t.photo || "" }))
+    : ["Ram Prasad Sharma", "Sita Devi Thapa", "Hari Bahadur KC", "Gita Kumari Shrestha"].map((n) => ({ name: n, role: "Teacher", photo: "" }));
+  const display = source.slice(0, maxItems);
 
   return (
     <section className="py-14 bg-white">
@@ -382,19 +467,25 @@ function TeachersSection({ c }: { c: C }) {
               {str(c.heading, "Our Teachers")}
             </h2>
           </div>
-          <span className="text-sm font-semibold hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</span>
+          {showViewAll && liveData?.school?.slug && (
+            <a href={`/school/${liveData.school.slug}/teachers`} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
+          )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-          {placeholders.map((name, i) => (
+        <div className={`grid gap-5 ${colClass[gridCols(c.columns, 4)]}`}>
+          {display.map((t, i) => (
             <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow text-center p-5 border border-gray-100">
-              <div
-                className="w-20 h-20 rounded-full mx-auto flex items-center justify-center text-2xl font-bold text-white mb-3"
-                style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
-              >
-                {name.charAt(0)}
-              </div>
-              <p className="font-semibold text-sm" style={{ color: "var(--color-primary, #1e3a5f)" }}>{name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Teacher</p>
+              {t.photo ? (
+                <img src={t.photo} alt={t.name} className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-gray-100 mb-3" />
+              ) : (
+                <div
+                  className="w-20 h-20 rounded-full mx-auto flex items-center justify-center text-2xl font-bold text-white mb-3"
+                  style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
+                >
+                  {t.name.charAt(0)}
+                </div>
+              )}
+              <p className="font-semibold text-sm" style={{ color: "var(--color-primary, #1e3a5f)" }}>{t.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{t.role}</p>
             </div>
           ))}
         </div>
@@ -405,11 +496,21 @@ function TeachersSection({ c }: { c: C }) {
 
 // ─── Gallery ─────────────────────────────────────────────────────────────────
 
-function GallerySection({ c }: { c: C }) {
+function GallerySection({ c, liveData }: { c: C; liveData?: LiveData }) {
+  const cols = gridCols(c.columns, 3);
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
+  const showViewAll = bool(c.show_view_all, true);
+  const liveGallery = liveData?.gallery;
   const colors = [
     "var(--color-primary, #1e3a5f)", "var(--color-secondary, #2e6da4)",
     "var(--color-accent, #f59e0b)", "#6b7280", "var(--color-primary, #1e3a5f)", "#9ca3af",
   ];
+  const emojis = ["📸", "🏫", "🎓", "📚", "⚽", "🎨", "🏆", "🎭", "🔬", "🚌", "🎶", "🧪"];
+  const tiles = Array.from({ length: maxItems }, (_, i) => ({
+    color: colors[i % colors.length],
+    emoji: emojis[i % 12],
+    item: liveGallery && liveGallery.length > 0 ? liveGallery[i % liveGallery.length] : undefined,
+  }));
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-14">
@@ -422,12 +523,18 @@ function GallerySection({ c }: { c: C }) {
             {str(c.heading, "Photo Gallery")}
           </h2>
         </div>
-        <span className="text-sm font-semibold hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</span>
+        {showViewAll && liveData?.school?.slug && (
+          <a href={`/school/${liveData.school.slug}/gallery`} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
+        )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {colors.map((bg, i) => (
-          <div key={i} className="aspect-video rounded-xl overflow-hidden flex items-center justify-center text-white/40 text-sm font-medium" style={{ backgroundColor: bg }}>
-            {i === 0 ? "📸" : i === 1 ? "🏫" : i === 2 ? "🎓" : i === 3 ? "📚" : i === 4 ? "⚽" : "🎨"}
+      <div className={`grid gap-3 ${colClass[cols]}`}>
+        {tiles.map((t, i) => (
+          <div key={i} className="aspect-video rounded-xl overflow-hidden flex items-center justify-center text-white/40 text-sm font-medium" style={{ backgroundColor: t.color }}>
+            {t.item?.url ? (
+              <img src={t.item.url} alt={t.item.caption || "Gallery photo"} className="w-full h-full object-cover" />
+            ) : (
+              t.emoji
+            )}
           </div>
         ))}
       </div>
@@ -439,11 +546,12 @@ function GallerySection({ c }: { c: C }) {
 
 function TestimonialsSection({ c }: { c: C }) {
   const items = arr<{ quote: string; name: string; title: string; initials?: string }>(c.items);
-  const display = items.length > 0 ? items : [
+  const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
+  const display = (items.length > 0 ? items : [
     { quote: "This school has given my child the best foundation for life. Highly recommended.", name: "Parent Name", title: "Parent of Grade 5 Student" },
     { quote: "The teachers are dedicated and the learning environment is excellent.", name: "Student Name", title: "Grade XII Science" },
     { quote: "Best school in the district. The facilities and teaching quality are outstanding.", name: "Alumni Name", title: "Class of 2075 BS" },
-  ];
+  ]).slice(0, maxItems);
 
   return (
     <section className="py-14" style={{ backgroundColor: "var(--color-surface, #f3f4f6)" }}>
@@ -456,7 +564,7 @@ function TestimonialsSection({ c }: { c: C }) {
             {str(c.heading, "What People Say")}
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`grid gap-6 ${colClass[gridCols(c.columns, 3)]}`}>
           {display.map((t, i) => (
             <div key={i} className="bg-white rounded-xl p-6 border shadow-sm" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
               <div className="flex gap-1 mb-3">
@@ -495,8 +603,8 @@ function CTASection({ c }: { c: C }) {
         <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ fontFamily: "var(--font-heading)" }}>
           {str(c.heading, "Join Our School Community")}
         </h2>
-        {c.subheading && (
-          <p className="opacity-80 mb-8 text-sm sm:text-base">{str(c.subheading)}</p>
+        {str(c.body ?? c.subheading) && (
+          <p className="opacity-80 mb-8 text-sm sm:text-base">{str(c.body ?? c.subheading)}</p>
         )}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           {c.cta_primary && (
@@ -522,20 +630,32 @@ function CTASection({ c }: { c: C }) {
 
 function SlideshowSection({ c }: { c: C }) {
   const slides = arr<{ title: string; subtitle?: string; image?: string; cta_text?: string }>(c.slides);
+  const autoPlay = bool(c.auto_play, true);
+  const interval = Math.max(2000, int(c.interval, 5000));
+  const opacity = Math.min(1, Math.max(0, typeof c.overlay_opacity === "number" ? c.overlay_opacity : 0.55));
   const display = slides.length > 0 ? slides : [
     { title: "Welcome to Our School", subtitle: "Excellence in Education", cta_text: "Apply Now" },
     { title: "Building Tomorrow's Leaders", subtitle: "Holistic Development", cta_text: "Learn More" },
     { title: "Join Our Community", subtitle: "Admissions Open", cta_text: "Contact Us" },
   ];
-  const slide = display[0];
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (!autoPlay || display.length < 2) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % display.length), interval);
+    return () => clearInterval(t);
+  }, [autoPlay, interval, display.length]);
+
+  const slide = display[Math.min(idx, display.length - 1)];
 
   return (
     <section
-      className="relative min-h-[420px] flex items-center justify-center text-white text-center overflow-hidden"
+      className="relative flex items-center justify-center text-white text-center overflow-hidden"
       style={{
+        minHeight: cssSize(c.height, "420px"),
         background: slide.image
-          ? `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url(${slide.image}) center/cover no-repeat`
-          : "linear-gradient(135deg, var(--color-primary, #1e3a5f) 0%, var(--color-secondary, #2e6da4) 100%)",
+          ? `linear-gradient(rgba(0,0,0,${opacity}), rgba(0,0,0,${opacity})), url(${slide.image}) center/cover no-repeat`
+          : `linear-gradient(rgba(0,0,0,${opacity}), rgba(0,0,0,${opacity})), linear-gradient(135deg, var(--color-primary, #1e3a5f) 0%, var(--color-secondary, #2e6da4) 100%)`,
       }}
     >
       <div className="relative z-10 max-w-3xl mx-auto px-6 py-16">
@@ -549,11 +669,19 @@ function SlideshowSection({ c }: { c: C }) {
           </span>
         )}
         {/* Slide indicators */}
-        <div className="flex gap-2 justify-center mt-8">
-          {display.map((_, i) => (
-            <div key={i} className={`h-1.5 rounded-full transition-all ${i === 0 ? "w-8 bg-white" : "w-2 bg-white/40"}`} />
-          ))}
-        </div>
+        {display.length > 1 && (
+          <div className="flex gap-2 justify-center mt-8">
+            {display.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Slide ${i + 1}`}
+                onClick={() => setIdx(i)}
+                className={`h-1.5 rounded-full transition-all ${i === idx ? "w-8 bg-white" : "w-2 bg-white/40"}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -630,6 +758,8 @@ function ContactFormSection({ slug }: { slug: string }) {
 function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const school = liveData?.school;
   const slug = school?.slug;
+  const showForm = bool(c.show_form, true);
+  const showMap = bool(c.show_map, false);
   const phone = school?.phone || str(c.phone, "+977-XX-XXXXXXX");
   const email = school?.email || str(c.email, "info@school.edu.np");
   const address = school
@@ -645,7 +775,7 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
           </h2>
           {c.subheading && <p className="text-gray-500 mt-2 text-sm">{str(c.subheading)}</p>}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className={`grid gap-10 ${showMap ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1 lg:grid-cols-2"}`}>
           <div className="space-y-4">
             <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
               <span className="text-xl">📍</span>
@@ -660,21 +790,34 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
               <div><p className="font-semibold text-sm">Email</p><p className="text-sm text-gray-500">{email}</p></div>
             </div>
           </div>
-          <div>
-            {slug ? (
-              <ContactFormSection slug={slug} />
-            ) : (
-              <div className="space-y-3" aria-hidden>
-                <input type="text" placeholder="Your Name" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
-                <input type="email" placeholder="Email Address" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
-                <textarea rows={4} placeholder="Your message..." className="w-full border rounded-lg px-4 py-3 text-sm resize-none bg-gray-50" disabled />
-                <button type="button" disabled className="w-full py-3 rounded-lg font-semibold text-white bg-gray-300 cursor-not-allowed">
-                  Send Message (preview)
-                </button>
-                <p className="text-xs text-gray-400 text-center">Form preview — visitors on your live site can send real messages.</p>
+          {showForm && (
+            <div className={showMap ? "lg:col-span-1" : ""}>
+              {slug ? (
+                <ContactFormSection slug={slug} />
+              ) : (
+                <div className="space-y-3" aria-hidden>
+                  <input type="text" placeholder="Your Name" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
+                  <input type="email" placeholder="Email Address" className="w-full border rounded-lg px-4 py-3 text-sm bg-gray-50" disabled />
+                  <textarea rows={4} placeholder="Your message..." className="w-full border rounded-lg px-4 py-3 text-sm resize-none bg-gray-50" disabled />
+                  <button type="button" disabled className="w-full py-3 rounded-lg font-semibold text-white bg-gray-300 cursor-not-allowed">
+                    Send Message (preview)
+                  </button>
+                  <p className="text-xs text-gray-400 text-center">Form preview — visitors on your live site can send real messages.</p>
+                </div>
+              )}
+            </div>
+          )}
+          {showMap && (
+            <div>
+              <div className="rounded-xl overflow-hidden bg-gray-100 h-56 flex items-center justify-center text-gray-400 border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                {str(c.embed_url) ? (
+                  <iframe src={str(c.embed_url)} className="w-full h-full" loading="lazy" title="Map" />
+                ) : (
+                  <div className="text-center"><p className="text-3xl mb-1">🗺️</p><p className="text-xs">Add a Map Embed URL in the properties panel</p></div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -684,15 +827,27 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
 // ─── Spacer / Divider / Map ───────────────────────────────────────────────────
 
 function SpacerSection({ c }: { c: C }) {
-  const h = typeof c.height === "number" ? c.height : 40;
-  return <div style={{ height: `${h}px` }} className="bg-white" />;
+  return <div style={{ height: cssSize(c.height, "40px"), backgroundColor: str(c.bg_color, "#ffffff") }} />;
 }
 
 function DividerSection({ c }: { c: C }) {
-  const style = str(c.style, "solid");
+  const style = str(c.style, "line"); // line | dots | wave (legacy "solid"/"dashed"/"dotted" still work)
+  const color = str(c.color, "var(--color-border, #e5e7eb)");
+  const contained = str(c.width, "full") === "contained";
+  const lineStyle = ["solid", "dashed", "dotted"].includes(style) ? style : "solid";
   return (
-    <div className="py-6 px-6 bg-white">
-      <hr style={{ borderStyle: style as "solid" | "dashed" | "dotted", borderColor: "var(--color-border, #e5e7eb)", borderTopWidth: "2px" }} />
+    <div className="py-6 px-6 bg-white" style={contained ? { paddingLeft: "6rem", paddingRight: "6rem" } : undefined}>
+      {style === "dots" ? (
+        <div className="flex justify-center gap-2">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      ) : style === "wave" ? (
+        <div className="text-center text-xl leading-none select-none" style={{ color }}>〜〜〜〜〜</div>
+      ) : (
+        <hr style={{ borderStyle: lineStyle as "solid" | "dashed" | "dotted", borderColor: color, borderTopWidth: "2px" }} />
+      )}
     </div>
   );
 }
@@ -720,10 +875,41 @@ function MapSection({ c }: { c: C }) {
   );
 }
 
+/** Public results checker card — routes students to the school's results page. */
+function ResultsSection({ c, liveData }: { c: C; liveData?: LiveData }) {
+  const slug = liveData?.school?.slug;
+  return (
+    <section className="py-14 bg-white">
+      <div className="max-w-xl mx-auto px-6 text-center">
+        <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "var(--font-heading)", color: "var(--color-primary, #1e3a5f)" }}>
+          {str(c.heading, "Check Your Result")}
+        </h2>
+        {str(c.subtitle) && <p className="text-gray-500 text-sm mb-6">{str(c.subtitle)}</p>}
+        {slug ? (
+          <a
+            href={`/school/${slug}/results`}
+            className="inline-block px-8 py-3 rounded-lg font-semibold text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
+          >
+            {str(c.button_text, "Check Result")}
+          </a>
+        ) : (
+          <span
+            className="inline-block px-8 py-3 rounded-lg font-semibold text-white"
+            style={{ backgroundColor: "var(--color-primary, #1e3a5f)" }}
+          >
+            {str(c.button_text, "Check Result")}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Main Renderer ────────────────────────────────────────────────────────────
 
 export function SectionRenderer({ section, liveData }: { section: SchoolSection; liveData?: LiveData }) {
-  const c = section.content as C;
+  const c = (section.content ?? {}) as C;
 
   switch (section.type) {
     case "hero":
@@ -743,11 +929,13 @@ export function SectionRenderer({ section, liveData }: { section: SchoolSection;
     case "notices":
       return <NoticesSection c={c} liveData={liveData} />;
     case "teachers":
-      return <TeachersSection c={c} />;
+      return <TeachersSection c={c} liveData={liveData} />;
     case "gallery":
-      return <GallerySection c={c} />;
+      return <GallerySection c={c} liveData={liveData} />;
     case "testimonials":
       return <TestimonialsSection c={c} />;
+    case "results":
+      return <ResultsSection c={c} liveData={liveData} />;
     case "cta":
       return <CTASection c={c} />;
     case "contact":

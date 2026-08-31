@@ -1,10 +1,17 @@
 "use client";
 
 /**
- * useExport — export the fabric.js canvas as PDF or PNG.
- * Uses jsPDF + html2canvas (PNG fallback) – fully client-side.
+ * useExport v2 — the designer export engine (client side).
+ *
+ *  - exportPNG / exportPDF accept a `dpiScale` (2×–5×). At 3× an A4 page is
+ *    exactly 300 DPI; 5× ≈ 4960px wide (beyond 4K) for ID cards etc.
+ *  - exportPagesZip: one high-res PNG per page, zipped (bulk / multi-page).
+ *  - Cross-origin images are loaded with crossOrigin so toDataURL never
+ *    taints; failures fall back to a drawn placeholder instead of blanking.
  */
 import { useCallback } from "react";
+import JSZip from "jszip";
+import { preloadCanvasImages } from "../designer/canvasImages";
 
 type ExportPage = {
   json?: Record<string, any>;
@@ -35,6 +42,14 @@ function sanitizePageJson(json: Record<string, any>): Record<string, any> {
   return clone;
 }
 
+/** Canonical DPI presets (multiplier over the 96dpi logical px canvas). */
+export const EXPORT_SCALES = [
+  { scale: 2, label: "2× — screen (192 DPI)" },
+  { scale: 3, label: "3× — print 300 DPI" },
+  { scale: 4, label: "4× — 400 DPI" },
+  { scale: 5, label: "5× — ultra (~4K+)" },
+] as const;
+
 export function useExport() {
   const renderPageDataUrl = useCallback(async (page: ExportPage, multiplier = 3) => {
     const { Canvas } = await import("fabric");
@@ -51,29 +66,44 @@ export function useExport() {
 
     await new Promise<void>((resolve) => {
       if (page.json && Object.keys(page.json).length > 0) {
-        canvas.loadFromJSON(sanitizePageJson(page.json), () => {
-          canvas.renderAll();
-          resolve();
-        }).catch(() => {
-          canvas.renderAll();
-          resolve();
-        });
+        // sanitize strips token srcs; preload converts every image to a
+        // data-URI so a single 404 photo can't blank the whole export
+        preloadCanvasImages(sanitizePageJson(page.json))
+          .then((safe) => canvas.loadFromJSON(safe, () => { canvas.renderAll(); resolve(); }))
+          .catch(() => { canvas.renderAll(); resolve(); });
       } else {
         canvas.renderAll();
         resolve();
       }
     });
 
-    const dataUrl = canvas.toDataURL({ format: "png", multiplier });
+    // give async images one extra beat to decode before rasterizing
+    await new Promise((r) => setTimeout(r, 60));
+
+    let dataUrl: string;
+    try {
+      dataUrl = canvas.toDataURL({ format: "png", multiplier });
+    } catch {
+      // tainted canvas (a cross-origin image without CORS) — report, don't hang
+      dataUrl = "";
+    }
     canvas.dispose();
     return { dataUrl, width, height };
   }, []);
 
-  const exportPNG = useCallback(async (fabricCanvas: any, filename = "design.png", doc?: { pages?: ExportPage[] }) => {
+  const exportPNG = useCallback(async (
+    fabricCanvas: any,
+    filename = "design.png",
+    doc?: { pages?: ExportPage[] },
+    dpiScale = 3,
+  ) => {
     if (!fabricCanvas) return;
     const pages = Array.isArray(doc?.pages) ? doc.pages : [];
     if (pages.length > 1) {
-      const renderedPages = await Promise.all(pages.map((page) => renderPageDataUrl(page, 3)));
+      const renderedPages = await Promise.all(pages.map((page) => renderPageDataUrl(page, dpiScale)));
+      if (renderedPages.some((p) => !p.dataUrl)) {
+        throw new Error("A page could not be rasterized (cross-origin image). Use the server PDF export.");
+      }
       const images = await Promise.all(renderedPages.map(({ dataUrl }) => new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
@@ -82,8 +112,8 @@ export function useExport() {
       })));
 
       const gap = 24;
-      const width = Math.max(...renderedPages.map((page) => page.width * 3));
-      const height = renderedPages.reduce((sum, page) => sum + page.height * 3, 0) + gap * (renderedPages.length - 1);
+      const width = Math.max(...renderedPages.map((page) => page.width * dpiScale));
+      const height = renderedPages.reduce((sum, page) => sum + page.height * dpiScale, 0) + gap * (renderedPages.length - 1);
       const combined = document.createElement("canvas");
       combined.width = width;
       combined.height = height;
@@ -93,8 +123,8 @@ export function useExport() {
 
       let offsetY = 0;
       images.forEach((image, index) => {
-        const pageWidth = renderedPages[index].width * 3;
-        const pageHeight = renderedPages[index].height * 3;
+        const pageWidth = renderedPages[index].width * dpiScale;
+        const pageHeight = renderedPages[index].height * dpiScale;
         const offsetX = Math.max(0, Math.round((width - pageWidth) / 2));
         ctx.drawImage(image, offsetX, offsetY, pageWidth, pageHeight);
         offsetY += pageHeight + gap;
@@ -107,16 +137,53 @@ export function useExport() {
       return;
     }
 
-    const dataURL = fabricCanvas.toDataURL({ format: "png", multiplier: 3 });
-    const link    = document.createElement("a");
+    let dataURL: string;
+    try {
+      dataURL = fabricCanvas.toDataURL({ format: "png", multiplier: dpiScale });
+    } catch {
+      throw new Error("Canvas has cross-origin images — use the server PDF export instead.");
+    }
+    const link = document.createElement("a");
     link.download = filename;
-    link.href     = dataURL;
+    link.href = dataURL;
     link.click();
   }, [renderPageDataUrl]);
 
-  const exportPDF = useCallback(async (fabricCanvas: any, filename = "design.pdf", doc?: { pages?: ExportPage[] }) => {
+  /** One high-res PNG per page, zipped. */
+  const exportPagesZip = useCallback(async (
+    doc: { pages?: ExportPage[] },
+    filename = "pages.zip",
+    dpiScale = 3,
+    nameFor?: (index: number, page: ExportPage) => string,
+  ) => {
+    const pages = Array.isArray(doc?.pages) ? doc.pages : [];
+    if (!pages.length) throw new Error("No pages to export");
+    const zip = new JSZip();
+    for (let i = 0; i < pages.length; i++) {
+      const { dataUrl } = await renderPageDataUrl(pages[i], dpiScale);
+      if (!dataUrl) {
+        throw new Error(`Page ${i + 1} could not be rasterized (cross-origin image). Use the server PDF export.`);
+      }
+      const base = nameFor?.(i, pages[i]) ?? `page_${String(i + 1).padStart(3, "0")}`;
+      zip.file(`${String(i + 1).padStart(3, "0")}_${base}.png`, dataUrl.split(",")[1], { base64: true });
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [renderPageDataUrl]);
+
+  const exportPDF = useCallback(async (
+    fabricCanvas: any,
+    filename = "design.pdf",
+    doc?: { pages?: ExportPage[] },
+    dpiScale = 3,
+  ) => {
     if (!fabricCanvas) return;
-    const { jsPDF }  = await import("jspdf");
+    const { jsPDF } = await import("jspdf");
     const pages = Array.isArray(doc?.pages) ? doc.pages : [];
     const pageList = pages.length > 0 ? pages : [{ width: fabricCanvas.getWidth(), height: fabricCanvas.getHeight(), background: fabricCanvas.backgroundColor || "#ffffff", json: fabricCanvas.toJSON(["data"]) }];
 
@@ -131,8 +198,11 @@ export function useExport() {
     for (let index = 0; index < pageList.length; index += 1) {
       const page = pageList[index];
       const rendered = index === 0 && pageList.length === 1 && fabricCanvas.toDataURL
-        ? { dataUrl: fabricCanvas.toDataURL({ format: "png", multiplier: 3 }), width: page.width || fabricCanvas.getWidth(), height: page.height || fabricCanvas.getHeight() }
-        : await renderPageDataUrl(page, 3);
+        ? { dataUrl: fabricCanvas.toDataURL({ format: "png", multiplier: dpiScale }), width: page.width || fabricCanvas.getWidth(), height: page.height || fabricCanvas.getHeight() }
+        : await renderPageDataUrl(page, dpiScale);
+      if (!rendered.dataUrl) {
+        throw new Error("A page could not be rasterized (cross-origin image). Use the server PDF export.");
+      }
       const mmW = (rendered.width / 96) * 25.4;
       const mmH = (rendered.height / 96) * 25.4;
       const orientation = mmW > mmH ? "l" : "p";
@@ -145,5 +215,5 @@ export function useExport() {
     pdf.save(filename);
   }, [renderPageDataUrl]);
 
-  return { exportPNG, exportPDF };
+  return { exportPNG, exportPDF, exportPagesZip };
 }

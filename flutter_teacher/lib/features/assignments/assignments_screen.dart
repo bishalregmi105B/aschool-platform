@@ -568,6 +568,14 @@ class _SubmissionTile extends ConsumerWidget {
                     ),
                   ),
                 const Spacer(),
+                // AI suggestion — POST /assignments/{id}/ai-grade with
+                // {submission_id}; the result pre-fills the grade dialog
+                // for review before saving (same flow as the web UI).
+                IconButton(
+                  tooltip: 'AI suggests a grade for this submission',
+                  onPressed: () => _aiGrade(context, ref),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                ),
                 FilledButton.tonalIcon(
                   onPressed: () => _showGradeDialog(context, ref),
                   icon: Icon(graded ? Icons.edit_rounded : Icons.grade_rounded),
@@ -599,18 +607,84 @@ class _SubmissionTile extends ConsumerWidget {
     return NetworkImage(photoUrl);
   }
 
-  void _showGradeDialog(BuildContext context, WidgetRef ref) {
+  /// Calls POST /assignments/{assignmentId}/ai-grade with
+  /// {submission_id: <id>} (parity with the web UI) and opens the grade
+  /// dialog pre-filled with the AI suggestion. Nothing is saved until the
+  /// teacher reviews and presses Save in the dialog.
+  Future<void> _aiGrade(BuildContext context, WidgetRef ref) async {
+    final assignmentId = assignment['id']?.toString() ?? '';
+    final submissionId = submission['id']?.toString() ?? '';
+    if (assignmentId.isEmpty || submissionId.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Getting AI grade suggestion...')),
+    );
+    try {
+      final resp = await ApiClient.instance.post(
+        '/assignments/$assignmentId/ai-grade',
+        data: {'submission_id': submissionId},
+      );
+      final result = safeMapOrNull(envelopeData(resp.data));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (result == null || result['error'] != null && result['marks_awarded'] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('AI grading failed for this submission')),
+        );
+        return;
+      }
+      final suggested = num.tryParse(result['marks_awarded']?.toString() ?? '');
+      final feedback = result['feedback'];
+      final feedbackText = feedback is Map
+          ? [
+              if (feedback['step_by_step']?.toString().trim().isNotEmpty == true)
+                feedback['step_by_step'],
+              if (feedback['improvements'] is List && (feedback['improvements'] as List).isNotEmpty)
+                'Improvements: ${(feedback['improvements'] as List).join('; ')}',
+            ].where((s) => s != null).join('\n')
+          : feedback?.toString();
+      if (!context.mounted) return;
+      await _showGradeDialog(
+        context,
+        ref,
+        prefillMarks: (suggested != null && suggested >= 0) ? suggested.toString() : null,
+        prefillFeedback:
+            (feedbackText != null && feedbackText.trim().isNotEmpty) ? feedbackText : null,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('AI grade suggestion applied — review and save')),
+        );
+      }
+    } catch (e) {
+      debugPrint('AI grade failed: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('AI grading failed for this submission')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showGradeDialog(BuildContext context, WidgetRef ref,
+      {String? prefillMarks, String? prefillFeedback}) {
     final assignmentId = assignment['id']?.toString() ?? '';
     final submissionId = submission['id']?.toString() ?? '';
     final marksCtrl = TextEditingController(
-      text: (submission['marks_obtained'] ?? submission['marks'])?.toString() ??
+      text: prefillMarks ??
+          (submission['marks_obtained'] ?? submission['marks'])?.toString() ??
           '',
     );
     final feedbackCtrl = TextEditingController(
-      text: submission['feedback']?.toString() ?? '',
+      text: prefillFeedback ?? submission['feedback']?.toString() ?? '',
     );
 
-    showDialog<void>(
+    return showDialog<void>(
       context: context,
       builder: (dialogContext) {
         var saving = false;

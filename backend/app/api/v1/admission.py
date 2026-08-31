@@ -28,6 +28,22 @@ def _parse_uuid(value):
         return None
 
 
+def _parse_date_value(value):
+    """Parse a client-supplied date/datetime; None when unparseable."""
+    from datetime import date as _date, datetime as _dt
+
+    if value is None or value == "":
+        return None
+    if isinstance(value, _dt):
+        return value
+    if isinstance(value, _date):
+        return value
+    try:
+        return _date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
 # ── Inquiries ─────────────────────────────────────────────
 
 @admission_bp.route("/inquiries", methods=["GET"])
@@ -147,30 +163,155 @@ def create_application():
     return created_response(_app_dict(app))
 
 
+# Stages at which application details may still be edited — once "accepted"
+# the admission.accepted listener has already auto-created the Student+User
+# from these fields, so edits would silently desync the two records.
+EDITABLE_APPLICATION_STATUSES = ("submitted", "under_review", "shortlisted", "interview")
+
+EDITABLE_APPLICATION_FIELDS = (
+    "student_name",
+    "dob",
+    "gender",
+    "address",
+    "previous_school",
+    "class_applied",
+    "parent_name",
+    "parent_phone",
+    "parent_email",
+    "guardian_name",
+    "guardian_phone",
+    "guardian_email",
+)
+
+
+@admission_bp.route("/applications/<app_id>", methods=["PUT"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin")
+def update_application(app_id):
+    """Edit application details (only before the accepted stage)."""
+    app_uuid = _parse_uuid(app_id)
+    if app_uuid is None:
+        return error_response("Application not found", 404)
+    application = AdmissionApplication.query.filter_by(
+        id=app_uuid, school_id=g.school_id
+    ).first()
+    if not application:
+        return error_response("Application not found", 404)
+    if application.status not in EDITABLE_APPLICATION_STATUSES:
+        return error_response(
+            "Application details can only be edited before the application "
+            "is accepted (a student record is auto-created at acceptance)",
+            400,
+        )
+    data = request.get_json(silent=True) or {}
+    if "student_name" in data and not str(data.get("student_name") or "").strip():
+        return error_response("student_name cannot be empty", 400)
+    # admission_applications.parent_phone is NOT NULL — an empty value here
+    # would surface as an IntegrityError (500) instead of a 400.
+    if "parent_phone" in data and not str(data.get("parent_phone") or "").strip():
+        return error_response("parent_phone is required", 400)
+    if "dob" in data:
+        parsed_dob = _parse_date_value(data.get("dob"))
+        if parsed_dob is None and data.get("dob") not in (None, ""):
+            return error_response("dob must be a valid ISO date", 400)
+        data["dob"] = parsed_dob
+    if "gender" in data and data.get("gender") not in (None, "", "male", "female", "other"):
+        return error_response("gender must be one of: male, female, other", 400)
+    updated = [key for key in EDITABLE_APPLICATION_FIELDS if key in data]
+    if not updated:
+        return error_response("No editable fields supplied", 400)
+    for key in updated:
+        setattr(application, key, data[key])
+    db.session.commit()
+    return success_response(_app_dict(application))
+
+
+@admission_bp.route("/applications/<app_id>", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+def get_application(app_id):
+    """Application detail — everything the detail dialog / edit form shows."""
+    app_uuid = _parse_uuid(app_id)
+    if app_uuid is None:
+        return error_response("Application not found", 404)
+    application = AdmissionApplication.query.filter_by(
+        id=app_uuid, school_id=g.school_id
+    ).first()
+    if not application:
+        return error_response("Application not found", 404)
+    return success_response(_app_detail_dict(application))
+
+
+# Legal pipeline transitions for PUT /applications/<id>/status. The stages in
+# PIPELINE_ORDER must move forward (a backwards jump is a 400); "rejected" and
+# "waitlisted" are side-states reachable from any live stage, "enrolled" is
+# terminal and may ONLY be entered from "accepted" (the admission.accepted
+# listener auto-creates the Student + login at acceptance — enrolling from an
+# earlier stage would leave an application with no student record).
+PIPELINE_ORDER = {
+    "submitted": 0,
+    "under_review": 1,
+    "shortlisted": 2,
+    "interview": 3,
+    "accepted": 4,
+    "enrolled": 5,
+}
+SIDE_STATUSES = ("rejected", "waitlisted")
+VALID_APPLICATION_STATUSES = (*PIPELINE_ORDER, *SIDE_STATUSES)
+
+
 @admission_bp.route("/applications/<app_id>/status", methods=["PUT"])
 @jwt_required()
 @school_required
 @plugin_required("admission")
 @role_required("superadmin", "school_admin")
 def update_application_status(app_id):
-    """Move application through pipeline: submitted → under_review → interview → accepted → enrolled / rejected."""
+    """Move application through pipeline: submitted → under_review → shortlisted → interview → accepted → enrolled (rejected/waitlisted are side-states)."""
     application = AdmissionApplication.query.filter_by(id=app_id, school_id=g.school_id).first_or_404()
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")
-    # E186: "shortlisted" is part of the DB enum (admission_status) but was
-    # missing here, so a legitimate pipeline stage was rejected with 400.
-    valid = ["submitted", "under_review", "shortlisted", "interview", "accepted", "enrolled", "rejected", "waitlisted"]
-    if new_status not in valid:
-        return error_response(f"Invalid status. Must be one of: {', '.join(valid)}", 400)
+    if new_status not in VALID_APPLICATION_STATUSES:
+        return error_response(
+            "Invalid status. Must be one of: " + ", ".join(VALID_APPLICATION_STATUSES),
+            400,
+        )
+    current = application.status
+    if current == "enrolled" and new_status != "enrolled":
+        return error_response(
+            "Enrolled applications are final — the status cannot change", 400
+        )
+    if new_status == "enrolled" and current != "accepted":
+        return error_response(
+            "Application must be accepted before it can be enrolled "
+            "(a student record is auto-created at the accepted stage)",
+            400,
+        )
+    current_rank = PIPELINE_ORDER.get(current)
+    new_rank = PIPELINE_ORDER.get(new_status)
+    if (
+        current_rank is not None
+        and new_rank is not None
+        and new_rank < current_rank
+    ):
+        allowed_back = current in ("accepted", "enrolled") and new_status == "rejected"
+        if not allowed_back:
+            return error_response(
+                f"Cannot move an application backwards from "
+                f"'{current}' to '{new_status}'",
+                400,
+            )
     application.status = new_status
     application.remarks = data.get("remarks", application.remarks)
     db.session.commit()
 
     # Fire integration events based on status transitions
-    if new_status == "accepted":
+    if new_status == "accepted" and current != "accepted":
         from app.plugins.events import emit
         emit("admission.accepted", school_id=str(g.school_id), application_id=str(application.id))
-    elif new_status == "enrolled":
+    elif new_status == "enrolled" and current != "enrolled":
         from app.plugins.events import emit
         emit("admission.enrolled", school_id=str(g.school_id), application_id=str(application.id))
 
@@ -208,8 +349,35 @@ def _inquiry_dict(i):
 def _app_dict(a):
     return {
         "id": str(a.id), "student_name": a.student_name, "guardian_name": a.guardian_name,
+        "guardian_phone": a.guardian_phone, "guardian_email": a.guardian_email,
         "parent_name": a.parent_name, "parent_phone": a.parent_phone,
+        "parent_email": a.parent_email,
+        # Full applicant fields so the frontend detail dialog / edit flows can
+        # show everything captured on the application.
+        "dob": a.dob.date().isoformat() if a.dob else None,
+        "gender": a.gender, "address": a.address, "previous_school": a.previous_school,
         "inquiry_id": str(a.inquiry_id) if a.inquiry_id else None,
         "class_applied": a.class_applied, "status": a.status, "remarks": a.remarks,
         "created_at": str(a.created_at) if a.created_at else None,
     }
+
+
+def _app_detail_dict(a):
+    """Serializer for GET /applications/<id> — everything _app_dict has plus
+    the review/merit fields the detail dialog and status timeline render."""
+    data = _app_dict(a)
+    data.update(
+        {
+            "test_score": float(a.test_score) if a.test_score is not None else None,
+            "interview_score": float(a.interview_score)
+            if a.interview_score is not None
+            else None,
+            "merit_rank": a.merit_rank,
+            "notes": a.notes,
+            "documents": a.documents if isinstance(a.documents, list) else [],
+            "form_data": a.form_data if isinstance(a.form_data, dict) else {},
+            "reviewed_by_id": str(a.reviewed_by_id) if a.reviewed_by_id else None,
+            "updated_at": str(a.updated_at) if getattr(a, "updated_at", None) else None,
+        }
+    )
+    return data

@@ -1,26 +1,53 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { sanitizeCss } from "@/lib/sanitize";
 import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/lib/school-website/registry";
-import { SectionRenderer } from "@/components/website/SectionRenderer";
+import { EditorSectionRenderer } from "@/components/website/EditorSectionRenderer";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
 import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
 
 type ContentState = Record<string, unknown>;
+type SectionDraft = { title?: string; content?: ContentState };
 
-interface PageData {
-  id: string;
+interface PageState {
   title: string;
-  sections: SchoolSection[];
+  slug?: string;
   is_published: boolean;
+  sections: SchoolSection[];
 }
+
+/**
+ * Normalize whatever the backend stores in WebsitePage.sections into the
+ * editor's SchoolSection shape. Legacy rows (pre-normalizer) may store
+ * {slug, category, settings, data} without ids — give those stable local ids
+ * so selection/editing works; the next save persists the normalized shape
+ * (backend PUT /pages accepts the full sections array, so ids stick).
+ */
+function normalizeSections(raw: unknown): SchoolSection[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+    .map((s, i) => {
+      const fallbackKey = typeof s.slug === "string" ? s.slug : typeof s.type === "string" ? s.type : String(i);
+      return {
+        id: typeof s.id === "string" && s.id ? s.id : `sec-${i}-${fallbackKey}`,
+        type: (s.type as string) || (s.slug as string) || "custom",
+        title: (s.title as string) || (s.label as string) || "Untitled Section",
+        content: (s.content as ContentState) || (s.data as ContentState) || {},
+        sort_order: typeof s.sort_order === "number" ? s.sort_order : i,
+      };
+    });
+}
+
+const AUTOSAVE_DELAY_MS = 1500;
 
 // ─── Widget Palette ─────────────────────────────────────────────────────────
 
@@ -110,9 +137,9 @@ function SectionItem({
           <p className="text-xs text-gray-400 capitalize">{section.type}</p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button onClick={onMoveUp} disabled={index === 0} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 text-xs">↑</button>
-          <button onClick={onMoveDown} disabled={index === total - 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 text-xs">↓</button>
-          <button onClick={onDelete} className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 text-xs">✕</button>
+          <button onClick={onMoveUp} disabled={index === 0} title="Move up" className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 text-xs">↑</button>
+          <button onClick={onMoveDown} disabled={index === total - 1} title="Move down" className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 text-xs">↓</button>
+          <button onClick={onDelete} title="Delete" className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 text-xs">✕</button>
         </div>
       </div>
     </div>
@@ -229,6 +256,16 @@ function ControlRenderer({ control, value, onChange }: {
         </div>
       );
     }
+    case "image":
+      return (
+        <div className="space-y-1.5">
+          <input type="text" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="https://... image URL" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          {(value as string) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value as string} alt="Preview" className="h-16 rounded border object-cover" />
+          )}
+        </div>
+      );
     default:
       return (
         <input type="text" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={control.placeholder} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -239,16 +276,17 @@ function ControlRenderer({ control, value, onChange }: {
 // ─── Properties Panel ─────────────────────────────────────────────────────────
 
 function PropertiesPanel({
-  section, onContentChange, onTitleChange, onSave, saving, onClose,
+  section, onContentChange, onTitleChange, onClose,
 }: {
   section: SchoolSection | null; onContentChange: (c: ContentState) => void;
-  onTitleChange: (t: string) => void; onSave: () => void; saving: boolean; onClose: () => void;
+  onTitleChange: (t: string) => void; onClose: () => void;
 }) {
   if (!section) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-6">
         <span className="text-4xl mb-3">👈</span>
         <p className="text-gray-500 text-sm">Click a section in the preview to edit its content and style</p>
+        <p className="text-gray-400 text-xs mt-2">Changes appear instantly and save automatically</p>
       </div>
     );
   }
@@ -305,12 +343,6 @@ function PropertiesPanel({
           );
         })}
       </div>
-
-      <div className="p-4 border-t flex-shrink-0">
-        <button onClick={onSave} disabled={saving} className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      </div>
     </div>
   );
 }
@@ -346,7 +378,7 @@ function EditableSectionBlock({
         {isSelected && <span className="ml-0.5">✏️</span>}
       </div>
       {/* Actual rendered section */}
-      <SectionRenderer section={section} />
+      <EditorSectionRenderer section={section} />
     </div>
   );
 }
@@ -360,14 +392,36 @@ export default function WebsiteEditor() {
 
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<"sections" | "widgets">("sections");
-  const [localSections, setLocalSections] = useState<SchoolSection[] | null>(null);
-  const [pendingChanges, setPendingChanges] = useState<Record<string, { title?: string; content?: ContentState }>>({});
+  const [draft, setDraft] = useState<Record<string, SectionDraft>>({});
+  const [saveState, setSaveState] = useState<"idle" | "unsaved" | "saving" | "saved" | "error">("idle");
 
-  const { data: pageData, isLoading, isError: pageError, refetch: refetchPage } = useQuery<PageData>({
+  const draftRef = useRef(draft);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistingRef = useRef(false);
+  const rerunPersistRef = useRef(false);
+  const sectionElsRef = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  const { data: page, isLoading, isError: pageError, refetch: refetchPage } = useQuery<PageState>({
     queryKey: ["website-page-sections", pageId],
-    queryFn: () => api.get(`/website-builder/pages/${pageId}`).then((r) => r.data.data),
+    queryFn: async () => {
+      const res = await api.get(`/website-builder/pages/${pageId}`);
+      const d = res.data?.data ?? {};
+      return {
+        title: (d.title as string) || "Page",
+        slug: d.slug as string | undefined,
+        is_published: !!d.is_published,
+        sections: normalizeSections(d.sections),
+      };
+    },
     enabled: !!pageId,
     retry: 1,
+    // The cache holds in-progress editor drafts; never let a background
+    // refetch (window focus etc.) swap sections mid-edit. We control
+    // reconciliation via setQueryData after each successful mutation.
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   // Fetch website config for theme CSS injection in the preview canvas
@@ -377,7 +431,7 @@ export default function WebsiteEditor() {
     staleTime: 60_000,
   });
 
-  const previewThemeCss = (() => {
+  const previewThemeCss = useMemo(() => {
     const themeSlug = websiteConfig?.theme_slug || DEFAULT_THEME_ID;
     const activeTheme = getThemeById(themeSlug) || getThemeById(DEFAULT_THEME_ID);
     const colorOverrides = websiteConfig?.customizations?.colors || {};
@@ -388,80 +442,122 @@ export default function WebsiteEditor() {
       generateThemeCSS(activeTheme, colorOverrides) +
         (websiteConfig?.customizations?.custom_css || "")
     );
-  })();
+  }, [websiteConfig]);
 
-  const sections: SchoolSection[] = (localSections ?? pageData?.sections ?? [])
-    .slice()
-    .sort((a, b) => a.sort_order - b.sort_order);
+  /** Sections as shown/edited: server cache with unsaved drafts applied. */
+  const viewSections: SchoolSection[] = useMemo(() => {
+    return (page?.sections ?? []).map((s) => {
+      const d = draft[s.id];
+      return d ? { ...s, title: d.title ?? s.title, content: d.content ?? s.content } : s;
+    });
+  }, [page?.sections, draft]);
 
-  const selectedSection = sections.find((s) => s.id === selectedSectionId) ?? null;
-  const selectedWithPending: SchoolSection | null = selectedSection
-    ? {
-        ...selectedSection,
-        title: pendingChanges[selectedSection.id]?.title ?? selectedSection.title,
-        content: pendingChanges[selectedSection.id]?.content ?? selectedSection.content,
+  const selectedSection = viewSections.find((s) => s.id === selectedSectionId) ?? null;
+
+  // ── Persistence: full-page sections PUT ─────────────────────────────────────
+  // A single PUT with the complete sections array is used for every change
+  // (content edits, reorder, delete). Unlike the per-section endpoints it also
+  // works for legacy sections stored without ids: our normalized ids are
+  // persisted on the first save, so subsequent saves update the right section.
+  const persistSections = useCallback(async () => {
+    if (!pageId || persistingRef.current) {
+      if (persistingRef.current) rerunPersistRef.current = true;
+      return;
+    }
+    persistingRef.current = true;
+    setSaveState("saving");
+    // Snapshot everything we are about to send.
+    const sentDraft = draftRef.current;
+    const base = qc.getQueryData<PageState>(["website-page-sections", pageId])?.sections ?? [];
+    const payload = base.map((s) => {
+      const d = sentDraft[s.id];
+      return d ? { ...s, title: d.title ?? s.title, content: d.content ?? s.content } : s;
+    });
+    try {
+      const res = await api.put(`/website-builder/pages/${pageId}`, {
+        sections: payload.map((s, i) => ({
+          id: s.id,
+          type: s.type,
+          title: s.title,
+          content: s.content,
+          sort_order: typeof s.sort_order === "number" ? s.sort_order : i,
+        })),
+      });
+      const serverSections = normalizeSections(res.data?.data?.sections);
+      qc.setQueryData<PageState>(["website-page-sections", pageId], (old) => ({
+        ...(old ?? { title: "Page", is_published: false, sections: [] }),
+        sections: serverSections,
+      }));
+      // Drop exactly the draft entries we sent — newer edits (new object
+      // identities) survive and trigger the next autosave.
+      setDraft((prev) => {
+        const next: Record<string, SectionDraft> = {};
+        for (const [id, val] of Object.entries(prev)) {
+          if (sentDraft[id] !== val) next[id] = val;
+        }
+        return next;
+      });
+      setSaveState("saved");
+      revalidateSchoolSite();
+    } catch {
+      setSaveState("error");
+      rerunPersistRef.current = false;
+      // Retry once after a short pause so transient failures still autosave
+      // (the next user edit reschedules this anyway).
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = setTimeout(() => void persistSections(), 4000);
+      return;
+    } finally {
+      persistingRef.current = false;
+    }
+    if (rerunPersistRef.current) {
+      rerunPersistRef.current = false;
+      void persistSections();
+    }
+  }, [pageId, qc]);
+
+  /** Single shared autosave timer (debounced) used by every change type. */
+  const schedulePersist = useCallback(() => {
+    setSaveState((cur) => (cur === "saving" ? "saving" : "unsaved"));
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => void persistSections(), AUTOSAVE_DELAY_MS);
+  }, [persistSections]);
+
+  // Debounced autosave whenever drafts change.
+  useEffect(() => {
+    if (Object.keys(draft).length === 0) return;
+    schedulePersist();
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, [draft, schedulePersist]);
+
+  // Ctrl/Cmd+S flushes immediately.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void persistSections();
       }
-    : null;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [persistSections]);
 
-  // Sync local sections when query data arrives
-  if (pageData && localSections === null) {
-    setLocalSections(pageData.sections || []);
-  }
+  useEffect(() => () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); }, []);
 
-  const addSectionMut = useMutation({
-    mutationFn: (s: { type: string; title: string; content: Record<string, unknown> }) =>
-      api.post(`/website-builder/pages/${pageId}/sections`, s),
-    onSuccess: (res) => {
-      const newSection = res.data?.data;
-      if (newSection) {
-        setLocalSections((prev) => [...(prev ?? []), newSection]);
-      }
-      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
-      revalidateSchoolSite();
-    },
-  });
+  const handleSaveNow = useCallback(() => {
+    void persistSections().then(() => {
+      if (Object.keys(draftRef.current).length === 0) toast.success("Changes saved");
+    });
+  }, [persistSections]);
 
-  const updateSectionMut = useMutation({
-    mutationFn: ({ sectionId, data }: { sectionId: string; data: Record<string, unknown> }) =>
-      api.put(`/website-builder/pages/${pageId}/sections/${sectionId}`, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
-      setPendingChanges({});
-      revalidateSchoolSite();
-    },
-  });
-
-  const deleteSectionMut = useMutation({
-    mutationFn: (sectionId: string) => api.delete(`/website-builder/pages/${pageId}/sections/${sectionId}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
-      setSelectedSectionId(null);
-      revalidateSchoolSite();
-    },
-  });
-
-  const moveSectionMut = useMutation({
-    mutationFn: ({ sectionId, direction }: { sectionId: string; direction: "up" | "down" }) =>
-      api.put(`/website-builder/pages/${pageId}/sections/${sectionId}/reorder`, { direction }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
-      revalidateSchoolSite();
-    },
-  });
-
-  const handleAddWidget = useCallback(
-    (def: SchoolWidgetDef) => {
-      addSectionMut.mutate({ type: def.type, title: def.name, content: def.defaultContent });
-      setLeftTab("sections");
-    },
-    [addSectionMut]
-  );
+  // ── Edit handlers ────────────────────────────────────────────────────────────
 
   const handleContentChange = useCallback(
     (content: ContentState) => {
       if (!selectedSectionId) return;
-      setPendingChanges((prev) => ({ ...prev, [selectedSectionId]: { ...prev[selectedSectionId], content } }));
-      setLocalSections((prev) => prev ? prev.map((s) => s.id === selectedSectionId ? { ...s, content } : s) : prev);
+      setDraft((prev) => ({ ...prev, [selectedSectionId]: { ...prev[selectedSectionId], content } }));
     },
     [selectedSectionId]
   );
@@ -469,26 +565,86 @@ export default function WebsiteEditor() {
   const handleTitleChange = useCallback(
     (title: string) => {
       if (!selectedSectionId) return;
-      setPendingChanges((prev) => ({ ...prev, [selectedSectionId]: { ...prev[selectedSectionId], title } }));
-      setLocalSections((prev) => prev ? prev.map((s) => s.id === selectedSectionId ? { ...s, title } : s) : prev);
+      setDraft((prev) => ({ ...prev, [selectedSectionId]: { ...prev[selectedSectionId], title } }));
     },
     [selectedSectionId]
   );
 
-  const handleSave = useCallback(() => {
-    if (!selectedSectionId) return;
-    const changes = pendingChanges[selectedSectionId];
-    if (!changes) return;
-    updateSectionMut.mutate({ sectionId: selectedSectionId, data: changes });
-  }, [selectedSectionId, pendingChanges, updateSectionMut]);
+  const addSectionMut = useMutation({
+    mutationFn: (s: { type: string; title: string; content: Record<string, unknown> }) =>
+      api.post(`/website-builder/pages/${pageId}/sections`, s).then((r) => normalizeSections([r.data?.data])[0]),
+    onSuccess: (newSection) => {
+      if (!newSection) return;
+      qc.setQueryData<PageState>(["website-page-sections", pageId], (old) => ({
+        ...(old ?? { title: "Page", is_published: false, sections: [] }),
+        sections: [...(old?.sections ?? []), newSection],
+      }));
+      // The POST endpoint already persists the new section.
+      setSaveState((cur) => (cur === "saving" ? cur : "saved"));
+    },
+    onError: () => toast.error("Failed to add the section"),
+  });
+
+  const handleAddWidget = useCallback(
+    (def: SchoolWidgetDef) => {
+      setLeftTab("sections");
+      addSectionMut.mutate(
+        { type: def.type, title: def.name, content: def.defaultContent },
+        {
+          onSuccess: (newSection) => {
+            if (newSection) setSelectedSectionId(newSection.id);
+            toast.success(`"${def.name}" section added`);
+          },
+        }
+      );
+    },
+    [addSectionMut]
+  );
+
+  const handleMove = useCallback(
+    (sectionId: string, direction: "up" | "down") => {
+      qc.setQueryData<PageState>(["website-page-sections", pageId], (old) => {
+        if (!old) return old;
+        const list = [...old.sections].sort((a, b) => a.sort_order - b.sort_order);
+        const idx = list.findIndex((s) => s.id === sectionId);
+        const target = direction === "up" ? idx - 1 : idx + 1;
+        if (idx === -1 || target < 0 || target >= list.length) return old;
+        [list[idx], list[target]] = [list[target], list[idx]];
+        return { ...old, sections: list.map((s, i) => ({ ...s, sort_order: i })) };
+      });
+      schedulePersist();
+    },
+    [pageId, qc, schedulePersist]
+  );
 
   const handleDelete = useCallback(
     (sectionId: string) => {
       if (!confirm("Delete this section?")) return;
-      deleteSectionMut.mutate(sectionId);
+      qc.setQueryData<PageState>(["website-page-sections", pageId], (old) =>
+        old
+          ? { ...old, sections: old.sections.filter((s) => s.id !== sectionId).map((s, i) => ({ ...s, sort_order: i })) }
+          : old
+      );
+      setDraft((prev) => {
+        if (!(sectionId in prev)) return prev;
+        const next = { ...prev };
+        delete next[sectionId];
+        return next;
+      });
+      if (selectedSectionId === sectionId) setSelectedSectionId(null);
+      schedulePersist();
     },
-    [deleteSectionMut]
+    [pageId, qc, selectedSectionId, schedulePersist]
   );
+
+  const selectSection = useCallback((sectionId: string, fromOutline = false) => {
+    setSelectedSectionId(sectionId);
+    if (fromOutline) {
+      sectionElsRef.current[sectionId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  // ── Guards ───────────────────────────────────────────────────────────────────
 
   if (!pageId) {
     return (
@@ -519,7 +675,18 @@ export default function WebsiteEditor() {
     );
   }
 
-  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+  const sortedView = [...viewSections].sort((a, b) => a.sort_order - b.sort_order);
+  const saveBadge =
+    saveState === "saving" ? "Saving…"
+    : saveState === "unsaved" ? "● Unsaved"
+    : saveState === "error" ? "⚠ Save failed — retrying"
+    : saveState === "saved" ? "✓ Saved"
+    : "All changes saved";
+  const saveBadgeClass =
+    saveState === "saving" ? "text-blue-700 bg-blue-50 border-blue-200"
+    : saveState === "unsaved" ? "text-amber-700 bg-amber-50 border-amber-200"
+    : saveState === "error" ? "text-red-700 bg-red-50 border-red-200"
+    : "text-green-700 bg-green-50 border-green-200";
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -527,14 +694,14 @@ export default function WebsiteEditor() {
       <div className="w-64 bg-white border-r flex flex-col flex-shrink-0 z-10 shadow-sm">
         <div className="p-3 border-b flex-shrink-0">
           <a href="/dashboard/website-builder/pages" className="text-xs text-blue-600 hover:underline">← Pages</a>
-          <h2 className="font-bold text-gray-900 mt-0.5 truncate text-sm">{pageData?.title || "Page"}</h2>
+          <h2 className="font-bold text-gray-900 mt-0.5 truncate text-sm">{page?.title || "Page"}</h2>
         </div>
         <div className="flex border-b flex-shrink-0">
           <button
             onClick={() => setLeftTab("sections")}
             className={`flex-1 py-2 text-xs font-medium transition-colors ${leftTab === "sections" ? "border-b-2 border-blue-600 text-blue-700" : "text-gray-500 hover:text-gray-700"}`}
           >
-            Sections ({sections.length})
+            Sections ({sortedView.length})
           </button>
           <button
             onClick={() => setLeftTab("widgets")}
@@ -546,22 +713,22 @@ export default function WebsiteEditor() {
         <div className="flex-1 overflow-hidden">
           {leftTab === "sections" ? (
             <div className="h-full overflow-y-auto p-2 space-y-1">
-              {sections.length === 0 ? (
+              {sortedView.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-gray-400 text-xs">No sections yet</p>
                   <button onClick={() => setLeftTab("widgets")} className="mt-2 text-blue-600 text-xs underline">Add section →</button>
                 </div>
               ) : (
-                sections.map((section, idx) => (
+                sortedView.map((section, idx) => (
                   <SectionItem
                     key={section.id}
                     section={section}
                     index={idx}
-                    total={sections.length}
+                    total={sortedView.length}
                     isSelected={selectedSectionId === section.id}
-                    onSelect={() => setSelectedSectionId(section.id)}
-                    onMoveUp={() => moveSectionMut.mutate({ sectionId: section.id, direction: "up" })}
-                    onMoveDown={() => moveSectionMut.mutate({ sectionId: section.id, direction: "down" })}
+                    onSelect={() => selectSection(section.id, true)}
+                    onMoveUp={() => handleMove(section.id, "up")}
+                    onMoveDown={() => handleMove(section.id, "down")}
                     onDelete={() => handleDelete(section.id)}
                   />
                 ))
@@ -579,17 +746,22 @@ export default function WebsiteEditor() {
         <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b px-4 py-2 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500 font-medium">Live Preview</span>
-            {hasPendingChanges && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">● Unsaved</span>
-            )}
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${saveBadgeClass}`}>{saveBadge}</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleSaveNow}
+              disabled={saveState === "saving"}
+              className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saveState === "saving" ? "Saving…" : "Save now"}
+            </button>
             <a href="/dashboard/website-builder" target="_blank" className="text-xs text-blue-600 hover:underline">Open Site ↗</a>
           </div>
         </div>
 
         {/* Page canvas */}
-        {sections.length === 0 ? (
+        {sortedView.length === 0 ? (
           <div className="m-6 bg-white rounded-lg border-2 border-dashed border-gray-300 p-16 text-center">
             <p className="text-4xl mb-3">🏫</p>
             <p className="text-gray-400 text-lg font-medium mb-1">No sections yet</p>
@@ -603,25 +775,18 @@ export default function WebsiteEditor() {
               <style dangerouslySetInnerHTML={{ __html: previewThemeCss.replace(/:root\s*\{/, ".website-canvas {") }} />
             )}
             <div className="website-canvas">
-            {sections.map((section) => {
-              // Apply pending changes for live preview
-              const rendered: SchoolSection =
-                pendingChanges[section.id]
-                  ? {
-                      ...section,
-                      content: pendingChanges[section.id]?.content ?? section.content,
-                      title: pendingChanges[section.id]?.title ?? section.title,
-                    }
-                  : section;
-              return (
-                <EditableSectionBlock
+              {sortedView.map((section) => (
+                <div
                   key={section.id}
-                  section={rendered}
-                  isSelected={selectedSectionId === section.id}
-                  onClick={() => setSelectedSectionId(section.id)}
-                />
-              );
-            })}
+                  ref={(el) => { sectionElsRef.current[section.id] = el; }}
+                >
+                  <EditableSectionBlock
+                    section={section}
+                    isSelected={selectedSectionId === section.id}
+                    onClick={() => selectSection(section.id)}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -637,11 +802,9 @@ export default function WebsiteEditor() {
         </div>
         <div className="flex-1 overflow-hidden">
           <PropertiesPanel
-            section={selectedWithPending}
+            section={selectedSection}
             onContentChange={handleContentChange}
             onTitleChange={handleTitleChange}
-            onSave={handleSave}
-            saving={updateSectionMut.isPending}
             onClose={() => setSelectedSectionId(null)}
           />
         </div>

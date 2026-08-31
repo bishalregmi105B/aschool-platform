@@ -269,7 +269,7 @@ function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             <div className="space-y-2">
               <Label>Password</Label>
               <Input name="password" type="password" placeholder="Leave empty for auto-generation" minLength={6} />
-              <p className="text-xs text-muted-foreground">Default: EMIS ID @ Last 4 of Phone</p>
+              <p className="text-xs text-muted-foreground">Default: {"{first}.{last4}"} (e.g. sita.4821)</p>
             </div>
           </div>
           <DialogFooter>

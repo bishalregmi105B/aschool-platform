@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteHost, schoolSiteUrl } from "@/lib/site-domain";
 
+/**
+ * Shape the backend GET/PUT /website-builder/seo endpoints actually use:
+ * the column is `og_image_url` (the old page read/wrote `og_image`, so the
+ * OG image never loaded and never saved). google_site_verification /
+ * sitemap_enabled / robots_txt are UI-only until the backend persists them.
+ */
 interface SeoSettings {
   meta_title: string;
   meta_description: string;
@@ -18,10 +25,41 @@ interface SeoSettings {
   robots_txt: string;
 }
 
+interface SeoApiResponse {
+  meta_title?: string | null;
+  meta_description?: string | null;
+  og_image_url?: string | null;
+  google_analytics_id?: string | null;
+  robots_txt?: string | null;
+}
+
+const EMPTY_FORM: SeoSettings = {
+  meta_title: "",
+  meta_description: "",
+  og_image: "",
+  google_analytics_id: "",
+  google_site_verification: "",
+  sitemap_enabled: true,
+  robots_txt: "User-agent: *\nAllow: /",
+};
+
+/** API → form: null-safe defaults + og_image_url → og_image mapping. */
+function toForm(raw: SeoApiResponse | undefined): SeoSettings {
+  return {
+    meta_title: raw?.meta_title ?? "",
+    meta_description: raw?.meta_description ?? "",
+    og_image: raw?.og_image_url ?? "",
+    google_analytics_id: raw?.google_analytics_id ?? "",
+    google_site_verification: "",
+    sitemap_enabled: true,
+    robots_txt: raw?.robots_txt ?? "User-agent: *\nAllow: /",
+  };
+}
+
 export default function SeoPage() {
   const qc = useQueryClient();
 
-  const { data: seo, isLoading, isError, refetch } = useQuery<SeoSettings>({
+  const { data: seo, isLoading, isError, refetch } = useQuery<SeoApiResponse>({
     queryKey: ["website-seo"],
     queryFn: () => api.get("/website-builder/seo").then((r) => r.data.data),
     retry: 1,
@@ -29,18 +67,31 @@ export default function SeoPage() {
 
   const [form, setForm] = useState<SeoSettings | null>(null);
 
-  // Initialize form when data loads
-  if (seo && !form) {
-    setForm(seo);
-  }
+  // Sync the form when fresh server data arrives. (The old
+  // `if (seo && !form) setForm(seo)` ran setState during render — an
+  // anti-pattern that crashed the page — and fed null fields straight into
+  // `.length`, throwing "cannot read properties of null".)
+  useEffect(() => {
+    if (seo) setForm(toForm(seo));
+  }, [seo]);
 
   const saveMut = useMutation({
-    mutationFn: (data: SeoSettings) => api.put("/website-builder/seo", data),
+    mutationFn: (data: SeoSettings) =>
+      api.put("/website-builder/seo", {
+        meta_title: data.meta_title,
+        meta_description: data.meta_description,
+        og_image_url: data.og_image,
+        google_analytics_id: data.google_analytics_id,
+        google_site_verification: data.google_site_verification,
+        sitemap_enabled: data.sitemap_enabled,
+        robots_txt: data.robots_txt,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-seo"] });
       revalidateSchoolSite();
-      alert("SEO settings saved!");
+      toast.success("SEO settings saved");
     },
+    onError: () => toast.error("Failed to save SEO settings"),
   });
 
   if (isError) {

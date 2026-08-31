@@ -17,20 +17,6 @@ conflicts_with: []
 
 frontend:
   route: "/dashboard/website-builder"
-  sidebar:
-    section: "Design & Web"
-    label: "Website"
-    label_nepali: "वेबसाइट"
-    icon: "Globe"
-    subitems:
-      - { label: "Pages", route: "/dashboard/website-builder/pages" }
-      - { label: "Themes", route: "/dashboard/website-builder/themes" }
-      - { label: "SEO", route: "/dashboard/website-builder/seo" }
-      - {
-          label: "Website Settings",
-          route: "/dashboard/settings/website-design",
-        }
-    visible_to: ["school_admin"]
 
 flutter:
   admin_app: { feature_folder: "website", tabs: ["Preview", "Settings"] }

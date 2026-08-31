@@ -1,0 +1,124 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Arial",
+    "fontSize": 10
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address}",
+      "tagline": "MARKSHEET / PROGRESS REPORT",
+      "bg": "#065f46",
+      "color": "#ffffff"
+    },
+    {
+      "type": "spacer",
+      "height": 6
+    },
+    {
+      "type": "divider",
+      "color": "#065f46",
+      "width": 1
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Student:  **{name}**",
+          "align": "left"
+        },
+        {
+          "text": "Roll No:  **{roll_no}**",
+          "align": "center"
+        },
+        {
+          "text": "Class:  **{class_name}**",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Exam:  {exam_name}",
+          "align": "left"
+        },
+        {
+          "text": "Section:  {section_name}",
+          "align": "center"
+        },
+        {
+          "text": "Year:  {exam_year}",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "divider",
+      "color": "#065f46",
+      "width": 1
+    },
+    {
+      "type": "spacer",
+      "height": 6
+    },
+    {
+      "type": "subject_rows"
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Percentage: **{percentage}%**",
+          "align": "left"
+        },
+        {
+          "text": "Overall Grade: **{grade}**",
+          "align": "center"
+        },
+        {
+          "text": "GPA: **{gpa}**",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Result: {grade}  |  This is to certify that the above student has {status} the examination.",
+      "align": "left",
+      "color": "#0f172a",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Class Teacher",
+        "Parent / Guardian",
+        "Principal"
+      ]
+    }
+  ]
+}

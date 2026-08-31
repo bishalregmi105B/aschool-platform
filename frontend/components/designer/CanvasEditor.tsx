@@ -79,7 +79,11 @@ export default function CanvasEditor() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const overlayRef   = useRef<HTMLCanvasElement>(null);
   const canvas       = useCanvas(canvasRef, overlayRef);
-  const { exportPDF, exportPNG } = useExport();
+  const { exportPDF, exportPNG, exportPagesZip } = useExport();
+
+  // export quality — multiplier over the 96dpi logical canvas
+  const [dpiScale, setDpiScale] = useState(3);
+  const [exporting, setExporting] = useState(false);
 
   // store-driven ui state
   const activePanel = useDesignerStore((s) => s.activePanel);
@@ -105,6 +109,16 @@ export default function CanvasEditor() {
   const templateLoadedRef = useRef(false);
   const docLoadedRef      = useRef(false);
   const importFileRef     = useRef<HTMLInputElement>(null);
+  const initialFitRef     = useRef(false);
+
+  // fit the page into the viewport once the canvas is live (Canva-style)
+  useEffect(() => {
+    if (!canvas.isReady || initialFitRef.current) return;
+    initialFitRef.current = true;
+    const t = setTimeout(() => canvas.zoomToFit(), 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.isReady]);
 
   const { data: docData } = useQuery({
     queryKey: ["designer-doc", docId],
@@ -159,6 +173,8 @@ export default function CanvasEditor() {
       canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
       toast.info(`${tpl.page_size ?? "Custom"} canvas ready — build from the left panels`);
     }
+    // re-fit whenever a template changes the page size
+    setTimeout(() => canvas.zoomToFit(), 120);
   }, [canvas, router]);
 
   useEffect(() => {
@@ -200,22 +216,32 @@ export default function CanvasEditor() {
   const saveAsTemplateMutation = useMutation({
     mutationFn: async () => {
       const fullJSON = canvas.toFullJSON();
-      const page = fullJSON.pages?.[0] ?? {};
-      return (
-        await api.post("/design-studio/templates", {
-          name: docName,
-          category: "custom",
-          editor_type: "designer",
-          description: `Custom template saved from "${docName}"`,
-          page_size: "Custom",
-          width: page.width ?? 794,
-          height: page.height ?? 1123,
-          thumbnail_emoji: "🧩",
-          is_default: false,
-          fields: [],
-          canvas_json: page.json ?? {},
-        })
-      ).data;
+      // multi-page docs save their whole page list; single-page saves one
+      const pages = fullJSON.pages ?? [];
+      const page = pages[0] ?? {};
+      const payload: any = {
+        name: docName,
+        category: "custom",
+        editor_type: "designer",
+        description: `Custom template saved from "${docName}"`,
+        page_size: "Custom",
+        width: page.width ?? 794,
+        height: page.height ?? 1123,
+        page_count: Math.max(1, pages.length),
+        thumbnail_emoji: "🧩",
+        is_default: false,
+        fields: [],
+        canvas_json: pages.length > 1 ? fullJSON : (page.json ?? {}),
+      };
+      // editing an existing template → overwrite that school template in
+      // place (key match = update, no duplicate rows)
+      if (templateIdState) {
+        payload.template_key = templateIdState;
+        payload.page_size = allTemplates.find((t: any) => t.id === templateIdState)?.page_size ?? "Custom";
+        payload.category = allTemplates.find((t: any) => t.id === templateIdState)?.category ?? "custom";
+        payload.thumbnail_emoji = allTemplates.find((t: any) => t.id === templateIdState)?.thumbnail_emoji ?? "🧩";
+      }
+      return (await api.post("/design-studio/templates", payload)).data;
     },
     onSuccess: () => {
       toast.success("Saved as school template — find it under Templates");
@@ -246,7 +272,7 @@ export default function CanvasEditor() {
     },
   });
 
-  const handleExport = useCallback(async (format: "pdf"|"png"|"json") => {
+  const handleExport = useCallback(async (format: "pdf"|"png"|"zip"|"json") => {
     const name = docName.replace(/\s+/g,"_").toLowerCase();
     if (format === "json") {
       const blob = new Blob([JSON.stringify(canvas.toFullJSON(), null, 2)], { type:"application/json" });
@@ -256,9 +282,24 @@ export default function CanvasEditor() {
     const fc = (window as any).__activeCanvas;
     if (!fc) { toast.error("Canvas not ready"); return; }
     const multiPageDoc = canvas.toFullJSON() as any;
-    if (format === "pdf") await exportPDF(fc, `${name}.pdf`, multiPageDoc);
-    else await exportPNG(fc, `${name}.png`, multiPageDoc);
-  }, [docName, canvas, exportPDF, exportPNG]);
+    setExporting(true);
+    try {
+      if (format === "pdf") await exportPDF(fc, `${name}.pdf`, multiPageDoc, dpiScale);
+      else if (format === "zip") await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale);
+      else if (format === "png" && (multiPageDoc.pages?.length ?? 0) > 1) {
+        // multi-page designs export as a ZIP of per-page PNGs (a stitched
+        // strip is useless for print) — auto-detect, no extra click
+        await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale);
+        toast.success(`Multi-page detected — exported ${multiPageDoc.pages.length} PNGs as ZIP at ${dpiScale}×`);
+      }
+      else await exportPNG(fc, `${name}.png`, multiPageDoc, dpiScale);
+      toast.success(`Exported at ${dpiScale}× (${Math.round(dpiScale * 96)} DPI)`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [docName, canvas, exportPDF, exportPNG, exportPagesZip, dpiScale]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -304,18 +345,25 @@ export default function CanvasEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas.isReady, zoom, canvas.currentPageIdx, canvas.pages.length]);
 
-  // ── ctrl+wheel zoom on canvas area ─────────────────────────────
-  const onCanvasWheel = useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const fc = (window as any).__activeCanvas;
-    if (!fc) return;
-    const vt = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
-    const cx = e.clientX - rect.left - vt[4];
-    const cy = e.clientY - rect.top - vt[5];
-    canvas.zoomAt(zoom * (e.deltaY < 0 ? 1.1 : 0.9), { x: cx / zoom, y: cy / zoom });
-  }, [canvas, zoom]);
+  // ── ctrl+wheel zoom on canvas area (cursor-anchored, non-passive) ──
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el || !canvas.isReady) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return; // plain wheel = native scroll/pan
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      canvas.zoomAtPointInContainer(
+        canvas.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1),
+        el,
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      );
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.isReady, canvas.zoom]);
 
   // ── context menu ───────────────────────────────────────────────
   const onCanvasContextMenu = useCallback((e: React.MouseEvent) => {
@@ -347,10 +395,16 @@ export default function CanvasEditor() {
     };
 
     // Templates may reference the same image under legacy token names.
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1\/?$/, "");
     const imageField = (key: string) => {
-      if (key === "photo") return fields.photo || fields.photo_url || fields.student_photo || "";
-      if (key === "photo_url") return fields.photo_url || fields.photo || "";
-      return fields[key] || "";
+      let v = "";
+      if (key === "photo") v = fields.photo || fields.photo_url || fields.student_photo || "";
+      else if (key === "photo_url") v = fields.photo_url || fields.photo || "";
+      else v = fields[key] || "";
+      if (!v) return v;
+      // relative upload paths must hit the API origin, not the frontend one
+      if (v.startsWith("/")) v = `${apiBase || window.location.origin}${v}`;
+      return v;
     };
 
     let changed = 0;
@@ -511,12 +565,30 @@ export default function CanvasEditor() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => serverPdfMutation.mutate()}>
-                  <FileOutput className="h-4 w-4 mr-2" /> PDF — Print-ready (server)
+              <DropdownMenuContent align="end" className="min-w-64">
+                <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">Quality</span>
+                  <Select value={String(dpiScale)} onValueChange={(v) => setDpiScale(Number(v))}>
+                    <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[2, 3, 4, 5, 6].map((s) => {
+                        const label = s >= 5 ? "ultra 4K+" : s >= 4 ? "4K-class" : s === 3 ? "print 300 DPI" : "screen";
+                        return (
+                          <SelectItem key={s} value={String(s)}>
+                            {s}× — {Math.round(s * 96)} DPI ({label}){s === 3 ? " ★" : ""}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={exporting} onClick={() => serverPdfMutation.mutate()}>
+                  <FileOutput className="h-4 w-4 mr-2" /> PDF — Print-ready (server, vector text)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF — quick (browser)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("png")}>PNG (300 DPI)</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("pdf")}>PDF — quick (browser)</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>PNG — current view</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("zip")}>PNG ZIP — one file per page</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => saveAsTemplateMutation.mutate()}>Save as school template</DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -757,28 +829,35 @@ export default function CanvasEditor() {
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 border border-dashed" onClick={canvas.addPage} title="Add page"><Plus className="h-3.5 w-3.5" /></Button>
               <span className="text-xs text-muted-foreground ml-auto shrink-0">{canvas.currentPageIdx+1} / {canvas.pages.length}</span>
             </div>
-            <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center bg-[#f0f0f0] p-8"
-              onWheel={onCanvasWheel} onContextMenu={onCanvasContextMenu}>
+            <div
+              ref={scrollAreaRef}
+              data-canvas-scroll
+              className="flex-1 min-h-0 overflow-auto flex bg-[#f0f0f0] p-8"
+              onContextMenu={onCanvasContextMenu}
+            >
+              {/* wrapper scales with zoom (m-auto keeps it centered AND fully
+                  scrollable when larger than the viewport — flex justify-center
+                  would clip the top/left overflow) */}
               <div
-                className="relative shadow-2xl shrink-0"
+                className="relative shadow-2xl m-auto"
                 style={{
-                  width: (canvas.currentPageSettings?.width ?? 794),
-                  height: (canvas.currentPageSettings?.height ?? 1123),
+                  width: (canvas.canvasSize?.width ?? 794) * zoom,
+                  height: (canvas.canvasSize?.height ?? 1123) * zoom,
                 }}
               >
-                {/* fabric v6 keeps the element at page size; zoom is viewport-internal */}
+                {/* fabric element is logical×zoom; the viewport transform matches */}
                 <canvas ref={canvasRef} id="fabric-canvas" className="block" />
                 {showGrid && (
                   <div className="absolute inset-0 pointer-events-none"
                     style={{
                       backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)",
-                      backgroundSize: "50px 50px",
+                      backgroundSize: `${50 * zoom}px ${50 * zoom}px`,
                     }} />
                 )}
                 <canvas ref={overlayRef} className="absolute left-0 top-0 pointer-events-none"
-                  width={canvas.currentPageSettings?.width ?? 794}
-                  height={canvas.currentPageSettings?.height ?? 1123}
-                  style={{ width: canvas.currentPageSettings?.width ?? 794, height: canvas.currentPageSettings?.height ?? 1123 }} />
+                  width={canvas.canvasSize?.width ?? 794}
+                  height={canvas.canvasSize?.height ?? 1123}
+                  style={{ width: (canvas.canvasSize?.width ?? 794) * zoom, height: (canvas.canvasSize?.height ?? 1123) * zoom }} />
               </div>
             </div>
           </div>

@@ -1,13 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
-import { AlertTriangle, Phone, Mail } from "lucide-react";
+import { AlertTriangle, Loader2, Phone, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -21,6 +22,37 @@ function DefaultersContent() {
     queryKey: ["fee-defaulters"],
     queryFn: async () => { const r = await api.get("/fees/defaulters"); return r.data; },
   });
+
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+
+  const remindMutation = useMutation({
+    mutationFn: async (studentId: string) => {
+      const r = await api.post(`/fees/defaulters/${studentId}/remind`);
+      return r.data;
+    },
+    onSuccess: (res) => {
+      const payload = res?.data;
+      const channel = payload?.channel === "sms" ? "via SMS" : "via notification";
+      toast.success(
+        payload?.phone
+          ? `Reminder sent ${channel} to ${payload.phone} • Rs. ${Number(payload.amount || 0).toLocaleString()} pending`
+          : "Reminder sent successfully",
+      );
+      setRemindingId(null);
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.error || error?.message || "Could not send reminder",
+      );
+      setRemindingId(null);
+    },
+  });
+
+  const handleRemind = (studentId: string) => {
+    setRemindingId(studentId);
+    remindMutation.mutate(studentId);
+  };
 
   const defaulters = data?.data || [];
   const totalDue = defaulters.reduce((sum: number, d: any) => sum + (d.total_due || 0), 0);
@@ -67,7 +99,22 @@ function DefaultersContent() {
                       {d.parent_email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {d.parent_email}</span>}
                     </div>
                   </TableCell>
-                  <TableCell><Button size="sm" variant="outline">Send Reminder</Button></TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      disabled={remindingId === d.id}
+                      onClick={() => handleRemind(d.id)}
+                    >
+                      {remindingId === d.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3" />
+                      )}
+                      {remindingId === d.id ? "Sending…" : "Send Reminder"}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

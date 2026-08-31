@@ -1,0 +1,22 @@
+template_key: circular
+name: Parent Circular
+category: notices
+editor_type: writer
+description: Circular to parents with header, body placeholders and signatures
+page_size: A4
+thumbnail_emoji: 📨
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- school_name
+- date
+- class
+- section
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

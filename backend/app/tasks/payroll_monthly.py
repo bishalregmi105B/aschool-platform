@@ -37,6 +37,44 @@ def process_monthly_payroll():
                 User.role.in_(("school_admin", "accountant", "teacher", "staff")),
             ).all()
 
+            # Honor the school's payroll settings (same shape the API's
+            # /hr/payroll/generate reads from school.settings.payroll) so cron
+            # drafts are not stuck at zero salary. Per-staff carry-forward of a
+            # prior month's basic is not done here (no request context) — the
+            # API route still covers that richer path.
+            from app.plugins.config_store import get_plugin_config
+            from app.models.school import School
+
+            school = School.query.get(school_id)
+            payroll_settings = {}
+            if school and isinstance(school.settings, dict):
+                payroll_settings = school.settings.get("payroll") or {}
+            if not isinstance(payroll_settings, dict):
+                payroll_settings = {}
+            plugin_cfg = get_plugin_config(school_id, "hr_payroll")
+            if isinstance(plugin_cfg.get("payroll"), dict) and plugin_cfg["payroll"]:
+                payroll_settings = plugin_cfg["payroll"]
+
+            from app.api.v1.hr_payroll import (
+                _components_from_settings,
+                _compute_payroll_totals,
+                _setting_number,
+            )
+
+            default_basic = 0.0
+            for key in ("defaultBasicSalary", "basicSalary", "default_basic_salary"):
+                value = _setting_number(payroll_settings.get(key))
+                if value and value > 0:
+                    default_basic = value
+                    break
+            tax_rate = _setting_number(payroll_settings.get("taxRate")) or 0.0
+            basic = round(default_basic, 2)
+            allowances = _components_from_settings(payroll_settings.get("allowances"), basic)
+            deductions = _components_from_settings(payroll_settings.get("deductions"), basic)
+            if tax_rate > 0 and basic > 0:
+                deductions["Tax"] = round(basic * tax_rate / 100.0, 2)
+            gross, net = _compute_payroll_totals(basic, allowances, deductions)
+
             created = 0
             for user in staff_members:
                 exists = StaffPayroll.query.filter_by(
@@ -52,11 +90,11 @@ def process_monthly_payroll():
                     school_id=school_id,
                     user_id=user.id,
                     month=month,
-                    basic_salary=0,
-                    allowances={},
-                    deductions={},
-                    gross_salary=0,
-                    net_salary=0,
+                    basic_salary=basic,
+                    allowances=allowances,
+                    deductions=deductions,
+                    gross_salary=gross,
+                    net_salary=net,
                     status="draft",
                 )
                 db.session.add(payroll)
