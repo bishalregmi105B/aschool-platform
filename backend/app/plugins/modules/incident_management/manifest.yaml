@@ -8,7 +8,7 @@ emoji: "📋"
 icon: "ShieldAlert"
 description: "Full behavior management — witnesses, escalation, parent conferences"
 
-api_blueprint: "app.api.v1.incidents"
+api_blueprint: "app.plugins.modules.incident_management.routes"
 models_module: "app.models.incident"
 
 depends_on:

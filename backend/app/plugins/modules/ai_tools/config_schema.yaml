@@ -1,0 +1,14 @@
+# AI Tools plugin settings screen (SchoolPlugin.config).
+# Real consumer: app/api/v1/ai_tools.py — generation routes fall back to
+# `default_language` when the request omits `language` (request value wins).
+fields:
+  - key: default_language
+    label: "Default generation language"
+    type: string
+    default: "english"
+    help: "Used for lesson plans etc. when the request doesn't pick one (english|nepali)."
+  - key: default_teaching_method
+    label: "Default teaching method"
+    type: string
+    default: "interactive"
+    help: "Used for lesson plans when the request doesn't specify one."

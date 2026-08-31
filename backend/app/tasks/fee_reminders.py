@@ -32,7 +32,23 @@ def send_fee_reminders(school_id: str):
     from app.tasks.sms_sender import send_sms
     from datetime import datetime, timedelta, timezone
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    # Plugin config (config_schema.yaml): reminder_enabled kill-switch +
+    # reminder_overdue_days (replaces the old hardcoded 30-day cutoff;
+    # nonsense values fall back to 30).
+    from app.plugins.config_store import plugin_config_value
+
+    if not plugin_config_value(school_id, "fees", "reminder_enabled", True):
+        return {"skipped": "reminders disabled in plugin settings"}
+    try:
+        overdue_days = int(
+            plugin_config_value(school_id, "fees", "reminder_overdue_days", 30) or 30
+        )
+    except (TypeError, ValueError):
+        overdue_days = 30
+    if overdue_days < 1:
+        overdue_days = 30
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=overdue_days)
     overdue = FeeCollection.query.filter(
         FeeCollection.school_id == school_id,
         FeeCollection.payment_status.in_(("pending", "partial")),

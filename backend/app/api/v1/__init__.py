@@ -36,13 +36,18 @@ STATICALLY_MOUNTED_MODULES = {
     "app.api.v1.faqs",
     "app.api.v1.db_backup_api",
     "app.api.v1.hostel",
-    "app.api.v1.white_label",
-    "app.api.v1.multi_branch",
-    "app.api.v1.biometric",
-    "app.api.v1.adaptive_learning",
-    "app.api.v1.disaster_management",
-    "app.api.v1.incident_management",
-    "app.api.v1.social_ads",
+    # WP-style move (2026-08-30): these seven plugin blueprints live in their
+    # module folders (app/plugins/modules/<slug>/routes.py); app/api/v1/<slug>.py
+    # is a 2-line re-export shim. They are STILL mounted statically below (via
+    # the shim) so their manifest paths are listed here to keep the loader from
+    # double-registering them.
+    "app.plugins.modules.white_label.routes",
+    "app.plugins.modules.multi_branch.routes",
+    "app.plugins.modules.biometric.routes",
+    "app.plugins.modules.ai_adaptive_learning.routes",
+    "app.plugins.modules.social_ads.routes",
+    "app.plugins.modules.disaster_management.routes",
+    "app.plugins.modules.incident_management.routes",
 }
 
 # Core routes (always available, not plugin-gated)

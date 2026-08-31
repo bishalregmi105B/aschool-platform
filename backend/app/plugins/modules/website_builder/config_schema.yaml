@@ -1,0 +1,11 @@
+# Website Builder plugin settings screen (SchoolPlugin.config).
+# Real consumer: app/services/website/website_builder.py — `default_theme`
+# is the theme a school's site falls back to when no theme has been chosen;
+# it is validated against the live ThemeEngine registry (unknown ids are
+# ignored so a typo can never break site rendering).
+fields:
+  - key: default_theme
+    label: "Default theme"
+    type: string
+    default: "global-elearning"
+    help: "Theme id from the theme registry used before any theme is picked in the builder."

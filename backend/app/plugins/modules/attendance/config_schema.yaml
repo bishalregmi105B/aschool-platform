@@ -1,0 +1,10 @@
+# Attendance plugin settings screen (SchoolPlugin.config).
+# Real consumer: app/tasks/attendance_alerts.py — the daily absent-alert job
+# honors `absent_alerts_enabled` per school (skip when false; alerts fire by
+# default so an empty config changes nothing).
+fields:
+  - key: absent_alerts_enabled
+    label: "Daily absent alerts"
+    type: boolean
+    default: true
+    help: "Notify parents via WhatsApp/SMS/push when a student is marked absent (daily job)."

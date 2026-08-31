@@ -1,7 +1,9 @@
 """Plugin Marketplace API — browse, install, uninstall, activate/deactivate, config."""
 
 import json
+import logging
 import math
+from types import SimpleNamespace
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
@@ -27,6 +29,8 @@ from app.utils.response import (
 )
 from extensions import db
 
+logger = logging.getLogger(__name__)
+
 plugins_bp = Blueprint("plugins", __name__, url_prefix="/plugins")
 
 # Schema-lite config validation (E163, plugin-architecture batch — FIX_STATUS
@@ -34,6 +38,27 @@ plugins_bp = Blueprint("plugins", __name__, url_prefix="/plugins")
 # reserved keys that the platform writes are not client-writable.
 PLUGIN_CONFIG_MAX_BYTES = 16 * 1024
 PLUGIN_CONFIG_RESERVED_KEYS = {"last_payment"}
+
+
+def _run_plugin_hook(plugin_slug: str, hook_name: str) -> None:
+    """Run a plugin's lifecycle hook (activate/deactivate/uninstall) if present.
+
+    WP-style: hooks are the module's own code — table creation on activate,
+    config-row cleanup on uninstall. Failures (import or runtime) are LOGGED
+    and never fatal: the install state must not depend on plugin hooks, and a
+    broken plugin cannot take the marketplace down.
+    """
+    try:
+        module = PluginLoader.get_hooks(plugin_slug)
+        fn = getattr(module, hook_name, None) if module else None
+        if fn is None:
+            return
+        fn(db)
+        logger.info("Plugin '%s': %s hook ran", plugin_slug, hook_name)
+    except Exception as e:  # noqa: BLE001 — hooks are never fatal
+        logger.warning(
+            "Plugin '%s': %s hook failed (ignored): %s", plugin_slug, hook_name, e
+        )
 
 
 def _install_state(sp: SchoolPlugin | None) -> str:
@@ -58,20 +83,122 @@ def _trial_days_left(sp: SchoolPlugin | None) -> int | None:
     return max(0, math.ceil(delta.total_seconds() / 86400))
 
 
+def _catalog_entries() -> list[dict]:
+    """WP-style catalog view: the REGISTRY (loader) is the source of truth.
+
+    Every manifest slug is an entry; the DB `plugins` mirror row only supplies
+    the extra marketplace fields manifests don't carry (screenshots, tags,
+    ratings, stats, sort order). Mirror rows for slugs no longer in the
+    registry act as a fallback until the next refresh unpublishes them.
+    """
+    manifests = PluginLoader.get_all_manifests()
+    rows_by_slug: dict[str, Plugin] = {
+        p.slug: p for p in Plugin.query.filter_by(is_deleted=False).all()
+    }
+
+    entries: list[dict] = []
+    seen: set[str] = set()
+    for slug, m in manifests.items():
+        seen.add(slug)
+        row = rows_by_slug.get(slug)
+        is_published = bool(m.get("published", True))
+        if not is_published and not (row and row.is_published):
+            # Delisted by its manifest and the mirror agrees — not offered.
+            continue
+
+        def _val(field, default):
+            """Manifest value wins; mirror row is the fallback."""
+            if m.get(field) is not None:
+                return m.get(field)
+            if row is not None:
+                v = getattr(row, field, None)
+                if v is not None:
+                    return v
+            return default
+
+        entries.append(
+            {
+                "slug": slug,
+                "name": _val("name", slug),
+                "name_nepali": _val("name_nepali", ""),
+                "description": _val("description", ""),
+                "emoji": _val("emoji", None),
+                "icon": _val("icon", None),
+                "category": _val("category", "core"),
+                "price_monthly": float(_val("price_monthly", 0) or 0),
+                "price_yearly": float(_val("price_yearly", 0) or 0),
+                "is_free": _val("is_free", float(_val("price_monthly", 0) or 0) == 0),
+                "version": _val("version", "1.0.0"),
+                "depends_on": _val("depends_on", []) or [],
+                "conflicts_with": _val("conflicts_with", []) or [],
+                "screenshots": (row.screenshots if row else None) or [],
+                "tags": (row.tags if row else None) or [],
+                "sort_order": (row.sort_order if row else None) or 0,
+                "is_featured": (row.is_featured if row else None) or False,
+                "avg_rating": float(
+                    ((row.avg_rating if row else None) or 0)
+                ),
+                "install_count": (row.install_count if row else None) or 0,
+            }
+        )
+
+    # Fallback: published mirror rows whose folder/manifest vanished (a
+    # refresh-registry hasn't unpublished them yet — e.g. mirror-only rows).
+    for slug, row in rows_by_slug.items():
+        if slug in seen or not row.is_published:
+            continue
+        entries.append(
+            {
+                "slug": slug,
+                "name": row.name,
+                "name_nepali": row.name_nepali or "",
+                "description": row.description or "",
+                "emoji": row.emoji,
+                "icon": row.icon,
+                "category": row.category,
+                "price_monthly": float(row.price_monthly or 0),
+                "price_yearly": float(row.price_yearly or 0),
+                "is_free": bool(row.is_free),
+                "version": row.version or "1.0.0",
+                "depends_on": row.depends_on or [],
+                "conflicts_with": row.conflicts_with or [],
+                "screenshots": row.screenshots or [],
+                "tags": row.tags or [],
+                "sort_order": row.sort_order or 0,
+                "is_featured": bool(row.is_featured),
+                "avg_rating": float(row.avg_rating or 0),
+                "install_count": row.install_count or 0,
+            }
+        )
+
+    entries.sort(key=lambda e: (e["sort_order"], (e["name"] or "").lower()))
+    return entries
+
+
 @plugins_bp.route("/marketplace", methods=["GET"])
 @jwt_required()
 def marketplace():
-    """Browse available plugins as a flat list."""
+    """Browse available plugins as a flat list.
+
+    Reads the plugin REGISTRY (directory scan) merged with per-school
+    SchoolPlugin state; the DB `plugins` table is only a mirror/fallback.
+    """
     category = request.args.get("category")
     search = request.args.get("search")
 
-    query = Plugin.query.filter_by(is_published=True, is_deleted=False)
+    entries = _catalog_entries()
     if category:
-        query = query.filter_by(category=category)
+        entries = [e for e in entries if e["category"] == category]
     if search:
-        query = query.filter(Plugin.name.ilike(f"%{search}%") | Plugin.tags.any(search))
-    query = query.order_by(Plugin.sort_order, Plugin.name)
-    plugins = query.all()
+        needle = search.lower()
+        entries = [
+            e
+            for e in entries
+            if needle in (e["name"] or "").lower()
+            or needle in (e["name_nepali"] or "").lower()
+            or needle in (e["description"] or "").lower()
+            or any(needle in (t or "").lower() for t in e["tags"])
+        ]
 
     # Check which are installed for the current school. All rows (active AND
     # deactivated) are loaded so the WP-style lifecycle state can be reported;
@@ -86,13 +213,18 @@ def marketplace():
         }
 
     result = []
-    for p in plugins:
-        tier = "free" if p.is_free else (p.category or "starter")
-        sp = installs_by_slug.get(p.slug)
-        is_free = plugin_is_free(p)
+    for e in entries:
+        sp = installs_by_slug.get(e["slug"])
+        # plugin_is_free/effective_trial_days only read category/is_free/
+        # price_monthly — a lightweight view over the merged entry suffices.
+        probe = SimpleNamespace(
+            category=e["category"], is_free=e["is_free"], price_monthly=e["price_monthly"]
+        )
+        is_free = plugin_is_free(probe)
+        tier = "free" if is_free else (e["category"] or "starter")
         state = _install_state(sp)
-        description = p.description
-        if p.slug == "website_builder":
+        description = e["description"]
+        if e["slug"] == "website_builder":
             # E207: the theme count in the copy went stale (said "20 themes"
             # after the registry was reduced to 10) — derive it live from the
             # theme registry so the card can never drift again.
@@ -105,20 +237,20 @@ def marketplace():
             )
         result.append(
             {
-                "slug": p.slug,
-                "name": p.name,
-                "name_nepali": p.name_nepali,
+                "slug": e["slug"],
+                "name": e["name"],
+                "name_nepali": e["name_nepali"],
                 "description": description,
-                "emoji": p.emoji,
-                "icon": p.icon,
-                "category": p.category,
-                "price_monthly": float(p.price_monthly or 0),
-                "price_yearly": float(p.price_yearly or 0),
+                "emoji": e["emoji"],
+                "icon": e["icon"],
+                "category": e["category"],
+                "price_monthly": e["price_monthly"],
+                "price_yearly": e["price_yearly"],
                 "is_free": is_free,
                 "tier": tier,
-                "trial_days": 0 if is_free else effective_trial_days(p),
-                "screenshots": p.screenshots or [],
-                "tags": p.tags or [],
+                "trial_days": 0 if is_free else effective_trial_days(probe),
+                "screenshots": e["screenshots"],
+                "tags": e["tags"],
                 "installed": state == "active",
                 "is_installed": state == "active",
                 # WP-style lifecycle: not_installed | active | inactive
@@ -127,12 +259,12 @@ def marketplace():
                 "is_trial": bool(sp and sp.is_trial and state == "active"),
                 "trial_days_left": _trial_days_left(sp) if state == "active" else None,
                 "can_subscribe": not is_free,
-                "is_featured": p.is_featured,
-                "avg_rating": float(p.avg_rating or 0),
-                "install_count": p.install_count or 0,
-                "depends_on": p.depends_on or [],
-                "conflicts_with": p.conflicts_with or [],
-                "version": p.version,
+                "is_featured": e["is_featured"],
+                "avg_rating": e["avg_rating"],
+                "install_count": e["install_count"],
+                "depends_on": e["depends_on"],
+                "conflicts_with": e["conflicts_with"],
+                "version": e["version"],
             }
         )
 
@@ -217,6 +349,10 @@ def install():
         )
         return error_response(result["error"], status)
 
+    # WP-style activation hook: the module creates its tables/defaults after
+    # the SchoolPlugin row exists. Logged-not-fatal on failure.
+    _run_plugin_hook(plugin_slug, "activate")
+
     return created_response(result)
 
 
@@ -281,6 +417,9 @@ def start_trial(slug):
         plugin.install_count = (plugin.install_count or 0) + 1
 
     db.session.commit()
+
+    # Trial installs mint a SchoolPlugin row too — run the activation hook.
+    _run_plugin_hook(slug, "activate")
 
     from app.plugins.billing import _invalidate_plugin_cache
 
@@ -438,6 +577,10 @@ def subscribe(slug):
 
     db.session.commit()
 
+    # First-ever paid install mints the SchoolPlugin row — run the activation
+    # hook (idempotent: table creation is checkfirst).
+    _run_plugin_hook(slug, "activate")
+
     from app.plugins.billing import _invalidate_plugin_cache
 
     _invalidate_plugin_cache(str(g.school_id))
@@ -473,6 +616,11 @@ def uninstall():
     result = uninstall_plugin(str(g.school_id), plugin_slug)
     if "error" in result:
         return error_response(result["error"], 400)
+
+    # WP-style uninstall hook: modules remove only their own config rows —
+    # data tables are kept (WordPress keeps data on uninstall too). Logged-
+    # not-fatal on failure.
+    _run_plugin_hook(plugin_slug, "uninstall")
 
     return success_response(result)
 
@@ -597,3 +745,43 @@ def update_plugin_config(slug):
     flag_modified(sp, "config")
     db.session.commit()
     return success_response(sp.config)
+
+
+@plugins_bp.route("/refresh-registry", methods=["POST"])
+@jwt_required()
+@role_required("superadmin")
+def refresh_registry():
+    """Rescan the plugin directory and re-sync the `plugins` catalog mirror.
+
+    WP model: the plugins DIRECTORY is the catalog source of truth — this
+    endpoint re-scans it without a restart, upserting mirror rows (missing
+    folders created published, vanished folders unpublished). Superadmin-only.
+    """
+    try:
+        result = PluginLoader.refresh_registry()
+    except Exception as e:  # noqa: BLE001 — reported, never crashes the API
+        logger.error("refresh-registry failed: %s", e)
+        return error_response(f"Registry refresh failed: {e}", 500)
+    return success_response(result)
+
+
+@plugins_bp.route("/<slug>/config-schema", methods=["GET"])
+@jwt_required()
+def get_plugin_config_schema(slug):
+    """Settings-screen definition for a plugin (from its config_schema.yaml).
+
+    `fields` is empty when the plugin carries no schema — the settings UI
+    then falls back to the generic key/value editor.
+    """
+    manifest = PluginLoader.get_manifest(slug)
+    if not manifest:
+        return error_response(f"Plugin '{slug}' not found", 404)
+    fields = PluginLoader.get_config_schema(slug)
+    return success_response(
+        {
+            "slug": slug,
+            "has_schema": bool(fields),
+            "fields": fields,
+        }
+    )
+

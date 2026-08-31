@@ -1,11 +1,18 @@
-"""Database seed script — creates superadmin, demo school, and core plugins."""
+"""Database seed script — creates superadmin, demo school, and demo installs.
+
+WP-style plugin model (2026-08-30): the plugins DIRECTORY is the catalog
+source of truth. This script NEVER seeds plugin catalog rows — the DB
+`plugins` table is only a mirror of the scanned manifests, kept in sync by
+PluginLoader.refresh_registry() (also runs on every app startup). The demo
+school's SchoolPlugin installs are created through install_plugin() against
+those registry-backed rows; only install STATE lives in the DB.
+"""
 import uuid
 
 from app import create_app
 from extensions import db
 from app.models.school import School
 from app.models.user import User
-from app.models.plugin import Plugin
 from app.plugins.billing import install_plugin
 from app.plugins.loader import PluginLoader
 
@@ -13,69 +20,18 @@ CORE_PLUGINS = ["attendance", "notices", "academics", "basic_reports", "basic_we
 
 
 def seed():
-    """Seed the database with essential data."""
+    """Seed the database with essential data (no plugin catalog seeding)."""
     app = create_app()
     with app.app_context():
-        # 1. Register all plugins from manifests into Plugin master table.
-        # Manifests are the pricing/tier source of truth and use FLAT keys
-        # (price_monthly / price_yearly / category / is_free) — NOT nested
-        # `pricing.monthly`; the old dead path silently seeded every paid
-        # plugin as price-0/free (audit E6). Existing rows are synced
-        # idempotently so a stale DB self-heals on the next seed.
-        manifests = PluginLoader.get_all_manifests()
-        created = synced = 0
-        for slug, m in manifests.items():
-            price_monthly = int(m.get("price_monthly") or 0)
-            price_yearly = int(m.get("price_yearly") or 0)
-            is_free = bool(m.get("is_free", price_monthly == 0))
-            category = m.get("category", "core")
-            # Manifests may delist a plugin from the catalog (e.g. the
-            # deprecated digital_content duplicate of elibrary): a top-level
-            # `published: false` maps to Plugin.is_published=False so the
-            # marketplace stops offering it while legacy installs keep working.
-            is_published = bool(m.get("published", True))
-            existing = Plugin.query.filter_by(slug=slug).first()
-            if not existing:
-                plugin = Plugin(
-                    id=str(uuid.uuid4()),
-                    slug=slug,
-                    name=m["name"],
-                    name_nepali=m.get("name_nepali", ""),
-                    description=m.get("description", ""),
-                    category=category,
-                    price_monthly=price_monthly,
-                    price_yearly=price_yearly,
-                    is_free=is_free,
-                    trial_days=14,  # manifests carry no trial_days; default 14
-                    version=m.get("version", "1.0.0"),
-                    is_published=is_published,
-                )
-                db.session.add(plugin)
-                created += 1
-                continue
-            # Idempotent sync of price/tier/category/published from the manifest.
-            changed = False
-            if float(existing.price_monthly or 0) != price_monthly:
-                existing.price_monthly = price_monthly
-                changed = True
-            if float(existing.price_yearly or 0) != price_yearly:
-                existing.price_yearly = price_yearly
-                changed = True
-            if bool(existing.is_free) != is_free:
-                existing.is_free = is_free
-                changed = True
-            if existing.category != category:
-                existing.category = category
-                changed = True
-            if bool(existing.is_published) != is_published:
-                existing.is_published = is_published
-                changed = True
-            if changed:
-                synced += 1
-        db.session.commit()
+        # 1. Sync the catalog MIRROR from the plugins directory (the registry
+        # scan — NOT seeding; identical to what runs at app startup). This
+        # guarantees the mirror rows exist before the demo installs below on
+        # a fresh database, and self-heals a stale DB idempotently.
+        result = PluginLoader.refresh_registry()
         print(
-            f"✓ Registered {len(manifests)} plugins "
-            f"({created} created, {synced} synced from manifests)"
+            f"✓ Registry synced from plugins directory: "
+            f"{result['scanned']} scanned, {result['created']} created, "
+            f"{result['updated']} updated, {result['deactivated']} deactivated"
         )
 
         # 2. Create demo school
@@ -99,14 +55,18 @@ def seed():
             db.session.commit()
             print("✓ Created demo school (slug=demo)")
 
-            # Auto-install core plugins for demo school
-            for slug in CORE_PLUGINS:
-                result = install_plugin(str(demo.id), slug)
-                if "error" not in result:
-                    print(f"  ✓ Installed {slug}")
-            print(f"✓ Installed {len(CORE_PLUGINS)} core plugins for demo school")
+        # 3. Demo install STATE only — every slug resolves against the
+        # registry-backed mirror rows via install_plugin (never a catalog
+        # insert). Runs even when the school already existed so a re-seed
+        # tops up any missing core install.
+        installed = 0
+        for slug in CORE_PLUGINS:
+            result = install_plugin(str(demo.id), slug)
+            if "error" not in result:
+                installed += 1
+        print(f"✓ Demo school install state: {installed} core plugins ensured")
 
-        # 3. Create superadmin user
+        # 4. Create superadmin user
         superadmin = User.query.filter_by(email="superadmin@aschool.com.np").first()
         if not superadmin:
             superadmin = User(
@@ -122,7 +82,7 @@ def seed():
             db.session.commit()
             print("✓ Created superadmin (email=superadmin@aschool.com.np)")
 
-        # 4. Create demo school admin
+        # 5. Create demo school admin
         admin = User.query.filter_by(email="admin@demo.aschool.com.np").first()
         if not admin:
             admin = User(

@@ -7,6 +7,10 @@ Discovery order (Odoo-style):
 
 All plugin blueprints are loaded once at startup. The @plugin_required
 decorator handles per-school access control at request time.
+WP-style catalog model (2026-08-30): the plugins DIRECTORY is the catalog
+source of truth. The DB `plugins` table is only a per-school-install-state
+store plus a backward-compatible MIRROR of the catalog (refresh_registry()
+upserts it from the scanned manifests); nothing ever seeds the catalog.
 """
 
 import importlib
@@ -16,6 +20,10 @@ from pathlib import Path
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# Categories allowed by the plugins.category enum — anything else falls back
+# to "starter" so a bad manifest header can never break the mirror upsert.
+_VALID_CATEGORIES = {"core", "starter", "growth", "premium", "add_on"}
 
 
 class PluginLoader:
@@ -32,26 +40,22 @@ class PluginLoader:
     _manifests_dir = Path(__file__).parent / "manifests"  # Legacy flat manifests
 
     @classmethod
-    def discover_and_register(cls, app):
-        """Scan module directories and register each plugin's Flask blueprint."""
+    def _scan_manifests(cls) -> set[str]:
+        """Rescan both manifest sources into the in-memory registry.
+
+        Returns the set of blueprint module paths the manifests point at
+        (informational; mounting is decided in discover_and_register).
+        Does NOT touch Flask — safe to call at any time (refresh_registry).
+        """
         cls._plugins.clear()
-        registered_blueprints: set[str] = set()
-
-        # Blueprints mounted statically by the core app must not be
-        # re-registered from manifests (that created duplicate URL rules).
-        try:
-            from app.api.v1 import STATICALLY_MOUNTED_MODULES
-
-            registered_blueprints.update(STATICALLY_MOUNTED_MODULES)
-        except ImportError:  # pragma: no cover — defensive
-            pass
+        registered: set[str] = set()
 
         # ── 1. New Odoo-style modules (modules/{slug}/manifest.yaml) ──────
         if cls._modules_dir.exists():
             for manifest_file in sorted(cls._modules_dir.rglob("manifest.yaml")):
                 if manifest_file.parent == cls._modules_dir:
                     continue  # skip orphaned manifest.yaml at root
-                cls._load_manifest(app, manifest_file, registered_blueprints)
+                cls._load_manifest(manifest_file, registered)
         else:
             logger.debug(
                 "Modules directory not found: %s (using legacy manifests)",
@@ -63,19 +67,18 @@ class PluginLoader:
             for manifest_file in sorted(cls._manifests_dir.glob("*.yaml")):
                 if manifest_file.name.startswith("_"):
                     continue
-                cls._load_manifest(
-                    app, manifest_file, registered_blueprints, legacy=True
-                )
+                cls._load_manifest(manifest_file, registered, legacy=True)
 
         logger.info(
             "PluginLoader: %d modules registered (%d from modules/, legacy fills gaps)",
             len(cls._plugins),
             sum(1 for m in cls._plugins.values() if m.get("_source") == "module"),
         )
+        return registered
 
     @classmethod
     def _load_manifest(
-        cls, app, manifest_file: Path, registered_blueprints: set, legacy: bool = False
+        cls, manifest_file: Path, registered_blueprints: set, legacy: bool = False
     ):
         try:
             manifest = yaml.safe_load(manifest_file.read_text())
@@ -97,10 +100,84 @@ class PluginLoader:
 
         manifest["_source"] = "legacy" if legacy else "module"
         manifest["_manifest_path"] = str(manifest_file)
-        cls._plugins[slug] = manifest
 
-        bp_path = manifest.get("api_blueprint")
-        if bp_path and bp_path not in registered_blueprints:
+        # ── Extended header fields (WP-style plugin headers) ─────────────
+        module_dir = (
+            manifest_file.parent if manifest_file.parent != cls._manifests_dir else None
+        )
+        manifest["_author"] = manifest.get("author") or ""
+
+        # config_schema: a `config_schema: true` (or a relative path) header
+        # points at the settings-screen definition next to the manifest.
+        cfg_schema = manifest.get("config_schema")
+        if module_dir is not None:
+            if cfg_schema is True:
+                manifest["_config_schema_path"] = str(
+                    module_dir / "config_schema.yaml"
+                )
+            elif isinstance(cfg_schema, str) and cfg_schema:
+                manifest["_config_schema_path"] = str(module_dir / cfg_schema)
+            elif (module_dir / "config_schema.yaml").exists():
+                manifest["_config_schema_path"] = str(
+                    module_dir / "config_schema.yaml"
+                )
+            else:
+                manifest["_config_schema_path"] = None
+        else:
+            manifest["_config_schema_path"] = None
+
+        # hooks module: explicit `hooks:` header, else auto-detect the WP-style
+        # default (hooks.py next to the manifest) for module packages.
+        hooks = manifest.get("hooks")
+        if isinstance(hooks, str) and hooks:
+            manifest["_hooks_module"] = hooks
+        elif module_dir is not None and (module_dir / "hooks.py").exists():
+            manifest["_hooks_module"] = (
+                f"app.plugins.modules.{slug}.hooks"
+                if manifest.get("_source") == "module"
+                else None
+            )
+            if manifest["_hooks_module"] is None:
+                # Legacy manifests have no package home — skip auto hooks.
+                manifest.pop("_hooks_module")
+        else:
+            manifest["_hooks_module"] = None
+
+        cls._plugins[slug] = manifest
+        if manifest.get("api_blueprint"):
+            registered_blueprints.add(manifest["api_blueprint"])
+
+    @classmethod
+    def discover_and_register(cls, app):
+        """Scan module directories and register each plugin's Flask blueprint."""
+        cls._scan_manifests()
+
+        # Blueprints mounted statically by the core app must not be
+        # re-registered from manifests (that created duplicate URL rules).
+        # Only the STATICALLY_MOUNTED set counts as "already mounted" — the
+        # scan's returned paths are the manifests that still NEED mounting.
+        try:
+            from app.api.v1 import STATICALLY_MOUNTED_MODULES
+
+            already_mounted: set[str] = set(STATICALLY_MOUNTED_MODULES)
+        except ImportError:  # pragma: no cover — defensive
+            already_mounted = set()
+
+        cls._register_manifest_blueprints(app, already_mounted)
+
+    @classmethod
+    def _register_manifest_blueprints(cls, app, already_mounted: set) -> None:
+        """Mount every manifest blueprint that is not statically mounted.
+
+        Split from the scan so refresh_registry() can rescan the directory
+        without touching Flask — blueprint mounting happens exactly once,
+        at startup. Import failures are logged and non-fatal: a broken
+        plugin module must never take the whole app down.
+        """
+        for slug, manifest in list(cls._plugins.items()):
+            bp_path = manifest.get("api_blueprint")
+            if not bp_path or bp_path in already_mounted:
+                continue
             try:
                 mod = importlib.import_module(bp_path)
                 bp = (
@@ -112,11 +189,11 @@ class PluginLoader:
                     app.register_blueprint(
                         bp, url_prefix=f"/api/v1{bp.url_prefix or ''}"
                     )
-                    registered_blueprints.add(bp_path)
+                    already_mounted.add(bp_path)
                     logger.info(
                         "Registered blueprint: %s (%s)",
                         slug,
-                        "module" if not legacy else "legacy",
+                        manifest.get("_source", "module"),
                     )
                 else:
                     logger.warning(
@@ -124,8 +201,6 @@ class PluginLoader:
                     )
             except ImportError:
                 logger.debug("Plugin %s: blueprint %s not found (skip)", slug, bp_path)
-
-        logger.info("Loaded %d plugin manifests", len(cls._plugins))
 
     @classmethod
     def _find_blueprint(cls, module):
@@ -147,6 +222,145 @@ class PluginLoader:
     @classmethod
     def get_all_manifests(cls) -> dict:
         return cls._plugins
+
+    @classmethod
+    def get_module_dir(cls, slug: str) -> Path | None:
+        """Directory of a module-package plugin, if it has one."""
+        manifest = cls._plugins.get(slug)
+        if not manifest or manifest.get("_source") != "module":
+            return None
+        path = Path(manifest.get("_manifest_path", "")).parent
+        return path if path != cls._manifests_dir else None
+
+    @classmethod
+    def get_config_schema(cls, slug: str) -> list[dict]:
+        """Settings-screen fields for a plugin from its config_schema.yaml.
+
+        Returns [] when the plugin carries no schema (the settings UI then
+        falls back to the generic key/value editor).
+        """
+        manifest = cls._plugins.get(slug)
+        if not manifest:
+            return []
+        schema_path = manifest.get("_config_schema_path")
+        if not schema_path:
+            return []
+        try:
+            data = yaml.safe_load(Path(schema_path).read_text())
+        except (OSError, yaml.YAMLError) as e:
+            logger.error("Failed to parse config schema for %s: %s", slug, e)
+            return []
+        if not data:
+            return []
+        fields = data.get("fields", []) if isinstance(data, dict) else data
+        return fields if isinstance(fields, list) else []
+
+    @classmethod
+    def get_hooks(cls, slug: str):
+        """Import and return a plugin's lifecycle hooks module, or None.
+
+        Import failures are logged (warning) and returned as None — a broken
+        hooks module must never take the app or the install flow down.
+        """
+        manifest = cls._plugins.get(slug)
+        if not manifest:
+            return None
+        module_path = manifest.get("_hooks_module")
+        if not module_path:
+            return None
+        try:
+            return importlib.import_module(module_path)
+        except Exception as e:  # noqa: BLE001 — never fatal by contract
+            logger.warning("Plugin %s: hooks module %s failed to import: %s",
+                           slug, module_path, e)
+            return None
+
+    # ── DB catalog mirror (WP: filesystem is the catalog, DB only mirrors) ──
+
+    @classmethod
+    def refresh_registry(cls) -> dict:
+        """Rescan the plugin directories and UPSERT the `plugins` mirror table.
+
+        The plugins directory is the catalog source of truth (zero seeding):
+        - missing folders' mirror rows are created (published=True unless the
+          manifest itself says `published: false`);
+        - existing rows get additive field syncs from their manifests;
+        - DB rows whose folder/manifest vanished are unpublished
+          (published=False — never deleted, history is preserved).
+        """
+        cls._scan_manifests()
+
+        from app.models.plugin import Plugin
+        from extensions import db
+
+        created = updated = 0
+        scanned_slugs: set[str] = set()
+        for slug, m in cls._plugins.items():
+            scanned_slugs.add(slug)
+            price_monthly = m.get("price_monthly") or 0
+            price_yearly = m.get("price_yearly") or 0
+            try:
+                price_monthly = float(price_monthly)
+                price_yearly = float(price_yearly)
+            except (TypeError, ValueError):
+                price_monthly = price_yearly = 0.0
+            is_free = bool(m.get("is_free", price_monthly == 0))
+            category = m.get("category") or "core"
+            if category not in _VALID_CATEGORIES:
+                category = "starter"
+            is_published = bool(m.get("published", True))
+            fields = dict(
+                name=m.get("name") or slug,
+                name_nepali=m.get("name_nepali") or "",
+                description=m.get("description") or "",
+                category=category,
+                price_monthly=price_monthly,
+                price_yearly=price_yearly,
+                is_free=is_free,
+                version=m.get("version") or "1.0.0",
+                emoji=m.get("emoji"),
+                icon=m.get("icon"),
+                depends_on=m.get("depends_on") or [],
+                conflicts_with=m.get("conflicts_with") or [],
+                api_blueprint=m.get("api_blueprint"),
+            )
+
+            existing = Plugin.query.filter_by(slug=slug).first()
+            if not existing:
+                plugin = Plugin(slug=slug, is_published=is_published, **fields)
+                db.session.add(plugin)
+                created += 1
+                continue
+            # Additive mirror sync — the manifest wins over drift, the DB
+            # keeps fields manifests don't carry (screenshots, tags, stats).
+            for key, value in fields.items():
+                if getattr(existing, key, None) != value:
+                    setattr(existing, key, value)
+            if bool(existing.is_published) != is_published:
+                existing.is_published = is_published
+            updated += 1
+        db.session.commit()
+
+        # Unpublish mirror rows whose plugin folder/manifest is gone.
+        deactivated = 0
+        orphans = Plugin.query.filter(
+            Plugin.slug.notin_(scanned_slugs) if scanned_slugs else Plugin.slug.isnot(None),
+            Plugin.is_published.is_(True),
+        ).all()
+        for row in orphans:
+            row.is_published = False
+            deactivated += 1
+        if deactivated:
+            db.session.commit()
+
+        result = {
+            "scanned": len(cls._plugins),
+            "created": created,
+            "updated": updated,
+            "deactivated": deactivated,
+        }
+        logger.info("Plugin registry refreshed: %s", result)
+        return result
 
     # ── Core slugs always included regardless of installation status ──────────
     CORE_ALWAYS_SLUGS: list[str] = [
