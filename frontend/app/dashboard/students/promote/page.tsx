@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -223,10 +223,7 @@ export default function PromotePage() {
   const allSelected = eligibleStudents.length > 0 && selectedIds.size === eligibleStudents.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
 
-  const canPromote = useMemo(
-    () => Boolean(fromClass && toClass && fromClass !== toClass && selectedIds.size > 0),
-    [fromClass, toClass, selectedIds.size],
-  );
+  const canPromote = Boolean(fromClass && toClass && fromClass !== toClass && selectedIds.size > 0);
 
   return (
     <div className="space-y-6">
