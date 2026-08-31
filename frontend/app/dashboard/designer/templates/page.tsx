@@ -32,6 +32,7 @@ interface Template {
   category: string;
   editor_type?: "designer" | "writer";
   thumbnail_url: string;
+  thumbnail_emoji?: string;
   is_default: boolean;
   description?: string;
 }
@@ -119,11 +120,21 @@ function TemplatesContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((t: Template) => (
             <Card key={t.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="aspect-[3/4] bg-muted flex items-center justify-center">
+              <div className="aspect-[3/4] bg-muted flex items-center justify-center relative">
                 {t.thumbnail_url ? (
-                  <img src={t.thumbnail_url} alt={t.name} className="w-full h-full object-cover" />
+                  <>
+                    <img
+                      src={t.thumbnail_url}
+                      alt={t.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    <Badge className="absolute top-2 left-2 bg-background/85 text-foreground border text-[10px] h-5 px-1.5 backdrop-blur-sm">
+                      Demo
+                    </Badge>
+                  </>
                 ) : (
-                  <span className="text-muted-foreground text-sm">Preview</span>
+                  <span className="text-muted-foreground text-4xl">{t.thumbnail_emoji || "📄"}</span>
                 )}
               </div>
               <CardContent className="p-4 space-y-2">

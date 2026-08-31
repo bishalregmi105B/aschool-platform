@@ -17,6 +17,7 @@ import { useCanvas, PAGE_SIZES } from "@/lib/hooks/useCanvas";
 import { useExport } from "@/lib/hooks/useExport";
 import { useDesignerStore, type DesignerPanel } from "@/lib/designer/store";
 import { attachShortcuts } from "@/lib/designer/shortcuts";
+import { absolutizeImageUrl } from "@/lib/designer/canvasImages";
 
 import { Button }   from "@/components/ui/button";
 import { FilePicker } from "@/components/files/FilePicker";
@@ -67,6 +68,35 @@ const SIDEBAR_ICONS: Array<{ id: DesignerPanel; icon: string; label: string }> =
 
 interface ContextMenuState { x: number; y: number }
 const CTX_NULL: ContextMenuState | null = null;
+
+// ── drag-drop / clipboard-paste helpers ────────────────────────────────
+
+/** Blob → data: URI (clipboard images and dropped files insert as data URIs,
+ *  which never fail CORS and never taint the canvas for exports). */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Map a client (viewport) point to logical canvas coordinates — the same
+ *  inversion fabric's getPointer does, done manually so it works with
+ *  native DragEvent/DropEvent objects (fabric v6 expects its own events). */
+function canvasPointFromClient(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
+  const fc = (window as any).__activeCanvas;
+  if (!fc?.getElement) return null;
+  const rect = fc.getElement().getBoundingClientRect();
+  const vpt: number[] = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+  const [a, b, c, d, tx, ty] = vpt;
+  const det = a * d - b * c;
+  if (!det) return null;
+  const px = e.clientX - rect.left - tx;
+  const py = e.clientY - rect.top - ty;
+  return { x: (d * px - b * py) / det, y: (-c * px + a * py) / det };
+}
 
 export default function CanvasEditor() {
   const router       = useRouter();
@@ -365,6 +395,144 @@ export default function CanvasEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas.isReady, canvas.zoom]);
 
+  // ── drag & drop images onto the canvas (files + image URLs) ──────
+  // Separate effect so the non-passive ctrl+wheel listener above stays put.
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el || !canvas.isReady) return;
+    let dragDepth = 0;
+
+    const wantsDrop = (e: DragEvent) => {
+      const dt = e.dataTransfer;
+      if (!dt) return false;
+      const types = Array.from(dt.types ?? []);
+      return types.includes("Files") || types.includes("text/uri-list");
+    };
+    const showHint = () => {
+      el.style.outline = "2px dashed rgb(99 102 241 / 0.7)";
+      el.style.outlineOffset = "-2px";
+    };
+    const hideHint = () => { el.style.outline = ""; };
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!wantsDrop(e)) return;
+      dragDepth += 1;
+      e.preventDefault();
+      showHint();
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!wantsDrop(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      showHint();
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!wantsDrop(e)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) hideHint();
+    };
+    const onDrop = (e: DragEvent) => {
+      dragDepth = 0;
+      hideHint();
+      if (!wantsDrop(e)) return;
+      e.preventDefault();
+      const dt = e.dataTransfer!;
+      // insert centered on the drop point (logical canvas coords)
+      const center = canvasPointFromClient(e) ?? undefined;
+
+      // 1) dropped image files
+      const file = Array.from(dt.files ?? []).find((f) => f.type.startsWith("image/"));
+      if (file) {
+        blobToDataUrl(file)
+          .then((dataUrl) => canvas.addImage(dataUrl, { center, intoFrame: "auto" }))
+          .catch(() => toast.error("Couldn't load image"));
+        return;
+      }
+
+      // 2) image URL dragged from another tab / the OS
+      const uri = (dt.getData("text/uri-list") || dt.getData("text/plain") || "").trim();
+      if (/^(https?:\/\/|data:image\/)/i.test(uri)) {
+        canvas.addImage(uri, { center, intoFrame: "auto" });
+        return;
+      }
+      toast.error("Only image files or image URLs can be dropped on the canvas");
+    };
+
+    el.addEventListener("dragenter", onDragEnter);
+    el.addEventListener("dragover", onDragOver);
+    el.addEventListener("dragleave", onDragLeave);
+    el.addEventListener("drop", onDrop);
+    return () => {
+      el.removeEventListener("dragenter", onDragEnter);
+      el.removeEventListener("dragover", onDragOver);
+      el.removeEventListener("dragleave", onDragLeave);
+      el.removeEventListener("drop", onDrop);
+      hideHint();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.isReady, canvas.addImage]);
+
+  // ── paste images from the system clipboard (Ctrl+V) ──────────────
+  // Only clipboard items of type image/* are handled, so the existing
+  // copy/paste of fabric objects keeps working unchanged.
+  useEffect(() => {
+    if (!canvas.isReady) return;
+
+    const isEditable = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+
+    /** True if an image was found on the system clipboard and inserted. */
+    const insertClipboardImage = async () => {
+      if (!navigator.clipboard?.read) return false;
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        canvas.addImage(await blobToDataUrl(blob), { intoFrame: "auto" });
+        return true;
+      }
+      return false;
+    };
+
+    // attachShortcuts cancels Ctrl+V keydowns, which suppresses the native
+    // `paste` event — so the reliable entry point is a capture-phase keydown
+    // that reads the system clipboard itself. No image there → fall back to
+    // the existing fabric-object paste; read() unavailable/denied → same.
+    const onKeyDownCapture = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "v") return;
+      if (isEditable(e.target)) return; // inputs / editing text: native paste
+      if (!navigator.clipboard?.read) return; // paste-event fallback below
+      e.preventDefault();
+      e.stopPropagation();
+      insertClipboardImage()
+        .then((inserted) => { if (!inserted) canvas.pasteClipboard(); })
+        .catch(() => canvas.pasteClipboard());
+    };
+
+    // native paste events (browser Edit menu, etc.) — images only
+    const onPaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imageItem = items.find((i) => i.type.startsWith("image/"));
+      if (!imageItem) return; // not an image → existing fabric paste flow
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      blobToDataUrl(file)
+        .then((dataUrl) => canvas.addImage(dataUrl))
+        .catch(() => toast.error("Couldn't load image"));
+    };
+
+    window.addEventListener("keydown", onKeyDownCapture, true);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKeyDownCapture, true);
+      window.removeEventListener("paste", onPaste);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.isReady, canvas.addImage]);
+
   // ── context menu ───────────────────────────────────────────────
   const onCanvasContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -480,7 +648,9 @@ export default function CanvasEditor() {
           onSelect={(files) => {
             const selected = files[0];
             if (selected?.url) {
-              canvas.addImage(selected.url);
+              // relative /uploads paths must resolve against the API origin;
+              // addImage then fetches it into a data URI (CORS-proof insert)
+              canvas.addImage(absolutizeImageUrl(selected.url));
             }
           }}
         />

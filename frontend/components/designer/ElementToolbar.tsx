@@ -19,7 +19,7 @@ import {
   Type, Heading1, Heading2, Heading3, Square, Circle, Triangle,
   Minus, ImagePlus, Link2, Trash2, Copy, BringToFront, SendToBack,
   AlignCenterHorizontal, AlignCenterVertical, FlipHorizontal, FlipVertical,
-  ArrowRight, Layers, Ungroup,
+  ArrowRight, Layers, Ungroup, Frame,
 } from "lucide-react";
 
 interface Props { canvas: any; }
@@ -32,6 +32,14 @@ const EXTRA_SHAPES = [
   { label: "Star 4pt",  icon: "✦", action: (c: any) => c.addStar(4) },
   { label: "Star 6pt",  icon: "✶", action: (c: any) => c.addStar(6) },
   { label: "Arrow →",   icon: "➡", action: (c: any) => c.addArrow() },
+];
+
+/** Canva-style image frames (canvas.addFrame clips a dropped photo to the shape) */
+const FRAMES = [
+  { label: "Rounded Frame", icon: "▢", kind: "rounded" as const },
+  { label: "Circle Frame",  icon: "●", kind: "circle" as const },
+  { label: "Star Frame",    icon: "★", kind: "star" as const },
+  { label: "Blob Frame",    icon: "◍", kind: "blob" as const },
 ];
 
 function ToolBtn({ icon: Icon, label, action, danger = false }: {
@@ -125,6 +133,38 @@ export default function ElementToolbar({ canvas }: Props) {
               </Tooltip>
             ))}
           </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Frames popover (Canva-style image frames) */}
+      <Popover>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 hover:text-primary">
+                <Frame className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right">Image Frames</TooltipContent>
+        </Tooltip>
+        <PopoverContent side="right" className="w-44 p-2">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">Image Frames</p>
+          <div className="grid grid-cols-4 gap-1">
+            {FRAMES.map(({ label, icon, kind }) => (
+              <Tooltip key={kind}>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-10 w-full text-xl" onClick={() => canvas.addFrame(kind)}>
+                    {icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Drop an image over a frame to clip it into the shape.
+          </p>
         </PopoverContent>
       </Popover>
 

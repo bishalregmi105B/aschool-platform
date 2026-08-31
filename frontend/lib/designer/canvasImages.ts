@@ -33,6 +33,15 @@ function absolutize(src: string): string {
   return src;
 }
 
+/**
+ * Public form of `absolutize` for UI code (same pattern as CanvasEditor's
+ * applyDataFields): relative "/uploads/..." paths must hit the API origin,
+ * not the frontend one. Other URLs pass through untouched.
+ */
+export function absolutizeImageUrl(src: string): string {
+  return absolutize(src);
+}
+
 async function fetchAsDataUrl(url: string, timeoutMs = 8000): Promise<string | null> {
   try {
     const controller = new AbortController();
@@ -64,6 +73,115 @@ function cachedFetch(url: string): Promise<string | null> {
     p.then((r) => { if (r === null) setTimeout(() => fetchCache.delete(url), 15000); });
   }
   return p;
+}
+
+// ── interactive image insertion (addImage / drag-drop / paste) ────────────
+//
+// The preload path above returns null on failure (one broken photo must not
+// blank a template load). The interactive path below is different: the user
+// explicitly asked for THIS image, so it throws a meaningful error instead
+// of failing silently, and it goes to greater lengths to actually load:
+//
+//  - Same-origin first: next.config.js rewrites `/uploads/:path*` and
+//    `/api/:path*` to the backend, so fetching those paths against the
+//    FRONTEND origin needs no CORS at all (R2/API origins may not send any).
+//  - `credentials: "include"` mirrors lib/api.ts (session tokens are
+//    HttpOnly cookies via withCredentials — there is no JWT header) so
+//    school-scoped upload URLs authenticate.
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("could not read image data"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchImageToDataUrl(url: string, timeoutMs: number): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      mode: "cors",
+      credentials: "include", // replicate axios withCredentials (cookie session)
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const blob = await res.blob();
+    if (blob.size === 0) throw new Error("empty response body");
+    if (blob.type && !blob.type.startsWith("image/")) {
+      throw new Error(`not an image (${blob.type})`);
+    }
+    return await blobToDataUrl(blob);
+  } catch (err) {
+    const raw = err instanceof Error ? err : new Error(String(err));
+    let reason: string;
+    if (raw.name === "AbortError") reason = `timed out after ${(timeoutMs / 1000).toFixed(0)}s`;
+    else if (raw.name === "TypeError") reason = "network or CORS error";
+    else reason = raw.message || "unknown error";
+    throw new Error(`${reason} (${new URL(url, window.location.origin).host})`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** All URLs worth trying for one image source (same-origin rewrite first). */
+function imageSrcCandidates(url: string): string[] {
+  const out: string[] = [];
+  const push = (u: string) => {
+    try {
+      const abs = new URL(u, window.location.origin).href;
+      if (!out.includes(abs)) out.push(abs);
+    } catch { /* unparsable — skip */ }
+  };
+  if (url.startsWith("/")) {
+    // 1) same-origin → Next.js rewrite forwards to the backend (no CORS)
+    // 2) direct API origin (in case the rewrite isn't available)
+    push(`${window.location.origin}${url}`);
+    push(`${apiBase()}${url}`);
+  } else {
+    push(url);
+    // a URL built against the API origin also exists behind the same path on
+    // the frontend origin (rewrite) — retry there if the direct one fails
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.origin !== window.location.origin && parsed.pathname.startsWith("/uploads/")) {
+        push(`${parsed.pathname}${parsed.search}`);
+      }
+    } catch { /* not a parseable URL — nothing else to try */ }
+  }
+  return out;
+}
+
+const resolveCache = new Map<string, Promise<string>>();
+
+/**
+ * Resolve any image source (http(s) URL, relative /uploads path, or data:
+ * URI) into a guaranteed-loadable data URI for interactive canvas insertion.
+ * data: URLs (including SVG data URLs) pass straight through. Throws an
+ * Error with a meaningful message on failure — callers should surface it
+ * (toast), never swallow it.
+ */
+export function resolveImageSrc(url: string, timeoutMs = 10000): Promise<string> {
+  if (url.startsWith("data:")) return Promise.resolve(url);
+  const cached = resolveCache.get(url);
+  if (cached) return cached;
+  const task = (async () => {
+    let lastError = "unknown error";
+    for (const candidate of imageSrcCandidates(url)) {
+      try {
+        return await fetchImageToDataUrl(candidate, timeoutMs);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    }
+    throw new Error(lastError);
+  })();
+  resolveCache.set(url, task);
+  // evict failures so a later attempt can retry (network flake, login, ...)
+  task.catch(() => { setTimeout(() => resolveCache.delete(url), 15000); });
+  return task;
 }
 
 export interface PreloadOptions {

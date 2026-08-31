@@ -376,11 +376,25 @@ def list_templates():
     from app.services.designer.template_engine import TemplateEngineService
 
     category = request.args.get("category")
-    return success_response(
-        TemplateEngineService.list_templates_for_school(
-            category=category, school_id=g.school_id
-        )
+    templates = TemplateEngineService.list_templates_for_school(
+        category=category, school_id=g.school_id
     )
+
+    # ── Demo thumbnails (additive): attach thumbnail_url for folder templates
+    # that ship a generated thumbnail.png, and lazily render missing ones in a
+    # fire-and-forget thread when the backlog is small (never blocks the list).
+    try:
+        from app.services.designer.thumbnails import (
+            attach_thumbnail_urls,
+            ensure_thumbnails_async,
+        )
+
+        attach_thumbnail_urls(templates)
+        ensure_thumbnails_async()
+    except Exception:
+        pass
+
+    return success_response(templates)
 
 
 @design_studio_bp.route("/templates", methods=["POST"])
@@ -1012,3 +1026,67 @@ def template_asset(template_key, filename):
     if not os.path.isdir(assets_dir):
         return error_response("No assets", 404)
     return send_from_directory(assets_dir, filename)
+
+
+@design_studio_bp.route("/templates/<template_key>/thumbnail", methods=["GET"])
+def template_thumbnail(template_key):
+    """Serve the generated demo thumbnail PNG for a template folder
+    (public, like assets — non-sensitive template art)."""
+    import os
+
+    from flask import send_file
+
+    from app.services.designer.thumbnails import thumbnail_path
+
+    path = thumbnail_path(template_key)
+    if not os.path.isfile(path):
+        return error_response("Thumbnail not found", 404)
+    return send_file(path, mimetype="image/png", max_age=3600)
+
+
+# ── Writer v2 — server-side DOCX export (fallback) ────────────
+# The writer2 page exports .docx client-side first (lib/writer/exportDocx.ts);
+# this route is the fallback that runs the same mapping with python-docx.
+
+
+@design_studio_bp.route("/writer/export-docx", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def export_writer_docx():
+    """Export a writer2 (TipTap) document to .docx.
+
+    Body: {name?: str, doc: ProseMirrorJSON, settings?: WriterSettings}.
+    Returns the .docx binary as an attachment.
+    """
+    from io import BytesIO
+    import re
+
+    from flask import current_app
+
+    payload = request.get_json(silent=True) or {}
+    doc = payload.get("doc") or {}
+    settings = payload.get("settings") or {}
+    name = payload.get("name") or "document"
+    if not isinstance(doc, dict) or not doc:
+        return error_response("doc (ProseMirror JSON) is required", 400)
+
+    try:
+        from app.services.writer_docx import writer_doc_to_bytes
+    except ImportError:
+        return error_response("DOCX export is unavailable on this server (python-docx missing)", 501)
+
+    try:
+        data = writer_doc_to_bytes(doc, settings, name=name)
+    except Exception:
+        current_app.logger.exception("writer DOCX export failed")
+        return error_response("Failed to render DOCX", 500)
+
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]+", "_", name).strip("_").lower() or "document"
+    return send_file(
+        BytesIO(data),
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=True,
+        download_name=f"{safe_name}.docx",
+    )

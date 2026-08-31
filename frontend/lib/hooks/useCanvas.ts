@@ -13,9 +13,10 @@
  *  - Keyboard nudge, distribute, align, lock/hide, reorder APIs
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useDesignerStore, type HistoryEntry } from "../designer/store";
 import { collectTargets, computeSnap, GuideRenderer } from "../designer/snapping";
-import { preloadCanvasImages } from "../designer/canvasImages";
+import { preloadCanvasImages, resolveImageSrc } from "../designer/canvasImages";
 
 export type FabricCanvas = any;
 export type FabricObject = any;
@@ -504,14 +505,86 @@ export function useCanvas(
     });
   }, [addObject]);
 
-  const addImage = useCallback((url: string) => {
-    import("fabric").then(({ FabricImage }) => {
-      FabricImage.fromURL(url, { crossOrigin: "anonymous" }).then((img: any) => {
-        img.scaleToWidth(200);
-        img.set({ left: 100, top: 100 });
-        addObject(img);
-      }).catch(() => {});
-    });
+  /**
+   * Insert an image from a URL, relative /uploads path, or data URI.
+   *
+   * Everything is resolved to a data URI first (resolveImageSrc): data URIs
+   * never fail CORS, never taint the canvas, and survive export/undo/redo.
+   * Uploaded files may live on the API/R2 origin without CORS headers, so a
+   * naive `FabricImage.fromURL(url, { crossOrigin: "anonymous" })` fails
+   * silently there — that is the bug this replaces. Failures toast; nothing
+   * is swallowed.
+   *
+   * opts.center — logical page point to center the image on (drag & drop
+   * target); defaults to the center of the visible viewport (zoom-aware).
+   */
+  const addImage = useCallback((url: string, opts: Record<string, any> = {}) => {
+    if (!url) {
+      toast.error("Couldn't load image", { description: "No image source was provided" });
+      return;
+    }
+    Promise.all([import("fabric"), resolveImageSrc(url)])
+      .then(([{ FabricImage, util, Point }, dataUri]) =>
+        FabricImage.fromURL(dataUri).then((img: any) => ({ util, Point, img })))
+      .then(({ util, Point, img }) => {
+        img.scaleToWidth(opts.width ?? 200);
+        let cx: number, cy: number;
+        if (opts.center && typeof opts.center.x === "number" && typeof opts.center.y === "number") {
+          cx = opts.center.x; cy = opts.center.y;
+        } else {
+          // center of the visible viewport in logical coords: invert the
+          // viewport transform at the fabric element's screen center
+          const fc = fabricRef.current;
+          const vpt = fc?.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+          const p = util.transformPoint(
+            new Point((fc?.getWidth() ?? 794) / 2, (fc?.getHeight() ?? 1123) / 2),
+            util.invertTransform(vpt),
+          );
+          cx = p.x; cy = p.y;
+        }
+        img.set({ left: cx - img.getScaledWidth() / 2, top: cy - img.getScaledHeight() / 2 });
+        // Frame drop: when opts.intoFrame names a frame group (or any frame
+        // exists if "auto"), clip the image inside it instead of stacking.
+        const fc2 = fabricRef.current;
+        const frames = (fc2?.getObjects() ?? []).filter(
+          (o: any) => o.clipPath && (String(o.name || "").startsWith("frame-") || o.data?.type === "frame"),
+        );
+        let target: any = null;
+        if (opts.intoFrame && opts.intoFrame !== "auto") {
+          target = frames.find((f: any) => f.name === opts.intoFrame || f === opts.intoFrame) ?? null;
+        } else if (opts.intoFrame === "auto" && frames.length) {
+          target = frames
+            .filter((f: any) => {
+              const fb = f.getBoundingRect();
+              return cx >= fb.left && cx <= fb.left + fb.width && cy >= fb.top && cy <= fb.top + fb.height;
+            })
+            .sort((a: any, b: any) => {
+              const av = Math.min(a.getBoundingRect().width, 1) * Math.min(a.getBoundingRect().height, 1);
+              const bv = Math.min(b.getBoundingRect().width, 1) * Math.min(b.getBoundingRect().height, 1);
+              return av - bv;
+            })[0] ?? null;
+        }
+        if (target) {
+          const fb = target.getBoundingRect();
+          // cover-fit: scale so the image fills the frame, centered
+          const s = Math.max(fb.width / img.width, fb.height / img.height);
+          img.scaleX = s; img.scaleY = s;
+          img.set({ left: fb.left + (fb.width - img.getScaledWidth()) / 2,
+                    top: fb.top + (fb.height - img.getScaledHeight()) / 2 });
+          target.add(img);
+          fc2?.setActiveObject(target);
+          fc2?.requestRenderAll();
+          toast.success("Image placed in frame");
+        } else {
+          addObject(img);
+          toast.success("Image added");
+        }
+      })
+      .catch((err: unknown) => {
+        toast.error("Couldn't load image", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      });
   }, [addObject]);
 
   /** Insert an SVG string (icon library) as a colorable group. */
@@ -575,6 +648,35 @@ export function useCanvas(
       snapshotNow();
     });
   }, [addObject, snapshotNow]);
+
+  /**
+   * Image frame (Canva-style): a fabric Group whose clipPath is the frame
+   * silhouette, containing a colored placeholder Rect marked data:{frame:true}.
+   * Drop/assign an image into it and the clipPath crops the photo to the
+   * frame shape. Kinds: rounded | circle | star | blob.
+   */
+  const addFrame = useCallback((kind: "rounded" | "circle" | "star" | "blob" = "rounded", opts: Record<string, any> = {}) => {
+    import("fabric").then(({ Group, Rect, Path }) => {
+      const S = 220;
+      const silhouettes: Record<string, string> = {
+        rounded: "M36 0H184A36 36 0 0 1 220 36V184A36 36 0 0 1 184 220H36A36 36 0 0 1 0 184V36A36 36 0 0 1 36 0Z",
+        circle: "M0 110A110 110 0 1 1 220 110A110 110 0 1 1 0 110Z",
+        star: "M110 2L137 72.8L212.7 76.6L153.7 124.2L173.5 197.4L110 156L46.5 197.4L66.3 124.2L7.3 76.6L83 72.8Z",
+        blob: "M110 4C160 0 206 34 214 86C220 130 194 176 152 202C112 226 58 218 28 184C2 154 4 104 22 66C42 26 70 8 110 4Z",
+      };
+      const d = silhouettes[kind] ?? silhouettes.rounded;
+      // placeholder that fills the frame until an image is dropped in
+      const placeholder = new Rect({ left: 0, top: 0, width: S, height: S, fill: "#e2e8f0", strokeWidth: 0 });
+      (placeholder as any).data = { frame: true };
+      // clipPath coordinates are relative to the group CENTER → offset by -size/2
+      const clip = new Path(d, { fill: "#000000" });
+      clip.set({ left: -clip.width / 2, top: -clip.height / 2 });
+      const group = new Group([placeholder], { clipPath: clip, ...opts });
+      (group as any).data = { type: "frame", frame: kind };
+      (group as any).name = `frame-${kind}`;
+      addObject(group);
+    });
+  }, [addObject]);
 
   const deleteSelected = useCallback(() => {
     const fc = fabricRef.current;
@@ -888,6 +990,7 @@ export function useCanvas(
     // elements
     addText, addHeading, addRect, addCircle, addTriangle,
     addPolygon, addStar, addArrow, addLine, addImage, addSVG, addQR, addWatermark,
+    addFrame,
     deleteSelected,
     bringForward, sendBackward, bringToFront, sendToBack, setObjectZ,
     duplicateSelected, copySelected, pasteClipboard,
