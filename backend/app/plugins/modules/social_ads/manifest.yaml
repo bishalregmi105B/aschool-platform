@@ -8,7 +8,7 @@ emoji: "📢"
 icon: "Megaphone"
 description: "Meta Ads API post boosting for admission campaigns"
 
-api_blueprint: "app.api.v1.social_hub"
+api_blueprint: "app.plugins.modules.social_ads.routes"
 models_module: "app.models.social"
 services:
   - "app.services.social.meta_ads"

@@ -408,6 +408,17 @@ def create_app(config_name: str | None = None) -> Flask:
 
     PluginLoader.discover_and_register(app)
 
+    # WP-style catalog: the plugins directory is the source of truth. Sync
+    # the DB mirror rows (create/update/unpublish orphans) so a fresh deploy
+    # gets a full marketplace with ZERO plugin seeding. Best-effort — a
+    # refresh failure must never prevent the app from starting. Needs an app
+    # context (Flask-SQLAlchemy 3 session) — create_app does not push one.
+    try:
+        with app.app_context():
+            PluginLoader.refresh_registry()
+    except Exception as e:  # noqa: BLE001 — startup resilience
+        app.logger.error("Plugin registry refresh failed at startup: %s", e)
+
     # Register cross-plugin event listeners
     from app.plugins import listeners  # noqa: F401 — registers @on() handlers
 

@@ -8,7 +8,7 @@ emoji: "🏢"
 icon: "Building2"
 description: "Cross-school unified dashboard, chain analytics"
 
-api_blueprint: "app.api.v1.multi_branch"
+api_blueprint: "app.plugins.modules.multi_branch.routes"
 models_module: "app.models.school_chain"
 
 depends_on: []

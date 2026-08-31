@@ -8,7 +8,7 @@ emoji: "✋"
 icon: "Fingerprint"
 description: "ZKTeco fingerprint attendance"
 
-api_blueprint: "app.api.v1.attendance"
+api_blueprint: "app.plugins.modules.biometric.routes"
 models_module: "app.models.attendance"
 
 depends_on:

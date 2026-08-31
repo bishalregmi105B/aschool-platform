@@ -1,0 +1,15 @@
+# Fees plugin settings screen (SchoolPlugin.config).
+# Real consumer: app/tasks/fee_reminders.py — send_fee_reminders honors
+# `reminder_enabled` (skip when false) and `reminder_overdue_days` (replaces
+# the hardcoded 30-day overdue cutoff; values below 1 fall back to 30).
+fields:
+  - key: reminder_enabled
+    label: "Fee reminders"
+    type: boolean
+    default: true
+    help: "Send SMS/push reminders to guardians for overdue fees."
+  - key: reminder_overdue_days
+    label: "Remind after (days overdue)"
+    type: number
+    default: 30
+    help: "Only fees pending for at least this many days get a reminder."

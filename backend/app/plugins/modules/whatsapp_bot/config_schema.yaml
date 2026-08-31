@@ -1,0 +1,41 @@
+# WhatsApp Bot plugin settings screen (SchoolPlugin.config).
+# Real consumer: the AI settings editor (/dashboard/communications/whatsapp/
+# ai-settings) persists exactly this `ai_settings` object via
+# GET/PUT /plugins/whatsapp_bot/config — the generic form edits the same keys
+# with dot paths so both screens stay in sync.
+fields:
+  - key: ai_settings.auto_reply_enabled
+    label: "AI auto-reply"
+    type: boolean
+    default: true
+    help: "Bot answers incoming parent/student messages automatically."
+  - key: ai_settings.ai_persona
+    label: "AI persona"
+    type: string
+    default: ""
+    help: "System prompt describing how the bot should talk (school tone, language)."
+  - key: ai_settings.working_hours.enabled
+    label: "Limit to working hours"
+    type: boolean
+    default: false
+    help: "Only auto-reply during the configured working hours."
+  - key: ai_settings.working_hours.start
+    label: "Working hours start"
+    type: string
+    default: "09:00"
+    help: "24h time (HH:MM), Nepal time."
+  - key: ai_settings.working_hours.end
+    label: "Working hours end"
+    type: string
+    default: "17:00"
+    help: "24h time (HH:MM), Nepal time."
+  - key: ai_settings.working_hours.days
+    label: "Working days"
+    type: json
+    default: ["Sun", "Mon", "Tue", "Wed", "Thu"]
+    help: "JSON array of day names, e.g. [\"Sun\",\"Mon\",\"Tue\",\"Wed\",\"Thu\"]."
+  - key: ai_settings.working_hours.off_hours_message
+    label: "Off-hours message"
+    type: string
+    default: ""
+    help: "Sent instead of the AI reply outside working hours."

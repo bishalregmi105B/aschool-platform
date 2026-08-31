@@ -27,7 +27,7 @@ class WebsiteBuilderService:
 
         customizations = config.customizations or {}
 
-        default_theme = cls._default_theme_slug()
+        default_theme = cls._default_theme_for_school(school_id)
         config_dict = {
             "school_id": school_id,
             "school_name": school.name if school else "",
@@ -177,10 +177,33 @@ class WebsiteBuilderService:
             return "global-elearning"
 
     @classmethod
+    def _default_theme_for_school(cls, school_id: str) -> str:
+        """Theme a school's site falls back to before the builder picks one.
+
+        Plugin-config aware (config_schema.yaml → `default_theme`): the
+        website_builder plugin config can set the fallback; the value is
+        validated against the live ThemeEngine registry so an unknown id
+        silently falls back to the platform default.
+        """
+        try:
+            from app.plugins.config_store import plugin_config_value
+            from app.services.website.theme_engine import ThemeEngineService
+
+            configured = plugin_config_value(
+                str(school_id), "website_builder", "default_theme", None
+            )
+            if configured and isinstance(configured, str):
+                if ThemeEngineService.get_theme(configured):
+                    return configured
+        except Exception:  # pragma: no cover — never block config reads
+            pass
+        return cls._default_theme_slug()
+
+    @classmethod
     def _default_config(cls, school_id: str) -> dict:
         return {
             "school_id": school_id,
-            "theme": cls._default_theme_slug(),
+            "theme": cls._default_theme_for_school(school_id),
             "primary_color": "#1a365d",
             "secondary_color": "#2563eb",
             "pages": [

@@ -2,6 +2,7 @@
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
+from app.plugins.config_store import plugin_config_value
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
@@ -34,7 +35,11 @@ def generate_question_paper():
         difficulty=data.get("difficulty", "medium"),
         include_answer_key=data.get("include_answer_key", True),
         question_types=data.get("question_types"),
-        language=data.get("language", "english"),
+        # Plugin-config default (config_schema.yaml) when request omits it.
+        language=data.get("language")
+        or plugin_config_value(
+            str(g.school_id), "ai_tools", "default_language", "english"
+        ),
     )
     if "error" in result:
         return error_response(result["error"], 500)
@@ -62,8 +67,15 @@ def generate_lesson_plan():
         topic=data["topic"],
         duration_minutes=data.get("duration_minutes", 45),
         learning_objectives=data.get("learning_objectives"),
-        teaching_method=data.get("teaching_method", "interactive"),
-        language=data.get("language", "english"),
+        # Plugin-config defaults (config_schema.yaml) when request omits them.
+        teaching_method=data.get("teaching_method")
+        or plugin_config_value(
+            str(g.school_id), "ai_tools", "default_teaching_method", "interactive"
+        ),
+        language=data.get("language")
+        or plugin_config_value(
+            str(g.school_id), "ai_tools", "default_language", "english"
+        ),
     )
     if "error" in result:
         return error_response(result["error"], 500)

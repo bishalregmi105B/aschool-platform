@@ -8,7 +8,7 @@ emoji: "🧠"
 icon: "Brain"
 description: "Personalized learning paths per student"
 
-api_blueprint: "app.api.v1.lms"
+api_blueprint: "app.plugins.modules.ai_adaptive_learning.routes"
 models_module: "app.models.lms"
 services:
   - "app.services.ai.adaptive_learning"

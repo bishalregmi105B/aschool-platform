@@ -30,6 +30,16 @@ def send_daily_absent_alerts():
 
     for (school_id,) in active_schools:
         try:
+            # Plugin config kill-switch (config_schema.yaml →
+            # absent_alerts_enabled, default true): a school that turned the
+            # daily alert off is skipped entirely.
+            from app.plugins.config_store import plugin_config_value
+
+            if not plugin_config_value(
+                str(school_id), "attendance", "absent_alerts_enabled", True
+            ):
+                continue
+
             absent_records = Attendance.query.filter_by(
                 school_id=school_id,
                 date=today,
