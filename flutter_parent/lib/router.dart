@@ -23,6 +23,7 @@ import 'features/dismissal/dismissal_qr_screen.dart';
 import 'features/elibrary/parent_elibrary_screen.dart';
 import 'features/portfolio/parent_portfolio_screen.dart';
 import 'features/health_records/child_health_screen.dart';
+import 'features/profile/child_profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authUser = ref.watch(authProvider.select((state) => state.user));
@@ -70,6 +71,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/dashboard',
                   builder: (_, __) => const ParentDashboard()),
+              GoRoute(
+                  path: '/child-profile',
+                  builder: (_, __) => const ChildProfileScreen()),
               GoRoute(
                   path: '/timetable',
                   builder: (_, __) => const ChildTimetableScreen()),

@@ -81,7 +81,7 @@ class _ExamResultCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
-      shadowColor: Colors.black.withAlpha(20),
+      shadowColor: Theme.of(context).colorScheme.onSurface.withAlpha(20),
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -243,7 +243,7 @@ class _ExamResultCard extends StatelessWidget {
                                   fontWeight: FontWeight.w500,
                                   color: failed
                                       ? Colors.red.shade700
-                                      : Colors.black87,
+                                      : Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                             ),
@@ -264,7 +264,7 @@ class _ExamResultCard extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                   color: failed
                                       ? Colors.red.shade700
-                                      : Colors.black87,
+                                      : Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                             ),
@@ -351,7 +351,7 @@ class _MiniStat extends StatelessWidget {
         Text(label,
             style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey.shade500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500)),
       ],
     );

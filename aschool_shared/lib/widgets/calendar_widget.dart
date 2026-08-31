@@ -35,13 +35,18 @@ class _CalendarWidgetState extends State<CalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: isDark
+            ? Border.all(color: ASchoolTheme.darkBorder)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(10),
+            color: Colors.black.withAlpha(isDark ? 60 : 10),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -61,22 +66,44 @@ class _CalendarWidgetState extends State<CalendarWidget> {
         },
         eventLoader: _getEventsForDay,
         calendarStyle: CalendarStyle(
-          selectedDecoration: const BoxDecoration(
-            color: ASchoolTheme.primary,
+          defaultTextStyle: TextStyle(color: theme.colorScheme.onSurface),
+          weekendTextStyle:
+              TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          outsideTextStyle: TextStyle(
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
+          selectedTextStyle: TextStyle(
+              color: theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.bold),
+          todayTextStyle: TextStyle(
+              color: theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.bold),
+          rowDecoration: const BoxDecoration(),
+          selectedDecoration: BoxDecoration(
+            color: theme.colorScheme.primary,
             shape: BoxShape.circle,
           ),
           todayDecoration: BoxDecoration(
-            color: ASchoolTheme.primary.withAlpha(100),
+            color: theme.colorScheme.primary.withAlpha(isDark ? 150 : 100),
             shape: BoxShape.circle,
           ),
-          markerDecoration: const BoxDecoration(
-            color: ASchoolTheme.secondary,
+          markerDecoration: BoxDecoration(
+            color: theme.colorScheme.tertiary,
             shape: BoxShape.circle,
           ),
         ),
-        headerStyle: const HeaderStyle(
+        daysOfWeekStyle: DaysOfWeekStyle(
+          weekdayStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          weekendStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        headerStyle: HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,
+          titleTextStyle:
+              TextStyle(color: theme.colorScheme.onSurface, fontSize: 16),
+          leftChevronIcon:
+              Icon(Icons.chevron_left, color: theme.colorScheme.onSurface),
+          rightChevronIcon:
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurface),
         ),
       ),
     );

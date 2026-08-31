@@ -258,3 +258,43 @@ def _user_dict(user: User):
     ]
     data["class_section_ids"] = [str(section.id) for section in sections]
     return data
+
+@users_bp.route("/<uuid:user_id>/reset-default-password", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def reset_default_password(user_id):
+    """Reset a student/parent login to the school's deterministic default.
+
+    Pattern (see app.utils.password.generate_default_password):
+      - students:  {EMIS}@{StudentID}
+      - parents:   {EMIS}@{last4 of phone}
+    Returns the login identifier + the default password so the admin can
+    hand it to the family. Only student/parent logins are resettable here.
+    """
+    from app.utils.password import generate_default_password
+
+    user = User.query.filter_by(
+        id=user_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not user:
+        return error_response("User not found", 404)
+
+    if user.role not in ("student", "parent"):
+        return error_response(
+            "Default-password reset is only available for student and parent logins",
+            400,
+        )
+
+    default_password = generate_default_password(user)
+    user.set_password(default_password)
+    db.session.commit()
+
+    return success_response(
+        {
+            "user_id": str(user.id),
+            "role": user.role,
+            "login": user.phone or user.email or "",
+            "default_password": default_password,
+        }
+    )

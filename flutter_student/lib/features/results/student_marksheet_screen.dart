@@ -76,7 +76,7 @@ class StudentMarksheetScreen extends ConsumerWidget {
                         Text(
                           data['student_name']?.toString() ?? 'Student',
                           style: TextStyle(
-                            color: Colors.grey.shade700,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 13,
                           ),
                         ),
@@ -192,7 +192,7 @@ class StudentMarksheetScreen extends ConsumerWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: isSubjectPass
-                                    ? Colors.black87
+                                    ? Theme.of(context).colorScheme.onSurface
                                     : Colors.red.shade700,
                               ),
                             ),
@@ -209,7 +209,7 @@ class StudentMarksheetScreen extends ConsumerWidget {
                             child: Text(
                               full.toStringAsFixed(1),
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey.shade700),
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                             ),
                           ),
                           Expanded(
@@ -264,7 +264,7 @@ class _SummaryChip extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface),
           ),
           const SizedBox(height: 2),
           Text(

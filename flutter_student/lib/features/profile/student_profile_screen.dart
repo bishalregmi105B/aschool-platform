@@ -231,7 +231,7 @@ class _ProfileHeader extends StatelessWidget {
                         ? 'Class details unavailable'
                         : student.classSection,
                     style: TextStyle(
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 13,
                     ),
                   ),
@@ -283,7 +283,7 @@ class _StatTile extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface),
           ),
         ],
       ),

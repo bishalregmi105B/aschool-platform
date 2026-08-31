@@ -38,6 +38,7 @@ export const PAGE_SIZES: Record<string, { width: number; height: number }> = {
   A5:        { width: 559,  height: 794  },
   A3:        { width: 1123, height: 1587 },
   "ID Card": { width: 300,  height: 189  },
+  "ID Card Portrait": { width: 300, height: 480 },
   Letter:    { width: 816,  height: 1056 },
   Legal:     { width: 816,  height: 1344 },
   Custom:    { width: 794,  height: 1123 },

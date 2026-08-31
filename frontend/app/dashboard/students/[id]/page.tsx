@@ -43,6 +43,22 @@ export default function StudentDetailPage() {
     queryFn: async () => fetchStudentAttendance(studentId),
   });
 
+  const queryClient = useQueryClient();
+  const [resetPwData, setResetPwData] = useState<any>(null);
+  const resetPw = useMutation({
+    mutationFn: async () => {
+      if (!s.user_id) throw new Error("no user");
+      const res = await api.post(`/users/${s.user_id}/reset-default-password`);
+      return res.data?.data;
+    },
+    onSuccess: (resData) => {
+      setResetPwData(resData);
+      toast.success("Password reset to school default");
+      queryClient.invalidateQueries({ queryKey: ["student", studentId] });
+    },
+    onError: () => toast.error("Could not reset password"),
+  });
+
   if (isLoading) return <PageLoader />;
   if (!data) return <div className="text-center py-16">Student not found</div>;
 
@@ -101,7 +117,32 @@ export default function StudentDetailPage() {
               <p className="font-mono text-sm bg-muted p-1.5 rounded inline-block break-all">
                 {s.default_password_hint || "Not generated"}
               </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pattern: <span className="font-mono">{"{EMIS}@{StudentID}"}</span> — parents use {"{EMIS}@{last4 of phone}"}
+              </p>
             </div>
+            {s.user_id && (
+              <div className="pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={resetPw.isPending}
+                  onClick={() => {
+                    if (!window.confirm("Reset the student's login password to the school default?")) return;
+                    resetPw.mutate();
+                  }}
+                >
+                  {resetPw.isPending ? "Resetting…" : "Reset password to default"}
+                </Button>
+                {resetPwData && (
+                  <div className="mt-2 rounded-md bg-emerald-50 border border-emerald-200 p-2.5 text-xs space-y-0.5">
+                    <p><span className="text-muted-foreground">Login:</span> <span className="font-mono">{resetPwData.login}</span></p>
+                    <p><span className="text-muted-foreground">Password:</span> <span className="font-mono font-semibold">{resetPwData.default_password}</span></p>
+                    <p className="text-muted-foreground">Share these with the family. Shown once per reset.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -117,6 +158,12 @@ export default function StudentDetailPage() {
                       <p className="font-medium">{g.full_name} <Badge variant="outline" className="ml-2">{g.relation}</Badge></p>
                       {g.phone && <p className="text-sm flex items-center gap-1"><Phone className="h-3 w-3" /> {g.phone}</p>}
                       {g.email && <p className="text-sm flex items-center gap-1"><Mail className="h-3 w-3" /> {g.email}</p>}
+                      {g.phone && (
+                        <p className="text-xs text-muted-foreground">
+                          Parent app login: <span className="font-mono">{g.phone}</span> · default password{" "}
+                          <span className="font-mono">{`{EMIS}@${String(g.phone).slice(-4)}`}</span>
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

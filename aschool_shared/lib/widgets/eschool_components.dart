@@ -20,7 +20,12 @@ class ESchoolCard extends StatelessWidget {
     return Container(
       margin: margin,
       padding: padding ?? const EdgeInsets.all(14),
-      decoration: ASchoolTheme.elevatedBox(color: color ?? Colors.white),
+      decoration: ASchoolTheme.elevatedBox(
+        color: color ?? Theme.of(context).cardColor,
+        borderColor: Theme.of(context).brightness == Brightness.dark
+            ? ASchoolTheme.darkBorder
+            : null,
+      ),
       child: child,
     );
   }
