@@ -41,6 +41,227 @@ def _normalize_sections(raw_sections):
     return normalized
 
 
+# ── Prebuilt theme pages ─────────────────────────────────────────────────
+# Every theme assumes these pages exist. They are created idempotently at
+# theme-apply time and backfilled on the pages list fetch so existing
+# schools get them too. Section types/keys mirror the public renderer
+# (frontend/components/website/SectionRenderer.tsx) so each section renders
+# on the public site and is editable in the builder editor.
+
+DEFAULT_PAGE_SLUGS = (
+    "home", "about", "academics", "admission", "teachers",
+    "notices", "gallery", "contact", "results",
+)
+
+DEFAULT_PAGES = [
+    {"slug": "home", "title": "Home", "page_type": "home"},
+    {"slug": "about", "title": "About Us", "page_type": "about"},
+    {"slug": "academics", "title": "Academics", "page_type": "custom"},
+    {"slug": "admission", "title": "Admission", "page_type": "custom"},
+    {"slug": "teachers", "title": "Teachers", "page_type": "custom"},
+    {"slug": "notices", "title": "Notices", "page_type": "custom"},
+    {"slug": "gallery", "title": "Gallery", "page_type": "gallery"},
+    {"slug": "contact", "title": "Contact Us", "page_type": "contact"},
+    {"slug": "results", "title": "Results", "page_type": "custom"},
+]
+
+
+def _default_section(s_type, title, content, sort_order):
+    return {
+        "id": str(uuid.uuid4()),
+        "type": s_type,
+        "title": title,
+        "content": content,
+        "sort_order": sort_order,
+    }
+
+
+def _default_sections_for_page(slug: str, school_name: str) -> list[dict]:
+    """Starter sections for a prebuilt page (public-renderer compatible)."""
+    label = school_name or "Our School"
+
+    if slug == "home":
+        return [
+            _default_section("slideshow", "Hero Slideshow", {
+                "slides": [
+                    {"title": f"Welcome to {label}", "subtitle": "Excellence in Education", "cta_text": "Apply Now"},
+                    {"title": "Building Tomorrow's Leaders", "subtitle": "Academics · Sports · Arts · Technology", "cta_text": "Learn More"},
+                    {"title": "Join Our Community", "subtitle": "Admissions Open", "cta_text": "Contact Us"},
+                ],
+            }, 0),
+            _default_section("stats", "Statistics", {
+                "items": [
+                    {"value": "1000+", "label": "Students"},
+                    {"value": "60+", "label": "Teachers"},
+                    {"value": "A+", "label": "Grade Ranking"},
+                    {"value": "2050", "label": "Established (BS)"},
+                ],
+            }, 1),
+            _default_section("about", "About Section", {
+                "tag": "Who We Are",
+                "heading": "About Our School",
+                "body": f"{label} is dedicated to academic excellence and the holistic development of every student.",
+                "vision": "To inspire lifelong learning and leadership in every child.",
+            }, 2),
+            _default_section("notices", "Latest Notices", {
+                "tag": "Updates", "heading": "Events & Notices",
+                "max_items": 6, "use_api": True, "show_view_all": True,
+            }, 3),
+            _default_section("programs", "Academic Programs", {
+                "tag": "What We Offer", "heading": "Academic Programs",
+                "items": [
+                    {"icon": "📚", "name": "Primary Level", "desc": "Grades 1–5: strong foundations", "grade": "1–5"},
+                    {"icon": "🔬", "name": "Secondary Level", "desc": "Grades 9–10: SEE preparation", "grade": "9–10"},
+                    {"icon": "🎓", "name": "Higher Secondary", "desc": "Grades 11–12: Science, Management & Humanities", "grade": "11–12"},
+                ],
+            }, 4),
+            _default_section("cta", "Call to Action", {
+                "heading": "Join Our School Community",
+                "subheading": "Admission is open for the upcoming academic year.",
+                "cta_primary": "Start Application", "cta_secondary": "Contact Us",
+            }, 5),
+        ]
+    if slug == "about":
+        return [
+            _default_section("hero", "Hero Banner", {
+                "heading": f"About {label}", "subheading": "Our story, vision and mission",
+                "cta_primary": "Contact Us", "show_logo": False, "show_location": True,
+            }, 0),
+            _default_section("about", "About Section", {
+                "tag": "Our Story", "heading": "About Our School", "body": "", "vision": "",
+            }, 1),
+            _default_section("principal", "Principal's Message", {
+                "heading": "Message from Principal", "message": "", "name": "", "designation": "Principal",
+            }, 2),
+        ]
+    if slug == "academics":
+        return [
+            _default_section("hero", "Hero Banner", {
+                "heading": "Academics", "subheading": "Programs from primary to higher secondary",
+                "show_logo": False, "show_location": True,
+            }, 0),
+            _default_section("programs", "Academic Programs", {
+                "tag": "Curriculum", "heading": "Programs We Offer",
+                "items": [
+                    {"icon": "📚", "name": "Primary Level", "desc": "Grades 1–5: strong foundations", "grade": "1–5"},
+                    {"icon": "🔬", "name": "Secondary Level", "desc": "Grades 9–10: SEE preparation", "grade": "9–10"},
+                    {"icon": "🎓", "name": "Higher Secondary", "desc": "Grades 11–12: Science, Management & Humanities", "grade": "11–12"},
+                ],
+            }, 1),
+            _default_section("stats", "Statistics", {
+                "items": [
+                    {"value": "1000+", "label": "Students"},
+                    {"value": "98%", "label": "SEE Pass Rate"},
+                ],
+            }, 2),
+        ]
+    if slug == "admission":
+        return [
+            _default_section("hero", "Hero Banner", {
+                "heading": "Admissions Open", "subheading": "Apply to join our school community",
+                "cta_primary": "Apply Now", "show_logo": False, "show_location": True,
+            }, 0),
+            _default_section("cta", "Admission CTA", {
+                "heading": "Ready to Join Our School?",
+                "subheading": "Admissions are open. Limited seats available. Apply today.",
+                "cta_primary": "Start Application", "cta_secondary": "Book a Visit",
+            }, 1),
+            _default_section("contact", "Admission Enquiry", {
+                "heading": "Contact the Admissions Office",
+                "subheading": "Send us a message and we will get back to you.",
+            }, 2),
+        ]
+    if slug == "teachers":
+        return [
+            _default_section("hero", "Hero Banner", {
+                "heading": "Our Teachers", "subheading": "Meet the educators behind our students' success",
+                "show_logo": False, "show_location": True,
+            }, 0),
+            _default_section("teachers", "Our Teachers", {
+                "tag": "Our Team", "heading": "Meet Our Teachers",
+                "use_api": True, "show_view_all": True,
+            }, 1),
+        ]
+    if slug == "notices":
+        return [
+            _default_section("notices", "Latest Notices", {
+                "tag": "Updates", "heading": "Events & Notices",
+                "max_items": 8, "use_api": True, "show_view_all": True,
+            }, 0),
+        ]
+    if slug == "gallery":
+        return [
+            _default_section("gallery", "Photo Gallery", {
+                "tag": "Memories", "heading": "Photo Gallery",
+                "use_api": True, "columns": 3, "max_items": 6, "show_view_all": True,
+            }, 0),
+        ]
+    if slug == "contact":
+        return [
+            _default_section("contact", "Contact Us", {
+                "heading": "Contact Us", "subheading": "We would love to hear from you.",
+            }, 0),
+            _default_section("map", "Find Us", {"heading": "Our Location", "embed_url": ""}, 1),
+        ]
+    if slug == "results":
+        return [
+            _default_section("cta", "Check Your Results", {
+                "heading": "Check Your Exam Results",
+                "subheading": "Enter your symbol number and date of birth to view your published results.",
+                "cta_primary": "Open Result Checker", "cta_secondary": "Contact Us",
+            }, 0),
+        ]
+    return []
+
+
+def ensure_default_pages(school_id) -> list[str]:
+    """Idempotently create the prebuilt pages every theme needs.
+
+    - Called from GET /website-builder/pages (backfill so existing schools
+      get the prebuilt pages on their next pages fetch) and from POST
+      /website-builder/themes/apply.
+    - Existing pages are NEVER overwritten: only missing slugs are created,
+      and soft-deleted rows are revived so one live page per slug is kept.
+    """
+    from app.models.school import School
+    from app.models.website import WebsitePage
+
+    existing = WebsitePage.query.filter(
+        WebsitePage.school_id == school_id,
+        WebsitePage.slug.in_(DEFAULT_PAGE_SLUGS),
+    ).all()
+    by_slug = {p.slug: p for p in existing}
+
+    school = School.query.get(school_id)
+    school_name = school.name if school else ""
+
+    created = []
+    changed = False
+    for sort_order, spec in enumerate(DEFAULT_PAGES):
+        page = by_slug.get(spec["slug"])
+        if page is None:
+            db.session.add(WebsitePage(
+                school_id=school_id,
+                title=spec["title"],
+                slug=spec["slug"],
+                page_type=spec["page_type"],
+                sections=_default_sections_for_page(spec["slug"], school_name),
+                sort_order=sort_order,
+                is_published=True,
+                is_deleted=False,
+            ))
+            created.append(spec["slug"])
+            changed = True
+        elif page.is_deleted:
+            page.is_deleted = False
+            page.is_published = True
+            changed = True
+
+    if changed:
+        db.session.commit()
+    return created
+
+
 # ── Themes ────────────────────────────────────────────────
 
 @website_builder_bp.route("/themes", methods=["GET"])
@@ -84,6 +305,12 @@ def apply_theme():
     result = ThemeEngineService.apply_theme(g.school_id, theme_id, color_overrides)
     if "error" in result:
         return error_response(result["error"], 400)
+
+    # A theme application must leave the school with ALL its prebuilt pages
+    # (home, about, academics, …) so they show up — and are editable — in
+    # the builder's Pages screen. Idempotent; never overwrites existing pages.
+    ensure_default_pages(g.school_id)
+
     return success_response(result)
 
 
@@ -126,6 +353,11 @@ def get_website_status():
 @plugin_required("website_builder")
 def list_pages():
     """List all website pages for the school."""
+    # Backfill: schools that never applied a theme (or predate prebuilt
+    # pages) get the default pages created here — idempotent, so existing
+    # school-authored pages are never touched.
+    ensure_default_pages(g.school_id)
+
     query = WebsitePage.query.filter_by(school_id=g.school_id, is_deleted=False)
     query = query.order_by(WebsitePage.sort_order)
     items, meta = paginate(query)
@@ -431,24 +663,40 @@ def verify_domain():
 
 # ── SEO ───────────────────────────────────────────────────
 
+DEFAULT_ROBOTS_TXT = "User-agent: *\nAllow: /"
+
+
 @website_builder_bp.route("/seo", methods=["GET"])
 @jwt_required()
 @school_required
 @plugin_required("website_builder")
 def get_seo_settings():
-    """Get SEO settings for the school website."""
+    """Get SEO settings for the school website.
+
+    ALWAYS returns the full key set the dashboard SEO page renders
+    (meta_title, meta_description, og_image, google_analytics_id,
+    google_site_verification, sitemap_enabled, robots_txt) with safe
+    defaults — the frontend does `form.meta_title.length`, so no key may
+    ever be missing or None. `og_image_url` is kept as a legacy alias.
+    """
     from app.models.school import SchoolWebsite
 
     website = SchoolWebsite.query.filter_by(school_id=g.school_id, is_deleted=False).first()
-    if not website:
-        return success_response({"meta_title": "", "meta_description": "", "og_image_url": ""})
+    customizations = (
+        dict(website.customizations)
+        if website and isinstance(website.customizations, dict) else {}
+    )
+    og_image = (website.og_image_url if website else None) or ""
 
     return success_response({
-        "meta_title": website.meta_title,
-        "meta_description": website.meta_description,
-        "og_image_url": website.og_image_url if hasattr(website, "og_image_url") else None,
-        "google_analytics_id": website.google_analytics_id,
-        "robots_txt": website.robots_txt if hasattr(website, "robots_txt") else "User-agent: *\nAllow: /",
+        "meta_title": (website.meta_title if website else None) or "",
+        "meta_description": (website.meta_description if website else None) or "",
+        "og_image": og_image,
+        "og_image_url": og_image,
+        "google_analytics_id": (website.google_analytics_id if website else None) or "",
+        "google_site_verification": customizations.get("google_site_verification") or "",
+        "sitemap_enabled": bool(customizations.get("sitemap_enabled", True)),
+        "robots_txt": customizations.get("robots_txt") or DEFAULT_ROBOTS_TXT,
     })
 
 
@@ -458,15 +706,36 @@ def get_seo_settings():
 @plugin_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_seo_settings():
-    """Update SEO settings."""
+    """Update SEO settings.
+
+    Accepts the dashboard's full key set. Column-backed fields are stored on
+    SchoolWebsite; the keys without dedicated columns
+    (google_site_verification, sitemap_enabled, robots_txt) live in the
+    `customizations` JSONB. `og_image` maps to the `og_image_url` column
+    (the legacy key is still accepted).
+    """
     from app.models.school import SchoolWebsite
 
     data = request.get_json(silent=True) or {}
     website = _get_school_website()
 
-    for key in ("meta_title", "meta_description", "og_image_url", "google_analytics_id"):
-        if key in data:
-            setattr(website, key, data[key])
+    if "meta_title" in data:
+        website.meta_title = str(data.get("meta_title") or "")[:200]
+    if "meta_description" in data:
+        website.meta_description = str(data.get("meta_description") or "")
+    if "og_image" in data or "og_image_url" in data:
+        website.og_image_url = str(data.get("og_image") or data.get("og_image_url") or "")
+    if "google_analytics_id" in data:
+        website.google_analytics_id = str(data.get("google_analytics_id") or "")[:50]
+
+    customizations = dict(website.customizations or {})
+    if "google_site_verification" in data:
+        customizations["google_site_verification"] = str(data.get("google_site_verification") or "")[:255]
+    if "sitemap_enabled" in data:
+        customizations["sitemap_enabled"] = bool(data.get("sitemap_enabled"))
+    if "robots_txt" in data:
+        customizations["robots_txt"] = str(data.get("robots_txt") or "")
+    website.customizations = customizations
 
     db.session.commit()
     return success_response({"updated": True})
@@ -584,6 +853,9 @@ def _page_dict(p):
         "meta_description": p.meta_description if hasattr(p, "meta_description") else None,
         "sort_order": p.sort_order,
         "is_published": p.is_published,
+        "page_type": p.page_type,
+        # The pages manager badges/hides delete for prebuilt pages.
+        "is_default": p.slug in DEFAULT_PAGE_SLUGS,
         "created_at": str(p.created_at) if p.created_at else None,
         "updated_at": str(p.updated_at) if hasattr(p, "updated_at") and p.updated_at else None,
     }

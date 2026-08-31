@@ -1,0 +1,27 @@
+template_key: admit_card_standard
+name: Exam Admit Card
+category: admit_cards
+editor_type: designer
+description: Exam admit card with student details, photo box and subject schedule
+  rows
+page_size: A4 Half
+thumbnail_emoji: 🎫
+is_default: true
+size:
+  width: 559
+  height: 794
+fields:
+- school_name
+- exam_name
+- student_name
+- class_name
+- roll_no
+- dob
+- father_name
+- photo
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

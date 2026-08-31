@@ -120,6 +120,8 @@ def list_source_records(source_type):
     from app.models.student import Guardian, Student
     from app.models.user import User
 
+    from app.services.designer.bulk_generator import _absolute_url
+
     q = request.args.get("q", "").strip().lower()
     class_filter = request.args.get("class_id")
     section_filter = request.args.get("section_id")
@@ -183,7 +185,7 @@ def list_source_records(source_type):
                         "student_id": s.student_id or "",
                         "admission_number": s.admission_number or "",
                         "academic_year": s.academic_year or "",
-                        "photo": s.photo_url or "",
+                        "photo": _absolute_url(s.photo_url or ""),
                     },
                 }
             )
@@ -220,7 +222,7 @@ def list_source_records(source_type):
                         "phone": u.phone or "",
                         "email": u.email or "",
                         "qualification": "",
-                        "photo": u.avatar_url if hasattr(u, "avatar_url") else "",
+                        "photo": _absolute_url(u.avatar_url) if hasattr(u, "avatar_url") and u.avatar_url else "",
                     },
                 }
             )
@@ -241,7 +243,7 @@ def list_source_records(source_type):
                     "school_phone": school.phone or "",
                     "school_email": school.email or "",
                     "school_website": school.website_external or "",
-                    "school_logo": school.logo_url or "",
+                    "school_logo": _absolute_url(school.logo_url or ""),
                     "principal_name": "",
                 },
             }
@@ -270,7 +272,7 @@ def list_source_records(source_type):
             "school_name": school.name if school else "",
             "school_address": school.address if school else "",
             "school_phone": school.phone if school else "",
-            "school_logo": school.logo_url if school else "",
+            "school_logo": _absolute_url(school.logo_url or "") if school else "",
         }
 
         # All marks for this exam
@@ -349,6 +351,7 @@ def list_source_records(source_type):
                         "status": rc.status
                         if rc and hasattr(rc, "status")
                         else ("pass" if percentage >= 40 else "fail"),
+                        "photo": _absolute_url(student.photo_url or ""),
                         "rank": str(rc.rank_in_class)
                         if rc and rc.rank_in_class
                         else "",
@@ -538,6 +541,28 @@ def bulk_certificates():
         template_id=data.get("template_id"),
     )
     return success_response({"count": len(certs), "certificates": certs})
+
+
+@design_studio_bp.route("/bulk/attendance-ledger", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def bulk_attendance_ledger():
+    """Generate the monthly attendance ledger for a class (pages of 20 rows)."""
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    data = request.get_json(silent=True) or {}
+    if not data.get("class_id") or not data.get("month_bs"):
+        return error_response("class_id and month_bs are required", 400)
+
+    pages = BulkGeneratorService.generate_attendance_ledger(
+        school_id=g.school_id,
+        class_id=data.get("class_id"),
+        year_bs=data.get("year_bs"),
+        month_bs=data.get("month_bs"),
+    )
+    return success_response({"count": len(pages), "pages": pages})
 
 
 # ── AI Features ───────────────────────────────────────────
@@ -878,7 +903,15 @@ def export_bulk_pdf():
     from app.services.designer.pdf_css import wrap_pdf_html
 
     orientation = payload.get("page_size", "portrait")
-    combined = wrap_pdf_html("".join(pages_html), page_size=orientation)
+    layout = payload.get("layout", "one_per_page")
+
+    if layout == "sheet":
+        # N-up imposition: lay the (small) pages out in a grid on A4 sheets
+        # with crop marks — what print shops actually print ID cards from.
+        sheet_html = _impose_sheet(pages_html, payload)
+        combined = wrap_pdf_html(sheet_html, page_size=orientation)
+    else:
+        combined = wrap_pdf_html("".join(pages_html), page_size=orientation)
     pdf_bytes = HTML(string=combined).write_pdf()
 
     return send_file(
@@ -887,6 +920,40 @@ def export_bulk_pdf():
         as_attachment=True,
         download_name="bulk.pdf",
     )
+
+
+def _impose_sheet(pages_html: list[str], payload: dict) -> str:
+    """Grid-impose card-sized pages onto A4 sheets (2 cols x 5 rows default).
+
+    Each item is a fixed-size card rendered as a positioned div; a crop-mark
+    outline is drawn at each slot so the shop can cut accurately.
+    """
+    card_w = int(payload.get("card_width", 300))
+    card_h = int(payload.get("card_height", 189))
+    cols = max(1, int(payload.get("columns", 2)))
+    rows = max(1, int(payload.get("rows", 5)))
+    gap_x, gap_y = 12, 12
+    sheet_pad = 30
+
+    cards = []
+    for idx, page_html in enumerate(pages_html):
+        col = idx % cols
+        row = (idx // cols) % rows
+        x = sheet_pad + col * (card_w + gap_x)
+        y = sheet_pad + row * (card_h + gap_y)
+        cards.append(
+            f"<div style='position:absolute;left:{x}px;top:{y}px;"
+            f"width:{card_w}px;height:{card_h}px;overflow:hidden;"
+            f"outline:1px dashed #94a3b8;'>{page_html}</div>"
+        )
+        # page break after each full sheet
+        if (idx + 1) % (cols * rows) == 0:
+            cards[-1] = cards[-1].replace(
+                "</div>",
+                "</div><div style='page-break-after:always;'></div>",
+                1,
+            )
+    return "".join(cards)
 
 @design_studio_bp.route("/documents/<doc_id>/revisions", methods=["GET"])
 @jwt_required()
@@ -926,3 +993,22 @@ def restore_document_revision(revision_id):
         thumbnail_url=rev.get("thumbnail_url") or "",
     )
     return success_response(doc)
+
+@design_studio_bp.route("/templates/<template_key>/assets/<path:filename>", methods=["GET"])
+def template_asset(template_key, filename):
+    """Serve images shipped inside a template folder (public — cards are
+    rendered client-side before login-free embeds, and assets are
+    non-sensitive template art)."""
+    import os
+
+    from flask import current_app, send_from_directory
+
+    from app.services.designer.template_folders import get_folder_template
+
+    tpl = get_folder_template(template_key)
+    if not tpl or not tpl.get("_folder"):
+        return error_response("Template not found", 404)
+    assets_dir = os.path.join(tpl["_folder"], "assets")
+    if not os.path.isdir(assets_dir):
+        return error_response("No assets", 404)
+    return send_from_directory(assets_dir, filename)

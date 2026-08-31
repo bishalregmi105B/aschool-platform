@@ -18,6 +18,24 @@ def _absolute_url(path: str) -> str:
         return path
 
 
+
+
+def _initials_avatar_uri(name: str) -> str:
+    """SVG data-URI avatar with the student's initial — used when no photo
+    exists so ID cards never show an empty frame."""
+    import urllib.parse
+
+    initial = (name or "S").strip()[:1].upper() or "S"
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='136' height='180'>"
+        f"<rect width='100%' height='100%' fill='#dbeafe'/>"
+        f"<text x='50%' y='54%' font-family='Arial' font-size='64' "
+        f"font-weight='bold' fill='#1e40af' text-anchor='middle' "
+        f"dominant-baseline='middle'>{initial}</text></svg>"
+    )
+    return "data:image/svg+xml;charset=utf-8," + urllib.parse.quote(svg)
+
+
 def _qr_data_uri(payload: str, box_size: int = 3) -> str:
     """Render a payload as a PNG data-URI QR code.
 
@@ -140,8 +158,12 @@ class BulkGeneratorService:
                 "address": student.address.get("permanent", "") if isinstance(student.address, dict) else (student.address or ""),
                 "blood_group": student.blood_group or "",
                 "phone": phone,
-                "photo": _absolute_url(student.photo_url or ""),
-                "photo_url": _absolute_url(student.photo_url or ""),
+                "photo": _absolute_url(student.photo_url or "") or _initials_avatar_uri(
+                    f"{student.first_name} {student.last_name}"
+                ),
+                "photo_url": _absolute_url(student.photo_url or "") or _initials_avatar_uri(
+                    f"{student.first_name} {student.last_name}"
+                ),
                 # QR verification payload (scannable identity string; a public
                 # verify URL can replace this once an endpoint exists).
                 "qr_code": _qr_data_uri(
@@ -614,6 +636,212 @@ class BulkGeneratorService:
             ms["rank"] = i
 
         return marksheets
+
+    @classmethod
+    def generate_attendance_ledger(
+        cls,
+        school_id: str,
+        class_id: str,
+        year_bs: str,
+        month_bs: str,
+    ) -> list[dict]:
+        """Generate monthly attendance ledgers for a class (designer template).
+
+        ``month_bs`` looks like "2083-05". Active students of the class are
+        ordered by roll number and split into pages of 20 rows (the ledger
+        template has exactly 20 roster rows). Every BS day of the month is a
+        column; marks come from the Attendance table (P/A/L/H/Lv, blank when
+        no record exists). Returns one item per page, shaped like the other
+        bulk generators.
+        """
+        import nepali_datetime
+
+        from app.models.academic import Class as ClassModel
+        from app.models.attendance import Attendance
+        from app.models.school import School
+        from app.models.student import Student
+        from app.services.designer.template_engine import TemplateEngineService
+
+        # ── parse "2083-05" ────────────────────────────────────────────
+        parts = str(month_bs or "").split("-")
+        try:
+            year_num, month_num = int(parts[0]), int(parts[1])
+            if not 1 <= month_num <= 12:
+                raise ValueError(month_num)
+        except (ValueError, IndexError):
+            raise ValueError("month_bs must look like '2083-05'")
+        try:
+            year_header = int(str(year_bs))
+        except (TypeError, ValueError):
+            year_header = year_num
+        month_bs_norm = f"{year_num:04d}-{month_num:02d}"
+
+        bs_first = nepali_datetime.date(year_num, month_num, 1)
+        bs_next_first = (
+            nepali_datetime.date(year_num + 1, 1, 1)
+            if month_num == 12
+            else nepali_datetime.date(year_num, month_num + 1, 1)
+        )
+        days_in_month = bs_next_first.toordinal() - bs_first.toordinal()
+        month_name = bs_first.strftime("%B")  # "Shrawan", "Bhadau", ...
+        ad_start = bs_first.to_datetime_date()
+        ad_end = bs_next_first.to_datetime_date()
+
+        school = School.query.get(school_id)
+        school_config = {
+            "name": school.name if school else "",
+            "address": school.address if school else "",
+            "phone": school.phone if school else "",
+            "email": school.email if school else "",
+            "website": school.website_external if school else "",
+            "logo_url": school.logo_url if school else "",
+        }
+        school_fields = cls._school_fields(school)
+
+        klass = ClassModel.query.filter_by(
+            id=class_id, school_id=school_id, is_deleted=False
+        ).first()
+        if not klass:
+            return []
+
+        students = (
+            Student.query.options(
+                db.selectinload(Student.section),
+            )
+            .filter_by(school_id=school_id, class_id=class_id, status="active")
+            .order_by(Student.roll_number.nulls_last(), Student.first_name, Student.last_name)
+            .all()
+        )
+        if not students:
+            return []
+
+        # ONE query for the whole month × class roster (no N+1).
+        marks_by_student_date: dict = {}
+        all_records = Attendance.query.filter(
+            Attendance.school_id == school_id,
+            Attendance.is_deleted == False,  # noqa: E712
+            Attendance.student_id.in_([s.id for s in students]),
+            Attendance.date >= ad_start,
+            Attendance.date < ad_end,
+        ).all()
+        for rec in all_records:
+            marks_by_student_date[(str(rec.student_id), rec.date)] = rec.status
+
+        _MARK_GLYPHS = {
+            "present": "P",
+            "absent": "A",
+            "late": "L",
+            "half_day": "H",
+            "leave": "Lv",
+        }
+
+        resolved_template_id = TemplateEngineService.resolve_template_id("attendance_ledger")
+        template_meta = (
+            TemplateEngineService.get_template(resolved_template_id, school_id=school_id)
+            or {}
+        )
+        # The seed-sync in TemplateEngineService refreshes canvas/name/fields of
+        # the global builtin row but never its width/height/page_size, so a
+        # page-size change in the file catalog leaves the seeded row stale
+        # (this template went landscape → portrait). For the pristine global
+        # row, prefer the file-catalog geometry; school DB overlays keep their
+        # own customized size untouched.
+        if template_meta and template_meta.get("school_id") is None:
+            from app.services.designer.template_folders import get_folder_template
+
+            file_meta = get_folder_template(resolved_template_id) or {}
+            if file_meta.get("width") and file_meta.get("height") and (
+                template_meta.get("width") != file_meta["width"]
+                or template_meta.get("height") != file_meta["height"]
+            ):
+                template_meta = {
+                    **template_meta,
+                    "width": file_meta["width"],
+                    "height": file_meta["height"],
+                    "page_size": file_meta.get("page_size", template_meta.get("page_size")),
+                }
+
+        class_name = klass.name or ""
+        rows_per_page = 20
+        items = []
+
+        for chunk_start in range(0, len(students), rows_per_page):
+            chunk = students[chunk_start: chunk_start + rows_per_page]
+
+            # {section_name}: one ledger page can mix sections when students
+            # are grouped by class only — show the common section, else "All".
+            section_names = {
+                (s.section.name or "").strip()
+                for s in chunk
+                if s.section and s.section.name
+            }
+            section_name = next(iter(section_names)) if len(section_names) == 1 else "All"
+
+            data = {
+                "class_name": class_name,
+                "section_name": section_name,
+                "month_name": month_name,
+                "year_bs": str(year_header),
+                "page_no": chunk_start // rows_per_page + 1,
+                "page_count": (len(students) + rows_per_page - 1) // rows_per_page,
+                "today_bs": today_bs(),
+                **school_fields,
+            }
+
+            total_p_in_page = 0
+            total_a_in_page = 0
+            for row_idx, student in enumerate(chunk, start=1):
+                roll = student.roll_number if student.roll_number is not None else ""
+                data[f"roll_{row_idx}"] = str(roll)
+                data[f"name_{row_idx}"] = (
+                    f"{student.first_name or ''} {student.last_name or ''}".strip()
+                )
+                present = 0
+                absent = 0
+                for day in range(1, 32):
+                    glyph = ""
+                    if day <= days_in_month:
+                        bs_date = nepali_datetime.date(year_num, month_num, day)
+                        status = marks_by_student_date.get(
+                            (str(student.id), bs_date.to_datetime_date())
+                        )
+                        glyph = _MARK_GLYPHS.get(status or "", "")
+                        if glyph == "P":
+                            present += 1
+                        elif glyph == "A":
+                            absent += 1
+                    data[f"m_{row_idx}_{day}"] = glyph
+                data[f"total_p_{row_idx}"] = str(present)
+                data[f"total_a_{row_idx}"] = str(absent)
+                total_p_in_page += present
+                total_a_in_page += absent
+
+            html = TemplateEngineService.render_html(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
+            canvas_json = TemplateEngineService.render_document(
+                resolved_template_id, data, school_config,
+                school_id=school_id, template_meta=template_meta or None,
+            )
+            items.append({
+                "label": f"{class_name}_{section_name}_{month_name}_{year_header}_p{data['page_no']}",
+                "class_name": class_name,
+                "section_name": section_name,
+                "month_name": month_name,
+                "year_bs": str(year_num),
+                "month_bs": month_bs_norm,
+                "student_count": len(chunk),
+                "total_present": total_p_in_page,
+                "total_absent": total_a_in_page,
+                "template_id": resolved_template_id,
+                "template_width": template_meta.get("width"),
+                "template_height": template_meta.get("height"),
+                "html": html,
+                "canvas_json": canvas_json,
+            })
+
+        return items
 
     # ── NEB Grading helpers ──────────────────────────────────────────────────
     @staticmethod

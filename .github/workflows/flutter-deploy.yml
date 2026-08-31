@@ -1,0 +1,111 @@
+name: Flutter Web + APK Deploy
+
+# Builds the Flutter web bundle (app.brighternepal.com) and release APKs
+# (served at /downloads/), then syncs them onto the server using the same
+# SSH credentials as the main deploy workflow.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "aschool_shared/**"
+      - "flutter_user/**"
+      - "flutter_admin/**"
+      - "flutter_teacher/**"
+      - "flutter_student/**"
+      - "flutter_parent/**"
+      - ".github/workflows/flutter-deploy.yml"
+
+env:
+  FLUTTER_VERSION: "3.41.2"
+  WEB_ROOT: /var/www/app.brighternepal.com
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build web bundle (flutter_user → app.brighternepal.com)
+        working-directory: flutter_user
+        run: |
+          flutter pub get
+          flutter build web --release
+
+      - name: Build release APKs
+        run: |
+          for app in flutter_user flutter_admin flutter_teacher flutter_student flutter_parent; do
+            echo "── building $app ──"
+            (cd "$app" && flutter pub get && flutter build apk --release)
+          done
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p stage/web stage/apks
+          cp -r flutter_user/build/web/* stage/web/
+          declare -A MAP=(
+            [flutter_user]=aschool-user
+            [flutter_admin]=aschool-admin
+            [flutter_teacher]=aschool-teacher
+            [flutter_student]=aschool-student
+            [flutter_parent]=aschool-parent
+          )
+          for app in "${!MAP[@]}"; do
+            cp "$app/build/app/outputs/flutter-apk/app-release.apk" "stage/apks/${MAP[$app]}.apk"
+          done
+          tar -czf deploy.tgz -C stage web apks
+          ls -la stage/apks
+
+      - name: Upload to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: deploy.tgz
+          target: /tmp/aschool-flutter-deploy/
+
+      - name: Publish on server (atomic-ish, keeps downloads/ history)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /tmp/aschool-flutter-deploy
+            tar -xzf deploy.tgz
+
+            # web bundle — never touch downloads/ (APK history lives there)
+            mkdir -p ${{ env.WEB_ROOT }}
+            rsync -a --delete --exclude downloads /tmp/aschool-flutter-deploy/web/ ${{ env.WEB_ROOT }}/
+
+            # APKs
+            mkdir -p ${{ env.WEB_ROOT }}/downloads
+            cp /tmp/aschool-flutter-deploy/apks/*.apk ${{ env.WEB_ROOT }}/downloads/
+            ls -la ${{ env.WEB_ROOT }}/downloads/
+
+            # host-nginx 413 check (report only — never blind-edit server config)
+            if sudo -n grep -q "client_max_body_size" /etc/nginx/nginx.conf 2>/dev/null \
+               || sudo -n grep -rq "client_max_body_size" /etc/nginx/conf.d /etc/nginx/sites-enabled 2>/dev/null; then
+              echo "host nginx client_max_body_size: present"
+            else
+              echo "WARNING: host nginx has no client_max_body_size — uploads >1M will 413."
+              echo "Fix on the server: add 'client_max_body_size 50M;' inside the port-80 server block, then 'sudo nginx -t && sudo systemctl reload nginx'."
+            fi
+
+            rm -rf /tmp/aschool-flutter-deploy
+            echo "flutter deploy done"

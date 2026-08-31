@@ -17,6 +17,7 @@ import {
 import { PageLoader } from "@/components/ui/spinner";
 import { FileText, Download, Printer, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 
 interface ReportCard {
   id: string;
@@ -41,6 +42,8 @@ export default function ReportCardsPage() {
 }
 
 function ReportCardsContent() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "school_admin";
   const [examId, setExamId] = useState("");
   const [classId, setClassId] = useState("");
 
@@ -144,6 +147,7 @@ function ReportCardsContent() {
             </Select>
           </div>
           <div className="flex gap-2">
+          {isAdmin ? (
             <Button
               onClick={() => generateMutation.mutate()}
               disabled={!examId || !classId || generateMutation.isPending}
@@ -151,6 +155,9 @@ function ReportCardsContent() {
               <Sparkles className="h-4 w-4 mr-2" />
               {generateMutation.isPending ? "Generating..." : "Generate with AI"}
             </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">Only admins can generate report cards</p>
+          )}
           </div>
         </CardContent>
       </Card>

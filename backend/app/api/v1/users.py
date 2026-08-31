@@ -266,9 +266,14 @@ def _user_dict(user: User):
 def reset_default_password(user_id):
     """Reset a student/parent login to the school's deterministic default.
 
-    Pattern (see app.utils.password.generate_default_password):
-      - students:  {EMIS}@{StudentID}
-      - parents:   {EMIS}@{last4 of phone}
+    Pattern (see app.utils.password.generate_default_password — built from
+    fields every user carries, never from the school's EMIS/regd number):
+      - students: {class}{section}{roll}.{first}   e.g. 7a12.ram
+      - parents:  p{roll}.{first}{last4}           e.g. p12.ram4821
+        (child's class/roll/name + last 4 of the parent's phone; falls
+        back to {first}.{last4} when the child link or roll is missing)
+    Schools can override the patterns in the User Management plugin
+    settings (credentials.student_pattern / credentials.parent_pattern).
     Returns the login identifier + the default password so the admin can
     hand it to the family. Only student/parent logins are resettable here.
     """
@@ -290,11 +295,24 @@ def reset_default_password(user_id):
     user.set_password(default_password)
     db.session.commit()
 
+    if user.role == "student":
+        scheme = (
+            "class + section + roll + first name, e.g. 7a12.ram "
+            "(falls back to first name + last 4 of phone when no roll is set)"
+        )
+    else:
+        scheme = (
+            "child's roll + child's first name + last 4 of the parent's "
+            "phone, e.g. p12.ram4821 (falls back to first name + last 4 of "
+            "phone when no child is linked)"
+        )
+
     return success_response(
         {
             "user_id": str(user.id),
             "role": user.role,
             "login": user.phone or user.email or "",
             "default_password": default_password,
+            "scheme": scheme,
         }
     )

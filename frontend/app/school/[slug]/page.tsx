@@ -90,6 +90,8 @@ export default async function SchoolHomePage({ params }: { params: { slug: strin
         about_us: sanitizeHtml(school.about_us as string),
       },
       notices: (notices || []).map((n) => ({ id: n.id, title: n.title, content: n.content, created_at: n.created_at })),
+      teachers: (teachers || []).map((t) => ({ id: t.id, name: t.name, subject: t.subject, photo: t.photo, designation: t.designation })),
+      gallery: (gallery || []).map((g) => ({ id: g.id, url: g.url, caption: g.caption })),
     };
     const sorted = [...sections].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     return (

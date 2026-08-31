@@ -1,0 +1,27 @@
+template_key: grade_sheet
+name: NEB Grade Sheet
+category: reports
+editor_type: writer
+description: Official NEB grade sheet with credit hours, grade points and GPA (IEMIS
+  format)
+page_size: A4
+thumbnail_emoji: 🎓
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- name
+- dob
+- symbol_no
+- class_name
+- school_name
+- exam_year
+- subjects_marks
+- gpa
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

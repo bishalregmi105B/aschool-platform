@@ -166,7 +166,19 @@ def _render_object(obj: dict, values: dict) -> str:
         if resolved:  # data URI
             style = base_style + f"background:url('{resolved}') no-repeat center/contain;"
             return f"<div style='{style}'></div>"
-        # unresolvable placeholder → visible empty slot with light border
+        # no image → initials avatar fallback when we know the subject name,
+        # else a visible empty slot with a light border
+        name = str(values.get("name") or values.get("student_name") or "").strip()
+        if name:
+            initial = name[0].upper()
+            bg = "#dbeafe"
+            fg = "#1e40af"
+            style = base_style + (
+                f"background:{bg};display:flex;align-items:center;justify-content:center;"
+                f"font-size:{min(width, height) * 0.42:.0f}px;font-weight:700;color:{fg};"
+                f"font-family:Arial,sans-serif;"
+            )
+            return f"<div style='{style}'>{_esc(initial)}</div>"
         style = base_style + "background:#f1f5f9;border:1px dashed #cbd5e1;box-sizing:border-box;"
         return f"<div style='{style}'></div>"
 

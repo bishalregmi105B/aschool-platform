@@ -166,3 +166,23 @@ export function formatNepaliDate(bsDateStr: string | null | undefined): string {
   }
   return bsDateStr;
 }
+
+// ── BS billing-period labels ────────────────────────────────────────────────
+// "2083-05" → "Bhadra 2083" (falls back to "05/2083" for non-month keys like
+// "2083-Q1"; unknown years render the raw key). FeeCollection.month_bs is a
+// BS "YYYY-MM" key written by both the manual billing path and the cron.
+export function formatBSMonth(
+  monthKey: string | null | undefined,
+  yearKey?: string | null,
+): string {
+  if (!monthKey) return "—";
+  const parts = String(monthKey).split("-");
+  if (parts.length === 2 && parts[0].length === 4 && parts[1].length === 2) {
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${BS_MONTHS[monthIdx]} ${parts[0]}`;
+    }
+  }
+  const label = monthKey;
+  return yearKey && !label.includes(yearKey) ? `${label} ${yearKey}` : label;
+}

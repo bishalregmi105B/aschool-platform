@@ -5,6 +5,7 @@ import html
 import json
 import math
 import re
+import uuid
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -1172,6 +1173,12 @@ class TemplateEngineService:
         "letterheads": "letterheads",
         "notice": "notices",
         "notices": "notices",
+        "calendar": "calendars",
+        "calendars": "calendars",
+        "register": "registers",
+        "registers": "registers",
+        "bill": "bills",
+        "bills": "bills",
     }
 
     @classmethod
@@ -1225,7 +1232,12 @@ class TemplateEngineService:
             return
 
         changed = False
-        for template_key, meta in TEMPLATES.items():
+        # File-based folders are the primary catalog (same philosophy as the
+        # plugin system); the in-code registry remains for legacy entries.
+        from app.services.designer.template_folders import scan_template_folders
+
+        catalog_meta = {**TEMPLATES, **scan_template_folders()}
+        for template_key, meta in catalog_meta.items():
             row = existing_rows.get(template_key)
 
             new_editor_type = meta.get("editor_type", "designer")
@@ -1281,9 +1293,9 @@ class TemplateEngineService:
                     row.category = meta.get("category", row.category or "documents")
                     changed = True
 
-        # Soft-delete builtin templates removed from the registry
+        # Soft-delete builtin templates removed from the catalog
         for key, row in existing_rows.items():
-            if key not in TEMPLATES:
+            if key not in catalog_meta:
                 row.is_deleted = True
                 changed = True
 
@@ -1317,7 +1329,9 @@ class TemplateEngineService:
 
     @classmethod
     def _build_fallback_template(cls, template_id: str) -> dict | None:
-        meta = TEMPLATES.get(template_id)
+        from app.services.designer.template_folders import get_folder_template
+
+        meta = TEMPLATES.get(template_id) or get_folder_template(template_id)
         if not meta:
             return None
         return {
@@ -1377,7 +1391,11 @@ class TemplateEngineService:
 
         template_key = payload.get("template_key") or payload.get("template_id") or payload.get("id")
         if not template_key:
-            raise ValueError("template_key is required")
+            # derive a stable key from the name so admins can save custom
+            # designs without inventing keys: "My ID Card 2082" → my_id_card_2082
+            name = (payload.get("name") or "").strip().lower()
+            slug = re.sub(r"[^a-z0-9]+", "_", name).strip("_") or "custom"
+            template_key = f"{slug}_{uuid.uuid4().hex[:6]}"
         template_key = cls.resolve_template_id(str(template_key))
 
         base_template = cls.get_template(template_key, school_id=school_id) or cls._build_fallback_template(template_key)
@@ -1533,6 +1551,49 @@ class TemplateEngineService:
             merged["date"] = merged["issue_date"]
         if not merged.get("leaving_date") and merged.get("issue_date"):
             merged["leaving_date"] = merged["issue_date"]
+
+        # ── built-in date/time autofill ──────────────────────────────────
+        # EVERY template can use these without any data-source wiring:
+        #   {today_bs} {today_bs_nepali} {today_ad} {current_time}
+        #   {bs_year} {bs_month} {bs_day} {bs_month_name}
+        #   {ad_year} {ad_month} {ad_day} {academic_year_bs}
+        try:
+            from app.utils.nepali_date import today_bs
+
+            merged.setdefault("today_bs", today_bs())
+        except Exception:
+            merged.setdefault("today_bs", "")
+        if not merged.get("today_bs"):
+            merged["today_bs"] = ""
+        try:
+            import nepali_datetime as _nd
+
+            _now_bs = _nd.datetime.now()
+            merged.setdefault("bs_year", str(_now_bs.year))
+            merged.setdefault("bs_month", str(_now_bs.month))
+            merged.setdefault("bs_day", str(_now_bs.day))
+            merged.setdefault("bs_month_name", _now_bs.strftime("%B"))  # e.g. Bhadra
+            merged.setdefault(
+                "today_bs_nepali", _now_bs.strftime("%Y-%m-%d")
+            )
+            merged.setdefault("academic_year_bs", f"{_now_bs.year}-{_now_bs.year + 1}")
+            merged.setdefault(
+                "weekday_name", _now_bs.strftime("%A")
+            )
+        except Exception:
+            pass
+        try:
+            from datetime import datetime as _dt
+
+            _now_ad = _dt.now()
+            merged.setdefault("today_ad", _now_ad.strftime("%Y-%m-%d"))
+            merged.setdefault("ad_year", str(_now_ad.year))
+            merged.setdefault("ad_month", str(_now_ad.month))
+            merged.setdefault("ad_day", str(_now_ad.day))
+            merged.setdefault("ad_month_name", _now_ad.strftime("%B"))
+            merged.setdefault("current_time", _now_ad.strftime("%I:%M %p"))
+        except Exception:
+            pass
 
         return merged
 

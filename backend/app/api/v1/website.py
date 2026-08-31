@@ -52,6 +52,114 @@ def sanitize_custom_css(css: str) -> str:
 website_bp = Blueprint("basic_website", __name__, url_prefix="/website")
 
 
+# ── shared public live-data helpers ─────────────────────────────────────
+# Every public endpoint (home payload, per-page payload, dedicated feeds)
+# serves the same shapes so any page can render any section type from
+# live school data.
+
+def _public_school_dict(school) -> dict:
+    return {
+        "name": school.name,
+        "name_nepali": school.name_nepali,
+        "slug": school.slug,
+        "logo_url": school.logo_url,
+        "banner_url": school.banner_url,
+        "type": school.type,
+        "level": school.level,
+        "district": school.district,
+        "municipality": school.municipality,
+        "phone": school.phone,
+        "email": school.email,
+        "established_year_bs": school.established_year_bs,
+        "total_students": school.total_students,
+        "total_staff": school.total_staff,
+        "about_us": getattr(school, "about_us", None),
+        "vision": getattr(school, "vision", None),
+    }
+
+
+def _public_notices_payload(school) -> list:
+    """Published notices for public view (feeds the 'notices' section)."""
+    notices = (
+        Notice.query.filter(
+            Notice.school_id == school.id,
+            Notice.is_deleted.is_(False),
+            Notice.published_at.isnot(None),
+        )
+        .order_by(Notice.published_at.desc(), Notice.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    return [
+        {
+            "id": str(n.id),
+            "title": n.title,
+            "content": n.content,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        }
+        for n in notices
+    ]
+
+
+def _public_teachers_payload(school) -> list:
+    """Real staff directory for the public site (feeds 'teachers' sections).
+
+    Carries both ``photo`` and ``photo_url`` keys: the public home fallback
+    template reads ``teacher.photo`` while the dedicated /teachers feed
+    consumers read ``photo_url``.
+    """
+    from app.models.user import User
+
+    teachers = (
+        User.query.filter(
+            User.school_id == school.id,
+            User.role == "teacher",
+            User.is_active.is_(True),
+            User.is_deleted.is_(False),
+        )
+        .order_by(User.full_name.asc())
+        .limit(200)
+        .all()
+    )
+    return [
+        {
+            "id": str(t.id),
+            "name": t.full_name,
+            "designation": "",
+            "department": "",
+            "qualification": "",
+            "photo_url": t.avatar_url or None,
+            "photo": t.avatar_url or None,
+        }
+        for t in teachers
+    ]
+
+
+def _public_gallery_payload(school) -> list:
+    """School's uploaded images for the public site (feeds 'gallery' sections)."""
+    from app.models.file import ManagedFile
+
+    images = (
+        ManagedFile.query.filter(
+            ManagedFile.school_id == school.id,
+            ManagedFile.file_type == "image",
+            ManagedFile.is_deleted.is_(False),
+        )
+        .order_by(ManagedFile.created_at.desc())
+        .limit(60)
+        .all()
+    )
+    return [
+        {
+            "id": str(img.id),
+            "url": img.url,
+            "caption": img.original_name or "",
+            "uploaded_at": img.created_at.isoformat() if img.created_at else None,
+        }
+        for img in images
+    ]
+
+
 @website_bp.route("/public/<slug>", methods=["GET"])
 def get_public_website(slug):
     """Get public website data for a school (no auth required)."""
@@ -63,17 +171,12 @@ def get_public_website(slug):
         school_id=school.id, is_published=True, is_deleted=False
     ).first()
 
-    # Get published notices for public view
-    notices = (
-        Notice.query.filter(
-            Notice.school_id == school.id,
-            Notice.is_deleted.is_(False),
-            Notice.published_at.isnot(None),
-        )
-        .order_by(Notice.published_at.desc(), Notice.created_at.desc())
-        .limit(10)
-        .all()
-    )
+    # Live data sources for every public section type (notices, teachers,
+    # gallery). The home fallback layout destructures `teachers` and
+    # `gallery` from this payload, so they must always be present.
+    notices = _public_notices_payload(school)
+    teachers = _public_teachers_payload(school)
+    gallery = _public_gallery_payload(school)
 
     # Get home page sections from website builder
     home_page = WebsitePage.query.filter_by(
@@ -94,24 +197,7 @@ def get_public_website(slug):
         customizations["custom_css"] = website.custom_css
 
     return success_response({
-        "school": {
-            "name": school.name,
-            "name_nepali": school.name_nepali,
-            "slug": school.slug,
-            "logo_url": school.logo_url,
-            "banner_url": school.banner_url,
-            "type": school.type,
-            "level": school.level,
-            "district": school.district,
-            "municipality": school.municipality,
-            "phone": school.phone,
-            "email": school.email,
-            "established_year_bs": school.established_year_bs,
-            "total_students": school.total_students,
-            "total_staff": school.total_staff,
-            "about_us": getattr(school, "about_us", None),
-            "vision": getattr(school, "vision", None),
-        },
+        "school": _public_school_dict(school),
         "website": {
             "theme_slug": website.theme_slug if website else "default",
             "customizations": customizations,
@@ -119,15 +205,50 @@ def get_public_website(slug):
             "meta_description": website.meta_description if website else None,
         } if website else None,
         "sections": page_sections,
-        "notices": [
-            {
-                "id": str(n.id),
-                "title": n.title,
-                "content": n.content,
-                "created_at": n.created_at.isoformat() if n.created_at else None,
-            }
-            for n in notices
-        ],
+        "notices": notices,
+        "teachers": teachers,
+        "gallery": gallery,
+    })
+
+
+@website_bp.route("/public/<slug>/pages/<page_slug>", methods=["GET"])
+def get_public_page(slug, page_slug):
+    """Public renderer for ANY stored website-builder page (no auth required).
+
+    Generalizes rendering beyond the hardcoded home page: every page created
+    in the builder (default theme pages or custom slugs) is resolvable here
+    by slug, with its sections plus the live data sources sections need.
+    Unknown slugs return 404.
+    """
+    school, err = _public_site_guard(slug)
+    if err:
+        return err
+
+    from sqlalchemy import func
+
+    page = WebsitePage.query.filter(
+        WebsitePage.school_id == school.id,
+        func.lower(WebsitePage.slug) == (page_slug or "").strip().lower(),
+        WebsitePage.is_deleted.is_(False),
+    ).first()
+    if not page:
+        return error_response("Page not found", 404)
+
+    page_sections = sorted(page.sections or [], key=lambda s: s.get("sort_order", 0))
+
+    return success_response({
+        "page": {
+            "id": str(page.id),
+            "title": page.title,
+            "slug": page.slug,
+            "meta_title": page.meta_title or page.title,
+            "meta_description": page.meta_description or "",
+        },
+        "school": _public_school_dict(school),
+        "sections": page_sections,
+        "notices": _public_notices_payload(school),
+        "teachers": _public_teachers_payload(school),
+        "gallery": _public_gallery_payload(school),
     })
 
 
@@ -385,33 +506,7 @@ def get_public_teachers(slug):
     if err:
         return err
 
-    from app.models.user import User
-
-    teachers = (
-        User.query.filter(
-            User.school_id == school.id,
-            User.role == "teacher",
-            User.is_active.is_(True),
-            User.is_deleted.is_(False),
-        )
-        .order_by(User.full_name.asc())
-        .limit(200)
-        .all()
-    )
-
-    return success_response({
-        "teachers": [
-            {
-                "id": str(t.id),
-                "name": t.full_name,
-                "designation": "",
-                "department": "",
-                "qualification": "",
-                "photo_url": t.avatar_url or None,
-            }
-            for t in teachers
-        ]
-    })
+    return success_response({"teachers": _public_teachers_payload(school)})
 
 
 @website_bp.route("/public/<slug>/events", methods=["GET"])
@@ -456,30 +551,7 @@ def get_public_gallery(slug):
     if err:
         return err
 
-    from app.models.file import ManagedFile
-
-    images = (
-        ManagedFile.query.filter(
-            ManagedFile.school_id == school.id,
-            ManagedFile.file_type == "image",
-            ManagedFile.is_deleted.is_(False),
-        )
-        .order_by(ManagedFile.created_at.desc())
-        .limit(60)
-        .all()
-    )
-
-    return success_response({
-        "images": [
-            {
-                "id": str(img.id),
-                "url": img.url,
-                "caption": img.original_name or "",
-                "uploaded_at": img.created_at.isoformat() if img.created_at else None,
-            }
-            for img in images
-        ]
-    })
+    return success_response({"images": _public_gallery_payload(school)})
 
 
 @website_bp.route("/public/<slug>/alumni", methods=["GET"])

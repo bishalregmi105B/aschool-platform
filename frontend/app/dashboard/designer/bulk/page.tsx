@@ -13,11 +13,11 @@ import { PageLoader } from "@/components/ui/spinner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Download, CreditCard, Award, FileText, Printer, Layers, FileOutput } from "lucide-react";
+import { ArrowLeft, Download, CreditCard, Award, FileText, Printer, Layers, FileOutput, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type BulkType = "id_cards" | "marksheets" | "certificates" | "admit_cards";
+type BulkType = "id_cards" | "marksheets" | "certificates" | "admit_cards" | "attendance_ledger";
 type OutputMode = "editor" | "pdf" | "zip";
 
 const TYPES: Array<{ id: BulkType; label: string; icon: React.ElementType }> = [
@@ -25,7 +25,30 @@ const TYPES: Array<{ id: BulkType; label: string; icon: React.ElementType }> = [
   { id: "marksheets", label: "Marksheets", icon: FileText },
   { id: "admit_cards", label: "Admit Cards", icon: FileText },
   { id: "certificates", label: "Certificates", icon: Award },
+  { id: "attendance_ledger", label: "Registers", icon: ClipboardList },
 ];
+
+const TEMPLATE_CATEGORY: Record<BulkType, string> = {
+  id_cards: "id_cards",
+  marksheets: "marksheets",
+  certificates: "certificates",
+  admit_cards: "admit_cards",
+  attendance_ledger: "registers",
+};
+
+const BS_MONTHS = [
+  "Baisakh", "Jestha", "Asar", "Shrawan", "Bhadau", "Ashwin",
+  "Kartik", "Mangsir", "Poush", "Magh", "Falgun", "Chaitra",
+];
+
+function currentBsYear(): number {
+  const now = new Date();
+  return now.getMonth() >= 3 ? now.getFullYear() + 57 : now.getFullYear() + 56;
+}
+
+function currentBsMonth(): number {
+  return new Date().getMonth() + 1; // close enough for a default pick
+}
 
 export default function BulkPage() {
   return (
@@ -44,6 +67,8 @@ function BulkContent() {
   const [templateId, setTemplateId] = useState("");
   const [examId, setExamId] = useState("");
   const [certType, setCertType] = useState("character");
+  const [ledgerYear, setLedgerYear] = useState(String(currentBsYear()));
+  const [ledgerMonth, setLedgerMonth] = useState(String(currentBsMonth()));
   const [output, setOutput] = useState<OutputMode>("pdf");
   const [progress, setProgress] = useState<string | null>(null);
 
@@ -60,7 +85,7 @@ function BulkContent() {
   const { data: templates } = useQuery<any>({
     queryKey: ["design-templates-cat", type],
     queryFn: async () => {
-      const res = await api.get(`/design-studio/templates?category=${type}`);
+      const res = await api.get(`/design-studio/templates?category=${TEMPLATE_CATEGORY[type]}`);
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
   });
@@ -82,22 +107,25 @@ function BulkContent() {
         type === "id_cards" ? "/design-studio/bulk/id-cards"
         : type === "marksheets" ? "/design-studio/bulk/marksheets"
         : type === "admit_cards" ? "/design-studio/bulk/admit-cards"
+        : type === "attendance_ledger" ? "/design-studio/bulk/attendance-ledger"
         : "/design-studio/bulk/certificates";
 
-      const payload: Record<string, string> = {
-        class_id: classId,
-        template_id: templateId,
-      };
+      const payload: Record<string, string> = { class_id: classId };
+      if (type !== "attendance_ledger") payload.template_id = templateId;
       if (sectionId) payload.section_id = sectionId;
       if (examId) payload.exam_id = examId;
       if (type === "certificates") payload.certificate_type = certType;
+      if (type === "attendance_ledger") {
+        payload.month_bs = `${ledgerYear}-${String(Number(ledgerMonth)).padStart(2, "0")}`;
+        payload.year_bs = ledgerYear;
+      }
 
       setProgress("Generating records on the server…");
       const res = await api.post(endpoint, payload);
       return res.data;
     },
     onSuccess: async (data) => {
-      const generated = data?.data?.cards || data?.data?.marksheets || data?.data?.certificates || [];
+      const generated = data?.data?.cards || data?.data?.marksheets || data?.data?.certificates || data?.data?.pages || [];
       if (!generated?.length && !data?.data?.download_url) {
         toast.error("No records generated for this selection");
         setProgress(null);
@@ -137,6 +165,7 @@ function BulkContent() {
         setProgress("Building print-ready PDF…");
         try {
           const tplType = type === "id_cards" ? "id_cards" : type; // backend maps template ids
+          const isCard = (generated[0]?.template_width ?? 794) < 500;
           const res = await api.post(
             "/design-studio/export/bulk-pdf",
             {
@@ -146,6 +175,15 @@ function BulkContent() {
                 html: g.html ?? null,
               })),
               page_size: generated[0]?.template_width > generated[0]?.template_height ? "landscape" : "portrait",
+              // card-sized documents (ID/admit cards) impose N-up onto A4
+              // sheets with crop marks — what print shops actually print
+              ...(isCard ? {
+                layout: "sheet",
+                card_width: generated[0]?.template_width ?? 300,
+                card_height: generated[0]?.template_height ?? 189,
+                columns: 2,
+                rows: 5,
+              } : {}),
             },
             { responseType: "blob" },
           );
@@ -186,7 +224,7 @@ function BulkContent() {
           setProgress(`Rendering ${i + 1} / ${generated.length}…`);
           const w = item.template_width || 794;
           const h = item.template_height || 1123;
-          const dataUrl = await renderCanvasJson(item.canvas_json, w, h);
+          const dataUrl = await renderCanvasJson(item.canvas_json, w, h, item.student_name ?? "");
           if (dataUrl) {
             const label = (item.student_name ?? item.label ?? `page_${i + 1}`).replace(/\s+/g, "_");
             zip.file(`${String(i + 1).padStart(3, "0")}_${label}.png`, dataUrl.split(",")[1], { base64: true });
@@ -261,7 +299,7 @@ function BulkContent() {
               </Select>
             </div>
 
-            {selectedClass?.sections?.length > 0 && (
+            {type !== "attendance_ledger" && selectedClass?.sections?.length > 0 && (
               <div className="space-y-2">
                 <Label>Section (optional)</Label>
                 <Select value={sectionId} onValueChange={setSectionId}>
@@ -276,6 +314,32 @@ function BulkContent() {
               </div>
             )}
 
+            {type === "attendance_ledger" ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>BS Year</Label>
+                  <Select value={ledgerYear} onValueChange={setLedgerYear}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 4 }, (_, i) => String(currentBsYear() - 2 + i)).map((y) => (
+                        <SelectItem key={y} value={y}>{y} BS</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>BS Month</Label>
+                  <Select value={ledgerMonth} onValueChange={setLedgerMonth}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BS_MONTHS.map((m, i) => (
+                        <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-2">
               <Label>Select Template</Label>
               <Select value={templateId} onValueChange={setTemplateId}>
@@ -287,6 +351,7 @@ function BulkContent() {
                 </SelectContent>
               </Select>
             </div>
+            )}
 
             {needsExam && (
               <div className="space-y-2">
@@ -343,7 +408,7 @@ function BulkContent() {
             <Button
               className="w-full"
               onClick={() => bulkMutation.mutate()}
-              disabled={!classId || !templateId || bulkMutation.isPending || (needsExam && !examId)}
+              disabled={!classId || bulkMutation.isPending || (needsExam && !examId) || (type !== "attendance_ledger" && !templateId)}
             >
               <Download className="h-4 w-4 mr-2" />
               {bulkMutation.isPending ? (progress || "Working…") : "Generate Batch"}
@@ -389,6 +454,14 @@ function BulkContent() {
                   <li>- QR code for verification</li>
                 </ul>
               )}
+              {type === "attendance_ledger" && (
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  <li>- 20 roll-wise rows × day columns 1..31</li>
+                  <li>- P / A / L / H / Lv marks from real attendance</li>
+                  <li>- Per-student present &amp; absent totals</li>
+                  <li>- One A4 page per 20 students</li>
+                </ul>
+              )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
               {output === "pdf" ? <Printer className="h-4 w-4" /> : <Badge variant="secondary">{output.toUpperCase()}</Badge>}
@@ -406,9 +479,10 @@ function BulkContent() {
 }
 
 /** Offscreen fabric render of a canvas_json → PNG data URL. */
-async function renderCanvasJson(json: any, width: number, height: number): Promise<string | null> {
+async function renderCanvasJson(json: any, width: number, height: number, fallbackName = ""): Promise<string | null> {
   try {
     const { Canvas } = await import("fabric");
+    const { preloadCanvasImages } = await import("@/lib/designer/canvasImages");
     const offscreen = document.createElement("canvas");
     const canvas = new Canvas(offscreen, {
       backgroundColor: "#ffffff",
@@ -418,11 +492,17 @@ async function renderCanvasJson(json: any, width: number, height: number): Promi
     });
     await new Promise<void>((resolve) => {
       if (json && Object.keys(json).length > 0) {
-        canvas.loadFromJSON(json, () => { canvas.renderAll(); resolve(); })
+        // preload converts every image src to a data-URI (initials avatar
+        // fallback for missing photos) — no more blank-white exports when a
+        // single image 404s, and no canvas tainting
+        preloadCanvasImages(JSON.parse(JSON.stringify(json)), { fallbackName })
+          .then((safe) => canvas.loadFromJSON(safe, () => { canvas.renderAll(); resolve(); }))
           .catch(() => { canvas.renderAll(); resolve(); });
       } else resolve();
     });
-    const url = canvas.toDataURL({ format: "png", multiplier: 2 });
+    // one beat for async image decode, then rasterize at 300-DPI-class quality
+    await new Promise((r) => setTimeout(r, 80));
+    const url = canvas.toDataURL({ format: "png", multiplier: 3 });
     canvas.dispose();
     return url;
   } catch {

@@ -180,7 +180,7 @@ def create_student():
             student_id=student.id,
         )
         _populate_guardian(guardian, gd_data)
-        parent_user = _resolve_or_create_parent_user(gd_data)
+        parent_user = _resolve_or_create_parent_user(gd_data, student)
         if parent_user:
             guardian.user_id = parent_user.id
         db.session.add(guardian)
@@ -387,25 +387,172 @@ def bulk_profile_images():
     })
 
 
-# ── Guardians ──────────────────────────────────────────────
+# ── Promotion ──────────────────────────────────────────────
+
+# Only these statuses may be promoted. transferred_out / dropped_out /
+# graduated students must NEVER move (the old endpoint blindly moved every
+# non-deleted row, which also re-promoted students who had already left).
+PROMOTABLE_STATUSES = ("active", "transferred_in", "on_leave")
 
 
-@students_bp.route("/promote", methods=["POST"])
+def _student_display_name(student) -> str:
+    return f"{student.first_name or ''} {student.last_name or ''}".strip()
+
+
+def _promote_order_key(student):
+    """Merge order for roll renumbering: old roll (nulls last), then name."""
+    roll = student.roll_number
+    return (
+        roll is None,
+        roll if roll is not None else 0,
+        (student.first_name or "").lower(),
+        (student.last_name or "").lower(),
+    )
+
+
+def _class_sections(class_id):
+    from app.models.academic import Section
+
+    return (
+        Section.query.filter_by(class_id=class_id, is_deleted=False)
+        .order_by(Section.name)
+        .all()
+    )
+
+
+def _resolve_target_section(student, section_by_name, fallback_section):
+    """Map a student's old section (by NAME) onto the target class's sections.
+
+    Same rule as the nightly rollover task; falls back to the first section of
+    the target class, or None when the target class has no sections at all.
+    """
+    old_name = (student.section.name or "").strip().lower() if student.section and student.section.name else ""
+    if old_name and old_name in section_by_name:
+        return section_by_name[old_name]
+    return fallback_section
+
+
+def _load_class_roster(school_id, class_id):
+    return (
+        Student.query.options(db.selectinload(Student.section))
+        .filter_by(school_id=school_id, class_id=class_id, is_deleted=False)
+        .all()
+    )
+
+
+def _group_by_section(students):
+    """students → {section_id: [students]} keeping insertion order."""
+    groups: dict = {}
+    for student in students:
+        groups.setdefault(student.section_id, []).append(student)
+    return groups
+
+
+def _renumber_class_rolls(school_id, class_id):
+    """Renumber rolls 1..N within each section of the target class.
+
+    Existing students of the target class and the freshly promoted ones are
+    interleaved in the same per-section sequence (old roll nulls last, then
+    name).
+    """
+    groups = _group_by_section(_load_class_roster(school_id, class_id))
+    for group in groups.values():
+        group.sort(key=_promote_order_key)
+        for idx, student in enumerate(group, start=1):
+            student.roll_number = idx
+
+
+def _next_free_roll(school_id, class_id, section_id, taken: set) -> int | None:
+    """First roll number ≥ 1 not already claimed in this target section."""
+    roster = _load_class_roster(school_id, class_id)
+    for student in roster:
+        if student.section_id != section_id:
+            continue
+        if student.roll_number is not None:
+            taken.add(student.roll_number)
+    roll = 1
+    while roll in taken:
+        roll += 1
+    return roll
+
+
+def _keep_roll_assignments(school_id, class_id, promoted_students):
+    """roll_strategy "keep": keep each promoted student's current roll when it
+    is free in the target section, else the next free roll. Existing students
+    of the target class never move. Returns per-student clash resolutions
+    (only where the old roll was already taken) for the response."""
+    per_section_taken: dict = {}
+    for student in _load_class_roster(school_id, class_id):
+        if student in promoted_students or student.roll_number is None:
+            continue
+        per_section_taken.setdefault(student.section_id, set()).add(
+            student.roll_number
+        )
+
+    resolutions = []
+    for student in promoted_students:
+        taken = per_section_taken.setdefault(student.section_id, set())
+        if student.roll_number is None or student.roll_number in taken:
+            old_roll = student.roll_number
+            new_roll = _next_free_roll(school_id, class_id, student.section_id, taken)
+            student.roll_number = new_roll
+            if old_roll is not None:
+                resolutions.append(
+                    {
+                        "student_id": str(student.id),
+                        "name": _student_display_name(student),
+                        "old_roll": old_roll,
+                        "assigned_roll": new_roll,
+                        "reason": "roll already taken in target section",
+                    }
+                )
+        if student.roll_number is not None:
+            taken.add(student.roll_number)
+    return resolutions
+
+
+def _find_roll_conflicts(school_id, class_id, roster=None):
+    """Duplicate roll numbers within the class, per section.
+
+    Returns entries like {roll_number, section_id, section_name, count,
+    student_ids, student_names} for every roll number shared by 2+ students.
+    """
+    members = roster if roster is not None else _load_class_roster(school_id, class_id)
+    conflicts = []
+    for group in _group_by_section(members).values():
+        by_roll: dict = {}
+        for student in group:
+            if student.roll_number is None:
+                continue
+            by_roll.setdefault(student.roll_number, []).append(student)
+        for roll in sorted(by_roll):
+            same = by_roll[roll]
+            if len(same) > 1:
+                section = same[0].section
+                conflicts.append(
+                    {
+                        "roll_number": roll,
+                        "section_id": str(section.id) if section else None,
+                        "section_name": section.name if section else None,
+                        "count": len(same),
+                        "student_ids": [str(s.id) for s in same],
+                        "student_names": [_student_display_name(s) for s in same],
+                    }
+                )
+    return conflicts
+
+
+@students_bp.route("/promote/preview", methods=["GET"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
-def promote_students():
-    """Move every active student of one class to another class (promotion).
-
-    Single transaction: any invalid target class or a from-class with no
-    students leaves the DB untouched. Roll numbers are kept (re-seat via
-    /students/batch-roll-numbers afterwards).
-    """
+def promote_preview():
+    """Preview a class promotion — who moves, where sections land, and which
+    roll numbers would clash after merging into the target class."""
     from app.models.academic import Class
 
-    data = request.get_json(silent=True) or {}
-    from_class_id = data.get("from_class_id")
-    to_class_id = data.get("to_class_id")
+    from_class_id = request.args.get("from_class_id")
+    to_class_id = request.args.get("to_class_id")
     if not from_class_id or not to_class_id:
         return error_response("from_class_id and to_class_id are required", 400)
     if str(from_class_id) == str(to_class_id):
@@ -420,21 +567,245 @@ def promote_students():
     if not source or not target:
         return error_response("Source and target class must belong to this school", 404)
 
-    students = Student.query.filter_by(
-        school_id=g.school_id, class_id=from_class_id, is_deleted=False
-    ).all()
+    source_students = _load_class_roster(g.school_id, from_class_id)
+    target_students = _load_class_roster(g.school_id, to_class_id)
+
+    target_sections = _class_sections(to_class_id)
+    section_by_name = {(s.name or "").strip().lower(): s for s in target_sections}
+    fallback_section = target_sections[0] if target_sections else None
+
+    # Merged per-section rosters: existing target students + every promotable
+    # source student. Used for both the renumber roll preview and the
+    # keep-rolls conflict preview.
+    merged: dict = {}
+    for student in target_students:
+        merged.setdefault(student.section_id, []).append(student)
+
+    students_payload = []
+    for student in source_students:
+        will_promote = student.status in PROMOTABLE_STATUSES
+        target_section = (
+            _resolve_target_section(student, section_by_name, fallback_section)
+            if will_promote
+            else None
+        )
+        if will_promote:
+            merged.setdefault(
+                target_section.id if target_section else None, []
+            ).append(student)
+        students_payload.append(
+            {
+                "id": str(student.id),
+                "name": _student_display_name(student),
+                "student_code": student.student_id,
+                "roll_no": student.roll_number,
+                "status": student.status,
+                "will_promote": will_promote,
+                "target_section_name": (
+                    target_section.name if target_section else None
+                ),
+                "target_roll_preview": None,  # filled after renumber pass
+            }
+        )
+
+    by_student_id = {row["id"]: row for row in students_payload}
+    for group in merged.values():
+        group.sort(key=_promote_order_key)
+        for idx, student in enumerate(group, start=1):
+            row = by_student_id.get(str(student.id))
+            if row is not None:
+                row["target_roll_preview"] = idx
+
+    section_name_by_id = {s.id: s.name for s in target_sections}
+    conflicts_preview = []
+    for group in merged.values():
+        by_roll: dict = {}
+        for student in group:
+            if student.roll_number is None:
+                continue
+            by_roll.setdefault(student.roll_number, []).append(student)
+        for roll in sorted(by_roll):
+            same = by_roll[roll]
+            if len(same) > 1:
+                conflicts_preview.append(
+                    {
+                        "roll_number": roll,
+                        "section_name": section_name_by_id.get(same[0].section_id),
+                        "count": len(same),
+                        "student_ids": [str(s.id) for s in same],
+                        "student_names": [_student_display_name(s) for s in same],
+                    }
+                )
+
+    section_mappings = {}
+    for student in source_students:
+        if student.status not in PROMOTABLE_STATUSES:
+            continue
+        old_name = (student.section.name or "").strip() if student.section and student.section.name else ""
+        target_section = _resolve_target_section(student, section_by_name, fallback_section)
+        key = old_name or "(no section)"
+        section_mappings[key] = target_section.name if target_section else None
+
+    return success_response(
+        {
+            "students": students_payload,
+            "target_class_student_count": len(target_students),
+            "conflicts_preview": conflicts_preview,
+            "section_mappings": section_mappings,
+            "target_section_count": len(target_sections),
+        }
+    )
+
+
+@students_bp.route("/promote", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def promote_students():
+    """Promote students of one class into another class.
+
+    Body:
+        from_class_id, to_class_id   (required, must differ)
+        academic_year_id             optional — stamped onto promoted students
+                                     (defaults to the target class's own year)
+        roll_strategy                "keep" (default) leaves roll numbers alone
+                                     and reports clashes; "renumber" renumbers
+                                     1..N per section of the target class
+        student_ids                  optional explicit promote list — omitted
+                                     means every eligible student
+
+    Eligible = status in (active, transferred_in, on_leave). transferred_out /
+    dropped_out / graduated students are never moved. Single transaction: any
+    failure rolls everything back.
+    """
+    from app.models.academic import Class
+
+    data = request.get_json(silent=True) or {}
+    from_class_id = data.get("from_class_id")
+    to_class_id = data.get("to_class_id")
+    if not from_class_id or not to_class_id:
+        return error_response("from_class_id and to_class_id are required", 400)
+    if str(from_class_id) == str(to_class_id):
+        return error_response("Source and target class must differ", 400)
+
+    roll_strategy = data.get("roll_strategy") or "keep"
+    if roll_strategy not in ("keep", "renumber"):
+        return error_response("roll_strategy must be 'keep' or 'renumber'", 400)
+    student_ids = data.get("student_ids")
+    if student_ids is not None and not isinstance(student_ids, list):
+        return error_response("student_ids must be a list of student IDs", 400)
+    selected_ids = {str(sid) for sid in student_ids} if student_ids is not None else None
+
+    source = Class.query.filter_by(
+        id=from_class_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    target = Class.query.filter_by(
+        id=to_class_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not source or not target:
+        return error_response("Source and target class must belong to this school", 404)
+
+    students = _load_class_roster(g.school_id, from_class_id)
     if not students:
         return error_response("No students found in the source class", 400)
 
+    target_sections = _class_sections(to_class_id)
+    section_by_name = {(s.name or "").strip().lower(): s for s in target_sections}
+    fallback_section = target_sections[0] if target_sections else None
+
+    # Target academic year: explicit body value wins, else the target class's
+    # own year; when neither exists the student's year is left untouched.
+    target_year_id = data.get("academic_year_id") or target.academic_year_id
+    if target_year_id:
+        from app.models.academic import AcademicYear
+
+        # Guard against junk strings ("None", "undefined", …) — assigning one
+        # into a UUID column would 500 the whole request at flush time.
+        if not AcademicYear.query.filter_by(
+            id=target_year_id, school_id=g.school_id, is_deleted=False
+        ).first():
+            return error_response(
+                "academic_year_id does not match an academic year of this school", 400
+            )
+
+    promoted_students = []
+    skipped = []
+    section_mappings = {}
+
+    for student in students:
+        name = _student_display_name(student)
+        if student.status not in PROMOTABLE_STATUSES:
+            skipped.append(
+                {
+                    "student_id": str(student.id),
+                    "name": name,
+                    "reason": f"status '{student.status}' is not promotable",
+                }
+            )
+            continue
+        if selected_ids is not None and str(student.id) not in selected_ids:
+            skipped.append(
+                {"student_id": str(student.id), "name": name, "reason": "not selected"}
+            )
+            continue
+
+        old_name = (student.section.name or "").strip() if student.section and student.section.name else ""
+        target_section = _resolve_target_section(student, section_by_name, fallback_section)
+
+        student.class_id = to_class_id
+        # Never keep a section row that belongs to another class.
+        student.section_id = target_section.id if target_section else None
+        if target_year_id:
+            student.academic_year_id = target_year_id
+
+        if old_name:
+            section_mappings[old_name] = target_section.name if target_section else None
+        elif fallback_section is not None:
+            section_mappings.setdefault("(no section)", fallback_section.name)
+        promoted_students.append(student)
+
+    if not promoted_students:
+        return success_response(
+            {
+                "promoted": 0,
+                "promoted_count": 0,
+                "to_class_id": str(to_class_id),
+                "skipped": skipped,
+                "roll_conflicts": [],
+                "section_mappings": section_mappings,
+            }
+        )
+
+    roll_conflicts: list = []
     try:
-        for student in students:
-            student.class_id = to_class_id
+        db.session.flush()
+        if roll_strategy == "renumber":
+            _renumber_class_rolls(g.school_id, to_class_id)
+        else:
+            roll_conflicts = _find_roll_conflicts(g.school_id, to_class_id)
         db.session.commit()
     except Exception:
+        import logging
+
         db.session.rollback()
+        logging.getLogger(__name__).exception(
+            "Promotion failed for school %s (%s -> %s)", g.school_id, from_class_id, to_class_id
+        )
         return error_response("Promotion failed and was rolled back", 500)
 
-    return success_response({"promoted": len(students), "to_class_id": str(to_class_id)})
+    return success_response(
+        {
+            "promoted": len(promoted_students),  # legacy key (old callers)
+            "promoted_count": len(promoted_students),
+            "to_class_id": str(to_class_id),
+            "skipped": skipped,
+            "roll_conflicts": roll_conflicts,
+            "section_mappings": section_mappings,
+        }
+    )
+
+
+# ── Guardians ──────────────────────────────────────────────
 
 
 @students_bp.route("/bulk-reset-passwords", methods=["POST"])
@@ -445,7 +816,8 @@ def bulk_reset_passwords():
     """Reset login passwords for the given students to the school default.
 
     Uses the same system default formula as enrollment
-    (generate_default_password → {EMIS_ID}@{StudentID}); system defaults are
+    (generate_default_password → {class}{section}{roll}.{first}, e.g.
+    7a12.ram); system defaults are
     exempt from the user-chosen password policy. Returns the generated
     passwords so the admin can hand them out.
     """
@@ -597,7 +969,7 @@ def add_guardian(student_id):
     data = request.get_json(silent=True) or {}
     guardian = Guardian(school_id=g.school_id, student_id=student.id)
     _populate_guardian(guardian, data)
-    parent_user = _resolve_or_create_parent_user(data)
+    parent_user = _resolve_or_create_parent_user(data, student)
     if parent_user:
         guardian.user_id = parent_user.id
     db.session.add(guardian)
@@ -633,7 +1005,7 @@ def _populate_guardian(guardian: Guardian, data: dict):
             setattr(guardian, key, data[key])
 
 
-def _resolve_or_create_parent_user(guardian_data: dict) -> User | None:
+def _resolve_or_create_parent_user(guardian_data: dict, student: "Student | None" = None) -> User | None:
     """Resolve guardian to an existing parent user or create one when safe."""
     explicit_user_id = guardian_data.get("user_id")
     if explicit_user_id:
@@ -690,7 +1062,7 @@ def _resolve_or_create_parent_user(guardian_data: dict) -> User | None:
         phone=phone,
         email=email or None,
     )
-    parent_user.set_password(generate_default_password(parent_user))
+    parent_user.set_password(generate_default_password(parent_user, student))
     db.session.add(parent_user)
     db.session.flush()
     return parent_user

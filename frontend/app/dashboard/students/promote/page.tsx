@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -15,23 +16,45 @@ import {
   type PromotionAcademicYear,
   type PromotionClassOption,
 } from "@/lib/promotion-utils";
-import { TrendingUp, ArrowRight } from "lucide-react";
+import { TrendingUp, ArrowRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-interface StudentPreview {
+interface PromotePreviewStudent {
   id: string;
-  full_name?: string;
-  first_name?: string;
-  last_name?: string;
-  roll_number?: number;
-  student_id?: string;
+  name: string;
+  student_code?: string | null;
+  roll_no?: number | null;
+  status: string;
+  will_promote: boolean;
+  target_section_name?: string | null;
+  target_roll_preview?: number | null;
 }
+
+interface RollConflictPreview {
+  roll_number: number;
+  section_name?: string | null;
+  count: number;
+  student_ids: string[];
+  student_names: string[];
+}
+
+interface PromotePreview {
+  students: PromotePreviewStudent[];
+  target_class_student_count: number;
+  conflicts_preview: RollConflictPreview[];
+  section_mappings: Record<string, string | null>;
+  target_section_count?: number;
+}
+
+type RollStrategy = "keep" | "renumber";
 
 export default function PromotePage() {
   const queryClient = useQueryClient();
   const [fromClass, setFromClass] = useState("");
   const [toClass, setToClass] = useState("");
-  const [previewStudents, setPreviewStudents] = useState<StudentPreview[]>([]);
+  const [rollStrategy, setRollStrategy] = useState<RollStrategy>("renumber");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [preview, setPreview] = useState<PromotePreview | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
 
   const { data: academicYears = [], isLoading: isLoadingYears } = useQuery({
@@ -98,43 +121,31 @@ export default function PromotePage() {
 
   useEffect(() => {
     setPreviewReady(false);
-    setPreviewStudents([]);
+    setPreview(null);
   }, [fromClass, toClass]);
 
   const previewMutation = useMutation({
     mutationFn: async () => {
-      const students: StudentPreview[] = [];
-      let page = 1;
-
-      while (true) {
-        const res = await api.get<ApiResponse<StudentPreview[]>>("/students", {
-          params: {
-            class_id: fromClass,
-            page,
-            per_page: 100,
-          },
-        });
-
-        students.push(...(res.data.data || []));
-
-        if (!res.data.meta?.pagination?.has_next) {
-          break;
-        }
-
-        page += 1;
-      }
-
-      return students;
+      const res = await api.get<ApiResponse<PromotePreview>>("/students/promote/preview", {
+        params: {
+          from_class_id: fromClass,
+          to_class_id: toClass,
+        },
+      });
+      return res.data.data;
     },
-    onSuccess: (students) => {
-      setPreviewStudents(students);
+    onSuccess: (data) => {
+      setPreview(data);
       setPreviewReady(true);
-      toast.success(`Loaded ${students.length} students for promotion preview.`);
+      setSelectedIds(
+        new Set((data.students || []).filter((s) => s.will_promote).map((s) => s.id)),
+      );
+      toast.success(`Loaded ${(data.students || []).length} students for promotion preview.`);
     },
     onError: () => {
-      toast.error("Could not load students for preview.");
+      toast.error("Could not load promotion preview.");
       setPreviewReady(false);
-      setPreviewStudents([]);
+      setPreview(null);
     },
   });
 
@@ -143,13 +154,33 @@ export default function PromotePage() {
       const res = await api.post("/students/promote", {
         from_class_id: fromClass,
         to_class_id: toClass,
+        academic_year_id: nextYear?.id || undefined,
+        roll_strategy: rollStrategy,
+        student_ids: Array.from(selectedIds),
       });
       return res.data?.data || res.data;
     },
-    onSuccess: (data: { promoted?: number }) => {
-      toast.success(`Promoted ${data?.promoted ?? 0} student(s) to ${toClassName}.`);
+    onSuccess: (data: {
+      promoted_count?: number;
+      promoted?: number;
+      skipped?: Array<{ student_id: string; name: string; reason: string }>;
+      roll_conflicts?: RollConflictPreview[];
+    }) => {
+      const promotedCount = data?.promoted_count ?? data?.promoted ?? 0;
+      const skippedCount = data?.skipped?.length ?? 0;
+      toast.success(
+        `Promoted ${promotedCount} student(s) to ${toClassName}` +
+          (skippedCount ? ` (${skippedCount} skipped)` : "") +
+          ".",
+      );
+      if (rollStrategy === "keep" && data?.roll_conflicts?.length) {
+        toast.warning(
+          `${data.roll_conflicts.length} duplicate roll number(s) remain in the target class — reseat via Batch Roll Numbers.`,
+        );
+      }
       setPreviewReady(false);
-      setPreviewStudents([]);
+      setPreview(null);
+      setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (err: unknown) => {
@@ -163,6 +194,39 @@ export default function PromotePage() {
   const classById = new Map(classes.map((klass) => [klass.id, klass]));
   const fromClassName = classById.get(fromClass)?.name || "Selected Class";
   const toClassName = classById.get(toClass)?.name || "Next Class";
+
+  const students = preview?.students || [];
+  const eligibleStudents = students.filter((s) => s.will_promote);
+  const conflicts = preview?.conflicts_preview || [];
+  const sectionMappings = Object.entries(preview?.section_mappings || {});
+
+  const toggleStudent = (id: string, checked: boolean | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked === true) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean | string) => {
+    if (checked) {
+      setSelectedIds(new Set(eligibleStudents.map((s) => s.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const allSelected = eligibleStudents.length > 0 && selectedIds.size === eligibleStudents.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const canPromote = useMemo(
+    () => Boolean(fromClass && toClass && fromClass !== toClass && selectedIds.size > 0),
+    [fromClass, toClass, selectedIds.size],
+  );
 
   return (
     <div className="space-y-6">
@@ -217,6 +281,25 @@ export default function PromotePage() {
               </Select>
             </div>
           </div>
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-1.5">
+              <label className="text-sm font-medium">Roll Number Strategy</label>
+              <Select value={rollStrategy} onValueChange={(v) => setRollStrategy(v as RollStrategy)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose roll strategy" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="renumber">Renumber 1..N (per section)</SelectItem>
+                  <SelectItem value="keep">Keep existing rolls</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {rollStrategy === "renumber"
+                  ? "Rolls in the target class are renumbered 1..N per section (old roll order, then name)."
+                  : "Existing roll numbers are kept; duplicates are reported after the move."}
+              </p>
+            </div>
+          </div>
           {currentYear ? (
             <p className="text-xs text-muted-foreground">
               Source session: {currentYear.name}
@@ -224,7 +307,7 @@ export default function PromotePage() {
             </p>
           ) : null}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-            <strong>Note:</strong> Promotion will move all students from the selected class to the next class for the upcoming academic year. This action can be reviewed before finalizing.
+            <strong>Note:</strong> Only active, transferred-in and on-leave students are moved. Left (transferred-out / dropped-out / graduated) students stay behind. This action can be reviewed before finalizing.
           </div>
           <Button
             disabled={!fromClass || !toClass || fromClass === toClass || previewMutation.isPending}
@@ -243,51 +326,131 @@ export default function PromotePage() {
         </CardContent>
       </Card>
 
-      {previewReady && (
+      {previewReady && preview && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
               Promotion Preview: {fromClassName} to {toClassName}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {previewStudents.length} students will be moved if you finalize promotion.
-            </p>
-            {previewStudents.length === 0 ? (
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="rounded-md bg-muted px-2 py-1">
+                {toClassName} currently has <strong>{preview.target_class_student_count}</strong> student(s)
+              </span>
+              <span className="rounded-md bg-muted px-2 py-1">
+                <strong>{selectedIds.size}</strong> of {eligibleStudents.length} eligible selected
+              </span>
+              <span className="rounded-md bg-muted px-2 py-1">
+                {students.length - eligibleStudents.length} left student(s) will be skipped
+              </span>
+            </div>
+
+            {sectionMappings.length > 0 && (
+              <div className="text-sm">
+                <p className="font-medium mb-1">Section mapping (by name)</p>
+                <div className="flex flex-wrap gap-2">
+                  {sectionMappings.map(([oldName, newName]) => (
+                    <span key={oldName} className="rounded-md border px-2 py-1 text-xs">
+                      {oldName} → {newName || "(no section)"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {conflicts.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800 flex gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">
+                    {conflicts.length} roll number conflict(s) in {toClassName}
+                  </p>
+                  <ul className="mt-1 list-disc list-inside text-xs">
+                    {conflicts.map((c) => (
+                      <li key={`${c.section_name}-${c.roll_number}`}>
+                        Roll {c.roll_number} shared by {c.count} students
+                        {c.section_name ? ` (Section ${c.section_name})` : ""}: {c.student_names.join(", ")}
+                        {rollStrategy === "renumber" ? " — resolved by renumbering." : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {students.length === 0 ? (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
                 No students were found in the selected source class.
               </p>
             ) : (
-              <div className="rounded-lg border divide-y">
-                {previewStudents.slice(0, 12).map((student) => {
-                  const name =
-                    student.full_name ||
-                    `${student.first_name || ""} ${student.last_name || ""}`.trim() ||
-                    "Student";
-                  return (
-                    <div key={student.id} className="px-3 py-2 flex items-center justify-between text-sm">
-                      <span className="font-medium">{name}</span>
-                      <span className="text-muted-foreground">
-                        Roll {student.roll_number ?? "-"} {student.student_id ? `• ${student.student_id}` : ""}
+              <div className="rounded-lg border divide-y max-h-96 overflow-y-auto">
+                <div className="px-3 py-2 flex items-center gap-3 bg-muted/40 text-sm font-medium">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => toggleAll(v)}
+                    aria-label="Select all eligible students"
+                  />
+                  <span>Select all eligible</span>
+                </div>
+                {students.map((student) => (
+                  <div key={student.id} className="px-3 py-2 flex items-center gap-3 text-sm">
+                    <Checkbox
+                      checked={selectedIds.has(student.id)}
+                      onCheckedChange={(v) => toggleStudent(student.id, v)}
+                      disabled={!student.will_promote}
+                      aria-label={`Select ${student.name}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className={`font-medium ${student.will_promote ? "" : "line-through text-muted-foreground"}`}>
+                        {student.name || "Student"}
                       </span>
+                      {student.student_code ? (
+                        <span className="text-muted-foreground ml-2 text-xs">{student.student_code}</span>
+                      ) : null}
                     </div>
-                  );
-                })}
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      Roll {student.roll_no ?? "-"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${
+                        student.will_promote
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {student.status}
+                    </span>
+                    <span className="text-muted-foreground whitespace-nowrap w-40 text-right">
+                      {student.will_promote
+                        ? `→ ${student.target_section_name || "(no section)"} · Roll ${student.target_roll_preview ?? "-"}`
+                        : "stays behind"}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
-            {previewStudents.length > 12 && (
-              <p className="text-xs text-muted-foreground">
-                Showing first 12 students.
+
+            <div className="bg-muted rounded-lg p-3 text-sm">
+              <p className="font-medium mb-1">Confirm summary</p>
+              <p className="text-muted-foreground">
+                Move <strong>{selectedIds.size}</strong> student(s) from {fromClassName} to {toClassName}
+                {nextYear ? ` for ${nextYear.name}` : ""} · Rolls:{" "}
+                <strong>{rollStrategy === "renumber" ? "renumber 1..N per section" : "keep existing"}</strong>
+                {rollStrategy === "keep" && conflicts.length > 0
+                  ? ` · ${conflicts.length} conflict(s) will remain`
+                  : ""}
+                .
               </p>
-            )}
+            </div>
+
             <Button
               className="w-full max-w-xs"
-              disabled={promoteMutation.isPending}
+              disabled={!canPromote || promoteMutation.isPending}
               onClick={() => {
                 if (
                   confirm(
-                    `Move ${previewStudents.length} student(s) from ${fromClassName} to ${toClassName}? This cannot be undone automatically.`,
+                    `Move ${selectedIds.size} student(s) from ${fromClassName} to ${toClassName}? This cannot be undone automatically.`,
                   )
                 )
                   promoteMutation.mutate();

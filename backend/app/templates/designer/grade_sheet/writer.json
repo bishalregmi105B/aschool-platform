@@ -1,0 +1,185 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Arial",
+    "fontSize": 10
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address}",
+      "tagline": "GRADE SHEET",
+      "bg": "#1e3a8a",
+      "color": "#ffffff"
+    },
+    {
+      "type": "spacer",
+      "height": 6
+    },
+    {
+      "type": "paragraph",
+      "text": "THE GRADE(S) SECURED BY  {name}  ({symbol_no})",
+      "align": "left",
+      "color": "#0f172a",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "DATE OF BIRTH: {dob} (B.S.) {dob_ad}(A.D)",
+          "align": "left"
+        },
+        {
+          "text": "SYMBOL NO: {symbol_no}",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "OF {school_name}, {school_address}   IEMIS CODE {iemis_code}",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "IN THE EDUCATION EXAMINATION OF YEAR {exam_year} B.S. ARE GIVEN BELOW.",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 6
+    },
+    {
+      "type": "subject_rows_neb"
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "GRADE POINT AVERAGE = {gpa}",
+      "align": "left",
+      "color": "#0f172a",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "1. ONE CREDIT HOUR EQUALS 28 HOURS",
+      "align": "left",
+      "color": "#64748b",
+      "bold": false,
+      "italic": true,
+      "fontSize": 9
+    },
+    {
+      "type": "paragraph",
+      "text": "2. TH: THEORY(FINAL/EXTERNAL)   IN: INTERNAL",
+      "align": "left",
+      "color": "#64748b",
+      "bold": false,
+      "italic": true,
+      "fontSize": 9
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "table",
+      "caption": "DETAILS OF GRADE SHEET",
+      "headers": [
+        "S.N.",
+        "Achievement In Percent",
+        "Grade",
+        "Description",
+        "Grade Point"
+      ],
+      "rows": [
+        [
+          "1",
+          "90 to 100",
+          "A+",
+          "Outstanding",
+          "4.0"
+        ],
+        [
+          "2",
+          "80 to below 90",
+          "A",
+          "Excellent",
+          "3.6"
+        ],
+        [
+          "3",
+          "70 to below 80",
+          "B+",
+          "Very Good",
+          "3.2"
+        ],
+        [
+          "4",
+          "60 to below 70",
+          "B",
+          "Good",
+          "2.8"
+        ],
+        [
+          "5",
+          "50 to below 60",
+          "C+",
+          "Satisfactory",
+          "2.4"
+        ],
+        [
+          "6",
+          "40 to below 50",
+          "C",
+          "Acceptable",
+          "2.0"
+        ],
+        [
+          "7",
+          "35 to below 40",
+          "D",
+          "Basic",
+          "1.6"
+        ],
+        [
+          "8",
+          "0 to below 35",
+          "NG",
+          "Not Graded",
+          "—"
+        ]
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Class Teacher",
+        "Head Teacher"
+      ]
+    }
+  ]
+}

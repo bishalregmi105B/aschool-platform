@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 /// Gamification — Badges, points, leaderboard, and houses
+///
+/// Backed by real endpoints:
+/// - GET /student/achievements → {total_points, rank, badges, locked_badges,
+///   leaderboard, history} (there is no /student/gamification endpoint)
+/// - GET /gamification/houses  → [{name, color, total_points, ...}]
 class GamificationScreen extends ConsumerStatefulWidget {
   const GamificationScreen({super.key});
 
@@ -33,13 +38,29 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
       _error = null;
     });
     try {
-      final res = await ApiClient.instance.get('/student/gamification');
-      final payload = res.data;
+      final res = await ApiClient.instance.get('/student/achievements');
+      final payload = safeMap(envelopeData(res.data));
+      // Houses live on the gamification blueprint; a failure there must not
+      // blank the whole screen, so degrade to an empty list.
+      List<dynamic> houses = const [];
+      try {
+        final housesRes = await ApiClient.instance.get('/gamification/houses');
+        houses = safeList(envelopeData(housesRes.data));
+      } catch (e) {
+        debugPrint('GamificationScreen houses load failed: $e');
+      }
       setState(() {
-        _myStats = safeMapOrNull(payload?['my_stats']);
-        _badges = safeList(payload?['badges']);
-        _leaderboard = safeList(payload?['leaderboard']);
-        _houses = safeList(payload?['houses']);
+        _myStats = {
+          'total_points': payload['total_points'] ?? 0,
+          'rank': payload['rank'],
+          'badge_count': safeList(payload['badges']).length,
+        };
+        _badges = [
+          ...safeList(payload['badges']),
+          ...safeList(payload['locked_badges']),
+        ];
+        _leaderboard = safeList(payload['leaderboard']);
+        _houses = houses;
       });
     } catch (e, st) {
       debugPrint('GamificationScreen load failed: $e\n$st');

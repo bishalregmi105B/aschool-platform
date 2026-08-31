@@ -8,6 +8,147 @@ from app.utils.tenant_url import school_site_domain
 logger = logging.getLogger(__name__)
 
 
+# ── Unified BS billing-cycle helpers (shared with app/api/v1/fees.py) ─────
+#
+# Manual billing (/fees/structures apply, /fees/batch-monthly) and the
+# auto_generate_monthly_fees cron used to disagree twice over: the API keyed
+# cycles by the GREGORIAN calendar while the cron keyed them by Bikram Sambat
+# month, and each wrote a different notes marker ([fee_structure:id:YYYY-MM]
+# vs [auto_monthly:id:BS-month:item]) — so the same BS month could be billed
+# twice (once by cron, once by an admin clicking batch-billing). Both paths
+# now go through the helpers below: one BS cycle key + one marker format.
+
+
+def bs_cycle_key(frequency: str, academic_year=None, on_date=None) -> str:
+    """BS-calendar cycle key for one billing period.
+
+    `on_date` lets callers generate for a historical BS month (simulation,
+    backfill); it defaults to today's BS date.
+    """
+    import nepali_datetime
+
+    today_bs = on_date or nepali_datetime.date.today()
+    frequency = str(frequency or "monthly").strip().lower()
+    if frequency == "monthly":
+        return f"{today_bs.year}-{today_bs.month:02d}"
+    if frequency == "quarterly":
+        return f"{today_bs.year}-Q{((today_bs.month - 1) // 3) + 1}"
+    if frequency == "semi-annual":
+        return f"{today_bs.year}-H{1 if today_bs.month <= 6 else 2}"
+    if frequency == "annual":
+        return str(academic_year or today_bs.year)
+    return "one-time"
+
+
+def is_bs_month_key(cycle_key: str) -> bool:
+    """True when the cycle key is a BS 'YYYY-MM' month key."""
+    parts = str(cycle_key or "").split("-")
+    return (
+        len(parts) == 2
+        and len(parts[0]) == 4
+        and len(parts[1]) == 2
+        and parts[0].isdigit()
+        and parts[1].isdigit()
+    )
+
+
+def structure_cycle_marker(structure_id, cycle_key: str, item_name=None) -> str:
+    """Idempotency marker written into FeeCollection.notes by BOTH the manual
+    API path and the cron. Per-item so multi-item structures dedupe correctly."""
+    base = f"[fee_structure:{structure_id}:{cycle_key}]"
+    if item_name:
+        return f"[fee_structure:{structure_id}:{cycle_key}:{item_name}]"
+    return base
+
+
+def legacy_auto_monthly_marker(structure_id, month_bs: str, item_name: str) -> str:
+    """Pre-unification cron marker — still HONORED when de-duplicating so
+    months billed by the old cron version are never billed again."""
+    return f"[auto_monthly:{structure_id}:{month_bs}:{item_name}]"
+
+
+def compose_fee_reminder_message(student_name: str, pending_amount: float, period: str) -> str:
+    """The one reminder SMS text — shared by the daily cron and the
+    per-student remind endpoint."""
+    return (
+        f"Fee Reminder: Rs.{pending_amount:.2f} pending for "
+        f"{student_name} ({period}). "
+        f"Pay via eSewa/Khalti at {school_site_domain()}"
+    )
+
+
+def send_single_fee_reminder(school_id: str, student_id: str) -> dict:
+    """Send ONE fee-reminder SMS to a student's primary guardian.
+
+    Used by POST /fees/defaulters/<student_id>/remind. Reuses the cron's
+    composition and the same per-school kill-switch. Returns:
+      {"ok": True, "sent": True, "phone": ..., "amount": ...}
+    or  {"ok": False, "reason": "student_not_found" | "reminders_disabled"
+         | "no_outstanding" | "no_guardian_phone"}
+    """
+    from app.models.fee import FeeCollection
+    from app.models.student import Guardian, Student
+    from app.plugins.config_store import plugin_config_value
+
+    student = Student.query.filter_by(
+        id=student_id, school_id=school_id, is_deleted=False
+    ).first()
+    if not student:
+        return {"ok": False, "reason": "student_not_found"}
+
+    # Same kill-switch the daily cron honors.
+    if not plugin_config_value(school_id, "fees", "reminder_enabled", True):
+        return {"ok": False, "reason": "reminders_disabled"}
+
+    collections = FeeCollection.query.filter(
+        FeeCollection.school_id == school_id,
+        FeeCollection.student_id == student_id,
+        FeeCollection.payment_status.in_(("pending", "partial")),
+        FeeCollection.is_deleted.is_(False),
+    ).all()
+
+    pending_amount = 0.0
+    periods = []
+    for fee in collections:
+        # Net payable (base + fine − discount) — the E180 rule.
+        payable = _fee_payable_total(fee)
+        due = max(payable - _fee_paid_amount(fee, payable), 0)
+        if due > 0:
+            pending_amount += due
+            period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part)
+            if period:
+                periods.append(period)
+    pending_amount = round(pending_amount, 2)
+    if pending_amount <= 0:
+        return {"ok": False, "reason": "no_outstanding"}
+
+    guardian = Guardian.query.filter_by(student_id=student_id, is_primary=True).first()
+    phone = guardian.phone if guardian else None
+    if not phone:
+        return {"ok": False, "reason": "no_guardian_phone"}
+
+    if len(periods) == 1:
+        period_label = periods[0]
+    elif periods:
+        period_label = f"{len(periods)} billing periods"
+    else:
+        period_label = "your billing period"
+
+    student_name = f"{student.first_name or ''} {student.last_name or ''}".strip()
+    message = compose_fee_reminder_message(student_name, pending_amount, period_label)
+
+    from app.tasks.sms_sender import send_sms
+
+    send_sms.delay(phone, message, str(school_id))
+    return {
+        "ok": True,
+        "sent": True,
+        "phone": phone,
+        "amount": pending_amount,
+        "message": message,
+    }
+
+
 @celery.task(name="dispatch_fee_reminders", queue="default")
 def dispatch_fee_reminders():
     """Fan out fee reminders for every active school."""
@@ -71,10 +212,11 @@ def send_fee_reminders(school_id: str):
         period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part) or "your billing period"
         guardian = Guardian.query.filter_by(student_id=student.id, is_primary=True).first()
         if guardian and guardian.phone:
-            msg = (
-                f"Fee Reminder: Rs.{pending_amount:.2f} pending for "
-                f"{student.first_name} ({period}). "
-                f"Pay via eSewa/Khalti at {school_site_domain()}"
+            msg = compose_fee_reminder_message(
+                f"{student.first_name or ''} {student.last_name or ''}".strip()
+                or "Student",
+                pending_amount,
+                period,
             )
             send_sms.delay(guardian.phone, msg, school_id)
 
@@ -333,9 +475,11 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
             for item in monthly_items:
                 item_name = item.get("name", "Tuition Fee")
                 item_amount = float(item.get("amount", 0))
-                marker = (
-                    f"[auto_monthly:{structure.id}:{month_bs}:{item_name}]"
-                )
+                # Unified dedupe marker — identical to the one the manual API
+                # path (/fees/structures apply + /fees/batch-monthly) writes,
+                # so a BS month billed by an admin is skipped by this cron and
+                # vice versa. The legacy cron marker is still honored below.
+                marker = structure_cycle_marker(structure.id, month_bs, item_name)
 
                 exists = FeeCollection.query.filter(
                     FeeCollection.school_id == school_id,
@@ -343,6 +487,18 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
                     FeeCollection.notes.ilike(f"%{marker}%"),
                     FeeCollection.is_deleted.is_(False),
                 ).first()
+                if not exists:
+                    # Honor the PRE-unification cron marker so months already
+                    # billed by the old code are never billed a second time.
+                    legacy_marker = legacy_auto_monthly_marker(
+                        structure.id, month_bs, item_name
+                    )
+                    exists = FeeCollection.query.filter(
+                        FeeCollection.school_id == school_id,
+                        FeeCollection.student_id == student.id,
+                        FeeCollection.notes.ilike(f"%{legacy_marker}%"),
+                        FeeCollection.is_deleted.is_(False),
+                    ).first()
 
                 if exists:
                     skipped_total += 1

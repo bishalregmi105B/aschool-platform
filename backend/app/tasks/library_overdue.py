@@ -13,7 +13,7 @@ def check_overdue_books():
     Only fires for schools with the 'library' plugin active.
     """
     from extensions import db
-    from app.models.library import BookTransaction
+    from app.models.library import BookIssue
     from app.models.plugin import SchoolPlugin
     from datetime import date
 
@@ -21,26 +21,31 @@ def check_overdue_books():
 
     active_schools = (
         db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="library", active=True)
+        .filter(
+            # the plugin was renamed library → library_management; both row
+            # generations exist across deployments
+            SchoolPlugin.plugin_slug.in_(["library", "library_management"]),
+            SchoolPlugin.active == True,  # noqa: E712
+        )
         .all()
     )
 
     for (school_id,) in active_schools:
         try:
-            overdue = BookTransaction.query.filter(
-                BookTransaction.school_id == school_id,
-                BookTransaction.due_date < today,
-                BookTransaction.return_date.is_(None),
+            overdue = BookIssue.query.filter(
+                BookIssue.school_id == school_id,
+                BookIssue.status == "issued",
+                BookIssue.due_date < today,
             ).all()
 
-            for tx in overdue:
+            for issue in overdue:
                 emit_for_school(
                     "library.book_overdue",
                     school_id=str(school_id),
-                    transaction_id=str(tx.id),
-                    student_id=str(tx.student_id),
-                    book_id=str(tx.book_id),
-                    due_date=str(tx.due_date),
+                    issue_id=str(issue.id),
+                    student_id=str(issue.student_id) if issue.student_id else None,
+                    book_id=str(issue.book_id),
+                    due_date=str(issue.due_date),
                 )
 
             logger.info("Found %d overdue books for school %s", len(overdue), school_id)

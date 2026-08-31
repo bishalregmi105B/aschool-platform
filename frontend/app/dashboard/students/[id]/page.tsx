@@ -23,6 +23,21 @@ import {
   fetchStudentFeeCollections,
 } from "@/lib/services/dashboard/students.service";
 
+// Mirrors the backend default (app/utils/password.py): parents get
+// p{roll}.{first}{last4 of phone} derived from the child's identity,
+// e.g. p12.ram4821; falls back to {first}.{last4} when the child has no
+// roll yet. The backend may append -2/-3 on in-school collisions.
+function parentDefaultHint(
+  s: { first_name?: string; roll_number?: number | null } | null,
+  phone: string
+): string {
+  const slug = (v: unknown) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const first = slug(s?.first_name) || "user";
+  const last4 = slug(phone).slice(-4);
+  if (s?.roll_number == null) return `${first}.${last4}`;
+  return `p${s.roll_number}.${first}${last4}`;
+}
+
 export default function StudentDetailPage() {
   const params = useParams();
   const studentId = params.id as string;
@@ -118,7 +133,7 @@ export default function StudentDetailPage() {
                 {s.default_password_hint || "Not generated"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Pattern: <span className="font-mono">{"{EMIS}@{StudentID}"}</span> — parents use {"{EMIS}@{last4 of phone}"}
+                Pattern: <span className="font-mono">{"{class}{section}{roll}.{first}"}</span> — parents use {"p{roll}.{first}{last4}"}
               </p>
             </div>
             {s.user_id && (
@@ -161,7 +176,7 @@ export default function StudentDetailPage() {
                       {g.phone && (
                         <p className="text-xs text-muted-foreground">
                           Parent app login: <span className="font-mono">{g.phone}</span> · default password{" "}
-                          <span className="font-mono">{`{EMIS}@${String(g.phone).slice(-4)}`}</span>
+                          <span className="font-mono">{parentDefaultHint(s, String(g.phone))}</span>
                         </p>
                       )}
                     </div>

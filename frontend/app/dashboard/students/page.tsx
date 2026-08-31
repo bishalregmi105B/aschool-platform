@@ -741,7 +741,7 @@ function AddStudentDialog({
                 placeholder="Leave empty for auto-generation"
               />
               <p className="text-xs text-muted-foreground">
-                Default: EMIS ID @ Student ID
+                Default: {"{class}{section}{roll}.{first}"} (e.g. 7a12.ram)
               </p>
             </div>
           </div>

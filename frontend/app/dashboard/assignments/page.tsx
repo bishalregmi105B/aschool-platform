@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -72,6 +73,8 @@ export default function AssignmentsPage() {
 
 function AssignmentsContent() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Dialog states
@@ -198,12 +201,15 @@ function AssignmentsContent() {
     onError: () => toast.error("Failed to save grade"),
   });
 
+  // AI-grade works per SUBMISSION (backend requires submission_id)
   const aiGradeMut = useMutation({
-    mutationFn: async (id: string) => (await api.post(`/assignments/${id}/ai-grade`)).data,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      toast.success("AI grading started — results will appear shortly");
+    mutationFn: async (p: { assignmentId: string; submissionId: string }) =>
+      (await api.post(`/assignments/${p.assignmentId}/ai-grade`, { submission_id: p.submissionId })).data,
+    onSuccess: (_d, p) => {
+      queryClient.invalidateQueries({ queryKey: ["submissions", submissionsFor?.id] });
+      toast.success("AI grade suggestion applied — review and save");
     },
+    onError: () => toast.error("AI grading failed for this submission"),
   });
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -271,7 +277,7 @@ function AssignmentsContent() {
   const stats = {
     total: allAssignments.length,
     active: allAssignments.filter((a) => a.status === "active").length,
-    closed: allAssignments.filter((a) => a.status === "closed" || a.status === "graded").length,
+    closed: allAssignments.filter((a) => a.status === "past" || a.status === "closed" || a.status === "graded").length,
   };
 
   return (
@@ -396,19 +402,12 @@ function AssignmentsContent() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => aiGradeMut.mutate(a.id)}
-                          title="AI Auto-grade"
-                        >
-                          <Brain className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
                           className="h-7 w-7 text-destructive"
                           onClick={() => {
                             if (confirm("Delete this assignment?")) deleteMut.mutate(a.id);
                           }}
+                          title={isAdmin ? "Delete" : "Delete (admins only)"}
+                          disabled={!isAdmin}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -566,7 +565,11 @@ function AssignmentsContent() {
               Cancel
             </Button>
             <Button
-              onClick={() => createMut.mutate()}
+              onClick={() => {
+                if (!form.class_id) { toast.error("Select a class"); return; }
+                if (!form.subject_id) { toast.error("Select a subject"); return; }
+                createMut.mutate();
+              }}
               disabled={createMut.isPending || !form.title}
             >
               {createMut.isPending ? "Saving…" : editAssignment ? "Update" : "Create Assignment"}
@@ -608,6 +611,19 @@ function AssignmentsContent() {
                         ) : (
                           <Badge variant="secondary">Not graded</Badge>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={aiGradeMut.isPending}
+                          onClick={() =>
+                            submissionsFor &&
+                            aiGradeMut.mutate({ assignmentId: submissionsFor.id, submissionId: sub.id })
+                          }
+                          title="AI suggests a grade for this submission"
+                        >
+                          <Brain className="h-3 w-3 mr-1" /> AI
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

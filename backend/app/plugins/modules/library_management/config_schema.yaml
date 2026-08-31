@@ -1,0 +1,33 @@
+# Library Management plugin settings screen (SchoolPlugin.config).
+# Real consumer: app/api/v1/library.py (_fine_settings / _circulation_settings)
+# reads these keys via app.plugins.config_store.plugin_config_value; the
+# fallback defaults there MUST mirror the defaults below. No migration needed —
+# values live in the SchoolPlugin.config JSONB column, edited at
+# /dashboard/plugins/library_management/settings.
+fields:
+  # ── Fines ─────────────────────────────────────────────────
+  - key: fines.per_day
+    label: "Fine per day (Rs)"
+    type: number
+    default: 2
+    min: 0
+    help: "NPR charged per day a book is overdue. 0 = no fine."
+  - key: fines.max
+    label: "Maximum fine (Rs)"
+    type: number
+    default: 500
+    min: 0
+    help: "Upper cap on the fine for a single overdue book."
+  # ── Circulation ───────────────────────────────────────────
+  - key: circulation.loan_days
+    label: "Loan period (days)"
+    type: number
+    default: 14
+    min: 0
+    help: "Default number of days a borrowed book is due back, used when the client does not send an explicit due date."
+  - key: circulation.max_books
+    label: "Max books per student"
+    type: number
+    default: 0
+    min: 0
+    help: "How many books one student may have out at once; 0 = no limit."

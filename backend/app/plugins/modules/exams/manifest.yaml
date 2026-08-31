@@ -27,6 +27,7 @@ frontend:
     label_nepali: "परीक्षा"
     icon: "FileText"
     subitems:
+      - { label: "Exam Dashboard", route: "/dashboard/exams" }
       - { label: "Schedule", route: "/dashboard/exams/schedule" }
       - { label: "Enter Marks", route: "/dashboard/exams/marks" }
       - { label: "Results", route: "/dashboard/exams/results" }
@@ -34,6 +35,8 @@ frontend:
       # AI paper generation lives under AI Tools (PluginGate ai_tools);
       # /dashboard/exams/ai-paper never existed as a page.
       - { label: "AI Paper Generator", route: "/dashboard/ai-tools/question-paper" }
+      - { label: "Online Exams", route: "/dashboard/exams/online" }
+      - { label: "Grade Table", route: "/dashboard/exams/grades" }
     visible_to: ["school_admin", "teacher"]
 
 flutter:

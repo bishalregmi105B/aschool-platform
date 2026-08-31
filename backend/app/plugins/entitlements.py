@@ -17,10 +17,14 @@ Also hosts the server-side School.max_students enforcement helpers
 (NULL/0 cap = unlimited) used by the student create/bulk-import paths.
 """
 
+import logging
+import uuid
 from datetime import datetime, timezone
 
 from extensions import db
 from app.models.plugin import Plugin, SchoolPlugin
+
+logger = logging.getLogger(__name__)
 
 # ── Plan → plugin tier categories (cumulative) ────────────────────────────────
 
@@ -113,6 +117,161 @@ def grant_plan_plugins(school_id: str, plan: str | None) -> list[dict]:
         db.session.commit()
         _invalidate_plugin_cache(school_id)
     return granted
+
+
+def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
+    """Idempotently install every plan-tier plugin for a school (auto-provisioning).
+
+    For every catalog plugin whose tier category falls inside the school's
+    plan tier set (free → core+add_on; starter/growth/enterprise are the
+    cumulative sets — see PLAN_PLUGIN_TIERS) that has NO SchoolPlugin row
+    yet, create one ACTIVE row as a plan entitlement: is_trial=False,
+    trial_ends_at=None, next_billing_date=None — never a trial row (the
+    school pays for the plan, not per-plugin trials).
+
+    Existing rows are NEVER touched: an admin's deactivated/uninstalled
+    choice and any stored config are preserved. Soft-deleted rows are
+    resurrected instead of re-inserted (the (school_id, plugin_slug) unique
+    constraint would reject a duplicate).
+
+    Catalog visibility matches the marketplace exactly: the REGISTRY
+    (PluginLoader manifests) is the source of truth, merged with the
+    `plugins` mirror rows under the same delisting rule as
+    api/v1/plugins._catalog_entries(); coming-soon and deprecated slugs are
+    never auto-granted (install_plugin refuses coming-soon installs too).
+
+    Cheap + idempotent: at most 2-3 queries (mirror rows, existing install
+    rows, School.plan when the caller did not supply it) and a bulk insert
+    of ONLY the missing rows; a fast no-op once the school is fully
+    provisioned. Intended call sites: school creation (auth register,
+    superadmin school create) and lazily from the marketplace / installed
+    plugins list endpoints so pre-existing schools self-heal on first load.
+
+    Returns the list of grant dicts ({plugin_slug, is_trial, trial_ends_at})
+    for rows created (or resurrected) by this call.
+    """
+    from app.plugins.loader import PluginLoader
+
+    # Accept a School instance OR a bare school_id (str/UUID).
+    if hasattr(school, "id"):
+        raw_id = school.id
+        if plan is None and hasattr(school, "plan"):
+            plan = getattr(school, "plan", None)
+    else:
+        raw_id = school
+    try:
+        school_uuid = raw_id if isinstance(raw_id, uuid.UUID) else uuid.UUID(str(raw_id))
+    except (TypeError, ValueError, AttributeError):
+        logger.warning("ensure_free_plugins: invalid school identifier %r", school)
+        return []
+    if plan is None:
+        plan = school_plan(school_uuid)  # 1 extra query only when plan unsupplied
+    tiers = plan_tiers(plan)
+
+    # 1. Entitled slugs — same visibility rule as the marketplace catalog:
+    #    a manifest entry is offered unless BOTH the manifest and the mirror
+    #    row agree it is delisted; published mirror rows without a manifest
+    #    are offered as fallbacks. One query for all mirror rows.
+    manifests = PluginLoader.get_all_manifests()
+    mirror_by_slug: dict[str, Plugin] = {
+        p.slug: p for p in Plugin.query.filter(Plugin.is_deleted.is_(False)).all()
+    }
+
+    entitled: set[str] = set()
+    for slug, m in manifests.items():
+        category = str(m.get("category") or "core")
+        if category not in tiers:
+            continue
+        # E230: coming-soon (final testing) and deprecated (legacy alias of a
+        # canonical successor) plugins are never auto-granted — installing a
+        # deprecated alias would double up sidebar entries beside the canon.
+        if m.get("coming_soon") or m.get("deprecated"):
+            continue
+        if m.get("published") is False:
+            row = mirror_by_slug.get(slug)
+            if not (row and row.is_published):
+                continue  # delisted by manifest and the mirror agrees
+        entitled.add(slug)
+    for slug, row in mirror_by_slug.items():
+        if (
+            slug not in manifests
+            and row.is_published
+            and (row.category or "") in tiers
+        ):
+            entitled.add(slug)  # mirror-only fallback the catalog still shows
+
+    if not entitled:
+        return []
+
+    # 2. Existing install rows for this school (ANY state) — one query.
+    existing = SchoolPlugin.query.filter(
+        SchoolPlugin.school_id == school_uuid,
+        SchoolPlugin.plugin_slug.in_(entitled),
+    ).all()
+    by_slug = {sp.plugin_slug: sp for sp in existing}
+
+    granted: list[dict] = []
+    for slug in sorted(entitled):
+        sp = by_slug.get(slug)
+        if sp is None:
+            db.session.add(
+                SchoolPlugin(
+                    school_id=school_uuid,
+                    plugin_slug=slug,
+                    active=True,
+                    billing_cycle="monthly",
+                    is_trial=False,
+                    trial_started_at=None,
+                    trial_ends_at=None,
+                    next_billing_date=None,
+                )
+            )
+        elif sp.is_deleted:
+            # Resurrect rather than re-insert (unique constraint); config kept.
+            sp.is_deleted = False
+            sp.active = True
+            sp.uninstalled_at = None
+            sp.is_trial = False
+            sp.trial_started_at = None
+            sp.trial_ends_at = None
+            sp.next_billing_date = None
+        else:
+            # Already installed (active, deactivated, or uninstalled) —
+            # leave the row exactly as the school's admins left it.
+            continue
+        granted.append(
+            {"plugin_slug": slug, "is_trial": False, "trial_ends_at": None}
+        )
+
+    if not granted:
+        return []
+
+    try:
+        db.session.commit()
+    except Exception as e:  # noqa: BLE001 — a concurrent install racing the
+        # unique constraint must never 500 the page that triggered backfill;
+        # the school ends up fully provisioned either way.
+        db.session.rollback()
+        logger.warning(
+            "ensure_free_plugins: commit failed for school=%s (concurrent "
+            "install?): %s", school_uuid, e,
+        )
+        return []
+    _invalidate_plugin_cache(str(school_uuid))
+    return granted
+
+
+def is_plan_core_plugin(plugin_or_category: "Plugin | str") -> bool:
+    """True when the plugin's tier is 'core' — the school's base toolset.
+
+    Deactivating/uninstalling a core plugin would break the school's
+    dashboard, sidebar and base flows, so the plugins API refuses it (see
+    plugins.py deactivate/uninstall guards). 'add_on' and the paid tiers
+    stay freely manageable by the school's admins.
+    """
+    if isinstance(plugin_or_category, str):
+        return (plugin_or_category or "").lower() == "core"
+    return ((getattr(plugin_or_category, "category", None) or "") == "core")
 
 
 def school_plan(school_id) -> str:

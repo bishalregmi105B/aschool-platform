@@ -1,0 +1,25 @@
+template_key: id_card_nepali
+name: Student ID Card (Nepali)
+category: id_cards
+editor_type: designer
+description: विद्यार्थी पहिचानपत्र — Devanagari-labelled ID card in Nepal-flag crimson with photo and QR
+page_size: ID Card
+thumbnail_emoji: 🇳🇵
+is_default: true
+size:
+  width: 300
+  height: 189
+fields:
+- photo
+- name
+- class
+- section
+- roll_no
+- dob
+- blood_group
+- phone
+autofill:
+  sources:
+  - school
+  dates: auto (school footer)
+  notes: School fields merge automatically; record data comes from bulk generation or the data-fill panel. Devanagari renders correctly in print PDF (Noto Sans Devanagari).

@@ -1,0 +1,20 @@
+template_key: admission_form
+name: Admission Application Form
+category: reports
+editor_type: designer
+description: प्रवेश आवेदन फारम — bilingual (Nepali/English) admission application form with dashed fill-in fields
+page_size: A4
+thumbnail_emoji: 📝
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- school_name
+- class_name
+autofill:
+  sources:
+  - school
+  dates:
+    today_bs: auto
+  notes: Print blank for walk-in applicants, or open in the designer to customise. {today_bs} fills automatically.

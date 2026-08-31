@@ -1,0 +1,189 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 13,
+    "showFooter": true,
+    "footerText": "School Address  •  Phone  •  Email  •  Website"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "YOUR SCHOOL NAME",
+      "align": "center",
+      "color": "#1e293b",
+      "bold": true
+    },
+    {
+      "type": "paragraph",
+      "text": "School Address  |  Phone  |  Email  |  Website",
+      "align": "center",
+      "color": "#64748b",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    },
+    {
+      "type": "divider",
+      "color": "#3b82f6",
+      "width": 2
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "",
+          "align": "left"
+        },
+        {
+          "text": "Date: __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "To,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Subject: _________________________________________________",
+      "align": "left",
+      "color": "#1e293b",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "divider",
+      "color": "#3b82f6",
+      "width": 1
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Dear Sir/Madam,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "_________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "Yours faithfully,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "paragraph",
+      "text": "__________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "Principal",
+      "align": "left",
+      "color": "#334155",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    }
+  ]
+}

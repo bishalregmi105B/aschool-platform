@@ -1,0 +1,245 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12,
+    "showHeader": true,
+    "headerText": "YOUR SCHOOL NAME — Affiliated to Board of Secondary Education",
+    "showFooter": true,
+    "footerText": "Phone: +000-000-0000  |  Email: info@school.edu  |  www.school.edu"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "level": 2,
+      "text": "YOUR SCHOOL NAME",
+      "align": "center",
+      "color": "#1e40af",
+      "bold": true
+    },
+    {
+      "type": "paragraph",
+      "text": "Affiliated to Board of Secondary Education",
+      "align": "center",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "Street Address, City, State — Pincode",
+      "align": "center",
+      "color": "#475569",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    },
+    {
+      "type": "paragraph",
+      "text": "Phone: +000-000-0000  |  Email: info@school.edu",
+      "align": "center",
+      "color": "#475569",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    },
+    {
+      "type": "paragraph",
+      "text": "www.school.edu  |  Estd. 2001",
+      "align": "center",
+      "color": "#64748b",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    },
+    {
+      "type": "divider",
+      "color": "#1e40af",
+      "width": 2
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Ref No.: _______________",
+          "align": "left"
+        },
+        {
+          "text": "Date: _______________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "To,",
+      "align": "left",
+      "color": "#334155",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_____________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_____________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "_____________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Subject: _________________________________________________________",
+      "align": "left",
+      "color": "#1e293b",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "divider",
+      "color": "#1e40af",
+      "width": 1
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Dear Sir / Madam,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "With reference to the above subject, I state that ___________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "Thanking you,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "Yours faithfully,",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "paragraph",
+      "text": "_______________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "Principal",
+      "align": "left",
+      "color": "#334155",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "YOUR SCHOOL NAME",
+      "align": "left",
+      "color": "#475569",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    }
+  ]
+}

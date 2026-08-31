@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
 import {
   fetchFeeReports,
+  getFeeReportRange,
   type FeeReportPeriod,
 } from "@/lib/services/dashboard/fees.service";
 import {
@@ -29,11 +33,37 @@ export default function FeeReportsPage() {
 
 function ReportsContent() {
   const [period, setPeriod] = useState<FeeReportPeriod>("monthly");
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["fee-reports", period],
     queryFn: () => fetchFeeReports(period),
   });
+
+  const exportCollectionsCsv = async () => {
+    setExportingCsv(true);
+    try {
+      // Narrow the CSV to the selected period (backend accepts inclusive ISO
+      // from/to on GET /fees/collections/export).
+      const range = getFeeReportRange(period);
+      const res = await api.get("/fees/collections/export", {
+        params: range,
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(
+        new Blob([res.data], { type: "text/csv" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `fee_collections_${range.start_date}_to_${range.end_date}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("CSV export unavailable");
+    } finally {
+      setExportingCsv(false);
+    }
+  };
 
   if (isLoading) return <PageLoader />;
   if (isError || !data) {
@@ -86,15 +116,46 @@ function ReportsContent() {
             Financial overview and collection analytics
           </p>
         </div>
-        <select
-          className="border rounded-md px-3 py-2"
-          value={period}
-          onChange={(e) => setPeriod(e.target.value as FeeReportPeriod)}
-        >
-          <option value="monthly">This Month</option>
-          <option value="quarterly">This Quarter</option>
-          <option value="yearly">This Year</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            className="border rounded-md px-3 py-2"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as FeeReportPeriod)}
+          >
+            <option value="monthly">This Month</option>
+            <option value="quarterly">This Quarter</option>
+            <option value="yearly">This Year</option>
+          </select>
+          <Button
+            variant="outline"
+            disabled={exportingCsv}
+            onClick={exportCollectionsCsv}
+          >
+            {exportingCsv ? "Exporting…" : "Export CSV"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const range = getFeeReportRange(period);
+                const res = await api.get("/reports/fees/collection/pdf", {
+                  params: range,
+                  responseType: "blob",
+                });
+                const url = URL.createObjectURL(res.data as Blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "fee_collection_report.pdf";
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                toast.error("PDF export unavailable");
+              }
+            }}
+          >
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

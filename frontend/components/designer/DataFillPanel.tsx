@@ -152,6 +152,28 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
         </div>
 
         <Separator />
+
+        {/* Built-in date tokens — always available, no data source needed */}
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+            📅 Auto Dates (always live)
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {["today_bs", "today_bs_nepali", "today_ad", "bs_year", "bs_month_name", "bs_day", "ad_year", "ad_month_name", "current_time", "academic_year_bs", "weekday_name"].map((f) => (
+              <button key={f}
+                onClick={() => onInsertToken?.(`{${f}}`)}
+                title={`Insert {${f}} — filled automatically on every render/export`}
+                className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-[9px] font-mono text-amber-800 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-colors inline-flex items-center gap-0.5">
+                <Plus className="h-2 w-2" />{f}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-muted-foreground mt-1">
+            These fill with the current Nepali (BS) / English (AD) date at render & export time — never stale.
+          </p>
+        </div>
+
+        <Separator />
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
           <p className="text-[10px] text-blue-700 font-medium mb-1">💡 How it works</p>
           <p className="text-[10px] text-blue-600 leading-relaxed">

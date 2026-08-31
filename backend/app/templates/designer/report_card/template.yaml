@@ -1,0 +1,23 @@
+template_key: report_card
+name: Report Card
+category: reports
+editor_type: designer
+description: Terminal report card with subject table, attendance and remarks
+page_size: A4
+thumbnail_emoji: 📋
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- name
+- class
+- section
+- roll_no
+- exam_name
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

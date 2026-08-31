@@ -1,11 +1,14 @@
 """Fees plugin API — fee structure, collection, receipts, payments."""
 
 import hashlib
-from datetime import datetime, timezone
+import csv
+import io
+import re
+from datetime import datetime, timedelta, timezone
 from html import escape
 from io import BytesIO
 
-from flask import Blueprint, g, request, send_file
+from flask import Blueprint, Response, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func, or_
 
@@ -936,12 +939,18 @@ def delete_fee_structure(structure_id):
 # ── Fee Collections ────────────────────────────────────────
 
 
-@fees_bp.route("/collections", methods=["GET"])
-@jwt_required()
-@school_required
-@plugin_required("fees")
-def list_collections():
-    """List fee collections."""
+def _collections_filtered_query():
+    """FeeCollection query with the standard list filters applied from the
+    request's query args (student_id, class_id, section_id, search, status,
+    from, to).
+
+    Shared by GET /fees/collections and GET /fees/collections/export so the
+    CSV export always honors exactly the same filters as the list endpoint.
+    `from`/`to` (ISO "YYYY-MM-DD", inclusive both ends) narrow the window by
+    bill activity date — collected_at when the bill has payments, otherwise
+    created_at. Unparseable values are ignored (lenient) so existing clients
+    can never break on a bad date.
+    """
     query = FeeCollection.query.filter_by(school_id=g.school_id, is_deleted=False)
     joined_student = False
 
@@ -983,9 +992,119 @@ def list_collections():
     if status:
         query = query.filter_by(payment_status=status)
 
+    activity_date = func.coalesce(FeeCollection.collected_at, FeeCollection.created_at)
+
+    def _parse_range_date(raw):
+        try:
+            return datetime.fromisoformat(str(raw).strip())
+        except (TypeError, ValueError):
+            return None
+
+    date_from = _parse_range_date(request.args.get("from") or request.args.get("start_date"))
+    if date_from:
+        query = query.filter(activity_date >= date_from.replace(tzinfo=timezone.utc))
+    date_to = _parse_range_date(request.args.get("to") or request.args.get("end_date"))
+    if date_to:
+        query = query.filter(activity_date <= date_to.replace(tzinfo=timezone.utc) + timedelta(days=1))
+
+    return query
+
+
+@fees_bp.route("/collections", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def list_collections():
+    """List fee collections."""
+    query = _collections_filtered_query()
     items, meta = paginate(query.order_by(FeeCollection.created_at.desc()))
     return success_response(
         [_collection_dict(c) for c in items], meta={"pagination": meta}
+    )
+
+
+@fees_bp.route("/collections/export", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def export_collections_csv():
+    """Export fee collections as CSV, honoring the same filters as
+    GET /fees/collections (student_id, class_id, section_id, search, status,
+    from, to inclusive ISO dates)."""
+    query = _collections_filtered_query()
+    collections = query.order_by(FeeCollection.created_at.desc()).all()
+
+    output = io.StringIO()
+    # UTF-8 BOM so Excel opens Nepali text correctly.
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "id",
+            "created_at",
+            "student_id",
+            "student_name",
+            "class_name",
+            "fee_type",
+            "month_bs",
+            "year_bs",
+            "base_amount",
+            "late_fine_amount",
+            "discount_amount",
+            "net_amount",
+            "paid_amount",
+            "due_amount",
+            "payment_status",
+            "payment_method",
+            "receipt_number",
+            "collected_at",
+        ]
+    )
+
+    student_cache: dict = {}
+    for c in collections:
+        sid = str(c.student_id) if c.student_id else ""
+        if sid not in student_cache:
+            student = Student.query.get(c.student_id) if c.student_id else None
+            klass = student.klass if student else None
+            student_cache[sid] = (
+                _student_name(student) or "Student",
+                klass.name if klass else "",
+            )
+        student_name, class_name = student_cache[sid]
+        payable = _collection_payable_total(c)
+        paid = min(_extract_partial_paid(c), payable)
+        writer.writerow(
+            [
+                str(c.id),
+                c.created_at.isoformat() if c.created_at else "",
+                sid,
+                student_name,
+                class_name,
+                c.fee_item_name or "",
+                c.month_bs or "",
+                c.year_bs or "",
+                _collection_base_amount(c),
+                _collection_late_fine_amount(c),
+                _collection_discount_amount(c),
+                payable,
+                round(paid, 2),
+                round(max(payable - paid, 0.0), 2),
+                c.payment_status or "",
+                c.payment_method or "",
+                c.receipt_number or "",
+                c.collected_at.isoformat() if c.collected_at else "",
+            ]
+        )
+
+    output.seek(0)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=fee_collections_{stamp}.csv"
+        },
     )
 
 
@@ -1038,6 +1157,49 @@ def list_defaulters():
         ):
             row["overdue_since"] = collection.created_at.isoformat()
     return success_response(list(grouped.values()))
+
+
+@fees_bp.route("/defaulters/<uuid:student_id>/remind", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def remind_defaulter(student_id):
+    """Send ONE fee-reminder SMS to a student's primary guardian.
+
+    Reuses the daily cron's composition + per-school kill-switch
+    (fees plugin setting reminder_enabled). Returns {sent, phone, amount}
+    where amount is the student's total outstanding (net payable).
+    """
+    from app.tasks.fee_reminders import send_single_fee_reminder
+
+    result = send_single_fee_reminder(str(g.school_id), str(student_id))
+    if not result.get("ok"):
+        reason = result.get("reason")
+        if reason == "student_not_found":
+            return error_response("Student not found", 404)
+        if reason == "reminders_disabled":
+            return error_response(
+                "Fee reminders are disabled for this school in the fees plugin settings",
+                409,
+            )
+        if reason == "no_outstanding":
+            return error_response("No outstanding fees for this student", 400)
+        if reason == "no_guardian_phone":
+            return error_response(
+                "No primary guardian phone number on file for this student",
+                400,
+            )
+        return error_response("Could not send reminder", 500)
+
+    return success_response(
+        {
+            "sent": result["sent"],
+            "channel": "sms",
+            "phone": result["phone"],
+            "amount": result["amount"],
+        }
+    )
 
 
 @fees_bp.route("/collections", methods=["POST"])
@@ -1252,12 +1414,37 @@ def record_payment(collection_id):
     if outstanding <= 0:
         return error_response("This fee collection is already paid", 400)
 
+    # Optional backdated payment date (ISO "YYYY-MM-DD"): when supplied the
+    # payment is stamped with it instead of "now" so cash collected at the
+    # desk yesterday records as yesterday. Future dates are rejected.
+    payment_date_raw = str(data.get("payment_date") or "").strip()
+    if payment_date_raw:
+        try:
+            payment_dt = datetime.fromisoformat(payment_date_raw).replace(
+                hour=23, minute=59, second=59, tzinfo=timezone.utc
+            )
+        except ValueError:
+            return error_response(
+                "payment_date must be a valid ISO date (YYYY-MM-DD)", 400
+            )
+        # Nepal is UTC+5:45 — "today" in Nepal must never be rejected just
+        # because UTC has already rolled over to the next day.
+        nepal_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=45)
+        if payment_dt > nepal_now:
+            return error_response("payment_date cannot be in the future", 400)
+        # Store the date at midnight UTC so the chosen calendar day is kept
+        # exactly (23:59:59 above is only for the future check).
+        fc.collected_at = datetime.fromisoformat(payment_date_raw).replace(
+            tzinfo=timezone.utc
+        )
+    else:
+        fc.collected_at = datetime.now(timezone.utc)
+
     new_paid = min(total_amount, previous_paid + amount)
     recorded_amount = min(amount, outstanding)
 
     fc.payment_method = method
     fc.transaction_id = data.get("transaction_id") or fc.transaction_id
-    fc.collected_at = datetime.now(timezone.utc)
     fc.notes = _merge_partial_payment_note(fc.notes, new_paid)
     if new_paid >= total_amount:
         fc.payment_status = "paid"
@@ -1372,6 +1559,191 @@ def download_receipt_pdf(receipt_id):
         as_attachment=True,
         download_name=f"{receipt.receipt_number}.pdf",
     )
+
+
+@fees_bp.route("/students/<uuid:student_id>/statement/pdf", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("superadmin", "school_admin", "accountant")
+def download_student_statement_pdf(student_id):
+    """Generate a printable PDF account statement for one student.
+
+    Prints every FeeCollection row with its net payable, paid amount and a
+    running outstanding balance — the accountant's ledger for that student.
+    """
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not student:
+        return error_response("Student not found", 404)
+
+    collections = (
+        FeeCollection.query.filter_by(
+            student_id=student.id,
+            school_id=g.school_id,
+            is_deleted=False,
+        )
+        .order_by(FeeCollection.created_at.asc(), FeeCollection.id.asc())
+        .all()
+    )
+
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        return error_response("PDF export is unavailable on this server", 501)
+
+    try:
+        pdf = HTML(
+            string=_statement_pdf_html(student, collections),
+            base_url=request.host_url,
+        ).write_pdf()
+    except Exception as exc:
+        return error_response(f"Failed to generate PDF: {exc}", 500)
+
+    buffer = BytesIO(pdf)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"statement_{student.student_id or student.id}.pdf",
+    )
+
+
+def _statement_pdf_html(student, collections):
+    """HTML for the student fee statement PDF (same styling as receipts)."""
+    school = getattr(g, "school", None)
+    school_name = escape(school.name if school else "ASchool")
+    student_name = escape(_student_name(student) or "Student")
+    klass = getattr(student, "klass", None)
+    student_meta = escape(
+        " • ".join(
+            part
+            for part in (
+                klass.name if klass else "",
+                getattr(student, "student_id", "") or "",
+                getattr(student, "admission_number", "") or "",
+            )
+            if part
+        )
+        or "—"
+    )
+
+    generated_ad = datetime.now(timezone.utc)
+    try:
+        from app.utils.nepali_date import ad_to_bs
+
+        generated_label = (
+            f"{ad_to_bs(generated_ad)} BS  ({generated_ad.strftime('%Y-%m-%d')} AD)"
+        )
+    except Exception:
+        generated_label = generated_ad.strftime("%Y-%m-%d")
+
+    rows_html = []
+    running_balance = 0.0
+    total_payable = 0.0
+    total_paid = 0.0
+    for c in collections:
+        payable = _collection_payable_total(c)
+        paid = min(_extract_partial_paid(c), payable)
+        due = round(max(payable - paid, 0.0), 2)
+        running_balance = round(running_balance + due, 2)
+        total_payable = round(total_payable + payable, 2)
+        total_paid = round(total_paid + paid, 2)
+        rows_html.append(
+            f"""<tr>
+      <td>{escape(c.created_at.strftime('%Y-%m-%d') if c.created_at else '-')}</td>
+      <td>{escape((c.month_bs or c.year_bs or '-') if (c.month_bs or c.year_bs) else '-')}</td>
+      <td>{escape(c.fee_item_name or 'Fee')}</td>
+      <td>{escape(str(c.payment_status or '-'))}</td>
+      <td class="num">NPR {payable:,.2f}</td>
+      <td class="num">NPR {paid:,.2f}</td>
+      <td class="num">NPR {due:,.2f}</td>
+      <td class="num"><strong>NPR {running_balance:,.2f}</strong></td>
+    </tr>"""
+        )
+    if not rows_html:
+        rows_html.append(
+            '<tr><td colspan="8" class="empty">No fee records for this student yet.</td></tr>'
+        )
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {{ size: A4; margin: 16mm; }}
+    body {{ margin: 0; font-family: Arial, sans-serif; color: #0f172a; }}
+    .statement {{ border: 1px solid #cbd5e1; border-radius: 8px; padding: 24px; }}
+    .header {{ display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #0f172a; padding-bottom: 16px; }}
+    .school {{ font-size: 22px; font-weight: 700; }}
+    .muted {{ color: #64748b; font-size: 12px; }}
+    .number {{ text-align: right; }}
+    h1 {{ margin: 18px 0; font-size: 18px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 16px 0; }}
+    .box {{ border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; background: #f8fafc; }}
+    .label {{ color: #64748b; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }}
+    .value {{ font-size: 14px; font-weight: 700; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 18px; }}
+    th, td {{ border-bottom: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; font-size: 12px; }}
+    th {{ background: #f8fafc; color: #475569; font-size: 11px; text-transform: uppercase; }}
+    td.num, th.num {{ text-align: right; }}
+    td.empty {{ text-align: center; color: #64748b; padding: 24px; }}
+    .totals {{ display: flex; justify-content: flex-end; margin-top: 16px; }}
+    .totals table {{ width: auto; }}
+    .totals td {{ font-size: 13px; padding: 6px 14px; }}
+    .signatures {{ display: flex; justify-content: space-between; margin-top: 42px; gap: 24px; }}
+    .sig {{ flex: 1; border-top: 1px solid #334155; padding-top: 8px; text-align: center; color: #475569; font-size: 12px; }}
+  </style>
+</head>
+<body>
+  <div class="statement">
+    <div class="header">
+      <div>
+        <div class="school">{school_name}</div>
+        <div class="muted">Student fee statement</div>
+      </div>
+      <div class="number">
+        <div class="muted">Generated</div>
+        <div class="value">{generated_label}</div>
+      </div>
+    </div>
+
+    <h1>Fee Statement</h1>
+    <div class="grid">
+      <div class="box"><div class="label">Student</div><div class="value">{student_name}</div></div>
+      <div class="box"><div class="label">Class / ID</div><div class="value">{student_meta}</div></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Period (BS)</th><th>Fee Item</th><th>Status</th>
+          <th class="num">Net Payable</th><th class="num">Paid</th>
+          <th class="num">Due</th><th class="num">Running Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(rows_html)}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <table>
+        <tr><td>Total billed (net)</td><td class="num"><strong>NPR {total_payable:,.2f}</strong></td></tr>
+        <tr><td>Total paid</td><td class="num"><strong>NPR {total_paid:,.2f}</strong></td></tr>
+        <tr><td>Outstanding balance</td><td class="num"><strong>NPR {running_balance:,.2f}</strong></td></tr>
+      </table>
+    </div>
+
+    <div class="signatures">
+      <div class="sig">Accountant</div>
+      <div class="sig">Guardian</div>
+    </div>
+  </div>
+</body>
+</html>"""
 
 
 # ── Online Payment Initiation ─────────────────────────────
@@ -1816,36 +2188,68 @@ def _structure_scope_label(structure, class_name):
     return " • ".join(parts)
 
 
-def _structure_cycle_key(structure):
-    now = datetime.now(timezone.utc)
-    frequency = _structure_frequency(structure)
+def _bs_today():
+    """Today as a BS date (import is lazy so module import stays light)."""
+    import nepali_datetime
+
+    return nepali_datetime.date.today()
+
+
+def _structure_cycle_key(structure, on_date=None):
+    """BS-calendar cycle key for a structure's primary item.
+
+    Delegates to the shared helper in app/tasks/fee_reminders.py so the
+    manual API path and the auto-generate cron compute IDENTICAL keys —
+    they used to diverge (Gregorian here, BS in the cron), which let the
+    same period be billed twice under two different dedupe markers.
+    """
+    from app.tasks.fee_reminders import bs_cycle_key
+
+    return bs_cycle_key(_structure_frequency(structure), structure.academic_year, on_date)
+
+
+def _item_cycle_fields(frequency, structure, on_date=None):
+    """(year_bs, month_bs) to stamp on a collection for one fee item.
+
+    Monthly items stamp the full BS month ("2083-05") into month_bs so they
+    match the format the cron has always written (and that
+    generate_monthly_fee_report filters on).
+    """
+    today_bs = on_date or _bs_today()
+    frequency = _normalize_fee_frequency(frequency)
     if frequency == "monthly":
-        return f"{now.year}-{now.month:02d}"
+        return str(today_bs.year), f"{today_bs.year}-{today_bs.month:02d}"
     if frequency == "quarterly":
-        return f"{now.year}-Q{((now.month - 1) // 3) + 1}"
+        quarter = ((today_bs.month - 1) // 3) + 1
+        return str(today_bs.year), f"{today_bs.year}-Q{quarter}"
     if frequency == "semi-annual":
-        return f"{now.year}-H{1 if now.month <= 6 else 2}"
+        half = 1 if today_bs.month <= 6 else 2
+        return str(today_bs.year), f"{today_bs.year}-H{half}"
     if frequency == "annual":
-        return str(structure.academic_year or now.year)
-    return "one-time"
+        return str(structure.academic_year or today_bs.year), None
+    return str(structure.academic_year or today_bs.year), None
 
 
-def _structure_cycle_fields(structure):
-    now = datetime.now(timezone.utc)
-    frequency = _structure_frequency(structure)
-    if frequency == "monthly":
-        return str(now.year), f"{now.month:02d}"
-    if frequency == "quarterly":
-        return str(now.year), f"Q{((now.month - 1) // 3) + 1}"
-    if frequency == "semi-annual":
-        return str(now.year), f"H{1 if now.month <= 6 else 2}"
-    if frequency == "annual":
-        return str(structure.academic_year or now.year), None
-    return str(structure.academic_year or now.year), "ONE_TIME"
+def _structure_cycle_fields(structure, on_date=None):
+    """(year_bs, month_bs) for the structure's primary item (BS calendar)."""
+    return _item_cycle_fields(
+        _structure_frequency(structure), structure, on_date=on_date
+    )
 
 
-def _structure_collection_marker(structure):
-    return f"[fee_structure:{structure.id}:{_structure_cycle_key(structure)}]"
+def _structure_collection_marker(structure, on_date=None):
+    """Unified per-item dedupe marker for the structure's primary item."""
+    from app.tasks.fee_reminders import structure_cycle_marker
+
+    first_item = _structure_primary_item(structure)
+    item_name = (
+        (first_item.get("name") or "").strip()
+        or _humanize_fee_label(first_item.get("fee_type"))
+        or "Fee"
+    )
+    return structure_cycle_marker(
+        structure.id, _structure_cycle_key(structure, on_date), item_name
+    )
 
 
 def _matching_students_query(structure):
@@ -1867,22 +2271,29 @@ def _matching_students_query(structure):
     return query
 
 
-def _has_existing_structure_collection(structure, student_id, marker):
-    existing_marker = FeeCollection.query.filter(
-        FeeCollection.school_id == structure.school_id,
-        FeeCollection.student_id == student_id,
-        FeeCollection.is_deleted.is_(False),
-        FeeCollection.notes.ilike(f"%{marker}%"),
-    ).first()
-    if existing_marker:
-        return True
+def _structure_collection_exists(structure, student_id, markers, item_name, year_bs, month_bs):
+    """True when a collection for (structure, student, item, cycle) exists.
 
-    year_bs, month_bs = _structure_cycle_fields(structure)
+    Checks (a) any of the dedupe markers in notes — the unified
+    [fee_structure:...] marker plus the legacy [auto_monthly:...] one the old
+    cron wrote — and (b) a column-level fallback that also catches pre-marker
+    rows from either generator.
+    """
+    for marker in markers:
+        exists = FeeCollection.query.filter(
+            FeeCollection.school_id == structure.school_id,
+            FeeCollection.student_id == student_id,
+            FeeCollection.is_deleted.is_(False),
+            FeeCollection.notes.ilike(f"%{marker}%"),
+        ).first()
+        if exists:
+            return True
+
     query = FeeCollection.query.filter(
         FeeCollection.school_id == structure.school_id,
         FeeCollection.student_id == student_id,
         FeeCollection.is_deleted.is_(False),
-        FeeCollection.fee_item_name == _structure_item_name(structure),
+        FeeCollection.fee_item_name == item_name,
         FeeCollection.academic_year == (structure.academic_year or year_bs),
         FeeCollection.year_bs == year_bs,
     )
@@ -1893,105 +2304,143 @@ def _has_existing_structure_collection(structure, student_id, marker):
     return query.first() is not None
 
 
-def _apply_fee_structure(structure):
-    marker = _structure_collection_marker(structure)
-    frequency = _structure_frequency(structure)
-    due_day = _structure_due_day(structure)
-    year_bs, month_bs = _structure_cycle_fields(structure)
-    amount = _structure_amount(structure)
-    item_name = _structure_item_name(structure)
-    now_year = str(datetime.now(timezone.utc).year)
+def _apply_fee_structure(structure, on_date=None):
+    """Generate FeeCollection rows for every billable fee item on a structure.
+
+    One bill per (fee item, BS billing cycle): each item is billed on its own
+    frequency with the SAME unified notes marker the
+    auto_generate_monthly_fees cron checks, so a period generated here is
+    skipped by the cron and vice versa. Safe to re-run — duplicates are
+    skipped via marker + column fallback.
+    """
+    from app.tasks.fee_reminders import (
+        bs_cycle_key,
+        is_bs_month_key,
+        legacy_auto_monthly_marker,
+        structure_cycle_marker,
+    )
+
+    items = structure.fee_items or []
+    if not isinstance(items, list):
+        items = []
 
     students = _matching_students_query(structure).all()
     created_count = 0
     skipped_count = 0
+    applied_cycles = set()
 
-    for student in students:
-        if _has_existing_structure_collection(structure, student.id, marker):
-            skipped_count += 1
+    for item in items:
+        if not isinstance(item, dict):
             continue
-
-        notes = f"{marker} [frequency:{frequency}]"
-        if due_day is not None:
-            notes = f"{notes} [due_day:{due_day}]"
-
-        # Auto-apply student scholarship/discount if one exists. ALL active
-        # matching discounts stack additively (e.g. sibling 10% + merit 5%
-        # = 15% of the base amount); fixed-NPR discounts add their flat
-        # value. Percentages are always computed on the base amount (not
-        # sequentially on the remainder), and the combined discount is
-        # capped at the base so the net payable can never go negative and
-        # discounts can never waive a late fine.
-        discount_amount = 0.0
-        is_scholarship = False
-        try:
-            import nepali_datetime
-            today_bs = nepali_datetime.date.today()
-            today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
-            # SAVEPOINT: if the discount lookup fails (e.g. table missing in an
-            # un-migrated DB), the error is contained — a bare failure here must
-            # never abort the surrounding billing transaction mid-run.
-            with db.session.begin_nested():
-                scholarships = (
-                    StudentScholarship.query.filter(
-                        StudentScholarship.school_id == structure.school_id,
-                        StudentScholarship.student_id == student.id,
-                        StudentScholarship.is_active.is_(True),
-                        StudentScholarship.is_deleted.is_(False),
-                        or_(
-                            StudentScholarship.fee_type.is_(None),
-                            StudentScholarship.fee_type == item_name,
-                        ),
-                        or_(
-                            StudentScholarship.valid_from_bs.is_(None),
-                            StudentScholarship.valid_from_bs <= today_bs_str,
-                        ),
-                        or_(
-                            StudentScholarship.valid_until_bs.is_(None),
-                            StudentScholarship.valid_until_bs >= today_bs_str,
-                        ),
-                    )
-                    .order_by(StudentScholarship.created_at.asc())
-                    .all()
-                )
-            if scholarships:
-                combined_discount = 0.0
-                for sc in scholarships:
-                    if sc.discount_type == "percent":
-                        combined_discount += float(amount) * float(sc.discount_value or 0) / 100
-                    else:
-                        combined_discount += float(sc.discount_value or 0)
-                discount_amount = round(
-                    min(max(combined_discount, 0.0), float(amount)), 2
-                )
-                is_scholarship = True
-        except Exception:
-            pass
-
-        collection = FeeCollection(
-            school_id=structure.school_id,
-            student_id=student.id,
-            academic_year=structure.academic_year or student.academic_year or now_year,
-            fee_item_name=item_name,
-            amount=amount,
-            discount_amount=discount_amount,
-            is_scholarship=is_scholarship,
-            month_bs=month_bs,
-            year_bs=year_bs,
-            payment_status="pending",
-            notes=notes,
+        item_name = (
+            (item.get("name") or "").strip()
+            or _humanize_fee_label(item.get("fee_type"))
+            or "Fee"
         )
-        db.session.add(collection)
-        created_count += 1
+        amount = _coerce_fee_amount(item.get("amount"))
+        if amount <= 0:
+            continue
+        frequency = _normalize_fee_frequency(item.get("frequency"))
+        due_day = _coerce_due_day(item.get("due_day"))
+        cycle_key = bs_cycle_key(frequency, structure.academic_year, on_date)
+        applied_cycles.add(cycle_key)
+        year_bs, month_bs = _item_cycle_fields(frequency, structure, on_date)
+        marker = structure_cycle_marker(structure.id, cycle_key, item_name)
+        markers = [marker]
+        if frequency == "monthly" and is_bs_month_key(cycle_key):
+            # Honor the pre-unification cron marker so months billed by the
+            # old auto_generate_monthly_fees are never billed twice.
+            markers.append(legacy_auto_monthly_marker(structure.id, cycle_key, item_name))
+
+        for student in students:
+            if _structure_collection_exists(
+                structure, student.id, markers, item_name, year_bs, month_bs
+            ):
+                skipped_count += 1
+                continue
+
+            notes = f"{marker} [frequency:{frequency}]"
+            if due_day is not None:
+                notes = f"{notes} [due_day:{due_day}]"
+
+            # Auto-apply student scholarship/discount if one exists. ALL active
+            # matching discounts stack additively (e.g. sibling 10% + merit 5%
+            # = 15% of the base amount); fixed-NPR discounts add their flat
+            # value. Percentages are always computed on the base amount (not
+            # sequentially on the remainder), and the combined discount is
+            # capped at the base so the net payable can never go negative and
+            # discounts can never waive a late fine.
+            discount_amount = 0.0
+            is_scholarship = False
+            try:
+                today_bs = on_date or _bs_today()
+                today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
+                # SAVEPOINT: if the discount lookup fails (e.g. table missing in an
+                # un-migrated DB), the error is contained — a bare failure here must
+                # never abort the surrounding billing transaction mid-run.
+                with db.session.begin_nested():
+                    scholarships = (
+                        StudentScholarship.query.filter(
+                            StudentScholarship.school_id == structure.school_id,
+                            StudentScholarship.student_id == student.id,
+                            StudentScholarship.is_active.is_(True),
+                            StudentScholarship.is_deleted.is_(False),
+                            or_(
+                                StudentScholarship.fee_type.is_(None),
+                                StudentScholarship.fee_type == item_name,
+                            ),
+                            or_(
+                                StudentScholarship.valid_from_bs.is_(None),
+                                StudentScholarship.valid_from_bs <= today_bs_str,
+                            ),
+                            or_(
+                                StudentScholarship.valid_until_bs.is_(None),
+                                StudentScholarship.valid_until_bs >= today_bs_str,
+                            ),
+                        )
+                        .order_by(StudentScholarship.created_at.asc())
+                        .all()
+                    )
+                if scholarships:
+                    combined_discount = 0.0
+                    for sc in scholarships:
+                        if sc.discount_type == "percent":
+                            combined_discount += float(amount) * float(sc.discount_value or 0) / 100
+                        else:
+                            combined_discount += float(sc.discount_value or 0)
+                    discount_amount = round(
+                        min(max(combined_discount, 0.0), float(amount)), 2
+                    )
+                    is_scholarship = True
+            except Exception:
+                pass
+
+            collection = FeeCollection(
+                school_id=structure.school_id,
+                student_id=student.id,
+                academic_year=structure.academic_year or student.academic_year or year_bs,
+                fee_item_name=item_name,
+                amount=amount,
+                discount_amount=discount_amount,
+                is_scholarship=is_scholarship,
+                month_bs=month_bs,
+                year_bs=year_bs,
+                payment_status="pending",
+                notes=notes,
+            )
+            db.session.add(collection)
+            created_count += 1
 
     if created_count:
         db.session.commit()
 
+    if not applied_cycles:
+        applied_cycles.add(_structure_cycle_key(structure, on_date))
     return {
         "matched_students": len(students),
         "created_collections": created_count,
         "skipped_existing": skipped_count,
-        "applied_cycle": _structure_cycle_key(structure),
+        "applied_cycle": "/".join(sorted(applied_cycles)),
     }
 
 
@@ -2039,8 +2488,49 @@ def _structure_dict(s):
         "applied_count": applied_count,
         "applied_cycle": applied_cycle,
         "effective_note": _structure_effective_note(applied_count, applied_cycle),
-        "due_date": None,
+        "due_date": _structure_due_date(s),
     }
+
+
+def _structure_due_date(structure):
+    """Ephemeral due date for display: the primary item's due_day inside the
+    current BS month. No DB column — computed on the fly."""
+    due_day = _structure_due_day(structure)
+    if not due_day:
+        return None
+    try:
+        today_bs = _bs_today()
+        return nepali_day_date(today_bs.year, today_bs.month, due_day)
+    except Exception:
+        return None
+
+
+def nepali_day_date(bs_year, bs_month, bs_day):
+    """ISO string for a BS (year, month, day) — None when not a valid BS date."""
+    try:
+        import nepali_datetime
+
+        return nepali_datetime.date(int(bs_year), int(bs_month), int(bs_day)).isoformat()
+    except Exception:
+        return None
+
+
+def _collection_due_date(collection):
+    """Ephemeral due date for a fee bill (FeeCollection has NO due_date column).
+
+    Derived from the fee item's due_day — written as "[due_day:N]" in notes by
+    both the manual apply generator and the auto cron — anchored to the bill's
+    BS month. month_bs from the generators is a full BS "YYYY-MM" key; legacy
+    two-digit month values can't locate a BS month, so they yield None.
+    """
+    match = re.search(r"\[due_day:(\d{1,2})\]", collection.notes or "")
+    if not match:
+        return None
+    month_bs = (collection.month_bs or "").strip()
+    if not re.match(r"^\d{4}-\d{2}$", month_bs):
+        return None
+    bs_year, bs_month = month_bs.split("-")
+    return nepali_day_date(bs_year, bs_month, match.group(1))
 
 
 def _collection_dict(c):
@@ -2080,7 +2570,7 @@ def _collection_dict(c):
         "year_bs": c.year_bs,
         "is_scholarship": bool(c.is_scholarship),
         "notes": c.notes,
-        "due_date": None,
+        "due_date": _collection_due_date(c),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "paid_at": c.collected_at.isoformat() if c.collected_at else None,
         "receipt_id": str(receipt.id) if receipt else None,

@@ -1,0 +1,117 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "YOUR SCHOOL NAME",
+      "subtitle": "School Address | Phone | www.school.edu",
+      "tagline": "OFFICIAL NOTICE",
+      "bg": "#dc2626",
+      "color": "#ffffff"
+    },
+    {
+      "type": "divider",
+      "color": "#dc2626",
+      "width": 2
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Ref. No: _______________",
+          "align": "left"
+        },
+        {
+          "text": "Date: ______________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "SUBJECT: ________________________________________________________________",
+      "align": "left",
+      "color": "#1e293b",
+      "bold": true,
+      "italic": false,
+      "fontSize": 13
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "This is to inform all concerned that ______________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "All students/staff/parents are requested to note and comply accordingly.",
+      "align": "left",
+      "color": "#475569",
+      "bold": false,
+      "italic": true,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 80
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Principal / Vice Principal"
+      ]
+    }
+  ]
+}

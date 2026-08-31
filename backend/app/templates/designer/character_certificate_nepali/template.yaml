@@ -1,0 +1,25 @@
+template_key: character_certificate_nepali
+name: Character Certificate (Nepali)
+category: certificates
+editor_type: designer
+description: चरित्र प्रमाणपत्र — formal Nepali-language character certificate with school seal and principal signature
+page_size: A4
+thumbnail_emoji: 📜
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- name
+- father_name
+- class_name
+- section
+- roll_no
+- enrollment_number
+autofill:
+  sources:
+  - school
+  dates:
+    today_bs: auto
+    today_ad: auto
+  notes: "Auto dates: {today_bs} / {today_ad} fill automatically at render time. Bulk-generate for a whole class from the designer hub."

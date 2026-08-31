@@ -1,0 +1,27 @@
+template_key: marksheet
+name: NEB Marksheet
+category: reports
+editor_type: writer
+description: IEMIS-style NEB marksheet with theory/practical split, grade points and
+  grading legend
+page_size: A4
+thumbnail_emoji: 📝
+is_default: true
+size:
+  width: 794
+  height: 1123
+fields:
+- name
+- class_name
+- roll_no
+- exam_name
+- subjects_marks
+- grade
+- gpa
+- percentage
+autofill:
+  sources:
+  - school
+  notes: School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students, exams)
+    is provided by bulk generation or the data-fill panel.

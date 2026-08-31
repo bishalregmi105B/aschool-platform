@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,14 @@ function PayrollContent() {
     new Date().toISOString().slice(0, 7),
   );
   const [editing, setEditing] = useState<PayrollRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Bulk actions wait behind a confirm dialog — approving/paying dozens of
+  // rows is not reversible, so the toolbar buttons stage the request here
+  // and only the dialog's "Confirm" button dispatches it.
+  const [pendingBulk, setPendingBulk] = useState<{
+    action: "approve" | "mark_paid";
+    count: number;
+  } | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["payroll", month],
@@ -104,6 +113,20 @@ function PayrollContent() {
 
   const payroll: PayrollRow[] = data?.data || [];
   const summary = data?.summary || {};
+
+  const draftSelected = payroll.filter(
+    (p) => p.status === "draft" && selectedIds.includes(p.id),
+  );
+  const approvedSelected = payroll.filter(
+    (p) => p.status === "approved" && selectedIds.includes(p.id),
+  );
+
+  const toggleAll = (checked: boolean) =>
+    setSelectedIds(checked ? payroll.map((p) => p.id) : []);
+  const toggleOne = (id: string, checked: boolean) =>
+    setSelectedIds((prev) =>
+      checked ? [...prev, id] : prev.filter((rowId) => rowId !== id),
+    );
 
   const generate = useMutation({
     mutationFn: async () =>
@@ -121,6 +144,35 @@ function PayrollContent() {
       toast.error(
         error?.response?.data?.error || "Failed to generate payroll",
       ),
+  });
+
+  const bulkAction = useMutation({
+    mutationFn: async ({
+      action,
+      ids,
+    }: {
+      action: "approve" | "mark_paid";
+      ids: string[];
+    }) =>
+      (
+        await api.post("/hr/payroll/bulk-action", {
+          action,
+          month,
+          ids,
+        })
+      ).data,
+    onSuccess: (res: any, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      setSelectedIds([]);
+      const updated = res?.data?.updated ?? 0;
+      const skipped = res?.data?.skipped ?? 0;
+      toast.success(
+        `${vars.action === "approve" ? "Approved" : "Marked paid"} ${updated} payroll record${updated === 1 ? "" : "s"}` +
+          (skipped > 0 ? ` — ${skipped} skipped (wrong status)` : ""),
+      );
+    },
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.error || "Bulk action failed"),
   });
 
   if (isError) {
@@ -168,7 +220,10 @@ function PayrollContent() {
           type="month"
           className="border rounded-md px-3 py-2"
           value={month}
-          onChange={(e) => setMonth(e.target.value)}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            setSelectedIds([]);
+          }}
         />
       </div>
 
@@ -228,7 +283,7 @@ function PayrollContent() {
         </Card>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
           {generate.isPending ? (
             <Spinner className="mr-2" />
@@ -237,13 +292,102 @@ function PayrollContent() {
           )}{" "}
           Generate Payroll
         </Button>
+        {draftSelected.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={() =>
+              setPendingBulk({ action: "approve", count: draftSelected.length })
+            }
+            disabled={bulkAction.isPending}
+          >
+            {bulkAction.isPending ? (
+              <Spinner size="sm" className="mr-2" />
+            ) : (
+              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+            )}
+            Approve selected ({draftSelected.length})
+          </Button>
+        )}
+        {approvedSelected.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={() =>
+              setPendingBulk({
+                action: "mark_paid",
+                count: approvedSelected.length,
+              })
+            }
+            disabled={bulkAction.isPending}
+          >
+            {bulkAction.isPending ? (
+              <Spinner size="sm" className="mr-2" />
+            ) : (
+              <Wallet className="h-4 w-4 mr-2 text-blue-600" />
+            )}
+            Mark selected paid ({approvedSelected.length})
+          </Button>
+        )}
       </div>
+
+      <Dialog
+        open={!!pendingBulk}
+        onOpenChange={(open) => !open && setPendingBulk(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingBulk?.action === "approve"
+                ? "Approve payroll records"
+                : "Mark payroll records as paid"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {pendingBulk?.action === "approve"
+              ? `You are about to approve ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month}. Approved records unlock payment.`
+              : `You are about to mark ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month} as paid. Only approved records are affected; this records the payment date.`}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingBulk(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingBulk) return;
+                bulkAction.mutate({
+                  action: pendingBulk.action,
+                  ids:
+                    pendingBulk.action === "approve"
+                      ? draftSelected.map((p) => p.id)
+                      : approvedSelected.map((p) => p.id),
+                });
+                setPendingBulk(null);
+              }}
+              disabled={bulkAction.isPending}
+            >
+              {bulkAction.isPending ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : null}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={
+                      payroll.length > 0 &&
+                      payroll.every((p) => selectedIds.includes(p.id))
+                    }
+                    onCheckedChange={(checked) => toggleAll(checked === true)}
+                    aria-label="Select all payroll rows"
+                  />
+                </TableHead>
                 <TableHead>Staff</TableHead>
                 <TableHead>Basic</TableHead>
                 <TableHead>Allowances</TableHead>
@@ -257,7 +401,7 @@ function PayrollContent() {
               {payroll.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center py-8 text-muted-foreground"
                   >
                     No payroll data. Click Generate Payroll.
@@ -266,6 +410,15 @@ function PayrollContent() {
               ) : (
                 payroll.map((p: any) => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.includes(p.id)}
+                        onCheckedChange={(checked) =>
+                          toggleOne(p.id, checked === true)
+                        }
+                        aria-label={`Select ${p.staff_name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       {p.staff_name}
                     </TableCell>

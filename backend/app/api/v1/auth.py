@@ -496,16 +496,20 @@ def register_school():
 
     # ── Auto-install plugins for the chosen plan (tier-based entitlements) ────
     # Plan tier → plugin categories (single source of truth in entitlements).
-    # Paid-plan grants are is_trial=False / no trial dates; free plan never
-    # receives a paid plugin; no trial rows are created at signup (E1/E1b).
+    # ensure_free_plugins is the idempotent provisioning path: it installs the
+    # full cumulative tier set as paid plan entitlements (is_trial=False, no
+    # trial dates — free plan schools receive every core/add_on plugin
+    # immediately, nobody hand-installs "Dashboard" or the marketplace).
+    # No trial rows are ever created at signup (E1/E1b).
     plugins_granted: list[dict] = []
     try:
-        from app.plugins.entitlements import grant_plan_plugins
-        plugins_granted = grant_plan_plugins(str(school.id), plan)
+        from app.plugins.entitlements import ensure_free_plugins
+        plugins_granted = ensure_free_plugins(school, plan=plan)
     except Exception:
         current_app.logger.exception(
             "Plan plugin grant failed for school %s (plan=%s) — "
-            "plugins can be granted later from the marketplace",
+            "plugins will be backfilled from the marketplace's lazy "
+            "provisioning on first load",
             school.id,
             plan,
         )

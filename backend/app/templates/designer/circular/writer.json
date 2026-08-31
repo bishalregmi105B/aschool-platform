@@ -1,0 +1,211 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "YOUR SCHOOL NAME",
+      "subtitle": "School Address | Phone | www.school.edu",
+      "tagline": "CIRCULAR",
+      "bg": "#0369a1",
+      "color": "#ffffff"
+    },
+    {
+      "type": "divider",
+      "color": "#0369a1",
+      "width": 2
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Circular No.: ___________",
+          "align": "left"
+        },
+        {
+          "text": "Date: _______________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "To: All Students / Parents / Staff  (Class: _____ to _____)",
+      "align": "left",
+      "color": "#334155",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "Subject: _______________________________________________",
+      "align": "left",
+      "color": "#0369a1",
+      "bold": true,
+      "italic": false,
+      "fontSize": 13
+    },
+    {
+      "type": "divider",
+      "color": "#bae6fd",
+      "width": 1
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "This is to inform you that _______________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "The event/activity will be held on  __________  from  __________  to  __________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "___________________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 8
+    },
+    {
+      "type": "paragraph",
+      "text": "Additional Guidelines:",
+      "align": "left",
+      "color": "#0369a1",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "•  ______________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "•  ______________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "•  ______________________________________________________________________",
+      "align": "left",
+      "color": "#334155",
+      "bold": false,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "spacer",
+      "height": 4
+    },
+    {
+      "type": "paragraph",
+      "text": "Please sign and return the slip below by ________________.",
+      "align": "left",
+      "color": "#64748b",
+      "bold": false,
+      "italic": true,
+      "fontSize": 12
+    },
+    {
+      "type": "divider",
+      "color": "#cbd5e1",
+      "width": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "PARENT / GUARDIAN ACKNOWLEDGEMENT SLIP",
+      "align": "left",
+      "color": "#334155",
+      "bold": true,
+      "italic": false,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "I have received and understood the above circular.",
+      "align": "left",
+      "color": "#475569",
+      "bold": false,
+      "italic": false,
+      "fontSize": 10
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Student Name: _______________",
+          "align": "left"
+        },
+        {
+          "text": "Class: _____  Section: _____",
+          "align": "left"
+        },
+        {
+          "text": "Parent Signature: ___________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "spacer",
+      "height": 40
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Principal"
+      ]
+    }
+  ]
+}

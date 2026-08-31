@@ -1,5 +1,5 @@
 """Schools CRUD API."""
-from flask import Blueprint, g, request
+from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required, get_jwt
 
 from app.models.school import School
@@ -99,11 +99,20 @@ def create_school():
     db.session.add(school)
     db.session.commit()
 
-    # Auto-install core plugins
-    from app.plugins.billing import install_plugin
+    # Auto-provision every plugin the school's plan entitles (free plan → all
+    # core/add_on plugins active out of the box; higher plans cumulative).
+    # Idempotent and non-fatal: a provisioning failure is logged and healed
+    # lazily by the marketplace's ensure_free_plugins backfill.
+    try:
+        from app.plugins.entitlements import ensure_free_plugins
 
-    for slug in ["attendance", "notices", "academics", "basic_reports", "basic_website"]:
-        install_plugin(str(school.id), slug)
+        ensure_free_plugins(school)
+    except Exception:  # noqa: BLE001 — never block school creation on plugins
+        current_app.logger.exception(
+            "Plan plugin provisioning failed for school %s — plugins will be "
+            "backfilled lazily by the marketplace endpoints",
+            school.id,
+        )
 
     return created_response(school.to_dict())
 
