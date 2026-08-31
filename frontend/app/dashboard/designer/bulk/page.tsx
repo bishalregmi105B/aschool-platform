@@ -13,9 +13,19 @@ import { PageLoader } from "@/components/ui/spinner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Download, CreditCard, Award, FileText, Printer } from "lucide-react";
+import { ArrowLeft, Download, CreditCard, Award, FileText, Printer, Layers, FileOutput } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+
+type BulkType = "id_cards" | "marksheets" | "certificates" | "admit_cards";
+type OutputMode = "editor" | "pdf" | "zip";
+
+const TYPES: Array<{ id: BulkType; label: string; icon: React.ElementType }> = [
+  { id: "id_cards", label: "ID Cards", icon: CreditCard },
+  { id: "marksheets", label: "Marksheets", icon: FileText },
+  { id: "admit_cards", label: "Admit Cards", icon: FileText },
+  { id: "certificates", label: "Certificates", icon: Award },
+];
 
 export default function BulkPage() {
   return (
@@ -28,10 +38,14 @@ export default function BulkPage() {
 function BulkContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const type = searchParams.get("type") || "id_cards";
+  const [type, setType] = useState<BulkType>((searchParams.get("type") as BulkType) || "id_cards");
   const [classId, setClassId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [examId, setExamId] = useState("");
+  const [certType, setCertType] = useState("character");
+  const [output, setOutput] = useState<OutputMode>("pdf");
+  const [progress, setProgress] = useState<string | null>(null);
 
   const { data: classes } = useQuery<any>({
     queryKey: ["classes"],
@@ -40,6 +54,8 @@ function BulkContent() {
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
   });
+
+  const selectedClass = (classes || []).find((c: any) => c.id === classId);
 
   const { data: templates } = useQuery<any>({
     queryKey: ["design-templates-cat", type],
@@ -58,29 +74,37 @@ function BulkContent() {
     enabled: type === "admit_cards" || type === "marksheets",
   });
 
+  const needsExam = type === "admit_cards" || type === "marksheets";
+
   const bulkMutation = useMutation({
     mutationFn: async () => {
       const endpoint =
-        type === "id_cards"
-          ? "/design-studio/bulk/id-cards"
-          : type === "marksheets"
-          ? "/design-studio/bulk/marksheets"
-          : type === "admit_cards"
-          ? "/design-studio/bulk/admit-cards"
-          : "/design-studio/bulk/certificates";
+        type === "id_cards" ? "/design-studio/bulk/id-cards"
+        : type === "marksheets" ? "/design-studio/bulk/marksheets"
+        : type === "admit_cards" ? "/design-studio/bulk/admit-cards"
+        : "/design-studio/bulk/certificates";
 
       const payload: Record<string, string> = {
         class_id: classId,
         template_id: templateId,
       };
+      if (sectionId) payload.section_id = sectionId;
       if (examId) payload.exam_id = examId;
+      if (type === "certificates") payload.certificate_type = certType;
 
+      setProgress("Generating records on the server…");
       const res = await api.post(endpoint, payload);
       return res.data;
     },
-    onSuccess: (data) => {
-      const generated = data?.data?.cards || data?.data?.marksheets || [];
-      if (generated?.length) {
+    onSuccess: async (data) => {
+      const generated = data?.data?.cards || data?.data?.marksheets || data?.data?.certificates || [];
+      if (!generated?.length && !data?.data?.download_url) {
+        toast.error("No records generated for this selection");
+        setProgress(null);
+        return;
+      }
+
+      if (output === "editor") {
         toast.success(`Generated ${generated.length} pages. Opening designer...`);
         const pagesData = generated.map((item: any, idx: number) => {
           const w = item.template_width || 794;
@@ -92,48 +116,129 @@ function BulkContent() {
             height: h,
             orientation: w > h ? "landscape" : "portrait",
             margins: { top: 0, right: 0, bottom: 0, left: 0 },
-            background: "#ffffff"
+            background: "#ffffff",
           };
         });
         const bulkSessionId = Date.now().toString();
-        const payload = { version: "multi-page", pages: pagesData };
-        (window as any).__bulkSessionData = payload; // Fast, reliable for soft navigations
+        const payloadData = { version: "multi-page", pages: pagesData };
+        (window as any).__bulkSessionData = payloadData;
         try {
-          sessionStorage.setItem(`bulk_${bulkSessionId}`, JSON.stringify(payload));
+          sessionStorage.setItem(`bulk_${bulkSessionId}`, JSON.stringify(payloadData));
         } catch (err: any) {
           console.warn("Storage quota exceeded. Relying on transient window state.");
         }
+        setProgress(null);
         router.push(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
-      } else if (data?.data?.download_url) {
-        window.open(data.data.download_url, "_blank");
-        toast.success("Bulk generation complete! Downloading...");
-      } else {
-        toast.success("Generation started. Check downloads when ready.");
+        return;
       }
+
+      if (output === "pdf") {
+        // Server-side print-ready PDF (WeasyPrint) — Nepali-safe, one page per record
+        setProgress("Building print-ready PDF…");
+        try {
+          const tplType = type === "id_cards" ? "id_cards" : type; // backend maps template ids
+          const res = await api.post(
+            "/design-studio/export/bulk-pdf",
+            {
+              template_id: templateId,
+              items: generated.map((g: any) => ({
+                data: g.data ?? g.fields ?? {},
+                html: g.html ?? null,
+              })),
+              page_size: generated[0]?.template_width > generated[0]?.template_height ? "landscape" : "portrait",
+            },
+            { responseType: "blob" },
+          );
+          const url = URL.createObjectURL(res.data as Blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `bulk_${type}_${Date.now()}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success(`PDF with ${generated.length} pages downloaded`);
+        } catch {
+          toast.error("Server PDF failed — falling back to designer export");
+          // fall through to editor flow
+          const pagesData = generated.map((item: any, idx: number) => ({
+            id: `bulk_${idx}_${Date.now()}`,
+            json: item.canvas_json || {},
+            width: item.template_width || 794,
+            height: item.template_height || 1123,
+            orientation: (item.template_width || 794) > (item.template_height || 1123) ? "landscape" : "portrait",
+            margins: { top: 0, right: 0, bottom: 0, left: 0 },
+            background: "#ffffff",
+          }));
+          const bulkSessionId = Date.now().toString();
+          (window as any).__bulkSessionData = { version: "multi-page", pages: pagesData };
+          router.push(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
+        }
+        setProgress(null);
+        return;
+      }
+
+      // ZIP of per-record PNGs, client-rendered from canvas_json
+      setProgress("Rendering PNGs…");
+      try {
+        const JSZip = (await import("jszip")).default;
+        const zip = new JSZip();
+        for (let i = 0; i < generated.length; i++) {
+          const item = generated[i];
+          setProgress(`Rendering ${i + 1} / ${generated.length}…`);
+          const w = item.template_width || 794;
+          const h = item.template_height || 1123;
+          const dataUrl = await renderCanvasJson(item.canvas_json, w, h);
+          if (dataUrl) {
+            const label = (item.student_name ?? item.label ?? `page_${i + 1}`).replace(/\s+/g, "_");
+            zip.file(`${String(i + 1).padStart(3, "0")}_${label}.png`, dataUrl.split(",")[1], { base64: true });
+          }
+        }
+        setProgress("Zipping…");
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `bulk_${type}_${Date.now()}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`ZIP with ${generated.length} images downloaded`);
+      } catch {
+        toast.error("ZIP render failed — try the PDF output instead");
+      }
+      setProgress(null);
     },
-    onError: () => toast.error("Bulk generation failed"),
+    onError: () => {
+      toast.error("Bulk generation failed");
+      setProgress(null);
+    },
   });
 
-  const typeConfig: Record<string, { icon: React.ElementType; label: string; desc: string }> = {
-    id_cards: { icon: CreditCard, label: "Bulk ID Cards", desc: "Generate ID cards for all students in a class" },
-    marksheets: { icon: FileText, label: "Bulk Marksheets", desc: "Generate marksheets for every student in a class" },
-    certificates: { icon: Award, label: "Bulk Certificates", desc: "Generate certificates for students" },
-    admit_cards: { icon: FileText, label: "Bulk Admit Cards", desc: "Generate exam admit cards" },
-  };
-
-  const config = typeConfig[type] || typeConfig.id_cards;
-  const Icon = config.icon;
+  const typeIcon = TYPES.find((t) => t.id === type)?.icon ?? CreditCard;
+  const Icon = typeIcon;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4 justify-between">
-        <Link href="/dashboard/designer">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{config.label}</h1>
-          <p className="text-muted-foreground">{config.desc}</p>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/designer">
+            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">Bulk Generation</h1>
+            <p className="text-muted-foreground">Generate documents for a whole class in one go</p>
+          </div>
         </div>
+        <Badge variant="secondary" className="gap-1"><Layers className="h-3 w-3" /> Designer</Badge>
+      </div>
+
+      {/* Type tabs */}
+      <div className="flex flex-wrap gap-2">
+        {TYPES.map((t) => (
+          <button key={t.id} onClick={() => { setType(t.id); setTemplateId(""); setProgress(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all
+              ${type === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>
+            <t.icon className="h-4 w-4" /> {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -146,15 +251,30 @@ function BulkContent() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Select Class</Label>
-              <Select value={classId} onValueChange={setClassId}>
+              <Select value={classId} onValueChange={(v) => { setClassId(v); setSectionId(""); }}>
                 <SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger>
                 <SelectContent>
-                  {(classes || []).map((c: { id: string; name: string }) => (
+                  {(classes || []).map((c: { id: string; name: string; sections?: { id: string; name: string }[] }) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedClass?.sections?.length > 0 && (
+              <div className="space-y-2">
+                <Label>Section (optional)</Label>
+                <Select value={sectionId} onValueChange={setSectionId}>
+                  <SelectTrigger><SelectValue placeholder="All sections" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All sections</SelectItem>
+                    {selectedClass.sections.map((s: { id: string; name: string }) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Select Template</Label>
@@ -168,7 +288,7 @@ function BulkContent() {
               </Select>
             </div>
 
-            {(type === "admit_cards" || type === "marksheets") && (
+            {needsExam && (
               <div className="space-y-2">
                 <Label>Select Exam</Label>
                 <Select value={examId} onValueChange={setExamId}>
@@ -182,66 +302,130 @@ function BulkContent() {
               </div>
             )}
 
+            {type === "certificates" && (
+              <div className="space-y-2">
+                <Label>Certificate Type</Label>
+                <Select value={certType} onValueChange={setCertType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="character">Character Certificate</SelectItem>
+                    <SelectItem value="transfer">Transfer Certificate</SelectItem>
+                    <SelectItem value="merit">Merit Certificate</SelectItem>
+                    <SelectItem value="participation">Participation Certificate</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Output</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: "pdf" as OutputMode, label: "Print PDF", icon: FileOutput, hint: "Best for print shops" },
+                  { id: "editor" as OutputMode, label: "Designer", icon: Layers, hint: "Preview & export in editor" },
+                  { id: "zip" as OutputMode, label: "PNG ZIP", icon: Download, hint: "One image per record" },
+                ]).map((o) => (
+                  <button key={o.id} onClick={() => setOutput(o.id)} title={o.hint}
+                    className={`flex flex-col items-center gap-1 border rounded-lg p-2.5 text-xs transition-all
+                      ${output === o.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted"}`}>
+                    <o.icon className="h-4 w-4" />
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {output === "pdf" && (
+                <p className="text-[10px] text-muted-foreground">
+                  Print-ready server PDF — correct Nepali text, selectable, one page per record.
+                </p>
+              )}
+            </div>
+
             <Button
               className="w-full"
               onClick={() => bulkMutation.mutate()}
-              disabled={!classId || !templateId || bulkMutation.isPending || ((type === "marksheets" || type === "admit_cards") && !examId)}
+              disabled={!classId || !templateId || bulkMutation.isPending || (needsExam && !examId)}
             >
               <Download className="h-4 w-4 mr-2" />
-              {bulkMutation.isPending ? "Generating..." : "Generate Batch"}
+              {bulkMutation.isPending ? (progress || "Working…") : "Generate Batch"}
             </Button>
+            {bulkMutation.isPending && progress && (
+              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                <div className="bg-primary h-full animate-pulse w-2/3 rounded-full" />
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Output Details</CardTitle></CardHeader>
+          <CardHeader><CardTitle>What gets generated</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-muted p-4 rounded-lg space-y-2">
-              <h4 className="font-semibold">What gets generated:</h4>
               {type === "id_cards" && (
                 <ul className="text-sm space-y-1 text-muted-foreground">
                   <li>- Student photo, name, class, section</li>
-                  <li>- Student ID number & barcode</li>
+                  <li>- Student ID number & verification QR</li>
                   <li>- School logo, name, address</li>
-                  <li>- Guardian contact on back</li>
-                  <li>- One generated page per student in preview</li>
+                  <li>- One page per student</li>
                 </ul>
               )}
               {type === "marksheets" && (
                 <ul className="text-sm space-y-1 text-muted-foreground">
                   <li>- Subject marks, totals, percentage, and rank</li>
                   <li>- School branding and template styling</li>
-                  <li>- One generated page per student</li>
-                  <li>- Download All opens a print-ready batch</li>
+                  <li>- One page per student</li>
                 </ul>
               )}
               {type === "certificates" && (
                 <ul className="text-sm space-y-1 text-muted-foreground">
                   <li>- Student name, class, section</li>
-                  <li>- Certificate type & title</li>
-                  <li>- School logo & branding</li>
+                  <li>- Selected certificate type & title</li>
                   <li>- Principal signature field</li>
-                  <li>- 1 certificate per A4 page</li>
                 </ul>
               )}
               {type === "admit_cards" && (
                 <ul className="text-sm space-y-1 text-muted-foreground">
                   <li>- Student photo, name, roll number</li>
-                  <li>- Exam schedule (subject, date, time)</li>
+                  <li>- Exam name, type & academic year</li>
                   <li>- QR code for verification</li>
-                  <li>- School stamp field</li>
-                  <li>- 2 admit cards per A4 page</li>
                 </ul>
               )}
             </div>
-              <div className="text-sm text-muted-foreground mt-4">
-                <Badge variant="secondary">Designer Output</Badge>
-                <span className="ml-2">Opens in visual designer for multi-page export</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
+              {output === "pdf" ? <Printer className="h-4 w-4" /> : <Badge variant="secondary">{output.toUpperCase()}</Badge>}
+              {output === "pdf"
+                ? "Single print-ready PDF — hand it straight to the print shop."
+                : output === "editor"
+                ? "Opens in the visual designer for multi-page preview and export."
+                : "One PNG per record, named per student, zipped."}
+            </div>
+          </CardContent>
+        </Card>
       </div>
-
+    </div>
   );
+}
+
+/** Offscreen fabric render of a canvas_json → PNG data URL. */
+async function renderCanvasJson(json: any, width: number, height: number): Promise<string | null> {
+  try {
+    const { Canvas } = await import("fabric");
+    const offscreen = document.createElement("canvas");
+    const canvas = new Canvas(offscreen, {
+      backgroundColor: "#ffffff",
+      width, height,
+      preserveObjectStacking: true,
+      selection: false,
+    });
+    await new Promise<void>((resolve) => {
+      if (json && Object.keys(json).length > 0) {
+        canvas.loadFromJSON(json, () => { canvas.renderAll(); resolve(); })
+          .catch(() => { canvas.renderAll(); resolve(); });
+      } else resolve();
+    });
+    const url = canvas.toDataURL({ format: "png", multiplier: 2 });
+    canvas.dispose();
+    return url;
+  } catch {
+    return null;
+  }
 }

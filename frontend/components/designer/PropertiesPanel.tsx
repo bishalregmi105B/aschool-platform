@@ -300,6 +300,8 @@ export default function PropertiesPanel({ canvas }: Props) {
                 });
               }} />
           </div>
+          <ImageEffects obj={obj} refresh={refresh} />
+          <PhotoFrames obj={obj} refresh={refresh} />
         </div>
       )}
 
@@ -310,6 +312,158 @@ export default function PropertiesPanel({ canvas }: Props) {
           checked={!!obj.lockMovementX}
           onCheckedChange={(v) => set({ lockMovementX: v, lockMovementY: v })}
         />
+      </div>
+    </div>
+  );
+}
+
+// ── Image effects (fabric v6 native filters) ─────────────────────────────────
+function ImageEffects({ obj, refresh }: { obj: any; refresh: () => void }) {
+  const active = (type: string) => (obj.filters ?? []).some((f: any) => f.type === type);
+
+  const toggle = (type: string) => {
+    import("fabric").then(({ filters }) => {
+      const rest = (obj.filters ?? []).filter((f: any) => f.type !== type);
+      if (!active(type)) {
+        const map: Record<string, () => any> = {
+          Grayscale: () => new filters.Grayscale(),
+          Sepia: () => new filters.Sepia(),
+          Blur: () => new filters.Blur({ blur: 0.15 }),
+        };
+        if (map[type]) rest.push(map[type]());
+      }
+      obj.filters = rest;
+      obj.applyFilters();
+      obj.canvas?.requestRenderAll();
+      refresh();
+    });
+  };
+
+  const adjust = (type: "Contrast" | "Saturation", v: number) => {
+    import("fabric").then(({ filters }) => {
+      const rest = (obj.filters ?? []).filter((f: any) => f.type !== type);
+      const Ctor = type === "Contrast" ? filters.Contrast : filters.Saturation;
+      const key = type === "Contrast" ? "contrast" : "saturation";
+      rest.push(new Ctor({ [key]: v / 100 }));
+      obj.filters = rest;
+      obj.applyFilters();
+      obj.canvas?.requestRenderAll();
+      refresh();
+    });
+  };
+
+  const current = (type: "Contrast" | "Saturation") => {
+    const f = (obj.filters ?? []).find((x: any) => x.type === type);
+    if (!f) return 0;
+    return Math.round(((type === "Contrast" ? f.contrast : f.saturation) ?? 0) * 100);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Effects</Label>
+      <div className="flex flex-wrap gap-1">
+        {["Grayscale", "Sepia", "Blur"].map((t) => (
+          <button key={t} onClick={() => toggle(t)}
+            className={`text-[10px] px-2 py-1 rounded border transition-colors ${active(t) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-0.5">
+          <Label className="text-[10px]">Contrast</Label>
+          <span className="text-[10px] text-muted-foreground">{current("Contrast")}</span>
+        </div>
+        <Slider min={-100} max={100} step={5} value={[current("Contrast")]}
+          onValueChange={([v]) => adjust("Contrast", v)} />
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-0.5">
+          <Label className="text-[10px]">Saturation</Label>
+          <span className="text-[10px] text-muted-foreground">{current("Saturation")}</span>
+        </div>
+        <Slider min={-100} max={100} step={5} value={[current("Saturation")]}
+          onValueChange={([v]) => adjust("Saturation", v)} />
+      </div>
+    </div>
+  );
+}
+
+// ── Photo frames — fabric clipPath masks for student photos ──────────────────
+const FRAME_SHAPES = [
+  { id: "none", label: "None" },
+  { id: "circle", label: "Circle" },
+  { id: "rounded", label: "Rounded" },
+  { id: "hexagon", label: "Hexagon" },
+  { id: "star", label: "Star" },
+  { id: "arch", label: "Arch" },
+] as const;
+
+function PhotoFrames({ obj, refresh }: { obj: any; refresh: () => void }) {
+  const current = obj.clipPath ? ((obj.clipPath as any).data?.frame ?? "custom") : "none";
+
+  const applyFrame = (id: string) => {
+    import("fabric").then((fabric) => {
+      if (id === "none") {
+        obj.set({ clipPath: undefined });
+        (obj as any).dirty = true;
+        obj.canvas?.requestRenderAll();
+        refresh();
+        return;
+      }
+      const w = obj.getScaledWidth();
+      const h = obj.getScaledHeight();
+      // cover-fill mask centered on the image (absolutePositioned semantics
+      // avoided: mask is object-relative, scaled to the image frame)
+      let mask: any;
+      if (id === "circle") {
+        const r = Math.min(w, h) / 2;
+        mask = new fabric.Circle({ radius: r, originX: "center", originY: "center", left: w / 2, top: h / 2 });
+      } else if (id === "rounded") {
+        mask = new fabric.Rect({
+          width: w, height: h, rx: Math.min(w, h) * 0.12, ry: Math.min(w, h) * 0.12,
+          originX: "center", originY: "center", left: w / 2, top: h / 2,
+        });
+      } else if (id === "hexagon") {
+        const r = Math.min(w, h) / 2;
+        const pts = Array.from({ length: 6 }, (_, i) => {
+          const a = (2 * Math.PI * i) / 6 - Math.PI / 2;
+          return { x: r * Math.cos(a), y: r * Math.sin(a) };
+        });
+        mask = new fabric.Polygon(pts, { originX: "center", originY: "center", left: w / 2, top: h / 2 });
+      } else if (id === "star") {
+        const outer = Math.min(w, h) / 2, inner = outer * 0.45;
+        const pts = Array.from({ length: 10 }, (_, i) => {
+          const a = (Math.PI * i) / 5 - Math.PI / 2;
+          const r = i % 2 === 0 ? outer : inner;
+          return { x: r * Math.cos(a), y: r * Math.sin(a) };
+        });
+        mask = new fabric.Polygon(pts, { originX: "center", originY: "center", left: w / 2, top: h / 2 });
+      } else {
+        // arch: rounded top, straight bottom
+        mask = new fabric.Rect({
+          width: w, height: h, rx: w / 2, ry: w / 2,
+          originX: "center", originY: "center", left: w / 2, top: h / 2,
+        });
+      }
+      mask.data = { frame: id };
+      obj.set({ clipPath: mask });
+      (obj as any).dirty = true;
+      obj.canvas?.requestRenderAll();
+      refresh();
+    });
+  };
+
+  return (
+    <div>
+      <Label className="text-xs">Photo Frame</Label>
+      <div className="grid grid-cols-3 gap-1 mt-1">
+        {FRAME_SHAPES.map((f) => (
+          <button key={f.id} onClick={() => applyFrame(f.id)}
+            className={`text-[10px] px-1.5 py-1 rounded border transition-colors ${current === f.id ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
+            {f.label}
+          </button>
+        ))}
       </div>
     </div>
   );

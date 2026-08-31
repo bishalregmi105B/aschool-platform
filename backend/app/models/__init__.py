@@ -42,6 +42,7 @@ from app.models.ai_insight import WeeklyInsightReport, DailyBrief, RiskAlert  # 
 from app.models.ai_token import AISchoolQuota, AIUsageLog  # noqa: F401
 from app.models.designer_template import DesignerTemplate  # noqa: F401
 from app.models.designer_document import DesignerDocument  # noqa: F401
+from app.models.designer_document_revision import DesignerDocumentRevision  # noqa: F401
 from app.models.health_records import HealthProfile, MedicalVisit, Immunization  # noqa: F401
 from app.models.visitor import Visitor, VisitorAppointment  # noqa: F401
 from app.models.alumni import Alumni, AlumniEvent, AlumniDonation  # noqa: F401

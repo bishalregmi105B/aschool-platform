@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Palette, FileText, Search, Plus, ArrowRight,
-  LayoutTemplate, ImageIcon, WalletCards,
+  Palette, FileText, Search, Plus, ArrowRight, Clock, Trash2, Pencil,
+  LayoutTemplate, ImageIcon, WalletCards, MoreVertical, RotateCcw,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 const CATEGORIES = [
   { id: "all",          label: "All" },
@@ -37,6 +41,7 @@ export default function DesignerPage() {
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
+  const queryClient = useQueryClient();
   const { data: templates = [], isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["design-templates"],
     queryFn: async () => {
@@ -44,6 +49,42 @@ export default function DesignerPage() {
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
     retry: 1,
+  });
+
+  // My Designs — recent saved documents
+  const { data: myDocs = [] } = useQuery<any>({
+    queryKey: ["designer-docs"],
+    queryFn: async () => {
+      const res = await api.get("/design-studio/documents");
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/design-studio/documents/${id}`),
+    onSuccess: () => {
+      toast.success("Design deleted");
+      queryClient.invalidateQueries({ queryKey: ["designer-docs"] });
+    },
+    onError: () => toast.error("Delete failed"),
+  });
+
+  const renameDocMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) =>
+      api.get(`/design-studio/documents/${id}`).then((r) =>
+        api.post("/design-studio/documents", {
+          id,
+          name,
+          template_type: r.data?.data?.template_type ?? "custom",
+          canvas_state: r.data?.data?.canvas_state ?? {},
+          thumbnail_url: r.data?.data?.thumbnail_url ?? "",
+        }),
+      ),
+    onSuccess: () => {
+      toast.success("Renamed");
+      queryClient.invalidateQueries({ queryKey: ["designer-docs"] });
+    },
+    onError: () => toast.error("Rename failed"),
   });
 
   const filtered = (templates as any[]).filter((t: any) => {
@@ -138,6 +179,72 @@ export default function DesignerPage() {
           </Card>
         </div>
       </div>
+
+      {/* My Designs — recent saved documents */}
+      {(myDocs as any[]).length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" /> My Designs
+            </h2>
+            <span className="text-xs text-muted-foreground">{(myDocs as any[]).length} saved</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {(myDocs as any[]).slice(0, 12).map((doc: any) => (
+              <div key={doc.id} className="group relative border rounded-xl overflow-hidden bg-background hover:shadow-md transition-shadow">
+                <button
+                  className="block w-full text-left"
+                  onClick={() => {
+                    const state = doc.canvas_state;
+                    const isWriter = state?.type === "writer" || state?.type === "writer2";
+                    router.push(isWriter ? `/dashboard/designer/writer?doc=${doc.id}` : `/dashboard/designer/editor?doc=${doc.id}`);
+                  }}
+                >
+                  <div className="aspect-[4/3] bg-muted/40 flex items-center justify-center overflow-hidden">
+                    {doc.thumbnail_url ? (
+                      <img src={doc.thumbnail_url} alt={doc.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Palette className="h-8 w-8 text-muted-foreground/30" />
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p className="text-xs font-medium truncate">{doc.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : ""}
+                    </p>
+                  </div>
+                </button>
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="h-6 w-6 rounded-full bg-background/90 border flex items-center justify-center hover:bg-muted">
+                        <MoreVertical className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        const name = window.prompt("Rename design", doc.name);
+                        if (name && name.trim()) renameDocMutation.mutate({ id: doc.id, name: name.trim() });
+                      }}>
+                        <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/designer/editor?doc=${doc.id}`)}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-2" /> Open in editor
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive" onClick={() => {
+                        if (window.confirm(`Delete "${doc.name}"?`)) deleteDocMutation.mutate(doc.id);
+                      }}>
+                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Templates Section */}
       <div>
