@@ -1,0 +1,52 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | फोन: {school_phone}",
+      "tagline": "Student's Leave Application",
+      "bg": "#7c3aed",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Date (BS): __________",
+          "align": "left"
+        },
+        {
+          "text": "Date (AD): __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Respected Sir/Madam,\n\nI respectfully wish to inform you that my son/daughter ____________________, studying in Class ______, Section ______, Roll No. ______, could not attend school from ______ to ______ (____ days) due to ____________________________________. Kindly grant leave for the mentioned period. The missed lessons and homework will be completed as directed by the class teacher.\n\nThank you.",
+      "align": "left",
+      "fontSize": 12
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Guardian's Signature",
+        "Class Teacher",
+        "Principal"
+      ]
+    },
+    {
+      "type": "footer_band",
+      "text": "Approved  ☐  Not approved  ☐     Remarks: ______________________________",
+      "bg": "#f1f5f9",
+      "color": "#334155"
+    }
+  ]
+}

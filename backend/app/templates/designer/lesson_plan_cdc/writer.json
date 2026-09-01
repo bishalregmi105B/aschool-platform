@@ -1,0 +1,131 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone}",
+      "tagline": "DAILY LESSON PLAN — CDC NEPAL FORMAT",
+      "bg": "#0e7490",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Subject: ___________________",
+          "align": "left"
+        },
+        {
+          "text": "Grade: _____   Date (AD/BS): __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Unit / Lesson: ___________________",
+          "align": "left"
+        },
+        {
+          "text": "Duration: _____ minutes",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Learning Objectives (measurable — students will be able to…):",
+      "align": "left",
+      "bold": true,
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "1. ____________________________________   2. ____________________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Phase",
+        "Time",
+        "Teacher Activities",
+        "Student Activities"
+      ],
+      "rows": [
+        [
+          "Preparation / Review",
+          "5 min",
+          "",
+          ""
+        ],
+        [
+          "Presentation (new content)",
+          "10 min",
+          "",
+          ""
+        ],
+        [
+          "Guided Practice",
+          "10 min",
+          "",
+          ""
+        ],
+        [
+          "Independent Practice",
+          "10 min",
+          "",
+          ""
+        ],
+        [
+          "Assessment / Closure",
+          "5 min",
+          "",
+          ""
+        ],
+        [
+          "**Total**",
+          "**45 min**",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Materials: ____________________________   Differentiation (struggling / advanced): ____________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "Homework: _________________________________________________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "Teacher Reflection (after the lesson): ______________________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Subject Teacher",
+        "Department Head",
+        "Principal"
+      ]
+    }
+  ]
+}

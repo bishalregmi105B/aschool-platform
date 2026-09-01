@@ -19,11 +19,11 @@
  * writer_json templates (via writerBlocksToHTML).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TextSelection } from "@tiptap/pm/state";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, FontSize, LineHeight } from "@tiptap/extension-text-style";
@@ -44,16 +44,17 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  ArrowLeft, Save, Download, ChevronDown, FileOutput, FileText, Braces, Loader2,
+  ArrowLeft, Save, Download, ChevronDown, FileOutput, FileText, Braces, Loader2, BookOpen,
 } from "lucide-react";
 
 import { Ribbon } from "@/components/writer/ribbon";
 import { FindReplaceDialog, WordArtDialog, HeaderFooterDialog } from "@/components/writer/dialogs";
 import { WriterRuler, StatusBar } from "@/components/writer/chrome";
+import { WriterSidePanel, type WriterCitation } from "@/components/writer/ResearchPanel";
 import type { WriterCtx, WordCounts } from "@/components/writer/context";
 import { FindReplaceExtension, setFindState } from "@/lib/writer/findReplace";
 import { PaginationExtension, computePagination, applyPagination, PAGE_GAP } from "@/lib/writer/pagination";
-import { WriterParagraphFormat, PageBreak, FloatingBoxNode } from "@/lib/writer/editorKit";
+import { WriterParagraphFormat, PageBreak, FloatingBoxNode, WriterImage, WriterCommentMark, TrackInsertMark, TrackDeleteMark } from "@/lib/writer/editorKit";
 import { exportDocx, downloadBlob, slugifyName } from "@/lib/writer/exportDocx";
 import {
   mergeSettings, pageGeometry, ALL_FONTS, WORDART_STYLES,
@@ -61,6 +62,11 @@ import {
 import type { WriterSettings, ShapeKind } from "@/lib/writer/settings";
 
 // token chip styles + page band styles injected once
+// NOTE: the editable surface is a `.writer-surface` div laid OVER the static
+// `.writer-band` page bands (not inside them), so every ProseMirror style
+// must be scoped to `.writer-surface` — scoping to `.writer-band` silently
+// dead-styles the editor (and the missing `outline:none` made the browser
+// draw its focus box around the content while typing).
 const TOKEN_CSS = `
 .writer-token {
   background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 4px;
@@ -74,22 +80,23 @@ const TOKEN_CSS = `
   box-shadow: 0 2px 12px rgba(0,0,0,0.14); overflow: hidden;
 }
 .writer-band.dark-border { border: 1px solid #334155; box-shadow: 0 2px 16px rgba(15,23,42,0.4); }
-.writer-band .ProseMirror { outline: none; min-height: 100%; }
-.writer-band .ProseMirror table { border-collapse: collapse; width: 100%; margin: 8px 0; }
-.writer-band .ProseMirror th, .writer-band .ProseMirror td {
+.writer-surface .ProseMirror { outline: none; min-height: 100%; }
+.writer-surface .ProseMirror:focus { outline: none; }
+.writer-surface .ProseMirror table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.writer-surface .ProseMirror th, .writer-surface .ProseMirror td {
   border: 1px solid #cbd5e1; padding: 5px 8px; position: relative;
 }
-.writer-band .ProseMirror th { background: #f1f5f9; font-weight: 600; }
-.writer-band .ProseMirror .selectedCell:after {
+.writer-surface .ProseMirror th { background: #f1f5f9; font-weight: 600; }
+.writer-surface .ProseMirror .selectedCell:after {
   content: ""; position: absolute; inset: 0; background: rgba(59,130,246,0.12); pointer-events: none;
 }
-.writer-band .ProseMirror p.is-editor-empty:first-child::before {
+.writer-surface .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); color: #94a3b8; float: left; height: 0; pointer-events: none;
 }
-.writer-band .ProseMirror blockquote {
+.writer-surface .ProseMirror blockquote {
   border-left: 3px solid #94a3b8; padding-left: 12px; color: #475569; font-style: italic;
 }
-.writer-band .ProseMirror pre {
+.writer-surface .ProseMirror pre {
   background: #f1f5f9; border-radius: 6px; padding: 10px 12px;
   font-family: Consolas, monospace; font-size: 0.9em;
 }
@@ -102,6 +109,25 @@ const TOKEN_CSS = `
 }
 .writer-floating-box { user-select: none; }
 .writer-floating-box [contenteditable="true"] { outline: 1.5px dashed #2563eb; user-select: text; }
+
+/* images (Word-like resize + wrap) */
+.writer-image-node { position: relative; display: block; max-width: 100%; line-height: 0; }
+.writer-image-node img { display: inline-block; max-width: 100%; }
+.writer-image-node.writer-image-left { float: left; margin: 4px 14px 8px 0; }
+.writer-image-node.writer-image-right { float: right; margin: 4px 0 8px 14px; }
+.writer-image-node.writer-image-center { margin-left: auto; margin-right: auto; }
+.writer-image-node button { font-family: inherit; }
+
+/* research citations [n] */
+.writer-citation { color: #2563eb; font-size: 0.72em; font-weight: 600; padding: 0 1px; }
+
+/* tracked changes + comments */
+.writer-surface .ProseMirror ins[data-track] { text-decoration: none; background: #dcfce7; color: #166534; }
+.writer-surface .ProseMirror del[data-track] { text-decoration: line-through; background: #fee2e2; color: #991b1b; }
+.writer-comment-mark {
+  display: inline-block; width: 10px; height: 10px; margin-left: 2px;
+  border-radius: 50%; background: #f59e0b; cursor: pointer; vertical-align: super;
+}
 `;
 
 export default function WriterPage() {
@@ -137,10 +163,14 @@ function WriterContent() {
   const [findShowReplace, setFindShowReplace] = useState(false);
   const [wordArtOpen, setWordArtOpen] = useState(false);
   const [hfOpen, setHfOpen] = useState(false);
+  const [sidePanel, setSidePanel] = useState<"none" | "research">("none");
+  const [citations, setCitations] = useState<WriterCitation[]>([]);
+  const [trackChanges, setTrackChanges] = useState(false);
 
   const loadedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSeenPage = useRef(1);
+  const trackRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -148,10 +178,11 @@ function WriterContent() {
       TextStyle, FontSize, LineHeight.configure({ types: ["paragraph", "heading"] }),
       Color, Highlight.configure({ multicolor: true }), Subscript, Superscript,
       WriterParagraphFormat, PageBreak, FloatingBoxNode, PaginationExtension,
+      WriterCommentMark, TrackInsertMark, TrackDeleteMark,
       FindReplaceExtension,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true }), TableRow, TableHeader, TableCell,
-      Image.configure({ inline: false, allowBase64: true }),
+      WriterImage.configure({ inline: false, allowBase64: true }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: "Start writing your document…" }),
     ],
@@ -161,6 +192,50 @@ function WriterContent() {
       attributes: {
         spellcheck: "false",
         style: `font-family:'${settings.font}',Arial,sans-serif; font-size:${settings.fontSize}pt; line-height:1.6;`,
+      },
+      // ── Word-like tracked changes: typed text is marked, deletions are
+      //    struck through first (second delete removes them) ──
+      handleTextInput: (view, from, to, text) => {
+        if (!trackRef.current) return false;
+        const { schema } = view.state;
+        const tr = view.state.tr;
+        if (from !== to) tr.addMark(from, to, schema.marks.trackDelete.create());
+        tr.replaceSelectionWith(schema.text(text, [schema.marks.trackInsert.create()]), true);
+        view.dispatch(tr.scrollIntoView());
+        return true;
+      },
+      handleKeyDown: (view, event) => {
+        if (!trackRef.current) return false;
+        if (event.key !== "Backspace" && event.key !== "Delete") return false;
+        const { state } = view;
+        const { from, to, empty } = state.selection;
+        const delMark = state.schema.marks.trackDelete.create();
+        if (!empty) {
+          view.dispatch(state.tr.addMark(from, to, delMark));
+          return true;
+        }
+        const $from = state.selection.$from;
+        if (event.key === "Backspace") {
+          if ($from.parentOffset === 0) return false;
+          const pos = $from.pos - 1;
+          const node = state.doc.nodeAt(pos);
+          if (!node?.isText) return false;
+          const tracked = node.marks.some((m) => m.type.name === "trackDelete");
+          if (tracked) view.dispatch(state.tr.delete(pos, pos + node.nodeSize));
+          else {
+            view.dispatch(
+              state.tr.addMark(pos, pos + node.nodeSize, delMark)
+                .setSelection(TextSelection.create(state.doc, pos)),
+            );
+          }
+          return true;
+        }
+        const node = state.doc.nodeAt($from.pos);
+        if (!node?.isText) return false;
+        const tracked = node.marks.some((m) => m.type.name === "trackDelete");
+        if (tracked) view.dispatch(state.tr.delete($from.pos, $from.pos + node.nodeSize));
+        else view.dispatch(state.tr.addMark($from.pos, $from.pos + node.nodeSize, delMark));
+        return true;
       },
     },
   });
@@ -459,6 +534,141 @@ function WriterContent() {
     editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: header }).run();
   }, [editor]);
 
+  // ── research & citations ─────────────────────────────────────────
+  const citationCountRef = useRef(0);
+  const addCitation = useCallback((c: Omit<WriterCitation, "n">) => {
+    citationCountRef.current += 1;
+    const n = citationCountRef.current;
+    setCitations((prev) => [...prev, { ...c, n }]);
+    return n;
+  }, []);
+
+  const insertCitationMarker = useCallback((n: number) => {
+    editor?.chain().focus()
+      .insertContent(`<sup class="writer-citation">[${n}]</sup>`)
+      .run();
+  }, [editor]);
+
+  const insertBibliography = useCallback((list: WriterCitation[]) => {
+    if (!editor || !list.length) return;
+    const items = list
+      .map((c) => `<p><sup>[${c.n}]</sup> <a href="${c.url}" rel="noreferrer">${c.title}</a> — ${c.url}</p>`)
+      .join("");
+    editor.chain().focus().insertContent(`<h3>References</h3>${items}`).run();
+    toast.success(`Bibliography with ${list.length} sources inserted`);
+  }, [editor]);
+
+  const insertQuote = useCallback((text: string, sourceUrl: string) => {
+    const safe = text.replace(/[<>&]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[ch] || ch));
+    editor?.chain().focus().insertContent(`<blockquote>${safe}<br/>— <a href="${sourceUrl}" rel="noreferrer">${sourceUrl}</a></blockquote><p></p>`).run();
+    toast.success("Excerpt inserted");
+  }, [editor]);
+
+  // ── AI agent (writer mode) ───────────────────────────────────────
+  const toggleTrackChanges = useCallback(() => {
+    trackRef.current = !trackRef.current;
+    setTrackChanges(trackRef.current);
+    toast.info(trackRef.current ? "Track changes ON — edits are recorded" : "Track changes OFF");
+  }, []);
+
+  const addCommentOnSelection = useCallback(() => {
+    const body = window.prompt("Comment text / टिप्पणी:");
+    if (!body?.trim()) return;
+    editor?.commands.addWriterComment("You", body.trim());
+    setDirty(true);
+    toast.success("Comment added");
+  }, [editor]);
+
+  const acceptAllChanges = useCallback(() => {
+    if (!editor) return;
+    const { state, view } = editor;
+    const tr = state.tr;
+    tr.removeMark(0, state.doc.content.size, state.schema.marks.trackInsert);
+    // deletions become real removals
+    const delRanges: Array<[number, number]> = [];
+    state.doc.descendants((node, pos) => {
+      if (node.isText && node.marks.some((m) => m.type.name === "trackDelete")) {
+        delRanges.push([pos, pos + node.nodeSize]);
+      }
+      return true;
+    });
+    for (let i = delRanges.length - 1; i >= 0; i--) {
+      const [a, b] = delRanges[i];
+      tr.delete(a, b);
+    }
+    tr.removeMark(0, tr.doc.content.size, state.schema.marks.trackDelete);
+    view.dispatch(tr);
+    toast.success("All changes accepted");
+  }, [editor]);
+
+  const rejectAllChanges = useCallback(() => {
+    if (!editor) return;
+    const { state, view } = editor;
+    const tr = state.tr;
+    // insertions are removed
+    const insRanges: Array<[number, number]> = [];
+    state.doc.descendants((node, pos) => {
+      if (node.isText && node.marks.some((m) => m.type.name === "trackInsert")) {
+        insRanges.push([pos, pos + node.nodeSize]);
+      }
+      return true;
+    });
+    for (let i = insRanges.length - 1; i >= 0; i--) {
+      const [a, b] = insRanges[i];
+      tr.delete(a, b);
+    }
+    tr.removeMark(0, tr.doc.content.size, state.schema.marks.trackDelete);
+    view.dispatch(tr);
+    toast.success("All changes rejected");
+  }, [editor]);
+
+
+  const getAgentContext = useCallback((): Record<string, unknown> => ({
+    documentName: docName,
+    page: { size: settings.pageSize, orientation: settings.orientation },
+    wordCount: counts.words,
+    selectedText: (() => {
+      const { from, to } = editor?.state.selection ?? { from: 0, to: 0 };
+      try { return editor?.state.doc.textBetween(from, to, " ")?.slice(0, 300) ?? null; } catch { return null; }
+    })(),
+  }), [docName, settings.pageSize, settings.orientation, counts.words, editor]);
+
+  const executeAgentAction = useCallback((action: Record<string, unknown>) => {
+    if (!editor) return;
+    const kind = String(action.action || "");
+    const text = String(action.text ?? "");
+    switch (kind) {
+      case "insert_text_at_cursor":
+        if (text) editor.chain().focus().insertContent(text).run();
+        break;
+      case "add_bullet_points": {
+        const items = Array.isArray(action.items) ? action.items.map(String).filter(Boolean) : [];
+        if (items.length) {
+          editor.chain().focus().insertContent(
+            items.map((t) => ({ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: t }] }] })),
+          ).run();
+        }
+        break;
+      }
+      case "replace_selected_text": {
+        const { from, to } = editor.state.selection;
+        if (from !== to) {
+          editor.chain().focus().insertContentAt({ from, to }, text).run();
+        } else {
+          editor.chain().focus().insertContent(text).run();
+        }
+        break;
+      }
+      case "replace_document_text":
+      case "add_text":
+      case "add_heading":
+      default:
+        if (text) editor.chain().focus().insertContent(text).run();
+        break;
+    }
+  }, [editor]);
+
+
   const setPageNumber = useCallback((pos: WriterSettings["pageNumber"]) => {
     setSettings((s) => ({ ...s, pageNumber: pos, footerOn: pos !== "none" ? true : s.footerOn }));
     setDirty(true);
@@ -524,6 +734,11 @@ function WriterContent() {
     insertTextbox, insertShape, insertPageBreak, insertDivider, insertTable,
     setPageNumber,
     exportDocx: doExportDocx, exportPdf: () => pdfMutation.mutate(), exporting,
+    trackChanges,
+    toggleTrackChanges,
+    addCommentOnSelection,
+    acceptAllChanges,
+    rejectAllChanges,
   };
 
   const insertToken = (token: string) => {
@@ -544,6 +759,9 @@ function WriterContent() {
         <Input value={docName} onChange={(e) => { setDocName(e.target.value); setDirty(true); }} className="w-52 h-7 text-sm font-medium" />
         <span className="text-[10px] text-slate-400 hidden md:inline">writer2 · word-mode</span>
         <div className="ml-auto flex items-center gap-1.5">
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}>
+            <BookOpen className="h-3.5 w-3.5" /> Research &amp; AI
+          </Button>
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowTokenBar(!showTokenBar)}>
             <Braces className="h-3.5 w-3.5" /> Tokens
           </Button>
@@ -690,7 +908,7 @@ function WriterContent() {
 
             {/* the single editable surface, laid over the bands at the content origin */}
             <div
-              className={`absolute ${settings.lineNumbers ? "writer-linenumbers" : ""}`}
+              className={`writer-surface absolute ${settings.lineNumbers ? "writer-linenumbers" : ""}`}
               style={{
                 left: settings.marginLeft,
                 top: settings.marginTop,
@@ -709,6 +927,22 @@ function WriterContent() {
 
       {/* Status bar */}
       <StatusBar counts={counts} zoom={zoom} setZoom={setZoom} dirty={dirty} />
+
+      {/* Research / AI drawer */}
+      {sidePanel === "research" && (
+        <div className="absolute right-0 top-0 bottom-0 w-80 z-40 shadow-2xl">
+          <WriterSidePanel
+            onClose={() => setSidePanel("none")}
+            executeAgentAction={executeAgentAction}
+            getAgentContext={getAgentContext}
+            insertCitationMarker={insertCitationMarker}
+            insertBibliography={insertBibliography}
+            citations={citations}
+            addCitation={addCitation}
+            insertQuote={insertQuote}
+          />
+        </div>
+      )}
 
       {/* Dialogs */}
       <FindReplaceDialog

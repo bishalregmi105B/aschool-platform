@@ -5,7 +5,7 @@
  * When nothing is selected → Page Settings (size, orientation, margins, bg).
  * When an object is selected → its type-specific properties.
  */
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -302,6 +302,7 @@ export default function PropertiesPanel({ canvas }: Props) {
           </div>
           <ImageEffects obj={obj} refresh={refresh} />
           <PhotoFrames obj={obj} refresh={refresh} />
+          <CropTool obj={obj} refresh={refresh} />
         </div>
       )}
 
@@ -398,6 +399,79 @@ const FRAME_SHAPES = [
   { id: "star", label: "Star" },
   { id: "arch", label: "Arch" },
 ] as const;
+
+// ── Crop tool — non-destructive crop via fractional clipPath (Canva-style) ───
+function CropTool({ obj, refresh }: { obj: any; refresh: () => void }) {
+  const [crop, setCrop] = useState<{ l: number; t: number; r: number; b: number } | null>(null);
+
+  // crop state is stored on the object so it survives undo/redo + JSON round-trips
+  React.useEffect(() => {
+    const c = obj.__crop;
+    setCrop(c && typeof c === "object" ? c : null);
+  }, [obj]);
+
+  const applyCrop = (l: number, t: number, r: number, b: number) => {
+    import("fabric").then(({ Rect }) => {
+      const state = { l, t, r, b };
+      if (l === 0 && t === 0 && r === 0 && b === 0) {
+        delete obj.__crop;
+        obj.clipPath = null;
+      } else {
+        obj.__crop = state;
+        // fractional crop: cover-fill rect inset by the trim amounts —
+        // positioned relative to the image center (origin left/top from the
+        // un-cropped top-left corner), so it moves/scales with the image
+        const w = obj.width ?? 1;
+        const h = obj.height ?? 1;
+        obj.clipPath = new Rect({
+          left: -w / 2 + w * l,
+          top: -h / 2 + h * t,
+          width: Math.max(8, w * (1 - l - r)),
+          height: Math.max(8, h * (1 - t - b)),
+          originX: "left",
+          originY: "top",
+          absolutePositioned: false,
+        });
+      }
+      obj.dirty = true;
+      obj.canvas?.requestRenderAll();
+      refresh();
+    });
+  };
+
+  const num = (v: number | undefined) => Math.round((v ?? 0) * 100);
+  const setSide = (side: "l" | "t" | "r" | "b", pct: number) => {
+    const base = crop ?? { l: 0, t: 0, r: 0, b: 0 };
+    const next = { ...base, [side]: Math.max(0, Math.min(45, pct)) / 100 };
+    setCrop(next);
+    applyCrop(next.l, next.t, next.r, next.b);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Crop</Label>
+        {crop && (
+          <button className="text-[10px] text-muted-foreground hover:text-foreground underline"
+            onClick={() => { setCrop(null); applyCrop(0, 0, 0, 0); }}>
+            Reset
+          </button>
+        )}
+      </div>
+      {([["l", "Left"], ["t", "Top"], ["r", "Right"], ["b", "Bottom"]] as const).map(([side, label]) => (
+        <div key={side}>
+          <div className="flex items-center justify-between mb-0.5">
+            <Label className="text-[10px]">{label}</Label>
+            <span className="text-[10px] text-muted-foreground">{num(crop?.[side])}%</span>
+          </div>
+          <Slider min={0} max={45} step={1} value={[num(crop?.[side])]}
+            onValueChange={([v]) => setSide(side, v)} />
+        </div>
+      ))}
+      <p className="text-[9px] text-muted-foreground">Trim edges without deleting pixels — re-crop anytime.</p>
+    </div>
+  );
+}
 
 function PhotoFrames({ obj, refresh }: { obj: any; refresh: () => void }) {
   const current = obj.clipPath ? ((obj.clipPath as any).data?.frame ?? "custom") : "none";

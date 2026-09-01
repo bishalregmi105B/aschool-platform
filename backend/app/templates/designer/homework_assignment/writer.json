@@ -1,0 +1,94 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone}",
+      "tagline": "WEEKLY HOMEWORK ASSIGNMENT — साप्ताहिक गृहकार्य",
+      "bg": "#ea580c",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Class: ______  Section: ______",
+          "align": "left"
+        },
+        {
+          "text": "Week: ____________  Submitted by: ____________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Day",
+        "Subject",
+        "Homework",
+        "Parent's Sign"
+      ],
+      "rows": [
+        [
+          "Sunday",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Monday",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Tuesday",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Wednesday",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Thursday",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Friday",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Notes for parents: Please sign daily after checking that the homework is completed. / गृहकार्य पूरा भएको जाँच गरी दैनिक हस्ताक्षर गर्नुहुन अनुरोध छ।",
+      "align": "left",
+      "fontSize": 10.5,
+      "italic": true
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Student",
+        "Parent / Guardian",
+        "Class Teacher"
+      ]
+    }
+  ]
+}

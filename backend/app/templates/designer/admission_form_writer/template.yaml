@@ -1,0 +1,21 @@
+template_key: admission_form_writer
+name: Admission Form (Bilingual)
+name_nepali: भर्ना आवेदन फारम
+category: forms
+editor_type: writer
+description: "Bilingual admission application — student info, guardian table, document checklist, office footer."
+page_size: A4
+thumbnail_emoji: "📝"
+is_default: true
+size: {width: 794, height: 1123}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+
+autofill:
+  sources: [school]
+  notes: >
+    School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students,
+    exams) is provided by bulk generation or the data-fill panel.

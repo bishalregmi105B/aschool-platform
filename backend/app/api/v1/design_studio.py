@@ -814,6 +814,204 @@ def ai_suggest():
         }
     )
 
+
+# ── Docs-Designer AI Agent (tool-calling chat) ───────────────────────────────
+
+AGENT_SYSTEM_PROMPT = """You are the ASchool Design & Writer Assistant for schools in Nepal.
+You help teachers and admins create and edit documents and designs.
+
+You reply ONLY with a JSON object (no markdown fences) of this shape:
+{
+  "reply": "<short friendly answer shown in chat>",
+  "content": "<optional generated text content to insert/replace, plain text>",
+  "actions": [
+    {"action": "add_text", "text": "...", "fontSize": 24, "fontWeight": "bold", "fill": "#ea580c", "textAlign": "center"},
+    {"action": "add_heading", "text": "..."},
+    {"action": "replace_selected_text", "text": "..."},
+    {"action": "insert_text_at_cursor", "text": "..."},
+    {"action": "set_background", "color": "#ffffff"},
+    {"action": "suggest_layout", "layout": "certificate|poster|notice|id_card|report_card"},
+    {"action": "replace_document_text", "text": "..."},
+    {"action": "add_bullet_points", "items": ["...", "..."]}
+  ]
+}
+
+Rules:
+- Use ONLY these actions. Choose actions that best fulfil the user's request; use several if needed.
+- Always include "reply". Include "content" only when the user asked you to write/generate text.
+- For Nepali users, if the request is in Nepali or asks for Nepali, write the content in Nepali (Devanagari).
+- Keep text content concise and print-ready for a school context (notices, certificates,
+  lesson plans, report remarks, event posters, admission forms, meeting minutes).
+"""
+
+
+@design_studio_bp.route("/ai/agent", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def ai_agent():
+    """AI chat endpoint that returns executable editor actions.
+
+    Body: {messages: [{role: "user"|"assistant", content: str}],
+           mode: "designer"|"writer", context: {...}}
+    The frontend executes the returned actions on the canvas / document.
+    """
+    import json as _json
+
+    from flask_jwt_extended import get_jwt
+
+    from app.services.ai.token_hub import AITokenHub, QuotaExceededError
+
+    data = request.get_json(silent=True) or {}
+    claims = get_jwt()
+    user_id = claims.get("sub")
+
+    messages = data.get("messages") or []
+    mode = data.get("mode", "designer")
+    context = data.get("context") or {}
+    if not messages:
+        return error_response("messages is required", 400)
+    if not isinstance(messages, list) or len(messages) > 24:
+        return error_response("messages must be a list of at most 24 items", 400)
+
+    convo = []
+    for m in messages[-12:]:
+        role = "assistant" if m.get("role") == "assistant" else "user"
+        convo.append({"role": role, "content": str(m.get("content", ""))[:4000]})
+
+    surface = (
+        "The user is working in the DESIGNER (canvas: posters, certificates, ID cards, notices)."
+        if mode == "designer"
+        else "The user is working in the WRITER (Word-like documents: notices, lesson plans, letters, reports)."
+    )
+    try:
+        result = AITokenHub.request(
+            school_id=g.school_id,
+            user_id=user_id,
+            feature="design-studio:ai-agent",
+            messages=[
+                {"role": "system", "content": AGENT_SYSTEM_PROMPT + surface},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{convo[0]['content']}\n\n"
+                        f"[Context: {str(context)[:800]}]"
+                        if len(convo) == 1
+                        else "\n".join(f"{m['role']}: {m['content']}" for m in convo)
+                        + f"\n\n[Context: {str(context)[:800]}]"
+                    ),
+                },
+            ],
+            max_tokens=1200,
+            model="smart",
+            metadata={"mode": mode},
+        )
+    except QuotaExceededError as exc:
+        return error_response(
+            f"AI quota exceeded: {exc.reason}. Used {exc.used}/{exc.limit} tokens.",
+            429,
+        )
+
+    parsed = {"reply": result["text"], "actions": []}
+    try:
+        start = result["text"].find("{")
+        end = result["text"].rfind("}")
+        if start >= 0 and end > start:
+            candidate = _json.loads(result["text"][start : end + 1])
+            if isinstance(candidate, dict):
+                parsed = {
+                    "reply": str(candidate.get("reply") or result["text"])[:4000],
+                    "content": candidate.get("content"),
+                    "actions": [
+                        a for a in (candidate.get("actions") or [])
+                        if isinstance(a, dict) and isinstance(a.get("action"), str)
+                    ][:8],
+                }
+    except (ValueError, TypeError):
+        pass  # fall back to raw text reply — the chat still works
+
+    return success_response(
+        {
+            "reply": parsed["reply"],
+            "content": parsed.get("content"),
+            "actions": parsed["actions"],
+            "tokens_used": result["tokens_used"],
+            "model": result["model"],
+            "provider": result["provider"],
+        }
+    )
+
+
+# ── Writer research (internet search + page fetch for citations) ─────────────
+
+@design_studio_bp.route("/writer/research", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def writer_research():
+    """Internet research for the Writer: search + fetch readable sources.
+
+    Body: {query} or {url}. Uses Wikipedia's open API for search (no external
+    key needed) and a readability-style extractor for fetched pages so users
+    can search, verify and cite sources without leaving the document.
+    """
+    import re as _re
+    from urllib.parse import quote as _quote
+    from urllib.request import Request as _Req, urlopen as _urlopen
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+    url = (data.get("url") or "").strip()
+
+    def _get_json(req_url, timeout=8):
+        req = _Req(req_url, headers={"User-Agent": "ASchoolWriter/1.0 (school research tool)"})
+        with _urlopen(req, timeout=timeout) as resp:  # nosec - fixed https endpoints
+            import json as _json
+            return _json.loads(resp.read().decode("utf-8", "replace"))
+
+    try:
+        if url:
+            if not url.startswith(("http://", "https://")):
+                return error_response("Only http(s) URLs are supported", 400)
+            req = _Req(url, headers={"User-Agent": "ASchoolWriter/1.0 (school research tool)"})
+            with _urlopen(req, timeout=10) as resp:  # nosec - user-provided https/http
+                raw = resp.read(600_000).decode(resp.headers.get_content_charset() or "utf-8", "replace")
+            # readability-lite: strip scripts/styles/tags, collapse whitespace
+            raw = _re.sub(r"<(script|style|noscript)[^>]*>.*?</\1>", " ", raw, flags=_re.S | _re.I)
+            title_m = _re.search(r"<title[^>]*>(.*?)</title>", raw, _re.S | _re.I)
+            text = _re.sub(r"<[^>]+>", " ", raw)
+            text = _re.sub(r"\s+", " ", text).strip()
+            return success_response({
+                "kind": "page",
+                "title": _esc(title_m.group(1).strip()) if title_m else url,
+                "url": url,
+                "text": text[:12000],
+            })
+
+        if not query:
+            return error_response("query or url is required", 400)
+
+        results = []
+        try:
+            wiki = _get_json(
+                "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=" + _quote(query)
+            )
+            for hit in (wiki.get("query", {}).get("search") or [])[:5]:
+                results.append({
+                    "title": hit.get("title", ""),
+                    "url": f"https://en.wikipedia.org/wiki/{str(hit.get('title', '')).replace(' ', '_')}",
+                    "snippet": _re.sub(r"<[^>]+>", "", hit.get("snippet", "")),
+                    "source": "Wikipedia",
+                })
+        except Exception:
+            pass
+        return success_response({"kind": "search", "query": query, "results": results})
+    except Exception as exc:  # network failures must not 500 the editor
+        return error_response(f"Research failed: {exc}", 502)
+
+
 # ── Server-side PDF export (WeasyPrint) ──────────────────────────────────────
 
 
@@ -848,16 +1046,31 @@ def export_document_pdf():
             # merge is a no-op pass-through for saved designs
             pdf_bytes = document_pdf(state, fields={}, school_config={})
         elif template_id:
-            html_str = TemplateEngineService.render_html(
-                template_id,
-                data=payload.get("data") or {},
-                school_id=g.school_id,
-            )
             from weasyprint import HTML
 
             from app.services.designer.pdf_css import wrap_pdf_html
 
-            pdf_bytes = HTML(string=wrap_pdf_html(html_str)).write_pdf()
+            from app.services.designer.template_engine import TemplateEngineService
+
+            template = TemplateEngineService.get_template(template_id, school_id=g.school_id)
+            if not template:
+                return error_response("Template not found", 404)
+            html_str = TemplateEngineService.render_html(
+                template_id,
+                data=payload.get("data") or {},
+                school_id=g.school_id,
+                template_meta=template,
+            )
+            # Size the sheet to the template's own design dimensions so A2 wall
+            # calendars / A5 cards / square posters never clip to A4.
+            try:
+                tw = int(template.get("width") or 794)
+                th = int(template.get("height") or 1123)
+            except (TypeError, ValueError):
+                tw, th = 794, 1123
+            pdf_bytes = HTML(
+                string=wrap_pdf_html(html_str, page_size=f"{max(1, tw)}px {max(1, th)}px")
+            ).write_pdf()
         else:
             return error_response("document_id or template_id is required", 400)
     except ImportError:
@@ -925,7 +1138,16 @@ def export_bulk_pdf():
         sheet_html = _impose_sheet(pages_html, payload)
         combined = wrap_pdf_html(sheet_html, page_size=orientation)
     else:
-        combined = wrap_pdf_html("".join(pages_html), page_size=orientation)
+        # One item per sheet — size each sheet to the items' own design size
+        # (bulk A5 admit cards / A2 calendars must not clip onto A4).
+        try:
+            bw = int(items[0].get("template_width", 794))
+            bh = int(items[0].get("template_height", 1123))
+        except (TypeError, ValueError):
+            bw, bh = 794, 1123
+        combined = wrap_pdf_html(
+            "".join(pages_html), page_size=f"{max(1, bw)}px {max(1, bh)}px"
+        )
     pdf_bytes = HTML(string=combined).write_pdf()
 
     return send_file(

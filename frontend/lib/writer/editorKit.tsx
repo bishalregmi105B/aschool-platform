@@ -5,9 +5,11 @@
  * (text box / WordArt / shape), paragraph indent + borders + shading.
  * Everything else comes from StarterKit / @tiptap extensions.
  */
-import { Extension, Node, mergeAttributes, CommandProps } from "@tiptap/core";
+import { Extension, Node, Mark, mergeAttributes, CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import Image from "@tiptap/extension-image";
 import React, { useCallback, useRef, useState } from "react";
+import type { Mark as PMMark } from "@tiptap/pm/model";
 import type { FloatingBox } from "./settings";
 import { WORDART_STYLES } from "./settings";
 
@@ -305,6 +307,351 @@ declare module "@tiptap/core" {
     writerExtras: {
       setPageBreak: () => ReturnType;
       insertFloatingBox: (box: Partial<FloatingBox>) => ReturnType;
+      setImageSize: (attrs: { width: number; height?: number | null }) => ReturnType;
+      addWriterComment: (author: string, body: string) => ReturnType;
     };
   }
 }
+
+// ── Resizable / alignable image node (Word / Google Docs style) ─────────
+
+interface ImageHandleProps {
+  selected: boolean;
+  width: number;
+  height: number | null;
+  align: "left" | "center" | "right" | "none";
+  imgRef: React.RefObject<HTMLImageElement | null>;
+  onWidthCommit: (w: number, h: number | null) => void;
+  onAlign: (a: "left" | "center" | "right" | "none") => void;
+  remove: () => void;
+}
+
+/** Selection handles + hover toolbar around a selected image. */
+function ImageHandles({
+  selected, width, height, align, imgRef, onWidthCommit, onAlign, remove,
+}: ImageHandleProps) {
+  const startDrag = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = imgRef.current;
+      if (!el) return;
+      const startX = e.clientX;
+      const startW = el.offsetWidth;
+      const aspect = el.offsetHeight > 0 ? el.offsetWidth / el.offsetHeight : 1;
+      let latest = { w: startW, h: startW / aspect };
+      const onMove = (ev: PointerEvent) => {
+        const next = Math.max(48, Math.min(2000, Math.round(startW + (ev.clientX - startX) * 2)));
+        latest = { w: next, h: Math.round(next / aspect) };
+        el.style.width = `${latest.w}px`;
+        el.style.height = `${latest.h}px`;
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        el.style.width = "";
+        el.style.height = "";
+        onWidthCommit(latest.w, latest.h);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [imgRef, onWidthCommit],
+  );
+
+  if (!selected) return null;
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          border: "1.5px solid #2563eb",
+        }}
+      />
+      <span
+        title="Resize (keep aspect)"
+        onPointerDown={startDrag}
+        style={{
+          position: "absolute", right: -7, bottom: -7, width: 13, height: 13,
+          background: "#2563eb", border: "2px solid white", borderRadius: 2,
+          cursor: "nwse-resize", zIndex: 6,
+        }}
+      />
+      <span
+        title="Resize (keep aspect)"
+        onPointerDown={startDrag}
+        style={{
+          position: "absolute", left: -7, bottom: -7, width: 13, height: 13,
+          background: "#2563eb", border: "2px solid white", borderRadius: 2,
+          cursor: "nesw-resize", zIndex: 6,
+        }}
+      />
+      <div
+        contentEditable={false}
+        style={{
+          position: "absolute", left: "50%", transform: "translateX(-50%)", top: -34,
+          display: "flex", gap: 1, background: "#0f172a", borderRadius: 6, padding: 3,
+          zIndex: 7, boxShadow: "0 4px 14px rgba(0,0,0,.28)", whiteSpace: "nowrap",
+        }}
+      >
+        {([
+          ["left", "⯇", "Align left"],
+          ["center", "≡", "Center"],
+          ["right", "⯈", "Align right"],
+          ["none", "⇥", "Inline with text"],
+        ] as const).map(([value, glyph, title]) => (
+          <button
+            key={value}
+            title={title}
+            onClick={() => onAlign(value)}
+            style={{
+              background: align === value ? "#2563eb" : "transparent",
+              color: "white", border: "none", borderRadius: 4, width: 24, height: 22,
+              cursor: "pointer", fontSize: 12, lineHeight: "22px", padding: 0,
+            }}
+          >
+            {glyph}
+          </button>
+        ))}
+        <span style={{ color: "#64748b", padding: "0 3px" }}>|</span>
+        <span title="Image width" style={{ color: "white", fontSize: 11, lineHeight: "22px", padding: "0 4px", userSelect: "none" }}>
+          {width}px
+        </span>
+        <button
+          title="Actual size (100%)"
+          onClick={() => onWidthCommit(0, null)}
+          style={{ background: "transparent", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 10, padding: "0 5px" }}
+        >
+          100%
+        </button>
+        <button
+          title="Remove image"
+          onClick={remove}
+          style={{ background: "#dc2626", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 12, lineHeight: "22px", padding: 0, width: 22 }}
+        >
+          ×
+        </button>
+      </div>
+      {height != null && (
+        <span
+          contentEditable={false}
+          style={{
+            position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: -24,
+            background: "#0f172a", color: "white", fontSize: 10, borderRadius: 4,
+            padding: "1px 6px", zIndex: 6, userSelect: "none",
+          }}
+        >
+          {width} × {height} px
+        </span>
+      )}
+    </>
+  );
+}
+
+/** Image node view: drag-to-resize handles + alignment toolbar, like Word. */
+function WriterImageView(props: any) {
+  const { node, updateAttributes, selected, deleteNode } = props;
+  const attrs = node.attrs as { src: string; alt?: string; title?: string; width?: number | null; height?: number | null; textAlign?: string };
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [live, setLive] = useState<{ w: number; h: number } | null>(null);
+
+  const align = (attrs.textAlign as ImageHandleProps["align"]) || "none";
+  const width = attrs.width || live?.w || null;
+  const height = attrs.height || live?.h || null;
+
+  const onWidthCommit = useCallback(
+    (w: number, h: number | null) => {
+      if (w === 0) updateAttributes({ width: null, height: null }); // reset to actual size
+      else updateAttributes({ width: w, height: h });
+    },
+    [updateAttributes],
+  );
+
+  const onAlign = useCallback(
+    (a: ImageHandleProps["align"]) => updateAttributes({ textAlign: a }),
+    [updateAttributes],
+  );
+
+  return (
+    <NodeViewWrapper
+      as="div"
+      className={`writer-image-node${align !== "none" ? ` writer-image-${align}` : ""}`}
+      style={{ maxWidth: "100%" }}
+    >
+      <img
+        ref={imgRef}
+        src={attrs.src}
+        alt={attrs.alt || ""}
+        title={attrs.title || ""}
+        draggable
+        onLoad={() => {
+          if (!attrs.width && imgRef.current) {
+            setLive({ w: imgRef.current.offsetWidth, h: imgRef.current.offsetHeight });
+          }
+        }}
+        style={{
+          width: attrs.width || undefined,
+          height: attrs.height || undefined,
+          maxWidth: "100%",
+        }}
+      />
+      <ImageHandles
+        selected={selected}
+        width={Number(width) || 0}
+        height={height != null ? Number(height) : null}
+        align={align}
+        imgRef={imgRef}
+        onWidthCommit={onWidthCommit}
+        onAlign={onAlign}
+        remove={deleteNode}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+export const WriterImage = Image.extend({
+  addAttributes() {
+    return {
+      ...(this.parent?.() ?? {}),
+      width: { default: null },
+      height: { default: null },
+      textAlign: { default: null },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    // keep the visual model in the DOM (export re-reads these attrs)
+    const { textAlign, ...rest } = HTMLAttributes as Record<string, any>;
+    const style: string[] = [];
+    if (rest.width) style.push(`width:${rest.width}px`);
+    if (rest.height) style.push(`height:${rest.height}px`);
+    return ["img", mergeAttributes(rest, { style: style.join(";") || undefined, "data-align": textAlign || undefined })];
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "img[src]",
+        getAttrs: (el) => {
+          const dom = el as HTMLImageElement;
+          const num = (v: string | null): number | null => {
+            if (!v) return null;
+            const n = parseInt(v, 10);
+            return Number.isFinite(n) && n > 0 ? n : null;
+          };
+          return {
+            width: num(dom.getAttribute("data-width") || dom.style.width || dom.getAttribute("width")),
+            height: num(dom.getAttribute("data-height") || dom.style.height || dom.getAttribute("height")),
+            textAlign: dom.getAttribute("data-align") || null,
+          };
+        },
+      },
+    ];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(WriterImageView);
+  },
+  addCommands() {
+    return {
+      ...(this.parent?.() ?? {}),
+      setImageSize: (attrs: { width: number; height?: number | null }) => (props: CommandProps) => {
+        const { state, tr, view } = props;
+        const { selection } = state;
+        if (selection.empty) return false;
+        const node = state.doc.nodeAt(selection.from);
+        if (!node || node.type.name !== "image") return false;
+        view.dispatch(
+          tr.setNodeMarkup(selection.from, undefined, {
+            ...node.attrs,
+            width: attrs.width,
+            height: attrs.height ?? null,
+          }),
+        );
+        return true;
+      },
+    } as never;
+  },
+});
+
+// ── Review tools: comments + tracked insert/delete marks (Word-like) ────
+// Marks survive round-trips (rendered as data-* spans) and are exported to
+// DOCX as real Word comments / tracked deletions by the writer_docx service.
+
+export interface WriterComment {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+}
+
+let commentCounter = 0;
+
+export const WriterCommentMark = Node.create({
+  name: "writerCommentMark",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      commentId: { default: null },
+      author: { default: "" },
+      body: { default: "" },
+      createdAt: { default: "" },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "span[data-comment-id]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes({
+      class: "writer-comment-mark",
+      "data-comment-id": HTMLAttributes.commentId,
+      title: `${HTMLAttributes.author}: ${HTMLAttributes.body}`,
+    })];
+  },
+  renderText() {
+    return "";
+  },
+  addCommands() {
+    return {
+      addWriterComment: (author: string, body: string) => (props: CommandProps) => {
+        const { state, view } = props;
+        const { from, to } = state.selection;
+        commentCounter += 1;
+        const id = `c-${Date.now()}-${commentCounter}`;
+        const mark = state.schema.nodes.writerCommentMark.create({
+          commentId: id, author, body, createdAt: new Date().toISOString(),
+        });
+        const tr = state.tr;
+        // inline atom at the END of the selection (Word-style anchor marker)
+        tr.insert(Math.min(to, state.doc.content.size), mark);
+        view.dispatch(tr);
+        return true;
+      },
+    } as never;
+  },
+});
+
+export const TrackInsertMark = Mark.create({
+  name: "trackInsert",
+  inclusive: false,
+  parseHTML() {
+    return [{ tag: "ins[data-track]" }];
+  },
+  renderHTML() {
+    return ["ins", { "data-track": "insert" }, 0];
+  },
+});
+
+export const TrackDeleteMark = Mark.create({
+  name: "trackDelete",
+  inclusive: false,
+  excludes: "",
+  parseHTML() {
+    return [{ tag: "del[data-track]" }];
+  },
+  renderHTML() {
+    return ["del", { "data-track": "delete" }, 0];
+  },
+});
+
+export type { PMMark };

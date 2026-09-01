@@ -1,0 +1,21 @@
+template_key: result_sheet_notice
+name: Result Publication Notice
+name_nepali: परीक्षाफल सूचना
+category: notices
+editor_type: designer
+description: "A4 SEE-mock result publication notice with NEB grading legend and table placeholder."
+page_size: A4
+thumbnail_emoji: "🧾"
+is_default: true
+size: {width: 794, height: 1123}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+
+autofill:
+  sources: [school]
+  notes: >
+    School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students,
+    exams) is provided by bulk generation or the data-fill panel.

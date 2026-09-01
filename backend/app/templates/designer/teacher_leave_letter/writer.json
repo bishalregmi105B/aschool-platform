@@ -1,0 +1,52 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | फोन: {school_phone}",
+      "tagline": "Leave Request — Teaching / Non-teaching Staff",
+      "bg": "#7c3aed",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Date (BS): __________",
+          "align": "left"
+        },
+        {
+          "text": "Date (AD): __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "The Principal,\n{school_name}\n{school_address}\n\nSubject: Application for leave\n\nRespected Sir/Madam,\n\nI would like to request leave for ______ day(s) from ______ to ______ due to ____________________________________. Arrangements for my classes during this period have been discussed with the concerned department. Kindly grant me leave for the mentioned dates.\n\nThank you.",
+      "align": "left",
+      "fontSize": 12
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Applicant",
+        "Department Head",
+        "Principal"
+      ]
+    },
+    {
+      "type": "footer_band",
+      "text": "Approved  ☐  Not approved  ☐     Remarks: ______________________________",
+      "bg": "#f1f5f9",
+      "color": "#334155"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+template_key: event_banner
+name: Event / Annual Day Banner
+name_nepali: वार्षिकोत्सव ब्यानर
+category: banners
+editor_type: designer
+description: "A3-landscape annual-day banner — dark header band, programme column, chief-guest photo slot."
+page_size: A3 Landscape (wide)
+thumbnail_emoji: "🎉"
+is_default: true
+size: {width: 1191, height: 1000}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+  - chief_guest_photo
+
+autofill:
+  sources: [school]
+  notes: >
+    School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students,
+    exams) is provided by bulk generation or the data-fill panel.

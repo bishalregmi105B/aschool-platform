@@ -1,0 +1,62 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone} | {school_website}",
+      "tagline": "TO WHOM IT MAY CONCERN",
+      "bg": "#0f172a",
+      "color": "#ffffff"
+    },
+    {
+      "type": "paragraph",
+      "text": "Date: ____________ (BS)   Ref. No.: ____________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "This is to certify that Mr./Ms. ________________________________________ was a bonafide student of this school from ______ to ______ in Class __________ (Roll No. ______). During his/her stay, his/her academic performance, conduct and character were found to be very good / excellent. He/She is hardworking, disciplined and co-operative. We wish him/her every success in future endeavours. This certificate is issued upon his/her request for ____________________ purpose.",
+      "align": "left",
+      "fontSize": 12
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Attendance: ______ %",
+          "align": "left"
+        },
+        {
+          "text": "GPA (last exam): ______",
+          "align": "center"
+        },
+        {
+          "text": "Conduct: ____________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Class Teacher",
+        "Vice-Principal",
+        "Principal"
+      ]
+    },
+    {
+      "type": "footer_band",
+      "text": "This letter is valid with the school seal only. / छाप बिना यो प्रमाणपत्र मान्य हुने छैन।",
+      "bg": "#f1f5f9",
+      "color": "#475569"
+    }
+  ]
+}

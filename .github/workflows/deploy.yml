@@ -8,8 +8,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  # GHCR/Docker require lowercase image names; github.repository may contain
+  # uppercase (bishalregmi105B/...) which makes docker push fail. Pin the
+  # lowercased path to match docker-compose.prod.yml image: pins.
+  BACKEND_IMAGE: ghcr.io/bishalregmi105b/aschool-platform/backend
+  FRONTEND_IMAGE: ghcr.io/bishalregmi105b/aschool-platform/frontend
 
 jobs:
   # ─── Backend Tests ───
@@ -193,16 +196,21 @@ jobs:
           script: |
             cd /opt/aschool
 
-            # Pull latest images
-            docker compose -f docker-compose.prod.yml pull flask nextjs
+            # Sync the checkout so compose files / nginx config / migrations
+            # on the server match what CI built (stale checkouts were the
+            # reason deployed UI lagged behind main).
+            git fetch --all
+            git reset --hard origin/main
+
+            # Pull the images CI built and push them live (compose now pins
+            # image: so this deploys the registry build, not a local rebuild).
+            docker compose -f docker-compose.prod.yml pull nextjs flask
+            docker compose -f docker-compose.prod.yml up -d --no-deps nextjs flask
 
             # Run database migrations
             docker compose -f docker-compose.prod.yml run --rm flask flask db upgrade
 
-            # Rolling restart (zero-downtime)
-            docker compose -f docker-compose.prod.yml up -d --no-deps --build flask
-            sleep 10
-            docker compose -f docker-compose.prod.yml up -d --no-deps --build nextjs
+            # Restart the background workers
             docker compose -f docker-compose.prod.yml up -d --no-deps celery-worker
             docker compose -f docker-compose.prod.yml up -d --no-deps celery-beat
 
