@@ -1,0 +1,21 @@
+template_key: lesson_plan_cdc_nepali
+name: Lesson Plan (Nepali)
+name_nepali: दैनिक पाठ योजना (नेपाली)
+category: lesson_plans
+editor_type: writer
+description: "Nepali-language daily lesson plan following the CDC Nepal 45-minute phase structure."
+page_size: A4
+thumbnail_emoji: "📋"
+is_default: true
+size: {width: 794, height: 1123}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+
+autofill:
+  sources: [school]
+  notes: >
+    School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students,
+    exams) is provided by bulk generation or the data-fill panel.

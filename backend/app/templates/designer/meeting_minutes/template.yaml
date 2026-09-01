@@ -1,0 +1,21 @@
+template_key: meeting_minutes
+name: Meeting Minutes
+name_nepali: बैठक निर्णय
+category: notices
+editor_type: writer
+description: "PTA / staff / SMC meeting minutes with agenda, decisions and action table."
+page_size: A4
+thumbnail_emoji: "🗓"
+is_default: true
+size: {width: 794, height: 1123}
+fields:
+  - school_name
+  - school_address
+  - school_phone
+
+autofill:
+  sources: [school]
+  notes: >
+    School fields ({school_name}, {school_address}, {school_phone}, {school_website},
+    {school_logo}) merge into every render automatically. Record data (students,
+    exams) is provided by bulk generation or the data-fill panel.

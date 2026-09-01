@@ -1,0 +1,77 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone}",
+      "tagline": "PARENTS' DAY & RESULT DISCUSSION — अभिभावक भेटघाट",
+      "bg": "#047857",
+      "color": "#ffffff"
+    },
+    {
+      "type": "paragraph",
+      "text": "Dear Parents / Guardians, प्यारा अभिभावकवर्ग,",
+      "align": "left",
+      "bold": true,
+      "fontSize": 12
+    },
+    {
+      "type": "paragraph",
+      "text": "We are pleased to invite you to the Parents' Day and one-to-one result discussion session. आगामी ______________ (मिति) गते __________ बजे हुने अभिभावक भेटघाट कार्यक्रममा उपस्थित हुन हार्दिक अनुरोध गर्दछौँ। कार्यक्रममा विद्यार्थीको शैक्षिक प्रगति, उपस्थिति र सुधारका उपायहरूबारे कक्षा अध्यापकसँग प्रत्यक्ष छलफल हुनेछ।",
+      "align": "left",
+      "fontSize": 12
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Item / विवरण",
+        "Details / विवरण"
+      ],
+      "rows": [
+        [
+          "Date / मिति (BS)",
+          ""
+        ],
+        [
+          "Time / समय",
+          ""
+        ],
+        [
+          "Venue / स्थान",
+          ""
+        ],
+        [
+          "Class Teacher",
+          ""
+        ]
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Session slots (15 minutes each) — please arrive 10 minutes before your slot: ☐ 10:00  ☐ 11:00  ☐ 12:00  ☐ 13:00",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Class Teacher",
+        "Co-ordinator",
+        "Principal"
+      ]
+    },
+    {
+      "type": "footer_band",
+      "text": "{school_phone}  |  {school_website}",
+      "bg": "#047857",
+      "color": "#ffffff"
+    }
+  ]
+}

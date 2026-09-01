@@ -1,0 +1,151 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone} | {school_website}",
+      "tagline": "STUDENT ADMISSION APPLICATION FORM — भर्ना आवेदन फारम",
+      "bg": "#1d4ed8",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Photo",
+          "align": "center"
+        },
+        {
+          "text": "Application No: ____________\nDate (BS): ____________",
+          "align": "left"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "1. Student's Name (in block letters): ______________________________________________________",
+      "align": "left",
+      "fontSize": 11.5
+    },
+    {
+      "type": "paragraph",
+      "text": "   विद्यार्थीको नाम: ______________________________________________________",
+      "align": "left",
+      "fontSize": 11.5
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "2. Date of Birth (BS): __________",
+          "align": "left"
+        },
+        {
+          "text": "(AD): __________",
+          "align": "left"
+        },
+        {
+          "text": "3. Gender: ☐ M  ☐ F  ☐ Other",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "4. Birth Certificate No.: ______________   5. Citizenship No. (if any): ______________",
+      "align": "left",
+      "fontSize": 11.5
+    },
+    {
+      "type": "paragraph",
+      "text": "6. Permanent Address (Province / District / Municipality / Ward): _________________________________",
+      "align": "left",
+      "fontSize": 11.5
+    },
+    {
+      "type": "paragraph",
+      "text": "7. Class Applying For: __________   8. Previous School: ____________________   SEE/SLC Regd. No.: __________",
+      "align": "left",
+      "fontSize": 11.5
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Guardian / Parent Details — अभिभावकको विवरण",
+      "align": "left"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Relation",
+        "Name",
+        "Occupation",
+        "Phone (Mobile)",
+        "Email"
+      ],
+      "rows": [
+        [
+          "Father",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Mother",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Local Guardian",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Documents Enclosed — संलग्न कागजात",
+      "align": "left"
+    },
+    {
+      "type": "paragraph",
+      "text": "☐ Birth certificate   ☐ Transfer Certificate   ☐ Previous mark-sheet   ☐ Passport photos (4)   ☐ Migration (if any)",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "Declaration: I hereby declare that the information provided above is true to the best of my knowledge. / माथि दिइएको विवरण सत्य भएकोले प्रमाणित गर्दछु।",
+      "align": "left",
+      "fontSize": 10.5,
+      "italic": true
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Applicant / Guardian",
+        "Verified By (Admission)",
+        "Principal"
+      ]
+    },
+    {
+      "type": "footer_band",
+      "text": "For office use: Interview date __________   Result __________   Class section __________",
+      "bg": "#f1f5f9",
+      "color": "#334155"
+    }
+  ]
+}

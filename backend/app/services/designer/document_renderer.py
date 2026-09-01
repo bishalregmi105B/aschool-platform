@@ -231,17 +231,32 @@ def _render_object(obj: dict, values: dict) -> str:
     return f"<div style='{style}'></div>"
 
 
-def _render_page(page: dict, width: int, height: int, values: dict) -> str:
+def _render_page(page: dict, width: int, height: int, values: dict, page_name: str | None = None) -> str:
     bg = page.get("background") or "#ffffff"
     objects_html = "".join(
         _render_object(o, values) for o in (page.get("objects") or [])
     )
+    # page_name maps the div to a matching `@page pgN` rule so WeasyPrint emits
+    # one PDF page per design page at the design's own px size (A2 wall
+    # calendars, A5 admit cards, 1080px posters — never clipped to A4).
+    page_rule = f"page:{page_name};" if page_name else ""
     return (
         f"<div style='width:{width}px;height:{height}px;position:relative;"
-        f"background:{bg};overflow:hidden;page-break-after:always;"
+        f"background:{bg};overflow:hidden;{page_rule}"
         f"font-family:'Poppins','Noto Sans Devanagari',Arial,sans-serif;'>"
         f"{objects_html}</div>"
     )
+
+
+def _document_pages(canvas_state: dict) -> list[tuple[int, int, dict]]:
+    """Normalized [(width_px, height_px, page_json), …] for a saved document."""
+    state = canvas_state or {}
+    if state.get("version") == "multi-page" and isinstance(state.get("pages"), list):
+        return [
+            (int(p.get("width", 794)), int(p.get("height", 1123)), p.get("json") or p)
+            for p in state["pages"]
+        ]
+    return [(int(state.get("width", 794)), int(state.get("height", 1123)), state)]
 
 
 def document_to_html(
@@ -249,30 +264,63 @@ def document_to_html(
     fields: dict | None = None,
     school_config: dict | None = None,
 ) -> str:
-    """Saved designer document → standalone HTML for WeasyPrint."""
+    """Saved designer document → HTML body fragment for WeasyPrint.
+
+    Returns a body fragment (callers wrap it via ``pdf_css.wrap_pdf_html``).
+    Each page div carries `page:pgN` so the wrapper can emit per-page
+    `@page pgN { size: Wpx Hpx }` rules matching the design's real size.
+    """
     values = _merge_fields(fields, school_config)
     state = _replace_tokens(copy.deepcopy(canvas_state or {}), values)
 
-    pages = []
-    if state.get("version") == "multi-page" and isinstance(state.get("pages"), list):
-        for p in state["pages"]:
-            pages.append((
-                int(p.get("width", 794)),
-                int(p.get("height", 1123)),
-                p.get("json") or p,
-            ))
-    else:
-        pages.append((int(state.get("width", 794)), int(state.get("height", 1123)), state))
+    parts = []
+    for index, (w, h, page) in enumerate(_document_pages(state)):
+        parts.append(_render_page(page, w, h, values, page_name=f"pg{index}"))
+    return "".join(parts)
 
-    body = "".join(_render_page(page, w, h, values) for w, h, page in pages)
-    return f"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style='margin:0;'>{body}</body></html>"
+
+def document_page_size_rule(canvas_state: dict) -> str:
+    """`@page` size string matching the document's own page dimensions (px).
+
+    Single-size documents → one `@page { size: Wpx Hpx }`. Mixed-size
+    documents additionally name every page (pgN) so each sheet keeps its own
+    dimensions. Falls back to A4 portrait for degenerate input.
+    """
+    pages = _document_pages(canvas_state or {})
+    if not pages:
+        return "A4 portrait"
+    sizes: list[tuple[int, int]] = []
+    rules: list[str] = []
+    for index, (w, h, _page) in enumerate(pages):
+        size = (max(1, w), max(1, h))
+        rules.append(f"@page pg{index} {{ size: {size[0]}px {size[1]}px; margin: 0; }}")
+        if size not in sizes:
+            sizes.append(size)
+    if len(sizes) == 1:
+        return f"{sizes[0][0]}px {sizes[0][1]}px"
+    # mixed sizes: default page = first size, plus a named rule per page
+    return "custom::" + " ".join([f"@page {{ size: {sizes[0][0]}px {sizes[0][1]}px; margin: 0; }}"] + rules)
 
 
 def document_pdf(canvas_state: dict, fields: dict | None = None, school_config: dict | None = None) -> bytes:
-    """Saved designer document → PDF bytes via WeasyPrint."""
+    """Saved designer document → PDF bytes via WeasyPrint.
+
+    The PDF page size always follows the document's own design dimensions
+    (px @ 96dpi), so e.g. the A2 wall calendar exports as one full-size A2
+    sheet instead of being clipped onto A4.
+    """
     from weasyprint import HTML
 
-    from app.services.designer.pdf_css import wrap_pdf_html
+    from app.services.designer.pdf_css import PDF_BASE_CSS, wrap_pdf_html
 
     html_str = document_to_html(canvas_state, fields, school_config)
-    return HTML(string=wrap_pdf_html(html_str)).write_pdf()
+    size_rule = document_page_size_rule(canvas_state)
+    if size_rule.startswith("custom::"):
+        extra_css = size_rule[len("custom::"):]
+        doc = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            f"<style>{PDF_BASE_CSS} {extra_css}</style>"
+            f"</head><body>{html_str}</body></html>"
+        )
+        return HTML(string=doc).write_pdf()
+    return HTML(string=wrap_pdf_html(html_str, page_size=size_rule)).write_pdf()

@@ -154,13 +154,16 @@ function imageRuns(node: JsonNode): ParagraphChild[] {
   const m = /^data:image\/(png|jpe?g|gif|bmp);base64,(.+)$/i.exec(src);
   if (!m) return [];
   const fmt = m[1].toLowerCase() === "jpeg" ? "jpg" : (m[1].toLowerCase() as "png" | "jpg" | "gif" | "bmp");
+  // honor editor-stored dimensions (px @96dpi → DOCX points = px × 0.75),
+  // scaled down only if they would overflow a 600×800pt box
   const w = Number(node.attrs?.width) || 300;
   const h = Number(node.attrs?.height) || Math.round(w * 0.66);
+  const scale = Math.min(1, 600 / w, 800 / h);
   return [
     new ImageRun({
       type: fmt,
       data: m[2],
-      transformation: { width: Math.min(w, 600), height: Math.min(h, 800) },
+      transformation: { width: Math.round(w * 0.75 * scale), height: Math.round(h * 0.75 * scale) },
     }),
   ];
 }
@@ -365,8 +368,17 @@ function blockTypeToDocx(node: JsonNode, ctx: Ctx): DocxBlock | DocxBlock[] {
         border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "94A3B8", space: 4 } },
         children: [],
       });
-    case "image":
-      return new Paragraph({ children: imageRuns(node) });
+    case "image": {
+      const run = imageRuns(node);
+      if (!run.length) return new Paragraph({ children: [] });
+      const alignAttr = node.attrs?.textAlign as string | undefined;
+      return new Paragraph({
+        alignment: alignAttr && alignAttr !== "none"
+          ? ALIGN[alignAttr] || undefined
+          : undefined,
+        children: run,
+      });
+    }
     case "pageBreak":
       return new Paragraph({ children: [new PageBreak()] });
     case "bulletList":

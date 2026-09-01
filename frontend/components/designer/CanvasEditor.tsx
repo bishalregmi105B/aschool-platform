@@ -40,9 +40,12 @@ import {
 
 import PropertiesPanel from "./PropertiesPanel";
 import AIAssistPanel   from "./AIAssistPanel";
+import { AIChatPanel } from "./AIChatPanel";
 import DataFillPanel   from "./DataFillPanel";
 import LayersPanel     from "./LayersPanel";
 import GraphicsPanel   from "./GraphicsPanel";
+import ExplorePanel    from "./ExplorePanel";
+import { VersionHistoryButton } from "./VersionHistoryButton";
 
 const SHAPE_GROUPS = [
   { label: "Basic",    shapes: [{ id:"rect",label:"Rectangle",emoji:"⬜"},{ id:"circle",label:"Circle",emoji:"⭕"},{ id:"triangle",label:"Triangle",emoji:"🔺"},{ id:"line",label:"Line",emoji:"➖"},{ id:"arrow",label:"Arrow",emoji:"➡"}] },
@@ -56,6 +59,7 @@ const BG_PRESETS = [
 ];
 
 const SIDEBAR_ICONS: Array<{ id: DesignerPanel; icon: string; label: string }> = [
+  { id:"explore",    icon:"🔎", label:"Explore"    },
   { id:"templates",  icon:"📄", label:"Templates"  },
   { id:"shapes",     icon:"⬜", label:"Shapes"     },
   { id:"text",       icon:"T",  label:"Text"       },
@@ -109,10 +113,11 @@ export default function CanvasEditor() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const overlayRef   = useRef<HTMLCanvasElement>(null);
   const canvas       = useCanvas(canvasRef, overlayRef);
-  const { exportPDF, exportPNG, exportPagesZip } = useExport();
+  const { exportPDF, exportPNG, exportPagesZip, exportPPTX, exportSVG } = useExport();
 
-  // export quality — multiplier over the 96dpi logical canvas
-  const [dpiScale, setDpiScale] = useState(3);
+  // export quality — multiplier over the 96dpi logical canvas (3.125 = 300 DPI)
+  const [dpiScale, setDpiScale] = useState(3.125);
+  const [exportJpeg, setExportJpeg] = useState(true);
   const [exporting, setExporting] = useState(false);
 
   // store-driven ui state
@@ -140,6 +145,61 @@ export default function CanvasEditor() {
   const docLoadedRef      = useRef(false);
   const importFileRef     = useRef<HTMLInputElement>(null);
   const initialFitRef     = useRef(false);
+
+  // ── AI agent action execution (designer mode) ────────────────────────
+  const getAgentContext = useCallback((): Record<string, unknown> => {
+    const fc = (window as any).__activeCanvas;
+    const sel = fc?.getActiveObject?.();
+    return {
+      page: { width: canvas.canvasSize?.width, height: canvas.canvasSize?.height },
+      documentName: docName,
+      selected: sel ? { type: sel.type, text: typeof sel.text === "string" ? sel.text.slice(0, 200) : undefined } : null,
+    };
+  }, [canvas.canvasSize, docName]);
+
+  const executeAgentAction = useCallback((action: Record<string, unknown>) => {
+    const kind = String(action.action || "");
+    const text = String(action.text ?? "");
+    const fc = (window as any).__activeCanvas;
+    switch (kind) {
+      case "add_text":
+      case "add_heading": {
+        const size = kind === "add_heading" ? 34 : Number(action.fontSize) || 22;
+        canvas.addText(text, {
+          fontSize: size,
+          fontWeight: (action.fontWeight as string) === "bold" ? "bold" : "normal",
+          fill: (action.fill as string) || "#0f172a",
+          textAlign: (action.textAlign as string) || "left",
+        });
+        break;
+      }
+      case "replace_selected_text": {
+        const sel = fc?.getActiveObject?.() ?? canvas.selectedObject;
+        if (sel && typeof sel.set === "function" && "text" in sel) {
+          sel.set({ text });
+          fc?.renderAll?.();
+        } else {
+          canvas.addText(text, { fontSize: 18 });
+        }
+        break;
+      }
+      case "set_background": {
+        const color = String(action.color || "#ffffff");
+        canvas.updatePageSettings({ background: color });
+        fc?.setBackgroundColor?.(color, () => fc.renderAll());
+        setBgColor(color);
+        break;
+      }
+      case "suggest_layout":
+      case "insert_text_at_cursor":
+      default:
+        // layouts are template-choice prompts; cursor ops are writer-only —
+        // degrade gracefully to a text element
+        if (text) canvas.addText(text, { fontSize: 18 });
+        break;
+    }
+  }, [canvas, setBgColor]);
+
 
   // fit the page into the viewport once the canvas is live (Canva-style)
   useEffect(() => {
@@ -312,24 +372,26 @@ export default function CanvasEditor() {
     const fc = (window as any).__activeCanvas;
     if (!fc) { toast.error("Canvas not ready"); return; }
     const multiPageDoc = canvas.toFullJSON() as any;
+    const imgFormat: "png" | "jpeg" = exportJpeg ? "jpeg" : "png";
+    const ext = imgFormat === "jpeg" ? "jpg" : "png";
     setExporting(true);
     try {
-      if (format === "pdf") await exportPDF(fc, `${name}.pdf`, multiPageDoc, dpiScale);
-      else if (format === "zip") await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale);
+      if (format === "pdf") await exportPDF(fc, `${name}.pdf`, multiPageDoc, dpiScale, imgFormat);
+      else if (format === "zip") await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale, undefined, imgFormat);
       else if (format === "png" && (multiPageDoc.pages?.length ?? 0) > 1) {
-        // multi-page designs export as a ZIP of per-page PNGs (a stitched
+        // multi-page designs export as a ZIP of per-page images (a stitched
         // strip is useless for print) — auto-detect, no extra click
-        await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale);
-        toast.success(`Multi-page detected — exported ${multiPageDoc.pages.length} PNGs as ZIP at ${dpiScale}×`);
+        await exportPagesZip(multiPageDoc, `${name}_pages.zip`, dpiScale, undefined, imgFormat);
+        toast.success(`Multi-page detected — exported ${multiPageDoc.pages.length} ${ext.toUpperCase()}s as ZIP at ${dpiScale}×`);
       }
-      else await exportPNG(fc, `${name}.png`, multiPageDoc, dpiScale);
-      toast.success(`Exported at ${dpiScale}× (${Math.round(dpiScale * 96)} DPI)`);
+      else await exportPNG(fc, `${name}.${ext}`, multiPageDoc, dpiScale, imgFormat);
+      toast.success(`Exported at ${dpiScale}× (${Math.round(dpiScale * 96)} DPI, ${imgFormat.toUpperCase()})`);
     } catch (e: any) {
       toast.error(e?.message ?? "Export failed");
     } finally {
       setExporting(false);
     }
-  }, [docName, canvas, exportPDF, exportPNG, exportPagesZip, dpiScale]);
+  }, [docName, canvas, exportPDF, exportPNG, exportPagesZip, dpiScale, exportJpeg]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -739,16 +801,23 @@ export default function CanvasEditor() {
                 <div className="px-2 py-1.5 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">Quality</span>
                   <Select value={String(dpiScale)} onValueChange={(v) => setDpiScale(Number(v))}>
-                    <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {[2, 3, 4, 5, 6].map((s) => {
-                        const label = s >= 5 ? "ultra 4K+" : s >= 4 ? "4K-class" : s === 3 ? "print 300 DPI" : "screen";
+                      {[2, 3.125, 4, 5].map((s) => {
+                        const label = s >= 5 ? "ultra 480 DPI" : s >= 4 ? "384 DPI" : s > 3 ? "print 300 DPI" : "screen 192 DPI";
                         return (
                           <SelectItem key={s} value={String(s)}>
-                            {s}× — {Math.round(s * 96)} DPI ({label}){s === 3 ? " ★" : ""}
+                            {s}× — {label}{s === 3.125 ? " ★" : ""}
                           </SelectItem>
                         );
                       })}
+                    </SelectContent>
+                  </Select>
+                  <Select value={exportJpeg ? "jpeg" : "png"} onValueChange={(v) => setExportJpeg(v === "jpeg")}>
+                    <SelectTrigger className="h-7 w-24 text-xs" title="Image compression — JPEG keeps PDFs small, PNG is lossless"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="jpeg">JPEG · small</SelectItem>
+                      <SelectItem value="png">PNG · lossless</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -759,8 +828,29 @@ export default function CanvasEditor() {
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("pdf")}>PDF — quick (browser)</DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>PNG — current view</DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("zip")}>PNG ZIP — one file per page</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => {
+                  const fc = (window as any).__activeCanvas;
+                  if (!fc) { toast.error("Canvas not ready"); return; }
+                  setExporting(true);
+                  exportPPTX(fc, `${docName.replace(/\s+/g, "_").toLowerCase()}.pptx`, canvas.toFullJSON())
+                    .then(() => toast.success("PowerPoint exported — one slide per page"))
+                    .catch((e: any) => toast.error(e?.message ?? "PPTX export failed"))
+                    .finally(() => setExporting(false));
+                }}>PPTX — PowerPoint slides</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => {
+                  const fc = (window as any).__activeCanvas;
+                  if (!fc) { toast.error("Canvas not ready"); return; }
+                  setExporting(true);
+                  exportSVG(fc, `${docName.replace(/\s+/g, "_").toLowerCase()}.svg`, canvas.toFullJSON())
+                    .then(() => toast.success("SVG exported (vector)"))
+                    .catch((e: any) => toast.error(e?.message ?? "SVG export failed"))
+                    .finally(() => setExporting(false));
+                }}>SVG — vector (editable)</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => saveAsTemplateMutation.mutate()}>Save as school template</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); }}>
+                  <VersionHistoryButton docId={docId} onRestored={() => window.location.reload()} />
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleExport("json")}><FileJson className="h-4 w-4 mr-2" />Save as .aschool-design</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => importFileRef.current?.click()}>Open .aschool-design File</DropdownMenuItem>
@@ -798,6 +888,14 @@ export default function CanvasEditor() {
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActivePanel(activePanel)}><X className="h-3.5 w-3.5" /></Button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+                {activePanel === "explore" && (
+                  <ExplorePanel
+                    onLoadTemplate={(tpl) => loadTemplate(tpl)}
+                    onAddIcon={(svg, color) => canvas.addSVG(svg, {}, color)}
+                    onAddPhoto={(url) => canvas.addImage(url, { width: 260 })}
+                  />
+                )}
 
                 {activePanel === "templates" && (
                   <>
@@ -1043,6 +1141,14 @@ export default function CanvasEditor() {
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAI(false)}><X className="h-3.5 w-3.5" /></Button>
                 </div>
                 <div className="flex-1 overflow-y-auto"><AIAssistPanel canvas={canvas} /></div>
+                <div className="h-80 border-t shrink-0">
+                  <AIChatPanel
+                    mode="designer"
+                    executeAction={executeAgentAction}
+                    getContext={getAgentContext}
+                    onClose={() => setShowAI(false)}
+                  />
+                </div>
               </>
             ) : (
               <>

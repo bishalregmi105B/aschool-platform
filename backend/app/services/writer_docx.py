@@ -147,8 +147,12 @@ def _add_hyperlink(paragraph, url, text):
     paragraph._p.append(hyperlink)
 
 
-def _add_image(paragraph, src, max_width_mm=160):
-    """Inline image from a data URL (PNG/JPEG/GIF/BMP)."""
+def _add_image(paragraph, src, width_px=None, height_px=None, max_width_mm=160):
+    """Inline image from a data URL (PNG/JPEG/GIF/BMP).
+
+    Honors editor-stored dimensions (px @96dpi → mm) when present, capped at
+    ``max_width_mm`` so a full-width photo never overflows the page.
+    """
     m = re.match(r"^data:image/(png|jpe?g|gif|bmp);base64,(.+)$", src or "", re.S | re.I)
     if not m:
         return
@@ -157,7 +161,18 @@ def _add_image(paragraph, src, max_width_mm=160):
     buf = io.BytesIO(data)
     buf.seek(0)
     try:
-        paragraph.add_run().add_picture(buf, width=Mm(max_width_mm))
+        kwargs = {}
+        if width_px:
+            w_mm = float(width_px) * MM_PER_PX
+            if height_px:
+                h_mm = float(height_px) * MM_PER_PX
+                if w_mm > max_width_mm:  # keep aspect when clamping
+                    h_mm = h_mm * max_width_mm / w_mm
+                    w_mm = max_width_mm
+                kwargs = {"width": Mm(w_mm), "height": Mm(h_mm)}
+            else:
+                kwargs = {"width": Mm(min(w_mm, max_width_mm))}
+        paragraph.add_run().add_picture(buf, **kwargs)
     except Exception:  # corrupt image data — skip rather than fail the export
         pass
 
@@ -269,7 +284,8 @@ def _walk_inline(paragraph, node, settings):
         if ctype == "hardBreak":
             paragraph.add_run().add_break()
         elif ctype == "image":
-            _add_image(paragraph, str((child.get("attrs") or {}).get("src") or ""))
+            attrs = child.get("attrs") or {}
+            _add_image(paragraph, str(attrs.get("src") or ""), attrs.get("width"), attrs.get("height"))
         elif child.get("text") is not None:
             marks = child.get("marks") or []
             link = next((m for m in marks if m.get("type") == "link"), None)
@@ -344,8 +360,11 @@ def _render_blocks(doc, blocks, settings, depth=0):
             pPr.append(pBdr)
 
         elif ntype == "image":
+            attrs = node.get("attrs") or {}
             p = doc.add_paragraph()
-            _add_image(p, str((node.get("attrs") or {}).get("src") or ""))
+            if attrs.get("textAlign") in _ALIGN:
+                p.alignment = _ALIGN[attrs["textAlign"]]
+            _add_image(p, str(attrs.get("src") or ""), attrs.get("width"), attrs.get("height"))
 
         elif ntype == "bulletList":
             for li in node.get("content") or []:

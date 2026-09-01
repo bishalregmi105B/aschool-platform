@@ -30,8 +30,20 @@ body { margin: 0; }
 
 
 def wrap_pdf_html(body_html: str, page_size: str = "portrait") -> str:
-    """Full HTML document for WeasyPrint with the font stack + @page rule."""
-    size_rule = "A4 landscape" if page_size == "landscape" else "A4 portrait"
+    """Full HTML document for WeasyPrint with the font stack + @page rule.
+
+    ``page_size`` may be:
+      - "portrait" / "landscape"  → A4 (kept for backwards compatibility)
+      - "A4 portrait", "A3 landscape", "A2 portrait", …  → named paper size
+      - "1191px 1684px" (or any "<w> <h>" pair)   → exact px size, matching
+        the canvas renderer's fixed-px page divs so nothing is clipped and
+        nothing overflows onto extra sheets.
+    """
+    size_rule = page_size if page_size else "A4 portrait"
+    if size_rule == "portrait":
+        size_rule = "A4 portrait"
+    elif size_rule == "landscape":
+        size_rule = "A4 landscape"
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         f"<style>{PDF_BASE_CSS} @page {{ size: {size_rule}; margin: 0; }}</style>"

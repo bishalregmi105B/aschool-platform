@@ -34,6 +34,7 @@ export type DesignerPanel =
   | "background"
   | "data"
   | "layers"
+  | "explore"
   | "brand"
   | null;
 

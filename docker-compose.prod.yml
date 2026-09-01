@@ -20,6 +20,11 @@ services:
       retries: 3
 
   nextjs:
+    # Prefer the registry image built by CI; the build: block is a local
+    # fallback only. `docker compose pull nextjs` + `up -d` deploys the
+    # latest main build instead of recompiling whatever source sits on the
+    # server (a stale checkout was silently shipping the old UI).
+    image: ghcr.io/bishalregmi105b/aschool-platform/frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -44,6 +49,7 @@ services:
       retries: 3
 
   flask:
+    image: ghcr.io/bishalregmi105b/aschool-platform/backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile

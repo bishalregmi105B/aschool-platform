@@ -1,0 +1,124 @@
+{
+  "type": "writer",
+  "config": {
+    "size": "A4",
+    "orientation": "portrait",
+    "font": "Times New Roman",
+    "fontSize": 12
+  },
+  "blocks": [
+    {
+      "type": "header_band",
+      "school": "{school_name}",
+      "subtitle": "{school_address} | Phone: {school_phone}",
+      "tagline": "MINUTES OF THE MEETING",
+      "bg": "#334155",
+      "color": "#ffffff"
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Meeting: ☐ PTA   ☐ Staff   ☐ SMC   ☐ Other: ____________",
+          "align": "left"
+        },
+        {
+          "text": "Date (BS): __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "text": "Venue: ___________________",
+          "align": "left"
+        },
+        {
+          "text": "Start Time: __________",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Attendees (name / role): ____________________________________________________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "paragraph",
+      "text": "Chairperson: ______________________   Minutes recorded by: ______________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Agenda",
+      "align": "left"
+    },
+    {
+      "type": "paragraph",
+      "text": "1. ______________________________   2. ______________________________   3. ______________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "text": "Discussion & Decisions",
+      "align": "left"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "#",
+        "Agenda Item",
+        "Discussion Summary",
+        "Decision / Action (who, when)"
+      ],
+      "rows": [
+        [
+          "1",
+          "",
+          "",
+          ""
+        ],
+        [
+          "2",
+          "",
+          "",
+          ""
+        ],
+        [
+          "3",
+          "",
+          "",
+          ""
+        ],
+        [
+          "4",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "Next meeting date: ____________________________",
+      "align": "left",
+      "fontSize": 11
+    },
+    {
+      "type": "signature",
+      "labels": [
+        "Minutes Prepared By",
+        "Verified By",
+        "Chairperson"
+      ]
+    }
+  ]
+}

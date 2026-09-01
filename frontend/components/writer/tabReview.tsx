@@ -7,6 +7,7 @@
 import React from "react";
 import {
   SpellCheck, Search, FileText, FileOutput, Loader2, Printer, Replace,
+  MessageSquarePlus, GitCompareArrows, CheckCheck, XSquare,
 } from "lucide-react";
 import { RibbonGroup, RBtn, BtnCol } from "@/components/writer/ribbon";
 import type { WriterCtx } from "@/components/writer/context";
@@ -25,6 +26,25 @@ export function ReviewTab({ ctx }: { ctx: WriterCtx }) {
   const { editor, counts } = ctx;
   return (
     <>
+      {/* Comments & tracked changes */}
+      <RibbonGroup label="Comments & Tracking">
+        <div className="flex flex-col gap-0.5 justify-center">
+          <RBtn
+            icon={<GitCompareArrows className="h-4 w-4" />}
+            label={ctx.trackChanges ? "Tracking On" : "Track Changes"}
+            title="Record insertions and deletions (Word-like)"
+            wide
+            active={ctx.trackChanges}
+            onClick={ctx.toggleTrackChanges}
+          />
+          <RBtn icon={<MessageSquarePlus className="h-4 w-4" />} label="New Comment" title="Comment on the selection" onClick={ctx.addCommentOnSelection} />
+        </div>
+        <BtnCol>
+          <RBtn icon={<CheckCheck className="h-4 w-4" />} label="Accept all" title="Accept all tracked changes" onClick={ctx.acceptAllChanges} />
+          <RBtn icon={<XSquare className="h-4 w-4" />} label="Reject all" title="Reject all tracked changes" onClick={ctx.rejectAllChanges} />
+        </BtnCol>
+      </RibbonGroup>
+
       {/* Proofing */}
       <RibbonGroup label="Proofing">
         <div className="flex">

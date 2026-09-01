@@ -58,4 +58,11 @@ export interface WriterCtx {
   exportDocx: () => void;
   exportPdf?: () => void;
   exporting: boolean;
+
+  // review (comments + tracked changes)
+  trackChanges: boolean;
+  toggleTrackChanges: () => void;
+  addCommentOnSelection: () => void;
+  acceptAllChanges: () => void;
+  rejectAllChanges: () => void;
 }
