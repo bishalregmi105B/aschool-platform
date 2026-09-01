@@ -243,11 +243,13 @@ export default function CanvasEditor() {
   }, [templateIdState, docId, allTemplates, canvas, canvas.isReady]);
 
   /** Route a template into the right surface: writer docs open the writer,
-   *  multi-page canvas JSON loads as pages, single-page into the canvas. */
+   *  multi-page canvas JSON loads as pages, single-page into the canvas.
+   *  editor_type is the single source of truth (mirrors the landing page and
+   *  /templates page so a click anywhere routes the same way). */
   const loadTemplate = useCallback((tpl: any) => {
     setDocName(tpl.name);
     setTemplateIdState(tpl.id);
-    if (tpl.editor_type === "writer" && (!tpl.canvas_json || Object.keys(tpl.canvas_json).length === 0)) {
+    if (tpl.editor_type === "writer") {
       // document-style template — belongs in the writer
       router.replace(`/dashboard/designer/writer?template=${tpl.id}`);
       toast.info(`${tpl.name} opens in the Writer`);

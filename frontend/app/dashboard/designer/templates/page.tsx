@@ -118,7 +118,9 @@ function TemplatesContent() {
         <div className="text-center py-16 text-muted-foreground">No templates found.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((t: Template) => (
+          {filtered.map((t: Template) => {
+            const isWriter = t.editor_type === "writer";
+            return (
             <Card key={t.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-[3/4] bg-muted flex items-center justify-center relative">
                 {t.thumbnail_url ? (
@@ -136,17 +138,30 @@ function TemplatesContent() {
                 ) : (
                   <span className="text-muted-foreground text-4xl">{t.thumbnail_emoji || "📄"}</span>
                 )}
+                {/* tool badge — matches the card on the designer home */}
+                <Badge
+                  className={`absolute top-2 right-2 text-[9px] h-4 px-1.5 backdrop-blur-sm border ${
+                    isWriter
+                      ? "bg-violet-50 text-violet-600 border-violet-200"
+                      : "bg-blue-50 text-blue-600 border-blue-200"
+                  }`}
+                >
+                  {isWriter ? "Writer" : "Designer"}
+                </Badge>
               </div>
               <CardContent className="p-4 space-y-2">
                 <h3 className="font-semibold">{t.name}</h3>
                 <Badge variant="secondary">{CATEGORY_LABELS[t.category] || t.category}</Badge>
                 {t.is_default && <Badge className="ml-2">Default</Badge>}
-                <Link href={t.editor_type === "writer" ? `/dashboard/designer/writer?template=${t.id}` : `/dashboard/designer/editor?template=${t.id}`}>
-                  <Button className="w-full mt-2" size="sm">Use Template</Button>
+                <Link href={isWriter ? `/dashboard/designer/writer?template=${t.id}` : `/dashboard/designer/editor?template=${t.id}`}>
+                  <Button className={`w-full mt-2 ${isWriter ? "bg-violet-600 hover:bg-violet-700" : ""}`} size="sm">
+                    Use Template
+                  </Button>
                 </Link>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

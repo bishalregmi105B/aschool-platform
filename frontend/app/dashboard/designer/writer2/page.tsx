@@ -128,6 +128,13 @@ const TOKEN_CSS = `
   display: inline-block; width: 10px; height: 10px; margin-left: 2px;
   border-radius: 50%; background: #f59e0b; cursor: pointer; vertical-align: super;
 }
+
+/* continuous-paper fallback: when a block (e.g. a long table) is taller than
+   one page it flows across boundaries — paint the gaps white so nothing
+   floats on the gray canvas, and mark page starts with a dashed rule */
+.writer-has-tall { background: #ffffff; border-radius: 2px; }
+.writer-has-tall .writer-band { box-shadow: none; outline: 1px solid #e2e8f0; }
+.writer-has-tall .writer-band + .writer-band { border-top: 1px dashed #94a3b8; }
 `;
 
 export default function WriterPage() {
@@ -155,6 +162,7 @@ function WriterContent() {
   const [painter, setPainter] = useState<{ type: string; attrs: Record<string, unknown> }[] | null>(null);
   const [pages, setPages] = useState(1);
   const [stackH, setStackH] = useState(0);
+  const [hasTallBlock, setHasTallBlock] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [counts, setCounts] = useState<WordCounts>({ words: 0, chars: 0, paras: 0, pages: 1, page: 1 });
 
@@ -437,6 +445,7 @@ function WriterContent() {
       applyPagination(editor.view, res.breaks);
       setPages(res.pages);
       setStackH(res.stackH);
+      setHasTallBlock(!!res.hasTallBlock);
       const txt = editor.state.doc.textBetween(0, editor.state.doc.content.size, " ", " ");
       const words = txt.split(/\s+/).filter(Boolean).length;
       setCounts((c) => ({
@@ -859,7 +868,7 @@ function WriterContent() {
           }}
         >
           <div
-            className="relative"
+            className={`relative ${hasTallBlock ? "writer-has-tall" : ""}`}
             style={{
               transform: `scale(${zoomScale})`,
               transformOrigin: "top left",
