@@ -1,12 +1,18 @@
-/** Public Gallery Page — school photos & events */
+/** Public Gallery Page — builder sections first, photo grid as fallback. */
+import { getBuilderPage, hasBuilderSections, BuilderPageSections } from "@/lib/builder-page";
+
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300, tags: [`school-${slug}`] },
-  });
-  if (!res.ok) return null;
-  return (await res.json()).data;
+  try {
+    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
+      next: { revalidate: 300, tags: [`school-${slug}`] },
+    });
+    if (!res.ok) return null;
+    return (await res.json()).data;
+  } catch {
+    return null;
+  }
 }
 
 async function getGallery(slug: string) {
@@ -32,6 +38,12 @@ interface GalleryImage {
 export default async function GalleryPage({ params }: { params: { slug: string } }) {
   const data = await getSchoolData(params.slug);
   if (!data) return <div className="p-8 text-center">School not found</div>;
+
+  // ── Builder-designed Gallery page → same rendering as builder preview ────
+  const builder = await getBuilderPage(params.slug, "gallery");
+  if (hasBuilderSections(builder)) {
+    return <BuilderPageSections slug={params.slug} data={builder!} />;
+  }
 
   const images: GalleryImage[] = await getGallery(params.slug);
 
