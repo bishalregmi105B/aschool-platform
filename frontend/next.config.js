@@ -5,6 +5,26 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["isomorphic-dompurify", "jsdom"],
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // pptxgenjs lazy-imports node:fs / node:https at runtime behind an
+      // isNode guard — never taken in the browser. Stub them so the client
+      // bundle builds; a checked-in empty shim provides the module.
+      const empty = require("path").resolve(__dirname, "src/shims/empty.js");
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "node:fs": empty,
+        "node:https": empty,
+      };
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: empty,
+        https: empty,
+        http: empty,
+      };
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {
