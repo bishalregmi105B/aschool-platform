@@ -28,6 +28,9 @@ export interface PaginationResult {
   breaks: PageBreakSpec[];
   /** total painted height of the band stack (px) */
   stackH: number;
+  /** true when some block is taller than one content page — it will flow
+   *  across page boundaries and needs the continuous-paper fallback */
+  hasTallBlock?: boolean;
 }
 
 export interface PageGeom {
@@ -41,31 +44,46 @@ export interface PageGeom {
  * Walk top-level blocks, decide page pushes. Pure function over the live DOM
  * (heights) + doc (positions), so decorations from a previous pass do not
  * skew results.
+ *
+ * COORDINATE MODEL (important): `y` tracks the ACTUAL flow position inside
+ * the single continuous editor surface — cumulative block heights plus every
+ * spacer inserted so far. y=0 is the surface top, which is page 0's content
+ * origin (marginTop). Page i's content origin in surface coords is
+ *   origin(i) = i*(ph + PAGE_GAP) + marginTop
+ * and its content bottom is origin(i) + pch. Pushing a block inserts a
+ * spacer of (nextOrigin - y) and moves y to nextOrigin, so the model always
+ * equals what the DOM will render. (The previous page-relative model
+ * "forgot" the margin+gap jump each spacer inserted and drifted by ~96px
+ * per pushed page — content visibly floated into the gap between bands.)
  */
 export function computePagination(editor: Editor, geom: PageGeom): PaginationResult {
   const view = editor.view;
   const doc = editor.state.doc;
   const pch = Math.max(100, geom.ph - geom.marginTop - geom.marginBottom);
   const breaks: PageBreakSpec[] = [];
-  let y = 0; // content coordinate of the block cursor
+  let y = 0; // actual flow coordinate (see above)
   let lastBottom = 0;
+  let hasTall = false;
 
   doc.forEach((node, offset) => {
     const el = view.nodeDOM(offset) as HTMLElement | null;
     const h = el && el.nodeType === 1 ? el.offsetHeight || 0 : 0;
-    const band = Math.floor(y / pch);
-    const local = y - band * pch;
-    const blockCanvasTop = band * (geom.ph + PAGE_GAP) + geom.marginTop + local;
-    const nextOrigin = (band + 1) * (geom.ph + PAGE_GAP) + geom.marginTop;
 
     // Floating boxes are absolutely positioned — they take no flow height.
     if (node.type.name === "floatingBox") return;
 
+    // Page containing the current flow position (clamp: y starts at the
+    // page-0 origin, before it floor() would give -1).
+    const p = Math.max(0, Math.floor((y - geom.marginTop) / (geom.ph + PAGE_GAP)));
+    const origin = p * (geom.ph + PAGE_GAP) + geom.marginTop;
+    const contentBottom = origin + pch;
+    const nextOrigin = origin + geom.ph + PAGE_GAP;
+
     if (node.type.name === "pageBreak") {
       const markerH = h || 2;
-      if (local > 4) {
-        breaks.push({ pos: offset, h: Math.max(0, nextOrigin - blockCanvasTop) });
-        y = (band + 1) * pch + markerH;
+      if (y > origin + 4) {
+        breaks.push({ pos: offset, h: Math.max(0, nextOrigin - y) });
+        y = nextOrigin + markerH;
       } else {
         y += markerH;
       }
@@ -73,19 +91,23 @@ export function computePagination(editor: Editor, geom: PageGeom): PaginationRes
       return;
     }
 
-    const crosses = local + h > pch && local > 2 && h <= pch;
+    // A block taller than one content page cannot be split — let it flow
+    // across the boundary (the page shows a continuous-paper fallback).
+    const crosses = y + h > contentBottom && h <= pch;
     if (crosses) {
-      breaks.push({ pos: offset, h: Math.max(0, nextOrigin - blockCanvasTop) });
-      y = (band + 1) * pch + h;
+      breaks.push({ pos: offset, h: Math.max(0, nextOrigin - y) });
+      y = nextOrigin + h;
     } else {
+      if (h > pch) hasTall = true;
       y += h;
     }
     lastBottom = Math.max(lastBottom, y);
   });
 
-  const pages = Math.max(1, Math.floor((lastBottom - 1) / pch) + 1);
+  const lastPage = Math.max(0, Math.floor((lastBottom - geom.marginTop) / (geom.ph + PAGE_GAP)));
+  const pages = Math.max(1, lastPage + 1);
   const stackH = pages * (geom.ph + PAGE_GAP) - PAGE_GAP;
-  return { pages, breaks, stackH };
+  return { pages, breaks, stackH, hasTallBlock: hasTall };
 }
 
 export const paginationKey = new PluginKey< { breaks: PageBreakSpec[] } >("writerPagination");
