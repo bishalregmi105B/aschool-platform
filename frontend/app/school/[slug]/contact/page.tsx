@@ -1,19 +1,30 @@
-/** Public Contact Page — form + OpenStreetMap */
+/** Public Contact Page — builder sections first, form + map as fallback. */
 import { ContactForm } from "./ContactForm";
+import { getBuilderPage, hasBuilderSections, BuilderPageSections } from "@/lib/builder-page";
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300, tags: [`school-${slug}`] },
-  });
-  if (!res.ok) return null;
-  return (await res.json()).data;
+  try {
+    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
+      next: { revalidate: 300, tags: [`school-${slug}`] },
+    });
+    if (!res.ok) return null;
+    return (await res.json()).data;
+  } catch {
+    return null;
+  }
 }
 
 export default async function ContactPage({ params }: { params: { slug: string } }) {
   const data = await getSchoolData(params.slug);
   if (!data) return <div className="p-8 text-center">School not found</div>;
+
+  // ── Builder-designed Contact page → same rendering as builder preview ────
+  const builder = await getBuilderPage(params.slug, "contact");
+  if (hasBuilderSections(builder)) {
+    return <BuilderPageSections slug={params.slug} data={builder!} />;
+  }
 
   const { school } = data;
 

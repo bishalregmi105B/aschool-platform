@@ -1,17 +1,31 @@
-/** Public Academics Page — curriculum overview */
+/** Public Academics Page — builder sections first, classic layout as fallback. */
+import { getBuilderPage, hasBuilderSections, BuilderPageSections } from "@/lib/builder-page";
+
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300, tags: [`school-${slug}`] },
-  });
-  if (!res.ok) return null;
-  return (await res.json()).data;
+  try {
+    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
+      next: { revalidate: 300, tags: [`school-${slug}`] },
+    });
+    if (!res.ok) return null;
+    return (await res.json()).data;
+  } catch {
+    return null;
+  }
 }
 
 export default async function AcademicsPage({ params }: { params: { slug: string } }) {
-  const data = await getSchoolData(params.slug);
+  const [data, builder] = await Promise.all([
+    getSchoolData(params.slug),
+    getBuilderPage(params.slug, "academics"),
+  ]);
   if (!data) return <div className="p-8 text-center">School not found</div>;
+
+  // ── Builder-designed Academics page → same rendering as builder preview ──
+  if (hasBuilderSections(builder)) {
+    return <BuilderPageSections slug={params.slug} data={builder!} />;
+  }
 
   const { school } = data;
 

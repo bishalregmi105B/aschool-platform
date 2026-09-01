@@ -64,6 +64,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Public school sites (/school/*) and subdomain rewrites have no session
+    // and don't need one — skip the /auth/me probe entirely so a 401 here can
+    // never cascade into the api interceptor's refresh→logout→/login flow
+    // (which used to kick anonymous visitors off public pages).
+    if (
+      typeof window !== "undefined" &&
+      (window.location.pathname.startsWith("/school/") ||
+        (!window.location.pathname.startsWith("/dashboard") &&
+          !window.location.pathname.startsWith("/super-admin") &&
+          !window.location.pathname.startsWith("/website-builder")))
+    ) {
+      setIsLoading(false);
+      return;
+    }
     refreshUser().finally(() => setIsLoading(false));
   }, [refreshUser]);
 

@@ -1,19 +1,30 @@
 import { displayBS } from "@/lib/nepali_date";
 import { sanitizeHtml } from "@/lib/sanitize";
-/** Public Notices Page — auto-synced from school management system */
+import { getBuilderPage, hasBuilderSections, BuilderPageSections } from "@/lib/builder-page";
+/** Public Notices Page — builder sections first, auto-synced list as fallback. */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://flask:5000";
 
 async function getSchoolData(slug: string) {
-  const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
-    next: { revalidate: 300, tags: [`school-${slug}`] },
-  });
-  if (!res.ok) return null;
-  return (await res.json()).data;
+  try {
+    const res = await fetch(`${API_URL}/api/v1/website/public/${slug}`, {
+      next: { revalidate: 300, tags: [`school-${slug}`] },
+    });
+    if (!res.ok) return null;
+    return (await res.json()).data;
+  } catch {
+    return null;
+  }
 }
 
 export default async function NoticesPage({ params }: { params: { slug: string } }) {
   const data = await getSchoolData(params.slug);
   if (!data) return <div className="p-8 text-center">School not found</div>;
+
+  // ── Builder-designed Notices page → same rendering as builder preview ────
+  const builder = await getBuilderPage(params.slug, "notices");
+  if (hasBuilderSections(builder)) {
+    return <BuilderPageSections slug={params.slug} data={builder!} />;
+  }
 
   const { school, notices } = data;
 

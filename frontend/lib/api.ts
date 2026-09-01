@@ -63,6 +63,20 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // 401 OUTSIDE authenticated areas (public school sites /school/*, landing
+    // page, marketing routes) just means "not logged in". The AuthProvider
+    // mounts globally, so every public page fires /auth/me — treating that
+    // 401 as a dead session used to run refresh → logout → window.location
+    // and kick anonymous visitors off public pages to /login.
+    const inAuthArea =
+      typeof window !== "undefined" &&
+      ["/dashboard", "/super-admin", "/website-builder"].some((p) =>
+        window.location.pathname.startsWith(p),
+      );
+    if (error.response?.status === 401 && !inAuthArea) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
