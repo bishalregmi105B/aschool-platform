@@ -5,22 +5,21 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["isomorphic-dompurify", "jsdom"],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
       // pptxgenjs lazy-imports node:fs / node:https at runtime behind an
-      // isNode guard — never taken in the browser. Stub them so the client
-      // bundle builds; a checked-in empty shim provides the module.
-      const empty = require("path").resolve(__dirname, "src/shims/empty.js");
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        "node:fs": empty,
-        "node:https": empty,
-      };
+      // isNode guard — never taken in the browser. Webpack 5 cannot resolve
+      // the "node:" scheme at all (aliases don't intercept it), so ignore
+      // those requests entirely: they compile to empty modules and are only
+      // reachable from Node-only code paths.
+      config.plugins.push(
+        new webpack.IgnorePlugin({ resourceRegExp: /^node:(fs|https|http|path|os|crypto)$/ }),
+      );
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        fs: empty,
-        https: empty,
-        http: empty,
+        fs: false,
+        https: false,
+        http: false,
       };
     }
     return config;
