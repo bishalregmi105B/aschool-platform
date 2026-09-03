@@ -212,6 +212,7 @@ export default async function SchoolLayout({
           address={school.address || `${school.municipality}, ${school.district}`}
           primaryColor="var(--color-primary)"
           accentColor="var(--color-accent)"
+          livePages={(data.pages as Array<{ slug: string; title: string; page_type?: string }>) || []}
         />
 
         <main className="flex-1">{children}</main>

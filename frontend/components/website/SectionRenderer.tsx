@@ -85,6 +85,60 @@ export function livePath(liveData: LiveData | undefined, type: string, fallback:
   return `${base}${fallback}`;
 }
 
+
+/** Scheme-allowlisted section CTA link (W-01): CTAs used to be dead <span>s —
+ *  no renderer read any *_link key. Internal paths resolve through livePath
+ *  so renamed pages keep working; only /, https:, mailto:, tel: are allowed. */
+const _SAFE_HREF_RE = /^(\/|https:\/\/|mailto:|tel:)/i;
+
+function SectionCta({
+  label,
+  href,
+  liveData,
+  variant,
+}: {
+  label: string;
+  href: unknown;
+  liveData?: LiveData;
+  variant: "solid" | "outline";
+}) {
+  const raw = str(href ?? "");
+  if (!_SAFE_HREF_RE.test(raw)) return null;
+  const resolved = raw.startsWith("/") ? livePath(liveData, "custom", raw) : raw;
+  const cls =
+    variant === "solid"
+      ? "px-7 py-3 rounded-lg font-semibold shadow-lg"
+      : "px-7 py-3 rounded-lg font-semibold border-2 border-white/70";
+  const style =
+    variant === "solid"
+      ? { backgroundColor: "var(--color-accent, #f59e0b)", color: "#fff" }
+      : undefined;
+  return (
+    <a href={resolved} className={cls} style={style}>
+      {label}
+    </a>
+  );
+}
+
+
+/** W-01 #5: embed_url allowlist — only Google Maps / OpenStreetMap embeds
+ *  render as iframes, sandboxed and lazy; anything else shows the fallback. */
+const _EMBED_URL_RE = /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|www\.openstreetmap\.org\/export\/embed)/i;
+
+function EmbedIframe({ url, title }: { url: string; title: string }) {
+  if (!_EMBED_URL_RE.test(url.trim())) return null;
+  return (
+    <iframe
+      src={url.trim()}
+      className="w-full h-full"
+      loading="lazy"
+      title={title}
+      referrerPolicy="no-referrer-when-downgrade"
+      sandbox="allow-scripts allow-same-origin allow-popups"
+    />
+  );
+}
+
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 function HeroSection({ c }: { c: C }) {
@@ -93,11 +147,13 @@ function HeroSection({ c }: { c: C }) {
   const style = bg
     ? { background: bg }
     : { background: "linear-gradient(135deg, var(--color-primary, #1e3a5f) 0%, var(--color-secondary, #2e6da4) 100%)" };
+  // W-01: the editor's height control was ignored by the renderer
+  const minHeight = cssSize(c.height, "400px");
 
   return (
     <section
-      className="relative min-h-[400px] flex items-center justify-center text-center overflow-hidden"
-      style={{ ...style, color: textColor }}
+      className="relative flex items-center justify-center text-center overflow-hidden"
+      style={{ ...style, color: textColor, minHeight }}
     >
       <div className="absolute top-8 left-8 w-32 h-32 rounded-full bg-white/5 blur-xl pointer-events-none" />
       <div className="absolute bottom-8 right-8 w-48 h-48 rounded-full bg-white/5 blur-xl pointer-events-none" />
@@ -108,25 +164,18 @@ function HeroSection({ c }: { c: C }) {
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 leading-tight" style={{ fontFamily: "var(--font-heading)" }}>
           {str(c.heading, "School Name")}
         </h1>
-        {c.subheading && (
-          <p className="text-lg sm:text-xl opacity-85 mb-6 max-w-xl mx-auto">{str(c.subheading)}</p>
+        {str(c.subheading ?? c.subtitle) && (
+          <p className="text-lg sm:text-xl opacity-85 mb-6 max-w-xl mx-auto">{str(c.subheading ?? c.subtitle)}</p>
         )}
         {bool(c.show_location) && (
           <p className="text-sm opacity-60 mb-6">📍 Location, District</p>
         )}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           {c.cta_primary && (
-            <span
-              className="px-7 py-3 rounded-lg font-semibold shadow-lg"
-              style={{ backgroundColor: "var(--color-accent, #f59e0b)", color: "#fff" }}
-            >
-              {str(c.cta_primary)}
-            </span>
+            <SectionCta label={str(c.cta_primary)} href={c.cta_primary_link} liveData={undefined} variant="solid" />
           )}
           {c.cta_secondary && (
-            <span className="px-7 py-3 rounded-lg font-semibold border-2 border-white/70">
-              {str(c.cta_secondary)}
-            </span>
+            <SectionCta label={str(c.cta_secondary)} href={c.cta_secondary_link} liveData={undefined} variant="outline" />
           )}
         </div>
       </div>
@@ -267,7 +316,7 @@ function PrincipalSection({ c }: { c: C }) {
               </div>
               <div>
                 <blockquote className="text-gray-600 text-sm leading-relaxed italic mb-4 border-l-4 pl-4" style={{ borderColor: "var(--color-accent, #f59e0b)" }}>
-                  &ldquo;{str(c.message, "Education is not the filling of a pail, but the lighting of a fire.")}&rdquo;
+                  &ldquo;{str(c.message ?? c.quote, "Education is not the filling of a pail, but the lighting of a fire.")}&rdquo;
                 </blockquote>
                 <p className="font-bold text-sm" style={{ color: "var(--color-primary, #1e3a5f)" }}>{str(c.name, "Principal Name")}</p>
                 {c.designation && <p className="text-xs text-gray-500">{str(c.designation)}</p>}
@@ -283,7 +332,7 @@ function PrincipalSection({ c }: { c: C }) {
 // ─── Programs ─────────────────────────────────────────────────────────────────
 
 function ProgramsSection({ c }: { c: C }) {
-  const items = arr<{ icon: string; name: string; desc: string; grade?: string }>(c.items);
+  const items = arr<{ icon: string; name?: string; title?: string; desc: string; grade?: string }>(c.items);
   const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
   const display = (items.length > 0 ? items : [
     { icon: "📚", name: "Primary Level", desc: "Grades 1–5, strong foundations", grade: "1–5" },
@@ -328,7 +377,7 @@ function ProgramsSection({ c }: { c: C }) {
 // ─── Facilities ───────────────────────────────────────────────────────────────
 
 function FacilitiesSection({ c }: { c: C }) {
-  const items = arr<{ icon: string; name: string; desc: string }>(c.items);
+  const items = arr<{ icon: string; name?: string; title?: string; desc?: string; description?: string; subtitle?: string }>(c.items);
   const maxItems = Math.min(12, Math.max(1, int(c.max_items, 6)));
   const display = (items.length > 0 ? items : [
     { icon: "🖥️", name: "Computer Lab", desc: "Modern computers with high-speed internet" },
@@ -361,8 +410,8 @@ function FacilitiesSection({ c }: { c: C }) {
                 {item.icon}
               </div>
               <div>
-                <h3 className="font-bold mb-1" style={{ color: "var(--color-primary, #1e3a5f)" }}>{item.name}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+                <h3 className="font-bold mb-1" style={{ color: "var(--color-primary, #1e3a5f)" }}>{item.name ?? item.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{item.desc ?? item.description ?? item.subtitle}</p>
               </div>
             </div>
           ))}
@@ -612,7 +661,7 @@ function TestimonialsSection({ c }: { c: C }) {
 
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 
-function CTASection({ c }: { c: C }) {
+function CTASection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const bg = str(c.bg_color, "var(--color-primary, #1e3a5f)");
   const textColor = str(c.text_color, "#ffffff");
 
@@ -627,17 +676,10 @@ function CTASection({ c }: { c: C }) {
         )}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           {c.cta_primary && (
-            <span
-              className="inline-block px-8 py-3 rounded-lg font-semibold text-white"
-              style={{ backgroundColor: "var(--color-accent, #f59e0b)" }}
-            >
-              {str(c.cta_primary)}
-            </span>
+            <SectionCta label={str(c.cta_primary)} href={c.cta_primary_link ?? "/admission"} liveData={liveData} variant="solid" />
           )}
           {c.cta_secondary && (
-            <span className="inline-block px-8 py-3 rounded-lg font-semibold border-2 border-white/60">
-              {str(c.cta_secondary)}
-            </span>
+            <SectionCta label={str(c.cta_secondary)} href={c.cta_secondary_link ?? "/contact"} liveData={liveData} variant="outline" />
           )}
         </div>
       </div>
@@ -830,7 +872,7 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
             <div>
               <div className="rounded-xl overflow-hidden bg-gray-100 h-56 flex items-center justify-center text-gray-400 border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
                 {str(c.embed_url) ? (
-                  <iframe src={str(c.embed_url)} className="w-full h-full" loading="lazy" title="Map" />
+                  <EmbedIframe url={str(c.embed_url)} title="Map" />
                 ) : (
                   <div className="text-center"><p className="text-3xl mb-1">🗺️</p><p className="text-xs">Add a Map Embed URL in the properties panel</p></div>
                 )}
@@ -880,7 +922,7 @@ function MapSection({ c }: { c: C }) {
         )}
         <div className="rounded-xl overflow-hidden bg-gray-100 h-64 flex items-center justify-center text-gray-400 border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
           {c.embed_url ? (
-            <iframe src={str(c.embed_url)} className="w-full h-full" loading="lazy" />
+            <EmbedIframe url={str(c.embed_url)} title="Map" />
           ) : (
             <div className="text-center">
               <p className="text-4xl mb-2">🗺️</p>
@@ -956,7 +998,7 @@ export function SectionRenderer({ section, liveData }: { section: SchoolSection;
     case "results":
       return <ResultsSection c={c} liveData={liveData} />;
     case "cta":
-      return <CTASection c={c} />;
+      return <CTASection c={c} liveData={liveData} />;
     case "contact":
       return <ContactSection c={c} liveData={liveData} />;
     case "spacer":
