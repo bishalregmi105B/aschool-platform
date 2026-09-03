@@ -843,42 +843,33 @@ class BulkGeneratorService:
 
         return items
 
-    # ── NEB Grading helpers ──────────────────────────────────────────────────
+    # ── NEB Grading helpers — ONE source of truth (N-02) ────────────────────
+    # The duplicated scale here drifted from app/utils/nepal_grading.py; every
+    # grade now flows through the shared util so report cards, marksheets and
+    # the exams API can never disagree.
     @staticmethod
     def _neb_grade(obtained: float, full: float) -> str:
+        from app.utils.nepal_grading import calculate_grade
+
         if not full:
             return "NG"
-        pct = obtained / full * 100
-        if pct >= 90: return "A+"
-        if pct >= 80: return "A"
-        if pct >= 70: return "B+"
-        if pct >= 60: return "B"
-        if pct >= 50: return "C+"
-        if pct >= 40: return "C"
-        if pct >= 35: return "D"
-        return "NG"
+        return calculate_grade(obtained / full * 100)["grade"]
 
     @staticmethod
     def _neb_gpa(obtained: float, full: float) -> float:
+        from app.utils.nepal_grading import calculate_grade
+
         if not full:
             return 0.0
-        pct = obtained / full * 100
-        if pct >= 90: return 4.0
-        if pct >= 80: return 3.6
-        if pct >= 70: return 3.2
-        if pct >= 60: return 2.8
-        if pct >= 50: return 2.4
-        if pct >= 40: return 2.0
-        if pct >= 35: return 1.6
-        return 0.0
+        return float(calculate_grade(obtained / full * 100)["gpa"])
 
     @staticmethod
     def _neb_grade_from_gpa(gpa: float) -> str:
-        if gpa >= 3.9: return "A+"
-        if gpa >= 3.5: return "A"
-        if gpa >= 3.1: return "B+"
-        if gpa >= 2.7: return "B"
-        if gpa >= 2.3: return "C+"
-        if gpa >= 1.9: return "C"
-        if gpa >= 1.5: return "D"
-        return "NG"
+        from app.utils.nepal_grading import NEB_GRADES
+
+        best = "NG"
+        for min_pct, grade, gpa_val, _desc in NEB_GRADES:
+            if gpa + 1e-9 >= gpa_val:
+                best = grade
+                break
+        return best

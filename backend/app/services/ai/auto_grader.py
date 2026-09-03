@@ -68,7 +68,7 @@ Be fair, constructive, and specific. Consider Nepal curriculum standards."""
             messages=[{"role": "user", "content": prompt}],
             model="smart",  # quality tier (sonnet-class model via hub routing)
             max_tokens=1500,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.2,  # A-02 temperature discipline (was 1.0)
             metadata={"subject": subject, "grade_level": grade_level},
         )["text"]
 

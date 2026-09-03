@@ -237,21 +237,36 @@ function rankInSection(section: string | null, slug: string): number {
 
 
 // ── Helper — convert a PluginSidebarItem to NavItem ───────────────────────
+// N-01: the manifests carry label_nepali for all 155 nav items; the backend
+// already transmits them — they were simply never read. Nepali shows when
+// the user's preferred_language is "ne" (the product default).
+function pickLabel(english: string, nepali?: string | null): string {
+  const lang =
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("preferred_language") ||
+        localStorage.getItem("lang"))) ||
+    "ne";
+  return lang === "ne" && nepali ? nepali : english;
+}
+
 function pluginToNavItem(item: PluginSidebarItem): NavItem {
   const icon = resolveIcon(item.icon);
   if (item.subitems && item.subitems.length > 0) {
     return {
-      label: item.label,
+      label: pickLabel(item.label, item.label_nepali),
       icon,
       pluginSlug: item.slug,
       children: item.subitems.map((sub) => ({
-        label: sub.label,
+        label: pickLabel(
+          sub.label,
+          (sub as unknown as { label_nepali?: string | null }).label_nepali
+        ),
         href: sub.route,
       })),
     };
   }
   return {
-    label: item.label,
+    label: pickLabel(item.label, item.label_nepali),
     icon,
     href: item.route,
     pluginSlug: item.slug,

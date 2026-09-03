@@ -80,7 +80,7 @@ Align with Nepal's CDC curriculum framework. Include practical, locally relevant
             messages=[{"role": "user", "content": prompt}],
             model="smart",  # quality tier (sonnet-class model via hub routing)
             max_tokens=2048,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.4,  # A-02 temperature discipline (was 1.0)
             metadata={"subject": subject, "grade": grade, "language": language},
         )["text"]
 

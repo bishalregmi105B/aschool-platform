@@ -68,7 +68,7 @@ Respond in JSON:
             messages=messages,
             model="fast",  # haiku-class model via hub routing
             max_tokens=800,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.4,  # A-02 temperature discipline (was 1.0)
             metadata={"subject": subject, "grade_level": grade_level},
         )["text"]
 

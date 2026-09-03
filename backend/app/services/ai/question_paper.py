@@ -93,7 +93,7 @@ Return a JSON object:
             messages=[{"role": "user", "content": prompt}],
             model="smart",  # quality tier (sonnet-class model via hub routing)
             max_tokens=4096,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.2,  # A-02 temperature discipline (was 1.0)
             metadata={"subject": subject, "grade": grade, "difficulty": difficulty},
         )["text"]
 
@@ -138,7 +138,7 @@ Be specific about strengths/areas for improvement. Appropriate for Nepal school 
             messages=[{"role": "user", "content": prompt}],
             model="fast",  # haiku-class model via hub routing
             max_tokens=200,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.2,  # A-02 temperature discipline (was 1.0)
             metadata={"student_name": student_name},
         )["text"]
         return text.strip()

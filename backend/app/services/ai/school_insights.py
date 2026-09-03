@@ -116,7 +116,7 @@ Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
             messages=[{"role": "user", "content": prompt}],
             model="fast",  # haiku-class model via hub routing
             max_tokens=1024,
-            temperature=1.0,  # matches the previous direct Anthropic default
+            temperature=0.4,  # A-02 temperature discipline (was 1.0)
             metadata={"school_id": str(school_id)},
         )["text"]
 
