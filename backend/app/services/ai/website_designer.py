@@ -83,7 +83,7 @@ Respond ONLY with a JSON object: {{"variations": [...]}}"""
                 messages=[{"role": "user", "content": prompt}],
                 model="smart",  # quality tier (sonnet-class model via hub routing)
                 max_tokens=2000,
-                temperature=1.0,  # matches the previous direct Anthropic default
+                temperature=0.4,  # A-02 temperature discipline (was 1.0)
                 metadata={"school_name": school_name, "style_preference": style_preference},
             )["text"]
             text = text.strip()
@@ -145,7 +145,7 @@ Return ONLY a JSON: {{
                 messages=[{"role": "user", "content": prompt}],
                 model="smart",  # quality tier (sonnet-class model via hub routing)
                 max_tokens=3000,
-                temperature=1.0,  # matches the previous direct Anthropic default
+                temperature=0.4,  # A-02 temperature discipline (was 1.0)
                 metadata={"school_name": school_name},
             )["text"]
             text = text.strip()
