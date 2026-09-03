@@ -49,7 +49,9 @@ services:
 
   celery-worker:
     build: ./backend
-    command: celery -A app.celery_app worker -l info -Q default,ai,notifications,gps -c 4
+    # -Q includes "celery": transition queue for unnamed tasks until
+    # every client publishes with task_routes (P-01a)
+    command: celery -A app.celery_app worker -l info -Q default,celery,ai,notifications,gps -c 4
     volumes:
       - ./backend:/app
       - uploads_data:/app/uploads
@@ -68,10 +70,13 @@ services:
 
   celery-beat:
     build: ./backend
-    command: celery -A app.celery_app beat -l info
+    command: celery -A app.celery_app beat -l info --schedule /app/celerybeat-schedule
     volumes:
       - ./backend:/app
       - uploads_data:/app/uploads
+      # P-01(d): the beat schedule state was a file inside the container —
+      # lost on restart, re-firing every schedule mid-window.
+      - celerybeat_data:/app/celerybeat-schedule
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-aschool}:${POSTGRES_PASSWORD:-aschool}@postgres:5432/aschool
       - REDIS_URL=redis://redis:6379/0
@@ -103,3 +108,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  celerybeat_data:

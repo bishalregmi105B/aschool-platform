@@ -27,10 +27,38 @@ def _default_celery_result_backend() -> str:
     return broker
 
 
+def _env(name: str, fallback: str) -> str:
+    """Secrets resolver — no published literal fallbacks outside dev/test (S-03).
+
+    - development/testing keep their well-known fallback so local boot and
+      the test suite stay deterministic.
+    - any other environment with an EMPTY secret gets a per-process random
+      value plus a loud warning: running on a known key is worse than a
+      rotated one. Set the variable explicitly for a stable signature.
+    """
+    value = os.getenv(name, "")
+    if value:
+        return value
+    env = os.getenv("FLASK_ENV", "development")
+    if env in ("development", "testing"):
+        return fallback
+    logger.warning(
+        "PRODUCTION CONFIG WARNING: %s is not set — a per-process random "
+        "secret was generated. Signatures will not survive restarts or be "
+        "shared across workers. Set %s explicitly.",
+        name,
+        name,
+    )
+    return secrets.token_urlsafe(48)
+
+
 class BaseConfig:
     """Base configuration shared by all environments."""
 
-    SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
+    # ENV is mirrored into config so runtime code can branch on it without
+    # reaching for os.getenv (Flask 3 does not define app.config["ENV"];
+    # S-04 cookie Secure depends on this key).
+    SECRET_KEY = _env("SECRET_KEY", "change-me")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JSON_ENSURE_ASCII = False  # Return Nepali/Unicode text as-is, not \uXXXX escapes
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -40,7 +68,7 @@ class BaseConfig:
     }
 
     # JWT
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-jwt")
+    JWT_SECRET_KEY = _env("JWT_SECRET_KEY", "change-me-jwt")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
     )
@@ -53,7 +81,7 @@ class BaseConfig:
     JWT_TOKEN_LOCATION = ["headers", "cookies"]
     JWT_ACCESS_COOKIE_NAME = "access_token"
     JWT_REFRESH_COOKIE_NAME = "refresh_token"
-    JWT_COOKIE_SECURE = False  # dev uses http; cookie's own Secure flag controls prod
+    JWT_COOKIE_SECURE = False  # create_app mirrors ENV: Secure in production only (S-04)
     JWT_COOKIE_SAMESITE = "Lax"
     JWT_COOKIE_CSRF_PROTECT = False  # cookies are first-party; SameSite=Lax is enough
 
@@ -90,7 +118,17 @@ class BaseConfig:
     # AI Token Hub settings
     AI_DEFAULT_DAILY_LIMIT = int(os.getenv("AI_DEFAULT_DAILY_LIMIT", "10000"))
     AI_DEFAULT_MONTHLY_LIMIT = int(os.getenv("AI_DEFAULT_MONTHLY_LIMIT", "100000"))
-    AI_QUOTA_ENFORCEMENT = os.getenv("AI_QUOTA_ENFORCEMENT", "true").lower() == "true"
+    # A-01: parse strictly — "1"/"0" previously fell through to True,
+    # silently disabling all cost control when the operator meant off.
+    AI_QUOTA_ENFORCEMENT = os.getenv("AI_QUOTA_ENFORCEMENT", "true").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+    # A-01: provider call hygiene (declared-but-never-read before)
+    AI_TIMEOUT_FAST = int(os.getenv("AI_TIMEOUT_FAST", "30"))
+    AI_TIMEOUT_QUALITY = int(os.getenv("AI_TIMEOUT_QUALITY", "90"))
+    AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "2"))
+    # A-01: USD per 1M tokens price sheet override (JSON: provider:model:[p,c])
+    AI_MODEL_PRICES_JSON = os.getenv("AI_MODEL_PRICES_JSON", "")
 
     # Nepal SMS
     SPARROW_SMS_TOKEN = os.getenv("SPARROW_SMS_TOKEN", "")
@@ -171,6 +209,7 @@ class BaseConfig:
 
 
 class DevelopmentConfig(BaseConfig):
+    ENV = "development"
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL", "postgresql://aschool:aschool@localhost:5432/aschool"
@@ -178,6 +217,7 @@ class DevelopmentConfig(BaseConfig):
 
 
 class TestingConfig(BaseConfig):
+    ENV = "testing"
     TESTING = True
     _base_db_url = os.getenv(
         "DATABASE_URL", "postgresql://aschool:aschool@localhost:5432/aschool"
@@ -190,37 +230,112 @@ class TestingConfig(BaseConfig):
 
 
 class ProductionConfig(BaseConfig):
+    ENV = "production"
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     RATELIMIT_DEFAULT = "60/minute"
 
+    # Signing secret for the WhatsApp Cloud API webhook — without it the
+    # X-Hub-Signature-256 check cannot run and the webhook fails open (IN-4).
+    WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
+
+    # Stripe is "enabled" for validation purposes when an account key is
+    # configured; then the webhook signing secret must exist too.
+    STRIPE_ENABLED = bool(os.getenv("STRIPE_SECRET_KEY", ""))
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
+
+    @staticmethod
+    def _env_example_values() -> dict:
+        """KEY=VALUE pairs from the repo-root .env.example (S-03): booting
+        production with a published placeholder must fail loudly."""
+        from pathlib import Path
+
+        example = Path(__file__).resolve().parent.parent / ".env.example"
+        values = {}
+        if example.exists():
+            for line in example.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                values[key.strip()] = val.strip().strip('"').strip("'")
+        return values
 
     @classmethod
     def validate(cls):
         """Validate production configuration — fail loudly for insecure defaults."""
-        insecure_defaults = {"change-me", "change-me-jwt", ""}
-        if cls.SECRET_KEY in insecure_defaults:
-            raise RuntimeError(
-                "FATAL: SECRET_KEY is using an insecure default. "
-                "Set a strong SECRET_KEY in environment variables."
-            )
-        if cls.JWT_SECRET_KEY in insecure_defaults:
-            raise RuntimeError(
-                "FATAL: JWT_SECRET_KEY is using an insecure default. "
-                "Set a strong JWT_SECRET_KEY in environment variables."
-            )
+        # (a) secrets: strong and not a published placeholder
+        example_values = cls._env_example_values()
+        for name in ("SECRET_KEY", "JWT_SECRET_KEY"):
+            value = getattr(cls, name) or ""
+            if not value or value in example_values.values():
+                raise RuntimeError(
+                    f"FATAL: {name} is empty or uses a published placeholder. "
+                    "Set a strong per-environment secret."
+                )
+            if len(value) < 32:
+                raise RuntimeError(
+                    f"FATAL: {name} must be at least 32 characters for production."
+                )
         if not cls.SQLALCHEMY_DATABASE_URI:
             raise RuntimeError(
                 "FATAL: DATABASE_URL is not set for production."
+            )
+        # (b) revalidation secret: an unset secret lets anyone purge the
+        # Next.js caches by POSTing to /api/revalidate.
+        if not os.getenv("ISR_REVALIDATE_SECRET", ""):
+            raise RuntimeError(
+                "FATAL: ISR_REVALIDATE_SECRET is not set for production — "
+                "on-demand cache revalidation would be unauthenticated."
+            )
+        # (c) compose-level credentials: the app container usually does not
+        # receive these (they belong to postgres/flower services), so they
+        # are loud warnings rather than boot-fatal.
+        for name in ("POSTGRES_PASSWORD", "FLOWER_PASSWORD"):
+            if not os.getenv(name, ""):
+                logger.warning(
+                    "PRODUCTION CONFIG WARNING: %s is not visible to the app "
+                    "process — ensure it is set for the %s service.",
+                    name,
+                    "postgres" if name == "POSTGRES_PASSWORD" else "flower",
+                )
+        # (d) conditional requirements
+        if cls.STRIPE_ENABLED and not cls.STRIPE_WEBHOOK_SECRET:
+            raise RuntimeError(
+                "FATAL: STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is "
+                "empty — subscription webhooks cannot be verified."
+            )
+        if (os.getenv("FILE_STORAGE_BACKEND", "local") == "r2"):
+            missing = [
+                name
+                for name in (
+                    "R2_ACCOUNT_ID",
+                    "R2_ACCESS_KEY_ID",
+                    "R2_SECRET_ACCESS_KEY",
+                    "R2_BUCKET_NAME",
+                    "R2_PUBLIC_URL",
+                )
+                if not os.getenv(name, "")
+            ]
+            if missing:
+                raise RuntimeError(
+                    f"FATAL: FILE_STORAGE_BACKEND=r2 but {', '.join(missing)} "
+                    "are not set."
+                )
+        if os.getenv("WHATSAPP_ACCESS_TOKEN", "") and not cls.WHATSAPP_APP_SECRET:
+            raise RuntimeError(
+                "FATAL: WHATSAPP_ACCESS_TOKEN is set but WHATSAPP_APP_SECRET "
+                "is empty — the WhatsApp webhook would accept unsigned "
+                "requests (IN-4)."
             )
         # OTP logins are the primary auth path for parents/students — a
         # missing SMS provider would silently break all of them.
         sparrow_token = os.getenv("SPARROW_SMS_TOKEN", "")
         if (
             not sparrow_token
-            or sparrow_token in insecure_defaults
+            or sparrow_token in example_values.values()
             or str(os.getenv("SMS_CONSOLE_MODE", "")).lower() in ("1", "true", "yes")
         ):
             raise RuntimeError(

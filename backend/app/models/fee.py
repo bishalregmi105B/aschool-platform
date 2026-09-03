@@ -5,10 +5,12 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -56,6 +58,9 @@ class FeeCollection(SchoolModel):
             "fonepay",
             "bank",
             "cheque",
+            # DB enum gained qr_pay in e4f5a6b7c8d9 — the model must match or
+            # reading a qr_pay row raises LookupError (D-01).
+            "qr_pay",
             name="payment_method",
         )
     )
@@ -67,11 +72,20 @@ class FeeCollection(SchoolModel):
     discount_amount = Column(Numeric(10, 2), default=0)
     is_scholarship = Column(Boolean, default=False)
     payment_status = Column(
-        Enum("paid", "pending", "partial", "waived", name="payment_status"),
+        # 'refunded' added by migration f8c2a9d4e1b7 (S-13): the refund path
+        # sets this status; without the enum value the commit raised DataError
+        # AFTER the gateway had already moved the money.
+        Enum(
+            "paid", "pending", "partial", "waived", "refunded",
+            name="payment_status",
+        ),
         default="pending",
     )
     notes = Column(Text)
     receipt_url = Column(Text)
+    # P-01(c): reminder dedupe — beat restarts/retries must not spam
+    # guardians; send_fee_reminders skips fees reminded within 72h.
+    last_reminder_sent_at = Column(DateTime)
 
     student = relationship("Student", backref="fee_collections")
     collected_by = relationship("User")
@@ -84,6 +98,8 @@ class FeeReceipt(SchoolModel):
         UUID(as_uuid=True), ForeignKey("fee_collections.id"), nullable=False
     )
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    # D-05 expand: year anchor from the student (contract phase NOT NULL)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
     receipt_number = Column(String(50), nullable=False)
     amount = Column(Numeric(10, 2), default=0)
     payment_method = Column(String(50))
@@ -97,6 +113,43 @@ class FeeReceipt(SchoolModel):
 
     collection = relationship("FeeCollection", backref="receipt")
     student = relationship("Student", backref="fee_receipts")
+
+    __table_args__ = (
+        # D-02: receipt numbers are a per-school series — a duplicate breaks
+        # the IRD-expected ordering and the books. Mirrors migration a9b3e7c1d5f8.
+        Index(
+            "uq_fee_receipts_school_receipt_number",
+            "school_id", "receipt_number",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+
+class FeeRefund(SchoolModel):
+    """A refunded fee payment (S-13) — written in the SAME transaction as the
+    collection status change, before the gateway call's money movement is
+    acknowledged. The refund story lives in the ledger, not in a parseable
+    substring of FeeCollection.notes."""
+
+    __tablename__ = "fee_refunds"
+
+    collection_id = Column(
+        UUID(as_uuid=True), ForeignKey("fee_collections.id"), nullable=False, index=True
+    )
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    reason = Column(String(255), nullable=False)
+    gateway = Column(String(50))            # khalti / esewa / ...
+    gateway_ref = Column(String(200))       # gateway refund transaction id
+    approved_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    status = Column(
+        Enum("initiated", "completed", "failed", name="refund_status"),
+        default="initiated",
+    )
+
+    collection = relationship("FeeCollection", backref="refunds")
+    approved_by = relationship("User")
 
 
 class PaymentInitiation(SchoolModel):
@@ -141,7 +194,9 @@ class StudentScholarship(SchoolModel):
     """
     __tablename__ = "student_scholarships"
 
-    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    student_id = Column(
+        UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
     fee_type = Column(String(100))          # null = all types
     discount_type = Column(String(10), default="percent")   # "percent" | "fixed"
     discount_value = Column(Numeric(10, 2), default=0)

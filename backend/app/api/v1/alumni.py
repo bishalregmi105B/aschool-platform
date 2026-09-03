@@ -1,5 +1,5 @@
 """Alumni Network API — directory, events, donations."""
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
@@ -230,7 +230,7 @@ def create_donation():
                 "transaction_ref", "receipt_url", "status"):
         if key in data:
             setattr(donation, key, data[key])
-    donation.donated_at = _parse_datetime(data.get("donated_at")) or datetime.utcnow()
+    donation.donated_at = _parse_datetime(data.get("donated_at")) or datetime.now(timezone.utc).replace(tzinfo=None)
     db.session.add(donation)
     db.session.commit()
     return created_response(_donation_dict(donation))

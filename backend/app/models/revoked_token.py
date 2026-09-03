@@ -24,11 +24,20 @@ class RevokedToken(BaseModel):
     # 'access' or 'refresh'
     token_type = Column(String(10), nullable=False, default="access")
     # When this revocation entry can be safely pruned (matches token expiry)
+    # Naive UTC — TIMESTAMP WITHOUT TIME ZONE: comparing against an aware
+    # datetime shifts with the session timezone (S-05).
     expires_at = Column(DateTime, nullable=False)
 
     __table_args__ = (
         Index("ix_revoked_tokens_expires_at", "expires_at"),
     )
+
+    @staticmethod
+    def _naive_utc(dt: datetime) -> datetime:
+        """Normalize aware datetimes to naive UTC for storage/comparison."""
+        if dt.tzinfo is None:
+            return dt
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
     @classmethod
     def revoke(cls, jti: str, token_type: str = "access", expires_at: datetime | None = None) -> None:
@@ -37,9 +46,13 @@ class RevokedToken(BaseModel):
             from flask import current_app
             from datetime import timedelta
             delta = current_app.config.get("JWT_ACCESS_TOKEN_EXPIRES", timedelta(hours=1))
-            expires_at = datetime.now(timezone.utc) + delta
-
-        entry = cls(jti=jti, token_type=token_type, expires_at=expires_at)
+            seconds = delta.total_seconds() if hasattr(delta, "total_seconds") else int(delta)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+        entry = cls(
+            jti=jti,
+            token_type=token_type,
+            expires_at=cls._naive_utc(expires_at),
+        )
         db.session.add(entry)
         db.session.commit()
 
@@ -49,13 +62,15 @@ class RevokedToken(BaseModel):
         return db.session.query(
             cls.query.filter(
                 cls.jti == jti,
-                cls.expires_at > datetime.now(timezone.utc),
+                cls.expires_at > cls._naive_utc(datetime.now(timezone.utc)),
             ).exists()
         ).scalar()
 
     @classmethod
     def prune_expired(cls) -> int:
         """Delete entries whose token has already expired. Call periodically."""
-        deleted = cls.query.filter(cls.expires_at <= datetime.now(timezone.utc)).delete()
+        deleted = cls.query.filter(
+            cls.expires_at <= cls._naive_utc(datetime.now(timezone.utc))
+        ).delete()
         db.session.commit()
         return deleted

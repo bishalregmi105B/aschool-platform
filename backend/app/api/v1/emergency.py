@@ -1,6 +1,6 @@
 """Emergency Management API — alerts, evacuation plans, headcount."""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
@@ -47,7 +47,7 @@ def trigger_alert():
     alert = EmergencyAlert(
         school_id=g.school_id,
         triggered_by_id=claims.get("sub"),
-        triggered_at=datetime.utcnow(),
+        triggered_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     for key in ("alert_type", "title", "description"):
         if key in data:
@@ -83,7 +83,7 @@ def resolve_alert(alert_id):
     if data.get("status") and data["status"] not in valid_status:
         return error_response(f"status must be one of: {', '.join(sorted(valid_status))}", 400)
     alert.status = data.get("status") or "resolved"
-    alert.resolved_at = datetime.utcnow()
+    alert.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.session.commit()
     return success_response(_alert_dict(alert))
 
@@ -202,7 +202,7 @@ def submit_headcount(alert_id):
         school_id=g.school_id,
         alert_id=alert_id,
         submitted_by_id=claims.get("sub"),
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     for key in ("class_id", "section_id", "total_expected", "total_present", "missing_student_ids"):
         if key in data:

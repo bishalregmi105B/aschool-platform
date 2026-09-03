@@ -17,7 +17,6 @@ class WebsitePage(SchoolModel):
     content = Column(JSONB, default=dict)  # Craft.js serialized
     sections = Column(JSONB, default=list)  # [{slug, category, settings, data}]
     is_published = Column(Boolean, default=False)
-    is_deleted = Column(Boolean, default=False)
     sort_order = Column(Integer, default=0)
     page_type = Column(String(50))  # home, about, contact, gallery, custom
     meta_title = Column(String(200))

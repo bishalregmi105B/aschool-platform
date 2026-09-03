@@ -504,28 +504,25 @@ def test_exam_marks_entry_guards_fail_batch_before_write(client, db, school, aca
 def test_exam_marks_entry_mid_batch_failure_leaves_no_partial_rows(
     client, db, school, app, acad_setup
 ):
-    """Numeric(6,2) overflow on record 2 raises during the batch — the single
-    commit means the whole batch rolls back: zero partial marks rows."""
+    """B-01 now rejects marks over full marks with a 400 BEFORE any write
+    (previously a Numeric(6,2) overflow 500'd mid-commit). Either way the
+    guarantee under test holds: the failure leaves zero partial rows."""
     s = acad_setup
     h = s["headers"]
     exam_id = _create_exam(client, h, s)
 
-    old_propagate = app.config.get("PROPAGATE_EXCEPTIONS")
-    app.config["PROPAGATE_EXCEPTIONS"] = False
-    try:
-        resp = client.post(
-            f"/api/v1/exams/{exam_id}/marks",
-            json={
-                "marks": [
-                    {"student_id": str(s["s3"].id), "subject_id": str(s["subject"].id), "theory_marks": 55},
-                    {"student_id": str(s["s1"].id), "subject_id": str(s["subject"].id), "theory_marks": 100000},
-                ],
-            },
-            headers=h,
-        )
-        assert resp.status_code == 500
-    finally:
-        app.config["PROPAGATE_EXCEPTIONS"] = old_propagate
+    resp = client.post(
+        f"/api/v1/exams/{exam_id}/marks",
+        json={
+            "marks": [
+                {"student_id": str(s["s3"].id), "subject_id": str(s["subject"].id), "theory_marks": 55},
+                {"student_id": str(s["s1"].id), "subject_id": str(s["subject"].id), "theory_marks": 100000},
+            ],
+        },
+        headers=h,
+    )
+    assert resp.status_code == 400
+    assert "records[1]" in resp.get_json()["error"]
 
     _db.session.rollback()
     assert Marks.query.filter_by(school_id=school.id, exam_id=exam_id).count() == 0

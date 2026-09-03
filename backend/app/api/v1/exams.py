@@ -7,6 +7,7 @@ from uuid import UUID
 from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.models.academic import Class, Section, Subject
 from app.models.exam import Exam, Marks, OnlineExam, OnlineExamAttempt, ReportCard
@@ -127,6 +128,18 @@ def _resolve_subject_marks_config(
         "total_full_marks": resolved_total_full,
         "total_pass_marks": resolved_total_pass,
     }
+
+
+def _assign_competition_ranks(items, key="percentage", rank_field="rank"):
+    """Rank a pre-sorted (descending) list using competition ranking —
+    ties share a rank and the next rank skips (1, 1, 3). Nepali report
+    cards expect this, not sequential position (B-05)."""
+    better = 0
+    for i, item in enumerate(items):
+        if i > 0 and float(item[key] or 0) != float(items[i - 1][key] or 0):
+            better = i
+        item[rank_field] = better + 1
+    return items
 
 
 def _build_subject_grade(
@@ -715,12 +728,22 @@ def submit_marks(exam_id):
         else:
             cls_id = student_row.class_id
 
-        cleaned.append((rec, sid, subj, cls_id, subject))
+        cleaned.append((idx, rec, sid, subj, cls_id, subject))
 
-    for rec, sid, subj, cls_id, subject in cleaned:
+    # B-01: 150/100 used to store and grade A+ — resolve every row's full
+    # marks and grade up front (same inputs as the write below) and reject
+    # the offending row BEFORE any write, with its records[idx] context.
+    validated = []
+    for idx, rec, sid, subj, cls_id, subject in cleaned:
         theory = float(rec.get("theory_marks", rec.get("marks", 0)) or 0)
         practical = float(rec.get("practical_marks", 0) or 0)
-        total = theory + practical
+
+        if theory < 0 or practical < 0:
+            return error_response(
+                f"records[{idx}]: negative marks are not allowed "
+                f"(theory={theory:g}, practical={practical:g})",
+                400,
+            )
 
         grade_result = _build_subject_grade(
             theory,
@@ -735,6 +758,18 @@ def submit_marks(exam_id):
                 or practical > 0
             ),
         )
+        full_marks = grade_result["total_full_marks"]
+        if full_marks is not None and theory + practical > float(full_marks):
+            return error_response(
+                f"records[{idx}]: obtained marks ({theory + practical:g}) exceed "
+                f"full marks ({float(full_marks):g}) for {subject.name}",
+                400,
+            )
+        validated.append((rec, sid, subj, cls_id, subject, theory, practical, grade_result))
+
+    for rec, sid, subj, cls_id, subject, theory, practical, grade_result in validated:
+        total = theory + practical
+
         full_marks = grade_result["total_full_marks"]
         pass_marks = grade_result["total_pass_marks"]
 
@@ -781,7 +816,18 @@ def submit_marks(exam_id):
             db.session.add(marks)
             created_count += 1
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # B-02/D-02: two concurrent submissions for the same
+        # (exam, student, subject) — the unique index decides; report 409
+        # instead of a 500, with zero partial rows (rollback above).
+        db.session.rollback()
+        return error_response(
+            "Duplicate marks: a concurrent submission already recorded marks "
+            "for one of these exam/student/subject rows. Refresh and retry.",
+            409,
+        )
 
     from app.plugins.events import emit
 
@@ -969,10 +1015,9 @@ def get_results(exam_id):
             }
         )
 
-    # Sort by percentage desc, assign rank
+    # Sort by percentage desc, assign competition ranks (1, 1, 3 — B-05)
     results.sort(key=lambda r: r["percentage"], reverse=True)
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
+    _assign_competition_ranks(results)
 
     return success_response(results)
 
@@ -1120,10 +1165,9 @@ def get_grade_sheet(exam_id):
             }
         )
 
-    # Assign rank
+    # Assign competition ranks (1, 1, 3 — B-05)
     rows.sort(key=lambda r: r["percentage"], reverse=True)
-    for i, r in enumerate(rows, 1):
-        r["rank"] = i
+    _assign_competition_ranks(rows)
 
     klass = Class.query.get(class_id)
     # Strip the internal _subject model reference before serialising to JSON

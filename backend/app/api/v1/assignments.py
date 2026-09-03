@@ -357,7 +357,12 @@ def _assignment_dict(a):
         status="active",
         is_deleted=False,
     ).count()
-    status = "past" if a.due_date and a.due_date.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc) else "active"
+    # due_date is a naive UTC column; guard the tz attach so an already-aware
+    # value can't be mislabeled (S-05 family).
+    _due = a.due_date
+    if _due is not None and _due.tzinfo is None:
+        _due = _due.replace(tzinfo=timezone.utc)
+    status = "past" if _due is not None and _due < datetime.now(timezone.utc) else "active"
     return {
         "id": str(a.id), "title": a.title, "description": a.description,
         "class_id": str(a.class_id) if a.class_id else None,

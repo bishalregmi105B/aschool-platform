@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -216,3 +217,24 @@ class SchemeGrade(BaseModel):
     ranges = Column(JSONB, default=list)
 
     school = relationship("School", backref="grading_schemes")
+
+
+class SchoolReceiptCounter(BaseModel):
+    """Per-school sequential receipt counter per BS fiscal year (D-02).
+
+    Rows are taken with SELECT … FOR UPDATE when a receipt number is drawn,
+    so concurrent payments can never receive the same sequence number (the
+    old COUNT(*)+1 numbering raced).
+    """
+
+    __tablename__ = "school_receipt_counters"
+
+    school_id = Column(
+        UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False, index=True
+    )
+    fiscal_year_bs = Column(String(10), nullable=False)
+    last_seq = Column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "fiscal_year_bs", name="uq_receipt_counters_school_year"),
+    )

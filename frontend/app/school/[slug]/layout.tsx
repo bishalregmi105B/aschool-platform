@@ -1,6 +1,6 @@
 /** Public school website layout — applies theme CSS variables */
 import { Metadata } from "next";
-import { sanitizeCss } from "@/lib/sanitize";
+import { sanitizeCss, sanitizeColorOverrides } from "@/lib/sanitize";
 import { getPublicSite, getPublicSiteStatus } from "@/lib/public-site";
 import { SCHOOL_SITE_DOMAIN } from "@/lib/site-domain";
 import { generateThemeCSS, getThemeById, THEMES, DEFAULT_THEME_ID } from "@/themes/registry";
@@ -153,8 +153,12 @@ export default async function SchoolLayout({
   const themeSlug = website?.theme_slug || DEFAULT_THEME_ID;
   const activeTheme = getThemeById(themeSlug) || getThemeById(DEFAULT_THEME_ID);
 
-  // Apply stored customization colors as overrides on top of the base theme
-  const colorOverrides = (website?.customizations?.colors as Record<string, string>) || {};
+  // Apply stored customization colors as overrides on top of the base theme.
+  // Values are hex/color-word validated before reaching the <style> block
+  // (S-11 defense in depth; the API enforces the same allowlist on write).
+  const colorOverrides = sanitizeColorOverrides(
+    (website?.customizations?.colors as Record<string, string>) || {}
+  );
   const themeCss = activeTheme ? generateThemeCSS(activeTheme, colorOverrides) : "";
 
   // Surface color override (not in ThemeColors but used by SectionRenderer)

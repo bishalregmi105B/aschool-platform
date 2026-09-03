@@ -25,6 +25,18 @@ def create_app(config_name: str | None = None) -> Flask:
         from config import ProductionConfig
         ProductionConfig.validate()
 
+    # JWT_COOKIE_SECURE follows the same source as the hand-rolled auth
+    # cookies (S-04): Secure in production, not in dev/test.
+    if str(app.config.get("COOKIE_SECURE", "auto")).lower() == "auto":
+        app.config["JWT_COOKIE_SECURE"] = app.config.get("ENV") == "production"
+
+    # Behind nginx/Cloudflare the real client IP arrives in X-Forwarded-*;
+    # without ProxyFix every client shares the proxy IP bucket for rate
+    # limiting and audit logging (S-08). One trusted proxy hop.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # ── Sentry APM ───────────────────────────────────────────────────────
     sentry_dsn = app.config.get("SENTRY_DSN", "")
     if sentry_dsn:
@@ -87,14 +99,10 @@ def create_app(config_name: str | None = None) -> Flask:
                 # still applies. Clear any aborted transaction state.
                 db.session.rollback()
 
-        try:
-            from app.models.revoked_token import RevokedToken
-            return RevokedToken.is_revoked(jti)
-        except Exception:
-            # Never block a token on lookup failure, but clear the aborted
-            # transaction so later statements on this connection still work.
-            db.session.rollback()
-            return False
+        from app.models.revoked_token import RevokedToken
+        # No fail-open wrapper: a revoked-token lookup failure must be loud,
+        # not silently accept revoked tokens (S-05).
+        return RevokedToken.is_revoked(jti)
 
     # Build allowed CORS origins from environment so the Authorization header
     # is permitted and wildcard '*' is not used (required for credentialed requests).
@@ -104,7 +112,10 @@ def create_app(config_name: str | None = None) -> Flask:
         _frontend,
         f"https://{_base}",
         f"https://www.{_base}",
-        _re.compile(rf"https://[^./]+\.{_re.escape(_base)}"),  # *.base_domain
+        # Anchored: a non-anchored pattern lets "https://demo.base.attacker.example"
+        # match (re.match only pins the start), handing attacker origins CORS
+        # credentials and CSRF acceptance (S-02).
+        _re.compile(rf"^https://[^./]+\.{_re.escape(_base)}$"),  # *.base_domain
         # Sane built-in dev defaults: Next.js dashboard ports + the Flutter
         # web dev server ports (each app gets its own `flutter run
         # -d web-server --web-port` — admin 8090/8091, teacher 8092, parent
@@ -188,9 +199,14 @@ def create_app(config_name: str | None = None) -> Flask:
         app,
         cors_allowed_origins=_socket_origins,
         async_mode="eventlet",
+        # Flask 3.1 made RequestContext.session read-only, which breaks
+        # flask-socketio's managed sessions (ctx.session setter). realtime.py
+        # keeps per-connection state itself, so let Flask handle sessions.
+        manage_session=False,
         # External processes (Celery GPS workers) publish realtime events via
         # the same Redis message queue so connected browsers receive them.
-        message_queue=app.config.get("SOCKET_MESSAGE_QUEUE") or app.config.get("REDIS_URL"),
+        message_queue=app.config.get("SOCKET_MESSAGE_QUEUE")
+        or (None if app.config.get("TESTING") else app.config.get("REDIS_URL")),
     )
 
     # Celery
@@ -199,6 +215,17 @@ def create_app(config_name: str | None = None) -> Flask:
         result_backend=app.config["CELERY_RESULT_BACKEND"],
         timezone=app.config["CELERY_TIMEZONE"],
         enable_utc=False,
+        # P-01(a): 20/44 tasks (no explicit queue) were published to the
+        # "celery" default queue — the worker only consumes
+        # -Q default,ai,notifications,gps, so those tasks were queued but
+        # never executed. Route everything unnamed to "default".
+        task_routes={"*": {"queue": "default"}},
+        # P-01(e): long-running beats must not pile up; idempotency via
+        # task locks lands before acks_late is flipped on.
+        task_acks_late=True,
+        task_time_limit=1800,
+        task_soft_time_limit=1500,
+        worker_prefetch_multiplier=1,
         beat_schedule={
             "dispatch-fee-reminders": {
                 "task": "dispatch_fee_reminders",
@@ -259,7 +286,7 @@ def create_app(config_name: str | None = None) -> Flask:
             "poll-firebase-gps": {
                 "task": "poll_firebase_gps",
                 "schedule": 15.0,
-                "options": {"queue": "gps"},
+                "options": {"queue": "gps", "expires": 14},
             },
             # ── Plugin trial expiry (hourly) ──────────────────────────
             "plugin-trial-expiry-hourly": {
@@ -326,6 +353,27 @@ def create_app(config_name: str | None = None) -> Flask:
 
         _resolve_jwt_user()
 
+        def _cross_tenant_response(school):
+            """403 response when the authenticated user resolved a school they
+            do not belong to, else None (S-01 tenant isolation).
+
+            Subdomains and the X-School-Slug header are untrusted request
+            data: a valid school-A token + school-B header must not grant
+            school-B access. Unauthenticated requests (public website,
+            login) pass through — endpoint auth handles those.
+            """
+            user = g.current_user
+            if user is None or g.role == "superadmin":
+                return None
+            user_school_id = getattr(user, "school_id", None)
+            if user_school_id is not None and str(user_school_id) == str(school.id):
+                return None
+            from app.utils.response import error_response
+
+            return error_response(
+                "Your account does not belong to this school.", 403
+            )
+
         # 1. Try subdomain resolution
         host = request.host.split(":")[0]
         base = app.config.get("BASE_DOMAIN", "brighternepal.com")
@@ -333,6 +381,9 @@ def create_app(config_name: str | None = None) -> Flask:
             slug = host.replace(f".{base}", "")
             school = School.query.filter_by(slug=slug, is_active=True).first()
             if school:
+                denial = _cross_tenant_response(school)
+                if denial is not None:
+                    return denial
                 _set_school_context(school)
                 return
 
@@ -341,6 +392,9 @@ def create_app(config_name: str | None = None) -> Flask:
         if slug_header:
             school = School.query.filter_by(slug=slug_header, is_active=True).first()
             if school:
+                denial = _cross_tenant_response(school)
+                if denial is not None:
+                    return denial
                 _set_school_context(school)
                 return
 
@@ -352,6 +406,9 @@ def create_app(config_name: str | None = None) -> Flask:
             if school_id:
                 school = School.query.filter_by(id=school_id, is_active=True).first()
                 if school:
+                    denial = _cross_tenant_response(school)
+                    if denial is not None:
+                        return denial
                     _set_school_context(school)
         except Exception:
             # Resolution is best-effort; roll back so the request's handlers
@@ -611,12 +668,56 @@ def create_app(config_name: str | None = None) -> Flask:
             )
         return response
 
-    # Serve locally-uploaded files (dev fallback when R2 is not configured)
+    # Serve locally-uploaded files (dev fallback when R2 is not configured).
+    # S-12: the upload dir is not world-readable by policy — visibility comes
+    # from the ManagedFile row (public → anyone; school_only/private → an
+    # authenticated member of the owning school), with private caching.
     @app.route("/uploads/<path:filepath>")
     def serve_upload(filepath):
         import os
         from flask import send_from_directory
+
+        from app.models.file import ManagedFile
+
         upload_dir = os.getenv("LOCAL_UPLOAD_DIR", "/app/uploads")
-        return send_from_directory(upload_dir, filepath)
+        record = ManagedFile.query.filter(
+            ManagedFile.key.in_([filepath, filepath.lstrip("/")]),
+            ManagedFile.is_deleted.is_(False),
+        ).first()
+
+        if record is None:
+            # Untracked file: only serve if it lives under a school-scoped
+            # path AND the requester belongs to that school.
+            school_scope = filepath.split("/", 1)[0]
+            from app.models.school import School
+
+            scope_school = School.query.filter_by(id=school_scope).first()
+            if scope_school is None:
+                return jsonify(success=False, error="Not found"), 404
+            if not _upload_requester_in_school(scope_school.id):
+                return jsonify(success=False, error="Authentication required"), 401
+        elif record.is_public != "public":
+            if not _upload_requester_in_school(record.school_id):
+                return jsonify(success=False, error="Authentication required"), 401
+
+        response = send_from_directory(upload_dir, filepath)
+        if record is None or record.is_public != "public":
+            response.headers["Cache-Control"] = "private, max-age=0"
+        return response
+
+    def _upload_requester_in_school(school_id) -> bool:
+        """True when the current request carries a valid token (cookie or
+        Bearer) for a user belonging to school_id — superadmins may fetch
+        any school's files."""
+        from flask_jwt_extended import get_jwt, verify_jwt_in_request
+
+        try:
+            verify_jwt_in_request(optional=True)
+            claims = get_jwt() or {}
+            if claims.get("role") == "superadmin":
+                return True
+            return str(claims.get("school_id") or "") == str(school_id)
+        except Exception:
+            return False
 
     return app

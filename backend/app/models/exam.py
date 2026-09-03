@@ -6,10 +6,12 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.dialects.postgresql import JSONB
@@ -86,6 +88,19 @@ class Marks(SchoolModel):
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     entered_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # D-05 expand: denormalized year anchor from the exam (contract phase NOT NULL)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
+
+    __table_args__ = (
+        # D-02: duplicate marks rows double every aggregate (GPA, rank,
+        # ledger). Mirrors the migration index for create_all-built schemas.
+        Index(
+            "uq_marks_exam_student_subject",
+            "school_id", "exam_id", "student_id", "subject_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
 
     # Marks split
     theory_marks = Column(Numeric(6, 2))
@@ -121,6 +136,8 @@ class ReportCard(SchoolModel):
 
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False)
+    # D-05 expand: year anchor from the exam (contract phase NOT NULL)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
     generated_at = Column(DateTime)
     pdf_url = Column(Text)
 

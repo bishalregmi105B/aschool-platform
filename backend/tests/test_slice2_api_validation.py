@@ -18,7 +18,7 @@ Pins the fixes verified against the live aschool-flask-1 container
 - E179 academics numeric_grade / initial_section_capacity must be integers.
 """
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -255,7 +255,7 @@ def test_reports_dashboard_monthly_fee_is_payable(client, db, school, admin_user
             amount=1000,
             discount_amount=400,
             payment_status="paid",
-            collected_at=datetime.utcnow(),
+            collected_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     )
     db.session.commit()
@@ -476,7 +476,7 @@ def test_teacher_assignment_validates_inputs(client, db, school, admin_user, aca
             "title": "Homework 1",
             "class_id": str(academy["class"].id),
             "subject_id": str(academy["subject"].id),
-            "due_date": (datetime.utcnow() + timedelta(days=2)).isoformat(),
+            "due_date": (datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=2)).isoformat(),
             "total_marks": 10,
         },
         headers=headers,
@@ -583,8 +583,8 @@ def test_online_exam_submit_validates_student(client, db, school, admin_user, ac
         title="Open quiz",
         duration_minutes=30,
         questions=[],
-        start_at=datetime.utcnow() - timedelta(hours=1),
-        end_at=datetime.utcnow() + timedelta(hours=1),
+        start_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1),
+        end_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1),
     )
     db.session.add(exam)
     db.session.commit()

@@ -4,6 +4,25 @@ All themes are token-level ports of real, openly-licensed school/education
 website designs (GPL WordPress education themes). Sources and licenses are
 recorded in frontend/themes/THEMES_CREDITS.md.
 """
+import re
+
+_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+_CSS_COLOR_WORD_RE = re.compile(r"^[a-z]+$", re.IGNORECASE)
+_CSS_COLOR_WORDS = {
+    "transparent", "currentcolor", "white", "black", "red", "green",
+    "blue", "yellow", "orange", "purple", "gray", "grey",
+}
+
+
+def _is_safe_color(value) -> bool:
+    """True for hex or a known CSS color word (S-11) — values interpolated
+    into the public <style> block must not be able to break out."""
+    if not isinstance(value, str):
+        return False
+    v = value.strip()
+    if _HEX_COLOR_RE.match(v):
+        return True
+    return bool(_CSS_COLOR_WORD_RE.match(v) and v.lower() in _CSS_COLOR_WORDS)
 
 
 class ThemeEngineService:
@@ -186,10 +205,16 @@ a:hover {{ color: var(--color-primary); }}
         if school_id:
             overrides.update(cls._white_label_brand_colors(school_id))
         overrides.update(color_overrides or {})
+        # S-11: every value here lands in the public site's <style> block —
+        # keep only real colors, from any source.
+        overrides = {
+            k: v for k, v in overrides.items() if _is_safe_color(v)
+        }
         theme_colors = theme["colors"]
         colors = {
-            k: v for k, v in dict(existing_colors or {}).items()
-            if k not in cls.CORE_COLOR_KEYS
+            k: v
+            for k, v in dict(existing_colors or {}).items()
+            if k not in cls.CORE_COLOR_KEYS and _is_safe_color(v)
         }
         for key in cls.CORE_COLOR_KEYS:
             colors[key] = overrides.get(key, theme_colors[key])

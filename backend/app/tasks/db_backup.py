@@ -84,6 +84,24 @@ def db_backup_daily():
         deleted = _prune_old_backups()
         logger.info("[db_backup] Pruned %d old backups", deleted)
 
+        # P-02: honest backup state, queryable — write the timestamp into
+        # the system_settings KV table instead of an env var nobody read.
+        try:
+            from app.models.system import SystemSetting
+            from extensions import db
+
+            row = SystemSetting.query.filter_by(key="last_db_backup_at").first()
+            if row is None:
+                row = SystemSetting(key="last_db_backup_at", value={})
+                db.session.add(row)
+            row.value = {"at": timestamp, "key": r2_key, "size_mb": round(file_size_mb, 2)}
+            db.session.commit()
+        except Exception:  # noqa: BLE001 — backup itself succeeded; state write is best-effort
+            from extensions import db as _db
+
+            _db.session.rollback()
+            logger.warning("[db_backup] could not persist last_db_backup_at")
+
         return {
             "status": "success",
             "key": r2_key,

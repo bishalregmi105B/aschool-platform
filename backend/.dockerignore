@@ -1,0 +1,17 @@
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+tests
+tmp_*
+*probe*
+seed_test_data.py
+scripts/repair_initial_migration.py
+uploads
+celerybeat-schedule
+.git
+.env
+.env.local
+migrations/versions/*.bak

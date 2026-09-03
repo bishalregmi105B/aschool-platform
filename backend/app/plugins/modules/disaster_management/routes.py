@@ -29,7 +29,7 @@ EmergencyAlert) alongside drill rows. No fabricated data anywhere:
 """
 
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, g, request
@@ -78,7 +78,7 @@ def list_drills():
     if request.args.get("upcoming", "").lower() == "true":
         query = query.filter(
             DisasterDrill.status == "scheduled",
-            DisasterDrill.scheduled_at >= datetime.utcnow(),
+            DisasterDrill.scheduled_at >= datetime.now(timezone.utc).replace(tzinfo=None),
         )
     items, meta = paginate(query.order_by(DisasterDrill.scheduled_at.desc()))
     return success_response([_drill_dict(d) for d in items], meta={"pagination": meta})
@@ -150,7 +150,7 @@ def update_drill(drill_id):
             )
         drill.status = data["status"]
         if data["status"] == "completed":
-            drill.completed_at = datetime.utcnow()
+            drill.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
             drill.completed_at = None
     if "drill_type" in data and data["drill_type"] is not None:
@@ -263,7 +263,7 @@ def record_participation(drill_id):
         school_id=g.school_id,
         drill_id=drill_id,
         recorded_by_id=get_jwt().get("sub"),
-        recorded_at=datetime.utcnow(),
+        recorded_at=datetime.now(timezone.utc).replace(tzinfo=None),
         notes=data.get("notes"),
     )
     for key in ("class_id", "section_id"):
@@ -285,7 +285,7 @@ def record_participation(drill_id):
 @school_required
 @plugin_required("disaster_management")
 def disaster_overview():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     year_start = datetime(now.year, 1, 1)
 
     total_plans = EvacuationPlan.query.filter_by(
@@ -444,7 +444,7 @@ def _fetch_seismic_events():
 
     params = {
         "format": "geojson",
-        "starttime": (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d"),
+        "starttime": (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)).strftime("%Y-%m-%d"),
         "minmagnitude": SEISMIC_MIN_MAGNITUDE,
         "latitude": lat,
         "longitude": lng,
@@ -467,7 +467,7 @@ def _fetch_seismic_events():
                 "center_default": center_default,
                 "radius_km": SEISMIC_RADIUS_KM,
                 "min_magnitude": SEISMIC_MIN_MAGNITUDE,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             },
         }
         return result
@@ -509,7 +509,7 @@ def _fetch_seismic_events():
             "center_default": center_default,
             "radius_km": SEISMIC_RADIUS_KM,
             "min_magnitude": SEISMIC_MIN_MAGNITUDE,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         },
     }
     try:

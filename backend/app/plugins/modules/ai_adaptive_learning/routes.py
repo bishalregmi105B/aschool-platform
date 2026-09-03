@@ -33,6 +33,7 @@ from app.models.adaptive_learning import LearningPath, MasteryRecord
 from app.models.exam import Marks
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
+from app.utils.rate_limiter import ai_rate_limit
 from app.services.ai.adaptive_learning import AdaptiveLearningAI
 from app.services.ai.token_hub import QuotaExceededError
 from app.utils.decorators import role_required, school_required
@@ -296,6 +297,7 @@ def create_learning_path():
 @school_required
 @plugin_required("ai_adaptive_learning")
 @role_required("school_admin", "teacher")
+@ai_rate_limit()
 def generate_learning_path():
     """Generate (or regenerate) a learning path for ONE student.
 

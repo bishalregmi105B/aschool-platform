@@ -99,5 +99,13 @@ def rate_limit(max_requests: int = 60, window: int = 60, key_func=None):
 
 
 def ai_rate_limit(max_requests: int = 20, window: int = 3600):
-    """Rate limit specifically for AI endpoints (stricter)."""
-    return rate_limit(max_requests=max_requests, window=window)
+    """Rate limit for AI generation endpoints — stricter, keyed per
+    (school_id, user_id) so one heavy teacher cannot starve the school's
+    quota, and one school cannot exhaust the provider (S-08)."""
+    def _key():
+        return (
+            f"ai:{getattr(g, 'school_id', 'global')}:"
+            f"{getattr(g, 'user_id', 'anon')}:{request.endpoint}"
+        )
+
+    return rate_limit(max_requests=max_requests, window=window, key_func=_key)

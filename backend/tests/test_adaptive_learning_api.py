@@ -114,7 +114,7 @@ def test_generate_ai_stores_llm_path(client, db, school, admin_user):
         "estimated_hours": 10,
     }
     with patch(
-        "app.api.v1.adaptive_learning.AdaptiveLearningAI.recommend_path",
+        "app.plugins.modules.ai_adaptive_learning.routes.AdaptiveLearningAI.recommend_path",
         return_value=llm,
     ):
         r = client.post("/api/v1/lms/learning-paths/generate-ai", headers=headers,
@@ -140,7 +140,7 @@ def test_generate_ai_falls_back_labeled_without_provider(client, db, school, adm
     headers = _headers(admin_user, school)
 
     with patch(
-        "app.api.v1.adaptive_learning.AdaptiveLearningAI.recommend_path",
+        "app.plugins.modules.ai_adaptive_learning.routes.AdaptiveLearningAI.recommend_path",
         side_effect=RuntimeError("No AI provider configured. Set GROQ_API_KEY"),
     ):
         r = client.post("/api/v1/lms/learning-paths/generate-ai", headers=headers,
@@ -180,7 +180,7 @@ def test_generate_ai_regenerates_and_deactivates_previous(client, db, school, ad
     student, _ = _setup_student(db, school)
     headers = _headers(admin_user, school)
     with patch(
-        "app.api.v1.adaptive_learning.AdaptiveLearningAI.recommend_path",
+        "app.plugins.modules.ai_adaptive_learning.routes.AdaptiveLearningAI.recommend_path",
         return_value={"recommended_topics": ["T1"]},
     ):
         client.post("/api/v1/lms/learning-paths/generate-ai", headers=headers,
@@ -194,7 +194,7 @@ def test_generate_ai_regenerates_and_deactivates_previous(client, db, school, ad
 
     # A subject-scoped plan coexists with the whole-student plan…
     with patch(
-        "app.api.v1.adaptive_learning.AdaptiveLearningAI.recommend_path",
+        "app.plugins.modules.ai_adaptive_learning.routes.AdaptiveLearningAI.recommend_path",
         return_value={"recommended_topics": ["T1"]},
     ):
         client.post("/api/v1/lms/learning-paths/generate-ai", headers=headers,
@@ -203,7 +203,7 @@ def test_generate_ai_regenerates_and_deactivates_previous(client, db, school, ad
     assert len(active) == 2
     # …but regenerating the same subject replaces only that subject's plan.
     with patch(
-        "app.api.v1.adaptive_learning.AdaptiveLearningAI.recommend_path",
+        "app.plugins.modules.ai_adaptive_learning.routes.AdaptiveLearningAI.recommend_path",
         return_value={"recommended_topics": ["T2"]},
     ):
         client.post("/api/v1/lms/learning-paths/generate-ai", headers=headers,

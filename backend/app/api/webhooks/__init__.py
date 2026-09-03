@@ -524,14 +524,60 @@ def stripe_webhook():
 
     if event.type == "checkout.session.completed":
         from app.models.plugin import SchoolPlugin
+        from app.models.webhook import ProcessedWebhookEvent
 
         session = event.data.object
+
+        # S-13(c): replay guard — Stripe redelivers on timeout; without this
+        # table a replayed checkout.session.completed re-activates plugins.
+        # Insert in the same transaction as the effect.
+        event_row = ProcessedWebhookEvent(
+            provider="stripe", event_id=str(event.id)
+        )
+        db.session.add(event_row)
+        try:
+            db.session.flush()
+        except Exception:
+            db.session.rollback()
+            return success_response({"received": True, "duplicate": True})
 
         # We expect metadata to contain school_id and plugin_slug/package_id
         school_id = session.metadata.get("school_id")
         plugin_slug = session.metadata.get("plugin_slug")
 
         if school_id and plugin_slug:
+            # school_id comes from provider metadata — it must reference a
+            # real school, or the payload is bogus/malicious.
+            from app.models.school import School
+
+            school = School.query.filter_by(id=school_id, is_deleted=False).first()
+            if school is None:
+                current_app.logger.error(
+                    "Stripe webhook: metadata school_id %r does not match a "
+                    "school — plugin %r NOT activated",
+                    school_id,
+                    plugin_slug,
+                )
+                # Commit the event marker and ACK: this payload can never
+                # become valid, so retrying serves nothing.
+                db.session.commit()
+                return success_response({"received": True, "ignored": "unknown_school"})
+
+            # slug must be a published catalog plugin (never an arbitrary
+            # string that happens to match a gate).
+            from app.models.plugin import Plugin
+
+            catalog_plugin = Plugin.query.filter_by(
+                slug=plugin_slug, is_published=True, is_deleted=False
+            ).first()
+            if catalog_plugin is None:
+                current_app.logger.error(
+                    "Stripe webhook: plugin_slug %r is not a published plugin",
+                    plugin_slug,
+                )
+                db.session.commit()
+                return success_response({"received": True, "ignored": "unknown_plugin"})
+
             billing_cycle = session.metadata.get("billing_cycle")
             if billing_cycle not in ("monthly", "yearly"):
                 billing_cycle = "monthly"
@@ -588,7 +634,10 @@ def _finalize_fee_payment(collection, gateway, amount, transaction_id, initiatio
     """
     from app.models.fee import FeeReceipt
 
-    total_amount = float(collection.amount or 0)
+    # S-13(b): the gateway charges base + fine − discount (see
+    # _collection_payable at :758); computing outstanding from raw `amount`
+    # made an over-fine payment silently vanish from the ledger.
+    total_amount = _collection_payable(collection)
     previous_paid = _extract_partial_paid(collection)
     outstanding = max(total_amount - previous_paid, 0)
 
@@ -805,17 +854,41 @@ def _merge_partial_payment_note(existing_notes, paid_amount):
 
 
 def _webhook_receipt_number(collection):
-    from app.models.fee import FeeReceipt
+    """Same school-level FOR UPDATE counter series as the /fees API (D-02) —
+    webhook receipts and manual receipts draw from ONE sequence per school
+    fiscal year, so numbers stay unique and IRD-ordered."""
+    from app.models.school import SchoolReceiptCounter
+    from app.utils.nepali_date import today_bs as _today_bs_str
 
-    count = (
-        FeeReceipt.query.filter_by(
-            school_id=collection.school_id,
-            collection_id=collection.id,
-            is_deleted=False,
-        ).count()
-        + 1
+    # "2082-03-14" → BS year/month for the fiscal-year bucket
+    _y, _m, _ = _today_bs_str().split("-")
+    today_bs_year, today_bs_month = int(_y), int(_m)
+    fy = today_bs_year if today_bs_month >= 4 else today_bs_year - 1
+    fiscal_year_bs = f"{fy}/{str((fy + 1) % 100).zfill(2)}"
+
+    from app.models.school import School
+
+    school = School.query.get(collection.school_id)
+    prefix = (school.slug if school else "school").upper()[:12]
+
+    counter = (
+        SchoolReceiptCounter.query.filter_by(
+            school_id=collection.school_id, fiscal_year_bs=fiscal_year_bs
+        ).with_for_update().first()
     )
-    return f"RCPT-{str(collection.id).split('-')[0].upper()}-{count:02d}"
+    if counter is None:
+        counter = SchoolReceiptCounter(
+            school_id=collection.school_id, fiscal_year_bs=fiscal_year_bs, last_seq=0
+        )
+        db.session.add(counter)
+        db.session.flush()
+        counter = (
+            SchoolReceiptCounter.query.filter_by(
+                school_id=collection.school_id, fiscal_year_bs=fiscal_year_bs
+            ).with_for_update().one()
+        )
+    counter.last_seq = (counter.last_seq or 0) + 1
+    return f"{prefix}/{fiscal_year_bs}/{counter.last_seq:05d}"
 
 
 def _webhook_receipt_hash(receipt_number, collection, amount):

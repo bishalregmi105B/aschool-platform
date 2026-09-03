@@ -12,7 +12,13 @@ from flask import Blueprint, Response, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func, or_
 
-from app.models.fee import FeeCollection, FeeReceipt, FeeStructure, StudentScholarship
+from app.models.fee import (
+    FeeCollection,
+    FeeReceipt,
+    FeeStructure,
+    StudentScholarship,
+    FeeRefund,
+)
 from app.models.school import School
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
@@ -1955,13 +1961,29 @@ def refund_payment(collection_id):
     if not result.get("success"):
         return error_response(result.get("error", "Refund failed"), 502)
 
+    # S-13: ledger row + status change in ONE commit (the money has moved
+    # gateway-side at this point — the local record must not be allowed to
+    # fail independently). 'refunded' was added to the payment_status enum
+    # by migration f8c2a9d4e1b7; before that, this commit raised DataError.
+    refund_row = FeeRefund(
+        school_id=fc.school_id,
+        collection_id=fc.id,
+        student_id=fc.student_id,
+        amount=_collection_payable_total(fc),
+        reason=reason,
+        gateway="khalti",
+        gateway_ref=result.get("refund_id") or result.get("transaction_id") or gateway_ref,
+        approved_by_id=g.user_id,
+        status="completed",
+    )
+    db.session.add(refund_row)
     fc.payment_status = "refunded"
     fc.notes = f"[REFUNDED: {reason}] {fc.notes or ''}".strip()
-    from extensions import db
     db.session.commit()
 
     return success_response({
         "collection_id": str(fc.id),
+        "refund_id": str(refund_row.id),
         "refund": result,
         "message": "Refund initiated successfully",
     })
@@ -2372,48 +2394,44 @@ def _apply_fee_structure(structure, on_date=None):
             # discounts can never waive a late fine.
             discount_amount = 0.0
             is_scholarship = False
-            try:
-                today_bs = on_date or _bs_today()
-                today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
-                # SAVEPOINT: if the discount lookup fails (e.g. table missing in an
-                # un-migrated DB), the error is contained — a bare failure here must
-                # never abort the surrounding billing transaction mid-run.
-                with db.session.begin_nested():
-                    scholarships = (
-                        StudentScholarship.query.filter(
-                            StudentScholarship.school_id == structure.school_id,
-                            StudentScholarship.student_id == student.id,
-                            StudentScholarship.is_active.is_(True),
-                            StudentScholarship.is_deleted.is_(False),
-                            or_(
-                                StudentScholarship.fee_type.is_(None),
-                                StudentScholarship.fee_type == item_name,
-                            ),
-                            or_(
-                                StudentScholarship.valid_from_bs.is_(None),
-                                StudentScholarship.valid_from_bs <= today_bs_str,
-                            ),
-                            or_(
-                                StudentScholarship.valid_until_bs.is_(None),
-                                StudentScholarship.valid_until_bs >= today_bs_str,
-                            ),
-                        )
-                        .order_by(StudentScholarship.created_at.asc())
-                        .all()
-                    )
-                if scholarships:
-                    combined_discount = 0.0
-                    for sc in scholarships:
-                        if sc.discount_type == "percent":
-                            combined_discount += float(amount) * float(sc.discount_value or 0) / 100
-                        else:
-                            combined_discount += float(sc.discount_value or 0)
-                    discount_amount = round(
-                        min(max(combined_discount, 0.0), float(amount)), 2
-                    )
-                    is_scholarship = True
-            except Exception:
-                pass
+            # No silent failure here (D-01): a swallowed scholarship-lookup
+            # error billed students in full while marking nothing. The table
+            # exists as of f3a8c2e6d9b4; a genuine DB failure fails loud.
+            today_bs = on_date or _bs_today()
+            today_bs_str = f"{today_bs.year}-{today_bs.month:02d}-{today_bs.day:02d}"
+            scholarships = (
+                StudentScholarship.query.filter(
+                    StudentScholarship.school_id == structure.school_id,
+                    StudentScholarship.student_id == student.id,
+                    StudentScholarship.is_active.is_(True),
+                    StudentScholarship.is_deleted.is_(False),
+                    or_(
+                        StudentScholarship.fee_type.is_(None),
+                        StudentScholarship.fee_type == item_name,
+                    ),
+                    or_(
+                        StudentScholarship.valid_from_bs.is_(None),
+                        StudentScholarship.valid_from_bs <= today_bs_str,
+                    ),
+                    or_(
+                        StudentScholarship.valid_until_bs.is_(None),
+                        StudentScholarship.valid_until_bs >= today_bs_str,
+                    ),
+                )
+                .order_by(StudentScholarship.created_at.asc())
+                .all()
+            )
+            if scholarships:
+                combined_discount = 0.0
+                for sc in scholarships:
+                    if sc.discount_type == "percent":
+                        combined_discount += float(amount) * float(sc.discount_value or 0) / 100
+                    else:
+                        combined_discount += float(sc.discount_value or 0)
+                discount_amount = round(
+                    min(max(combined_discount, 0.0), float(amount)), 2
+                )
+                is_scholarship = True
 
             collection = FeeCollection(
                 school_id=structure.school_id,
@@ -2677,15 +2695,41 @@ def _merge_partial_payment_note(existing_notes, paid_amount):
 
 
 def _generate_receipt_number(collection):
-    count = (
-        FeeReceipt.query.filter_by(
-            school_id=g.school_id,
-            collection_id=collection.id,
-            is_deleted=False,
-        ).count()
-        + 1
+    """School-level IRD-style series: {SLUG}/{FY-BS}/{seq:05d} (D-02).
+
+    A per-school counter row is taken with SELECT … FOR UPDATE so two
+    concurrent receipts can never draw the same sequence number — the old
+    COUNT(*)+1 numbering raced and issued duplicates.
+    """
+    from app.models.school import SchoolReceiptCounter
+
+    today_bs = _bs_today()
+    fy = today_bs.year if today_bs.month >= 4 else today_bs.year - 1
+    fiscal_year_bs = f"{fy}/{str((fy + 1) % 100).zfill(2)}"
+
+    school = School.query.get(g.school_id)
+    prefix = (school.slug if school else "school").upper()[:12]
+
+    counter = (
+        SchoolReceiptCounter.query.filter_by(
+            school_id=g.school_id, fiscal_year_bs=fiscal_year_bs
+        ).with_for_update().first()
     )
-    return f"RCPT-{str(collection.id).split('-')[0].upper()}-{count:02d}"
+    if counter is None:
+        counter = SchoolReceiptCounter(
+            school_id=g.school_id, fiscal_year_bs=fiscal_year_bs, last_seq=0
+        )
+        db.session.add(counter)
+        db.session.flush()
+        # Re-select under lock — a concurrent first receipt may have created it.
+        counter = (
+            SchoolReceiptCounter.query.filter_by(
+                school_id=g.school_id, fiscal_year_bs=fiscal_year_bs
+            ).with_for_update().one()
+        )
+    counter.last_seq = (counter.last_seq or 0) + 1
+    seq = counter.last_seq
+    return f"{prefix}/{fiscal_year_bs}/{seq:05d}"
 
 
 def _receipt_hash(receipt_number, collection_id, amount):

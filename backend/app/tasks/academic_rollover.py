@@ -4,11 +4,13 @@ from datetime import date
 import logging
 
 from extensions import celery, db
+from app.utils.task_locks import task_lock
 
 logger = logging.getLogger(__name__)
 
 
 @celery.task(name="academic_rollover_daily")
+@task_lock("academic-rollover", ttl=6 * 3600)
 def academic_rollover_daily():
     """Promote students when the current academic year ends."""
     from app.models.school import School

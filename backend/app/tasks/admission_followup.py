@@ -1,3 +1,4 @@
+from datetime import timezone
 """Admission follow-up tasks — reminders, pipeline automation."""
 
 from extensions import celery
@@ -12,7 +13,7 @@ def send_admission_followups(school_id: str):
     from extensions import db
     from datetime import datetime, timedelta
 
-    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    three_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=3)
 
     pending = AdmissionInquiry.query.filter(
         AdmissionInquiry.school_id == school_id,
@@ -46,7 +47,7 @@ def cleanup_stale_applications(school_id: str, stale_days: int = 90):
     from extensions import db
     from datetime import datetime, timedelta
 
-    cutoff = datetime.utcnow() - timedelta(days=stale_days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=stale_days)
 
     stale = AdmissionApplication.query.filter(
         AdmissionApplication.school_id == school_id,

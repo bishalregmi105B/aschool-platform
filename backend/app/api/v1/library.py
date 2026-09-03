@@ -171,7 +171,14 @@ def list_issues():
 @role_required("superadmin", "school_admin", "teacher")
 def issue_book():
     data = request.get_json(silent=True) or {}
-    book = Book.query.filter_by(id=data.get("book_id"), school_id=g.school_id).first()
+    # B-04: take the Book row with SELECT … FOR UPDATE — two concurrent
+    # issues of the last copy previously both passed the check-then-act and
+    # drove available_copies negative.
+    book = (
+        Book.query.filter_by(id=data.get("book_id"), school_id=g.school_id)
+        .with_for_update()
+        .first()
+    )
     if not book or (book.available_copies or 0) <= 0:
         return error_response("Book not available for issue", 400)
 
@@ -232,7 +239,11 @@ def return_book(issue_id):
     overdue_days = _overdue_days(issue)
     issue.fine_amount = min(max_fine, overdue_days * per_day)
 
-    book = Book.query.get(issue.book_id)
+    book = (
+        Book.query.filter_by(id=issue.book_id, school_id=g.school_id)
+        .with_for_update()
+        .first()
+    )
     if book:
         book.available_copies = (book.available_copies or 0) + 1
 

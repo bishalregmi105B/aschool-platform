@@ -7,6 +7,7 @@ from functools import wraps
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
+from extensions import limiter
 from app.services.auth_service import AuthService
 from app.models.user import User
 from app.utils.response import error_response, success_response
@@ -75,14 +76,17 @@ def _pwreset_store_delete(token: str) -> None:
 def _cookie_params():
     """Cookie attributes: HttpOnly always; Secure + Domain configurable.
 
-    COOKIE_DOMAIN (e.g. ".brighternepal.com") makes the session visible to the
-    app. subdomain middleware; unset -> host-only cookie (dev/single host).
+    COOKIE_DOMAIN (e.g. ".aschool.com.np") shares the session across school
+    subdomains; unset -> host-only cookie (dashboard/API live on one host,
+    mobile uses Bearer headers — host-only is the S-04 posture, and the S-11
+    XSS vector that made domain-scoped cookies dangerous is being removed).
     COOKIE_SECURE forces the Secure attribute; "auto" (default) enables it
-    only outside development/testing so the Flask test client still works.
+    only in production so the Flask test client still works. Note: Flask 3
+    does not define config["FLASK_ENV"] — the config class mirrors ENV (S-04).
     """
     secure_setting = str(current_app.config.get("COOKIE_SECURE", "auto")).lower()
     if secure_setting == "auto":
-        secure = current_app.config.get("FLASK_ENV") == "production"
+        secure = current_app.config.get("ENV") == "production"
     else:
         secure = secure_setting in ("1", "true", "yes")
     return {
@@ -133,6 +137,7 @@ def _refresh_token_from_cookie():
 
 
 @auth_bp.route("/send-otp", methods=["POST"])
+@limiter.limit("5/minute")
 def send_otp():
     """Send OTP to phone number."""
     data = request.get_json(silent=True) or {}
@@ -151,6 +156,7 @@ def send_otp():
 
 
 @auth_bp.route("/verify-otp", methods=["POST"])
+@limiter.limit("5/minute")
 def verify_otp():
     """Verify OTP and return tokens."""
     data = request.get_json(silent=True) or {}
@@ -166,6 +172,7 @@ def verify_otp():
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("5/minute")
 def login():
     """Login with email or phone + password."""
     data = request.get_json(silent=True) or {}
@@ -181,6 +188,7 @@ def login():
 
 
 @auth_bp.route("/student-login", methods=["POST"])
+@limiter.limit("5/minute")
 def student_login():
     """Login specifically for students using their student_id."""
     data = request.get_json(silent=True) or {}
@@ -272,6 +280,7 @@ def change_password():
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
+@limiter.limit("5/minute")
 def forgot_password():
     """Issue a single-use, 30-minute password reset token for an email account.
 

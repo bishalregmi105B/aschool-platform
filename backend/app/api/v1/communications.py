@@ -336,7 +336,10 @@ def _guardian_user_ids(class_id: str | None, defaulters_only: bool = False) -> l
     return [guardian.user_id for guardian in query.all()]
 
 
-def _users_for_audience(audience: str, class_id: str | None, limit: int = 500):
+def _users_for_audience(audience: str, class_id: str | None, limit: int | None = None):
+    """limit=None by default (B-03): a school with 800 parents broadcast
+    to "all_parents" used to silently deliver to the first 500. Callers
+    that pass an explicit cap get recipients_capped in the response."""
     """Active users of this school matching a broadcast audience (push)."""
     from app.models.user import User
 
@@ -374,7 +377,9 @@ def _users_for_audience(audience: str, class_id: str | None, limit: int = 500):
         if not ids:
             return []
         query = query.filter(User.id.in_(ids))
-    return query.limit(limit).all()
+    if limit is not None:
+        return query.limit(limit).all()
+    return query.all()
 
 
 def _broadcast_push(title: str, message: str, audience: str, class_id: str | None):
@@ -395,6 +400,7 @@ def _broadcast_push(title: str, message: str, audience: str, class_id: str | Non
                 "note": "no matching users in this audience",
             }
         )
+
 
     for user in users:
         db.session.add(

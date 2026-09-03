@@ -1,3 +1,4 @@
+from datetime import timezone
 """Wellbeing API — mood tracking, counselor notes, wellbeing surveys."""
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
@@ -78,7 +79,7 @@ def mood_summary():
     from datetime import datetime, timedelta
 
     days = int(request.args.get("days", 7))
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
     results = db.session.query(
         MoodEntry.mood, func.count(MoodEntry.id)

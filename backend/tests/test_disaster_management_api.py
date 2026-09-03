@@ -10,7 +10,7 @@ backend was the emergency tier. These pin the new surface:
   when the external feed is unreachable — never fabricated events);
 - plugin gating (no disaster_management → 403) and rollback on commit failure.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -49,7 +49,7 @@ def _drill_payload(**overrides):
     payload = {
         "title": "Term Earthquake Drill",
         "drill_type": "earthquake",
-        "scheduled_date": (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d"),
+        "scheduled_date": (datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7)).strftime("%Y-%m-%d"),
         "duration_minutes": "45",
         "notes": "Assembly point B",
     }
@@ -83,7 +83,7 @@ def test_drill_crud_and_validation(client, db, admin_headers):
     # upcoming filter excludes future-completed/past drills
     past = client.post(
         "/api/v1/emergency/drills",
-        json=_drill_payload(title="Past", scheduled_date=(datetime.utcnow() - timedelta(days=10)).strftime("%Y-%m-%d")),
+        json=_drill_payload(title="Past", scheduled_date=(datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=10)).strftime("%Y-%m-%d")),
         headers=admin_headers,
     ).get_json()["data"]
     r = client.get("/api/v1/emergency/drills?upcoming=true", headers=admin_headers)
@@ -147,12 +147,12 @@ def test_overview_readiness_hand_computed(client, db, school, admin_headers):
     db.session.add(EmergencyAlert(
         school_id=school.id, alert_type="drill", title="Announcement",
         triggered_by_id=User.query.filter_by(school_id=school.id).first().id,
-        triggered_at=datetime.utcnow(),
+        triggered_at=datetime.now(timezone.utc).replace(tzinfo=None),
     ))
     db.session.commit()
 
     r = client.post("/api/v1/emergency/drills", json=_drill_payload(
-        title="Past drill", scheduled_date=(datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")),
+        title="Past drill", scheduled_date=(datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)).strftime("%Y-%m-%d")),
         headers=admin_headers)
     drill_id = r.get_json()["data"]["id"]
     client.patch(f"/api/v1/emergency/drills/{drill_id}", json={"status": "completed"}, headers=admin_headers)

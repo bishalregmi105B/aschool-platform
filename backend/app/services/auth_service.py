@@ -1,5 +1,6 @@
 """Authentication service — OTP, JWT, token refresh."""
-import random
+import hmac
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
@@ -29,6 +30,7 @@ class AuthService:
     OTP_LENGTH = 6
     OTP_EXPIRY_SECONDS = 600  # 10 minutes
     MAX_OTP_ATTEMPTS = 3
+    MAX_OTP_VERIFY_ATTEMPTS = 5  # verify-side brute-force lock (S-06)
     OTP_COOLDOWN_SECONDS = 60
 
     @staticmethod
@@ -60,8 +62,9 @@ class AuthService:
 
     @staticmethod
     def generate_otp() -> str:
-        """Generate a 6-digit OTP."""
-        return "".join(random.choices(string.digits, k=AuthService.OTP_LENGTH))
+        """Generate a 6-digit OTP — CSPRNG (S-06): random.choices is
+        Mersenne-Twister and predictable from prior outputs."""
+        return "".join(secrets.choice(string.digits) for _ in range(AuthService.OTP_LENGTH))
 
     @staticmethod
     def send_otp(phone: str) -> dict:
@@ -96,6 +99,8 @@ class AuthService:
         cache.set(f"otp:{phone}", otp, timeout=AuthService.OTP_EXPIRY_SECONDS)
         cache.set(cooldown_key, True, timeout=AuthService.OTP_COOLDOWN_SECONDS)
         cache.set(attempt_key, attempts + 1, timeout=900)
+        # A freshly issued OTP starts with a fresh verify-attempt budget (S-06)
+        cache.delete(f"otp_verify_attempts:{phone}")
 
         # Send SMS (async)
         msg = f"Your ASchool verification code is: {otp}. Valid for 10 minutes."
@@ -106,6 +111,24 @@ class AuthService:
         if current_app.config.get("SMS_CONSOLE_MODE") or current_app.config.get("DEBUG"):
             current_app.logger.debug("DEV OTP for %s: %s", phone, otp)
         return result
+
+    @staticmethod
+    def _invalidate_otp(phone: str) -> None:
+        """Kill an OTP everywhere after brute-force lockout (S-06)."""
+        cache.delete(f"otp:{phone}")
+        try:
+            user = (
+                User.query.filter(
+                    User.phone.in_(AuthService._phone_lookup_variants(phone)),
+                    User.is_deleted.is_(False),
+                ).first()
+            )
+            if user and (user.otp_code or user.otp_expires_at):
+                user.otp_code = None
+                user.otp_expires_at = None
+                db.session.commit()
+        except Exception:  # noqa: BLE001 — cache entry already cleared
+            db.session.rollback()
 
     @staticmethod
     def verify_otp(phone: str, otp: str) -> dict:
@@ -121,10 +144,25 @@ class AuthService:
                 ).first()
             )
             if user and user.otp_code and user.otp_expires_at:
-                if user.otp_expires_at > datetime.now(timezone.utc):
+                # otp_expires_at is a naive UTC column — compare against naive
+                # UTC now so the expiry window doesn't shift with the session
+                # timezone (S-05).
+                if user.otp_expires_at > datetime.now(timezone.utc).replace(tzinfo=None):
                     stored_otp = user.otp_code
 
-        if not stored_otp or stored_otp != otp:
+        if not stored_otp or not hmac.compare_digest(
+            str(stored_otp), str(otp or "")
+        ):
+            # Verify-side attempt counter (S-06): an attacker with the phone
+            # number gets 5 tries per issued OTP, then it is invalidated.
+            attempts_key = f"otp_verify_attempts:{phone}"
+            verify_attempts = int(cache.get(attempts_key) or 0) + 1
+            cache.set(attempts_key, verify_attempts, timeout=AuthService.OTP_EXPIRY_SECONDS)
+            if verify_attempts >= AuthService.MAX_OTP_VERIFY_ATTEMPTS:
+                AuthService._invalidate_otp(phone)
+                return {
+                    "error": "Too many incorrect attempts. Request a new OTP."
+                }
             return {"error": "Invalid or expired OTP"}
 
         # Clear OTP

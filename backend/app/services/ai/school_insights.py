@@ -5,7 +5,7 @@ usage logging happen there (E7: no direct Anthropic calls).
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 
@@ -45,7 +45,7 @@ class SchoolInsightsService:
         from app.models.exam import Marks
         from app.models.incident import Incident
 
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
 
         # Gather metrics
         total_students = Student.query.filter_by(school_id=school_id, status="active").count()
@@ -135,7 +135,7 @@ Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
             }
 
         report["metrics"] = metrics
-        report["generated_at"] = datetime.utcnow().isoformat()
+        report["generated_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         return report
 
     @classmethod
@@ -146,7 +146,7 @@ Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
         from app.models.fee import FeeCollection
         from app.models.incident import Incident
 
-        thirty_days = datetime.utcnow() - timedelta(days=30)
+        thirty_days = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
         students = Student.query.filter_by(school_id=school_id, status="active").all()
 
         at_risk = []
@@ -214,7 +214,7 @@ Focus on practical, Nepal-context relevant insights. Use NPR for currency."""
         from app.models.notice import Event
         from app.models.student import Student
 
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).replace(tzinfo=None).date()
 
         events_today = Event.query.filter(
             Event.school_id == school_id,

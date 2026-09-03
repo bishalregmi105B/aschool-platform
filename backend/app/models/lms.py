@@ -28,7 +28,6 @@ class Course(SchoolModel):
     instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     thumbnail_url = Column(Text)
     is_published = Column(Boolean, default=False)
-    is_deleted = Column(Boolean, default=False)
     status = Column(String(20), default="draft")  # draft, published, archived
     total_lessons = Column(Integer, default=0)
     total_duration_mins = Column(Integer, default=0)
@@ -55,7 +54,6 @@ class Lesson(SchoolModel):
     )
     resources = Column(JSONB, default=list)
     is_published = Column(Boolean, default=True)
-    is_deleted = Column(Boolean, default=False)
 
     course = relationship("Course", back_populates="lessons")
     topics = relationship("Topic", back_populates="lesson")

@@ -1,3 +1,4 @@
+from datetime import timezone
 """HR & Payroll API — staff payroll, leave management, appraisals."""
 
 from flask import Blueprint, g, request
@@ -535,7 +536,7 @@ def mark_paid(payroll_id):
         return error_response("Payroll must be approved before marking as paid")
     data = request.get_json(silent=True) or {}
     payroll.status = "paid"
-    payroll.paid_at = datetime.utcnow()
+    payroll.paid_at = datetime.now(timezone.utc).replace(tzinfo=None)
     payroll.bank_ref = data.get("bank_ref")
     # E123: the payroll page sends payment_method here — store it instead of
     # silently dropping it (the serializer exposes the column).
@@ -598,7 +599,7 @@ def bulk_payroll_action():
     rows = query.all()
 
     claims = get_jwt()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     updated_ids = []
     for payroll in rows:
         if action == "approve":
@@ -721,7 +722,7 @@ def approve_leave(leave_id):
         )
     leave.status = new_status
     leave.approved_by_id = claims.get("sub")
-    leave.approved_at = datetime.utcnow()
+    leave.approved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     leave.notes = data.get("notes", leave.notes)
     db.session.commit()
     return success_response(_leave_dict(leave))

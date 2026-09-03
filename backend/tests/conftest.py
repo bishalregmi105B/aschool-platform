@@ -21,6 +21,20 @@ def app():
         _reset_database()
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Flask-Limiter counters live in their own redis namespace (not cleared
+    by the cache flush below). Reset per test so S-08 route limits reflect
+    only the current test's traffic."""
+    try:
+        from extensions import limiter
+
+        limiter.reset()
+    except Exception:
+        pass
+    yield
+
+
 @pytest.fixture(scope="function")
 def db(app):
     """Fresh database for each test."""
@@ -118,6 +132,43 @@ def superadmin_user(db):
         phone_verified=True,
     )
     u.set_password("SuperSecret@1")
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+@pytest.fixture
+def school_b(db):
+    """A second school for cross-tenant isolation tests."""
+    s = School(
+        name="Rival Academy",
+        slug="school-b",
+        plan="growth",
+        status="active",
+        is_active=True,
+        phone="+9779800000002",
+        email="admin@schoolb.edu.np",
+        province="Bagmati",
+        district="Lalitpur",
+    )
+    db.session.add(s)
+    db.session.commit()
+    return s
+
+
+@pytest.fixture
+def admin_b_user(db, school_b):
+    """School-admin user belonging to school_b."""
+    u = User(
+        school_id=school_b.id,
+        role="school_admin",
+        full_name="Rival Admin",
+        phone="+9779841000011",
+        email="admin@schoolb.edu.np",
+        is_active=True,
+        phone_verified=True,
+    )
+    u.set_password("Test@1234")
     db.session.add(u)
     db.session.commit()
     return u

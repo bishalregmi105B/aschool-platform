@@ -1,4 +1,5 @@
 """Website Builder Pro API — themes, page builder, AI designer, domain management."""
+import re
 import uuid
 
 from flask import Blueprint, g, request
@@ -372,6 +373,10 @@ def list_pages():
 def create_page():
     """Create a new website page."""
     data = request.get_json(silent=True) or {}
+    slug = str(data.get("slug") or "").strip().lower()
+    err = _validate_page_slug(g.school_id, slug)
+    if err:
+        return error_response(err, 400)
     page = WebsitePage(school_id=g.school_id)
     for key in ("title", "slug", "sections", "meta_title", "meta_description", "sort_order", "is_published"):
         if key in data:
@@ -391,15 +396,50 @@ def get_page(page_id):
     return success_response(_page_dict(page))
 
 
+RESERVED_PAGE_SLUGS = {
+    # Reserved by App Router folders or platform routes — a page with these
+    # slugs could never be served by the catch-all.
+    "school", "dashboard", "login", "register", "api", "super-admin",
+    "uploads", "webhooks", "marketplace", "verify-otp", "reset-password",
+}
+
+SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def _validate_page_slug(school_id, slug: str, page_id=None) -> str | None:
+    """Return an error message if `slug` is unusable, else None."""
+    slug = (slug or "").strip().lower()
+    if not slug or len(slug) > 150:
+        return "Slug is required (max 150 characters)"
+    if not SLUG_RE.match(slug):
+        return "Slug may only contain lowercase letters, numbers and dashes"
+    if slug in RESERVED_PAGE_SLUGS:
+        return f"'{slug}' is a reserved URL"
+    clash = WebsitePage.query.filter(
+        WebsitePage.school_id == school_id,
+        WebsitePage.slug == slug,
+        WebsitePage.is_deleted.is_(False),
+        WebsitePage.id != page_id,
+    ).first()
+    if clash:
+        return "Another page already uses this URL"
+    return None
+
+
 @website_builder_bp.route("/pages/<page_id>", methods=["PUT"])
 @jwt_required()
 @school_required
 @plugin_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_page(page_id):
-    """Update page content and sections."""
+    """Update page content and sections (title, slug, layout, publish state)."""
     page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
     data = request.get_json(silent=True) or {}
+
+    if "slug" in data:
+        err = _validate_page_slug(g.school_id, data.get("slug"), page_id=page.id)
+        if err:
+            return error_response(err, 400)
 
     for key in ("title", "slug", "sections", "meta_title", "meta_description",
                 "sort_order", "is_published", "custom_css"):

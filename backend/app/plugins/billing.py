@@ -107,7 +107,9 @@ def install_plugin(school_id: str, plugin_slug: str, billing_cycle: str = "month
             # reinstall would make the trial infinite). Expired trials are
             # refused outright; running trials resume with their remaining
             # days.
-            ends = existing.trial_ends_at.replace(tzinfo=timezone.utc)
+            ends = existing.trial_ends_at
+            if ends.tzinfo is None:
+                ends = ends.replace(tzinfo=timezone.utc)
             if ends < now:
                 return {
                     "error": (

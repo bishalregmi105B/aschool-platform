@@ -1,11 +1,13 @@
 """Social media post scheduler — publishes scheduled posts at their scheduled time."""
 from extensions import celery
 import logging
+from app.utils.task_locks import task_lock
 
 logger = logging.getLogger(__name__)
 
 
 @celery.task(name="social_publish_scheduled")
+@task_lock("social-publish-scheduled", ttl=240)
 def publish_scheduled_posts():
     """Run every 5 minutes: publish social media posts scheduled for now.
 
