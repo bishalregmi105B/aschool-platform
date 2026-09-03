@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 
+interface NavPage {
+  slug: string;
+  title: string;
+  page_type?: string;
+}
+
 interface SchoolNavbarProps {
   slug: string;
   schoolName: string;
@@ -12,6 +18,9 @@ interface SchoolNavbarProps {
   address?: string;
   primaryColor?: string;
   accentColor?: string;
+  /** W-01: published builder pages — custom pages become reachable; the
+   *  hardcoded list stays as the empty-state fallback. */
+  livePages?: NavPage[];
 }
 
 const NAV_ITEMS = [
@@ -25,6 +34,15 @@ const NAV_ITEMS = [
   { label: "Contact", path: "/contact" },
 ];
 
+function buildNavItems(livePages?: NavPage[]) {
+  if (!livePages || livePages.length === 0) return NAV_ITEMS;
+  // order: Home first, then the school's pages in their published order
+  const rest = livePages
+    .filter((p) => p.slug !== "home")
+    .map((p) => ({ label: p.title || p.slug, path: `/${p.slug}` }));
+  return [{ label: "Home", path: "" }, ...rest];
+}
+
 export function SchoolNavbar({
   slug,
   schoolName,
@@ -35,9 +53,11 @@ export function SchoolNavbar({
   address,
   primaryColor = "var(--color-primary)",
   accentColor = "var(--color-accent)",
+  livePages,
 }: SchoolNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const base = `/school/${slug}`;
+  const navItems = buildNavItems(livePages);
 
   return (
     <>
@@ -95,7 +115,7 @@ export function SchoolNavbar({
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <a
                 key={item.path}
                 href={`${base}${item.path}`}
@@ -135,7 +155,7 @@ export function SchoolNavbar({
         {menuOpen && (
           <div className="lg:hidden border-t border-white/20" style={{ backgroundColor: primaryColor }}>
             <nav className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1">
-              {NAV_ITEMS.map((item) => (
+              {navItems.map((item) => (
                 <a
                   key={item.path}
                   href={`${base}${item.path}`}
