@@ -9,7 +9,16 @@ from app.models.website import WebsitePage
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
-from extensions import db
+from extensions import db, limiter
+from flask_limiter.util import get_remote_address
+
+
+def _public_form_key():
+    """Rate-limit key for unauthenticated public form endpoints:
+    school slug + client IP (S-08) — one IP cannot spam one school's
+    forms, and one IP cannot spray every school either."""
+    slug = request.view_args.get("slug", "") if request.view_args else ""
+    return f"{slug}:{get_remote_address()}"
 
 
 # ── custom_css sanitization ─────────────────────────────────────────────
@@ -48,6 +57,53 @@ def sanitize_custom_css(css: str) -> str:
         if decls:
             safe_blocks.append(f"{selector} {{ { '; '.join(decls)}; }}")
     return "\n".join(safe_blocks)
+
+
+# Any customizations.colors value is interpolated into the public site's
+# <style> block by the Next.js layout — a "</style><script>" payload there is
+# stored XSS with superadmin as the victim (S-11). Colors must be hex or a
+# small CSS color-word set; anything else is dropped.
+_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+_CSS_COLOR_WORD_RE = re.compile(r"^[a-z]+$", re.IGNORECASE)
+_CSS_COLOR_WORDS = {
+    "transparent", "currentcolor", "white", "black", "red", "green",
+    "blue", "yellow", "orange", "purple", "gray", "grey",
+}
+
+
+def _sanitize_color_value(value):
+    """Return the color if hex or a known CSS color word, else None."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip()
+    if _HEX_COLOR_RE.match(v):
+        return v
+    if _CSS_COLOR_WORD_RE.match(v) and v.lower() in _CSS_COLOR_WORDS:
+        return v.lower()
+    return None
+
+
+_COLOR_KEYS_ALLOWLIST = (
+    "primary", "secondary", "accent", "bg", "text",
+    "surface", "sidebar_active", "sidebar_text",
+)
+
+
+def sanitize_colors(colors):
+    """Allowlist the keys the product reads; each value must be a real color.
+
+    Unknown keys are dropped (the wholesale setattr made this dict a free-form
+    injection point); invalid values are dropped rather than stored.
+    """
+    if not isinstance(colors, dict):
+        return {}
+    clean = {}
+    for key in _COLOR_KEYS_ALLOWLIST:
+        if key in colors:
+            value = _sanitize_color_value(colors[key])
+            if value is not None:
+                clean[key] = value
+    return clean
 
 website_bp = Blueprint("basic_website", __name__, url_prefix="/website")
 
@@ -136,13 +192,19 @@ def _public_teachers_payload(school) -> list:
 
 
 def _public_gallery_payload(school) -> list:
-    """School's uploaded images for the public site (feeds 'gallery' sections)."""
+    """School's public gallery images (feeds 'gallery' sections).
+
+    S-12: only files explicitly marked is_public='public' may appear on the
+    unauthenticated site — the school's uploads root contains scanned
+    documents and fee invoices that must never leak here.
+    """
     from app.models.file import ManagedFile
 
     images = (
         ManagedFile.query.filter(
             ManagedFile.school_id == school.id,
             ManagedFile.file_type == "image",
+            ManagedFile.is_public == "public",
             ManagedFile.is_deleted.is_(False),
         )
         .order_by(ManagedFile.created_at.desc())
@@ -157,6 +219,29 @@ def _public_gallery_payload(school) -> list:
             "uploaded_at": img.created_at.isoformat() if img.created_at else None,
         }
         for img in images
+    ]
+
+
+def _public_pages_payload(school):
+    """Nav-ready list of the school's published builder pages.
+
+    Drives the dynamic navbar/footer and lets renamed slugs propagate
+    (links are built from the stored slug, never hardcoded).
+    """
+    pages = WebsitePage.query.filter(
+        WebsitePage.school_id == school.id,
+        WebsitePage.is_deleted.is_(False),
+        WebsitePage.is_published.is_(True),
+    ).order_by(WebsitePage.sort_order.asc()).all()
+    return [
+        {
+            "id": str(p.id),
+            "title": p.title,
+            "slug": p.slug,
+            "page_type": p.page_type or "custom",
+            "sort_order": p.sort_order or 0,
+        }
+        for p in pages
     ]
 
 
@@ -180,7 +265,10 @@ def get_public_website(slug):
 
     # Get home page sections from website builder
     home_page = WebsitePage.query.filter_by(
-        school_id=school.id, slug="home", is_deleted=False
+        school_id=school.id,
+        slug="home",
+        is_published=True,
+        is_deleted=False,
     ).first()
     page_sections = []
     if home_page:
@@ -205,6 +293,7 @@ def get_public_website(slug):
             "meta_description": website.meta_description if website else None,
         } if website else None,
         "sections": page_sections,
+        "pages": _public_pages_payload(school),
         "notices": notices,
         "teachers": teachers,
         "gallery": gallery,
@@ -226,9 +315,11 @@ def get_public_page(slug, page_slug):
 
     from sqlalchemy import func
 
+    # S-12: drafts must not be publicly renderable.
     page = WebsitePage.query.filter(
         WebsitePage.school_id == school.id,
         func.lower(WebsitePage.slug) == (page_slug or "").strip().lower(),
+        WebsitePage.is_published.is_(True),
         WebsitePage.is_deleted.is_(False),
     ).first()
     if not page:
@@ -246,6 +337,7 @@ def get_public_page(slug, page_slug):
         },
         "school": _public_school_dict(school),
         "sections": page_sections,
+        "pages": _public_pages_payload(school),
         "notices": _public_notices_payload(school),
         "teachers": _public_teachers_payload(school),
         "gallery": _public_gallery_payload(school),
@@ -324,6 +416,14 @@ def update_website_config():
         if key in data:
             setattr(website, key, data[key])
 
+    # S-11: customizations.colors is interpolated into the public <style>
+    # block — allowlist its keys and require real color values.
+    if isinstance(website.customizations, dict) and "colors" in website.customizations:
+        website.customizations = {
+            **website.customizations,
+            "colors": sanitize_colors(website.customizations.get("colors")),
+        }
+
     # Theme switch: keep customizations["colors"] core tokens in sync with the
     # chosen theme (a stale template palette would otherwise keep overriding
     # the new theme on the public site). Explicit colors in the same payload win.
@@ -363,6 +463,7 @@ def update_website_config():
 
 
 @website_bp.route("/public/<slug>/contact", methods=["POST"])
+@limiter.limit("5/hour;20/day", key_func=_public_form_key)
 def submit_contact_form(slug):
     """Public contact form submission (no auth required)."""
     school = School.query.filter_by(slug=slug, is_active=True, is_deleted=False).first()
@@ -398,6 +499,7 @@ def submit_contact_form(slug):
 
 
 @website_bp.route("/public/<slug>/admission-inquiry", methods=["POST"])
+@limiter.limit("5/hour;20/day", key_func=_public_form_key)
 def submit_admission_inquiry(slug):
     """Public admission inquiry form (no auth required)."""
     school = School.query.filter_by(slug=slug, is_active=True, is_deleted=False).first()
@@ -590,6 +692,7 @@ def get_public_alumni(slug):
 
 
 @website_bp.route("/public/<slug>/results", methods=["GET"])
+@limiter.limit("5/hour;20/day", key_func=_public_form_key)
 def get_public_results(slug):
     """Public result checker — symbol number + DOB returns published exam result."""
     school, err = _public_site_guard(slug)

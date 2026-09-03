@@ -64,6 +64,25 @@ export interface LiveData {
   notices?: Array<{ id: string; title: string; content?: string; created_at: string }>;
   teachers?: Array<{ id: string; name: string; subject?: string; photo?: string; designation?: string }>;
   gallery?: Array<{ id: string; url: string; caption?: string }>;
+  /** Published builder pages — lets internal links (View All, results…) use
+   *  the school's ACTUAL slugs instead of hardcoded defaults, so renamed
+   *  pages keep working. */
+  pages?: Array<{ slug: string; title: string; page_type?: string }>;
+}
+
+/** Resolve the live path for a page TYPE (about/gallery/…) from the school's
+ *  published pages. Falls back to the conventional slug when the pages list
+ *  is unavailable (builder editor preview). */
+export function livePath(liveData: LiveData | undefined, type: string, fallback: string): string {
+  const base = liveData?.school?.slug ? `/school/${liveData.school.slug}` : "";
+  const pages = liveData?.pages;
+  if (pages && pages.length > 0) {
+    const page =
+      pages.find((p) => p.page_type === type) ||
+      pages.find((p) => p.slug === fallback.replace(/^\//, ""));
+    if (page) return `${base}/${page.slug}`;
+  }
+  return `${base}${fallback}`;
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
@@ -396,7 +415,7 @@ function NoticesSection({ c, liveData }: { c: C; liveData?: LiveData }) {
             </h2>
           </div>
           {showViewAll && liveData?.school?.slug && (
-            <a href={`/school/${liveData.school.slug}/notices`} className="text-sm font-semibold hover:underline" style={{ color: "var(--color-accent, #f59e0b)" }}>View All</a>
+            <a href={livePath(liveData, "notices", "/notices")} className="text-sm font-semibold hover:underline" style={{ color: "var(--color-accent, #f59e0b)" }}>View All</a>
           )}
         </div>
 
@@ -468,7 +487,7 @@ function TeachersSection({ c, liveData }: { c: C; liveData?: LiveData }) {
             </h2>
           </div>
           {showViewAll && liveData?.school?.slug && (
-            <a href={`/school/${liveData.school.slug}/teachers`} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
+            <a href={livePath(liveData, "teachers", "/teachers")} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
           )}
         </div>
         <div className={`grid gap-5 ${colClass[gridCols(c.columns, 4)]}`}>
@@ -524,7 +543,7 @@ function GallerySection({ c, liveData }: { c: C; liveData?: LiveData }) {
           </h2>
         </div>
         {showViewAll && liveData?.school?.slug && (
-          <a href={`/school/${liveData.school.slug}/gallery`} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
+          <a href={livePath(liveData, "gallery", "/gallery")} className="text-sm font-semibold hover:underline hidden sm:block" style={{ color: "var(--color-primary, #1e3a5f)" }}>View All</a>
         )}
       </div>
       <div className={`grid gap-3 ${colClass[cols]}`}>

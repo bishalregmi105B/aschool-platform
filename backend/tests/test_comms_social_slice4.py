@@ -24,7 +24,7 @@ Pins the runtime-verified fixes E190-E199 (audits/FIX_STATUS_2026-08-30.md):
 import base64
 import json
 import uuid as _uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -431,7 +431,7 @@ def test_post_scheduler_uses_real_columns(db, school):
 
     result = PostSchedulerService.schedule_post(
         str(school.id), "scheduled announcement", ["facebook"],
-        datetime.utcnow() + timedelta(hours=1))
+        datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1))
     assert result["status"] == "scheduled"
     row = SocialPost.query.filter_by(
         school_id=school.id, status="scheduled").first()

@@ -4,7 +4,10 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev libpango-1.0-0 libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info fontconfig && \
+    libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info fontconfig \
+    # P-02: pg_dump for the nightly backup task (was silently failing —
+    # the binary was never installed in the image)
+    postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
 # Devanagari fonts for WeasyPrint PDFs (Noto, SIL OFL) — installed system-wide

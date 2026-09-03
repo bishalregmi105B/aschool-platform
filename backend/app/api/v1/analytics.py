@@ -1,6 +1,6 @@
 """Analytics & dashboard API for school and platform summaries."""
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -116,7 +116,7 @@ def _overview_payload(school_id):
     pending_fee_amount = 0.0
     total_fee_amount = 0.0
     total_paid_fee = 0.0
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Fee math must use the PAYABLE amount (base + late fine − discount), not
     # the raw `amount` column — the same discount-blind bug class fixed in
@@ -406,7 +406,7 @@ def academic():
 @role_required("school_admin", "accountant")
 def financial():
     period = request.args.get("period", "yearly")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if period == "monthly":
         start = now - timedelta(days=30)
     elif period == "quarterly":

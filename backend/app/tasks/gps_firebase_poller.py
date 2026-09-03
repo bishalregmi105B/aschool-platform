@@ -17,6 +17,7 @@ from extensions import celery, db
 from app.models.school import School
 from app.models.transport import Bus, GPSLog
 from app.tasks.gps_processing import check_geofence_alerts, process_gps_data
+from app.utils.task_locks import task_lock
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def _pick_latest_fix(node):
 
 
 @celery.task(name="poll_firebase_gps", queue="gps")
+@task_lock("poll-firebase-gps", ttl=14)
 def poll_firebase_gps():
     """Pull latest GPS fixes from Firebase RTDB for all registered devices."""
     base_url = (os.getenv("FIREBASE_DATABASE_URL") or "").rstrip("/")

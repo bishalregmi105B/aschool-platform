@@ -1,5 +1,5 @@
 """AI Token models — per-school quota and per-call usage log."""
-from sqlalchemy import Boolean, Column, Float, Integer, String, Text
+from sqlalchemy import Numeric, Boolean, Column, Float, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.models.base import SchoolModel
@@ -42,6 +42,10 @@ class AIUsageLog(SchoolModel):
     total_tokens = Column(Integer, nullable=False, default=0)
     latency_ms = Column(Integer, default=0)
     status = Column(String(20), nullable=False, default="success")  # success | error | quota_exceeded
+    # A-01 cost accounting: USD/NPR cost of the call (price-sheet derived);
+    # quota enforcement moves to COST since Groq vs Claude differ ~40x.
+    cost_usd = Column(Numeric(10, 6))
+    cost_npr = Column(Numeric(12, 4))
     error_message = Column(Text)
     metadata_ = Column("metadata", JSONB)          # prompt hash, doc type, etc.
 

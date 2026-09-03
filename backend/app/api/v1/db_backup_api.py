@@ -17,12 +17,26 @@ def backup_status():
     from datetime import datetime, timezone, timedelta
     import os
 
-    # Try to get last backup info from Celery result backend or env
-    last_backup = os.environ.get("LAST_DB_BACKUP_AT", None)
+    # P-02: honest state from the system_settings KV table (written by the
+    # nightly task); fall back to the legacy env var, then None.
+    last_backup = None
+    try:
+        from app.models.system import SystemSetting
+
+        row = SystemSetting.query.filter_by(key="last_db_backup_at").first()
+        if row and isinstance(row.value, dict):
+            last_backup = row.value.get("at")
+            size_mb = row.value.get("size_mb")
+        else:
+            size_mb = None
+    except Exception:  # noqa: BLE001 — status endpoint must never 500
+        size_mb = None
+    last_backup = last_backup or os.environ.get("LAST_DB_BACKUP_AT")
     backup_dest = os.environ.get("DB_BACKUP_DEST", "r2" if os.environ.get("R2_BUCKET_NAME") else "local")
 
     return success_response({
         "last_backup_at": last_backup,
+        "last_backup_size_mb": size_mb,
         "backup_destination": backup_dest,
         "scheduled_time": "03:00 UTC daily",
         "status": "configured",

@@ -194,6 +194,14 @@ class TestResetPassword:
         ):
             from app import create_app as _create_app
 
+            # The E96 per-email cooldown (raw redis namespace, 60s) was set
+            # by this test's first forgot-password call — clear it so the
+            # re-mint is testable (cooldown behavior has its own test).
+            from extensions import redis_client as _rc
+
+            if _rc is not None:
+                _rc.delete(f"pwreset_cooldown:{reset_target.email}")
+
             fresh = _create_app().test_client()
             resp = fresh.post(
                 "/api/v1/auth/forgot-password",
@@ -203,20 +211,23 @@ class TestResetPassword:
         token = _extract_token(captured["html"])
 
         # Weak password rejected (token NOT consumed — validated before store).
-        weak = client.post(
+        # Use the cookie-less `fresh` client: `client` carries the login's
+        # auth cookies, and the CSRF guard rejects cookie-authenticated
+        # state-changing requests that present no Origin (deliberate).
+        weak = fresh.post(
             "/api/v1/auth/reset-password",
             json={"token": token, "new_password": "weak"},
         )
         assert weak.status_code == 400
 
-        reset = client.post(
+        reset = fresh.post(
             "/api/v1/auth/reset-password",
             json={"token": token, "new_password": "NewPass123"},
         )
         assert reset.status_code == 200
 
         # Single use.
-        replay = client.post(
+        replay = fresh.post(
             "/api/v1/auth/reset-password",
             json={"token": token, "new_password": "OtherPass1"},
         )

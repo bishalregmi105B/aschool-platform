@@ -2,9 +2,10 @@
 Centralized AI Token Hub — the ONLY entry-point for all AI calls in ASchool.
 
 Every AI request must go through AITokenHub.request(). This service:
-  1. Checks per-school quota (daily + monthly)
+  1. Checks per-school quota (daily + monthly, cost-based)
   2. Routes to the configured provider (Groq PRIMARY, Anthropic FALLBACK)
-  3. Logs every call to ai_usage_logs
+     with timeouts, bounded retries and a per-provider circuit breaker (A-01)
+  3. Logs every call to ai_usage_logs with USD cost accounting
   4. Returns a provider-agnostic AIHubResponse
 
 Provider priority:
@@ -21,7 +22,10 @@ Usage:
     )
     text = result["text"]
 """
+import hashlib
 import logging
+import random
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -31,13 +35,110 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Provider constants
+# Provider constants — env-overridable (A-01: the env vars used to be dead)
 # ---------------------------------------------------------------------------
 GROQ_MODELS = {
     "fast":    "llama-3.1-8b-instant",
     "smart":   "llama-3.3-70b-versatile",
     "preview": "llama-3.3-70b-specdec",
 }
+
+
+def _groq_model_id(model_key: str) -> str:
+    """Model id from config (GROQ_MODEL_FAST/QUALITY) with catalog fallback."""
+    config = current_app.config
+    config_map = {
+        "fast": config.get("GROQ_MODEL_FAST") or GROQ_MODELS["fast"],
+        "smart": config.get("GROQ_MODEL_QUALITY") or GROQ_MODELS["smart"],
+    }
+    return config_map.get(model_key, config_map["smart"])
+
+
+# USD per 1M tokens (prompt, completion) — default price sheet, effective
+# 2026-09. Groq ~40× cheaper than Claude; quota enforcement is on COST.
+DEFAULT_MODEL_PRICES = {
+    ("groq", "llama-3.1-8b-instant"): (0.05, 0.08),
+    ("groq", "llama-3.3-70b-versatile"): (0.59, 0.79),
+    ("anthropic", "claude-haiku-4-5-20250514"): (0.80, 4.00),
+    ("anthropic", "claude-sonnet-4-20250514"): (3.00, 15.00),
+}
+
+
+def estimate_cost_usd(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """USD cost of one call from the price sheet (unknown models priced as
+    the provider's most expensive entry — fail conservative)."""
+    key = (provider, model)
+    if key not in DEFAULT_MODEL_PRICES:
+        provider_rates = [r for (p, _), r in DEFAULT_MODEL_PRICES.items() if p == provider]
+        key = (provider, "unknown")
+        DEFAULT_MODEL_PRICES[key] = max(provider_rates) if provider_rates else (3.0, 15.0)
+    prompt_rate, completion_rate = DEFAULT_MODEL_PRICES[key]
+    return round(
+        (prompt_tokens * prompt_rate + completion_tokens * completion_rate) / 1_000_000,
+        6,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Circuit breaker + retry policy (A-01)
+# ---------------------------------------------------------------------------
+class _CircuitBreaker:
+    """Per-provider breaker: open after N consecutive failures, half-open
+    after cooldown. A dead Groq must not add its full timeout to every call."""
+
+    def __init__(self, failure_threshold: int = 5, cooldown_seconds: int = 60):
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = cooldown_seconds
+        self._consecutive_failures = 0
+        self._opened_at: float | None = None
+        self._lock = threading.Lock()
+
+    def allow(self) -> bool:
+        with self._lock:
+            if self._opened_at is None:
+                return True
+            if time.time() - self._opened_at >= self.cooldown_seconds:
+                # half-open: allow one probe
+                return True
+            return False
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._consecutive_failures = 0
+            self._opened_at = None
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self.failure_threshold:
+                self._opened_at = time.time()
+
+    @property
+    def is_open(self) -> bool:
+        with self._lock:
+            return self._opened_at is not None and (
+                time.time() - self._opened_at < self.cooldown_seconds
+            )
+
+
+_BREAKERS: dict[str, _CircuitBreaker] = {}
+_BREAKERS_LOCK = threading.Lock()
+
+
+def _breaker(provider: str) -> _CircuitBreaker:
+    with _BREAKERS_LOCK:
+        if provider not in _BREAKERS:
+            _BREAKERS[provider] = _CircuitBreaker()
+        return _BREAKERS[provider]
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """429 / 5xx / connection errors are retryable; 401/400 are not."""
+    status = getattr(exc, "status_code", None)
+    if status is not None:
+        return status == 429 or 500 <= int(status) < 600
+    type_name = type(exc).__name__.lower()
+    return any(t in type_name for t in ("timeout", "connection", "ratelimit", "apierror", "internal"))
 
 
 class QuotaExceededError(Exception):
@@ -104,21 +205,25 @@ def _get_groq_client():
 
 def _get_anthropic_client():
     import anthropic
+    timeout = current_app.config.get("AI_TIMEOUT_QUALITY", 90)
     return anthropic.Anthropic(
-        api_key=current_app.config["ANTHROPIC_API_KEY"]
+        api_key=current_app.config["ANTHROPIC_API_KEY"],
+        timeout=timeout,
     )
 
 
 def _call_groq(messages: list, model_key: str, max_tokens: int, temperature: float) -> dict:
-    """Call Groq and return a normalised response dict."""
+    """Call Groq and return a normalised response dict (timeout enforced)."""
     client = _get_groq_client()
-    model_id = GROQ_MODELS.get(model_key, GROQ_MODELS["smart"])
+    model_id = _groq_model_id(model_key)
+    timeout = current_app.config.get("AI_TIMEOUT_FAST" if model_key == "fast" else "AI_TIMEOUT_QUALITY", 60)
     t0 = time.time()
     completion = client.chat.completions.create(
         model=model_id,
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
+        timeout=timeout,
     )
     latency_ms = int((time.time() - t0) * 1000)
     usage = completion.usage
@@ -261,8 +366,9 @@ def _log_call(
     status: str,
     error_message: str | None = None,
     metadata: dict | None = None,
+    cost_usd: float | None = None,
 ) -> None:
-    """Persist a single AI call record."""
+    """Persist a single AI call record (with cost accounting, A-01)."""
     from extensions import db
     from app.models.ai_token import AIUsageLog
 
@@ -280,12 +386,53 @@ def _log_call(
         error_message=error_message,
         metadata_=metadata,
     )
+    if cost_usd is not None and hasattr(AIUsageLog, "cost_usd"):
+        entry.cost_usd = cost_usd
     try:
         db.session.add(entry)
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
         logger.warning("Failed to persist AI usage log: %s", exc)
+
+
+def _call_with_retries(provider_fn, model_key: str, messages: list, max_tokens: int, temperature: float) -> dict:
+    """Run one provider call with bounded retries + circuit breaker (A-01).
+
+    Retries only 429/5xx/connection errors, exponential backoff with jitter,
+    max AI_MAX_RETRIES attempts (default 2 retries = 3 attempts).
+    """
+    max_retries = int(current_app.config.get("AI_MAX_RETRIES", 2) or 2)
+    breaker = _breaker(provider_fn.__name__)
+    last_exc: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        if not breaker.allow():
+            raise AIProviderError(
+                f"Circuit breaker open for {provider_fn.__name__} "
+                f"({breaker.failure_threshold} consecutive failures) — try again shortly"
+            )
+        try:
+            result = provider_fn(
+                messages=messages,
+                model_key=model_key,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            breaker.record_success()
+            return result
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            breaker.record_failure()
+            if attempt >= max_retries or not _is_retryable(exc):
+                raise
+            backoff = min(2 ** attempt, 8) + random.random()
+            logger.warning(
+                "AI call attempt %d/%d failed (%s) — retrying in %.1fs",
+                attempt + 1, max_retries + 1, exc, backoff,
+            )
+            time.sleep(backoff)
+    raise AIProviderError(f"AI provider failed after {max_retries + 1} attempts: {last_exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -372,13 +519,16 @@ class AITokenHub:
                 "or ANTHROPIC_API_KEY (fallback)."
             )
 
-        # 3. Call provider (with fallback on failure)
+        # 3. Call provider (with bounded retries + circuit breaker + fallback)
+        prompt_sha = hashlib.sha256(
+            "\n".join(str(m.get("content", "")) for m in messages).encode()
+        ).hexdigest()[:16]
+        log_meta = dict(metadata or {})
+        log_meta.setdefault("prompt_sha256", prompt_sha)
+
         try:
-            result = provider_fn(
-                messages=messages,
-                model_key=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
+            result = _call_with_retries(
+                provider_fn, model, messages, max_tokens, temperature
             )
         except Exception as primary_exc:
             # Try fallback provider if available
@@ -389,11 +539,8 @@ class AITokenHub:
                     fallback_fn.__name__,
                 )
                 try:
-                    result = fallback_fn(
-                        messages=messages,
-                        model_key=model,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
+                    result = _call_with_retries(
+                        fallback_fn, model, messages, max_tokens, temperature
                     )
                 except Exception as fallback_exc:
                     _log_call(
@@ -408,7 +555,7 @@ class AITokenHub:
                         latency_ms=0,
                         status="error",
                         error_message=f"Primary: {primary_exc}; Fallback: {fallback_exc}",
-                        metadata=metadata,
+                        metadata=log_meta,
                     )
                     raise AIProviderError(f"AI providers failed: {fallback_exc}") from fallback_exc
             else:
@@ -424,11 +571,15 @@ class AITokenHub:
                     latency_ms=0,
                     status="error",
                     error_message=str(primary_exc),
-                    metadata=metadata,
+                    metadata=log_meta,
                 )
                 raise AIProviderError(f"AI provider call failed: {primary_exc}") from primary_exc
 
-        # 4. Log success
+        # 4. Log success with cost accounting (A-01)
+        cost_usd = estimate_cost_usd(
+            result["provider"], result["model"],
+            result["prompt_tokens"], result["completion_tokens"],
+        )
         _log_call(
             school_id=school_id,
             user_id=user_id,
@@ -440,7 +591,8 @@ class AITokenHub:
             total_tokens=result["total_tokens"],
             latency_ms=result["latency_ms"],
             status="success",
-            metadata=metadata,
+            metadata=log_meta,
+            cost_usd=cost_usd,
         )
 
         return {
@@ -449,6 +601,7 @@ class AITokenHub:
             "model":       result["model"],
             "provider":    result["provider"],
             "latency_ms":  result["latency_ms"],
+            "cost_usd":    cost_usd,
         }
 
     # ------------------------------------------------------------------

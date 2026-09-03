@@ -1,5 +1,5 @@
 """Student Dismissal & Pickup API — authorized pickups, QR verification, records."""
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
@@ -131,7 +131,7 @@ def create_record():
     record = DismissalRecord(
         school_id=g.school_id,
         dismissed_by_id=claims.get("sub"),
-        dismissed_at=datetime.utcnow(),
+        dismissed_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     for key in ("student_id", "picked_up_by", "pickup_id", "qr_verified", "notes"):
         if key in data:
@@ -212,7 +212,7 @@ def verify_qr():
         pickup_id=pickup_id,
         qr_verified=True,
         dismissed_by_id=claims.get("sub"),
-        dismissed_at=datetime.utcnow(),
+        dismissed_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.session.add(record)
     db.session.commit()

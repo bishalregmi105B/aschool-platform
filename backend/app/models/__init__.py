@@ -1,6 +1,6 @@
 """Models package — import all models so Alembic can discover them."""
 from app.models.base import BaseModel, SchoolModel  # noqa: F401
-from app.models.school import School, SchoolWebsite, SchemeGrade  # noqa: F401
+from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptCounter  # noqa: F401
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.student import Student, Guardian, StudentHealthRecord  # noqa: F401
@@ -15,6 +15,7 @@ from app.models.fee import (  # noqa: F401
     FeeType,
     PaymentInitiation,
     StudentScholarship,
+    FeeRefund,
 )
 from app.models.notice import Notice, Event  # noqa: F401
 from app.models.chat import ChatThread, ChatMessage  # noqa: F401
@@ -63,3 +64,11 @@ from app.models.revoked_token import RevokedToken  # noqa: F401,E402 — must be
 from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog  # noqa: F401
 from app.models.disaster_management import DisasterDrill, DrillParticipation  # noqa: F401
 from app.models.incident_management import IncidentEscalation, IncidentWorkflowEvent  # noqa: F401
+# faqs / hostel tables have migrations (c1d2e3f4a5b6, d2e3f4a5b6c7) but were
+# absent here — autogenerate treated the models as orphaned and could emit
+# drops for live tables (D-01).
+from app.models.faq import FAQ  # noqa: F401
+from app.models.webhook import ProcessedWebhookEvent  # noqa: F401
+from app.models.system import SystemSetting  # noqa: F401
+from app.models.question_bank import QuestionBankItem, PaperBlueprint, GeneratedPaper  # noqa: F401
+from app.models.hostel import Hostel, HostelRoom, HostelAllocation  # noqa: F401

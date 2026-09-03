@@ -8,7 +8,7 @@ audit + validation (E187), visitor checkout/appointment guards (E188) and
 transport update-side FK checks (E189).
 """
 import uuid as _uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -282,7 +282,7 @@ def test_e185_hr_stats_monthly_payroll_is_current_month_only(client, db, school,
 
     _install_plugin(db, school, "hr_payroll")
     h = get_auth_headers(client, "admin@test.edu.np", "Test@1234")
-    current = datetime.utcnow().strftime("%Y-%m")
+    current = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m")
     db.session.add(StaffPayroll(school_id=school.id, user_id=admin_user.id,
                                 month=current, basic_salary=5000,
                                 gross_salary=5000, net_salary=5000))

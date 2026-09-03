@@ -2,11 +2,13 @@
 from extensions import celery
 from datetime import date
 import logging
+from app.utils.task_locks import task_lock
 
 logger = logging.getLogger(__name__)
 
 
 @celery.task(name="payroll_monthly_process")
+@task_lock("payroll-monthly", ttl=6 * 3600)
 def process_monthly_payroll():
     """Run on 1st of each month: generate draft payroll records for all active staff.
 

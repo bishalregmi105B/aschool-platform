@@ -1,11 +1,13 @@
+import json
 """AI Tools Suite API — question paper, lesson plan, timetable, remarks, insights."""
-from flask import Blueprint, g, request
+from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
 from app.plugins.config_store import plugin_config_value
 from app.plugins.decorators import plugin_required
+from app.utils.rate_limiter import ai_rate_limit
 from app.utils.decorators import role_required, school_required
-from app.utils.response import error_response, success_response
+from app.utils.response import created_response, error_response, success_response
 from extensions import db
 
 ai_tools_bp = Blueprint("ai_tools", __name__, url_prefix="/ai-tools")
@@ -16,6 +18,7 @@ ai_tools_bp = Blueprint("ai_tools", __name__, url_prefix="/ai-tools")
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
 def generate_question_paper():
     """Generate an AI-powered exam question paper."""
     from app.services.ai.question_paper import QuestionPaperService
@@ -51,6 +54,7 @@ def generate_question_paper():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
 def generate_lesson_plan():
     """Generate an AI-powered lesson plan."""
     from app.services.ai.lesson_plan import LessonPlanService
@@ -87,6 +91,7 @@ def generate_lesson_plan():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin")
+@ai_rate_limit()
 def generate_timetable():
     """Generate an AI-optimized clash-free timetable."""
     from app.services.ai.timetable_solver import TimetableSolverService
@@ -112,6 +117,7 @@ def generate_timetable():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin")
+@ai_rate_limit()
 def save_timetable():
     """Save a generated timetable to the database."""
     from app.services.ai.timetable_solver import TimetableSolverService
@@ -129,6 +135,7 @@ def save_timetable():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
 def generate_remarks():
     """Generate AI-powered report card remarks for a student."""
     from app.services.ai.question_paper import QuestionPaperService
@@ -152,6 +159,7 @@ def generate_remarks():
 @jwt_required()
 @school_required
 @plugin_required("ai_tools")
+@ai_rate_limit()
 def homework_help():
     """AI homework helper — guided hints, not direct answers."""
     from app.services.ai.homework_helper import HomeworkHelperService
@@ -174,6 +182,7 @@ def homework_help():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin")
+@ai_rate_limit()
 def weekly_insights():
     """Get AI-generated weekly school intelligence report."""
     from app.services.ai.school_insights import SchoolInsightsService
@@ -187,6 +196,7 @@ def weekly_insights():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin")
+@ai_rate_limit()
 def daily_brief():
     """Get AI-generated daily morning brief."""
     from app.services.ai.school_insights import SchoolInsightsService
@@ -200,6 +210,7 @@ def daily_brief():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
 def risk_alerts():
     """Get at-risk student detection."""
     from app.services.ai.school_insights import SchoolInsightsService
@@ -213,6 +224,7 @@ def risk_alerts():
 @school_required
 @plugin_required("ai_tools")
 @role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
 def generate_letter():
     """Generate a school letter/circular draft (web AI Letter Writer)."""
     from app.services.ai.question_paper import QuestionPaperService
@@ -230,3 +242,223 @@ def generate_letter():
         tone=data.get("tone") or "formal",
     )
     return success_response({"content": letter})
+
+
+# ── A-03: Question Bank + Paper Generator v2 ─────────────────────────────
+
+
+@ai_tools_bp.route("/question-bank", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def list_question_bank():
+    """List/search the school's question pool."""
+    from app.models.question_bank import QuestionBankItem
+
+    query = QuestionBankItem.query.filter(
+        QuestionBankItem.school_id == g.school_id,
+        QuestionBankItem.is_deleted.is_(False),
+    )
+    subject_id = request.args.get("subject_id")
+    if subject_id:
+        query = query.filter(QuestionBankItem.subject_id == subject_id)
+    qtype = request.args.get("question_type")
+    if qtype:
+        query = query.filter(QuestionBankItem.question_type == qtype)
+    difficulty = request.args.get("difficulty")
+    if difficulty:
+        query = query.filter(QuestionBankItem.difficulty == difficulty)
+    approved = request.args.get("approved")
+    if approved == "true":
+        query = query.filter(QuestionBankItem.is_approved.is_(True))
+    search = (request.args.get("q") or "").strip()
+    if search:
+        query = query.filter(QuestionBankItem.question_text.ilike(f"%{search}%"))
+
+    items = query.order_by(QuestionBankItem.created_at.desc()).limit(200).all()
+    return success_response([i.to_dict() for i in items])
+
+
+@ai_tools_bp.route("/question-bank", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def add_question_bank_items():
+    """Bulk-add manual questions to the bank."""
+    from app.models.question_bank import QuestionBankItem
+    from app.utils.llm_output import parse_and_validate
+
+    data = request.get_json(silent=True) or {}
+    items = data.get("items") or []
+    if not items:
+        return error_response("items is required (non-empty list)")
+
+    created = []
+    for raw in items:
+        try:
+            item = parse_and_validate(
+                raw if isinstance(raw, str) else json.dumps(raw),
+                schema={
+                    "type": "object",
+                    "required": ["subject_id", "question_text", "question_type"],
+                    "properties": {
+                        "question_type": {"type": "string"},
+                        "question_text": {"type": "string"},
+                    },
+                },
+            )
+        except ValueError as exc:
+            return error_response(f"invalid item: {exc}", 400)
+        entry = QuestionBankItem(
+            school_id=g.school_id,
+            subject_id=item["subject_id"],
+            class_id=item.get("class_id"),
+            created_by_id=g.user_id,
+            question_text=item["question_text"].strip(),
+            question_type=item["question_type"],
+            difficulty=item.get("difficulty") or "medium",
+            marks=item.get("marks") or 1,
+            topic=item.get("topic"),
+            options=item.get("options") or [],
+            correct_answer=item.get("correct_answer"),
+            explanation=item.get("explanation"),
+            source="manual",
+            is_approved=True,  # manual entry is teacher-authored
+        )
+        db.session.add(entry)
+        created.append(entry)
+    db.session.commit()
+    return created_response([e.to_dict() for e in created])
+
+
+@ai_tools_bp.route("/question-bank/<uuid:item_id>", methods=["PUT"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def update_question_bank_item(item_id):
+    """Approve/edit a bank item (the AI-item review step)."""
+    from app.models.question_bank import QuestionBankItem
+
+    item = QuestionBankItem.query.filter_by(
+        id=item_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not item:
+        return error_response("Question not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    if "question_text" in data:
+        item.question_text = data["question_text"]
+    if "correct_answer" in data:
+        item.correct_answer = data["correct_answer"]
+    if "difficulty" in data:
+        item.difficulty = data["difficulty"]
+    if "marks" in data:
+        item.marks = data["marks"]
+    if "topic" in data:
+        item.topic = data["topic"]
+    if "is_approved" in data:
+        item.is_approved = bool(data["is_approved"])
+    db.session.commit()
+    return success_response(item.to_dict())
+
+
+@ai_tools_bp.route("/question-bank/<uuid:item_id>", methods=["DELETE"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def delete_question_bank_item(item_id):
+    from app.models.question_bank import QuestionBankItem
+
+    item = QuestionBankItem.query.filter_by(
+        id=item_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not item:
+        return error_response("Question not found", 404)
+    item.is_deleted = True
+    db.session.commit()
+    return success_response({"deleted": True})
+
+
+@ai_tools_bp.route("/question-paper/v2", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
+def generate_question_paper_v2():
+    """Generate a paper from a blueprint (bank-first, then AI shortfall)."""
+    from app.models.question_bank import GeneratedPaper, PaperBlueprint
+    from app.services.ai.question_paper_v2 import QuestionPaperServiceV2
+
+    data = request.get_json(silent=True) or {}
+    blueprint_id = data.get("blueprint_id")
+
+    if blueprint_id:
+        blueprint = PaperBlueprint.query.filter_by(
+            id=blueprint_id, school_id=g.school_id, is_deleted=False
+        ).first()
+        if not blueprint:
+            return error_response("Blueprint not found", 404)
+    else:
+        # inline blueprint from the request
+        required = ("name", "subject_id", "total_marks", "sections")
+        missing = [f for f in required if not data.get(f)]
+        if missing:
+            return error_response(f"Missing required fields: {', '.join(missing)}")
+        blueprint = PaperBlueprint(
+            school_id=g.school_id,
+            name=data["name"],
+            subject_id=data["subject_id"],
+            class_id=data.get("class_id"),
+            total_marks=data["total_marks"],
+            duration_minutes=data.get("duration_minutes", 180),
+            sections=data["sections"],
+            language=data.get("language", "en"),
+            created_by_id=g.user_id,
+        )
+        db.session.add(blueprint)
+        db.session.flush()
+
+    try:
+        paper = QuestionPaperServiceV2.generate_from_blueprint(
+            blueprint,
+            school_id=g.school_id,
+            user_id=g.user_id,
+            title=data.get("title"),
+        )
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception("Paper v2 generation failed")
+        return error_response(f"Paper generation failed: {exc}", 502)
+
+    include_answers = bool(data.get("include_answer_key"))
+    payload = paper.to_dict(include_answers=include_answers)
+    payload["ai_generated_count"] = sum(
+        1 for q in (paper.questions or []) if q.get("source") == "ai"
+    )
+    payload["bank_used_count"] = sum(
+        1 for q in (paper.questions or []) if q.get("source") == "bank"
+    )
+    return created_response(payload)
+
+
+@ai_tools_bp.route("/generated-papers/<uuid:paper_id>", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("ai_tools")
+@role_required("superadmin", "school_admin", "teacher")
+def get_generated_paper(paper_id):
+    """Fetch a generated paper; ?include_answer_key=true for the key."""
+    from app.models.question_bank import GeneratedPaper
+
+    paper = GeneratedPaper.query.filter_by(
+        id=paper_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not paper:
+        return error_response("Paper not found", 404)
+    include_answers = request.args.get("include_answer_key") == "true"
+    return success_response(paper.to_dict(include_answers=include_answers))

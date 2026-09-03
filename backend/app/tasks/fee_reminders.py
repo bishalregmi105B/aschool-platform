@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 
 from extensions import celery
+from app.utils.task_locks import task_lock
 from app.utils.tenant_url import school_site_domain
 
 logger = logging.getLogger(__name__)
@@ -150,6 +151,7 @@ def send_single_fee_reminder(school_id: str, student_id: str) -> dict:
 
 
 @celery.task(name="dispatch_fee_reminders", queue="default")
+@task_lock("dispatch-fee-reminders", ttl=1800)
 def dispatch_fee_reminders():
     """Fan out fee reminders for every active school."""
     from app.models.school import School
@@ -167,6 +169,7 @@ def dispatch_fee_reminders():
 
 
 @celery.task(name="send_fee_reminders", queue="default")
+@task_lock("fee-reminders-{school_id}", ttl=1800)
 def send_fee_reminders(school_id: str):
     """Send fee reminders for overdue payments."""
     from app.models.fee import FeeCollection
@@ -198,7 +201,21 @@ def send_fee_reminders(school_id: str):
         FeeCollection.is_deleted.is_(False),
     ).all()
 
+    # P-01(c): a reminder at most once per REMINDER_DEDUPE_HOURS per fee —
+    # a re-fired beat (restart mid-window, worker retry) must not spam the
+    # same guardian twice.
+    REMINDER_DEDUPE_HOURS = 72
+    dedupe_cutoff = datetime.now(timezone.utc) - timedelta(hours=REMINDER_DEDUPE_HOURS)
+
     for fee in overdue:
+        if fee.last_reminder_sent_at is not None:
+            last = fee.last_reminder_sent_at
+            if last.tzinfo is None:
+                from datetime import timezone as _tz
+
+                last = last.replace(tzinfo=_tz.utc)
+            if last >= dedupe_cutoff:
+                continue
         student = Student.query.get(fee.student_id)
         if not student:
             continue
@@ -254,6 +271,13 @@ def send_fee_reminders(school_id: str):
                     )
         except Exception as _e:
             logger.warning("Fee reminder push failed for student %s: %s", student.id, _e)
+
+        # P-01(c): stamp AFTER delivery attempts so a crash mid-loop retries
+        # only the un-sent tail.
+        fee.last_reminder_sent_at = datetime.now(timezone.utc)
+    from extensions import db
+
+    db.session.commit()
 
 
 def _fee_payable_total(collection) -> float:
@@ -389,6 +413,7 @@ def generate_monthly_fee_report(school_id: str, month: int, year: int):
 # ── Auto-generate monthly fee collections (BS month 1) ──────────────────
 
 @celery.task(name="auto_generate_monthly_fees", queue="default")
+@task_lock("auto-generate-fees", ttl=6 * 3600)
 def auto_generate_monthly_fees():
     """Run daily: generates FeeCollection records for all students on the 1st
     of each Bikram Sambat month based on active monthly FeeStructures.

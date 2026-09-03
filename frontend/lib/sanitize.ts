@@ -117,3 +117,31 @@ export function sanitizeCss(css: string | null | undefined): string {
   }
   return safeBlocks.join("\n");
 }
+
+const _HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const _COLOR_WORD_RE = /^[a-z]+$/i;
+const _COLOR_WORDS = new Set([
+  "transparent", "currentcolor", "white", "black", "red", "green",
+  "blue", "yellow", "orange", "purple", "gray", "grey",
+]);
+
+/**
+ * Keep only real color values from customizations.colors (S-11): these are
+ * interpolated into the public site's <style> block, so any value that can
+ * break out (e.g. `</style><script>`) must never reach the template. Values
+ * are also allowlisted server-side — this is defense in depth.
+ */
+export function sanitizeColorOverrides(
+  colors: Record<string, unknown> | null | undefined
+): Record<string, string> {
+  if (!colors) return {};
+  const clean: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(colors)) {
+    if (typeof raw !== "string") continue;
+    const v = raw.trim();
+    if (_HEX_COLOR_RE.test(v) || (_COLOR_WORD_RE.test(v) && _COLOR_WORDS.has(v.toLowerCase()))) {
+      clean[key] = v;
+    }
+  }
+  return clean;
+}

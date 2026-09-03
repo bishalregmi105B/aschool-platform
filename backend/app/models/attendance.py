@@ -17,6 +17,8 @@ class Attendance(SchoolModel):
 
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
+    # D-05 expand: year-anchored attendance (contract phase makes it NOT NULL)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
     section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"))
     date = Column(Date, nullable=False)
     date_bs = Column(String(10))

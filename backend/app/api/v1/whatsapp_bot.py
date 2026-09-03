@@ -1,3 +1,4 @@
+from datetime import timezone
 """WhatsApp Bot API — chatbot config, auto-replies, conversation management."""
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import aliased
@@ -337,7 +338,7 @@ def get_analytics():
 
     school_id = g.school_id
     days = min(max(int(request.args.get("days", 14) or 14), 1), 90)
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
     daily = (
         WhatsAppMessage.query.filter(

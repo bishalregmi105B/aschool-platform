@@ -1,3 +1,4 @@
+from datetime import timezone
 """Social Hub sync tasks — content moderation, activity digests."""
 
 from extensions import celery
@@ -11,7 +12,7 @@ def send_activity_digest(school_id: str):
     from extensions import db
     from datetime import datetime, timedelta
 
-    yesterday = datetime.utcnow() - timedelta(days=1)
+    yesterday = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
 
     post_count = Post.query.filter(
         Post.school_id == school_id,

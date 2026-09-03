@@ -1,6 +1,6 @@
 """Visitor Management API — check-in, check-out, appointments."""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
@@ -72,7 +72,7 @@ def checkin_visitor():
             )
     visitor = Visitor(
         school_id=g.school_id,
-        checked_in_at=datetime.utcnow(),
+        checked_in_at=datetime.now(timezone.utc).replace(tzinfo=None),
         status="checked_in",
     )
     for key in ("name", "phone", "email", "id_type", "id_number", "photo_url",
@@ -99,7 +99,7 @@ def checkout_visitor(visitor_id):
     # original checkout timestamp used to be silently overwritten).
     if visitor.status == "checked_out":
         return error_response("Visitor is already checked out", 400)
-    visitor.checked_out_at = datetime.utcnow()
+    visitor.checked_out_at = datetime.now(timezone.utc).replace(tzinfo=None)
     visitor.status = "checked_out"
     db.session.commit()
     return success_response(_visitor_dict(visitor))

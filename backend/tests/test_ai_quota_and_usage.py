@@ -8,7 +8,7 @@ Pins:
 4. AdaptiveLearningAI.assess_mastery returns JSON-safe floats (Numeric→Decimal).
 """
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 from flask_jwt_extended import create_access_token
@@ -147,7 +147,7 @@ def test_daily_chart_covers_last_seven_days_only(client, db, school, admin_user)
     db.session.commit()
     db.session.execute(
         text("UPDATE ai_usage_logs SET created_at = :c WHERE id = :i"),
-        {"c": datetime.utcnow() - timedelta(days=20), "i": old_row.id},
+        {"c": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=20), "i": old_row.id},
     )
     db.session.commit()
 
@@ -190,7 +190,7 @@ def test_risk_alerts_counts_incidents_via_involved_student_ids(client, db, schoo
         Incident(
             school_id=school.id, title="Fight", incident_type="behavioral",
             reported_by_id=admin_user.id, involved_student_ids=[student.id],
-            occurred_at=datetime.utcnow(),
+            occurred_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     )
     db.session.commit()

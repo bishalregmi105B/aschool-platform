@@ -1,6 +1,6 @@
 """LMS Video Service — Jitsi live class management + recording."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class VideoService:
         if not lc:
             return {"error": "Class not found"}
         lc.status = "live"
-        lc.started_at = datetime.utcnow()
+        lc.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
         return {"status": "live", "join_url": lc.join_url}
 
@@ -67,7 +67,7 @@ class VideoService:
         if not lc:
             return {"error": "Class not found"}
         lc.status = "completed"
-        lc.ended_at = datetime.utcnow()
+        lc.ended_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
         return {"status": "completed"}
 

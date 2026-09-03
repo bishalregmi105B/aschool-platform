@@ -1,0 +1,9 @@
+node_modules
+.next
+coverage
+tsconfig.tsbuildinfo
+templates_demo
+*.test.*
+.git
+.env
+.env.local

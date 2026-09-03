@@ -1,7 +1,7 @@
 """School banner slider API."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
@@ -24,7 +24,7 @@ def list_sliders():
     if not include_inactive or role not in ("superadmin", "school_admin"):
         query = query.filter_by(is_active=True)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     query = query.filter(
         (SchoolSlider.starts_at.is_(None)) | (SchoolSlider.starts_at <= now),
         (SchoolSlider.ends_at.is_(None)) | (SchoolSlider.ends_at >= now),

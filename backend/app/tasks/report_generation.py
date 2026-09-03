@@ -223,12 +223,24 @@ def generate_bulk_report_cards(school_id: str, exam_id: str, class_id: str):
             .filter(ReportCard.student_id.in_([str(s.id) for s in students]))
             .all()
         )
-        for rank, card in enumerate(
-            sorted(cards, key=lambda c: (c.total_percentage if c.total_percentage is not None else -1), reverse=True),
-            start=1,
-        ):
-            card.rank_in_class = rank
-            card.rank = rank
+        # Competition ranking (1, 1, 3 — B-05): ties share a rank, the next
+        # rank skips. Nepali report cards expect this, not seat position.
+        sorted_cards = sorted(
+            cards,
+            key=lambda c: (c.total_percentage if c.total_percentage is not None else -1),
+            reverse=True,
+        )
+        better = 0
+        for i, card in enumerate(sorted_cards):
+            pct = card.total_percentage if card.total_percentage is not None else -1
+            if i > 0 and pct != float(
+                sorted_cards[i - 1].total_percentage
+                if sorted_cards[i - 1].total_percentage is not None
+                else -1
+            ):
+                better = i
+            card.rank_in_class = better + 1
+            card.rank = better + 1
         db.session.commit()
     except Exception as exc:  # noqa: BLE001 — ranking must not fail the export
         db.session.rollback()

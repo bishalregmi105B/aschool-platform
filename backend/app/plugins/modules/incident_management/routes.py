@@ -30,7 +30,7 @@ the school's admins) through the existing in-app notification service
 (`notifications.create_notification`).
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
@@ -83,7 +83,7 @@ TYPE_MAP = {
 @school_required
 @plugin_required("incident_management")
 def overview():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     month_start = datetime(now.year, now.month, 1)
     year_start = datetime(now.year, 1, 1)
     school_scoped = Incident.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -207,7 +207,7 @@ def create_case():
         incident_type=TYPE_MAP[raw_type],
         severity=severity,
         reported_by_id=get_jwt().get("sub"),
-        occurred_at=datetime.utcnow(),
+        occurred_at=datetime.now(timezone.utc).replace(tzinfo=None),
         parent_notified=bool(data.get("parent_notified")),
     )
     if student_id:
@@ -290,11 +290,11 @@ def change_status(incident_id):
     old_status = incident.status
     incident.status = new_status
     if new_status == "resolved":
-        incident.resolved_at = datetime.utcnow()
+        incident.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
         if resolution:
             incident.resolution = resolution
     elif new_status == "closed":
-        incident.resolved_at = incident.resolved_at or datetime.utcnow()
+        incident.resolved_at = incident.resolved_at or datetime.now(timezone.utc).replace(tzinfo=None)
     _audit(incident, "status_change", from_value=old_status, to_value=new_status,
            notes=resolution or data.get("notes"))
     db.session.commit()
@@ -348,7 +348,7 @@ def escalate_case(incident_id):
     old_status = incident.status
     db.session.add(escalation)
     incident.severity = after
-    incident.escalated_at = datetime.utcnow()
+    incident.escalated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     incident.escalated_to_id = target.id if target else None
     if incident.status == "reported":
         # An escalation means management is now looking at it.
@@ -395,7 +395,7 @@ def resolve_case(incident_id):
     old_status = incident.status
     incident.status = "resolved"
     incident.resolution = data.get("resolution")
-    incident.resolved_at = datetime.utcnow()
+    incident.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     _audit(incident, "resolve", from_value=old_status, to_value="resolved",
            notes=data.get("resolution") or data.get("notes"))
     db.session.commit()
@@ -428,7 +428,7 @@ def schedule_conference(incident_id):
     if data.get("conference_at") and conference_at is None:
         return error_response("conference_at must be an ISO datetime", 400)
     escalation.conference_scheduled = True
-    escalation.conference_scheduled_at = conference_at or datetime.utcnow()
+    escalation.conference_scheduled_at = conference_at or datetime.now(timezone.utc).replace(tzinfo=None)
     if data.get("notes"):
         escalation.conference_notes = data["notes"]
     incident.conference_scheduled = True
@@ -465,7 +465,7 @@ def audit_trail(incident_id):
 @plugin_required("incident_management")
 def reports():
     period = request.args.get("period", "this_month")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if period == "this_week":
         # Monday-based week (documented; the reports page offers week/month/year)
         start = (now - timedelta(days=now.weekday())).replace(

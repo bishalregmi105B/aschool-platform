@@ -193,7 +193,6 @@ class Post(SchoolModel):
     # author and school admins) may read, like, or comment.
     group_id = Column(UUID(as_uuid=True), ForeignKey("hub_groups.id"), index=True)
     group = relationship("Group", foreign_keys=[group_id])
-    is_deleted = Column(Boolean, default=False)
 
     author = relationship("User", backref="hub_posts", foreign_keys=[author_id])
     comments = relationship("Comment", back_populates="post", lazy="dynamic")
@@ -205,7 +204,6 @@ class Comment(SchoolModel):
     post_id = Column(UUID(as_uuid=True), ForeignKey("hub_posts.id"), nullable=False)
     author_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
-    is_deleted = Column(Boolean, default=False)
 
     post = relationship("Post", back_populates="comments")
     author = relationship("User")
@@ -219,7 +217,6 @@ class Group(SchoolModel):
     group_type = Column(String(30), default="class")  # class, club, staff, custom
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     member_count = Column(Integer, default=0)
-    is_deleted = Column(Boolean, default=False)
 
     creator = relationship("User")
     memberships = relationship(
