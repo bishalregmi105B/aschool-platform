@@ -39,6 +39,25 @@ All previous audit logs, simulation reports, and implementation plans have been 
 
 ## 📝 Real-Time Codebase Change Log
 
+### [2026-09-03] - Master plan phases 1-3+5 wave: celery, backups, timestamps, indexes, question bank v2, renderer seams, Nepal moat quick wins
+- **Author/Agent:** ZCode implementation agent (per `docs/MASTER_PLAN_2026-09.md`)
+- **Action Taken:**
+  - **P-01** `task_routes` default queue (20 beat tasks were published to the unconsumed `celery` queue — fee reminders/trial expiry silently never ran); worker `-Q` gains `celery` as transition; new `app/utils/task_locks.py` redis SET NX EX lock wrapped around 7 beat tasks; `fee_collections.last_reminder_sent_at` + 72h dedupe in `send_fee_reminders`; beat schedule volume-mounted; GPS beat `expires`; `acks_late` + time limits. Haversine at `gps_processing.py:149` VERIFIED CORRECT (audit false positive).
+  - **P-02** `postgresql-client` in the Dockerfile (pg_dump never existed in the image); new `system_settings` KV (model + migration) with real `last_db_backup_at` written by the task and read by `/db-backup/status`.
+  - **D-03** BaseModel timestamps → TIMESTAMPTZ with server defaults + server-side uuid default; **52** `datetime.utcnow()` sites swept to aware now(); 6 shadowed `is_deleted` re-declarations removed (website/lms/social).
+  - **D-04** migration `d7f2c8b3e9a4` programmatically indexed every unindexed FK (**215 created**) + 10 tenant-first composites + `users.email/phone` + `schools.custom_domain`.
+  - **D-05 (expand)** nullable `academic_year_id` FK + index on marks/report_cards/attendance/fee_receipts, backfilled from exams/students; `SchoolModel.for_school_and_year()` helper. NOT NULL contract phase deliberately deferred.
+  - **A-01** AITokenHub: env-driven timeouts + bounded retries with jitter + per-provider circuit breaker; `GROQ_MODEL_*` env vars now actually read; cost accounting (`cost_usd`/`cost_npr` columns + price sheet, quota basis moving to cost); `AI_QUOTA_ENFORCEMENT` strict parse ("1" no longer silently disables); sha256 prompt hashes in usage metadata; shared `app/utils/llm_output.py` `parse_and_validate()` (fence/span extraction + bounded repair + schema subset).
+  - **A-02** temperature discipline: all 8 `temperature=1.0` sites → 0.2 (grading, question paper) / 0.4 (documents).
+  - **A-03** Question Bank + Paper Generator v2: `QuestionBankItem`/`PaperBlueprint`/`GeneratedPaper` models (+migration `a3c8e2f5b7d9`); bank-first-then-generate pipeline (AI shortfall at temperature 0.2, structured output, generated items seeded unapproved); question-bank CRUD/approve routes; `POST /ai-tools/question-paper/v2`; answer key withheld by default.
+  - **W-01** renderer seams: real `<a>` CTAs with scheme allowlist (were dead `<span>`s), hero height honored, name??title / message??quote / subtitle fallbacks (live cards had empty headings), navbar nav from published builder pages, embed_url iframe allowlist (Maps/OSM + sandbox).
+  - **N-01** sidebar renders `label_nepali` (transmitted by manifests, never read) per `preferred_language`.
+  - **N-02** bulk_generator's drifted duplicate NEB scale replaced with the shared `nepal_grading` util (parity verified).
+  - **F-01** `global-error.tsx` / `error.tsx` / `not-found.tsx` + dashboard `loading.tsx`/`error.tsx` — no error boundary existed anywhere.
+  - Pre-existing failures fixed along the way: stale patch target in `test_adaptive_learning_api.py` (5 sites), E96-cooldown/CSRF 403 in `test_password_reset.py`.
+- **Verification (batched sweeps):** batch A (15 new/changed suites) **106 passed**; batch B (money/exam) **42 passed**; batch C (plugins/billing/auth) **184 passed, 2 skipped**, 2 failures in `test_plugin_registry.py` verified PRE-EXISTING on unmodified HEAD; batch D (25 remaining suites) run separately. `tsc --noEmit` clean; jest 9 suites / 36 tests passing.
+- **Audit References:** `docs/MASTER_PLAN_2026-09.md` §3-§8.
+
 ### [2026-09-03] - Master plan M0 wave 2: prod validation, OTP, rate limits, XSS, website authz, payments, uniqueness, hygiene
 - **Author/Agent:** ZCode implementation agent (per `docs/MASTER_PLAN_2026-09.md`)
 - **Action Taken:**
