@@ -219,14 +219,20 @@ def test_assess_mastery_returns_json_safe_floats(app, db, school):
     subject = Subject(school_id=school.id, name="Math", code="M")
     db.session.add_all([student, exam, subject])
     db.session.flush()
+    # Same name (both resolve under the "Math" filter), different code so the
+    # D-02 (school, exam, student, subject) unique index is satisfied.
+    subject2 = Subject(school_id=school.id, name="Math", code="M-ADV")
+    db.session.add(subject2)
+    db.session.flush()
     db.session.add(
         Marks(school_id=school.id, exam_id=exam.id, student_id=student.id,
               subject_id=subject.id, class_id=klass.id, total_marks=77, obtained_marks=77)
     )
-    # NULL obtained_marks must not crash (counted as 0)
+    # NULL obtained_marks must not crash (counted as 0) — second subject,
+    # since D-02 forbids duplicate (exam, student, subject) rows.
     db.session.add(
         Marks(school_id=school.id, exam_id=exam.id, student_id=student.id,
-              subject_id=subject.id, class_id=klass.id, total_marks=None, obtained_marks=None)
+              subject_id=subject2.id, class_id=klass.id, total_marks=None, obtained_marks=None)
     )
     db.session.commit()
 
