@@ -39,6 +39,17 @@ All previous audit logs, simulation reports, and implementation plans have been 
 
 ## 📝 Real-Time Codebase Change Log
 
+### [2026-09-04] - Closing wave: AW-06 red-team PASS (live), S-10 TLS, W-02 draft/live, D-03 timestamptz
+- **Author/Agent:** ZCode implementation agent
+- **Action Taken:**
+  - **AW-06 red-team** (the founder launch blocker): 13 adversarial cases run LIVE against gpt-oss-120b — injection, exam-bypass (incl. Spanish), persona jailbreaks, prompt extraction, PII fishing, self-harm escalation. **ALL PASS**; report at `backend/audits/ai_redteam/known_failure_modes.md`. The suite caught and fixed 3 tutor bugs: provider role mapping (tutor→assistant; Groq 400'd), transient source_id ordering, and off-JSON model output now fails safe (canned redirect, never raw output to a student).
+  - **S-10 TLS**: nginx/nginx.tls.conf (443/HSTS/TLS1.2-1.3/OCSP/421 catch-all/wildcard school vhosts) + Cloudflare real-IP restore in nginx.conf + CSP headers in next.config.js (dashboard frame-ancestors:none; public allows fonts/Maps/GA).
+  - **W-02 draft/live**: autosave targets draft_config; publish-draft/history(10)/revert/restore endpoints; editor Publish button; draft saves no longer purge the live cache.
+  - **D-03 completion**: migration b2e7c4a9f1d3 converted **418 naive columns → TIMESTAMPTZ** (Kathmandu interpretation); TZ=Asia/Kathmandu in all compose services.
+  - **A-02**: golden-set cases for planning/assessment/communication.
+- **Verification:** red-team 2/2 live; regression 58 passed; chain head `b2e7c4a9f1d3` from scratch; tsc clean. Deploy note: certs → ./nginx/ssl, Cloudflare Full (strict).
+- **Audit References:** `docs/MASTER_PLAN_2026-09.md`, ecosystem §13.3.
+
 ### [2026-09-04] - Final backlog wave: money-leak repairs, deploy ordering, D-06, AW-05/07, W-03/W-04, N-04, P-04
 - **Author/Agent:** ZCode implementation agent
 - **Action Taken:**
