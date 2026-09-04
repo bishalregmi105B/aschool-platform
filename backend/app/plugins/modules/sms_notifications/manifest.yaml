@@ -11,7 +11,7 @@ description: "Bulk SMS via Sparrow SMS, attendance alerts, fee reminders, exam n
 api_blueprint: "app.api.v1.sms"
 models_module: "app.models.notification"
 services:
-  - "app.services.communications.sparrow_sms"
+  - "app.services.communications.sms_gateway"
 tasks:
   - "app.tasks.sms_sender"
 

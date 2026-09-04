@@ -67,7 +67,7 @@ def send_sms(phone: str, message: str, school_id: str = None, log_id: str = None
 
     try:
         resp = requests.post(
-            "http://api.sparrowsms.com/v2/sms/",
+            "https://api.sparrowsms.com/v2/sms/",
             data={"token": token, "from": sender, "to": phone, "text": message},
             timeout=15,
         )

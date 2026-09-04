@@ -10,7 +10,7 @@ icon: "BarChart3"
 description: "Attendance summaries, fee collection overview, student count reports"
 
 api_blueprint: "app.api.v1.reports"
-models_module: "app.models.report"
+models_module: "app.models.analytics"
 
 depends_on: []
 conflicts_with: []

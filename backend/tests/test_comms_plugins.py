@@ -49,11 +49,11 @@ def _seed_plugin(db, slug):
 
 @pytest.fixture
 def admin_headers(client, db, school, admin_user):
+    # social_hub was deleted in W0 (2026-09-04) — no longer seeded.
     for slug in (
         "sms_notifications",
         "whatsapp_bot",
         "notices",
-        "social_hub",
         "conferences",
     ):
         _seed_plugin(db, slug)
@@ -345,16 +345,15 @@ def test_wa_webhook_signature_verification(client, db, school, app):
         app.config["WHATSAPP_APP_SECRET"] = ""
 
 
-# ── social_ads (E30 — now WIRED; pin the gate) ───────────────────────────────
+# ── social_ads (deleted in W0, 2026-09-04) ───────────────────────────────────
 
-def test_social_ads_campaigns_endpoints_exist_and_are_gated(client, db, admin_headers):
-    """E30 flipped (2026-08-29): /social/campaigns* routes now exist and are
-    gated `plugin_required("social_ads")` — a school WITHOUT the plugin gets
-    403 (not 404) from every campaign route."""
+def test_social_ads_routes_are_gone(client, db, admin_headers):
+    """social_ads/social_hub were withdrawn then deleted (dedup audit W0):
+    their routes must 404, not 403-gate, and the slugs must not be offered."""
     assert client.get("/api/v1/social/campaigns",
-                      headers=admin_headers).status_code == 403
+                      headers=admin_headers).status_code == 404
     assert client.post("/api/v1/social/campaigns", json={"name": "x"},
-                       headers=admin_headers).status_code == 403
+                       headers=admin_headers).status_code == 404
 
 
 # ── Conferences (E33) ────────────────────────────────────────────────────────

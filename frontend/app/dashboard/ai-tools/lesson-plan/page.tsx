@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 export default function LessonPlanPage() {
   return (
-    <PluginGate slug="ai_tools"><LessonPlanContent /></PluginGate>
+    <PluginGate slug="ai_suite"><LessonPlanContent /></PluginGate>
   );
 }
 

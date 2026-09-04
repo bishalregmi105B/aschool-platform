@@ -12,7 +12,7 @@ api_blueprint: "app.api.v1.design_studio"
 models_module: "app.models.website"
 services:
   - "app.services.designer.template_engine"
-  - "app.services.designer.pdf_generator"
+  - "app.services.designer.document_renderer"
 
 depends_on: []
 conflicts_with: []

@@ -971,3 +971,86 @@ def _is_truthy(value):
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# ── Curriculum / NEB grid (read-only) ─────────────────────────
+# Backs the AI workbench (lesson plans, question papers) and the
+# academics UI. Visibility rule shared by all three endpoints: a school
+# sees its OWN frameworks/offerings plus the platform-seeded CDC/NEB rows
+# (school_id IS NULL); platform rows are read-only for schools.
+
+
+@academics_bp.route("/curriculum/frameworks", methods=["GET"])
+@jwt_required()
+@school_required
+def list_curriculum_frameworks():
+    """List visible curriculum frameworks (school-owned + platform CDC/NEB)."""
+    from app.models.curriculum import CurriculumFramework
+
+    query = CurriculumFramework.query.filter(
+        CurriculumFramework.is_active.is_(True),
+        db.or_(
+            CurriculumFramework.school_id.is_(None),
+            CurriculumFramework.school_id == g.school_id,
+        ),
+    )
+    grade = (request.args.get("grade") or "").strip()
+    if grade:
+        query = query.filter(CurriculumFramework.grade == grade)
+    board = (request.args.get("board") or "").strip().lower()
+    if board:
+        query = query.filter(CurriculumFramework.board == board)
+    subject = (request.args.get("subject_code") or "").strip()
+    if subject:
+        query = query.filter(CurriculumFramework.subject_code == subject)
+
+    items = query.order_by(
+        CurriculumFramework.grade,
+        CurriculumFramework.subject_code,
+    ).all()
+    return success_response([f.to_dict() for f in items])
+
+
+@academics_bp.route("/curriculum/frameworks/<uuid:framework_id>", methods=["GET"])
+@jwt_required()
+@school_required
+def get_curriculum_framework(framework_id):
+    """One framework with its units and nested learning outcomes."""
+    from app.models.curriculum import CurriculumFramework
+
+    fw = CurriculumFramework.query.get(framework_id)
+    if (
+        not fw
+        or not fw.is_active
+        or fw.is_deleted
+        or (fw.school_id is not None and str(fw.school_id) != str(g.school_id))
+    ):
+        return error_response("Curriculum framework not found", 404)
+    data = fw.to_dict()
+    units = sorted(fw.units, key=lambda u: u.unit_no)
+    data["units"] = []
+    for unit in units:
+        unit_data = unit.to_dict()
+        unit_data["outcomes"] = [o.to_dict() for o in unit.outcomes]
+        data["units"].append(unit_data)
+    return success_response(data)
+
+
+@academics_bp.route("/subject-offerings", methods=["GET"])
+@jwt_required()
+@school_required
+def list_subject_offerings():
+    """NEB/SEE subject grid (theory/practical full & pass marks) for a grade."""
+    from app.models.curriculum import SubjectOffering
+
+    query = SubjectOffering.query.filter(
+        db.or_(
+            SubjectOffering.school_id.is_(None),
+            SubjectOffering.school_id == g.school_id,
+        )
+    )
+    grade = (request.args.get("grade") or "").strip()
+    if grade:
+        query = query.filter(SubjectOffering.grade == grade)
+    items = query.order_by(SubjectOffering.grade, SubjectOffering.subject_code).all()
+    return success_response([o.to_dict() for o in items])

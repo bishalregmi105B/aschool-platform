@@ -310,10 +310,6 @@ def create_app(config_name: str | None = None) -> Flask:
                 "task": "library_overdue_check",
                 "schedule": crontab(hour=7, minute=30),
             },
-            "social-publish-scheduled": {
-                "task": "social_publish_scheduled",
-                "schedule": crontab(minute="*/5"),
-            },
             "payroll-monthly-process": {
                 "task": "payroll_monthly_process",
                 "schedule": crontab(day_of_month=1, hour=0, minute=10),

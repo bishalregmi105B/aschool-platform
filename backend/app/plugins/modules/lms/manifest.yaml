@@ -12,7 +12,6 @@ api_blueprint: "app.api.v1.lms"
 models_module: "app.models.lms"
 services:
   - "app.services.lms.video_service"
-  - "app.services.lms.content_engine"
   - "app.services.ai.adaptive_learning"
 tasks:
 

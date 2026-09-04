@@ -42,6 +42,7 @@ from app.models.plugin import SchoolPlugin
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
+from app.utils.rate_limiter import device_rate_limit
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
 
@@ -580,6 +581,7 @@ def list_punches():
 
 
 @biometric_bp.route("/ingest", methods=["POST"])
+@device_rate_limit(max_requests=120, window=60)
 def ingest():
     """Device punch ingestion. Auth: X-Device-Key header.
 
@@ -591,6 +593,7 @@ def ingest():
     timestamp) are counted as duplicates and never double-written. Validated
     atomically — any malformed record rejects the whole batch with 400 and
     nothing is written. Mapped punches upsert the daily attendance row.
+    Rate-limited per device key: hardware floods must not starve the API.
     """
     device, err = _device_from_key()
     if err:

@@ -12,7 +12,7 @@ description: "Two-way WhatsApp chatbot for parents — attendance, fees, results
 api_blueprint: "app.api.v1.whatsapp_bot"
 models_module: "app.models.notification"
 services:
-  - "app.services.communications.whatsapp"
+  - "app.services.communications.whatsapp_cloud"
 tasks:
   - "app.tasks.whatsapp_sender"
 

@@ -23,7 +23,6 @@ from app.models.slider import SchoolSlider  # noqa: F401
 from app.models.diary import DiaryCategory, DiaryEntry  # noqa: F401
 from app.models.assignment import Assignment, AssignmentSubmission  # noqa: F401
 from app.models.transport import Route, Bus, BusStop, GPSLog  # noqa: F401
-from app.models.social import SocialAccount, SocialPost, SocialMessage, AdCampaign, Post, Comment, Group  # noqa: F401
 from app.models.library import Book, BookTransaction, BookIssue  # noqa: F401
 from app.models.lms import Course, Lesson, Topic, StudyMaterial, LiveClass, StudentProgress, Quiz, QuizAttempt, Enrollment  # noqa: F401
 from app.models.admission import AdmissionForm, AdmissionApplication, AdmissionLead, AdmissionInquiry  # noqa: F401
@@ -59,7 +58,6 @@ from app.models.health import StudentHealthRecord as LegacyStudentHealthRecord  
 from app.models.hr import StaffPayroll as HRPayrollAlias  # noqa: F401
 from app.models.analytics import WeeklyInsightReport as AnalyticsInsightReport  # noqa: F401
 from app.models.designer import DesignerDocument as DesignerDocumentAlias  # noqa: F401
-from app.models.ad_campaign import AdCampaign as AdCampaignAlias  # noqa: F401
 from app.models.revoked_token import RevokedToken  # noqa: F401,E402 — must be in metadata for create_all/Alembic autogenerate
 from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog  # noqa: F401
 from app.models.disaster_management import DisasterDrill, DrillParticipation  # noqa: F401

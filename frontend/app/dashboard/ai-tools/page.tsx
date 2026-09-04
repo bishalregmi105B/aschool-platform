@@ -17,7 +17,7 @@ const AI_TOOLS = [
 
 export default function AIToolsPage() {
   return (
-    <PluginGate slug="ai_tools">
+    <PluginGate slug="ai_suite">
       <AIToolsContent />
     </PluginGate>
   );

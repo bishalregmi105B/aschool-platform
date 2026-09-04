@@ -14,7 +14,7 @@ import { PageLoader } from "@/components/ui/spinner";
 import { TrendingUp, Brain, Search } from "lucide-react";
 
 export default function StudentProgressPage() {
-  return <PluginGate slug="ai_adaptive_learning"><ProgressContent /></PluginGate>;
+  return <PluginGate slug="ai_suite"><ProgressContent /></PluginGate>;
 }
 
 function ProgressContent() {

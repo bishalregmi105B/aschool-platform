@@ -19,7 +19,7 @@ interface RemarkRow {
 
 export default function ReportRemarksPage() {
   return (
-    <PluginGate slug="ai_tools"><RemarksContent /></PluginGate>
+    <PluginGate slug="ai_suite"><RemarksContent /></PluginGate>
   );
 }
 

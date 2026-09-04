@@ -41,6 +41,9 @@ stripe>=5.0,<6.0
 # PDF
 WeasyPrint==63.*
 Pillow==11.*
+# Writer .docx export fallback (app/services/writer_docx.py) — was imported
+# but never declared, so the deployed image 500'd the docx export route.
+python-docx==1.1.*
 
 # Storage (R2/S3)
 boto3==1.35.*

@@ -56,7 +56,16 @@ def plan_tiers(plan: str | None) -> list[str]:
 
 
 def plan_plugin_slugs(plan: str | None) -> list[str]:
-    """Slugs of published catalog plugins the plan is entitled to, tier-ordered."""
+    """Slugs of published catalog plugins the plan is entitled to, tier-ordered.
+
+    Mirrors the marketplace visibility rule (and ensure_free_plugins below):
+    coming-soon (final testing) and deprecated (legacy alias) plugins are
+    never granted by a plan — the DB mirror does not track coming_soon, so
+    the manifest must be consulted too, else e.g. an enterprise plan would
+    auto-install conferences/gps_tracking/whatsapp_bot ahead of launch.
+    """
+    from app.plugins.loader import PluginLoader
+
     tiers = plan_tiers(plan)
     plugins = (
         Plugin.query.filter(Plugin.category.in_(tiers), Plugin.is_published.is_(True))
@@ -70,7 +79,12 @@ def plan_plugin_slugs(plan: str | None) -> list[str]:
         )
         .all()
     )
-    return [p.slug for p in plugins]
+    return [
+        p.slug
+        for p in plugins
+        if not (PluginLoader.get_manifest(p.slug) or {}).get("coming_soon")
+        and not (PluginLoader.get_manifest(p.slug) or {}).get("deprecated")
+    ]
 
 
 def grant_plan_plugins(school_id: str, plan: str | None) -> list[dict]:

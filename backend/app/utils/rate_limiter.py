@@ -1,4 +1,5 @@
 """Rate limiter — per-school API rate limiting using Redis."""
+import hashlib
 import logging
 import time
 from functools import wraps
@@ -107,5 +108,20 @@ def ai_rate_limit(max_requests: int = 20, window: int = 3600):
             f"ai:{getattr(g, 'school_id', 'global')}:"
             f"{getattr(g, 'user_id', 'anon')}:{request.endpoint}"
         )
+
+    return rate_limit(max_requests=max_requests, window=window, key_func=_key)
+
+
+def device_rate_limit(max_requests: int = 120, window: int = 60):
+    """Rate limit for hardware ingest endpoints (X-Device-Key auth, no JWT).
+
+    Keyed by the SHA-256 of the raw device key so a compromised/rogue device
+    cannot hammer the ingest pipeline; fail-open on Redis errors like the
+    rest of the limiter (attendance must not die because Redis blipped).
+    """
+    def _key():
+        raw = (request.headers.get("X-Device-Key") or "").strip()
+        key_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest() if raw else "unknown"
+        return f"device:{key_hash}:{request.endpoint}"
 
     return rate_limit(max_requests=max_requests, window=window, key_func=_key)

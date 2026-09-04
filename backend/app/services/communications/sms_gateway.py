@@ -7,7 +7,7 @@ from flask import current_app
 class SmsGatewayService:
     """Sparrow SMS API integration for OTP and bulk notifications."""
 
-    BASE_URL = "http://api.sparrowsms.com/v2"
+    BASE_URL = "https://api.sparrowsms.com/v2"
 
     @classmethod
     def _token(cls) -> str:

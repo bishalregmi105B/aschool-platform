@@ -18,7 +18,7 @@ import { toast } from "sonner";
 
 export default function QuestionPaperPage() {
   return (
-    <PluginGate slug="ai_tools">
+    <PluginGate slug="ai_suite">
       <QuestionPaperContent />
     </PluginGate>
   );
