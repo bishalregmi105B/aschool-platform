@@ -197,11 +197,14 @@ def _populate_user(user: User, data: dict):
     allowed = {
         "full_name", "full_name_nepali", "email", "phone", "role",
         "avatar_url", "gender", "dob_bs", "dob_ad", "address",
-        "preferred_language", "permissions", "is_active",
+        "preferred_language", "is_active",
     }
     for key in allowed:
         if key in data:
             setattr(user, key, data[key])
+    # D-07: `permissions` is the MFA settings bag (holds the TOTP secret) and
+    # a privilege-escalation vector via this endpoint — it is NOT writable
+    # here. TOTP flows mutate it server-side only (auth.py).
 
 
 def _user_dict(user: User):

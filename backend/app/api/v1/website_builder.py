@@ -670,8 +670,9 @@ def update_domain():
 
     if "custom_domain" in data:
         school.custom_domain = data["custom_domain"]
-    if "domain_verified" in data:
-        school.domain_verified = data["domain_verified"]
+    # S-09: domain_verified is NEVER accepted from request bodies — the real
+    # DNS-verified value comes only from the white-label verify flow
+    # (POST /schools/white-label/domain/verify, real dnspython check).
 
     db.session.commit()
     return success_response({"custom_domain": school.custom_domain, "updated": True})
@@ -683,8 +684,12 @@ def update_domain():
 @plugin_required("website_builder")
 @role_required("superadmin", "school_admin")
 def verify_domain():
-    """Compatibility endpoint for dashboard verification flow."""
+    """Compatibility endpoint for the dashboard verification flow — S-09:
+    this used to unconditionally set domain_verified=True (a lie). It now
+    delegates to the REAL white-label DNS verification (dnspython CNAME/A)
+    and returns its three-way verdict."""
     from app.models.school import School
+    from app.services.website.white_label import WhiteLabelService
 
     school = School.query.get(g.school_id)
     if not school:
@@ -692,12 +697,15 @@ def verify_domain():
     if not school.custom_domain:
         return error_response("No custom domain configured", 400)
 
-    school.domain_verified = True
+    verdict = WhiteLabelService.verify_domain_dns(school) or {}
+    domain = school.custom_domain
+    school.domain_verified = verdict.get("status") == "verified"
     db.session.commit()
     return success_response({
-        "custom_domain": school.custom_domain,
-        "domain_verified": True,
-        "verified": True,
+        "custom_domain": domain,
+        "domain_verified": school.domain_verified,
+        "verified": school.domain_verified,
+        "detail": verdict,
     })
 
 

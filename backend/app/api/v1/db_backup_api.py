@@ -2,6 +2,8 @@
 from flask import g
 from flask_jwt_extended import jwt_required
 
+from app.utils.decorators import role_required
+
 from app.utils.response import success_response, error_response
 from app.tasks.db_backup import db_backup_daily
 
@@ -45,6 +47,7 @@ def backup_status():
 
 @db_backup_api_bp.route("/trigger", methods=["POST"])
 @jwt_required()
+@role_required("superadmin")
 def trigger_backup():
     """Manually trigger a database backup (superadmin only)."""
     role = getattr(g, "current_user_role", None) or getattr(g, "role", None)

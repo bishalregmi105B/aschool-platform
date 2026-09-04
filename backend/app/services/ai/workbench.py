@@ -133,7 +133,23 @@ class AIWorkbenchOrchestrator:
         # tutor sessions, student-facing tools, or staff tools invoked with
         # a student_id — requires a granted guardian consent first.
         student_id = payload.get("student_id")
-        if student_id and (tool.category in ("tutor", "student") or g.role == "student"):
+        if g.role == "student":
+            # A student is always acting on themselves — resolve their student
+            # row and require guardian consent for ANY tool (AW-04: the old
+            # category-based check was bypassable by omitting student_id).
+            from app.models.student import Student
+
+            own = Student.query.filter_by(
+                user_id=g.user_id, school_id=g.school_id, is_deleted=False
+            ).first()
+            if own is None:
+                raise ToolPipelineError(
+                    "No student profile linked to this account.", 403,
+                    blocked=True,
+                )
+            payload["student_id"] = str(own.id)
+            _require_guardian_consent(str(own.id))
+        elif student_id and tool.category in ("tutor", "student"):
             _require_guardian_consent(student_id)
 
         # 3. context build (tenant-scoped) ----------------------------------
@@ -362,6 +378,17 @@ def _persist_generation(tool, result: dict, parsed, schema_name, blocked: bool =
     )
     db.session.add(row)
     db.session.commit()
+    try:
+        from app.services.ai.extensions import caliper_event
+
+        caliper_event(
+            "aiGenerationEvent",
+            {"type": "AIGeneration", "id": str(row.id),
+             "toolKey": row.tool_key, "provider": row.provider},
+            school_id=row.school_id, user_id=row.user_id,
+        )
+    except Exception:  # noqa: BLE001 — analytics must not break the pipeline
+        logger.warning("caliper emission failed", exc_info=True)
     return str(row.id)
 
 

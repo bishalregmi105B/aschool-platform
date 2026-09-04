@@ -493,6 +493,13 @@ def create_app(config_name: str | None = None) -> Flask:
             seed_curriculum()
     except Exception as e:  # noqa: BLE001
         app.logger.error("curriculum seed failed at startup: %s", e)
+    try:
+        with app.app_context():
+            from app.services.ai.extensions import seed_pd_framework
+
+            seed_pd_framework()
+    except Exception as e:  # noqa: BLE001
+        app.logger.error("PD framework seed failed at startup: %s", e)
 
     # D-07: audit trail on the sensitive-table set (money/identity/grades)
     from app.utils.audit_trail import register_audit_listeners
