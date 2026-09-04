@@ -589,15 +589,52 @@ def create_leave_request():
 @plugin_required("attendance")
 @role_required("school_admin", "teacher")
 def approve_leave_request(request_id):
-    """Approve a leave request."""
+    """Approve a staff leave request.
+
+    Write-through: every date in [start_date, end_date] gets a
+    TeacherAttendance row with status "leave" (the unique constraint on
+    (school, user, date) makes this an upsert — an existing row such as a
+    same-day manual mark is re-stamped as leave). LeaveRequest rows are
+    STAFF leaves (user_id → users.id); student leave is a plain attendance
+    row with status "leave" and never flows through here.
+    """
     lr = LeaveRequest.query.get(request_id)
     if not lr or lr.is_deleted or str(lr.school_id) != str(g.school_id):
         return error_response("Leave request not found", 404)
-    lr.status = "approved"
-    lr.approved_by_id = get_jwt_identity()
-    lr.approved_at = datetime.now(timezone.utc)
+    if lr.status != "approved":
+        lr.status = "approved"
+        lr.approved_by_id = get_jwt_identity()
+        lr.approved_at = datetime.now(timezone.utc)
+        lr.rejection_reason = None
+        _upsert_teacher_leave_attendance(lr)
     db.session.commit()
     return success_response(_leave_dict(lr))
+
+
+def _upsert_teacher_leave_attendance(lr: LeaveRequest):
+    """Stamp TeacherAttendance rows for the leave's inclusive date range."""
+    if not lr.user:
+        return
+    remarks = f"Approved {lr.leave_type or ''} leave".strip()
+    current = lr.start_date
+    while current <= lr.end_date:
+        row = TeacherAttendance.query.filter_by(
+            school_id=lr.school_id, user_id=lr.user_id, date=current
+        ).first()
+        if row:
+            row.status = "leave"
+            row.remarks = remarks
+        else:
+            db.session.add(
+                TeacherAttendance(
+                    school_id=lr.school_id,
+                    user_id=lr.user_id,
+                    date=current,
+                    status="leave",
+                    remarks=remarks,
+                )
+            )
+        current += timedelta(days=1)
 
 
 @attendance_bp.route("/leave-requests/<uuid:request_id>/reject", methods=["POST"])
@@ -606,14 +643,13 @@ def approve_leave_request(request_id):
 @plugin_required("attendance")
 @role_required("school_admin", "teacher")
 def reject_leave_request(request_id):
-    """Reject a leave request."""
+    """Reject a leave request, persisting the reviewer's note."""
     lr = LeaveRequest.query.get(request_id)
     if not lr or lr.is_deleted or str(lr.school_id) != str(g.school_id):
         return error_response("Leave request not found", 404)
     data = request.get_json(silent=True) or {}
     lr.status = "rejected"
-    # No dedicated rejection_reason column exists on LeaveRequest; the note
-    # (if any) is not persisted — same as the previous silent behavior.
+    lr.rejection_reason = (data.get("rejection_reason") or data.get("reason") or "").strip() or None
     lr.approved_by_id = get_jwt_identity()
     lr.approved_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -651,6 +687,7 @@ def _leave_dict(lr):
         "end_date": str(lr.end_date),
         "reason": lr.reason,
         "status": lr.status,
+        "rejection_reason": getattr(lr, "rejection_reason", None),
     }
 
 

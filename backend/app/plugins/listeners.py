@@ -66,6 +66,124 @@ def on_attendance_marked(school_id: str, date, count: int, **kwargs):
         logger.exception("Failed to create attendance in-app notifications")
 
 
+@on("attendance.student_absent")
+def on_student_absent(school_id: str, student_id: str, date, **kwargs):
+    """Absent alert for ONE student — notify their guardians specifically.
+
+    The daily cron (app/tasks/attendance_alerts.py) emits this per absent
+    record; until now nothing consumed it, so absent alerts were silently
+    dropped. Reaches guardians by every configured channel:
+    - push to each guardian user's registered OneSignal/FCM tokens
+    - SMS to the primary guardian's phone (same Sparrow pipeline as fees)
+    - in-app notification rows
+    """
+    date_str = str(date)
+    try:
+        from app.models.student import Guardian, Student
+        from app.models.user import User
+
+        student = Student.query.filter_by(
+            school_id=school_id, id=student_id, is_deleted=False
+        ).first()
+        if not student:
+            return
+        first = (student.first_name or "").strip()
+        last = (student.last_name or "").strip()
+        student_name = f"{first} {last}".strip() or "your child"
+        class_name = getattr(student, "class_name", None) or ""
+
+        title = "Absence Alert"
+        body = f"{student_name} was marked absent on {date_str}."
+        if class_name:
+            body = f"{student_name} (class {class_name}) was marked absent on {date_str}."
+
+        guardians = Guardian.query.filter_by(student_id=student_id).all()
+        guardian_users = [
+            g for g in guardians
+            if getattr(g, "user_id", None)
+        ]
+        users = (
+            User.query.filter(
+                User.id.in_([g.user_id for g in guardian_users]),
+                User.is_deleted.is_(False),
+            ).all()
+            if guardian_users
+            else []
+        )
+        user_by_id = {str(u.id): u for u in users}
+
+        for guardian in guardians:
+            guardian_user = user_by_id.get(str(guardian.user_id)) if guardian.user_id else None
+
+            # 1. Push — per registered device token.
+            if guardian_user:
+                for player_id in (guardian_user.onesignal_player_ids or []):
+                    try:
+                        from app.tasks.push_notifications import send_push_notification
+
+                        send_push_notification.delay(
+                            player_id,
+                            title,
+                            body,
+                            data={"type": "attendance", "date": date_str, "student_id": student_id},
+                        )
+                    except Exception:
+                        logger.exception("Absent-alert push failed (guardian=%s)", guardian.id)
+                if not (guardian_user.onesignal_player_ids or []):
+                    for fcm_token in (guardian_user.fcm_tokens or []):
+                        try:
+                            from app.tasks.push_notifications import send_push_notification
+
+                            send_push_notification.delay(
+                                fcm_token,
+                                title,
+                                body,
+                                data={"type": "attendance", "date": date_str, "student_id": student_id},
+                            )
+                        except Exception:
+                            logger.exception("Absent-alert FCM failed (guardian=%s)", guardian.id)
+
+            # 2. SMS to the primary guardian (cost-bearing channel).
+            if guardian.is_primary and guardian.phone:
+                try:
+                    from app.tasks.sms_sender import send_sms
+
+                    send_sms.delay(
+                        guardian.phone,
+                        f"Dear parent, {student_name} was marked absent on {date_str}. "
+                        "Please contact the school if this is unexpected.",
+                        school_id,
+                    )
+                except Exception:
+                    logger.exception("Absent-alert SMS failed (guardian=%s)", guardian.id)
+
+        # 3. In-app rows for guardian users.
+        if users:
+            try:
+                from app.models.notification import InAppNotification
+                from extensions import db
+
+                for guardian_user in users:
+                    db.session.add(
+                        InAppNotification(
+                            school_id=school_id,
+                            user_id=str(guardian_user.id),
+                            title=title,
+                            body=body,
+                            category="attendance",
+                            priority="high",
+                            data={"type": "absent_alert", "date": date_str, "student_id": student_id},
+                            action_url=f"/student/{student_id}/attendance",
+                        )
+                    )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                logger.exception("Absent-alert in-app notifications failed")
+    except Exception:
+        logger.exception("attendance.student_absent listener failed (student=%s)", student_id)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ASSIGNMENT / HOMEWORK EVENTS
 # ═══════════════════════════════════════════════════════════════════════════

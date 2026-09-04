@@ -23,7 +23,7 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export default function LearningPathsPage() {
-  return <PluginGate slug="ai_adaptive_learning"><LearningPathsContent /></PluginGate>;
+  return <PluginGate slug="ai_suite"><LearningPathsContent /></PluginGate>;
 }
 
 function LearningPathsContent() {

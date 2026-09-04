@@ -13,7 +13,7 @@ models_module: "app.models.exam"
 services:
   - "app.services.ai.question_paper"
 tasks:
-  - "app.tasks.report_card_generator"
+  - "app.tasks.report_generation"
 
 depends_on:
   - academics

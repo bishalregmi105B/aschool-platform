@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function InsightsPage() {
   return (
-    <PluginGate slug="ai_tools"><InsightsContent /></PluginGate>
+    <PluginGate slug="ai_suite"><InsightsContent /></PluginGate>
   );
 }
 

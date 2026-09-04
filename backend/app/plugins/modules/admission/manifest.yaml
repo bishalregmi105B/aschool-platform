@@ -11,7 +11,7 @@ description: "Online admission forms, document collection, admission tests, meri
 api_blueprint: "app.api.v1.admission"
 models_module: "app.models.admission"
 services:
-  - "app.services.ai.lead_scoring"
+  - "app.services.ai.admission_bot"
 tasks:
   - "app.tasks.admission_followup"
 

@@ -71,6 +71,7 @@ class LeaveRequest(SchoolModel):
     )
     approved_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     approved_at = Column(DateTime)
+    rejection_reason = Column(Text)
 
     user = relationship("User", foreign_keys=[user_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])

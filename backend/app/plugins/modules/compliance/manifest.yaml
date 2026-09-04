@@ -11,7 +11,7 @@ description: "Government EMIS reporting, compliance checklists, audit trails, re
 api_blueprint: "app.api.v1.compliance"
 models_module: "app.models.compliance"
 services:
-  - "app.services.compliance.emis_export"
+  - "app.services.compliance.moe_reports"
 
 depends_on: []
 conflicts_with: []

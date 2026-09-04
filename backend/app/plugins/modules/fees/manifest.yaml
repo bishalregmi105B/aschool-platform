@@ -11,9 +11,9 @@ description: "Digital fee structure, collection, receipts, eSewa/Khalti payment,
 api_blueprint: "app.api.v1.fees"
 models_module: "app.models.fee"
 services:
-  - "app.services.payments.esewa"
-  - "app.services.payments.khalti"
-  - "app.services.payments.fonepay"
+  - "app.services.payments.esewa_gateway"
+  - "app.services.payments.khalti_gateway"
+  - "app.services.payments.fonepay_gateway"
 tasks:
   - "app.tasks.fee_reminders"
 

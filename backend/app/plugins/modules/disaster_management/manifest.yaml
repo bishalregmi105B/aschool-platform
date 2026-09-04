@@ -11,7 +11,7 @@ description: "Earthquake API, evacuation plans, drill scheduling"
 api_blueprint: "app.plugins.modules.disaster_management.routes"
 models_module: "app.models.emergency"
 services:
-  - "app.services.emergency.earthquake_api"
+  - "app.services.emergency.alert_service"
 
 depends_on:
   - emergency

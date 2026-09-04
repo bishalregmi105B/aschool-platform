@@ -11,7 +11,7 @@ description: "Daily mood check-ins, wellbeing surveys, counselor sessions, menta
 api_blueprint: "app.api.v1.wellbeing"
 models_module: "app.models.wellbeing"
 services:
-  - "app.services.ai.sentiment_analysis"
+  - "app.services.ai.school_insights"
 
 depends_on: []
 conflicts_with: []

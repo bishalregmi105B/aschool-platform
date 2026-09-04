@@ -11,7 +11,7 @@ description: "Class scheduling, teacher allocation, room management, AI timetabl
 api_blueprint: "app.api.v1.timetable"
 models_module: "app.models.timetable"
 services:
-  - "app.services.ai.timetable_generator"
+  - "app.services.ai.timetable_solver"
 
 depends_on:
   - academics

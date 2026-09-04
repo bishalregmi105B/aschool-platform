@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 export default function LetterWriterPage() {
   return (
-    <PluginGate slug="ai_tools"><LetterContent /></PluginGate>
+    <PluginGate slug="ai_suite"><LetterContent /></PluginGate>
   );
 }
 

@@ -12,10 +12,9 @@ description: "Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route manag
 api_blueprint: "app.api.v1.transport"
 models_module: "app.models.transport"
 services:
-  - "app.services.emergency.gps_processor"
+  - "app.tasks.gps_firebase_poller"
 tasks:
-  - "app.tasks.gps_processor"
-  - "app.tasks.bus_eta_alerts"
+  - "app.tasks.gps_processing"
 
 depends_on: []
 conflicts_with: []

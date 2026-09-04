@@ -74,7 +74,64 @@ class PluginLoader:
             len(cls._plugins),
             sum(1 for m in cls._plugins.values() if m.get("_source") == "module"),
         )
+        cls._validate_pointers()
         return registered
+
+    # ── Manifest pointer validation ────────────────────────────────────────
+
+    _POINTER_FIELDS = ("api_blueprint", "models_module")
+
+    @classmethod
+    def _module_path_exists(cls, dotted: str) -> bool:
+        """True when a dotted module path maps to a real file/package on disk.
+
+        Filesystem check only — importing plugin modules at scan time would
+        defeat the loader's fail-soft design and drag heavy deps into startup.
+        Anchored to the backend root (app/plugins/loader.py's grandparent),
+        NOT the process CWD, which Flask/Celery may launch from anywhere.
+        """
+        parts = dotted.split(".")
+        if not parts or parts[0] not in ("app", "tests"):
+            return True  # out of project scope — not validated
+        backend_root = Path(__file__).resolve().parents[2]
+        candidate = backend_root.joinpath(*parts)
+        return (
+            candidate.with_suffix(".py").exists()
+            or (candidate / "__init__.py").exists()
+        )
+
+    @classmethod
+    def _validate_pointers(cls) -> list[str]:
+        """Loudly verify every manifest's declared code pointers exist.
+
+        The manifests are documentation as much as configuration: stale
+        `api_blueprint:` / `models_module:` / `services:` / `tasks:` entries
+        silently misled contributors for months (the dedup audit counted
+        ~20). Each broken pointer is logged at ERROR with its manifest path;
+        the app still boots (fail-soft), but the log names the file to fix.
+        """
+        errors: list[str] = []
+        for slug, manifest in cls._plugins.items():
+            path = manifest.get("_manifest_path", slug)
+            for field in cls._POINTER_FIELDS:
+                target = manifest.get(field)
+                if target and not cls._module_path_exists(str(target)):
+                    errors.append(f"{path}: {field} -> {target} (module not found)")
+            for field in ("services", "tasks"):
+                for target in manifest.get(field) or []:
+                    if not cls._module_path_exists(str(target)):
+                        errors.append(f"{path}: {field}[] -> {target} (module not found)")
+            for target in (manifest.get("models") or []):
+                if str(target).startswith("app.") and not cls._module_path_exists(str(target)):
+                    errors.append(f"{path}: models[] -> {target} (module not found)")
+        for err in errors:
+            logger.error("Plugin manifest pointer broken: %s", err)
+        if errors:
+            logger.error(
+                "PluginLoader: %d broken manifest pointer(s) — fix the listed "
+                "manifest.yaml files", len(errors),
+            )
+        return errors
 
     @classmethod
     def _load_manifest(
@@ -448,17 +505,6 @@ class PluginLoader:
         "compliance": "Safety & Compliance",
         # Growth
         "alumni": "Growth",
-        "social_ads": "Growth",
-        "social_hub": "Growth",  # withdrawn plugin — sidebar hidden anyway
-        # AI plugins merged into ai_suite (manifests carry section "Insights",
-        # sidebar hidden via visible_to: [] — entries kept for completeness)
-        "advanced_analytics": "Insights",
-        "ai_grading": "Insights",
-        "ai_tutor": "Insights",
-        "ai_tools": "Insights",
-        "ai_adaptive_learning": "Insights",
-        "ai_insights": "Insights",
-        "benchmarking": "Insights",
     }
 
     # ── Sidebar supersede map (E238, 2026-08-31) ─────────────────────────────

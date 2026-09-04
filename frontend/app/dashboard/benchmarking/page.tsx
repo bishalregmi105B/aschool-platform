@@ -11,7 +11,7 @@ import { BarChart3, TrendingUp, TrendingDown, Award, Target } from "lucide-react
 
 export default function BenchmarkingPage() {
   return (
-    <PluginGate slug="benchmarking">
+    <PluginGate slug="ai_suite">
       <BenchmarkingContent />
     </PluginGate>
   );

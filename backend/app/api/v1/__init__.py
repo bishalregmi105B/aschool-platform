@@ -45,7 +45,6 @@ STATICALLY_MOUNTED_MODULES = {
     "app.plugins.modules.multi_branch.routes",
     "app.plugins.modules.biometric.routes",
     "app.plugins.modules.ai_adaptive_learning.routes",
-    "app.plugins.modules.social_ads.routes",
     "app.plugins.modules.disaster_management.routes",
     "app.plugins.modules.incident_management.routes",
 }
@@ -151,11 +150,10 @@ api_v1_bp.register_blueprint(biometric_bp)
 from app.api.v1.adaptive_learning import adaptive_learning_bp
 api_v1_bp.register_blueprint(adaptive_learning_bp)
 
-# Social Ads — ad campaign CRUD + honest in-school audience estimates
-# (growth plugin; routes self-gate via @plugin_required("social_ads");
-# no Meta Ads wiring — reach/impressions stay real (0) until delivery exists)
-from app.api.v1.social_ads import social_ads_bp
-api_v1_bp.register_blueprint(social_ads_bp)
+# Social Ads / Social Hub were WITHDRAWN and deleted (dedup audit 2026-09-04:
+# unpublished, zero UI, declared integrations never existed). Their tables
+# are dropped by migration e8b1c4d6a9f2; SchoolPlugin rows are unpublished
+# by the registry refresh because the manifests are gone.
 
 # Disaster Management — drills + participation + overview + seismic alerts
 # (premium plugin; premium tier of `emergency`. Routes mount under

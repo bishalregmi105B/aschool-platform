@@ -39,7 +39,7 @@ interface SolverResult {
 
 export default function TimetablePage() {
   return (
-    <PluginGate slug="ai_tools"><TimetableContent /></PluginGate>
+    <PluginGate slug="ai_suite"><TimetableContent /></PluginGate>
   );
 }
 

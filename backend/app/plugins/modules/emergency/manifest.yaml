@@ -11,7 +11,7 @@ description: "Emergency alerts, evacuation plans, headcount tracking, safe statu
 api_blueprint: "app.api.v1.emergency"
 models_module: "app.models.emergency"
 services:
-  - "app.services.emergency.alert_system"
+  - "app.services.emergency.alert_service"
 
 depends_on: []
 conflicts_with: []

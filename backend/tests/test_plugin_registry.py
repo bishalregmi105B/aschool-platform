@@ -15,26 +15,26 @@ from app.models.plugin import Plugin, SchoolPlugin
 from app.plugins.billing import install_plugin, uninstall_plugin
 from app.plugins.loader import PluginLoader
 
-# The seven plugin blueprints moved into their module folders (routes.py).
+# The plugin blueprints moved into their module folders (routes.py).
+# social_ads lived here too until W0 (2026-09-04) deleted the plugin outright.
 MOVED_MODULES = [
     "white_label",
     "biometric",
     "multi_branch",
     "ai_adaptive_learning",
-    "social_ads",
     "disaster_management",
     "incident_management",
 ]
 
-# Delisted from the catalog by their manifests (published: false).
-# E230 (2026-08-31) catalog consolidation: the seven AI plugins folded into
-# the `ai_suite` bundle, the `library` duplicate folded into
-# `library_management`, and `social_hub` withdrawn — all unpublished exactly
-# like the digital_content→elibrary and portfolio→student_portfolio merges
-# (gating aliases KEPT so legacy installs still pass).
+# Delisted from the catalog. E230 (2026-08-31) folded the seven AI plugins
+# into `ai_suite`, library into library_management, withdrew social_hub;
+# W0 (2026-09-04) DELETED those manifests outright (plus digital_content,
+# advanced_analytics, social_ads, portfolio) — the registry unpublishes any
+# stale mirror rows, and the routes/models were removed with the manifests.
+# What the catalog must guarantee is: none of these slugs is ever LISTED.
 DELISTED_SLUGS = {
     "digital_content",
-    "plugins_nav",
+    "plugins_nav",  # platform nav page, never an installable product
     "portfolio",
     "ai_grading",
     "ai_tutor",
@@ -44,6 +44,7 @@ DELISTED_SLUGS = {
     "benchmarking",
     "advanced_analytics",
     "social_hub",
+    "social_ads",
     "library",
 }
 
@@ -57,10 +58,18 @@ class TestRegistryRefresh:
         scanned = PluginLoader.get_all_manifests()
         # The directory is the catalog — both module packages and legacy
         # manifests are scanned (modules take precedence on slug clashes).
-        assert len(scanned) >= 55, f"directory scan too small: {len(scanned)}"
-        for slug in ("attendance", "fees", "whatsapp_bot", "ai_tools",
+        # 47 on-disk after the W0 deletions; keep a floor, not a ceiling.
+        assert len(scanned) >= 45, f"directory scan too small: {len(scanned)}"
+        for slug in ("attendance", "fees", "whatsapp_bot", "ai_suite",
                      "website_builder", *MOVED_MODULES):
             assert slug in scanned, f"missing {slug}"
+
+    def test_deleted_plugins_are_gone_from_the_directory(self):
+        PluginLoader._scan_manifests()
+        scanned = PluginLoader.get_all_manifests()
+        for slug in ("social_ads", "social_hub", "digital_content",
+                     "advanced_analytics"):
+            assert slug not in scanned, f"{slug} manifest must be deleted"
 
     def test_refresh_upserts_mirror_for_every_scanned_slug(self, db):
         result = PluginLoader.refresh_registry()
@@ -80,11 +89,17 @@ class TestRegistryRefresh:
         assert Plugin.query.count() == second["scanned"]
 
     def test_delisted_manifests_are_unpublished_in_mirror(self, db):
+        """Manifests with published:false (or deleted outright) never show in
+        the catalog, and any stale mirror row is unpublished by the refresh.
+        On a fresh DB the deleted slugs have no row at all — either way the
+        catalog must not offer them."""
         PluginLoader.refresh_registry()
+        entries = {e["slug"] for e in _catalog_entries()}
         for slug in DELISTED_SLUGS:
             row = Plugin.query.filter_by(slug=slug).first()
-            assert row is not None
-            assert row.is_published is False, f"{slug} must be delisted"
+            if row is not None:  # stale row from an older deploy
+                assert row.is_published is False, f"{slug} must be delisted"
+            assert slug not in entries, f"{slug} must not be listed"
 
     def test_vanished_folder_is_unpublished_by_refresh(self, db):
         """A mirror row whose plugin folder/manifest is gone gets delisted
@@ -246,9 +261,13 @@ class TestMovedBlueprints:
 
         endpoints = {r.endpoint for r in app.url_map.iter_rules()}
         for bp in ("white_label", "biometric", "multi_branch",
-                   "adaptive_learning", "social_ads", "disaster_management",
+                   "adaptive_learning", "disaster_management",
                    "incident_management"):
             assert _owned(endpoints, bp), f"blueprint {bp} has no mounted routes"
+
+        # The deleted social plugins must have NO mounted routes either.
+        for bp in ("social_ads", "social_hub"):
+            assert not _owned(endpoints, bp), f"{bp} routes must be deleted"
 
         # No (path, method) pair is registered twice — the loader must skip
         # statically mounted module paths (a double registration would 500 at
@@ -278,7 +297,9 @@ class TestMovedBlueprints:
         assert "absent_alerts_enabled" in keys
 
         # A plugin without a schema falls back to the generic editor.
-        resp = client.get("/api/v1/plugins/library_management/config-schema", headers=headers)
+        # `alumni` ships no config_schema.yaml (library_management does — it
+        # gained one in 3d327eb, which is why this assertion used to fail).
+        resp = client.get("/api/v1/plugins/alumni/config-schema", headers=headers)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
         assert data["has_schema"] is False and data["fields"] == []
