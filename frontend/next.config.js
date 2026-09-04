@@ -95,4 +95,9 @@ const nextConfig = {
   },
 };
 
+// B2 build hygiene (2026-09-05): honor NEXT_DIST_DIR so local builds can run
+// alongside the Docker dev container's root-owned .next directory.
+if (process.env.NEXT_DIST_DIR) {
+  nextConfig.distDir = process.env.NEXT_DIST_DIR;
+}
 module.exports = nextConfig;

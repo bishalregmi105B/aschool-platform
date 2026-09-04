@@ -25,7 +25,7 @@ PLUGIN_SLUG = "library_management"
 # Legacy slug kept for pre-rename SchoolPlugin rows (see PLUGIN_SLUG_ALIASES
 # in app/plugins/decorators.py) — read as a fallback so old installs still
 # pick up their configured values without a migration.
-_LEGACY_PLUGIN_SLUG = "library"
+_LEGACY_PLUGIN_SLUG = "library"  # legacy installs keep their config visible
 
 
 def _config_value(school_id, key, default):
@@ -72,7 +72,7 @@ def _overdue_days(issue) -> int:
 @library_bp.route("/books", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 def list_books():
     query = Book.query.filter_by(school_id=g.school_id, is_deleted=False)
     category = request.args.get("category")
@@ -91,7 +91,7 @@ def list_books():
 @library_bp.route("/books", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def create_book():
     data = request.get_json(silent=True) or {}
@@ -109,7 +109,7 @@ def create_book():
 @library_bp.route("/books/<book_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def update_book(book_id):
     book = Book.query.filter_by(id=book_id, school_id=g.school_id).first_or_404()
@@ -124,7 +124,7 @@ def update_book(book_id):
 @library_bp.route("/books/<book_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("superadmin", "school_admin")
 def delete_book(book_id):
     book = Book.query.filter_by(id=book_id, school_id=g.school_id).first_or_404()
@@ -138,7 +138,7 @@ def delete_book(book_id):
 @library_bp.route("/issues", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 def list_issues():
     query = BookIssue.query.filter_by(school_id=g.school_id)
     status = request.args.get("status")
@@ -167,7 +167,7 @@ def list_issues():
 @library_bp.route("/issues", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def issue_book():
     data = request.get_json(silent=True) or {}
@@ -224,7 +224,7 @@ def issue_book():
 @library_bp.route("/issues/<issue_id>/return", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def return_book(issue_id):
     issue = BookIssue.query.filter_by(id=issue_id, school_id=g.school_id).first_or_404()
@@ -287,7 +287,7 @@ def _issue_dict(i):
 @library_bp.route("/settings", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 def library_settings():
     """Fine + circulation policy for this school.
 
@@ -308,7 +308,7 @@ def library_settings():
 @library_bp.route("/teacher/library", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library")
+@plugin_required("library_management")
 @role_required("teacher", "school_admin", "superadmin")
 def teacher_library():
     """Single call for the teacher app: catalog summary + active issues + overdue.

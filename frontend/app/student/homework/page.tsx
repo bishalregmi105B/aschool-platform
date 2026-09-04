@@ -1,11 +1,16 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { PageLoader } from "@/components/ui/spinner";
-import { BookOpen, CheckCircle2, Clock3 } from "lucide-react";
+import { BookOpen, CheckCircle2, Clock3, Upload } from "lucide-react";
 
 interface StudentAssignment {
   id: string;
@@ -32,6 +37,14 @@ function formatDate(bsDate?: string | null, adDate?: string | null) {
 }
 
 export default function StudentHomeworkPage() {
+  const qc = useQueryClient();
+  const [submitTarget, setSubmitTarget] = useState<StudentAssignment | null>(null);
+  const [submissionText, setSubmissionText] = useState("");
+  const [fileUrl, setFileUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitNote, setSubmitNote] = useState<string | null>(null);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["student-homework"],
     queryFn: async () => {
@@ -54,6 +67,31 @@ export default function StudentHomeworkPage() {
       </Card>
     );
   }
+
+  const submitHomework = async () => {
+    if (!submitTarget) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await api.post(`/student/assignments/${submitTarget.id}/submit`, {
+        note: submissionText.trim(),
+        file_url: fileUrl.trim() || undefined,
+      });
+      setSubmitNote(`“${submitTarget.title}” submitted.`);
+      setSubmitTarget(null);
+      setSubmissionText("");
+      setFileUrl("");
+      await qc.invalidateQueries({ queryKey: ["student-homework"] });
+      await qc.invalidateQueries({ queryKey: ["student-dashboard"] });
+    } catch (e) {
+      setSubmitError(
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+          "Couldn't submit — try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -136,6 +174,15 @@ export default function StudentHomeworkPage() {
                     <span>Due: {formatDate(assignment.due_date_bs, assignment.due_date)}</span>
                     <span>Total: {assignment.total_marks ?? "—"}</span>
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSubmitTarget(assignment);
+                      setSubmitError(null);
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-1" /> Submit work
+                  </Button>
                 </div>
               ))
             ) : (
@@ -194,6 +241,43 @@ export default function StudentHomeworkPage() {
           </CardContent>
         </Card>
       </div>
+
+      {submitNote && (
+        <p className="rounded-md bg-muted px-3 py-2 text-sm">{submitNote}</p>
+      )}
+
+      <Dialog open={Boolean(submitTarget)} onOpenChange={(open) => !open && setSubmitTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit — {submitTarget?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Textarea
+              value={submissionText}
+              onChange={(e) => setSubmissionText(e.target.value)}
+              placeholder="Write your answer or notes about your work…"
+              rows={5}
+            />
+            <Input
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+              placeholder="Optional: paste a link to your file (Drive, photo…)"
+            />
+            {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubmitTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitHomework}
+              disabled={submitting || (!submissionText.trim() && !fileUrl.trim())}
+            >
+              {submitting ? "Submitting…" : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

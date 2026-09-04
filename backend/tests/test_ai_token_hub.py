@@ -40,20 +40,27 @@ def test_generate_with_system_prompt_prepends_message(app):
 
 
 def test_all_service_modules_use_existing_hub_methods():
-    """The 10 AI service modules must import cleanly (no phantom methods)."""
+    """The live AI service modules must import cleanly (no phantom methods).
+
+    W0-close (2026-09-05): the 8 dead modules (report_remarks, content_gen,
+    sentiment, translator, social_ai, wellbeing_ai, admission_bot,
+    attendance_ai, fee_predictor, plagiarism) were deleted — zero importers,
+    confirmed by grep — so they leave this list. The modules kept are the
+    ones actually mounted by routes/tasks.
+    """
     import importlib
 
     modules = [
-        "app.services.ai.report_remarks",
-        "app.services.ai.content_gen",
         "app.services.ai.risk_detector",
-        "app.services.ai.sentiment",
-        "app.services.ai.translator",
-        "app.services.ai.social_ai",
         "app.services.ai.benchmarking_ai",
-        "app.services.ai.wellbeing_ai",
         "app.services.ai.adaptive_learning",
-        "app.services.ai.admission_bot",
+        "app.services.ai.question_paper",
+        "app.services.ai.question_paper_v2",
+        "app.services.ai.lesson_plan",
+        "app.services.ai.homework_helper",
+        "app.services.ai.tutor_engine",
+        "app.services.ai.school_insights",
+        "app.services.ai.auto_grader",
     ]
     for name in modules:
         assert importlib.import_module(name) is not None

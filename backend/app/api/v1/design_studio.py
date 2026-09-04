@@ -585,7 +585,7 @@ def bulk_attendance_ledger():
 @design_studio_bp.route("/ai/question-paper", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("digital_content")
+@plugin_required("elibrary")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_question_paper():
     """AI-generate an exam paper."""
@@ -607,7 +607,7 @@ def generate_question_paper():
 @design_studio_bp.route("/ai/lesson-plan", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("digital_content")
+@plugin_required("elibrary")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_lesson_plan():
     """AI-generate a lesson plan."""
@@ -627,7 +627,7 @@ def generate_lesson_plan():
 @design_studio_bp.route("/ai/insights", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_insights")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def get_ai_insights():
     """Get AI-powered school insights report."""
@@ -640,7 +640,7 @@ def get_ai_insights():
 @design_studio_bp.route("/ai/risk-students", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_insights")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def get_risk_students():
     """Get AI-calculated at-risk student list."""
@@ -653,7 +653,7 @@ def get_risk_students():
 @design_studio_bp.route("/ai/homework-help", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tutor")
+@plugin_required("ai_suite")
 def homework_help():
     """AI homework helper (Socratic tutoring)."""
     from app.services.ai.homework_helper import HomeworkHelperService

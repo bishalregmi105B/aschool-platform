@@ -294,7 +294,7 @@ function WorkbenchContent() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Your AI teaching assistants — every tool shows exactly what data it
-            uses, never trains on your school's work.
+            uses, never trains on your school&apos;s work.
           </p>
         </div>
       )}

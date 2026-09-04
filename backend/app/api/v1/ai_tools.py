@@ -1,5 +1,10 @@
 import json
-"""AI Tools Suite API — question paper, lesson plan, timetable, remarks, insights."""
+"""AI Tools Suite API — question paper, lesson plan, timetable, remarks, insights.
+
+Part of the ai_suite bundle (E230): every route gates @plugin_required("ai_suite").
+The legacy `ai_tools` slug is satisfied through the alias table in
+app/plugins/decorators.py, but new code gates the canonical bundle slug.
+"""
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
@@ -16,7 +21,7 @@ ai_tools_bp = Blueprint("ai_tools", __name__, url_prefix="/ai-tools")
 @ai_tools_bp.route("/question-paper", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def generate_question_paper():
@@ -41,7 +46,7 @@ def generate_question_paper():
         # Plugin-config default (config_schema.yaml) when request omits it.
         language=data.get("language")
         or plugin_config_value(
-            str(g.school_id), "ai_tools", "default_language", "english"
+            str(g.school_id), "ai_suite", "default_language", "english"
         ),
     )
     if "error" in result:
@@ -52,7 +57,7 @@ def generate_question_paper():
 @ai_tools_bp.route("/lesson-plan", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def generate_lesson_plan():
@@ -74,11 +79,11 @@ def generate_lesson_plan():
         # Plugin-config defaults (config_schema.yaml) when request omits them.
         teaching_method=data.get("teaching_method")
         or plugin_config_value(
-            str(g.school_id), "ai_tools", "default_teaching_method", "interactive"
+            str(g.school_id), "ai_suite", "default_teaching_method", "interactive"
         ),
         language=data.get("language")
         or plugin_config_value(
-            str(g.school_id), "ai_tools", "default_language", "english"
+            str(g.school_id), "ai_suite", "default_language", "english"
         ),
     )
     if "error" in result:
@@ -89,7 +94,7 @@ def generate_lesson_plan():
 @ai_tools_bp.route("/timetable", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 @ai_rate_limit()
 def generate_timetable():
@@ -115,7 +120,7 @@ def generate_timetable():
 @ai_tools_bp.route("/timetable/save", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 @ai_rate_limit()
 def save_timetable():
@@ -133,7 +138,7 @@ def save_timetable():
 @ai_tools_bp.route("/remarks", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def generate_remarks():
@@ -158,7 +163,7 @@ def generate_remarks():
 @ai_tools_bp.route("/homework-help", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @ai_rate_limit()
 def homework_help():
     """AI homework helper — guided hints, not direct answers."""
@@ -180,7 +185,7 @@ def homework_help():
 @ai_tools_bp.route("/insights/weekly", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 @ai_rate_limit()
 def weekly_insights():
@@ -194,7 +199,7 @@ def weekly_insights():
 @ai_tools_bp.route("/insights/daily-brief", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin")
 @ai_rate_limit()
 def daily_brief():
@@ -208,7 +213,7 @@ def daily_brief():
 @ai_tools_bp.route("/insights/risk-alerts", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def risk_alerts():
@@ -222,7 +227,7 @@ def risk_alerts():
 @ai_tools_bp.route("/letter-writer", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def generate_letter():
@@ -250,7 +255,7 @@ def generate_letter():
 @ai_tools_bp.route("/question-bank", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def list_question_bank():
     """List/search the school's question pool."""
@@ -283,7 +288,7 @@ def list_question_bank():
 @ai_tools_bp.route("/question-bank", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def add_question_bank_items():
     """Bulk-add manual questions to the bank."""
@@ -336,7 +341,7 @@ def add_question_bank_items():
 @ai_tools_bp.route("/question-bank/<uuid:item_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def update_question_bank_item(item_id):
     """Approve/edit a bank item (the AI-item review step)."""
@@ -368,7 +373,7 @@ def update_question_bank_item(item_id):
 @ai_tools_bp.route("/question-bank/<uuid:item_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def delete_question_bank_item(item_id):
     from app.models.question_bank import QuestionBankItem
@@ -386,7 +391,7 @@ def delete_question_bank_item(item_id):
 @ai_tools_bp.route("/question-paper/v2", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 @ai_rate_limit()
 def generate_question_paper_v2():
@@ -453,7 +458,7 @@ def generate_question_paper_v2():
 @ai_tools_bp.route("/generated-papers/<uuid:paper_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_tools")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def get_generated_paper(paper_id):
     """Fetch a generated paper; ?include_answer_key=true for the key."""

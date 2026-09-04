@@ -1,4 +1,4 @@
-"""Student, Guardian, and StudentHealthRecord models."""
+"""Student and Guardian models."""
 from sqlalchemy import (
     ARRAY,
     Boolean,
@@ -223,25 +223,3 @@ class Guardian(SchoolModel):
     # Relationships
     student = relationship("Student", back_populates="guardians")
     user = relationship("User", backref="guardian_profile")
-
-
-class StudentHealthRecord(SchoolModel):
-    __tablename__ = "student_health_records"
-
-    student_id = Column(
-        UUID(as_uuid=True), ForeignKey("students.id"), nullable=False
-    )
-    height_cm = Column(Numeric(5, 2))
-    weight_kg = Column(Numeric(5, 2))
-    blood_group = Column(String(5))
-    allergies = Column(ARRAY(Text))
-    chronic_conditions = Column(ARRAY(Text))
-    vaccination_records = Column(JSONB, default=dict)
-    emergency_contact = Column(String(20))
-    doctor_name = Column(String(200))
-    doctor_phone = Column(String(20))
-    insurance_info = Column(JSONB, default=dict)
-    last_checkup_date = Column(Date)
-    notes = Column(Text)
-
-    student = relationship("Student", backref="health_records")

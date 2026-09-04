@@ -1,15 +1,8 @@
 import { notFound } from "next/navigation";
-import { PortalSectionPage } from "@/components/portal/portal-section-page";
-import { isKnownPortalRoute } from "@/lib/portal-route-meta";
 
-export default function TeacherPortalSectionPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  if (!isKnownPortalRoute("teacher", params.slug)) {
-    notFound();
-  }
-
-  return <PortalSectionPage portal="teacher" slug={params.slug} />;
+// Every known teacher-portal route has a real page under app/teacher/<route>/.
+// This catch-all therefore has nothing to serve — unknown slugs are an honest 404
+// (the old "Coming soon" placeholder is retired in the portal pass, 2026-09-05).
+export default function TeacherPortalCatchAll() {
+  notFound();
 }
