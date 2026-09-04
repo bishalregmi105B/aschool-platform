@@ -107,8 +107,8 @@ class BaseConfig:
 
     # AI — Groq (PRIMARY provider)
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL_FAST = os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
-    GROQ_MODEL_QUALITY = os.getenv("GROQ_MODEL_QUALITY", "llama-3.3-70b-versatile")
+    GROQ_MODEL_FAST = os.getenv("GROQ_MODEL_FAST", "openai/gpt-oss-20b")
+    GROQ_MODEL_QUALITY = os.getenv("GROQ_MODEL_QUALITY", "openai/gpt-oss-120b")
 
     # AI — Anthropic (FALLBACK when Groq key absent or Groq fails)
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

@@ -52,7 +52,7 @@ def upgrade():
         ("content_visibility", "'private', 'school', 'district', 'public_template'"),
         ("tutor_focus", "'guide', 'practice', 'review'"),
         ("plan_status", "'active', 'archived'"),
-        ("session_status", "'open', 'closed'"),
+        ("tutor_session_status", "'open', 'closed'"),
         ("tutor_msg_role", "'student', 'tutor', 'system'"),
         ("iep_status", "'draft', 'in_review', 'active', 'rejected', 'archived'"),
         ("moderation_severity", "'low', 'medium', 'high', 'critical'"),
@@ -246,7 +246,7 @@ def upgrade():
         *_school_table("tutor_sessions", [
             sa.Column("plan_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("student_id", postgresql.UUID(as_uuid=True), nullable=False),
-            sa.Column("status", postgresql.ENUM("open", "closed", name="session_status", create_type=False), nullable=True),
+            sa.Column("status", postgresql.ENUM("open", "closed", name="tutor_session_status", create_type=False), nullable=True),
             sa.Column("turns_used", sa.Integer(), nullable=True),
             sa.Column("reflection", sa.Text(), nullable=True),
             sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),

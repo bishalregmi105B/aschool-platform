@@ -174,3 +174,15 @@ api_v1_bp.register_blueprint(incident_management_bp)
 # nutrition + moderation queue (routes self-gate per tool via the orchestrator)
 from app.api.v1.ai_workbench import workbench_bp
 api_v1_bp.register_blueprint(workbench_bp)
+
+# AW-06 AI tutor — plan/session/turn state machine
+from app.api.v1.ai_tutor import tutor_bp
+api_v1_bp.register_blueprint(tutor_bp)
+
+# AW-08 capture tools — voice-first data entry with human confirmation
+from app.api.v1.ai_capture import capture_bp
+api_v1_bp.register_blueprint(capture_bp)
+
+# AW-09/10/11 extensions — PD coach, live polls, QTI export
+from app.api.v1.ai_extensions import extensions_bp
+api_v1_bp.register_blueprint(extensions_bp)
