@@ -79,12 +79,12 @@ class TutorEngine:
             else f"Let's work on: {plan.topic}. I'll guide you with questions — "
             "tell me what you already know about it."
         )
-        TutorMessage(
+        db_add(TutorMessage(
             school_id=school_id,
             session_id=session.id,
             role="system",
             content=opening,
-        )
+        ))
         db_commit()
         return session
 
@@ -126,14 +126,18 @@ class TutorEngine:
                 snippet=student_text[:500],
             )
             db_add(flag)
-            TutorMessage(
+            from extensions import db as _db
+
+            _db.session.flush()
+            flag.source_id = student_msg.id
+            db_add(TutorMessage(
                 school_id=school_id, session_id=session.id, role="system",
                 content=(
                     "I'm stopping our session here. What you shared matters, "
                     "and a counselor from your school will follow up with you "
                     "very soon. You are not alone."
                 ),
-            )
+            ))
             db_commit()
             return {"session_closed": True, "escalated": True}
 
@@ -145,10 +149,10 @@ class TutorEngine:
                 "I can absolutely get you there. Start by telling me what the "
                 "question is asking in your own words."
             )
-            TutorMessage(
+            db_add(TutorMessage(
                 school_id=school_id, session_id=session.id,
                 role="tutor", content=reply_text,
-            )
+            ))
             session.turns_used += 1
             db_commit()
             return {"reply": reply_text, "move": "redirect", "deflected": True}
@@ -187,12 +191,15 @@ class TutorEngine:
             school_id=school_id, session_id=session.id,
             role="tutor", content=reply,
         )
+        db_add(tutor_msg)
         generation = AIGeneration(
             school_id=school_id, tool_key="tutor:turn",
             user_id=_tutor_user_id(school_id, session),
             provider=result["provider"], model=result["model"],
             input_tokens=result["tokens_used"], cost_usd=result.get("cost_usd"),
         )
+        db_add(generation)
+        _db_session().flush()
         tutor_msg.generation_id = generation.id
         session.turns_used += 1
         _bump_analytics("tutor:turn", result, school_id=school_id)
@@ -255,6 +262,12 @@ def _tutor_user_id(school_id, session):
 
     school = School.query.get(school_id)
     return school.owner_id if school else None
+
+
+def _db_session():
+    from extensions import db
+
+    return db.session
 
 
 def db_add(obj):
