@@ -9,7 +9,7 @@ icon: "Heart"
 description: "Medical records, vaccination tracking, allergy alerts, health checkup logs, BMI tracking"
 
 api_blueprint: "app.api.v1.health_records"
-models_module: "app.models.health"
+models_module: "app.models.health_records"
 
 depends_on: []
 conflicts_with: []

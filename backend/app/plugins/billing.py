@@ -167,6 +167,10 @@ def install_plugin(school_id: str, plugin_slug: str, billing_cycle: str = "month
     db.session.add(school_plugin)
 
     plugin.install_count = (plugin.install_count or 0) + 1
+    # The usage ledger had zero callers since E230 — every install is itself
+    # the one telemetry event a plugin lifecycle produces, so record it here
+    # rather than keeping log_usage() dead.
+    log_usage(school_id, plugin_slug, "install")
     db.session.commit()
     _invalidate_plugin_cache(school_id)
 

@@ -18,6 +18,9 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
             <a href="/parent/fees" className="hover:text-blue-200">Fees</a>
             <a href="/parent/notices" className="hover:text-blue-200">Notices</a>
             <a href="/parent/bus" className="hover:text-blue-200">Bus Tracker</a>
+            <a href="/parent/health" className="hover:text-blue-200">Health</a>
+            <a href="/parent/wellbeing" className="hover:text-blue-200">Wellbeing</a>
+            <a href="/parent/conferences" className="hover:text-blue-200">PT Conferences</a>
             <a href="/parent/chat" className="hover:text-blue-200">Messages</a>
           </nav>
         </div>

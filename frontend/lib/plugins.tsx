@@ -3,6 +3,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, type ApiResponse } from "./api";
 import { useAuth } from "./auth-context";
+import {
+  getAcceptablePluginSlugs,
+  getPluginDisplayName as resolveDisplayName,
+  hydratePluginAliases,
+  normalizePluginSlug as resolveSlug,
+  type PluginAliasPayload,
+} from "./plugin-aliases";
 
 export interface InstalledPlugin {
   plugin_slug: string;
@@ -52,61 +59,22 @@ interface PluginContextType {
   pluginBottomNav: PluginBottomNavItem[];
 }
 
-const PLUGIN_SLUG_ALIASES: Record<string, string> = {
-  communications: "sms_notifications",
-  hr: "hr_payroll",
-  transport: "gps_tracking",
-  visitors: "visitor_management",
-  library: "library_management",
-  digital_content: "elibrary",
-  // portfolio was a duplicate of student_portfolio (same blueprint/routes);
-  // renamed to the canonical slug, alias kept for legacy installs.
-  portfolio: "student_portfolio",
-  // ── AI Suite bundle (E230 catalog consolidation, 2026-08-31) ──
-  // The individual AI plugins are deprecated catalog items; one ai_suite
-  // install satisfies every ai_* / benchmarking / advanced_analytics gated
-  // page. Aliases KEPT so legacy installs keep working. Mirrors the backend
-  // PLUGIN_SLUG_ALIASES in app/plugins/decorators.py.
-  ai_grading: "ai_suite",
-  ai_tutor: "ai_suite",
-  ai_tools: "ai_suite",
-  ai_adaptive_learning: "ai_suite",
-  ai_insights: "ai_suite",
-  benchmarking: "ai_suite",
-  advanced_analytics: "ai_suite",
-  // NOTE: no "social_hub" entry — the plugin was withdrawn (unpublished +
-  // deprecated); its gates stay satisfied by existing installs of the slug
-  // itself. No "design_studio" entry either — it is its own plugin.
-};
+// The alias table + display labels now live in lib/plugin-aliases.ts, hydrated
+// from GET /plugins/aliases so the client can never drift from the backend's
+// effective map (three hand-kept copies used to disagree after every merge).
 
-function getAcceptablePluginSlugs(slug: string): Set<string> {
-  const requested = String(slug || "").trim();
-  const accepted = new Set<string>();
-  if (!requested) return accepted;
-
-  accepted.add(requested);
-
-  // Single-hop alias expansion (mirrors backend _acceptable_plugin_slugs):
-  // the requested slug plus its direct alias / legacy aliases. No chaining.
-  const mapped = PLUGIN_SLUG_ALIASES[requested];
-  if (mapped) accepted.add(mapped);
-  Object.entries(PLUGIN_SLUG_ALIASES).forEach(([from, to]) => {
-    if (to === requested) accepted.add(from);
-  });
-
-  return accepted;
-}
-
+/** Re-exported for the many pages that import it from here. */
 export function normalizePluginSlug(slug: string): string {
-  return PLUGIN_SLUG_ALIASES[slug] ?? slug;
+  return resolveSlug(slug);
 }
 
 export function getPluginDisplayName(slug: string): string {
-  return (
-    PLUGIN_LABELS[normalizePluginSlug(slug)] ||
-    PLUGIN_LABELS[slug] ||
-    slug.replace(/_/g, " ")
-  );
+  const lang =
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("preferred_language") ||
+        localStorage.getItem("lang"))) ||
+    undefined;
+  return resolveDisplayName(slug, lang || undefined);
 }
 
 const PluginContext = createContext<PluginContextType | undefined>(undefined);
@@ -120,10 +88,14 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
 
   const refreshPlugins = async () => {
     try {
-      // Fetch installed plugins and sidebar config in parallel
-      const [installedRes, sidebarRes] = await Promise.allSettled([
+      // Installed plugins, sidebar config and the alias map in parallel. The
+      // alias fetch is best-effort: plugin-aliases.ts keeps working literals
+      // as a fallback, so a failure degrades gating to yesterday's table
+      // rather than ungating pages.
+      const [installedRes, sidebarRes, aliasRes] = await Promise.allSettled([
         api.get<ApiResponse<InstalledPlugin[]>>("/plugins/installed"),
         api.get<ApiResponse<PluginSidebarResponse>>("/plugins/sidebar"),
+        api.get<ApiResponse<PluginAliasPayload>>("/plugins/aliases"),
       ]);
 
       if (
@@ -137,6 +109,10 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
         const sidebarData = sidebarRes.value.data.data;
         setSidebarItems(sidebarData.items || []);
         setPluginBottomNav(sidebarData.bottom_nav || []);
+      }
+
+      if (aliasRes.status === "fulfilled" && aliasRes.value.data.success) {
+        hydratePluginAliases(aliasRes.value.data.data);
       }
     } catch {
       setPlugins([]);
@@ -192,58 +168,6 @@ export function usePluginEnabled(pluginSlug: string): boolean {
   const { isPluginInstalled } = useInstalledPlugins();
   return isPluginInstalled(pluginSlug);
 }
-
-// Friendly display names for plugin slugs.
-// Labels below match the published marketplace catalog names
-// (Plugin.name in the backend seed, 55 published plugins) so gate
-// prompts never fall back to raw underscored slugs.
-const PLUGIN_LABELS: Record<string, string> = {
-  design_studio: "Docs & Designer",
-  attendance: "Attendance",
-  fees: "Fees",
-  exams: "Exams",
-  lms: "Learning Management",
-  library: "Library",
-  library_management: "Library Management",
-  hostel: "Hostel",
-  transport: "Transport",
-  gps_tracking: "Transport",
-  hr_payroll: "HR & Payroll",
-  sms_notifications: "Communications",
-  whatsapp_bot: "WhatsApp Bot",
-  ai_tools: "AI Tools",
-  ai_suite: "AI Suite",
-  digital_content: "Digital Content",
-  elibrary: "E-Library & Digital Content",
-  website_builder: "Website Builder",
-  gamification: "Gamification",
-  alumni: "Alumni",
-  visitor_management: "Visitor Management",
-  file_management: "Files",
-  iemis_importer: "IEMIS Importer",
-  // Gating slugs that previously fell back to the raw slug:
-  admission: "Admission CRM",
-  assignments: "Assignments & Homework",
-  basic_reports: "Basic Reports",
-  benchmarking: "School Benchmarking",
-  biometric: "Biometric Integration",
-  compliance: "Government Compliance",
-  conferences: "PT Conference Scheduler",
-  disaster_management: "Disaster Management",
-  dismissal: "Student Dismissal/Pickup",
-  emergency: "Emergency Alerts",
-  health_records: "Health Records",
-  incident_management: "Full Incident Management",
-  incidents: "Incident Reporting",
-  inventory: "Inventory & Assets",
-  multi_branch: "Multi-Branch Chain",
-  notices: "Notices & Circulars",
-  student_portfolio: "Student Portfolio",
-  timetable: "Timetable Management",
-  wellbeing: "Student Wellbeing",
-  white_label: "White-Label Branding",
-  ai_adaptive_learning: "AI Adaptive Learning",
-};
 
 /**
  * PluginGate — wraps content that requires a specific plugin to be installed.

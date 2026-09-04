@@ -16,12 +16,14 @@ from app.plugins.billing import install_plugin, uninstall_plugin
 from app.plugins.loader import PluginLoader
 
 # The plugin blueprints moved into their module folders (routes.py).
-# social_ads lived here too until W0 (2026-09-04) deleted the plugin outright.
+# social_ads lived here too until W0 (2026-09-04) deleted the plugin outright;
+# ai_adaptive_learning's manifest was deleted in W0-close (2026-09-05) — its
+# routes stay mounted (statically) and self-gate `ai_suite`, but it is no
+# longer a catalog module with install hooks.
 MOVED_MODULES = [
     "white_label",
     "biometric",
     "multi_branch",
-    "ai_adaptive_learning",
     "disaster_management",
     "incident_management",
 ]

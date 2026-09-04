@@ -3,11 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledPlugins, getPluginDisplayName } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
+import { SkeletonStat } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { WidgetSlot } from "@/components/plugin-widgets/PluginWidgetHost";
 import { formatCurrency } from "@/lib/utils";
 import {
   GraduationCap,
@@ -29,6 +31,17 @@ interface DashboardData {
   active_plugins: number;
 }
 
+/**
+ * The school dashboard.
+ *
+ * Two layers, deliberately:
+ *   1. Six platform KPIs from /analytics/overview — core data, ungated, always
+ *      present, so a school with zero paid plugins still opens to something real.
+ *   2. Plugin widget slots. Every installed plugin's `widgets.yaml` entries for
+ *      `dashboard.actions` / `.main` / `.wide` / `.side` render themselves; the
+ *      page has no idea which plugins exist. Uninstall a plugin and its cards
+ *      vanish with no change here.
+ */
 export default function DashboardPage() {
   const { user } = useAuth();
   const { installedPlugins } = useInstalledPlugins();
@@ -41,17 +54,6 @@ export default function DashboardPage() {
     },
     retry: 1,
   });
-
-  if (isLoading) return <PageLoader />;
-
-  if (isError) {
-    return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load dashboard. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
-    );
-  }
 
   const stats = data || {
     total_students: 0,
@@ -109,90 +111,123 @@ export default function DashboardPage() {
     },
   ];
 
+  const activePlugins = installedPlugins.filter((p) => p.active);
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold text-foreground">
-          Welcome back, {user?.full_name?.split(" ")[0] || "Admin"}
-        </h1>
-        <p className="text-[13px] text-muted-foreground">
-          Here&apos;s what&apos;s happening at your school today.
-        </p>
-      </div>
+      <PageHeader
+        title={`Welcome back, ${user?.full_name?.split(" ")[0] || "Admin"}`}
+        description="Here's what's happening at your school today."
+      />
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {cards.map((card) => (
-          <Card key={card.title} className="shadow-sm">
-            <CardContent className="p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground leading-tight truncate">{card.title}</p>
-                  <p className="text-xl font-bold mt-0.5">{card.value}</p>
+      {/* Platform KPIs — skeletons keep the grid from jumping when data lands. */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {cards.map((c) => (
+            <SkeletonStat key={c.title} />
+          ))}
+        </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="p-0">
+            <ErrorState
+              title="Couldn't load the school overview"
+              body="The dashboard totals are unavailable right now. Plugin cards below may still work."
+              onRetry={() => refetch()}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {cards.map((card) => (
+            <Card key={card.title} className="shadow-sm">
+              <CardContent className="p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                      {card.title}
+                    </p>
+                    <p className="mt-0.5 text-xl font-bold">{card.value}</p>
+                  </div>
+                  <div className={`shrink-0 rounded-lg p-2 ${card.bg}`}>
+                    <card.icon className={`h-4 w-4 ${card.color}`} />
+                  </div>
                 </div>
-                <div className={`p-2 rounded-lg shrink-0 ${card.bg}`}>
-                  <card.icon className={`h-4 w-4 ${card.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* Quick info */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-[13px] font-semibold">Active Plugins</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="flex flex-wrap gap-1.5">
-              {installedPlugins
-                .filter((p) => p.active)
-                .map((p) => (
-                  <Badge key={p.plugin_slug} variant="secondary" className="text-[11px] py-0.5">
-                    {p.plugin_slug.replace(/_/g, " ")}
-                    {p.is_trial && (
-                      <span className="ml-1 text-[10px] text-amber-600">(trial)</span>
-                    )}
-                  </Badge>
-                ))}
-              {installedPlugins.filter((p) => p.active).length === 0 && (
-                <p className="text-[12px] text-muted-foreground">
-                  No plugins installed yet.{" "}
-                  <a href="/dashboard/marketplace" className="text-primary hover:underline">
-                    Browse marketplace
+      {/* Plugin-contributed quick actions; falls back to the core four. */}
+      <Card className="shadow-sm">
+        <CardHeader className="px-4 pb-2 pt-3">
+          <CardTitle className="text-[13px] font-semibold">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <WidgetSlot
+            id="dashboard.actions"
+            grid={false}
+            className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+            fallback={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { label: "Add Student", href: "/dashboard/students?action=add" },
+                  { label: "Mark Attendance", href: "/dashboard/attendance/mark" },
+                  { label: "Create Notice", href: "/dashboard/notices?action=add" },
+                  { label: "Collect Fee", href: "/dashboard/fees/collect" },
+                ].map((action) => (
+                  <a
+                    key={action.label}
+                    href={action.href}
+                    className="flex items-center justify-center rounded border p-2.5 text-center text-[12px] font-medium transition-colors hover:bg-accent"
+                  >
+                    {action.label}
                   </a>
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            }
+          />
+        </CardContent>
+      </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-[13px] font-semibold">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "Add Student", href: "/dashboard/students?action=add" },
-                { label: "Mark Attendance", href: "/dashboard/attendance" },
-                { label: "Create Notice", href: "/dashboard/notices?action=add" },
-                { label: "Collect Fee", href: "/dashboard/fees" },
-              ].map((action) => (
+      {/* Every installed plugin's dashboard widgets, server-ordered. */}
+      <WidgetSlot id="dashboard.main" />
+      <WidgetSlot id="dashboard.wide" />
+      <WidgetSlot id="dashboard.side" />
+
+      <Card className="shadow-sm">
+        <CardHeader className="px-4 pb-2 pt-3">
+          <CardTitle className="text-[13px] font-semibold">Active Plugins</CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <div className="flex flex-wrap gap-1.5">
+            {activePlugins.map((p) => (
+              <Badge
+                key={p.plugin_slug}
+                variant="secondary"
+                className="py-0.5 text-[11px]"
+              >
+                {getPluginDisplayName(p.plugin_slug)}
+                {p.is_trial && (
+                  <span className="ml-1 text-[10px] text-amber-600">(trial)</span>
+                )}
+              </Badge>
+            ))}
+            {activePlugins.length === 0 && (
+              <p className="text-[12px] text-muted-foreground">
+                No plugins installed yet.{" "}
                 <a
-                  key={action.label}
-                  href={action.href}
-                  className="flex items-center justify-center p-2.5 rounded border hover:bg-accent transition-colors text-[12px] font-medium text-center"
+                  href="/dashboard/marketplace"
+                  className="text-primary hover:underline"
                 >
-                  {action.label}
+                  Browse marketplace
                 </a>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,13 +1,5 @@
 import axios from "axios";
-
-const PLUGIN_MARKETPLACE_ALIASES: Record<string, string> = {
-  communications: "sms_notifications",
-  hr: "hr_payroll",
-  transport: "gps_tracking",
-  visitors: "visitor_management",
-  library: "library_management",
-  digital_content: "elibrary",
-};
+import { normalizePluginSlug } from "./plugin-aliases";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "";
@@ -118,9 +110,7 @@ api.interceptors.response.use(
             onClick: () => {
               if (typeof window !== "undefined") {
                 // Since dynamic /marketplace/[slug] routes don't exist, we send them to the main marketplace.
-                const slug =
-                  PLUGIN_MARKETPLACE_ALIASES[pluginData.plugin_slug] ||
-                  pluginData.plugin_slug;
+                const slug = normalizePluginSlug(pluginData.plugin_slug);
                 window.location.href = `/dashboard/marketplace?search=${encodeURIComponent(slug)}`;
               }
             }

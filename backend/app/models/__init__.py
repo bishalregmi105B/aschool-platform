@@ -3,7 +3,7 @@ from app.models.base import BaseModel, SchoolModel  # noqa: F401
 from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptCounter  # noqa: F401
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
-from app.models.student import Student, Guardian, StudentHealthRecord  # noqa: F401
+from app.models.student import Student, Guardian  # noqa: F401
 from app.models.student_transfer import StudentTransfer  # noqa: F401
 from app.models.academic import AcademicYear, Semester, Medium, Stream, Shift, Class, Section, Subject  # noqa: F401
 from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest  # noqa: F401
@@ -54,7 +54,6 @@ from app.models.school_chain import SchoolChain, SchoolChainMember  # noqa: F401
 from app.models.adaptive_learning import LearningPath, MasteryRecord  # noqa: F401
 from app.models.staff import Staff, StaffMember  # noqa: F401
 from app.models.communication import Notice as CommunicationNotice  # noqa: F401
-from app.models.health import StudentHealthRecord as LegacyStudentHealthRecord  # noqa: F401
 from app.models.hr import StaffPayroll as HRPayrollAlias  # noqa: F401
 from app.models.analytics import WeeklyInsightReport as AnalyticsInsightReport  # noqa: F401
 from app.models.designer import DesignerDocument as DesignerDocumentAlias  # noqa: F401

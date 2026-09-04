@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth-context";
 import { PluginProvider } from "@/lib/plugins";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,7 +24,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <PluginProvider>
-          {children}
+          {/* ConfirmProvider hosts the single destructive-action dialog;
+              useConfirm() refuses (returns false) when it is absent, so it
+              must wrap everything that can delete. */}
+          <ConfirmProvider>{children}</ConfirmProvider>
         </PluginProvider>
         <Toaster position="top-right" richColors />
       </AuthProvider>

@@ -977,6 +977,68 @@ def add_guardian(student_id):
     return created_response(_guardian_dict(guardian))
 
 
+@students_bp.route("/<uuid:student_id>/guardians/<uuid:guardian_id>", methods=["PATCH"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin", "staff")
+def update_guardian(student_id, guardian_id):
+    """Edit a guardian's contact/relationship details.
+
+    User-account fields (role, login) are intentionally NOT editable here —
+    the guardian's linked parent user is managed in users.py. Relation is
+    validated against the guardian_relation enum; is_primary is exclusive:
+    promoting one guardian demotes the student's other guardians.
+    """
+    guardian = Guardian.query.get(guardian_id)
+    if (
+        not guardian
+        or guardian.is_deleted
+        or str(guardian.school_id) != str(g.school_id)
+        or str(guardian.student_id) != str(student_id)
+    ):
+        return error_response("Guardian not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    valid_relations = {"father", "mother", "guardian", "other"}
+    if "relation" in data and data["relation"] not in valid_relations:
+        return error_response(
+            f"relation must be one of: {', '.join(sorted(valid_relations))}"
+        )
+    _populate_guardian(guardian, data)
+
+    if data.get("is_primary"):
+        for other in Guardian.query.filter(
+            Guardian.student_id == guardian.student_id,
+            Guardian.id != guardian.id,
+            Guardian.is_deleted.is_(False),
+        ).all():
+            other.is_primary = False
+
+    db.session.commit()
+    return success_response(_guardian_dict(guardian))
+
+
+@students_bp.route("/<uuid:student_id>/guardians/<uuid:guardian_id>", methods=["DELETE"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def delete_guardian(student_id, guardian_id):
+    """Soft-delete a guardian. The linked parent user account is left intact
+    (it may be the guardian of siblings); only the link is removed."""
+    guardian = Guardian.query.get(guardian_id)
+    if (
+        not guardian
+        or guardian.is_deleted
+        or str(guardian.school_id) != str(g.school_id)
+        or str(guardian.student_id) != str(student_id)
+    ):
+        return error_response("Guardian not found", 404)
+
+    guardian.is_deleted = True
+    db.session.commit()
+    return success_response({"id": str(guardian.id), "deleted": True})
+
+
 # ── Helpers ────────────────────────────────────────────────
 
 

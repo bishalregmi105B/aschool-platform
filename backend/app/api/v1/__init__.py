@@ -145,8 +145,9 @@ from app.api.v1.biometric import biometric_bp
 api_v1_bp.register_blueprint(biometric_bp)
 
 # AI Adaptive Learning — per-student learning paths + mastery records
-# (premium plugin; routes self-gate via @plugin_required("ai_adaptive_learning");
-# LLM calls go through AITokenHub with a labeled deterministic fallback)
+# (part of the ai_suite bundle; routes self-gate via
+# @plugin_required("ai_suite"); LLM calls go through AITokenHub with a
+# labeled deterministic fallback)
 from app.api.v1.adaptive_learning import adaptive_learning_bp
 api_v1_bp.register_blueprint(adaptive_learning_bp)
 
