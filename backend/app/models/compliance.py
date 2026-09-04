@@ -3,7 +3,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import SchoolModel
+from app.models.base import BaseModel, SchoolModel
 
 
 class ComplianceReport(SchoolModel):
@@ -32,9 +32,13 @@ class EMISExport(SchoolModel):
     generated_by = relationship("User")
 
 
-class AuditLog(SchoolModel):
+class AuditLog(BaseModel):
+    """Audit trail row. school_id is nullable: platform-level (superadmin)
+    actions on audited tables have no school but must still be recorded
+    (D-07)."""
     __tablename__ = "audit_logs"
 
+    school_id = Column(UUID(as_uuid=True), ForeignKey("schools.id"), nullable=True, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     action = Column(String(100), nullable=False)
     resource_type = Column(String(100))
