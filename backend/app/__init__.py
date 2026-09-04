@@ -476,6 +476,29 @@ def create_app(config_name: str | None = None) -> Flask:
     except Exception as e:  # noqa: BLE001 — startup resilience
         app.logger.error("Plugin registry refresh failed at startup: %s", e)
 
+    # ai_workbench: registry + nutrition facts seed (AW-01/AW-03) and the
+    # platform CDC/NEB curriculum seed (A-04). Idempotent; best-effort so a
+    # seed failure never blocks boot.
+    try:
+        with app.app_context():
+            from app.services.ai.workbench_seed import seed_workbench_tools
+
+            seed_workbench_tools()
+    except Exception as e:  # noqa: BLE001
+        app.logger.error("ai_workbench seed failed at startup: %s", e)
+    try:
+        with app.app_context():
+            from app.services.ai.curriculum_seed import seed_curriculum
+
+            seed_curriculum()
+    except Exception as e:  # noqa: BLE001
+        app.logger.error("curriculum seed failed at startup: %s", e)
+
+    # D-07: audit trail on the sensitive-table set (money/identity/grades)
+    from app.utils.audit_trail import register_audit_listeners
+
+    register_audit_listeners()
+
     # Register cross-plugin event listeners
     from app.plugins import listeners  # noqa: F401 — registers @on() handlers
 

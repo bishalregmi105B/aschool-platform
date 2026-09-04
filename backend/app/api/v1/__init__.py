@@ -169,3 +169,8 @@ api_v1_bp.register_blueprint(disaster_management_bp)
 # @plugin_required("incident_management"); no base /incidents route duplicated)
 from app.api.v1.incident_management import incident_management_bp
 api_v1_bp.register_blueprint(incident_management_bp)
+
+# ai_workbench — AW-01/AW-03 generic dispatcher + catalog + settings +
+# nutrition + moderation queue (routes self-gate per tool via the orchestrator)
+from app.api.v1.ai_workbench import workbench_bp
+api_v1_bp.register_blueprint(workbench_bp)

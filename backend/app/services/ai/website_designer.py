@@ -91,12 +91,19 @@ Respond ONLY with a JSON object: {{"variations": [...]}}"""
                 text = text.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(text)
         except Exception as e:
+            # A-06(5) honesty: these are RULE-BASED fallbacks, not AI output —
+            # every variation carries source="rule_based_fallback" so the UI
+            # can label it truthfully instead of fabricating "AI-generated".
             return {
                 "variations": [
-                    _default_variation("global-elearning", "Clean & Modern", school_name),
-                    _default_variation("collegiate-heritage", "Traditional Elegance", school_name),
-                    _default_variation("educenter-bright", "Classic Elegance", school_name),
+                    {**_default_variation("global-elearning", "Clean & Modern", school_name),
+                     "source": "rule_based_fallback"},
+                    {**_default_variation("collegiate-heritage", "Traditional Elegance", school_name),
+                     "source": "rule_based_fallback"},
+                    {**_default_variation("educenter-bright", "Classic Elegance", school_name),
+                     "source": "rule_based_fallback"},
                 ],
+                "fallback": True,
                 "error": str(e),
             }
 
@@ -197,6 +204,8 @@ Return ONLY a JSON: {{
 
 
 def _default_variation(theme_slug: str, label: str, school_name: str) -> dict:
+    """Rule-based template variation — callers MUST attach
+    source='rule_based_fallback'; it is not AI output."""
     palettes = {
         "global-elearning": {"primary": "#027abb", "secondary": "#269bd1", "accent": "#1e7ba6", "background": "#fafafa", "text": "#16181a"},
         "collegiate-heritage": {"primary": "#294a70", "secondary": "#ffab1f", "accent": "#15305b", "background": "#ffffff", "text": "#333333"},
