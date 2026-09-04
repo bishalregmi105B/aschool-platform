@@ -340,15 +340,21 @@ def _get_usage_month(school_id) -> int:
     return int(result or 0)
 
 
-def _check_quota(school_id) -> None:
-    """Raise QuotaExceededError if the school is over limit.
+def _check_quota(school_id, est_cost_usd: float = 0.0) -> None:
+    """Raise QuotaExceededError if the school is over limit (A-01: atomic).
+
+    Two doors:
+      1. COST check — the estimated call cost is reserved atomically in
+         Redis (INCRBY + TTL). Concurrent bursts cannot collectively blow
+         through the budget the way check-then-act allows.
+      2. TOKEN totals — the DB day/month sums remain the source of truth
+         for reconciliation; the Redis reservation is reconciled to actual
+         usage after the call (`reconcile_quota_reservation`).
 
     NOTE on the default path: a MISSING AISchoolQuota row (or an inactive one)
-    is treated as BLOCKED ("inactive"), not unlimited — there is no
-    None=unlimited fallback. Schools therefore must have a quota row before
-    their first AI call; registration provisions one eagerly via
-    AITokenHub.ensure_quota_exists() (app/api/v1/auth.py register_school),
-    with POST /api/v1/ai-usage/quota/init as the manual fallback.
+    is treated as BLOCKED ("inactive"), not unlimited. Registration
+    provisions one eagerly; POST /api/v1/ai-usage/quota/init is the manual
+    fallback.
     """
     # If enforcement is disabled (dev mode), skip
     if not current_app.config.get("AI_QUOTA_ENFORCEMENT", True):
@@ -367,6 +373,56 @@ def _check_quota(school_id) -> None:
         raise QuotaExceededError("daily_limit", today, quota.daily_limit)
     if monthly >= quota.monthly_limit:
         raise QuotaExceededError("monthly_limit", monthly, quota.monthly_limit)
+
+    _reserve_cost(school_id, est_cost_usd, quota)
+
+
+def _reserve_cost(school_id, est_cost_usd: float, quota) -> None:
+    """Atomically reserve the estimated USD cost against the daily budget
+    (A-01). Redis INCRBY on a micro-USD integer with a 48h TTL; the budget
+    is the school's daily token limit converted at a conservative blended
+    rate when no explicit usd budget is stored."""
+    if not est_cost_usd or est_cost_usd <= 0:
+        return
+    from extensions import redis_client
+
+    if redis_client is None:
+        return
+    try:
+        blended_usd_per_mtoken = float(
+            current_app.config.get("AI_BLENDED_USD_PER_MTOKEN", 0.6)
+        )
+        daily_budget_usd_micro = int(
+            quota.daily_limit * blended_usd_per_mtoken * 1_000_000
+        )
+        est_micro = max(1, int(est_cost_usd * 1_000_000))
+        key = f"ai:cost:{school_id}:{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+        used = redis_client.incrby(key, est_micro)
+        if used == est_micro:  # first increment today — set the TTL
+            redis_client.expire(key, 172800)
+        if used > daily_budget_usd_micro:
+            # roll back the reservation; the caller reports quota-exceeded
+            redis_client.decrby(key, est_micro)
+            raise QuotaExceededError("daily_cost", used // 1_000_000, daily_budget_usd_micro)
+    except QuotaExceededError:
+        raise
+    except Exception:  # noqa: BLE001 — redis down must not block AI calls
+        logger.warning("cost reservation unavailable — falling back to token totals")
+
+
+def reconcile_quota_reservation(school_id, est_cost_usd: float, actual_cost_usd: float) -> None:
+    """After the call: return the estimated reservation and record actual."""
+    from extensions import redis_client
+
+    if redis_client is None or not est_cost_usd:
+        return
+    try:
+        diff_micro = int((est_cost_usd - (actual_cost_usd or 0)) * 1_000_000)
+        if diff_micro > 0:
+            key = f"ai:cost:{school_id}:{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+            redis_client.decrby(key, diff_micro)
+    except Exception:  # noqa: BLE001
+        logger.warning("cost reconciliation failed")
 
 
 def _log_call(
@@ -490,9 +546,15 @@ class AITokenHub:
         if user_id is None:
             user_id = _resolve_user_id(school_id)
 
-        # 1. Quota check
+        # 1. Quota check with an atomic cost reservation (A-01): the
+        # estimate is derived from the request size and max_tokens.
+        est_cost = estimate_cost_usd(
+            "groq", _groq_model_id(model),
+            sum(len(str(m.get("content", ""))) for m in messages) // 4,
+            max_tokens,
+        )
         try:
-            _check_quota(school_id)
+            _check_quota(school_id, est_cost_usd=est_cost)
         except QuotaExceededError as exc:
             _log_call(
                 school_id=school_id,
@@ -596,6 +658,10 @@ class AITokenHub:
             result["provider"], result["model"],
             result["prompt_tokens"], result["completion_tokens"],
         )
+        try:
+            reconcile_quota_reservation(school_id, est_cost, cost_usd)
+        except Exception:  # noqa: BLE001
+            logger.warning("quota reconciliation failed")
         _log_call(
             school_id=school_id,
             user_id=user_id,

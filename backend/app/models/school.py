@@ -128,6 +128,16 @@ class School(BaseModel):
     school_start_time = Column(Time)
     school_end_time = Column(Time)
 
+    # W-04: public-site profile fields — the About section of every school
+    # site was permanent placeholder text via getattr defaults before this.
+    about_us = Column(Text)
+    vision = Column(Text)
+    mission = Column(Text)
+    principal_name = Column(String(300))
+    principal_message = Column(Text)
+    principal_photo = Column(Text)
+    principal_designation = Column(String(200))
+
     # Denormalized metrics
     total_students = Column(Integer, default=0)
     total_staff = Column(Integer, default=0)

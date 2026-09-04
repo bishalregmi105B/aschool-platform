@@ -73,6 +73,8 @@ from app.models.system import SystemSetting  # noqa: F401
 from app.models.question_bank import QuestionBankItem, PaperBlueprint, GeneratedPaper  # noqa: F401
 from app.models.curriculum import CurriculumFramework, CurriculumUnit, LearningOutcome, SubjectOffering  # noqa: F401
 from app.models.document_chunk import DocumentChunk  # noqa: F401
+from app.models.money import ClassSubject, SectionSubjectTeacher, FeeStructureItem  # noqa: F401
+from app.models.contact import ContactMessage  # noqa: F401
 from app.models.ai_workbench import (  # noqa: F401
     AIGeneration,
     AINutritionFacts,

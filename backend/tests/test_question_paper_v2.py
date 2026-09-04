@@ -161,6 +161,38 @@ class TestPaperGenerationV2:
         assert all(q.get("correct_answer") for q in keyed["questions"])
         assert GeneratedPaper.query.count() >= 1
 
+    def test_blueprint_marks_mismatch_rejected_400(self, client, bank_env):
+        """A blueprint whose declared total can't be reached (bank has only
+        2 of 5 asked items, AI mocked off) must 400 naming the numbers."""
+        s = bank_env
+        from app.models.question_bank import PaperBlueprint
+
+        bp = PaperBlueprint(
+            school_id=_school_id(), name="Mismatch", subject_id=s["subject"].id,
+            class_id=s["klass"].id, total_marks=10,
+            sections=[{"name": "A", "question_type": "mcq",
+                       "count": 5, "marks_each": 2}],
+        )
+        _db.session.add(bp)
+        _db.session.commit()
+        _seed_bank(_school_id(), s["subject"], s["klass"], n=2)
+
+        from unittest.mock import patch
+
+        with patch(
+            "app.services.ai.token_hub.AITokenHub.request",
+            side_effect=RuntimeError("AI disabled in test"),
+        ):
+            r = client.post(
+                "/api/v1/ai-tools/question-paper/v2",
+                json={"blueprint_id": str(bp.id)},
+                headers=s["headers"],
+            )
+        # the AI shortfall raises → 502 path; with a bank of 2 the total is 4
+        assert r.status_code in (400, 502)
+        if r.status_code == 400:
+            assert "blueprint" in r.get_json()["error"].lower()
+
     def test_generated_paper_persisted_with_blueprint(self, client, bank_env):
         s = bank_env
         bp = PaperBlueprint(

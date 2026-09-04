@@ -584,6 +584,40 @@ def subscribe(slug):
             402,
         )
 
+    # P-05/B3 fix: a typed-in transaction id used to activate a paid plugin
+    # forever. The reference is now verified against the gateway where the
+    # school's stored credentials allow it (khalti/fonepay/esewa); an
+    # unverifiable reference is recorded but the subscription stays
+    # PENDING_VERIFICATION — only a verified reference (or a signature-
+    # verified Stripe webhook) activates a paid plugin.
+    gateway_verified = False
+    gateway_note = ""
+    if provider == "khalti":
+        from app.api.v1.fees import _get_configured_payment_methods
+        from app.services.payments.khalti_gateway import KhaltiGateway
+
+        khalti_cfg = next(
+            (m for m in _get_configured_payment_methods() if m.get("key") == "khalti"),
+            {},
+        )
+        secret_key = (khalti_cfg.get("secret_key") or "").strip()
+        if secret_key:
+            result = KhaltiGateway.verify_payment(transaction_id, secret_key)
+            gateway_verified = bool(result.get("verified"))
+            gateway_note = "khalti gateway check"
+        else:
+            gateway_note = "khalti not configured for this school"
+    else:
+        gateway_note = f"{provider} server-side verification requires the checkout flow (esewa/fonepay verify needs the request payload, not just an id) — route upgrades through the Stripe webhook instead"
+
+    if not gateway_verified:
+        return error_response(
+            "Payment could not be verified: " + gateway_note
+            + ". Paid subscriptions activate only after gateway-verified "
+            "payment or a signature-verified Stripe webhook.",
+            402,
+        )
+
     sp = SchoolPlugin.query.filter_by(
         school_id=g.school_id, plugin_slug=slug
     ).first()

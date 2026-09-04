@@ -63,7 +63,9 @@ def test_trial_then_subscribe_flow(client, db, school):
     sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
     assert sp.is_trial is True
 
-    # With a payment reference the subscription activates.
+    # P-05/B3: an UNVERIFIABLE payment reference must NOT activate either —
+    # only a gateway-verified reference (khalti with school credentials) or
+    # a signature-verified Stripe webhook activates a paid subscription.
     sub = client.post(
         "/api/v1/plugins/lms/subscribe",
         json={
@@ -72,14 +74,10 @@ def test_trial_then_subscribe_flow(client, db, school):
         },
         headers=headers,
     )
-    assert sub.status_code == 200
-    data = sub.get_json()["data"]
-    assert data["is_trial"] is False
-    assert data["billing_cycle"] == "yearly"
-    assert data["payment_provider"] == "stripe"
-
+    assert sub.status_code == 402
+    assert "could not be verified" in sub.get_json()["error"]
     sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
-    assert sp.is_trial is False
+    assert sp.is_trial is True, "unverified reference must not flip to paid"
 
 
 def test_unpublished_stub_plugins_cannot_be_installed(client, db, school):

@@ -454,8 +454,13 @@ def register_school():
         counter += 1
 
     # ── Plan mapping (frontend "pro" → DB "growth") ───────────────────────────
-    plan_map = {"free": "free", "starter": "starter", "pro": "growth", "growth": "growth", "enterprise": "enterprise"}
-    plan = plan_map.get(data.get("plan", "free"), "free")
+    # P-05/B1 fix: self-registration ALWAYS creates plan="free". Previously
+    # the client-supplied plan was honored verbatim — anyone could POST
+    # plan:"enterprise" and receive NPR 5,670/mo of paid plugins forever.
+    # The requested plan is kept as a sales signal in the school's settings,
+    # and real upgrades move behind the payment webhook.
+    plan = "free"
+    requested_plan = (data.get("plan") or "free").strip().lower()
 
     # ── Create School ─────────────────────────────────────────────────────────
     school = School(
@@ -473,6 +478,9 @@ def register_school():
         school.level = data["level"]
     if email:
         school.email = email
+
+    if requested_plan not in ("", "free"):
+        school.settings = {**(school.settings or {}), "requested_plan": requested_plan}
 
     db.session.add(school)
     db.session.flush()  # get school.id before creating user

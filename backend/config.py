@@ -129,6 +129,9 @@ class BaseConfig:
     AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "2"))
     # A-01: USD per 1M tokens price sheet override (JSON: provider:model:[p,c])
     AI_MODEL_PRICES_JSON = os.getenv("AI_MODEL_PRICES_JSON", "")
+    # A-01 cost-quota conversion: daily token limit → USD budget at a
+    # conservative blended per-M-token rate (Groq-heavy mix).
+    AI_BLENDED_USD_PER_MTOKEN = float(os.getenv("AI_BLENDED_USD_PER_MTOKEN", "0.6"))
 
     # Nepal SMS
     SPARROW_SMS_TOKEN = os.getenv("SPARROW_SMS_TOKEN", "")
