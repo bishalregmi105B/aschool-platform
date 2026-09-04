@@ -39,6 +39,20 @@ All previous audit logs, simulation reports, and implementation plans have been 
 
 ## 📝 Real-Time Codebase Change Log
 
+### [2026-09-04] - Live AI verification (Milan Groq key) + AW-06/08/09/10/11 + 4-agent implementation audit
+- **Author/Agent:** ZCode implementation agent
+- **Action Taken:**
+  - **Live AI:** Groq API key retrieved from the Milan deployment server (root@2.25.81.90, /var/www/milan/backend/.env) per founder request; local .env configured; model catalog updated to Groq 2026 (llama-3.x retired → openai/gpt-oss-20b/120b, whisper-large-v3-turbo, llama-prompt-guard-2); price sheet updated; reasoning-model handling (gpt-oss spends max_tokens on the reasoning field — hub surfaces finish_reason/reasoning, default budget raised). ALL AI features live-tested: hub fast/smart + JSON parse, flashcards/lesson-plan/differentiation/parent-email through the guardrail pipeline (ledger+analytics rows confirmed), paper-v2 AI shortfall (3 MCQs generated, options+keys, bank-seeded unapproved), designer AI path, homework helper, whisper transcription.
+  - **AW-01 live fix:** the orchestrator never told the model which schema to emit — _system_prompt now embeds the registered output schema (flashcards failed before, passes now).
+  - **AW-06 tutor engine** (state machine, exam-mode deflection, per-turn guardrails, reflection, routes) — LIVE-verified: deflection fired on "just give me the answer"; turn-2 returned a genuine Socratic question.
+  - **AW-08 speech:** AITokenHub.transcribe (whisper, live-verified) + /capture/voice two-stage flow with human confirmation; /capture/photo honest 501.
+  - **AW-09/10/11:** UNESCO PD framework seeded as RAG policy chunks (+framework/progress routes, startup-wired); ephemeral live polls (aggregate-only); Caliper event emission (wired into AIGeneration persist) + QTI 3.0 export.
+  - **Enum collision found live:** PT conferences own session_status — tutor enum renamed tutor_session_status (model + migration).
+  - **4-agent implementation audit** vs master plan (Phase 0/0.5, 1/2, 2b, 3/5). Critical findings FIXED: tutor data-loss (messages/generations never persisted), self-harm flag transient id, permissions/TOTP write hole via users API, consent-gate bypass, S-09 lying domain-verify stub (now delegates to real DNS verify), broken tsbuildinfo gitignore + stray tmp files, caliper never emitted, PD seed never called, backup trigger over-permissive, ProgramsSection name??title seam.
+  - Full verdicts: **audits/IMPLEMENTATION_AUDIT_2026-09-04.md** (per-item IMPLEMENTED/PARTIAL/NOT with file:line evidence + ranked remaining backlog).
+- **Verification:** workbench 11 ✓, audit/honesty 4 ✓ after fixes; migration chain head d8a1f4c7b2e9 verified from scratch; tsc clean.
+- **Audit References:** `docs/MASTER_PLAN_2026-09.md`, `docs/AI_TEACHING_ECOSYSTEM_PROMPT_2026-09.md`.
+
 ### [2026-09-04] - Master plan phase 2/2b wave: curriculum, RAG, ai_workbench, audit trail
 - **Author/Agent:** ZCode implementation agent (per `docs/MASTER_PLAN_2026-09.md`)
 - **Action Taken:**
