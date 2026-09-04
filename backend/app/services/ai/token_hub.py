@@ -675,6 +675,51 @@ class AITokenHub:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def embed(texts: list[str], school_id=None, user_id=None, feature: str = "embedding") -> list[list[float]]:
+        """A-05: embedding API through the hub — same quota/log/cost doors.
+
+        Provider: OPENAI_API_KEY → text-embedding-3-small (1024-dim via
+        dimensions param). Without a key, raises AIProviderError — callers
+        decide whether to degrade (BM25-only retrieval) or fail.
+        """
+        if not texts:
+            return []
+        api_key = current_app.config.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise AIProviderError(
+                "No embedding provider configured. Set OPENAI_API_KEY for "
+                "text-embedding-3-small (RAG degrades to BM25-only without it)."
+            )
+        import openai
+
+        client = openai.OpenAI(
+            api_key=api_key,
+            timeout=current_app.config.get("AI_TIMEOUT_FAST", 30),
+        )
+        t0 = time.time()
+        response = client.embeddings.create(
+            model="text-embedding-3-small", input=texts, dimensions=1024
+        )
+        latency_ms = int((time.time() - t0) * 1000)
+        usage = response.usage
+        vectors = [item.embedding for item in response.data]
+        # embeddings are cheap; log for the meter anyway (prompt tokens only)
+        _log_call(
+            school_id=school_id,
+            user_id=user_id,
+            feature=feature,
+            model="text-embedding-3-small",
+            provider="openai",
+            prompt_tokens=usage.total_tokens,
+            completion_tokens=0,
+            total_tokens=usage.total_tokens,
+            latency_ms=latency_ms,
+            status="success",
+            cost_usd=estimate_cost_usd("openai", "text-embedding-3-small", usage.total_tokens, 0),
+        )
+        return vectors
+
+    @staticmethod
     def get_usage_today(school_id) -> int:
         return _get_usage_today(school_id)
 

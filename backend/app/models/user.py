@@ -95,6 +95,11 @@ class User(BaseModel):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self, include_sensitive=False):
+        # D-07: `permissions` is the de-facto MFA settings bag and holds the
+        # TOTP secret — it must never serialize to any API response. RBAC
+        # permission KEYS (non-secret) are exposed; everything else is
+        # stripped. The TOTP secret lives at permissions["totp_secret"] and
+        # is read server-side only (auth.py).
         data = {
             "id": str(self.id),
             "role": self.role,
@@ -107,7 +112,11 @@ class User(BaseModel):
             "gender": self.gender,
             "dob_bs": self.dob_bs,
             "preferred_language": self.preferred_language,
-            "permissions": self.permissions or {},
+            "permissions": {
+                k: v
+                for k, v in (self.permissions or {}).items()
+                if not k.endswith("_secret")
+            },
             "is_active": self.is_active,
             "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
             "school_id": str(self.school_id) if self.school_id else None,

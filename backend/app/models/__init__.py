@@ -71,4 +71,21 @@ from app.models.faq import FAQ  # noqa: F401
 from app.models.webhook import ProcessedWebhookEvent  # noqa: F401
 from app.models.system import SystemSetting  # noqa: F401
 from app.models.question_bank import QuestionBankItem, PaperBlueprint, GeneratedPaper  # noqa: F401
+from app.models.curriculum import CurriculumFramework, CurriculumUnit, LearningOutcome, SubjectOffering  # noqa: F401
+from app.models.document_chunk import DocumentChunk  # noqa: F401
+from app.models.ai_workbench import (  # noqa: F401
+    AIGeneration,
+    AINutritionFacts,
+    AIToolRegistry,
+    SchoolAIToolSettings,
+    AIContentLibraryItem,
+    TutorSessionPlan,
+    TutorSession,
+    TutorMessage,
+    IEPPlan,
+    GuardianAIConsent,
+    ModerationFlag,
+    AIToolAnalyticsDaily,
+    StudentAIProfile,
+)
 from app.models.hostel import Hostel, HostelRoom, HostelAllocation  # noqa: F401
