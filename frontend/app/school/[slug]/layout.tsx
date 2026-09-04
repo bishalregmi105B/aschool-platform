@@ -7,6 +7,7 @@ import { generateThemeCSS, getThemeById, THEMES, DEFAULT_THEME_ID } from "@/them
 import { SchoolNavbar } from "@/components/website/SchoolNavbar";
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || process.env.BASE_DOMAIN || SCHOOL_SITE_DOMAIN;
+const BASE = process.env.NEXT_PUBLIC_SITE_URL || `https://${BASE_DOMAIN}`;
 const FONT_NAMES = Array.from(
   new Set(THEMES.flatMap((theme) => [theme.fonts.heading, theme.fonts.body])),
 );
@@ -48,34 +49,28 @@ export async function generateMetadata({
   const school = data.school;
   const website = data.website;
 
+  const canonical = `${BASE}/school/${params.slug}`;
+  const ogImage = website?.og_image_url || school.banner_url;
   return {
     title: website?.meta_title || school.name,
     description: website?.meta_description || `${school.name} — ${school.district}, Nepal`,
+    // W-03: canonical — four URL variants previously competed with each other
+    alternates: { canonical },
     openGraph: {
       title: school.name,
       description: website?.meta_description || `${school.name} official website`,
-      images: school.banner_url ? [school.banner_url] : [],
+      images: ogImage ? [ogImage] : [],
+      url: canonical,
       type: "website",
     },
-    other: {
-      "application/ld+json": JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "EducationalOrganization",
-        name: school.name,
-        alternateName: school.name_nepali,
-        url: `https://${params.slug}.${BASE_DOMAIN}`,
-        logo: school.logo_url,
-        address: {
-          "@type": "PostalAddress",
-          addressLocality: school.municipality,
-          addressRegion: school.district,
-          addressCountry: "NP",
-        },
-        telephone: school.phone,
-        email: school.email,
-        foundingDate: school.established_year_bs,
-      }),
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title: school.name,
+      description: website?.meta_description || undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
+    // W-03: GA / FB pixel ids surface as env-consumable globals; the scripts
+    // render in the body below (Next metadata `other` cannot inject scripts).
   };
 }
 
@@ -186,6 +181,51 @@ export default async function SchoolLayout({
         href={`https://fonts.googleapis.com/css2?${FONT_QUERY}&display=swap`}
         rel="stylesheet"
       />
+      {/* W-03: JSON-LD as a REAL script tag (the metadata-`other` approach
+          emits a meta tag Google cannot parse as structured data). */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "EducationalOrganization",
+            name: school.name,
+            alternateName: school.name_nepali,
+            url: `${BASE}/school/${params.slug}`,
+            logo: school.logo_url,
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: school.municipality,
+              addressRegion: school.district,
+              addressCountry: "NP",
+            },
+            telephone: school.phone,
+            email: school.email,
+            foundingDate: school.established_year_bs,
+          }),
+        }}
+      />
+      {/* W-03: stored-but-never-rendered analytics ids */}
+      {website?.google_analytics_id && (
+        <script
+          async
+          src={`https://www.googletagmanager.com/gtag/js?id=${website.google_analytics_id}`}
+        />
+      )}
+      {website?.google_analytics_id && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${website.google_analytics_id}');`,
+          }}
+        />
+      )}
+      {website?.facebook_pixel_id && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${website.facebook_pixel_id}');fbq('track','PageView');`,
+          }}
+        />
+      )}
       <style
         dangerouslySetInnerHTML={{
           __html: `

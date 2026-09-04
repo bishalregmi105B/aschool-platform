@@ -12,6 +12,74 @@ from extensions import cache, celery, cors, db, init_redis, jwt, limiter, migrat
 logger = logging.getLogger(__name__)
 
 
+def _setup_logging(app: Flask) -> None:
+    """P-04: structured JSON logs (LOG_LEVEL controlled) + X-Request-ID
+    propagation. Every request gets an id; errors carry it for correlation
+    with Sentry. Console remains human-readable outside production."""
+    import json as _json
+    import uuid as _uuid
+    import time as _time
+    from flask import request as _req
+
+    level = os.getenv("LOG_LEVEL", "INFO" if app.config.get("ENV") != "development" else "DEBUG")
+    logging.getLogger().setLevel(level)
+
+    if app.config.get("ENV") != "production":
+        return
+
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+
+    class _JsonFormatter(logging.Formatter):
+        def format(self, record):
+            payload = {
+                "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+            }
+            if record.exc_info:
+                payload["exception"] = self.formatException(record.exc_info)
+            for key in ("request_id", "school_id", "user_id", "path", "method", "duration_ms"):
+                if hasattr(record, key):
+                    payload[key] = getattr(record, key)
+            return _json.dumps(payload, default=str)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(_JsonFormatter())
+    root.addHandler(handler)
+
+    @app.before_request
+    def _assign_request_id():
+        from flask import g as _g
+
+        _g.request_id = _req.headers.get("X-Request-ID") or str(_uuid.uuid4())
+        _g._req_start = _time.time()
+
+    @app.after_request
+    def _log_request(response):
+        from flask import g as _g
+
+        duration_ms = int((_time.time() - getattr(_g, "_req_start", _time.time())) * 1000)
+        app.logger.info(
+            "request",
+            extra={
+                "request_id": getattr(_g, "request_id", None),
+                "method": _req.method,
+                "path": _req.path,
+                "status": response.status_code,
+                "duration_ms": duration_ms,
+                "school_id": str(getattr(_g, "school_id", None) or "") or None,
+                "user_id": str(getattr(_g, "user_id", None) or "") or None,
+            },
+        )
+        rid = getattr(_g, "request_id", None)
+        if rid:
+            response.headers["X-Request-ID"] = rid
+        return response
+
+
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application."""
     if config_name is None:
@@ -24,6 +92,9 @@ def create_app(config_name: str | None = None) -> Flask:
     if config_name == "production":
         from config import ProductionConfig
         ProductionConfig.validate()
+
+    # ── P-04: JSON log formatting + request-ID middleware ─────────────────
+    _setup_logging(app)
 
     # JWT_COOKIE_SECURE follows the same source as the hand-rolled auth
     # cookies (S-04): Secure in production, not in dev/test.

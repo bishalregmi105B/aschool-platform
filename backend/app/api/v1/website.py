@@ -114,6 +114,7 @@ website_bp = Blueprint("basic_website", __name__, url_prefix="/website")
 # live school data.
 
 def _public_school_dict(school) -> dict:
+    # W-04: real profile fields (getattr fallbacks kept for pre-migration DBs)
     return {
         "name": school.name,
         "name_nepali": school.name_nepali,
@@ -150,7 +151,12 @@ def _public_notices_payload(school) -> list:
         {
             "id": str(n.id),
             "title": n.title,
+            # W-03 i18n: Nepali variants exist on the model and were never
+            # selected — the public site can now offer a language toggle.
+            "title_nepali": getattr(n, "title_nepali", None),
             "content": n.content,
+            "content_nepali": getattr(n, "content_nepali", None),
+            "attachment_urls": getattr(n, "attachment_urls", None) or [],
             "created_at": n.created_at.isoformat() if n.created_at else None,
         }
         for n in notices
@@ -479,12 +485,26 @@ def submit_contact_form(slug):
     if not name or not message:
         return error_response("Name and message are required", 400)
 
+    # W-04: persist to a real inbox (was audit_logs-only — nobody could ever
+    # read the message) + keep the audit line for the trail.
+    from app.models.contact import ContactMessage
     from app.models.compliance import AuditLog as _AuditLog
 
+    msg = ContactMessage(
+        school_id=school.id,
+        name=name,
+        phone=phone or None,
+        email=email or None,
+        message=message,
+        source_page=request.headers.get("Referer", "")[:300],
+        ip_address=request.remote_addr,
+    )
+    db.session.add(msg)
     log = _AuditLog(
         school_id=school.id,
         action="contact_form",
         resource_type="contact",
+        resource_id=msg.id,
         new_values={"name": name, "phone": phone, "email": email, "message": message},
         ip_address=request.remote_addr,
         user_agent=str(request.user_agent)[:500],
@@ -823,3 +843,73 @@ def get_public_results(slug):
         "rank": latest_mark.rank_in_class,
         "remarks": latest_mark.remarks or "",
     })
+
+
+# ── W-04: contact inbox (admin) ──────────────────────────────────────────
+
+
+@website_bp.route("/contact-messages", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def list_contact_messages():
+    """Unread-first inbox for the school's public contact form."""
+    from app.models.contact import ContactMessage
+    from sqlalchemy import case
+
+    query = ContactMessage.query.filter(
+        ContactMessage.school_id == g.school_id,
+        ContactMessage.is_deleted.is_(False),
+    )
+    if request.args.get("unread") == "true":
+        query = query.filter(ContactMessage.is_read.is_(False))
+    rows = (
+        query.order_by(
+            case((ContactMessage.is_read.is_(False), 0), else_=1),
+            ContactMessage.created_at.desc(),
+        )
+        .limit(100)
+        .all()
+    )
+    return success_response(
+        {
+            "unread_count": ContactMessage.query.filter_by(
+                school_id=g.school_id, is_read=False, is_deleted=False
+            ).count(),
+            "messages": [
+                {
+                    "id": str(m.id),
+                    "name": m.name,
+                    "phone": m.phone,
+                    "email": m.email,
+                    "message": m.message,
+                    "source_page": m.source_page,
+                    "is_read": bool(m.is_read),
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in rows
+            ],
+        }
+    )
+
+
+@website_bp.route("/contact-messages/<uuid:message_id>/read", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def mark_contact_read(message_id):
+    from datetime import datetime, timezone
+
+    from app.models.contact import ContactMessage
+    from extensions import db
+
+    msg = ContactMessage.query.filter_by(
+        id=message_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if msg is None:
+        return error_response("Message not found", 404)
+    msg.is_read = True
+    msg.read_by_id = g.user_id
+    msg.read_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return success_response({"read": True})

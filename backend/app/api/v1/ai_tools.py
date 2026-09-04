@@ -430,6 +430,10 @@ def generate_question_paper_v2():
             user_id=g.user_id,
             title=data.get("title"),
         )
+    except ValueError as exc:
+        # blueprint marks-sum mismatch / unfilled sections — client error
+        db.session.rollback()
+        return error_response(str(exc), 400)
     except Exception as exc:
         db.session.rollback()
         current_app.logger.exception("Paper v2 generation failed")

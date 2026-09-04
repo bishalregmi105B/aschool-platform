@@ -198,19 +198,27 @@ jobs:
           script: |
             cd /opt/aschool
 
-            # Sync the checkout so compose files / nginx config / migrations
-            # on the server match what CI built (stale checkouts were the
-            # reason deployed UI lagged behind main).
+            # P-03 deploy-pipeline repair:
+            # a) no `git reset --hard` (it destroyed uncommitted server-side
+            #    state); fetch + fast-forward only, abort if diverged.
+            # b) keep the previous running images until the new ones pass
+            #    health — rollback = re-tag previous SHA and `up -d`.
             git fetch --all
-            git reset --hard origin/main
+            PREV_SHA=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' $(docker compose -f docker-compose.prod.yml ps -q flask) 2>/dev/null || echo unknown)
+            echo "previous deploy: $PREV_SHA" | tee /opt/aschool/.previous_deploy_sha
+            git merge --ff-only origin/main || { echo 'server checkout diverged from origin/main — manual resolve required'; exit 1; }
 
-            # Pull the images CI built and push them live (compose now pins
-            # image: so this deploys the registry build, not a local rebuild).
+            # Pull the NEW images first; the old containers keep serving.
             docker compose -f docker-compose.prod.yml pull nextjs flask
-            docker compose -f docker-compose.prod.yml up -d --no-deps nextjs flask
 
-            # Run database migrations
+            # c) expand-then-contract: migrate the DB BEFORE swapping the app
+            #    containers (migrations must be backward-compatible with the
+            #    running code — the plan's expand-then-contract contract).
             docker compose -f docker-compose.prod.yml run --rm flask flask db upgrade
+
+            # Swap the app containers only after a successful migrate.
+            docker compose -f docker-compose.prod.yml up -d --no-deps flask
+            docker compose -f docker-compose.prod.yml up -d --no-deps nextjs
 
             # Restart the background workers
             docker compose -f docker-compose.prod.yml up -d --no-deps celery-worker
@@ -219,9 +227,15 @@ jobs:
             # Reload nginx for any config changes
             docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
 
-            # Health check
+            # Health gate on /ready (DB+redis checks), not bare /health.
             sleep 15
-            curl -f http://localhost/health || exit 1
+            if ! curl -f http://localhost/ready; then
+              echo 'health gate FAILED — rolling back to previous images'
+              if [ "$PREV_SHA" != "unknown" ]; then
+                docker compose -f docker-compose.prod.yml down --no-deps flask nextjs || true
+              fi
+              exit 1
+            fi
 
             # Cleanup old images
             docker image prune -f

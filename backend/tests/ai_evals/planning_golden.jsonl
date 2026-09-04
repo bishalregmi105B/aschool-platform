@@ -1,0 +1,4 @@
+# Golden cases: planning category (lesson_plan tool). Extend freely — the
+# runner asserts only `expect_contains` needles, keeping assertions robust
+# to model paraphrase.
+{"tool_key": "lesson_plan", "input": "Create a 40-minute lesson plan on the water cycle for grade 6 science", "expect_contains": ["phases", "objectives"]}
