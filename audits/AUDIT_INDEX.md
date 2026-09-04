@@ -39,6 +39,19 @@ All previous audit logs, simulation reports, and implementation plans have been 
 
 ## 📝 Real-Time Codebase Change Log
 
+### [2026-09-04] - Final backlog wave: money-leak repairs, deploy ordering, D-06, AW-05/07, W-03/W-04, N-04, P-04
+- **Author/Agent:** ZCode implementation agent
+- **Action Taken:**
+  - **P-05/B1** `register_school` always creates plan=free (self-registered "enterprise" granted NPR 5,670/mo of plugins forever); requested plan stored as a sales signal. **P-05/B3** `/subscribe` verifies the reference via the Khalti gateway (school credentials) and 402s honestly otherwise — typed-in transaction ids can no longer activate paid plugins; test contract updated.
+  - **P-03** deploy.yml: ff-only fetch (no reset --hard), previous-SHA rollback record, migrate BEFORE container swap, /ready health gate with rollback.
+  - **D-06** `app/utils/money.py` Decimal helpers + `ClassSubject`/`SectionSubjectTeacher`/`FeeStructureItem` models (migration e5b2d8f4a7c1) replacing ARRAY/JSONB denormalization; chain head now `a7c3e9b1d5f4`.
+  - **A-01** atomic Redis cost reservation (INCRBY micro-USD, 48h TTL, reconciled post-call) — bursts cannot collectively bypass the daily budget.
+  - **A-03** server-side blueprint marks-sum validation (400 naming shortfall) + test.
+  - **AW-05** content-library CRUD with visibility tiers; **AW-07** IEP drafter + reviewer gate (principal/special_ed/superadmin/can_review_iep, evidence-citation enforced, human_review_required hard-true).
+  - **W-03** sitemap.ts/robots.ts, JSON-LD as a real script tag, canonical + twitter, GA/FB pixel rendered; **W-04** ContactMessage inbox (model, unread-first routes, migration f9b4e1c6d2a8), school profile fields (migration a7c3e9b1d5f4), notices payload Nepali + attachments.
+  - **N-04** 2072 fee-cap: 14 heading constants + Nepali-keyword classifier. **A-02** tests/ai_evals golden-set skeleton + offline-safe runner. **P-04** production JSON logs + X-Request-ID middleware.
+- **Verification:** 67 tests across 9 suites green; migration chain verified from scratch; tsc + jest clean.
+
 ### [2026-09-04] - Live AI verification (Milan Groq key) + AW-06/08/09/10/11 + 4-agent implementation audit
 - **Author/Agent:** ZCode implementation agent
 - **Action Taken:**
