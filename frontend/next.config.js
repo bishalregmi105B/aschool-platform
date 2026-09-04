@@ -1,5 +1,49 @@
 /** @type {import('next').NextConfig} */
+
+// S-10 CSP: dashboard routes lock down hard (no third-party frame/embed
+// needs); public school sites allow Google Fonts + Maps iframes + GA.
+const dashboardCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.aschool.com.np https://*.r2.cloudflarestorage.com",
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.groq.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+const publicSiteCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https:",
+  "frame-src https://www.google.com https://maps.google.com https://www.openstreetmap.org",
+  "connect-src 'self' https://www.google-analytics.com",
+  "base-uri 'self'",
+].join("; ");
+
 const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/dashboard/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: dashboardCsp },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
+        source: "/school/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: publicSiteCsp },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+    ];
+  },
   // isomorphic-dompurify -> jsdom reads files from its own package dir at
   // import time; it must be require()d at runtime, not webpack-bundled.
   experimental: {

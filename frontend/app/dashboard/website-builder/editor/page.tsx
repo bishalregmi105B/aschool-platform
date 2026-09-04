@@ -474,7 +474,10 @@ export default function WebsiteEditor() {
       return d ? { ...s, title: d.title ?? s.title, content: d.content ?? s.content } : s;
     });
     try {
+      // W-02: autosave lands in the DRAFT — the live site keeps rendering
+      // the published sections until the user hits Publish.
       const res = await api.put(`/website-builder/pages/${pageId}`, {
+        draft: true,
         sections: payload.map((s, i) => ({
           id: s.id,
           type: s.type,
@@ -498,7 +501,7 @@ export default function WebsiteEditor() {
         return next;
       });
       setSaveState("saved");
-      revalidateSchoolSite();
+      // NOTE: no revalidate here — draft saves must not purge the LIVE site cache.
     } catch {
       setSaveState("error");
       rerunPersistRef.current = false;
@@ -513,6 +516,20 @@ export default function WebsiteEditor() {
     if (rerunPersistRef.current) {
       rerunPersistRef.current = false;
       void persistSections();
+    }
+  }, [pageId, qc]);
+
+  /** W-02: publish the draft to the live site (single action). */
+  const publishDraft = useCallback(async () => {
+    if (!pageId) return;
+    setSaveState("saving");
+    try {
+      await api.post(`/website-builder/pages/${pageId}/publish-draft`);
+      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
+      setSaveState("saved");
+      revalidateSchoolSite();
+    } catch {
+      setSaveState("error");
     }
   }, [pageId, qc]);
 
@@ -747,6 +764,14 @@ export default function WebsiteEditor() {
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500 font-medium">Live Preview</span>
             <span className={`text-xs px-2 py-0.5 rounded-full border ${saveBadgeClass}`}>{saveBadge}</span>
+            {/* W-02: draft saves no longer touch the live site — publish here */}
+            <button
+              onClick={() => void publishDraft()}
+              disabled={saveState === "saving"}
+              className="text-xs px-3 py-1 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Publish
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -1,0 +1,2 @@
+# Golden cases: communication category (parent_email).
+{"tool_key": "parent_email", "input": "Draft a short warm email to a parent whose child missed 3 days of school", "expect_contains": ["subject", "body"]}
