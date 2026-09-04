@@ -116,6 +116,7 @@ class TutorEngine:
             school_id=school_id, session_id=session.id,
             role="student", content=student_text,
         )
+        db_add(student_msg)
         if severity == "critical":
             student_msg.flagged = True
             student_msg.flag_severity = "critical"
@@ -125,11 +126,11 @@ class TutorEngine:
                 severity="critical", category=category or "self_harm",
                 snippet=student_text[:500],
             )
-            db_add(flag)
             from extensions import db as _db
 
-            _db.session.flush()
+            _db.session.flush()  # student_msg.id exists before flag insert
             flag.source_id = student_msg.id
+            db_add(flag)
             db_add(TutorMessage(
                 school_id=school_id, session_id=session.id, role="system",
                 content=(
@@ -169,8 +170,12 @@ class TutorEngine:
             {"role": "system", "content": _tutor_system_prompt(plan)},
         ]
         for m in history:
-            if m.role in ("student", "tutor"):
-                messages.append({"role": m.role, "content": m.content})
+            if m.role == "student":
+                messages.append({"role": "user", "content": m.content})
+            elif m.role == "tutor":
+                # provider role is "assistant" (found live: Groq 400s on
+                # role=tutor — the red-team pass caught it)
+                messages.append({"role": "assistant", "content": m.content})
         messages.append({"role": "user", "content": safe_text})
 
         from app.services.ai.token_hub import AITokenHub
@@ -184,7 +189,20 @@ class TutorEngine:
             max_tokens=800,
             temperature=0.3,
         )
-        parsed = parse_and_validate(result["text"], schema=_TURN_SCHEMA)
+        try:
+            parsed = parse_and_validate(result["text"], schema=_TURN_SCHEMA)
+        except ValueError:
+            # Fail-safe (red-team finding): adversarial prompts can push the
+            # model off-format. Never crash on a student and never surface
+            # raw model output — steer back to the topic with a canned reply.
+            parsed = {
+                "reply": (
+                    "Let's keep going with our problem — can you tell me "
+                    "what you've tried so far, step by step?"
+                ),
+                "move": "redirect",
+            }
+            _bump_analytics("tutor:turn:parse_fallback", result, school_id=school_id)
         reply = _strip_pseudonyms(parsed.get("reply", ""), name_map)
 
         tutor_msg = TutorMessage(

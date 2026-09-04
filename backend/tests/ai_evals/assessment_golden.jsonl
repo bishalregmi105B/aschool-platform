@@ -1,0 +1,3 @@
+# Golden cases: assessment category (exit_ticket, writing_feedback).
+{"tool_key": "exit_ticket", "input": "Create an exit ticket for grade 4 on telling time", "expect_contains": ["questions"]}
+{"tool_key": "writing_feedback", "input": "Give feedback on this student paragraph about Dashain: My dashain was fun. I eat lots of food and play with my friend.", "expect_contains": ["strengths", "improvements"]}

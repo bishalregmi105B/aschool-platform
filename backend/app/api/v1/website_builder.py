@@ -1,6 +1,7 @@
 """Website Builder Pro API — themes, page builder, AI designer, domain management."""
 import re
 import uuid
+from datetime import datetime, timezone
 
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
@@ -432,14 +433,41 @@ def _validate_page_slug(school_id, slug: str, page_id=None) -> str | None:
 @plugin_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_page(page_id):
-    """Update page content and sections (title, slug, layout, publish state)."""
+    """Update page content and sections (title, slug, layout, publish state).
+
+    W-02 draft/live separation: the builder's autosave sends
+    {"draft": true} and lands sections in page.draft_config — the LIVE
+    site keeps rendering page.sections until an explicit publish copies
+    draft → live. Without the draft flag (legacy callers), sections still
+    write directly to `sections` for backward compatibility.
+    """
     page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
     data = request.get_json(silent=True) or {}
+    is_draft_save = bool(data.pop("draft", False))
 
     if "slug" in data:
         err = _validate_page_slug(g.school_id, data.get("slug"), page_id=page.id)
         if err:
             return error_response(err, 400)
+
+    if is_draft_save and "sections" in data:
+        draft = dict(page.draft_config or {})
+        draft["sections"] = data.pop("sections")
+        draft["saved_at"] = datetime.now(timezone.utc).isoformat()
+        page.draft_config = draft
+        # metadata fields still apply immediately (title/slug/seo are safe)
+        for key in ("title", "slug", "meta_title", "meta_description", "sort_order"):
+            if key in data:
+                setattr(page, key, data[key])
+        if "custom_css" in data:
+            page.custom_css = data["custom_css"]
+        page.draft_config = {**(page.draft_config or {}), "dirty": True}
+        db.session.commit()
+        return success_response({
+            **_page_dict(page),
+            "draft_mode": True,
+            "has_unpublished_changes": True,
+        })
 
     for key in ("title", "slug", "sections", "meta_title", "meta_description",
                 "sort_order", "is_published", "custom_css"):
@@ -448,6 +476,102 @@ def update_page(page_id):
 
     db.session.commit()
     return success_response(_page_dict(page))
+
+
+@website_builder_bp.route("/pages/<page_id>/publish-draft", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("website_builder")
+@role_required("superadmin", "school_admin")
+def publish_page_draft(page_id):
+    """W-02: copy the draft sections to the live page in ONE action."""
+    page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
+    draft = page.draft_config or {}
+    if not draft.get("sections"):
+        return error_response("No draft saved for this page", 400)
+
+    if page.sections:
+        # version history: the outgoing live state becomes a revision
+        page.draft_config = {
+            **draft,
+            "dirty": False,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "previous_live": page.sections,
+        }
+    else:
+        page.draft_config = {
+            **draft, "dirty": False,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+        }
+    page.sections = draft["sections"]
+
+    # W-02 undo: keep the last 10 previous-live snapshots in the draft blob
+    history = list((page.draft_config or {}).get("history") or [])
+    history.insert(0, {"sections": draft["sections"],
+                       "published_at": page.draft_config["published_at"]})
+    page.draft_config = {**page.draft_config, "history": history[:10]}
+
+    db.session.commit()
+    return success_response({
+        **_page_dict(page),
+        "published": True,
+        "has_unpublished_changes": False,
+    })
+
+
+@website_builder_bp.route("/pages/<page_id>/revert-draft", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("website_builder")
+@role_required("superadmin", "school_admin")
+def revert_page_draft(page_id):
+    """W-02 undo/redo: discard the draft and return to the live state."""
+    page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
+    page.draft_config = {
+        **(page.draft_config or {}),
+        "sections": page.sections,
+        "dirty": False,
+    }
+    db.session.commit()
+    return success_response({**_page_dict(page), "draft_reverted": True})
+
+
+@website_builder_bp.route("/pages/<page_id>/history", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("website_builder")
+@role_required("superadmin", "school_admin")
+def page_history(page_id):
+    """W-02 version history: the last 10 published snapshots."""
+    page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
+    history = (page.draft_config or {}).get("history") or []
+    return success_response(
+        [
+            {"published_at": h.get("published_at"),
+             "section_count": len(h.get("sections") or [])}
+            for h in history
+        ]
+    )
+
+
+@website_builder_bp.route("/pages/<page_id>/history/<int:index>/restore", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("website_builder")
+@role_required("superadmin", "school_admin")
+def restore_page_history(page_id, index):
+    """Restore a historical snapshot INTO THE DRAFT (publish separately)."""
+    page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
+    history = (page.draft_config or {}).get("history") or []
+    if index < 0 or index >= len(history):
+        return error_response("History index out of range", 404)
+    page.draft_config = {
+        **(page.draft_config or {}),
+        "sections": history[index]["sections"],
+        "dirty": True,
+    }
+    db.session.commit()
+    return success_response({"restored": True, "draft_dirty": True})
 
 
 @website_builder_bp.route("/pages/<page_id>", methods=["DELETE"])
