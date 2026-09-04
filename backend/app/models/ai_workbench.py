@@ -168,7 +168,13 @@ class TutorSession(SchoolModel):
 
     plan_id = Column(UUID(as_uuid=True), ForeignKey("tutor_session_plans.id"), nullable=False, index=True)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
-    status = Column(Enum("open", "closed", name="session_status"), default="open")
+    status = Column(
+        # NOT the PT-conference session_status enum — distinct name so the
+        # guarded CREATE TYPE in the migration can't silently bind the wrong
+        # type (found live: conferences own session_status already).
+        Enum("open", "closed", name="tutor_session_status"),
+        default="open",
+    )
     turns_used = Column(Integer, default=0)
     reflection = Column(Text)                           # written on close
     closed_at = Column(DateTime(timezone=True))

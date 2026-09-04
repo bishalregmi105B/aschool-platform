@@ -38,9 +38,14 @@ logger = logging.getLogger(__name__)
 # Provider constants — env-overridable (A-01: the env vars used to be dead)
 # ---------------------------------------------------------------------------
 GROQ_MODELS = {
-    "fast":    "llama-3.1-8b-instant",
-    "smart":   "llama-3.3-70b-versatile",
-    "preview": "llama-3.3-70b-specdec",
+    # Groq 2026 catalog (verified live): the llama-3.x chat models were
+    # retired; the OpenAI gpt-oss line and qwen are the current chat models.
+    "fast":    "openai/gpt-oss-20b",
+    "smart":   "openai/gpt-oss-120b",
+    "preview": "qwen/qwen3.8-27b",
+    # Special-purpose (AW-04/AW-08)
+    "guard":   "meta-llama/llama-prompt-guard-2-86m",
+    "speech":  "whisper-large-v3-turbo",
 }
 
 
@@ -57,8 +62,10 @@ def _groq_model_id(model_key: str) -> str:
 # USD per 1M tokens (prompt, completion) — default price sheet, effective
 # 2026-09. Groq ~40× cheaper than Claude; quota enforcement is on COST.
 DEFAULT_MODEL_PRICES = {
-    ("groq", "llama-3.1-8b-instant"): (0.05, 0.08),
-    ("groq", "llama-3.3-70b-versatile"): (0.59, 0.79),
+    ("groq", "openai/gpt-oss-20b"): (0.05, 0.08),
+    ("groq", "openai/gpt-oss-120b"): (0.15, 0.75),
+    ("groq", "qwen/qwen3.8-27b"): (0.10, 0.50),
+    ("groq", "whisper-large-v3-turbo"): (0.04, 0.0),  # per-M audio tokens approx
     ("anthropic", "claude-haiku-4-5-20250514"): (0.80, 4.00),
     ("anthropic", "claude-sonnet-4-20250514"): (3.00, 15.00),
 }
@@ -227,8 +234,17 @@ def _call_groq(messages: list, model_key: str, max_tokens: int, temperature: flo
     )
     latency_ms = int((time.time() - t0) * 1000)
     usage = completion.usage
+    message = completion.choices[0].message
+    text = message.content or ""
+    if not text and getattr(message, "reasoning", None):
+        # gpt-oss reasoning models: max_tokens can be fully consumed by the
+        # reasoning field — surface the reasoning tail honestly so callers
+        # see why output is missing (and retries with a higher budget work).
+        text = ""
     return {
-        "text":               completion.choices[0].message.content or "",
+        "text":               text,
+        "reasoning":          getattr(message, "reasoning", None),
+        "finish_reason":      getattr(completion.choices[0], "finish_reason", None),
         "model":              model_id,
         "provider":           "groq",
         "prompt_tokens":      usage.prompt_tokens,
@@ -462,7 +478,7 @@ class AITokenHub:
         feature: str,
         messages: list[dict],
         model: str = "smart",
-        max_tokens: int = 1000,
+        max_tokens: int = 2000,  # reasoning models spend part of this
         temperature: float = 0.7,
         metadata: dict | None = None,
     ) -> dict:
@@ -718,6 +734,54 @@ class AITokenHub:
             cost_usd=estimate_cost_usd("openai", "text-embedding-3-small", usage.total_tokens, 0),
         )
         return vectors
+
+    @staticmethod
+    def transcribe(audio_bytes: bytes, filename: str = "audio.webm", school_id=None, user_id=None, feature: str = "speech", language: str | None = None) -> dict:
+        """AW-08 speech kind: audio → text via Groq whisper-large-v3-turbo.
+
+        Same quota/log/cost discipline as chat. Never used for ambient
+        recording — callers must present the transcript for user
+        confirmation before any data is committed (capture-tools contract).
+        """
+        api_key = current_app.config.get("GROQ_API_KEY", "")
+        if not api_key:
+            raise AIProviderError("GROQ_API_KEY is not configured (speech provider)")
+        import groq
+
+        client = groq.Groq(api_key=api_key)
+        t0 = time.time()
+        kwargs: dict[str, Any] = {
+            "model": "whisper-large-v3-turbo",
+            "file": (filename, audio_bytes),
+        }
+        if language:
+            kwargs["language"] = language
+        try:
+            transcription = client.audio.transcriptions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            _log_call(
+                school_id=school_id, user_id=user_id, feature=feature,
+                model="whisper-large-v3-turbo", provider="groq",
+                prompt_tokens=0, completion_tokens=0, total_tokens=0,
+                latency_ms=int((time.time() - t0) * 1000),
+                status="error", error_message=str(exc)[:300],
+            )
+            raise AIProviderError(f"Speech transcription failed: {exc}") from exc
+
+        latency_ms = int((time.time() - t0) * 1000)
+        text = getattr(transcription, "text", "") or ""
+        # whisper pricing is per audio-second; token metering is approximate —
+        # log tokens as audio bytes/1000 so quotas still bind.
+        approx_tokens = max(1, len(audio_bytes) // 1000)
+        cost = estimate_cost_usd("groq", "whisper-large-v3-turbo", approx_tokens, 0)
+        _log_call(
+            school_id=school_id, user_id=user_id, feature=feature,
+            model="whisper-large-v3-turbo", provider="groq",
+            prompt_tokens=approx_tokens, completion_tokens=0,
+            total_tokens=approx_tokens, latency_ms=latency_ms,
+            status="success", cost_usd=cost,
+        )
+        return {"text": text, "latency_ms": latency_ms, "cost_usd": cost, "provider": "groq"}
 
     @staticmethod
     def get_usage_today(school_id) -> int:
