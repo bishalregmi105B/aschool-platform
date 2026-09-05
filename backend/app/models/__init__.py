@@ -57,6 +57,28 @@ from app.models.communication import Notice as CommunicationNotice  # noqa: F401
 from app.models.hr import StaffPayroll as HRPayrollAlias  # noqa: F401
 from app.models.analytics import WeeklyInsightReport as AnalyticsInsightReport  # noqa: F401
 from app.models.designer import DesignerDocument as DesignerDocumentAlias  # noqa: F401
+from app.models.ai_teacher import (  # noqa: F401
+    AITeacherServiceKey,
+    AITeacherLesson,
+    AITeacherLessonChapter,
+    AITeacherMessage,
+    AITeacherMastery,
+    AITeacherLearningEvent,
+)
+from app.models.teaching_content import (  # noqa: F401
+    TeachingSection,
+    TeachingSectionVersion,
+    TeachingSectionOutcome,
+    TeachingNote,
+    TeachingExample,
+    TeachingMisconception,
+    TeachingFormula,
+    TeachingExamTip,
+    TeachingKeyTerm,
+    TeachingMedia,
+    TeachingContentSnapshot,
+    TeachingContentReview,
+)
 from app.models.revoked_token import RevokedToken  # noqa: F401,E402 — must be in metadata for create_all/Alembic autogenerate
 from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog  # noqa: F401
 from app.models.disaster_management import DisasterDrill, DrillParticipation  # noqa: F401

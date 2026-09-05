@@ -1,0 +1,142 @@
+# AI Teacher plugin settings (SchoolPlugin.config) — AT §D.2.
+# Rule: a setting with no consumer is a lie — the consumer is named per field.
+# Secrets (service key) are NOT here; they live in ai_teacher_service_keys
+# and are rotated from the settings screen, never displayed.
+fields:
+  # ── Service wiring (service_client.py) ────────────────────────────────
+  - key: service_base_url
+    label: "AI Teacher service URL"
+    type: string
+    default: ""
+    help: "Base URL of the dedicated runtime service, e.g. https://aiteacher.internal. Empty = service disabled."
+    admin_only: true
+  - key: player_base_url
+    label: "Player embed URL"
+    type: string
+    default: ""
+    help: "Where the lesson player is served from. Must be allowed by the dashboard CSP frame-src."
+    admin_only: true
+
+  # ── Lesson defaults (create-lesson payload, routes.py) ───────────────
+  - key: default_persona_slug
+    label: "Default teacher persona"
+    type: select
+    options: [aria, max, sophia, leo, nova]
+    default: "aria"
+    help: "ARIA (warm, analogy-first), Max (coach), Sophia (rigorous), Leo (story-first), Nova (visual-first)."
+  - key: allow_student_persona_choice
+    label: "Students may pick their teacher persona"
+    type: boolean
+    default: true
+  - key: default_language
+    label: "Default lesson language"
+    type: select
+    options: [en, ne, mixed]
+    default: "ne"
+    help: "mixed = Nepali speech with English subject terms (via the content glossary)."
+  - key: default_voice
+    label: "Default voice"
+    type: select
+    options: [ne-NP-HemkalaNeural, ne-NP-SagarNeural, en-US-AriaNeural, en-US-GuyNeural, hi-IN-SwaraNeural]
+    default: "ne-NP-HemkalaNeural"
+
+  # ── Lesson shape / cost drivers (create clamp + service payload) ─────
+  - key: lesson_max_minutes
+    label: "Max lesson length (minutes)"
+    type: integer
+    min: 5
+    max: 90
+    default: 25
+  - key: lesson_target_chapters
+    label: "Target chapters per lesson"
+    type: integer
+    min: 1
+    max: 8
+    default: 4
+    help: "The main cost driver — every chapter is one planner pass + streamed teach."
+  - key: max_questions_per_lesson
+    label: "Max student questions per lesson"
+    type: integer
+    default: 40
+  - key: attention_reset_minutes
+    label: "Attention reset every N minutes (0 disables)"
+    type: integer
+    default: 10
+
+  # ── Create gates (the create gate reads these) ────────────────────────
+  - key: allow_free_topic
+    label: "Allow un-grounded free-topic lessons"
+    type: boolean
+    default: false
+    help: "Off (recommended) = lessons must teach published curriculum content; the AI refuses to improvise a syllabus."
+  - key: allowed_grades
+    label: "Grades AI Teacher may teach"
+    type: multiselect
+    options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
+    default: ["6","7","8","9","10"]
+  - key: allowed_subjects
+    label: "Subjects AI Teacher may teach"
+    type: multiselect
+    options: []
+    default: []
+    help: "Empty = every subject that has published content. Options populate from your school's subjects."
+  - key: allowed_roles
+    label: "Roles who may start lessons"
+    type: multiselect
+    options: [student, teacher, school_admin]
+    default: ["student", "teacher"]
+  - key: student_hours_window
+    label: "Students may take lessons between"
+    type: string
+    default: "06:00-21:00"
+    help: "Local school time window. Teachers and admins are exempt."
+
+  # ── Guardrails (guardrail block; consent cannot be disabled for under-13) ──
+  - key: require_guardian_consent
+    label: "Require guardian AI consent"
+    type: boolean
+    default: true
+    help: "Platform enforces this regardless for students under 13."
+  - key: moderation_strictness
+    label: "Moderation strictness"
+    type: select
+    options: [standard, strict]
+    default: "standard"
+    help: "strict = medium-severity flags pause the lesson and notify a teacher."
+  - key: kill_switch
+    label: "Kill switch (block all lessons)"
+    type: boolean
+    default: false
+    admin_only: true
+    help: "Blocks new lessons and ends live ones on the next event."
+
+  # ── Retention + cost (tasks + reservation check) ─────────────────────
+  - key: transcript_retention_days
+    label: "Transcript retention (days)"
+    type: integer
+    min: 7
+    max: 1095
+    default: 180
+    help: "Nightly purge task enforces this."
+  - key: teacher_can_watch_live
+    label: "Teachers may watch live lessons (read-only mirror)"
+    type: boolean
+    default: true
+  - key: monthly_cost_ceiling_npr
+    label: "Monthly cost ceiling (NPR, 0 = platform quota only)"
+    type: integer
+    default: 3000
+    help: "Lesson creation reserves against this; a school at its ceiling gets a clean 429."
+  - key: monthly_minutes_per_student
+    label: "Monthly minutes per student"
+    type: integer
+    default: 240
+  - key: max_concurrent_lessons
+    label: "Max concurrent lessons (school-wide)"
+    type: integer
+    default: 25
+  - key: cost_alert_percent
+    label: "Cost alert at % of ceiling"
+    type: integer
+    default: 80
+    help: "Fires the ai_teacher.cost_ceiling_reached event."
