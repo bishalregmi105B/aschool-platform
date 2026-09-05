@@ -122,7 +122,7 @@ class RAGService:
                 """
                 SELECT id, ROW_NUMBER() OVER (ORDER BY embedding_vec <=> CAST(:qvec AS vector)) AS rank
                 FROM document_chunks
-                WHERE school_id = :school_id AND is_deleted = false
+                WHERE (school_id = :school_id OR school_id IS NULL) AND is_deleted = false
                   AND embedding_vec IS NOT NULL
                 LIMIT 40
                 """
@@ -145,7 +145,7 @@ class RAGService:
                                     plainto_tsquery('simple', :query)) DESC
                 ) AS rank
                 FROM document_chunks
-                WHERE school_id = :school_id AND is_deleted = false
+                WHERE (school_id = :school_id OR school_id IS NULL) AND is_deleted = false
                   AND text @@ plainto_tsquery('simple', :query){type_filter}
                 LIMIT 40
             )
@@ -154,7 +154,7 @@ class RAGService:
             FROM document_chunks c
             LEFT JOIN semantic s ON s.id = c.id
             LEFT JOIN lexical l ON l.id = c.id
-            WHERE c.school_id = :school_id AND c.is_deleted = false
+            WHERE (c.school_id = :school_id OR c.school_id IS NULL) AND c.is_deleted = false
               AND (s.id IS NOT NULL OR l.id IS NOT NULL)
             ORDER BY score DESC
             LIMIT :top_k
