@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, Search, Users, Mail, Phone, Pencil, Trash2, Upload, Shield } from "lucide-react";
 import Link from "next/link";
@@ -51,6 +52,7 @@ const STAFF_ROLE_OPTIONS: Array<{ value: StaffRole; label: string }> = [
 
 export default function StaffPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -211,9 +213,17 @@ export default function StaffPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => {
-                          if (confirm(`Delete ${s.full_name}?`)) {
+                          void (async () => {
+                          const ok = await confirm({
+                            title: `Delete ${s.full_name}?`,
+                            body: "The staff account is removed; payroll history is kept.",
+                            confirmLabel: "Delete staff member",
+                            tone: "danger",
+                          });
+                          if (ok) {
                             deleteMutation.mutate(s.id);
                           }
+                          })();
                         }}
                         disabled={deleteMutation.isPending}
                       >

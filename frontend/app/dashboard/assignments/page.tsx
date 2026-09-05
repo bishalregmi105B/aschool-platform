@@ -12,6 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -73,6 +74,7 @@ export default function AssignmentsPage() {
 
 function AssignmentsContent() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -404,7 +406,15 @@ function AssignmentsContent() {
                           variant="ghost"
                           className="h-7 w-7 text-destructive"
                           onClick={() => {
-                            if (confirm("Delete this assignment?")) deleteMut.mutate(a.id);
+                            void (async () => {
+                              const ok = await confirm({
+                                title: "Delete this assignment?",
+                                body: "Submissions attached to it stay in the record.",
+                                confirmLabel: "Delete assignment",
+                                tone: "danger",
+                              });
+                              if (ok) deleteMut.mutate(a.id);
+                            })();
                           }}
                           title={isAdmin ? "Delete" : "Delete (admins only)"}
                           disabled={!isAdmin}

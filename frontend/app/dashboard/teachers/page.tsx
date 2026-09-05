@@ -22,6 +22,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, UserCog, Mail, Phone, Search, Upload, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -33,6 +34,7 @@ export default function TeachersPage() {
   const [editItem, setEditItem] = useState<Teacher | null>(null);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const {
     data,
@@ -212,9 +214,17 @@ export default function TeachersPage() {
                         size="sm"
                         className="text-destructive"
                         onClick={() => {
-                          if (confirm(`Delete teacher \"${t.full_name}\"?`)) {
+                          void (async () => {
+                          const ok = await confirm({
+                            title: `Delete teacher "${t.full_name}"?`,
+                            body: "Their classes keep running — reassign a class teacher afterwards.",
+                            confirmLabel: "Delete teacher",
+                            tone: "danger",
+                          });
+                          if (ok) {
                             deleteMutation.mutate(t.id);
                           }
+                          })();
                         }}
                       >
                         <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete

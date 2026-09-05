@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import {
   Plus,
@@ -120,6 +121,7 @@ export default function StudentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const router = useRouter();
 
   // Fetch classes for proper class/section filter
@@ -228,13 +230,14 @@ export default function StudentsPage() {
     });
   }
 
-  function handleBulkDelete() {
-    if (
-      !confirm(
-        `Delete ${selected.size} selected student(s)? This cannot be undone.`,
-      )
-    )
-      return;
+  async function handleBulkDelete() {
+    const ok = await confirm({
+      title: `Delete ${selected.size} selected student(s)?`,
+      body: "This cannot be undone — their login and guardian links are removed too.",
+      confirmLabel: "Delete students",
+      tone: "danger",
+    });
+    if (!ok) return;
     bulkDeleteMutation.mutate(Array.from(selected));
   }
 
@@ -516,8 +519,15 @@ export default function StudentsPage() {
                           size="sm"
                           className="text-destructive"
                           onClick={() => {
-                            if (confirm("Delete this student?"))
-                              deleteMutation.mutate(student.id);
+                            void (async () => {
+                              const ok = await confirm({
+                                title: "Delete this student?",
+                                body: "Their login and guardian links are removed. This cannot be undone.",
+                                confirmLabel: "Delete student",
+                                tone: "danger",
+                              });
+                              if (ok) deleteMutation.mutate(student.id);
+                            })();
                           }}
                         >
                           Delete

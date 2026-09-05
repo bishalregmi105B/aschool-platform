@@ -43,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { displayBS } from "@/lib/nepali_date";
@@ -251,6 +252,7 @@ export default function AcademicsPage() {
 
 function AcademicYearsTab() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<AcademicYear | null>(null);
   // E219: Start/End are REQUIRED — a year without dates is meaningless
@@ -469,6 +471,7 @@ function AcademicYearsTab() {
 
 function ClassesTab() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showAddClass, setShowAddClass] = useState(false);
   const [editClass, setEditClass] = useState<ClassItem | null>(null);
   const [addSectionFor, setAddSectionFor] = useState<ClassItem | null>(null);
@@ -632,10 +635,18 @@ function ClassesTab() {
                               variant="ghost"
                               size="icon"
                               onClick={() => {
-                                if (confirm(`Delete section \"${section.name}\" from ${klass.name}?`)) {
-                                  deleteSectionMutation.mutate({ classId: klass.id, sectionId: section.id });
-                                }
-                              }}
+                                void (async () => {
+                              const ok = await confirm({
+                                title: `Delete section "${section.name}"?`,
+                                body: `It will be removed from ${klass.name}. Students stay enrolled in the class.`,
+                                confirmLabel: "Delete section",
+                                tone: "danger",
+                              });
+                              if (ok) {
+                                deleteSectionMutation.mutate({ classId: klass.id, sectionId: section.id });
+                              }
+                              })();
+                            }}
                               aria-label={`Delete section ${section.name}`}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
