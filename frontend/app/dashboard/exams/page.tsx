@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +85,7 @@ export default function ExamsPage() {
 
 function ExamsContent() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin";
   const [createOpen, setCreateOpen] = useState(false);
@@ -538,7 +540,15 @@ function ExamsContent() {
                               <DropdownMenuItem
                                 className="text-destructive"
                                 onClick={() => {
-                                  if (confirm("Delete this exam?")) deleteMutation.mutate(exam.id);
+                                  void (async () => {
+                                  const ok = await confirm({
+                                    title: "Delete this exam?",
+                                    body: "Marks and report cards already recorded stay in the archive.",
+                                    confirmLabel: "Delete exam",
+                                    tone: "danger",
+                                  });
+                                  if (ok) deleteMutation.mutate(exam.id);
+                                })();
                                 }}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete
