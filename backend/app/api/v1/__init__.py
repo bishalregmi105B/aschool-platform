@@ -185,3 +185,10 @@ api_v1_bp.register_blueprint(capture_bp)
 # AW-09/10/11 extensions — PD coach, live polls, QTI export
 from app.api.v1.ai_extensions import extensions_bp
 api_v1_bp.register_blueprint(extensions_bp)
+
+# AI Teacher plugin (Phase C) — admin-entered teaching content: sections →
+# versions → bilingual blocks, publish workflow, school-override chain.
+# Routes self-gate @plugin_required("ai_teacher"); the AI runtime reads
+# published snapshots, it never writes here.
+from app.api.v1.teaching_content import teaching_content_bp
+api_v1_bp.register_blueprint(teaching_content_bp)

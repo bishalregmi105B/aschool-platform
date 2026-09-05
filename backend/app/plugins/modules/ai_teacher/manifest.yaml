@@ -1,0 +1,94 @@
+slug: ai_teacher
+name: "AI Teacher (Live Whiteboard Tutor)"
+name_nepali: "एआई शिक्षक (लाइभ ह्वाइटबोर्ड ट्युटर)"
+category: premium
+price_monthly: 1499
+price_yearly: 14990
+emoji: "👩‍🏫"
+icon: "PenTool"
+version: "1.0.0"
+author: "ASchool"
+published: true
+coming_soon: false
+description: >-
+  A live AI teacher that speaks and hand-writes on an animated whiteboard,
+  chapter by chapter, grounded strictly in your school's published curriculum
+  content (admin-entered — no OCR, no guessing). Students interrupt by voice
+  or text and the teacher answers on the board, then resumes exactly where it
+  left off. Mastery is recorded per curriculum learning outcome and flows
+  into progress reports. Runs on a dedicated, isolated service; ASchool owns
+  every lesson record, cost and safety flag.
+# Hard dependencies, not soft hints: ai_suite is the AI licensing tier the
+# workbench guardrails check (_require_plan_tier → "ai_suite"); academics
+# owns curriculum_units, which every lesson is grounded on.
+depends_on:
+  - ai_suite
+  - academics
+conflicts_with: []
+
+# The runtime routes (lesson create/history/mastery/webhook) mount from the
+# plugin's own module; the admin content CRUD is statically mounted at
+# app.api.v1.teaching_content (see api/v1/__init__.py).
+api_blueprint: "app.plugins.modules.ai_teacher.routes"
+models_module: "app.models.ai_teacher"
+models:
+  - "app.models.ai_teacher"
+  - "app.models.teaching_content"
+services:
+  - "app.plugins.modules.ai_teacher.service_client"
+tasks:
+  - "app.plugins.modules.ai_teacher.tasks"
+
+frontend:
+  route: "/dashboard/ai-teacher"
+  sidebar:
+    section: "Learning"
+    label: "AI Teacher"
+    label_nepali: "एआई शिक्षक"
+    icon: "PenTool"
+    subitems:
+      - { label: "Start a Lesson", route: "/dashboard/ai-teacher" }
+      - { label: "Lesson History", route: "/dashboard/ai-teacher/history" }
+      - { label: "Mastery", route: "/dashboard/ai-teacher/mastery" }
+      - { label: "Teaching Content", route: "/dashboard/ai-teacher/content" }
+      - { label: "Usage & Cost", route: "/dashboard/analytics/ai-usage" }
+    visible_to: ["school_admin", "teacher", "student"]
+
+flutter:
+  admin_app: { feature_folder: "ai_teacher", tabs: ["Usage", "Content", "Safety"] }
+  teacher_app: { feature_folder: "ai_teacher", tabs: ["Assign Lesson", "Live", "Mastery"] }
+  student_app: { feature_folder: "ai_teacher", tabs: ["Learn", "My Lessons", "Due for Review"] }
+  parent_app: { feature_folder: "ai_teacher", tabs: ["Child's Lessons", "Consent"] }
+
+events:
+  emits:
+    - "ai_teacher.lesson_started"
+    - "ai_teacher.lesson_completed"
+    - "ai_teacher.mastery_updated"
+    - "ai_teacher.moderation_flagged"
+    - "ai_teacher.cost_ceiling_reached"
+    - "ai_teacher.service_unavailable"
+  listens:
+    - "curriculum.content_published"
+    - "student.consent_revoked"
+    - "plugin.deactivated"
+
+owns_tables:
+  - ai_teacher_service_keys
+  - ai_teacher_lessons
+  - ai_teacher_lesson_chapters
+  - ai_teacher_messages
+  - ai_teacher_mastery
+  - ai_teacher_learning_events
+  - teaching_sections
+  - teaching_section_versions
+  - teaching_section_outcomes
+  - teaching_notes
+  - teaching_examples
+  - teaching_misconceptions
+  - teaching_formulas
+  - teaching_exam_tips
+  - teaching_key_terms
+  - teaching_media
+  - teaching_content_snapshots
+  - teaching_content_reviews
