@@ -94,6 +94,8 @@ def activate(db) -> None:
 
 def _provision_school(db, school_id) -> None:
     from app.models.ai_teacher import AITeacherServiceKey
+    from app.models.plugin import SchoolPlugin
+    from app.plugins.config_schema import encrypt_secret
     from app.plugins.modules.ai_teacher.service_client import provision_tenant
 
     existing = AITeacherServiceKey.query.filter_by(
@@ -106,6 +108,19 @@ def _provision_school(db, school_id) -> None:
         key = AITeacherServiceKey.issue(school_id=school_id, secret=secret)
         db.session.add(key)
         db.session.commit()
+        # Webhook-verify copy: the service signs lesson events home with this
+        # secret, and HMAC verification needs the plaintext — sha256 (what
+        # AITeacherServiceKey holds) can never verify a MAC. Store an
+        # ENCRYPTED envelope in the plugin config; the webhook handler
+        # decrypts it per request. Plaintext is still shown exactly once.
+        sp = SchoolPlugin.query.filter_by(
+            school_id=school_id, plugin_slug="ai_teacher"
+        ).first()
+        if sp is not None:
+            cfg = dict(sp.config or {})
+            cfg["webhook_secret"] = encrypt_secret(secret)
+            sp.config = cfg
+            db.session.commit()
         try:
             provision_tenant(school_id, key.key_id, secret)
         except Exception as exc:  # noqa: BLE001 — provisioning is retryable
