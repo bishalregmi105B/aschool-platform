@@ -22,6 +22,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import {
+  FormRenderer,
+  getPath as frGetPath,
+  setPath as frSetPath,
+  type V2Schema,
+} from "@/components/config/form-renderer";
 import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 
 /**
@@ -159,10 +165,12 @@ export default function PluginSettingsPage() {
   });
 
   // Settings-screen definition from the plugin module (config_schema.yaml).
+  // v2 dialects (schema_version: 2) render through FormRenderer; v1 keeps
+  // the original typed-drafts editor below.
   const { data: schema } = useQuery({
     queryKey: ["plugin-config-schema", slug],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<ConfigSchema>>(
+      const res = await api.get<ApiResponse<ConfigSchema & { schema_version?: number }>>(
         `/plugins/${slug}/config-schema`
       );
       return res.data.data || null;
@@ -170,12 +178,19 @@ export default function PluginSettingsPage() {
     enabled: !!slug,
   });
 
+  const isV2 = Boolean(
+    schema?.has_schema && (schema as { schema_version?: number }).schema_version === 2
+  );
+  const v2Schema = (isV2 ? (schema as unknown as V2Schema) : null);
+
   const schemaFields = useMemo(
     () => (schema?.has_schema ? schema.fields : []),
     [schema]
   );
 
   const [schemaDrafts, setSchemaDrafts] = useState<Record<string, DraftField>>({});
+  const [v2Values, setV2Values] = useState<Record<string, unknown>>({});
+  const [v2Errors, setV2Errors] = useState<Record<string, string>>({});
   const [extraDrafts, setExtraDrafts] = useState<Record<string, DraftField>>({});
   const [newKey, setNewKey] = useState("");
   const [newKind, setNewKind] = useState<FieldKind>("string");
@@ -189,6 +204,18 @@ export default function PluginSettingsPage() {
   useEffect(() => {
     if (!data) return;
     const clean = stripReserved(data);
+    if (v2Schema) {
+      // Stored values first; undeclared defaults filled for display only.
+      const base: Record<string, unknown> = JSON.parse(JSON.stringify(clean));
+      for (const f of v2Schema.fields) {
+        const current = frGetPath(base, f.key);
+        if (current === undefined && f.default !== undefined) {
+          frSetPath(base, f.key, f.default);
+        }
+      }
+      setV2Values(base);
+      return;
+    }
     if (schemaFields.length > 0) {
       setSchemaDrafts(
         Object.fromEntries(
@@ -211,7 +238,7 @@ export default function PluginSettingsPage() {
         Object.fromEntries(Object.entries(clean).map(([k, v]) => [k, toDraft(v)]))
       );
     }
-  }, [data, schemaFields, schemaTopKeys]);
+  }, [data, schemaFields, schemaTopKeys, v2Schema]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
@@ -227,13 +254,21 @@ export default function PluginSettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plugins-config", slug] });
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
+      setV2Errors({});
       toast.success("Settings saved");
     },
     onError: (err: unknown) => {
+      // v2 validation: 422 with a field-keyed errors dict → render inline.
+      const resp = (err as { response?: { status?: number; data?: { data?: { errors?: Record<string, string> }; error?: string } } })
+        ?.response;
+      if (resp?.status === 422 && resp.data?.data?.errors) {
+        setV2Errors(resp.data.data.errors);
+        toast.error("Fix the highlighted fields and save again");
+        return;
+      }
       const msg =
         err && typeof err === "object" && "response" in err
-          ? ((err as { response?: { data?: { error?: string } } }).response?.data
-              ?.error ?? "Could not save settings")
+          ? (resp?.data?.error ?? "Could not save settings")
           : "Could not save settings";
       toast.error(typeof msg === "string" ? msg : "Could not save settings");
     },
@@ -245,6 +280,25 @@ export default function PluginSettingsPage() {
     const payload: Record<string, unknown> = data
       ? (JSON.parse(JSON.stringify(stripReserved(data))) as Record<string, unknown>)
       : {};
+
+    if (v2Schema) {
+      // v2: schema values live at their dot-paths inside v2Values (which
+      // started from the stored config). Secret envelopes untouched by the
+      // user pass through unchanged; the server re-validates everything.
+      const merged = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+      // Drop removed extras (keys not in v2Values' top level and not claimed
+      // by the schema) so ?replace=1 keeps the editor's delete affordance.
+      for (const key of Object.keys(merged)) {
+        const claimed = v2Schema.fields.some((f) => f.key.split(".")[0] === key);
+        if (!claimed && !(key in v2Values)) delete merged[key];
+      }
+      for (const [key, value] of Object.entries(v2Values)) {
+        frSetPath(merged, key, value);
+      }
+      saveMutation.mutate(merged);
+      return;
+    }
+
     // Extra (schema-undeclared) keys: validate, then REPLACE the top-level
     // keys not claimed by the schema — keys the user removed actually drop.
     const extras: Record<string, unknown> = {};
@@ -396,7 +450,44 @@ export default function PluginSettingsPage() {
         </p>
       </div>
 
-      {hasSchema && (
+      {v2Schema && (
+        <FormRenderer
+          schema={v2Schema}
+          values={v2Values}
+          errors={v2Errors}
+          disabled={!canManage}
+          onChange={(key, value) => {
+            setV2Values((prev) => {
+              const next = JSON.parse(JSON.stringify(prev)) as Record<string, unknown>;
+              frSetPath(next, key, value);
+              return next;
+            });
+            setV2Errors((prev) => {
+              if (!(key in prev)) return prev;
+              const next = { ...prev };
+              delete next[key];
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {v2Schema && canManage && (
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <Spinner size="sm" />
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Settings
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {!v2Schema && hasSchema && (
         <Card>
           <CardHeader>
             <CardTitle>Settings</CardTitle>
@@ -435,6 +526,7 @@ export default function PluginSettingsPage() {
         </Card>
       )}
 
+      {!v2Schema && (
       <Card>
         <CardHeader>
           <CardTitle>{hasSchema ? "Other settings" : "Settings"}</CardTitle>
@@ -536,6 +628,7 @@ export default function PluginSettingsPage() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

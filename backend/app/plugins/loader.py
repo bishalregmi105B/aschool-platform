@@ -399,21 +399,32 @@ class PluginLoader:
         Returns [] when the plugin carries no schema (the settings UI then
         falls back to the generic key/value editor).
         """
+        raw = cls.get_config_schema_raw(slug)
+        if not raw:
+            return []
+        return raw.get("fields", []) if isinstance(raw, dict) else raw
+
+    @classmethod
+    def get_config_schema_raw(cls, slug: str) -> dict:
+        """Full parsed config_schema.yaml (groups + fields + schema_version).
+
+        {} when the plugin carries no schema or the file is unreadable —
+        callers (config_schema.load_schema) treat {} as "no schema".
+        """
         manifest = cls._plugins.get(slug)
         if not manifest:
-            return []
+            return {}
         schema_path = manifest.get("_config_schema_path")
         if not schema_path:
-            return []
+            return {}
         try:
             data = yaml.safe_load(Path(schema_path).read_text())
         except (OSError, yaml.YAMLError) as e:
             logger.error("Failed to parse config schema for %s: %s", slug, e)
-            return []
+            return {}
         if not data:
-            return []
-        fields = data.get("fields", []) if isinstance(data, dict) else data
-        return fields if isinstance(fields, list) else []
+            return {}
+        return data if isinstance(data, dict) else {"fields": data}
 
     @classmethod
     def get_hooks(cls, slug: str):

@@ -19,6 +19,7 @@ from app.plugins.billing import (
     uninstall_plugin,
 )
 from app.plugins.entitlements import ensure_free_plugins
+from app.plugins import config_schema as plugin_config_schema
 
 from datetime import datetime, timedelta, timezone
 from app.plugins.loader import PluginLoader
@@ -823,7 +824,14 @@ def get_plugin_config(slug):
     ).first()
     if not sp or sp.uninstalled_at is not None:
         return error_response(f"Plugin '{slug}' is not installed", 404)
-    return success_response(sp.config or {})
+    # Secrets are never echoed — only the last4 marker reaches the client.
+    try:
+        schema = plugin_config_schema.load_schema(slug)
+    except ValueError:
+        schema = None
+    return success_response(
+        plugin_config_schema.redact_config(schema, sp.config or {}, g.role)
+    )
 
 
 @plugins_bp.route("/<slug>/config", methods=["PUT"])
@@ -878,11 +886,48 @@ def update_plugin_config(slug):
     # JSONB column would be silently dropped; flag_modified is applied as
     # defense-in-depth for the same bug class.
     replace = request.args.get("replace", "").lower() in ("1", "true", "yes")
-    merged_config = dict(data) if replace else {**(sp.config or {}), **data}
+
+    # Schema v2 path: when the plugin ships config_schema.yaml, validate the
+    # payload against it (18 typed fields, visible_when, per-role visibility,
+    # secret envelopes). Errors non-empty ⇒ NOTHING applied — 422 with the
+    # field-keyed errors for inline form rendering. Plugins without a schema
+    # keep the legacy pass-through merge.
+    try:
+        schema = plugin_config_schema.load_schema(slug)
+    except ValueError as e:
+        logger.error("Broken config schema for %s: %s", slug, e)
+        schema = None
+
+    if schema is not None:
+        # requires_plugins visibility needs the school's installed-slug set.
+        installed = {
+            row.plugin_slug
+            for row in SchoolPlugin.query.filter_by(
+                school_id=g.school_id, uninstalled_at=None
+            ).all()
+        }
+        stored_cfg = {} if replace else (sp.config or {})
+        errors, merged_config = plugin_config_schema.validate_config(
+            schema,
+            data,
+            role=g.role,
+            installed=installed,
+            stored=stored_cfg,
+            ctx={"school_id": g.school_id},
+        )
+        if errors:
+            return error_response(
+                "Config validation failed", 422, data={"errors": errors}
+            )
+    else:
+        merged_config = dict(data) if replace else {**(sp.config or {}), **data}
+
     sp.config = merged_config
     flag_modified(sp, "config")
     db.session.commit()
-    return success_response(sp.config)
+    return success_response(
+        plugin_config_schema.redact_config(schema, sp.config, g.role)
+    )
 
 
 @plugins_bp.route("/refresh-registry", methods=["POST"])
@@ -908,18 +953,76 @@ def refresh_registry():
 def get_plugin_config_schema(slug):
     """Settings-screen definition for a plugin (from its config_schema.yaml).
 
-    `fields` is empty when the plugin carries no schema — the settings UI
-    then falls back to the generic key/value editor.
+    v2 dialect: fields/groups are filtered by the caller's role; a v1 schema
+    is upgraded in memory. `fields` is empty when the plugin carries no
+    schema — the settings UI then falls back to the generic key/value editor.
     """
     manifest = PluginLoader.get_manifest(slug)
     if not manifest:
         return error_response(f"Plugin '{slug}' not found", 404)
-    fields = PluginLoader.get_config_schema(slug)
+    try:
+        schema = plugin_config_schema.load_schema(slug)
+    except ValueError as e:
+        logger.error("Broken config schema for %s: %s", slug, e)
+        return error_response(f"Plugin '{slug}' has a broken config schema", 500)
+    if schema is None:
+        return success_response(
+            {
+                "slug": slug,
+                "has_schema": False,
+                "schema_version": 1,
+                "groups": [],
+                "fields": PluginLoader.get_config_schema(slug),
+            }
+        )
+    body = plugin_config_schema.schema_for_role(schema, g.role)
+    body.update({"slug": slug, "has_schema": True})
+    return success_response(body)
+
+
+@plugins_bp.route("/<slug>/migrate-config", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin")
+def migrate_plugin_config(slug):
+    """Bulk-pass all schools' stored config to the schema's config_version.
+
+    The lazy runner (ensure_config_version) handles installs on read; this
+    endpoint front-runs every school at once, e.g. after shipping a new
+    migration step. Snapshots land in audit_logs (config_schema._snapshot).
+    """
+    try:
+        schema = plugin_config_schema.load_schema(slug)
+    except ValueError as e:
+        return error_response(f"Plugin '{slug}' has a broken config schema: {e}", 500)
+    if schema is None:
+        return error_response(f"Plugin '{slug}' has no config schema", 404)
+
+    rows = SchoolPlugin.query.filter_by(
+        plugin_slug=slug, uninstalled_at=None
+    ).all()
+    migrated = 0
+    already_current = 0
+    for sp in rows:
+        cfg = plugin_config_schema.ensure_config_version(
+            slug, sp.school_id, sp.config
+        )
+        if int((cfg or {}).get("__config_version__") or 1) != schema.config_version:
+            continue  # missing step / transform failure — logged, never half-migrated
+        if cfg != sp.config:
+            sp.config = cfg
+            flag_modified(sp, "config")
+            migrated += 1
+        else:
+            already_current += 1
+    db.session.commit()
     return success_response(
         {
             "slug": slug,
-            "has_schema": bool(fields),
-            "fields": fields,
+            "target_config_version": schema.config_version,
+            "schools_total": len(rows),
+            "migrated": migrated,
+            "already_current": already_current,
         }
     )
 
