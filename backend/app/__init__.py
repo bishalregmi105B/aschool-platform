@@ -360,6 +360,17 @@ def create_app(config_name: str | None = None) -> Flask:
                 "task": "expire_trials",
                 "schedule": crontab(minute=0),
             },
+            # ── AI Teacher reconciler (every 10 min) + nightly purge ──
+            # T-20: the plugin's tasks were plain functions; these beat
+            # entries plus app/tasks/ai_teacher.py make them runnable.
+            "ai-teacher-reconcile-lessons": {
+                "task": "ai_teacher_reconcile_lessons",
+                "schedule": 600.0,
+            },
+            "ai-teacher-purge-transcripts": {
+                "task": "ai_teacher_purge_transcripts",
+                "schedule": crontab(hour=3, minute=40),
+            },
         },
     )
 
