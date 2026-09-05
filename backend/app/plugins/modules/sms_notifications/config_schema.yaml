@@ -1,0 +1,16 @@
+# SMS Notifications plugin settings (SchoolPlugin.config).
+# Rule: a setting with no consumer is a lie — the consumer is named per field.
+schema_version: 2
+config_version: 1
+fields:
+  # ── Credits ledger (api/v1/sms.py:186 — /sms/credits response) ───────────
+  # Remaining credits = credits_topup (purchased top-ups recorded here)
+  # minus Σ SMSLog.cost of sent messages. A live Sparrow gateway balance
+  # wins when the integration is configured; this number is the fallback.
+  - key: credits_topup
+    label: "Purchased credit top-ups (NPR)"
+    type: number
+    default: 0
+    min: 0
+    unit: "NPR"
+    help: "Total top-ups purchased for this school. The Credits tab subtracts what was actually sent from this balance. A live Sparrow gateway balance overrides it when the integration is on."

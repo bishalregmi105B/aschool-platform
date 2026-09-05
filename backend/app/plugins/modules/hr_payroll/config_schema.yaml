@@ -1,0 +1,41 @@
+# HR Payroll plugin settings (SchoolPlugin.config).
+# Rule: a setting with no consumer is a lie — every consumer is named below.
+schema_version: 2
+config_version: 1
+groups:
+  - key: payroll
+    label: "Payroll defaults"
+    label_ne: "तलब गणना"
+    description: "Used when a school has no payroll section in its School.settings — plugin-level settings win over school settings (hr_payroll.py:_resolve_payroll_settings, payroll_monthly.py)."
+    icon: "Wallet"
+fields:
+  # ── Payroll defaults (hr_payroll.py:208-232 + tasks/payroll_monthly.py:56) ──
+  # Keys mirror the consumer EXACTLY (it reads these spellings from the
+  # `payroll` dict — renaming here would silently stop working).
+  - key: payroll.defaultBasicSalary
+    label: "Default basic salary (NPR)"
+    type: number
+    group: payroll
+    default: 0
+    min: 0
+    unit: "NPR"
+    help: "Fallback basic salary when a staff member has none. The consumer also accepts basicSalary / default_basic_salary as fallbacks."
+  - key: payroll.taxRate
+    label: "Flat tax rate (% of basic)"
+    type: number
+    group: payroll
+    default: 0
+    min: 0
+    max: 100
+    unit: "%"
+    help: "Flat percentage of basic withheld per payslip. TDS slab support lands with payroll module ② — until then this is the only tax mechanism."
+  - key: payroll.basicSalaryPercentage
+    label: "Basic as % of gross"
+    type: number
+    group: payroll
+    default: 100
+    min: 1
+    max: 100
+    unit: "%"
+    help: "When carrying basic forward from the previous payslip, the previous GROSS is scaled by this (100 = plain carry-forward)."
+    advanced: true

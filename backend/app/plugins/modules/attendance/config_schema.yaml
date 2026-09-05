@@ -2,6 +2,8 @@
 # Real consumer: app/tasks/attendance_alerts.py — the daily absent-alert job
 # honors `absent_alerts_enabled` per school (skip when false; alerts fire by
 # default so an empty config changes nothing).
+schema_version: 2
+config_version: 1
 fields:
   - key: absent_alerts_enabled
     label: "Daily absent alerts"
