@@ -1,6 +1,7 @@
 """Teaching Content API — admin CRUD over sections/versions/blocks + publish.
 
-Part of the ai_teacher plugin (Phase C P1). All content is ADMIN-ENTERED:
+Part of the nepal_curriculum plugin (D3 §B packaging): content is
+ownable — and usable — without buying AI. The AI Teacher reads it. All content is ADMIN-ENTERED:
 there is no OCR/vision ingestion path anywhere in this module by design.
 The AI Teacher runtime reads the published snapshot over the read API in
 api/v1/ai_teacher.py; it never writes here.
@@ -95,7 +96,7 @@ def _require_write_access(section):
 @teaching_content_bp.route("/sections", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin", "teacher")
 def list_sections():
     query = _visible_sections_query(g.school_id)
@@ -112,7 +113,7 @@ def list_sections():
 @teaching_content_bp.route("/sections/<uuid:section_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin", "teacher")
 def get_section(section_id):
     section = _load_section(section_id)
@@ -128,7 +129,7 @@ def get_section(section_id):
 @teaching_content_bp.route("/sections", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def create_section():
     data = request.get_json(silent=True) or {}
@@ -192,7 +193,7 @@ def create_section():
 @teaching_content_bp.route("/sections/<uuid:section_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def update_section(section_id):
     section = _load_section(section_id)
@@ -217,7 +218,7 @@ def update_section(section_id):
 @teaching_content_bp.route("/sections/<uuid:section_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def delete_section(section_id):
     section = _load_section(section_id)
@@ -237,7 +238,7 @@ def delete_section(section_id):
 @teaching_content_bp.route("/sections/<uuid:section_id>/versions", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin", "teacher")
 def list_versions(section_id):
     section = _load_section(section_id)
@@ -258,7 +259,7 @@ def list_versions(section_id):
 )
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin", "teacher")
 def get_version(section_id, version_no):
     section = _load_section(section_id)
@@ -328,7 +329,7 @@ def _transition(version, action, comment=None):
 )
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def version_action(section_id, version_no, action):
     section = _load_section(section_id)
@@ -357,7 +358,7 @@ def version_action(section_id, version_no, action):
 )
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def clone_version(section_id, version_no):
     """'Editing' a published version: deep-clone it as the next draft.
@@ -553,7 +554,7 @@ def _clone_blocks(source, clone):
 )
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin")
 def replace_blocks(section_id, version_no, block_kind):
     """Replace a version's block list wholesale (the admin editor's save).
@@ -643,7 +644,7 @@ def _update_language_coverage(version):
 )
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@plugin_required("nepal_curriculum")
 @role_required("superadmin", "school_admin", "teacher")
 def version_reviews(section_id, version_no):
     section = _load_section(section_id)
