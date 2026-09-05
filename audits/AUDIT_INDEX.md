@@ -1,7 +1,7 @@
 # 📋 ASCHOOL AUDIT & CHANGELOG INDEX
 **Centralized Directory of System Audits, Historical Logs, and Real-Time Codebase Changes**  
 **Maintained by:** Development Team & AI Engineering Assistants  
-**Last Updated:** August 27, 2026  
+**Last Updated:** September 5, 2026  
 
 ---
 
@@ -9,7 +9,10 @@
 
 | Date | Audit Document | Description | Scope |
 | :--- | :--- | :--- | :--- |
-| **2026-09-05** | [**`research/UNIFIED_ROADMAP_2026-09.md`**](research/UNIFIED_ROADMAP_2026-09.md) | **Roadmap v3 FINAL** — reconciled plan of record after the full re-audit; build progress ledger included. | Full Stack, Plan |
+| **2026-09-05** | [**`research/ROADMAP_V4_2026-09-05.md`**](research/ROADMAP_V4_2026-09-05.md) | **Roadmap v4 — PLAN OF RECORD.** Rebuilt from the R2 corpus digest + R3 tree verification: v3's ledger re-audited item-by-item against the working tree (B1 7/7 ✅, B3 ✅, C-P1 ✅; exact remainders for B2/C/D/E/F), corpus defects folded in (D-06 cutover, IEMIS importer fixes, receipt reversal, naive datetimes), new Phase 0 (commit in-flight plugin-v2 work + first valid full-suite run) and Phase B′. | Full Stack, Plan |
+| **2026-09-05** | [`research/_digest/R2_CORPUS_DEMANDS_2026-09-05.md`](research/_digest/R2_CORPUS_DEMANDS_2026-09-05.md) | Full re-read digest of the entire research corpus: locked decisions, consolidated open-work backlog by track with citations, cross-document conflicts/staleness, all test/eval gate obligations. | All Research Docs |
+| **2026-09-05** | [`research/_digest/R3_TREE_VERIFICATION_2026-09-05.md`](research/_digest/R3_TREE_VERIFICATION_2026-09-05.md) | Ground-truth verification of every v3 roadmap claim against the working tree (file:line evidence), incl. the uncommitted plugin-v2/widget in-flight work, migration chain (single head `a7c3e9f1d4b8`), and test counts. | Codebase Verification |
+| **2026-09-05** | [`research/UNIFIED_ROADMAP_2026-09.md`](research/UNIFIED_ROADMAP_2026-09.md) | Roadmap v3 — **superseded by v4**; kept for its locked decisions (§3), evidence base (§0) and anti-goals (§11), which v4 carries forward. | Full Stack, Plan |
 | **2026-09-05** | [`research/_digest/D1_AITEACHER_AND_TOOLS.md`](research/_digest/D1_AITEACHER_AND_TOOLS.md) | AI Teacher plugin contract (topology, endpoints, DDL, catalog 153 tools, deck/document emitter contract) + staleness ledger vs the 2026-09-04 corpus. | AI Teacher, ai_suite, teaching-content |
 | **2026-09-05** | [`research/_digest/D2_ARCHITECTURE_AND_ENGINE.md`](research/_digest/D2_ARCHITECTURE_AND_ENGINE.md) | Plugin/theme/widget/config v2 contract + ATeacher engine internals (board grammar, prompts, defect list) + public-site parity lock. | Plugin Architecture, ATeacher |
 | **2026-09-05** | [`research/_digest/D3_SAHAYATRI_PLUGIN_SPEC.md`](research/_digest/D3_SAHAYATRI_PLUGIN_SPEC.md) | Sahayatri→ASchool implementation spec: scope table (PORT/SKIP per no-whiteboard/no-OCR constraints), one new plugin `nepal_curriculum`, 16-table de-dup verdicts, result templates, sockets, admin entry UI, slices. | Sahayatri Port, Content Model |
