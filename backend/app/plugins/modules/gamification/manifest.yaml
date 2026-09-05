@@ -1,52 +1,68 @@
 slug: gamification
-name: "Student Gamification"
-name_nepali: "विद्यार्थी गेमिफिकेसन"
+name: Student Gamification
+name_nepali: विद्यार्थी गेमिफिकेसन
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "🏆"
-icon: "Trophy"
-description: "Points, badges, streaks, leaderboards, house system, rewards for attendance, grades, and behavior"
-
-api_blueprint: "app.api.v1.gamification"
-models_module: "app.models.gamification"
-
+emoji: 🏆
+icon: Trophy
+description: Points, badges, streaks, leaderboards, house system, rewards for attendance,
+  grades, and behavior
 depends_on:
-  - attendance
+- attendance
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/gamification"
-  sidebar:
-    section: "Student Life"
-    label: "Gamification"
-    label_nepali: "गेमिफिकेसन"
-    icon: "Trophy"
-    subitems:
-      - { label: "Dashboard", route: "/dashboard/gamification" }
-      - { label: "Badges", route: "/dashboard/gamification/badges" }
-      - { label: "Leaderboard", route: "/dashboard/gamification/leaderboard" }
-      - { label: "Houses", route: "/dashboard/gamification/houses" }
-      - { label: "Rewards", route: "/dashboard/gamification/rewards" }
-    visible_to: ["school_admin", "teacher"]
-
-flutter:
-  admin_app:
-    { feature_folder: "gamification", tabs: ["Settings", "Badges", "Houses"] }
-  teacher_app:
-    { feature_folder: "gamification", tabs: ["Award Points", "Leaderboard"] }
-  parent_app: { feature_folder: "achievements", tabs: ["Child's Achievements"] }
-  student_app:
-    {
-      feature_folder: "achievements",
-      tabs: ["My Points", "Badges", "Leaderboard"],
-    }
-
 events:
   emits:
-    - "gamification.points_awarded"
-    - "gamification.badge_earned"
+  - gamification.points_awarded
+  - gamification.badge_earned
   listens:
-    - "attendance.marked"
-    - "assignment.submitted"
-    - "exams.result_published"
+  - attendance.marked
+  - assignment.submitted
+  - exams.result_published
+capabilities:
+  api_blueprint: app.api.v1.gamification
+  models_module: app.models.gamification
+ui:
+  nav:
+    route: /dashboard/gamification
+    section: Student Life
+    label: Gamification
+    label_nepali: गेमिफिकेसन
+    icon: Trophy
+    visible_to:
+    - school_admin
+    - teacher
+    subitems:
+    - label: Dashboard
+      route: /dashboard/gamification
+    - label: Badges
+      route: /dashboard/gamification/badges
+    - label: Leaderboard
+      route: /dashboard/gamification/leaderboard
+    - label: Houses
+      route: /dashboard/gamification/houses
+    - label: Rewards
+      route: /dashboard/gamification/rewards
+mobile:
+  admin:
+    feature_folder: gamification
+    tabs:
+    - Settings
+    - Badges
+    - Houses
+  teacher:
+    feature_folder: gamification
+    tabs:
+    - Award Points
+    - Leaderboard
+  parent:
+    feature_folder: achievements
+    tabs:
+    - Child's Achievements
+  student:
+    feature_folder: achievements
+    tabs:
+    - My Points
+    - Badges
+    - Leaderboard
+schema_version: 2

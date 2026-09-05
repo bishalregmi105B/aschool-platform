@@ -1,35 +1,38 @@
 slug: multi_branch
-name: "Multi-Branch Chain"
-name_nepali: "बहु-शाखा चेन"
+name: Multi-Branch Chain
+name_nepali: बहु-शाखा चेन
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🏢"
-icon: "Building2"
-description: "Cross-school unified dashboard, chain analytics"
-
-api_blueprint: "app.plugins.modules.multi_branch.routes"
-models_module: "app.models.school_chain"
-
+emoji: 🏢
+icon: Building2
+description: Cross-school unified dashboard, chain analytics
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/multi-branch"
-  sidebar:
-    section: "Admin"
-    label: "Multi-Branch"
-    label_nepali: "बहु-शाखा"
-    icon: "Building2"
+capabilities:
+  api_blueprint: app.plugins.modules.multi_branch.routes
+  models_module: app.models.school_chain
+ui:
+  nav:
+    route: /multi-branch
+    section: Admin
+    label: Multi-Branch
+    label_nepali: बहु-शाखा
+    icon: Building2
+    visible_to:
+    - school_admin
     subitems:
-      - { label: "Branches", route: "/multi-branch/branches" }
-      - { label: "Unified Dashboard", route: "/multi-branch/dashboard" }
-      - { label: "Chain Analytics", route: "/multi-branch/analytics" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "multi_branch",
-      tabs: ["Branches", "Dashboard", "Analytics"],
-    }
+    - label: Branches
+      route: /multi-branch/branches
+    - label: Unified Dashboard
+      route: /multi-branch/dashboard
+    - label: Chain Analytics
+      route: /multi-branch/analytics
+mobile:
+  admin:
+    feature_folder: multi_branch
+    tabs:
+    - Branches
+    - Dashboard
+    - Analytics
+schema_version: 2

@@ -1,36 +1,42 @@
 slug: elibrary
-name: "E-Library & Digital Content"
-name_nepali: "ई-पुस्तकालय"
+name: E-Library & Digital Content
+name_nepali: ई-पुस्तकालय
 category: starter
 price_monthly: 99
 price_yearly: 990
-emoji: "📖"
-icon: "Tablet"
-description: "Digital books, past papers, educational resources"
-
-api_blueprint: "app.api.v1.library"
-models_module: "app.models.digital_content"
-
+emoji: 📖
+icon: Tablet
+description: Digital books, past papers, educational resources
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/elibrary"
-  sidebar:
-    section: "Learning"
-    label: "E-Library"
-    label_nepali: "ई-पुस्तकालय"
-    icon: "BookOpen"
+capabilities:
+  api_blueprint: app.api.v1.library
+  models_module: app.models.digital_content
+ui:
+  nav:
+    route: /dashboard/elibrary
+    section: Learning
+    label: E-Library
+    label_nepali: ई-पुस्तकालय
+    icon: BookOpen
+    visible_to:
+    - school_admin
+    - teacher
+    - student
     subitems:
-      # E236 (2026-08-31): subitem routes must match real frontend pages —
-      # /dashboard/elibrary/books and /dashboard/elibrary/papers were 404s
-      # (no such pages; the browse page is /dashboard/elibrary, past papers
-      # live at /dashboard/elibrary/past-papers, and there is no separate
-      # resources page — the browse table already lists all resources).
-      - { label: "Browse Books", route: "/dashboard/elibrary" }
-      - { label: "Past Papers", route: "/dashboard/elibrary/past-papers" }
-    visible_to: ["school_admin", "teacher", "student"]
-
-flutter:
-  teacher_app: { feature_folder: "elibrary", tabs: ["Upload", "Browse"] }
-  student_app: { feature_folder: "elibrary", tabs: ["Browse", "Downloads"] }
+    - label: Browse Books
+      route: /dashboard/elibrary
+    - label: Past Papers
+      route: /dashboard/elibrary/past-papers
+mobile:
+  teacher:
+    feature_folder: elibrary
+    tabs:
+    - Upload
+    - Browse
+  student:
+    feature_folder: elibrary
+    tabs:
+    - Browse
+    - Downloads
+schema_version: 2

@@ -1,39 +1,48 @@
 slug: hr_payroll
-name: "HR & Payroll"
-name_nepali: "कर्मचारी तथा तलब"
+name: HR & Payroll
+name_nepali: कर्मचारी तथा तलब
 category: growth
 price_monthly: 199
 price_yearly: 1990
-emoji: "👔"
-icon: "Briefcase"
-description: "Staff payroll, leave management, appraisal, PF/SSF"
-
-api_blueprint: "app.api.v1.hr_payroll"
-models_module: "app.models.hr_payroll"
-
+emoji: 👔
+icon: Briefcase
+description: Staff payroll, leave management, appraisal, PF/SSF
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/hr"
-  sidebar:
-    section: "Money"
-    label: "HR & Payroll"
-    label_nepali: "कर्मचारी तलब"
-    icon: "Briefcase"
+capabilities:
+  api_blueprint: app.api.v1.hr_payroll
+  models_module: app.models.hr_payroll
+ui:
+  nav:
+    route: /dashboard/hr
+    section: Money
+    label: HR & Payroll
+    label_nepali: कर्मचारी तलब
+    icon: Briefcase
+    visible_to:
+    - school_admin
+    - accountant
     subitems:
-      - { label: "Overview", route: "/dashboard/hr" }
-      - { label: "Payroll", route: "/dashboard/hr/payroll" }
-      - { label: "Payroll Settings", route: "/dashboard/hr/payroll/settings" }
-      - { label: "Leave Management", route: "/dashboard/hr/leaves" }
-      - { label: "Staff Attendance", route: "/dashboard/hr/staff-attendance" }
-      - { label: "Appraisals", route: "/dashboard/hr/appraisal" }
-      - { label: "Expenses", route: "/dashboard/hr/expenses" }
-    visible_to: ["school_admin", "accountant"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "hr_payroll",
-      tabs: ["Staff", "Payroll", "Leave", "Appraisals"],
-    }
+    - label: Overview
+      route: /dashboard/hr
+    - label: Payroll
+      route: /dashboard/hr/payroll
+    - label: Payroll Settings
+      route: /dashboard/hr/payroll/settings
+    - label: Leave Management
+      route: /dashboard/hr/leaves
+    - label: Staff Attendance
+      route: /dashboard/hr/staff-attendance
+    - label: Appraisals
+      route: /dashboard/hr/appraisal
+    - label: Expenses
+      route: /dashboard/hr/expenses
+mobile:
+  admin:
+    feature_folder: hr_payroll
+    tabs:
+    - Staff
+    - Payroll
+    - Leave
+    - Appraisals
+schema_version: 2

@@ -1,41 +1,40 @@
 slug: hostel
-name: "Hostel Management"
-name_nepali: "छात्रावास व्यवस्थापन"
+name: Hostel Management
+name_nepali: छात्रावास व्यवस्थापन
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "🏠"
-icon: "Building"
-description: "Hostel rooms, student allocations, occupancy tracking, warden management, hostel fee collection"
-
-api_blueprint: "app.api.v1.hostel"
-models_module: "app.models.hostel"
-
+emoji: 🏠
+icon: Building
+description: Hostel rooms, student allocations, occupancy tracking, warden management,
+  hostel fee collection
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/hostel"
-  sidebar:
-    label: "Hostel"
-    label_nepali: "छात्रावास"
-    icon: "Building"
-    section: "Operations"
-    # Single-page feature (E236 sweep): the /hostel page has internal tabs
-    # (Hostels / Rooms / Allocations) — the old rooms/allocations subitems
-    # pointed at FE pages that do not exist (404) and are dropped.
-    subitems:
-      - { label: "Overview", route: "/hostel" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app: { feature_folder: "hostel", tabs: ["Overview", "Rooms", "Allocations"] }
-  teacher_app: null
-  parent_app: null
-  student_app: null
-
 events:
   emits:
-    - "hostel.student_allocated"
-    - "hostel.student_checkedout"
+  - hostel.student_allocated
+  - hostel.student_checkedout
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.hostel
+  models_module: app.models.hostel
+ui:
+  nav:
+    route: /hostel
+    section: Operations
+    label: Hostel
+    label_nepali: छात्रावास
+    icon: Building
+    visible_to:
+    - school_admin
+    subitems:
+    - label: Overview
+      route: /hostel
+mobile:
+  admin:
+    feature_folder: hostel
+    tabs:
+    - Overview
+    - Rooms
+    - Allocations
+schema_version: 2

@@ -1,39 +1,42 @@
 slug: incidents
-name: "Incident Management"
-name_nepali: "घटना व्यवस्थापन"
+name: Incident Management
+name_nepali: घटना व्यवस्थापन
 category: premium
-price_monthly: 299  # E234: premium band (was 499 — the only out-of-band straggler)
+price_monthly: 299
 price_yearly: 2990
-emoji: "⚠️"
-icon: "AlertTriangle"
-description: "Incident reporting, witness statements, action logs, bullying tracking, disciplinary records"
-
-api_blueprint: "app.api.v1.incidents"
-models_module: "app.models.incident"
-
+emoji: ⚠️
+icon: AlertTriangle
+description: Incident reporting, witness statements, action logs, bullying tracking,
+  disciplinary records
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/incidents"
-  sidebar:
-    section: "Safety & Compliance"
-    label: "Incidents"
-    label_nepali: "घटना"
-    icon: "ShieldCheck"
-    # E236: single-page feature — create/actions child routes were 404s.
-    subitems: []
-    visible_to: ["school_admin", "teacher"]
-
-flutter:
-  admin_app:
-    { feature_folder: "incidents", tabs: ["Reports", "Actions", "Statistics"] }
-  teacher_app: { feature_folder: "incidents", tabs: ["Report Incident"] }
-  parent_app: null
-  student_app: null
-
 events:
   emits:
-    - "incident.reported"
-    - "incident.resolved"
+  - incident.reported
+  - incident.resolved
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.incidents
+  models_module: app.models.incident
+ui:
+  nav:
+    route: /dashboard/incidents
+    section: Safety & Compliance
+    label: Incidents
+    label_nepali: घटना
+    icon: ShieldCheck
+    visible_to:
+    - school_admin
+    - teacher
+mobile:
+  admin:
+    feature_folder: incidents
+    tabs:
+    - Reports
+    - Actions
+    - Statistics
+  teacher:
+    feature_folder: incidents
+    tabs:
+    - Report Incident
+schema_version: 2

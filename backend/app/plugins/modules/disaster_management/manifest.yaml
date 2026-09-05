@@ -1,34 +1,41 @@
 slug: disaster_management
-name: "Disaster Management"
-name_nepali: "विपद व्यवस्थापन"
+name: Disaster Management
+name_nepali: विपद व्यवस्थापन
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🆘"
-icon: "Shield"
-description: "Earthquake API, evacuation plans, drill scheduling"
-
-api_blueprint: "app.plugins.modules.disaster_management.routes"
-models_module: "app.models.emergency"
-services:
-  - "app.services.emergency.alert_service"
-
+emoji: 🆘
+icon: Shield
+description: Earthquake API, evacuation plans, drill scheduling
 depends_on:
-  - emergency
+- emergency
 conflicts_with: []
-
-frontend:
-  route: "/disaster"
-  sidebar:
-    section: "Safety & Compliance"
-    label: "Disaster Mgmt"
-    label_nepali: "विपद व्यवस्थापन"
-    icon: "Shield"
+capabilities:
+  api_blueprint: app.plugins.modules.disaster_management.routes
+  models_module: app.models.emergency
+  services:
+  - app.services.emergency.alert_service
+ui:
+  nav:
+    route: /disaster
+    section: Safety & Compliance
+    label: Disaster Mgmt
+    label_nepali: विपद व्यवस्थापन
+    icon: Shield
+    visible_to:
+    - school_admin
     subitems:
-      - { label: "Evacuation Plans", route: "/disaster/plans" }
-      - { label: "Drill Schedule", route: "/disaster/drills" }
-      - { label: "Seismic Alerts", route: "/disaster/alerts" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app: { feature_folder: "disaster", tabs: ["Plans", "Drills", "Alerts"] }
+    - label: Evacuation Plans
+      route: /disaster/plans
+    - label: Drill Schedule
+      route: /disaster/drills
+    - label: Seismic Alerts
+      route: /disaster/alerts
+mobile:
+  admin:
+    feature_folder: disaster
+    tabs:
+    - Plans
+    - Drills
+    - Alerts
+schema_version: 2

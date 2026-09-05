@@ -567,6 +567,14 @@ class PluginValidator:
     # ── entry point ────────────────────────────────────────────────────────
 
     def run(self) -> list[Finding]:
+        # Reset ALL per-run state: run() is called twice in doctor --fix-safe
+        # (once for the report, once for the dirty set) and stale `manifests`
+        # made every manifest report itself as a duplicate slug on the second
+        # pass — which silently skipped the entire ratchet wave.
+        self.manifests = {}
+        self.paths = {}
+        self.legacy = set()
+        self.findings = []
         self.load()
         for slug in sorted(self.manifests):
             self.check_identity(slug)

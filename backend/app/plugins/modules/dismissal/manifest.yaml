@@ -1,39 +1,45 @@
 slug: dismissal
-name: "Student Dismissal & Pickup"
-name_nepali: "विद्यार्थी विदाई"
+name: Student Dismissal & Pickup
+name_nepali: विद्यार्थी विदाई
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🚗"
-icon: "CarFront"
-description: "QR code pickup verification, authorized pickup management, dismissal queue, parent notification"
-
-api_blueprint: "app.api.v1.dismissal"
-models_module: "app.models.dismissal"
-
+emoji: 🚗
+icon: CarFront
+description: QR code pickup verification, authorized pickup management, dismissal
+  queue, parent notification
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/dismissal"
-  sidebar:
-    section: "Operations"
-    label: "Dismissal"
-    label_nepali: "विदाई"
-    icon: "CalendarOff"
-    # Single page (queue + verify-QR + records list). No subitems: /authorized
-    # and /history have no pages and rendered as dead sidebar links.
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "dismissal", tabs: ["Queue", "Scan QR", "History"] }
-  teacher_app: { feature_folder: "dismissal", tabs: ["My Class Dismissal"] }
-  parent_app:
-    { feature_folder: "dismissal", tabs: ["QR Code", "Authorize Pickup"] }
-  student_app: null
-
 events:
   emits:
-    - "dismissal.student_picked_up"
+  - dismissal.student_picked_up
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.dismissal
+  models_module: app.models.dismissal
+ui:
+  nav:
+    route: /dashboard/dismissal
+    section: Operations
+    label: Dismissal
+    label_nepali: विदाई
+    icon: CalendarOff
+    visible_to:
+    - school_admin
+mobile:
+  admin:
+    feature_folder: dismissal
+    tabs:
+    - Queue
+    - Scan QR
+    - History
+  teacher:
+    feature_folder: dismissal
+    tabs:
+    - My Class Dismissal
+  parent:
+    feature_folder: dismissal
+    tabs:
+    - QR Code
+    - Authorize Pickup
+schema_version: 2

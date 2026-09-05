@@ -1,45 +1,49 @@
 slug: emergency
-name: "Emergency Management"
-name_nepali: "आपतकालीन व्यवस्थापन"
+name: Emergency Management
+name_nepali: आपतकालीन व्यवस्थापन
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🆘"
-icon: "Siren"
-description: "Emergency alerts, evacuation plans, headcount tracking, safe status confirmation, drill management"
-
-api_blueprint: "app.api.v1.emergency"
-models_module: "app.models.emergency"
-services:
-  - "app.services.emergency.alert_service"
-
+emoji: 🆘
+icon: Siren
+description: Emergency alerts, evacuation plans, headcount tracking, safe status confirmation,
+  drill management
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/emergency"
-  sidebar:
-    section: "Safety & Compliance"
-    label: "Emergency"
-    label_nepali: "आपतकालीन"
-    icon: "ShieldCheck"
-    # E236: single-page feature — alert/plans/drills child routes were 404s.
-    subitems: []
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "emergency",
-      tabs: ["Dashboard", "Trigger Alert", "Plans"],
-    }
-  teacher_app:
-    { feature_folder: "emergency", tabs: ["Headcount", "Safe Status"] }
-  parent_app: { feature_folder: "emergency", tabs: ["Alerts", "Child Status"] }
-  student_app: null
-
 events:
   emits:
-    - "emergency.alert_triggered"
-    - "emergency.all_clear"
+  - emergency.alert_triggered
+  - emergency.all_clear
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.emergency
+  models_module: app.models.emergency
+  services:
+  - app.services.emergency.alert_service
+ui:
+  nav:
+    route: /dashboard/emergency
+    section: Safety & Compliance
+    label: Emergency
+    label_nepali: आपतकालीन
+    icon: ShieldCheck
+    visible_to:
+    - school_admin
+mobile:
+  admin:
+    feature_folder: emergency
+    tabs:
+    - Dashboard
+    - Trigger Alert
+    - Plans
+  teacher:
+    feature_folder: emergency
+    tabs:
+    - Headcount
+    - Safe Status
+  parent:
+    feature_folder: emergency
+    tabs:
+    - Alerts
+    - Child Status
+schema_version: 2

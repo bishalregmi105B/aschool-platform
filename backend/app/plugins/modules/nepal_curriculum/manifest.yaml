@@ -1,66 +1,70 @@
 slug: nepal_curriculum
-name: "Nepal Curriculum & Chapter Content"
-name_nepali: "नेपाली पाठ्यक्रम र अध्याय सामग्री"
+name: Nepal Curriculum & Chapter Content
+name_nepali: नेपाली पाठ्यक्रम र अध्याय सामग्री
 category: starter
 price_monthly: 199
 price_yearly: 1990
-emoji: "📚"
-icon: "BookOpen"
-version: "1.0.0"
-author: "ASchool"
+emoji: 📚
+icon: BookOpen
+version: 1.0.0
+author: ASchool
 published: true
 coming_soon: false
-description: >-
-  Author and publish bilingual (EN/NE) chapter content on top of the CDC/NEB
-  curriculum: teaching notes, worked examples with steps, common
-  misconceptions, formulas (LaTeX + spoken form), NEB/SEE exam tips and a key
-  terms glossary. Includes the exercise bank typed to Nepal's 19 question
-  patterns — never forced multiple-choice — and a student chapter reader.
-  Content is versioned, reviewable and publishable per school, with a
-  school-override chain over platform-seeded curriculum. The AI Teacher
-  teaches ONLY from what this plugin publishes; a school does not need AI to
-  use its own chapters and question banks.
+description: 'Author and publish bilingual (EN/NE) chapter content on top of the CDC/NEB
+  curriculum: teaching notes, worked examples with steps, common misconceptions, formulas
+  (LaTeX + spoken form), NEB/SEE exam tips and a key terms glossary. Includes the
+  exercise bank typed to Nepal''s 19 question patterns — never forced multiple-choice
+  — and a student chapter reader. Content is versioned, reviewable and publishable
+  per school, with a school-override chain over platform-seeded curriculum. The AI
+  Teacher teaches ONLY from what this plugin publishes; a school does not need AI
+  to use its own chapters and question banks.'
 depends_on:
-  - academics
+- academics
 conflicts_with: []
-
-# Content CRUD routes are statically mounted (app.api.v1.teaching_content)
-# and self-gate @plugin_required("nepal_curriculum") from the next slice —
-# the blueprint pointer lands with that move (D3 §B packaging).
-services: []
-tasks: []
-
-frontend:
-  route: "/dashboard/academics"
-  sidebar:
-    section: "Academics"
-    label: "Chapter Content"
-    label_nepali: "अध्याय सामग्री"
-    icon: "BookOpen"
-    subitems:
-      - { label: "Sections", route: "/dashboard/ai-teacher/content" }
-      - { label: "Exercise Bank", route: "/dashboard/ai-tools" }
-    visible_to: ["school_admin", "teacher"]
-
-flutter:
-  student_app: { feature_folder: "chapter_reader", tabs: ["Chapters", "Practice"] }
-  teacher_app: { feature_folder: "chapter_reader", tabs: ["Browse", "Bank"] }
-
 events:
   emits:
-    - "curriculum.content_published"
+  - curriculum.content_published
   listens: []
-
 owns_tables:
-  - teaching_sections
-  - teaching_section_versions
-  - teaching_section_outcomes
-  - teaching_notes
-  - teaching_examples
-  - teaching_misconceptions
-  - teaching_formulas
-  - teaching_exam_tips
-  - teaching_key_terms
-  - teaching_media
-  - teaching_content_snapshots
-  - teaching_content_reviews
+- teaching_sections
+- teaching_section_versions
+- teaching_section_outcomes
+- teaching_notes
+- teaching_examples
+- teaching_misconceptions
+- teaching_formulas
+- teaching_exam_tips
+- teaching_key_terms
+- teaching_media
+- teaching_content_snapshots
+- teaching_content_reviews
+capabilities:
+  services: []
+  tasks: []
+ui:
+  nav:
+    route: /dashboard/academics
+    section: Academics
+    label: Chapter Content
+    label_nepali: अध्याय सामग्री
+    icon: BookOpen
+    visible_to:
+    - school_admin
+    - teacher
+    subitems:
+    - label: Sections
+      route: /dashboard/ai-teacher/content
+    - label: Exercise Bank
+      route: /dashboard/ai-tools
+mobile:
+  student:
+    feature_folder: chapter_reader
+    tabs:
+    - Chapters
+    - Practice
+  teacher:
+    feature_folder: chapter_reader
+    tabs:
+    - Browse
+    - Bank
+schema_version: 2

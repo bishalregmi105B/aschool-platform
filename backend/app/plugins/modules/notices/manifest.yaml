@@ -1,39 +1,52 @@
 slug: notices
-name: "Notice Board"
-name_nepali: "सूचना पाटी"
+name: Notice Board
+name_nepali: सूचना पाटी
 category: core
 price_monthly: 0
 price_yearly: 0
 is_free: true
-emoji: "📢"
-icon: "Megaphone"
-description: "School announcements, noticeboard, events calendar, push notifications"
-
-api_blueprint: "app.api.v1.notices"
-models_module: "app.models.notice"
-
+emoji: 📢
+icon: Megaphone
+description: School announcements, noticeboard, events calendar, push notifications
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/notices"
-  sidebar:
-    section: "Communication"
-    label: "Notices"
-    label_nepali: "सूचना"
-    icon: "Bell"
-    # E236: single-page feature (create is in-page) — create/events child
-    # routes were 404s.
-    subitems: []
-    visible_to: ["school_admin", "teacher"]
-
-flutter:
-  admin_app: { feature_folder: "notices", tabs: ["All", "Create", "Events"] }
-  teacher_app: { feature_folder: "notices", tabs: ["View", "Create"] }
-  parent_app: { feature_folder: "notices", tabs: ["Notices", "Events"] }
-  student_app: { feature_folder: "notices", tabs: ["Notices", "Events"] }
-
 events:
   emits:
-    - "notice.published"
+  - notice.published
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.notices
+  models_module: app.models.notice
+ui:
+  nav:
+    route: /dashboard/notices
+    section: Communication
+    label: Notices
+    label_nepali: सूचना
+    icon: Bell
+    visible_to:
+    - school_admin
+    - teacher
+mobile:
+  admin:
+    feature_folder: notices
+    tabs:
+    - All
+    - Create
+    - Events
+  teacher:
+    feature_folder: notices
+    tabs:
+    - View
+    - Create
+  parent:
+    feature_folder: notices
+    tabs:
+    - Notices
+    - Events
+  student:
+    feature_folder: notices
+    tabs:
+    - Notices
+    - Events
+schema_version: 2

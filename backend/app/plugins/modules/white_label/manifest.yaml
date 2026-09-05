@@ -1,34 +1,40 @@
 slug: white_label
-name: "White-Label Branding"
-name_nepali: "ह्वाइट-लेबल ब्राण्डिङ"
+name: White-Label Branding
+name_nepali: ह्वाइट-लेबल ब्राण्डिङ
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🏷️"
-icon: "Tag"
-description: "Custom branding, own domain, remove ASchool branding"
-
-api_blueprint: "app.plugins.modules.white_label.routes"
-models_module: "app.models.school"
-services:
-  - "app.services.website.white_label"
-
+emoji: 🏷️
+icon: Tag
+description: Custom branding, own domain, remove ASchool branding
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/white-label"
-  sidebar:
-    section: "Design & Web"
-    label: "White Label"
-    label_nepali: "ह्वाइट-लेबल"
-    icon: "Tag"
+capabilities:
+  api_blueprint: app.plugins.modules.white_label.routes
+  models_module: app.models.school
+  services:
+  - app.services.website.white_label
+ui:
+  nav:
+    route: /white-label
+    section: Design & Web
+    label: White Label
+    label_nepali: ह्वाइट-लेबल
+    icon: Tag
+    visible_to:
+    - school_admin
     subitems:
-      - { label: "Branding", route: "/white-label/branding" }
-      - { label: "Custom Domain", route: "/white-label/domain" }
-      - { label: "Theme", route: "/white-label/theme" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "white_label", tabs: ["Branding", "Domain", "Theme"] }
+    - label: Branding
+      route: /white-label/branding
+    - label: Custom Domain
+      route: /white-label/domain
+    - label: Theme
+      route: /white-label/theme
+mobile:
+  admin:
+    feature_folder: white_label
+    tabs:
+    - Branding
+    - Domain
+    - Theme
+schema_version: 2

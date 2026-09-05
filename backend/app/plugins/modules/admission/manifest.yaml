@@ -1,49 +1,43 @@
 slug: admission
-name: "Admission Management"
-name_nepali: "भर्ना व्यवस्थापन"
+name: Admission Management
+name_nepali: भर्ना व्यवस्थापन
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "🎓"
-icon: "UserPlus"
-description: "Online admission forms, document collection, admission tests, merit lists, AI lead scoring from social inquiries"
-
-api_blueprint: "app.api.v1.admission"
-models_module: "app.models.admission"
-services: []
-tasks:
-  - "app.tasks.admission_followup"
-
+emoji: 🎓
+icon: UserPlus
+description: Online admission forms, document collection, admission tests, merit lists,
+  AI lead scoring from social inquiries
 depends_on:
-  - academics
+- academics
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/admission"
-  sidebar:
-    section: "Money"
-    label: "Admission"
-    label_nepali: "भर्ना"
-    icon: "ClipboardList"
-    # Single page with internal tabs (Dashboard / Inquiries / Applications).
-    # No subitems: the previously listed /applications, /leads, /forms and
-    # /merit routes have no pages and rendered as dead sidebar links.
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "admission",
-      tabs: ["Dashboard", "Applications", "Leads"],
-    }
-  teacher_app: null
-  parent_app: null
-  student_app: null
-
 events:
   emits:
-    - "admission.application_received"
-    - "admission.accepted"
-    - "admission.lead_created"
+  - admission.application_received
+  - admission.accepted
+  - admission.lead_created
   listens:
-    - "social.admission_lead"
+  - social.admission_lead
+capabilities:
+  api_blueprint: app.api.v1.admission
+  models_module: app.models.admission
+  services: []
+  tasks:
+  - app.tasks.admission_followup
+ui:
+  nav:
+    route: /dashboard/admission
+    section: Money
+    label: Admission
+    label_nepali: भर्ना
+    icon: ClipboardList
+    visible_to:
+    - school_admin
+mobile:
+  admin:
+    feature_folder: admission
+    tabs:
+    - Dashboard
+    - Applications
+    - Leads
+schema_version: 2

@@ -1,38 +1,42 @@
 slug: design_studio
-name: "Design Studio"
-name_nepali: "डिजाइन स्टुडियो"
+name: Design Studio
+name_nepali: डिजाइन स्टुडियो
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "🎨"
-icon: "Palette"
-description: "Canva-like designer — certificates, ID cards, flyers"
-
-api_blueprint: "app.api.v1.design_studio"
-models_module: "app.models.website"
-services:
-  - "app.services.designer.template_engine"
-  - "app.services.designer.document_renderer"
-
+emoji: 🎨
+icon: Palette
+description: Canva-like designer — certificates, ID cards, flyers
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/designer"
-  sidebar:
-    section: "Design & Web"
-    label: "Design Studio"
-    label_nepali: "डिजाइन स्टुडियो"
-    icon: "Palette"
+capabilities:
+  api_blueprint: app.api.v1.design_studio
+  models_module: app.models.website
+  services:
+  - app.services.designer.template_engine
+  - app.services.designer.document_renderer
+ui:
+  nav:
+    route: /dashboard/designer
+    section: Design & Web
+    label: Design Studio
+    label_nepali: डिजाइन स्टुडियो
+    icon: Palette
+    visible_to:
+    - school_admin
+    - teacher
     subitems:
-      - { label: "Templates", route: "/dashboard/designer/templates" }
-      - { label: "Editor", route: "/dashboard/designer/editor" }
-      - { label: "Bulk ID Cards", route: "/dashboard/designer/bulk" }  # E236: id-cards child route never existed
-    visible_to: ["school_admin", "teacher"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "design_studio",
-      tabs: ["Templates", "Designs", "ID Cards"],
-    }
+    - label: Templates
+      route: /dashboard/designer/templates
+    - label: Editor
+      route: /dashboard/designer/editor
+    - label: Bulk ID Cards
+      route: /dashboard/designer/bulk
+mobile:
+  admin:
+    feature_folder: design_studio
+    tabs:
+    - Templates
+    - Designs
+    - ID Cards
+schema_version: 2

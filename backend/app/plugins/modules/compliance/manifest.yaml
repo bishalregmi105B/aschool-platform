@@ -1,40 +1,38 @@
 slug: compliance
-name: "Compliance & EMIS"
-name_nepali: "अनुपालन र ईएमआईएस"
+name: Compliance & EMIS
+name_nepali: अनुपालन र ईएमआईएस
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "📋"
-icon: "ShieldCheck"
-description: "Government EMIS reporting, compliance checklists, audit trails, regulatory document management"
-
-api_blueprint: "app.api.v1.compliance"
-models_module: "app.models.compliance"
-services:
-  - "app.services.compliance.moe_reports"
-
+emoji: 📋
+icon: ShieldCheck
+description: Government EMIS reporting, compliance checklists, audit trails, regulatory
+  document management
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/compliance"
-  sidebar:
-    section: "Safety & Compliance"
-    label: "Compliance"
-    label_nepali: "अनुपालन"
-    icon: "ShieldCheck"
-    # E236: single-page feature — emis/audit child routes were 404s.
-    subitems: []
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "compliance", tabs: ["Dashboard", "EMIS", "Audit"] }
-  teacher_app: null
-  parent_app: null
-  student_app: null
-
 events:
   emits:
-    - "compliance.report_generated"
+  - compliance.report_generated
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.compliance
+  models_module: app.models.compliance
+  services:
+  - app.services.compliance.moe_reports
+ui:
+  nav:
+    route: /dashboard/compliance
+    section: Safety & Compliance
+    label: Compliance
+    label_nepali: अनुपालन
+    icon: ShieldCheck
+    visible_to:
+    - school_admin
+mobile:
+  admin:
+    feature_folder: compliance
+    tabs:
+    - Dashboard
+    - EMIS
+    - Audit
+schema_version: 2

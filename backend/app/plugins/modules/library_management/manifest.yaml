@@ -1,33 +1,41 @@
 slug: library_management
-name: "Library Management"
-name_nepali: "पुस्तकालय व्यवस्थापन"
+name: Library Management
+name_nepali: पुस्तकालय व्यवस्थापन
 category: starter
 price_monthly: 99
 price_yearly: 990
-emoji: "📚"
-icon: "Library"
-description: "Book catalog, issue/return, overdue tracking"
-
-api_blueprint: "app.api.v1.library"
-models_module: "app.models.library"
-
+emoji: 📚
+icon: Library
+description: Book catalog, issue/return, overdue tracking
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/library"
-  sidebar:
-    section: "Learning"
-    label: "Library"
-    label_nepali: "पुस्तकालय"
-    icon: "Library"
+capabilities:
+  api_blueprint: app.api.v1.library
+  models_module: app.models.library
+ui:
+  nav:
+    route: /library
+    section: Learning
+    label: Library
+    label_nepali: पुस्तकालय
+    icon: Library
     subitems:
-      - { label: "Catalog", route: "/library/catalog" }
-      - { label: "Issue/Return", route: "/library/checkout" }
-      - { label: "Overdue", route: "/library/overdue" }
-    visible_to: []
-
-flutter:
-  admin_app:
-    { feature_folder: "library", tabs: ["Catalog", "Transactions", "Overdue"] }
-  student_app: { feature_folder: "library", tabs: ["Browse", "My Books"] }
+    - label: Catalog
+      route: /library/catalog
+    - label: Issue/Return
+      route: /library/checkout
+    - label: Overdue
+      route: /library/overdue
+mobile:
+  admin:
+    feature_folder: library
+    tabs:
+    - Catalog
+    - Transactions
+    - Overdue
+  student:
+    feature_folder: library
+    tabs:
+    - Browse
+    - My Books
+schema_version: 2

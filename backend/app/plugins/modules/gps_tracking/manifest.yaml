@@ -1,50 +1,60 @@
 slug: gps_tracking
-name: "GPS Bus Tracking"
-name_nepali: "जीपीएस बस ट्र्याकिङ"
+name: GPS Bus Tracking
+name_nepali: जीपीएस बस ट्र्याकिङ
 category: premium
 price_monthly: 299
 price_yearly: 2990
-coming_soon: true  # in final testing — not installable yet (E231): marketplace card disabled, sidebar hidden, routes stay gated
-emoji: "🚌"
-icon: "Bus"
-description: "Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route management, stop notifications, speed alerts"
-
-api_blueprint: "app.api.v1.transport"
-models_module: "app.models.transport"
-services:
-  - "app.tasks.gps_firebase_poller"
-tasks:
-  - "app.tasks.gps_processing"
-
+coming_soon: true
+emoji: 🚌
+icon: Bus
+description: Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route management,
+  stop notifications, speed alerts
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/transport"
-  sidebar:
-    section: "Operations"
-    label: "Bus Tracking"
-    label_nepali: "बस ट्र्याकिङ"
-    icon: "Bus"
-    subitems:
-      - { label: "Live Map", route: "/dashboard/transport/map" }
-      - { label: "Routes", route: "/dashboard/transport/routes" }
-      - { label: "Buses", route: "/dashboard/transport/buses" }
-      - { label: "Stops", route: "/dashboard/transport/stops" }
-      - { label: "GPS Logs", route: "/dashboard/transport/logs" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "transport", tabs: ["Live Map", "Routes", "Buses"] }
-  teacher_app: null
-  parent_app:
-    { feature_folder: "bus_tracker", tabs: ["Track Bus", "ETA", "Stops"] }
-  student_app: null
-
 events:
   emits:
-    - "transport.bus_departed"
-    - "transport.bus_arrived"
-    - "transport.speed_alert"
+  - transport.bus_departed
+  - transport.bus_arrived
+  - transport.speed_alert
   listens: []
+capabilities:
+  api_blueprint: app.api.v1.transport
+  models_module: app.models.transport
+  services:
+  - app.tasks.gps_firebase_poller
+  tasks:
+  - app.tasks.gps_processing
+ui:
+  nav:
+    route: /dashboard/transport
+    section: Operations
+    label: Bus Tracking
+    label_nepali: बस ट्र्याकिङ
+    icon: Bus
+    visible_to:
+    - school_admin
+    subitems:
+    - label: Live Map
+      route: /dashboard/transport/map
+    - label: Routes
+      route: /dashboard/transport/routes
+    - label: Buses
+      route: /dashboard/transport/buses
+    - label: Stops
+      route: /dashboard/transport/stops
+    - label: GPS Logs
+      route: /dashboard/transport/logs
+mobile:
+  admin:
+    feature_folder: transport
+    tabs:
+    - Live Map
+    - Routes
+    - Buses
+  parent:
+    feature_folder: bus_tracker
+    tabs:
+    - Track Bus
+    - ETA
+    - Stops
+schema_version: 2
