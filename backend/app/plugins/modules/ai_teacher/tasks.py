@@ -47,15 +47,56 @@ def reconcile_lessons() -> dict:
             final = get_session_state(lesson)
         except ServiceUnavailableError:
             final = None
-        except NotImplementedError:
-            final = None
+        if final:
+            # Poll-derived events go through the SAME applier as webhooks
+            # (routes.apply_event) so lessons converge either way.
+            from app.plugins.modules.ai_teacher.routes import apply_event
+
+            for event in final.get("events") or []:
+                try:
+                    apply_event(
+                        lesson,
+                        event.get("type", ""),
+                        event.get("payload") or {},
+                        event.get("event_id"),
+                    )
+                except Exception:  # noqa: BLE001 — one bad event ≠ a stuck lesson
+                    logger.warning(
+                        "ai_teacher.reconcile: bad event for %s",
+                        lesson.id,
+                        exc_info=True,
+                    )
+            db.session.expire(lesson)
+            db.session.refresh(lesson)
+            usage = final.get("usage")
+            if usage and lesson.cost_source != "measured":
+                from app.plugins.modules.ai_teacher.routes import _usage_log
+                from app.services.ai.token_hub import (
+                    estimate_cost_usd,
+                    reconcile_quota_reservation,
+                )
+
+                cost_usd = estimate_cost_usd(
+                    usage.get("provider", "groq"),
+                    usage.get("model", "unknown"),
+                    int(usage.get("prompt_tokens", 0)),
+                    int(usage.get("completion_tokens", 0)),
+                )
+                lesson.cost_npr = round(cost_usd * 135, 2)
+                lesson.cost_source = "measured"
+                db.session.add(_usage_log(lesson, usage, cost_usd))
+                reconcile_quota_reservation(
+                    lesson.school_id,
+                    float(lesson.estimated_cost_npr or 0) / 135,
+                    cost_usd,
+                )
+            if final.get("status") == "ended":
+                continue  # apply_event already closed it honestly
         lesson.status = "abandoned"
         lesson.end_reason = "reconciler_timeout"
         lesson.ended_at = now
         if lesson.started_at:
             lesson.duration_seconds = int((now - lesson.started_at).total_seconds())
-        if final and final.get("chapters_completed") is not None:
-            lesson.chapters_completed = final["chapters_completed"]
         closed += 1
     db.session.commit()
     if closed:

@@ -646,6 +646,13 @@ def webhook_lesson_event():
     if not lesson:
         return error_response("Lesson not found", 404)
 
+    return success_response(apply_event(lesson, etype, payload, event_id))
+
+
+def apply_event(lesson, etype: str, payload: dict, event_id=None) -> dict:
+    """Apply one service event to a lesson row — the single applier shared
+    by the webhook (service → us) and the reconciler (poll-derived events
+    go through identical code, tasks.py). Returns a response-ready dict."""
     from app.models.ai_teacher import (
         AITeacherLearningEvent,
         AITeacherLessonChapter,
@@ -742,7 +749,7 @@ def webhook_lesson_event():
             cost_usd,
         )
     else:
-        return success_response({"ignored": etype})
+        return {"ignored": etype}
 
     db.session.add(
         AITeacherLearningEvent(
@@ -756,7 +763,7 @@ def webhook_lesson_event():
         )
     )
     db.session.commit()
-    return success_response({"received": True})
+    return {"received": True}
 
 
 def _webhook_secret_for_key(key_id: str) -> str | None:
