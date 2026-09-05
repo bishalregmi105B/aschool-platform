@@ -23,7 +23,7 @@ description: >-
 # owns curriculum_units, which every lesson is grounded on.
 depends_on:
   - ai_suite
-  - academics
+  - nepal_curriculum
 conflicts_with: []
 
 # The runtime routes (lesson create/history/mastery/webhook) mount from the
@@ -73,6 +73,9 @@ events:
     - "student.consent_revoked"
     - "plugin.deactivated"
 
+# The 12 teaching_* content tables are owned by nepal_curriculum (D3 §B:
+# a school without AI still owns its chapters). This plugin owns its runtime
+# records only, and reads published content through the content API.
 owns_tables:
   - ai_teacher_service_keys
   - ai_teacher_lessons
@@ -80,15 +83,3 @@ owns_tables:
   - ai_teacher_messages
   - ai_teacher_mastery
   - ai_teacher_learning_events
-  - teaching_sections
-  - teaching_section_versions
-  - teaching_section_outcomes
-  - teaching_notes
-  - teaching_examples
-  - teaching_misconceptions
-  - teaching_formulas
-  - teaching_exam_tips
-  - teaching_key_terms
-  - teaching_media
-  - teaching_content_snapshots
-  - teaching_content_reviews

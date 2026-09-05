@@ -49,6 +49,7 @@ export const FALLBACK_PLUGIN_LABELS: Record<string, string> = {
   sms_notifications: "Communications",
   whatsapp_bot: "WhatsApp Bot",
   ai_suite: "AI Suite",
+  ai_teacher: "AI Teacher",
   elibrary: "E-Library & Digital Content",
   website_builder: "Website Builder",
   gamification: "Gamification",

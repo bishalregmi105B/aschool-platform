@@ -56,8 +56,24 @@ def ai_teacher_installed(db, school):
             is_trial=False,
         )
         db.session.add(sp)
-    else:
-        sp.active = True
+
+    # teaching-content routes gate nepal_curriculum (D3 packaging)
+    nc = SchoolPlugin.query.filter_by(
+        school_id=school.id, plugin_slug="nepal_curriculum"
+    ).first()
+    if not nc:
+        plugin_nc = Plugin.query.filter_by(slug="nepal_curriculum").first()
+        if not plugin_nc:
+            plugin_nc = Plugin(
+                slug="nepal_curriculum", name="Nepal Curriculum",
+                category="starter", is_free=False, is_published=True,
+                version="1.0.0",
+            )
+            db.session.add(plugin_nc)
+            db.session.flush()
+        db.session.add(SchoolPlugin(
+            school_id=school.id, plugin_slug="nepal_curriculum", active=True,
+            is_trial=False))
     db.session.commit()
     return sp
 
