@@ -1,0 +1,53 @@
+:root {
+  --color-primary: #002b46;
+  --color-secondary: #c2272d;
+  --color-accent: #0d2b46;
+  --color-bg: #f8f8f8;
+  --color-text: #1a1a1a;
+  --font-heading: 'PT Serif', sans-serif;
+  --font-body: 'PT Sans', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--color-primary);
+}
+
+a { color: var(--color-secondary); }
+a:hover { color: var(--color-primary); }
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.navbar {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: white;
+  padding: 1rem 2rem;
+}
+
+.footer {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 2rem;
+}
