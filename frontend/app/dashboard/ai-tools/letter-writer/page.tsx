@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Sparkles, Copy, FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { AiResultView } from "@/components/ai/ai-result-view";
 
 export default function LetterWriterPage() {
   return (
@@ -95,7 +96,7 @@ function LetterContent() {
           <CardContent>
             {result ? (
               <div className="bg-white border rounded-lg p-8 shadow-sm min-h-[500px]">
-                <pre className="whitespace-pre-wrap text-sm font-serif">{result}</pre>
+                <div className="rounded-lg bg-muted p-4 font-serif"><AiResultView result={result} /></div>
               </div>
             ) : (
               <div className="text-center py-16 text-muted-foreground">

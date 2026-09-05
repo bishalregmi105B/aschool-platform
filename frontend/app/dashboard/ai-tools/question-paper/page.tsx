@@ -15,6 +15,7 @@ import {
 import { ArrowLeft, Sparkles, Download, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { AiResultView } from "@/components/ai/ai-result-view";
 
 export default function QuestionPaperPage() {
   return (
@@ -129,7 +130,7 @@ function QuestionPaperContent() {
           </CardHeader>
           <CardContent>
             {result ? (
-              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg max-h-[600px] overflow-y-auto">{result}</pre>
+              <div className="max-h-[600px] overflow-y-auto rounded-lg bg-muted p-4"><AiResultView result={result} /></div>
             ) : (
               <div className="text-center py-16 text-muted-foreground">
                 <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />

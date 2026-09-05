@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Sparkles, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { AiResultView } from "@/components/ai/ai-result-view";
 
 export default function LessonPlanPage() {
   return (
@@ -63,7 +64,7 @@ function LessonPlanContent() {
         <Card>
           <CardHeader><div className="flex items-center justify-between"><CardTitle>Generated Plan</CardTitle>{result && <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(result); toast.success("Copied!"); }}><Copy className="h-4 w-4 mr-1" /> Copy</Button>}</div></CardHeader>
           <CardContent>
-            {result ? <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg max-h-[600px] overflow-y-auto">{result}</pre> : <div className="text-center py-16 text-muted-foreground"><Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Fill in details and click Generate</p></div>}
+            {result ? <div className="max-h-[600px] overflow-y-auto rounded-lg bg-muted p-4"><AiResultView result={result} /></div> : <div className="text-center py-16 text-muted-foreground"><Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Fill in details and click Generate</p></div>}
           </CardContent>
         </Card>
       </div>

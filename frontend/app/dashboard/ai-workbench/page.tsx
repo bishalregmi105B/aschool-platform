@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PluginGate } from "@/lib/plugins";
+import { AiResultView } from "@/components/ai/ai-result-view";
 import { api, type ApiResponse } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -201,9 +202,7 @@ function ToolRunner({
                 gen:{generate.data.generation_id.slice(0, 8)}
               </span>
             </div>
-            <pre className="whitespace-pre-wrap text-sm font-sans">
-              {JSON.stringify(generate.data.result, null, 2)}
-            </pre>
+            <AiResultView result={generate.data.result} />
           </CardContent>
         </Card>
       )}
