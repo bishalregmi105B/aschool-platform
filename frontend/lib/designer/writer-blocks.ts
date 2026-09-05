@@ -6,7 +6,8 @@
  * ({type:"writer", html}) keep their raw HTML path.
  *
  * Block types: heading, paragraph, divider, spacer, table, columns,
- * signature, header_band, footer_band, subject_rows, subject_rows_neb, fee_rows.
+ * signature, header_band, footer_band, subject_rows, subject_rows_neb, fee_rows,
+ * section_header, question, answer_space, page_break, checkbox_list.
  */
 
 export function esc(value: unknown): string {
@@ -72,6 +73,55 @@ export function writerBlocksToHTML(writerData: {
           `<div data-band="footer" style="background:${esc(block.bg ?? "#0e3b2e")};color:${esc(block.color ?? "#fff")};text-align:center;padding:8px 16px;font-size:8.5pt;">${md(String(block.text ?? ""))}</div>`,
         );
         break;
+      // ── Assessment blocks (W4/B3 — mirror of the backend render path) ──
+      case "section_header":
+        parts.push(
+          `<div style="display:flex;justify-content:space-between;align-items:baseline;background:#0f172a;color:#fff;padding:5px 10px;margin:10px 0 6px;font-weight:700;font-size:10.5pt;border-radius:3px;">` +
+          `<span>${esc(String(block.text ?? ""))}</span>` +
+          (block.note ? `<span style="font-weight:600;font-size:9pt;">${esc(String(block.note))}</span>` : "") +
+          `</div>`,
+        );
+        break;
+      case "question": {
+        const subparts = Array.isArray(block.subparts) ? block.subparts : [];
+        const subHtml = subparts.length
+          ? `<div style="margin:2px 0 0 22px;">${subparts
+              .map(
+                (sp: Record<string, unknown>) =>
+                  `<div style="display:flex;justify-content:space-between;"><span><b>${esc(String(sp.label ?? "a"))})</b> ${esc(String(sp.text ?? ""))}</span>` +
+                  (sp.marks != null ? `<span style="color:#475569;">[${esc(String(sp.marks))}]</span>` : "") +
+                  `</div>`,
+              )
+              .join("")}</div>`
+          : "";
+        parts.push(
+          `<div style="margin:6px 0;">` +
+          `<div style="display:flex;justify-content:space-between;gap:12px;"><span style="flex:1;"><b>${esc(String(block.number ?? ""))}.</b> ${md(String(block.text ?? ""))}</span>` +
+          (block.marks != null ? `<span style="white-space:nowrap;color:#475569;">[${esc(String(block.marks))}]</span>` : "") +
+          `</div>${subHtml}</div>`,
+        );
+        break;
+      }
+      case "answer_space": {
+        const lines = Math.max(0, Number(block.lines) || 4);
+        parts.push(
+          `<div style="margin:4px 0 8px;">${Array.from({ length: lines }, () =>
+            `<div style="border-bottom:1px solid #cbd5e1;height:18px;"></div>`).join("")}</div>`,
+        );
+        break;
+      }
+      case "page_break":
+        parts.push(`<div style="page-break-after:always;"></div>`);
+        break;
+      case "checkbox_list": {
+        const items = Array.isArray(block.items) ? block.items : [];
+        parts.push(
+          `<div style="margin:4px 0;">${items
+            .map((item: unknown) => `<div style="margin:3px 0;">☐&nbsp;&nbsp;${esc(String(item))}</div>`)
+            .join("")}</div>`,
+        );
+        break;
+      }
       case "heading": {
         const level = Math.min(4, Math.max(1, Number(block.level) || 1));
         parts.push(

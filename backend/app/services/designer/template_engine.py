@@ -560,6 +560,28 @@ def _w_header_band(school="YOUR SCHOOL NAME", subtitle="", tagline="", bg="#1e40
 def _w_footer_band(text="", bg="#1e293b", color="#94a3b8"):
     return {"type": "footer_band", "text": text, "bg": bg, "color": color}
 
+# ── Assessment blocks (W4/B3 — worksheet/paper artifacts) ──────────────────
+
+def _w_section_header(text="SECTION A", note=""):
+    """Exam section bar, e.g. 'SECTION A — Objective (5 × 1 = 5)'."""
+    return {"type": "section_header", "text": text, "note": note}
+
+def _w_question(number=1, text="", marks=1, subparts=None):
+    """One numbered question with right-aligned marks tag.
+    subparts: optional list of {label, text, marks} rendered nested."""
+    return {"type": "question", "number": number, "text": text, "marks": marks, "subparts": subparts or []}
+
+def _w_answer_space(lines=4):
+    """Ruled blank answer lines."""
+    return {"type": "answer_space", "lines": lines}
+
+def _w_page_break():
+    return {"type": "page_break"}
+
+def _w_checklist(items=None):
+    """Printable checkbox list, e.g. OMR-ish instructions or MCQ options."""
+    return {"type": "checkbox_list", "items": items or []}
+
 def _writer(config, blocks):
     return {"type": "writer", "config": config, "blocks": blocks}
 
@@ -1990,6 +2012,75 @@ class TemplateEngineService:
                     f"background:{block.get('bg') or '#1e293b'};color:{block.get('color') or '#94a3b8'};'>"
                     f"{esc(block.get('text') or '')}</div>"
                 )
+                continue
+
+            # ── Assessment blocks (W4/B3) ──────────────────────────────────
+            if block_type == "section_header":
+                note = esc(block.get("note") or "")
+                body_parts.append(
+                    "<div style='display:flex;justify-content:space-between;align-items:baseline;"
+                    "background:#0f172a;color:#ffffff;padding:5px 10px;margin:10px 0 6px 0;"
+                    "font-weight:700;font-size:10.5pt;border-radius:3px;'>"
+                    f"<span>{esc(block.get('text') or '')}</span>"
+                    + (f"<span style='font-weight:600;font-size:9pt;'>{note}</span>" if note else "")
+                    + "</div>"
+                )
+                continue
+
+            if block_type == "question":
+                subparts = block.get("subparts") or []
+                sub_html = ""
+                if subparts:
+                    sub_html = "<div style='margin:2px 0 0 22px;'>"
+                    for sp in subparts:
+                        sp_marks = sp.get("marks")
+                        sub_html += (
+                            f"<div style='display:flex;justify-content:space-between;'>"
+                            f"<span><b>{esc(str(sp.get('label') or 'a'))})</b> "
+                            f"{esc(str(sp.get('text') or ''))}</span>"
+                            + (
+                                f"<span style='color:#475569;'>[{esc(str(sp_marks))}]</span>"
+                                if sp_marks is not None
+                                else ""
+                            )
+                            + "</div>"
+                        )
+                    sub_html += "</div>"
+                marks = block.get("marks")
+                body_parts.append(
+                    "<div style='margin:6px 0;'>"
+                    "<div style='display:flex;justify-content:space-between;gap:12px;'>"
+                    f"<span style='flex:1;'><b>{esc(str(block.get('number') or ''))}.</b> "
+                    f"{esc(str(block.get('text') or ''))}</span>"
+                    + (
+                        f"<span style='white-space:nowrap;color:#475569;'>[{esc(str(marks))}]</span>"
+                        if marks is not None
+                        else ""
+                    )
+                    + f"</div>{sub_html}</div>"
+                )
+                continue
+
+            if block_type == "answer_space":
+                lines = max(0, int(block.get("lines") or 4))
+                ruled = "".join(
+                    "<div style='border-bottom:1px solid #cbd5e1;height:18px;'></div>"
+                    for _ in range(lines)
+                )
+                body_parts.append(f"<div style='margin:4px 0 8px 0;'>{ruled}</div>")
+                continue
+
+            if block_type == "page_break":
+                body_parts.append("<div style='page-break-after:always;'></div>")
+                continue
+
+            if block_type == "checkbox_list":
+                items = block.get("items") or []
+                rows = "".join(
+                    f"<div style='margin:3px 0;'>☐&nbsp;&nbsp;{esc(str(item))}</div>"
+                    for item in items
+                )
+                body_parts.append(f"<div style='margin:4px 0;'>{rows}</div>")
                 continue
 
             if block_type == "subject_rows":
