@@ -783,11 +783,17 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route("/uploads/<path:filepath>")
     def serve_upload(filepath):
         import os
+
         from flask import send_from_directory
 
         from app.models.file import ManagedFile
 
-        upload_dir = os.getenv("LOCAL_UPLOAD_DIR", "/app/uploads")
+        upload_dir = os.getenv("LOCAL_UPLOAD_DIR")
+        if not upload_dir:
+            upload_dir = "/app/uploads" if os.path.isdir("/app") else os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "uploads",
+            )
         record = ManagedFile.query.filter(
             ManagedFile.key.in_([filepath, filepath.lstrip("/")]),
             ManagedFile.is_deleted.is_(False),
@@ -795,11 +801,32 @@ def create_app(config_name: str | None = None) -> Flask:
 
         if record is None:
             # Untracked file: only serve if it lives under a school-scoped
-            # path AND the requester belongs to that school.
-            school_scope = filepath.split("/", 1)[0]
+            # path AND the requester belongs to that school. The school id
+            # is whichever path segment is a UUID — folder layouts differ
+            # (`reports/<school_id>/<name>.pdf`, `<school_id>/general/…`),
+            # and the old first-segment-only guess queried
+            # School(id="reports") → DataError 500 on every report PDF.
+            from uuid import UUID as _UUID
+
+            def _is_uuidish(value: str) -> bool:
+                try:
+                    _UUID(value)
+                    return True
+                except (ValueError, AttributeError, TypeError):
+                    return False
+
+            school_scope = next(
+                (seg for seg in filepath.split("/") if _is_uuidish(seg)),
+                None,
+            )
+            if not school_scope:
+                return jsonify(success=False, error="Not found"), 404
             from app.models.school import School
 
-            scope_school = School.query.filter_by(id=school_scope).first()
+            try:
+                scope_school = School.query.filter_by(id=_UUID(school_scope)).first()
+            except ValueError:
+                return jsonify(success=False, error="Not found"), 404
             if scope_school is None:
                 return jsonify(success=False, error="Not found"), 404
             if not _upload_requester_in_school(scope_school.id):
