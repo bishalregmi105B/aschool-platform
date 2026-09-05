@@ -306,12 +306,20 @@ async function exportPPTXImpl(
   pptx.author = "ASchool Design Studio";
   pptx.company = "ASchool";
 
+  // Layout must be defined ONCE and assigned before any slide is added:
+  // defineLayout only REGISTERS a layout; without `pptx.layout = "PAGE"`
+  // pptxgenjs silently keeps the default 10x7.5in grid and every page
+  // renders letterboxed. All design pages share one page size.
+  const first = pages[0] || { width: 794, height: 1123 };
+  const pageW = Math.max(1, Number(first.width) || 794) / 96;
+  const pageH = Math.max(1, Number(first.height) || 1123) / 96;
+  pptx.defineLayout({ name: "PAGE", width: pageW, height: pageH });
+  pptx.layout = "PAGE";
+
   for (const page of pages) {
     const w = Math.max(1, Number(page.width) || 794);
     const h = Math.max(1, Number(page.height) || 1123);
     const slide = pptx.addSlide();
-    // slide dims in inches follow the page aspect (96px = 1in)
-    pptx.defineLayout({ name: "PAGE", width: w / 96, height: h / 96 });
     slide.background = { color: (page.background || "#ffffff").replace("#", "") };
     const { Canvas } = await import("fabric");
     const offscreen = document.createElement("canvas");
