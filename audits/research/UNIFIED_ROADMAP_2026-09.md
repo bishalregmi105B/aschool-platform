@@ -97,6 +97,22 @@ the W0-close migration; `exportPPTX` bug confirmed (`useExport.ts:314`).
 
 ## 4. Phase A (DONE) — see §1.
 
+### Build progress ledger (2026-09-05, this pass)
+
+| Slice | Commit | State |
+|---|---|---|
+| B1 W0-close (gates canonical, dead code, guardian CRUD, health merge, row migration, install telemetry) | `461dde5` | ✅ done, tests green |
+| B3 Portals (mock /student killed, 18 coming-soon routes → real pages, catch-alls 404) | `461dde5` | ✅ done, build green |
+| C-P1 teaching-content spine (12 tables, publish workflow, override chain) | `c4b09af` | ✅ done, 12 tests |
+| C-P2 runtime tables + lesson API + webhook results + reconciler/purge tasks | `c4b09af` | ✅ backend done; **separate runtime service + player = remaining** |
+| C-P3 web launcher + usage + history (PluginGate-wrapped) | `e291f4b` | ✅ v1 done; **in-app player = remaining** |
+| D-1 nepal_curriculum packaging (owns the 12 content tables; ai_teacher depends on it) | `e291f4b` | ✅ done |
+| D-2 catalog columns (11) + 13 new tools seeded on doc_sections/item_analysis | `9de7cfe` (D-2 part) | ✅ done; **remaining 100+ tools = follow-on waves** |
+| D-4 AiResultView markdown+KaTeX (4 pages) | `9de7cfe` | ✅ done; **deck/docx/pdf emitters = remaining** |
+| Extra defect fixed: platform RAG seed failed every boot (document_chunks.school_id NOT NULL vs platform NULL) | `9de7cfe` | ✅ fixed |
+| E Nepal modules (transcripts, TDS, refunds, designer marksheet, timetable solver…) | — | ⬜ next |
+| F Mobile (FCM deep links, .arb, offline outbox) + pricing page | — | ⬜ next |
+
 ## 5. Phase B — W0-close + design-system foundation (the everything-unblocker)
 
 **B1 Backend closes (S):**
