@@ -24,6 +24,7 @@ frontend:
     icon: "UserCheck"
     subitems:
       - { label: "Mark / View", route: "/dashboard/attendance" }
+      - { label: "Leave Requests", route: "/dashboard/attendance/leave-requests" }
       - { label: "Monthly Report", route: "/dashboard/attendance/reports" }
       - { label: "Holiday List", route: "/dashboard/attendance/holidays" }
     visible_to: ["school_admin", "teacher"]
