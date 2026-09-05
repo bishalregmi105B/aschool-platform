@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -22,6 +22,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
+import { usePluginWidgets } from "@/lib/plugin-widgets/usePluginWidgets";
+import {
+  resolveComponentWidget,
+  type ComponentWidgetProps,
+} from "@/lib/plugin-widgets/registry";
 import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -202,6 +207,47 @@ function MarksContent() {
 
   // Stats
   const studentList: Student[] = students || [];
+
+  // ── Plugin-carried marks grid (exams/widgets.yaml → marks_entry_grid) ──
+  // The exams plugin declares its own keyboard-first grid; when the widget
+  // system serves it for this slot we render THAT instead of the page's
+  // fallback table. Same endpoint, same gating — just a better grid, and a
+  // school without the widget deployment keeps the fallback.
+  const { widgets } = usePluginWidgets("plugin_page.main");
+  const marksWidget = widgets.find((w) => w.key === "marks_entry_grid");
+  const MarksGrid = resolveComponentWidget(marksWidget?.component);
+
+  const gridRows = React.useMemo(
+    () =>
+      studentList.map((s) => {
+        const existing = (existingMarks || []).find(
+          (m: { student_id: string }) => m.student_id === s.id
+        );
+        return {
+          student_id: s.id,
+          student_name: `${s.first_name} ${s.last_name}`,
+          roll_number: s.roll_number,
+          theory_marks: existing?.theory_marks ?? null,
+          practical_marks: existing?.practical_marks ?? null,
+          full_marks: totalFullMarks,
+          pass_marks: totalPassMarks,
+        };
+      }),
+    [studentList, existingMarks, totalFullMarks, totalPassMarks]
+  );
+
+  const marksGridProps: ComponentWidgetProps | null =
+    marksWidget && MarksGrid
+      ? {
+          widget: marksWidget,
+          context: {
+            exam_id: examId,
+            subject_id: subjectId,
+            class_id: classId,
+            rows: gridRows,
+          },
+        }
+      : null;
   const entered = Object.values(marks).filter((m: any) => m.theory_marks || m.practical_marks).length;
   const passCount = Object.values(marks).filter((m: any) => {
     const theory = parseFloat(m.theory_marks) || 0;
@@ -343,7 +389,7 @@ function MarksContent() {
         </div>
       )}
 
-      {/* Marks Table */}
+      {/* Marks Table — the plugin-carried keyboard grid when served */}
       {examId && classId && subjectId && (
         <Card>
           <CardContent className="p-0">
@@ -356,6 +402,11 @@ function MarksContent() {
               <PageLoader />
             ) : studentList.length === 0 ? (
               <p className="text-center py-12 text-muted-foreground">No students found in this class.</p>
+            ) : marksGridProps && MarksGrid ? (
+              /* The exams plugin's marks_entry_grid: Enter/↓ navigation,
+                 Excel-paste, per-cell validation and its own Save — replaces
+                 the fallback display table entirely. */
+              <MarksGrid {...marksGridProps} />
             ) : (
               <Table>
                 <TableHeader>

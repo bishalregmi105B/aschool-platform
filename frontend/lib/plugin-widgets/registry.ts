@@ -20,7 +20,11 @@ import type { WidgetSpec } from "./types";
 
 export interface ComponentWidgetProps {
   widget: WidgetSpec;
-  context?: Record<string, string | number | null | undefined>;
+  /** Component widgets receive rich context (rows, records, computed views) —
+   * that is WHY they are component-rendered. Declarative widgets keep the
+   * scalar-only bindings from the spec; this prop is the component escape
+   * hatch (e.g. exams/MarksGrid consumes `rows`). */
+  context?: Record<string, unknown>;
   /** Per-school widget config from `SchoolPlugin.config`. */
   config?: Record<string, unknown>;
 }
