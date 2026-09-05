@@ -60,18 +60,32 @@ def _acceptable_plugin_slugs(plugin_slug: str) -> set[str]:
     target, and any legacy slug aliasing directly to it. Chaining is
     deliberately NOT followed (non-transitive) so an alias can never
     unlock a third plugin's routes.
+
+    The map consulted is the EFFECTIVE one — the table above merged with
+    every manifest's `aliases:` declaration (`PluginLoader.alias_map`), so a
+    plugin can ship its own legacy slugs without editing this file. The merge
+    only ever adds `legacy → canonical` pairs, so the single-hop property is
+    preserved by construction. Falls back to the table alone if the loader is
+    unavailable (import cycles during early boot, bare unit tests).
     """
     requested = str(plugin_slug or "").strip()
     if not requested:
         return set()
 
+    try:
+        from app.plugins.loader import PluginLoader
+
+        alias_map = PluginLoader.alias_map()
+    except Exception:  # noqa: BLE001 — gating must never depend on the loader
+        alias_map = PLUGIN_SLUG_ALIASES
+
     accepted = {requested}
 
-    mapped = PLUGIN_SLUG_ALIASES.get(requested)
+    mapped = alias_map.get(requested)
     if mapped:
         accepted.add(mapped)
 
-    for old_slug, current_slug in PLUGIN_SLUG_ALIASES.items():
+    for old_slug, current_slug in alias_map.items():
         if current_slug == requested and old_slug not in accepted:
             accepted.add(old_slug)
 

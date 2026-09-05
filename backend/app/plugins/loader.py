@@ -39,6 +39,109 @@ class PluginLoader:
     _modules_dir = Path(__file__).parent / "modules"  # Odoo-style module packages
     _manifests_dir = Path(__file__).parent / "manifests"  # Legacy flat manifests
 
+    # ── v1 → v2 manifest normalization ────────────────────────────────────
+    #
+    # The v2 contract renames three groups of keys (`frontend:` → `ui.nav`,
+    # `flutter:` → `mobile`, top-level code pointers → `capabilities.*`) and
+    # adds `aliases`/`supersedes`/`owns_tables`. Rather than migrate 48 files
+    # at once, every scanned manifest is normalized IN MEMORY to the v2 shape,
+    # so `get_frontend_sidebar`, the alias resolver and the widget loader read
+    # exactly one shape. Nothing on disk is touched; a v1 manifest still
+    # reports `schema_version: 1` through /plugins/registry.
+
+    _POINTER_KEYS = ("api_blueprint", "models_module", "services", "tasks")
+
+    @classmethod
+    def _normalize_manifest(cls, m: dict) -> dict:
+        """Return the manifest in the v2 in-memory shape (never mutates files).
+
+        v1 keys are KEPT alongside their v2 equivalents: existing consumers
+        (`refresh_registry`, `_register_manifest_blueprints`, the marketplace
+        payload) keep reading `m["api_blueprint"]` unchanged, while new code
+        reads `m["capabilities"]["api_blueprint"]`.
+        """
+        declared = m.get("schema_version")
+        try:
+            version = int(declared) if declared is not None else 1
+        except (TypeError, ValueError):
+            version = 1
+        m["schema_version"] = version
+
+        caps = dict(m.get("capabilities") or {})
+        for key in cls._POINTER_KEYS:
+            if m.get(key) is not None:
+                caps.setdefault(key, m[key])
+            elif caps.get(key) is not None:
+                # v2 manifest: mirror back so the legacy readers keep working.
+                m[key] = caps[key]
+        m["capabilities"] = caps
+
+        if not (m.get("ui") or {}).get("nav"):
+            fe = m.get("frontend") or {}
+            sb = fe.get("sidebar") or {}
+            if fe or sb:
+                nav = {
+                    "route": fe.get("route"),
+                    "section": sb.get("section"),
+                    "label": sb.get("label") or m.get("name"),
+                    "label_nepali": sb.get("label_nepali") or m.get("name_nepali"),
+                    "icon": sb.get("icon") or m.get("icon"),
+                    "visible_to": sb.get("visible_to") or [],
+                    "subitems": sb.get("subitems") or [],
+                    # A manifest with `frontend:` but no `sidebar:` block has
+                    # deliberately opted out of navigation; the flag preserves
+                    # that distinction, which "empty dict" would erase.
+                    "_in_sidebar": bool(sb),
+                }
+                ui = dict(m.get("ui") or {})
+                ui["nav"] = nav
+                m["ui"] = ui
+
+        if not m.get("mobile"):
+            flutter = m.get("flutter") or {}
+            if flutter:
+                m["mobile"] = {
+                    role.replace("_app", ""): cfg
+                    for role, cfg in flutter.items()
+                    if cfg
+                }
+
+        return m
+
+    @classmethod
+    def _nav(cls, slug: str) -> dict | None:
+        """Normalized nav block for a slug, or None when it has no navigation."""
+        manifest = cls._plugins.get(slug) or {}
+        nav = (manifest.get("ui") or {}).get("nav")
+        if not nav:
+            return None
+        if nav.get("_in_sidebar") is False:
+            return None
+        return nav
+
+    # ── Effective alias map (manifest `aliases:` ∪ the hardcoded table) ────
+
+    @classmethod
+    def alias_map(cls) -> dict[str, str]:
+        """legacy slug → canonical slug, merged from manifests and the table.
+
+        `decorators.PLUGIN_SLUG_ALIASES` remains the authority for the merges
+        that predate the manifest key; a manifest that declares
+        `aliases: [old_slug]` contributes `old_slug → its own slug`. The result
+        stays SINGLE-HOP by construction: values are canonical slugs only, so
+        no chain can form and an alias can never unlock a third plugin.
+        """
+        from app.plugins.decorators import PLUGIN_SLUG_ALIASES
+
+        merged = dict(PLUGIN_SLUG_ALIASES)
+        for slug, manifest in cls._plugins.items():
+            for legacy in manifest.get("aliases") or []:
+                legacy = str(legacy)
+                if legacy == slug:
+                    continue
+                merged.setdefault(legacy, slug)
+        return merged
+
     @classmethod
     def _scan_manifests(cls) -> set[str]:
         """Rescan both manifest sources into the in-memory registry.
@@ -200,7 +303,7 @@ class PluginLoader:
         else:
             manifest["_hooks_module"] = None
 
-        cls._plugins[slug] = manifest
+        cls._plugins[slug] = cls._normalize_manifest(manifest)
         if manifest.get("api_blueprint"):
             registered_blueprints.add(manifest["api_blueprint"])
 
@@ -541,6 +644,9 @@ class PluginLoader:
           one of the deprecated individual AI plugins, and canonical entries
           for schools still holding legacy duplicate installs.
         - Role scoping via `visible_to` is unchanged.
+
+        Reads the normalized `ui.nav` block (`_normalize_manifest`), so v1
+        `frontend.sidebar` and v2 `ui.nav` manifests flow through one path.
         """
         from app.plugins.decorators import _acceptable_plugin_slugs
 
@@ -575,15 +681,11 @@ class PluginLoader:
             if manifest.get("deprecated"):
                 continue
 
-            fe = manifest.get("frontend")
-            if not fe:
-                continue  # plugin has no frontend (API-only)
+            nav = cls._nav(slug)
+            if not nav:
+                continue  # API-only plugin, or opted out of the sidebar
 
-            sb = fe.get("sidebar")
-            if not sb:
-                continue  # plugin explicitly opts out of sidebar
-
-            visible_to = sb.get("visible_to", [])
+            visible_to = nav.get("visible_to") or []
             # Show if: visible_to is empty (open), contains "all", or matches role
             if visible_to and "all" not in visible_to and user_role not in visible_to:
                 continue
@@ -594,7 +696,7 @@ class PluginLoader:
             if not acceptable & installed_set:
                 continue
 
-            section = sb.get("section")
+            section = nav.get("section")
             # Use SLUG_SECTION_MAP as fallback when manifest has no explicit section
             if section is None:
                 section = cls.SLUG_SECTION_MAP.get(slug)
@@ -610,14 +712,15 @@ class PluginLoader:
                     return route
                 return f"/dashboard{route}"
 
-            route = _normalize_route(fe.get("route", ""))
+            route = _normalize_route(nav.get("route"))
 
             subitems = []
-            for item in sb.get("subitems", []):
+            for item in nav.get("subitems") or []:
                 sub_route = _normalize_route(item.get("route"))
                 subitems.append(
                     {
                         "label": item.get("label"),
+                        "label_nepali": item.get("label_nepali"),
                         "route": sub_route,
                     }
                 )
@@ -625,9 +728,9 @@ class PluginLoader:
             sidebar.append(
                 {
                     "slug": slug,
-                    "label": sb.get("label") or manifest.get("name", slug),
-                    "label_nepali": sb.get("label_nepali"),
-                    "icon": sb.get("icon") or manifest.get("icon", "Package"),
+                    "label": nav.get("label") or manifest.get("name", slug),
+                    "label_nepali": nav.get("label_nepali"),
+                    "icon": nav.get("icon") or manifest.get("icon", "Package"),
                     "section": section,
                     "route": route,
                     "subitems": subitems,
@@ -642,6 +745,7 @@ class PluginLoader:
 
         Always includes BOTTOM_NAV_ALWAYS_SLUGS (Settings, Marketplace) and
         any installed plugin marked section: bottom_nav. Includes subitems.
+        Reads the normalized `ui.nav` block, like get_frontend_sidebar.
         """
         all_slugs: list[str] = list(
             dict.fromkeys([*cls.BOTTOM_NAV_ALWAYS_SLUGS, *installed_slugs])
@@ -653,11 +757,10 @@ class PluginLoader:
                 continue
             if manifest.get("coming_soon"):
                 continue  # E231: coming-soon plugins are hidden from nav
-            fe = manifest.get("frontend") or {}
-            sb = fe.get("sidebar") or {}
-            if sb.get("section") != "bottom_nav":
+            nav = cls._nav(slug)
+            if not nav or nav.get("section") != "bottom_nav":
                 continue
-            visible_to = sb.get("visible_to", [])
+            visible_to = nav.get("visible_to") or []
             if visible_to and "all" not in visible_to and user_role not in visible_to:
                 continue
 
@@ -669,15 +772,19 @@ class PluginLoader:
                 return f"/dashboard{route}"
 
             subitems = [
-                {"label": s.get("label"), "route": _normalize(s.get("route"))}
-                for s in sb.get("subitems", [])
+                {
+                    "label": s.get("label"),
+                    "label_nepali": s.get("label_nepali"),
+                    "route": _normalize(s.get("route")),
+                }
+                for s in nav.get("subitems") or []
             ]
             items.append(
                 {
                     "slug": slug,
-                    "label": sb.get("label") or manifest.get("name", slug),
-                    "icon": sb.get("icon") or manifest.get("icon", "Package"),
-                    "route": _normalize(fe.get("route", "/dashboard")),
+                    "label": nav.get("label") or manifest.get("name", slug),
+                    "icon": nav.get("icon") or manifest.get("icon", "Package"),
+                    "route": _normalize(nav.get("route")),
                     "subitems": subitems,
                 }
             )

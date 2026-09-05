@@ -923,3 +923,169 @@ def get_plugin_config_schema(slug):
         }
     )
 
+
+@plugins_bp.route("/widgets", methods=["GET"])
+@jwt_required()
+@school_required
+def plugin_widgets():
+    """Widget specs the caller may render, for a surface and optional slot.
+
+    Query: ?surface=web|mobile|public_site|pdf (default web) &slot=<slot id>
+
+    Gating is absolute here rather than in the client: a widget whose plugin is
+    not installed+active for this school, or whose role/permissions do not
+    match, is ABSENT from the payload. `default_layout` is what a school that
+    has never customized its dashboard sees.
+    """
+    from app.plugins.widgets import default_layout, widgets_for
+
+    surface = request.args.get("surface", "web")
+    slot = request.args.get("slot") or None
+    role = g.role or "school_admin"
+    widgets = widgets_for(
+        installed_slugs=g.installed_plugins or [],
+        role=role,
+        surface=surface,
+        slot=slot,
+    )
+    return success_response(
+        {
+            "surface": surface,
+            "slot": slot,
+            "role": role,
+            "widgets": widgets,
+            "default_layout": default_layout(widgets, slot) if slot else [],
+        }
+    )
+
+
+@plugins_bp.route("/aliases", methods=["GET"])
+@jwt_required()
+def plugin_aliases():
+    """Effective slug-alias map + display labels, served from the manifests.
+
+    `frontend/lib/plugins.tsx` hand-maintained a copy of PLUGIN_SLUG_ALIASES
+    and a PLUGIN_LABELS dict; the two drifted every time a plugin merged. The
+    client now fetches this and keeps its literals only as an offline
+    fallback. `aliases` is legacy→canonical, single-hop (see
+    PluginLoader.alias_map).
+    """
+    aliases = PluginLoader.alias_map()
+    labels = {
+        slug: (m.get("name") or slug.replace("_", " "))
+        for slug, m in PluginLoader.get_all_manifests().items()
+    }
+    labels_nepali = {
+        slug: m.get("name_nepali")
+        for slug, m in PluginLoader.get_all_manifests().items()
+        if m.get("name_nepali")
+    }
+    return success_response(
+        {
+            "aliases": aliases,
+            "labels": labels,
+            "labels_nepali": labels_nepali,
+        }
+    )
+
+
+@plugins_bp.route("/registry", methods=["GET"])
+@jwt_required()
+@role_required("superadmin")
+def plugin_registry():
+    """Normalized manifests + contract-validator findings (superadmin).
+
+    This is the introspection endpoint the plugin_doctor CLI mirrors: it
+    answers "what does the platform actually think is installed on disk, and
+    which manifests are lying?" without shell access to the container.
+    """
+    from app.plugins.validator import validate_all
+
+    manifests = PluginLoader.get_all_manifests()
+    findings = validate_all()
+    by_slug: dict[str, list[dict]] = {}
+    for f in findings:
+        by_slug.setdefault(f.slug, []).append(
+            {"severity": f.severity, "file": f.file, "message": f.message}
+        )
+
+    entries = []
+    for slug, m in sorted(manifests.items()):
+        entries.append(
+            {
+                "slug": slug,
+                "name": m.get("name"),
+                "schema_version": m.get("schema_version", 1),
+                "source": m.get("_source"),
+                "manifest_path": m.get("_manifest_path"),
+                "category": m.get("category"),
+                "published": bool(m.get("published", True)),
+                "coming_soon": bool(m.get("coming_soon")),
+                "deprecated": bool(m.get("deprecated")),
+                "capabilities": m.get("capabilities") or {},
+                "nav": (m.get("ui") or {}).get("nav"),
+                "mobile": m.get("mobile") or {},
+                "has_config_schema": bool(m.get("_config_schema_path")),
+                "has_hooks": bool(m.get("_hooks_module")),
+                "aliases": m.get("aliases") or [],
+                "owns_tables": m.get("owns_tables") or [],
+                "findings": by_slug.get(slug, []),
+            }
+        )
+
+    return success_response(
+        {
+            "count": len(entries),
+            "errors": sum(1 for f in findings if f.severity == "error"),
+            "warnings": sum(1 for f in findings if f.severity == "warning"),
+            "plugins": entries,
+        }
+    )
+
+
+@plugins_bp.route("/<slug>/health", methods=["GET"])
+@jwt_required()
+@role_required("superadmin")
+def plugin_health(slug):
+    """Run a plugin's declared `health_check` (module:callable), if any.
+
+    Contract: the callable takes no arguments and returns
+    {"ok": bool, "detail": str, "checks": {...}}. A plugin with no
+    health_check reports ok=True with detail="no health check declared" —
+    absence of a check is not a failure.
+    """
+    manifest = PluginLoader.get_manifest(slug)
+    if not manifest:
+        return error_response(f"Plugin '{slug}' not found", 404)
+    target = (manifest.get("capabilities") or {}).get("health_check") or manifest.get(
+        "health_check"
+    )
+    if not target:
+        return success_response(
+            {"slug": slug, "ok": True, "detail": "no health check declared", "checks": {}}
+        )
+    module_path, _, attr = str(target).partition(":")
+    try:
+        import importlib
+
+        module = importlib.import_module(module_path)
+        fn = getattr(module, attr or "health_check", None)
+        if not callable(fn):
+            return error_response(
+                f"health_check '{target}' is not callable", 500
+            )
+        result = fn() or {}
+    except Exception as e:  # noqa: BLE001 — a broken check reports, never 500s opaquely
+        logger.warning("Plugin '%s' health check failed: %s", slug, e)
+        return success_response(
+            {"slug": slug, "ok": False, "detail": f"health check raised: {e}", "checks": {}}
+        )
+    return success_response(
+        {
+            "slug": slug,
+            "ok": bool(result.get("ok", False)),
+            "detail": result.get("detail", ""),
+            "checks": result.get("checks") or {},
+        }
+    )
+

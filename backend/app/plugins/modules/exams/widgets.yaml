@@ -1,0 +1,219 @@
+# Widgets contributed by the exams plugin.
+#
+# Endpoints verified against app/api/v1/exams.py:
+#   GET /exams                       exams.py:217  (paginated, teacher-scoped)
+#   GET /exams/<id>/results          exams.py:928  (per-exam result set)
+#   GET /exams/<id>/marks            exams.py:577  (marks grid source)
+#   GET /exams/results               exams.py:882  (a student's results)
+#   GET /exams/<id>/report-cards     exams.py:1431 (generated report cards)
+#   GET /exams/grade-table           exams.py:205  (grading scale)
+#
+# The marks grid itself is `renderer: component` — a keyboard-first spreadsheet
+# with per-cell validation and an offline outbox is not something a declarative
+# spec should pretend to express.
+schema_version: 1
+
+widgets:
+  - key: upcoming_exams
+    title: "Upcoming Exams"
+    title_i18n: widget.upcoming_exams.title
+    description: "Scheduled exams that have not been held yet"
+    type: list
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.side, default: true, order: 40 }
+    roles: [school_admin, teacher, student, parent]
+    size:
+      default: { w: 4, h: 4 }
+      min: { w: 3, h: 3 }
+    data:
+      source: api
+      endpoint: /exams
+      params: { status: "scheduled,ongoing", per_page: 6 }
+      refresh: { mode: poll, interval_s: 900 }
+      select: data
+    spec:
+      item:
+        title: "$.name"
+        subtitle: "$.exam_type · $.class_name"
+        timestamp: "$.start_date"
+        timestamp_format: bs_date
+        badge: { value: "$.status", format: status_pill, map: { scheduled: muted, ongoing: warning, completed: success, published: primary } }
+        link: "/dashboard/exams/$.id"
+      link: { label: "All exams", href: /dashboard/exams }
+    states:
+      empty:
+        title: "No exams scheduled"
+        body: "Create an exam to start entering marks."
+        action: { label: "Create exam", href: /dashboard/exams }
+      error: { title: "Couldn't load exams", retry: true }
+      loading: skeleton
+      locked: { title: "Exams not installed", cta: marketplace }
+
+  - key: marks_entry_grid
+    title: "Marks Entry"
+    title_i18n: widget.marks_entry_grid.title
+    description: "Keyboard-first marks grid with live grade preview"
+    type: table-panel
+    renderer: component
+    component: exams/MarksGrid
+    surfaces: [web]
+    slots:
+      - { id: plugin_page.main, default: true, order: 10 }
+    roles: [school_admin, teacher]
+    requires_permissions: [exams.enter_marks]
+    size:
+      default: { w: 12, h: 8 }
+      min: { w: 8, h: 6 }
+    data:
+      source: api
+      endpoint: /exams/$context.exam_id/marks
+      select: data
+    states:
+      empty: { title: "Pick an exam and subject", body: "Choose a class and subject to enter marks." }
+      error: { title: "Couldn't load the marks grid", retry: true }
+      loading: skeleton
+
+  - key: exam_result_summary
+    title: "Result Summary"
+    title_i18n: widget.exam_result_summary.title
+    description: "Pass rate, average and top scorer for an exam"
+    type: stat-group
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: plugin_page.header, default: true, order: 10 }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 6, h: 2 }
+    data:
+      source: api
+      endpoint: /exams/$context.exam_id/results
+      select: data.summary
+    spec:
+      items:
+        - { label: "Pass rate", value: "$.pass_percentage", format: percent, tone: success }
+        - { label: "Class average", value: "$.average_percentage", format: percent, tone: primary }
+        - { label: "Highest", value: "$.highest_percentage", format: percent, tone: muted }
+        - { label: "Students", value: "$.total_students", tone: muted }
+    states:
+      empty: { title: "No marks entered yet", body: "Enter marks to see the result summary." }
+      error: { title: "Couldn't load results", retry: true }
+      loading: skeleton
+
+  - key: grade_distribution
+    title: "Grade Distribution"
+    title_i18n: widget.grade_distribution.title
+    description: "How many students landed in each grade band"
+    type: chart
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: plugin_page.main, order: 20 }
+      - { id: dashboard.main, order: 50 }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 6, h: 4 }
+      min: { w: 4, h: 3 }
+    data:
+      source: api
+      endpoint: /exams/$context.exam_id/results
+      select: data.grade_distribution
+    spec:
+      chart: bar
+      x: { key: grade, label: Grade }
+      series:
+        - { key: count, label: Students, tone: primary }
+    states:
+      empty: { title: "No graded marks yet" }
+      error: { title: "Couldn't load grade distribution", retry: true }
+      loading: skeleton
+
+  - key: student_results_tab
+    title: "Results"
+    title_i18n: widget.student_results_tab.title
+    description: "Every published result for this student"
+    type: table-panel
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - id: student_profile.tab
+        default: true
+        order: 30
+        params_from: { student_id: "$route.id" }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 12, h: 4 }
+      min: { w: 8, h: 3 }
+    data:
+      source: api
+      endpoint: /exams/results
+      params: { student_id: "$context.student_id" }
+      select: data
+    spec:
+      columns:
+        - { key: exam_name, label: Exam, width: 220 }
+        - { key: total_marks, label: Total, align: right }
+        - { key: obtained_marks, label: Obtained, align: right }
+        - { key: percentage, label: "%", format: percent, align: right }
+        - { key: grade, label: Grade, format: status_pill }
+        - { key: gpa, label: GPA, align: right }
+      export: { csv: true, print: true }
+    states:
+      empty: { title: "No results yet", body: "Results appear once an exam is published." }
+      error: { title: "Couldn't load results", retry: true }
+      loading: skeleton
+
+  - key: enter_marks_action
+    title: "Enter Marks"
+    title_i18n: widget.enter_marks_action.title
+    description: "Jump to the marks grid"
+    type: quick-action
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.actions, default: true, order: 30 }
+      - { id: mobile.quick_actions, default: true, order: 20 }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 3, h: 1 }
+      min: { w: 2, h: 1 }
+    spec:
+      icon: PenTool
+      tone: primary
+      label: "Enter Marks"
+      label_i18n: widget.enter_marks_action.label
+      href: /dashboard/exams/marks
+      mobile_route: /marks
+
+  - key: mobile_result_card
+    title: "Latest Result"
+    title_i18n: widget.mobile_result_card.title
+    description: "The most recent published result"
+    type: mobile-card
+    renderer: spec
+    surfaces: [mobile]
+    slots:
+      - { id: mobile.home, default: true, order: 30 }
+    roles: [student, parent]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 12, h: 2 }
+    data:
+      source: api
+      endpoint: /exams/results
+      params: { student_id: "$context.student_id" }
+      select: data
+    spec:
+      layout: headline
+      title: "$[0].exam_name"
+      items:
+        - { label: "Percentage", value: "$[0].percentage", format: percent }
+        - { label: "Grade", value: "$[0].grade" }
+      tap: { route: /results }
+    states:
+      empty: { title: "No results published yet" }
+      error: { title: "Couldn't load results", retry: true }
+      loading: skeleton
