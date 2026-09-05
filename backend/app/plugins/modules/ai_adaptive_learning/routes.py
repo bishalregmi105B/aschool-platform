@@ -6,7 +6,7 @@ E21: the plugin was published/sold with a working service layer
 (`frontend/app/dashboard/ai-tools/{learning-paths,progress}/page.tsx`) called
 `/lms/learning-paths*` and `/lms/adaptive-progress`, which 404'd.
 
-Routes (mounted under /api/v1, all gated @plugin_required("ai_adaptive_learning"),
+Routes (mounted under /api/v1, all gated @plugin_required("ai_suite"),
 tenant-scoped to g.school_id):
   GET  /lms/learning-paths               list paths (?search, ?student_id, ?class_name)
   POST /lms/learning-paths               manual create (teacher dialog)
@@ -218,7 +218,7 @@ def _assess_and_store(student, subject_name):
 @adaptive_learning_bp.route("/learning-paths", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def list_learning_paths():
     """Learning paths for this school (?search, ?student_id, ?class_name)."""
@@ -252,7 +252,7 @@ def list_learning_paths():
 @adaptive_learning_bp.route("/learning-paths", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def create_learning_path():
     """Manual path creation (teacher dialog). No steps are invented — a
@@ -295,7 +295,7 @@ def create_learning_path():
 @adaptive_learning_bp.route("/learning-paths/generate-ai", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 @ai_rate_limit()
 def generate_learning_path():
@@ -415,7 +415,7 @@ def generate_learning_path():
 @adaptive_learning_bp.route("/mastery", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def list_mastery():
     """Mastery records for this school (?student_id, ?subject)."""
@@ -433,7 +433,7 @@ def list_mastery():
 @adaptive_learning_bp.route("/mastery/assess", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def assess_mastery():
     """Compute mastery from real Marks via the service (no LLM, no quota)
@@ -471,7 +471,7 @@ def assess_mastery():
 @adaptive_learning_bp.route("/mastery/<record_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def update_mastery(record_id):
     """Teacher override of a mastery record (level + notes)."""
@@ -504,7 +504,7 @@ def update_mastery(record_id):
 @adaptive_learning_bp.route("/adaptive-progress", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_adaptive_learning")
+@plugin_required("ai_suite")
 @role_required("school_admin", "teacher")
 def adaptive_progress():
     """Per-student progress rows for the Student Progress page. Every number

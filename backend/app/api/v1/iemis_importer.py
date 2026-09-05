@@ -1055,7 +1055,9 @@ def download_template():
 @jwt_required()
 @school_required
 @plugin_required("iemis_importer")
-@role_required("school_admin", "data_entry")
+# "data_entry" is not a user_role enum value (app/models/user.py:26-38), so it
+# never granted anybody access — dropped rather than silently widened.
+@role_required("school_admin")
 def validate_import():
     """Validate IEMIS Excel file and return a preview (dry run — no DB writes)."""
     if "file" not in request.files:
@@ -1110,7 +1112,7 @@ def validate_import():
 @jwt_required()
 @school_required
 @plugin_required("iemis_importer")
-@role_required("school_admin", "data_entry")
+@role_required("school_admin")  # see /validate — "data_entry" was a phantom role
 def run_import():
     """Execute the IEMIS import — parses file and writes to database."""
     if "file" not in request.files:

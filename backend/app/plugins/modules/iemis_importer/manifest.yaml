@@ -81,7 +81,12 @@ frontend:
           route: "/dashboard/iemis-import?format=school_level",
         }
       - { label: "Import History", route: "/dashboard/iemis-import/history" }
-    visible_to: ["school_admin", "data_entry"]
+    # "data_entry" was listed here and on the /validate + /import route gates,
+    # but it is not a value of the user_role enum (app/models/user.py:26-38),
+    # so it matched nobody — those routes are school_admin-only in practice.
+    # Widening to `staff` would hand student-record writes to every staff
+    # account, so the phantom role is dropped instead.
+    visible_to: ["school_admin"]
 
 flutter:
   admin_app: { feature_folder: "iemis_import", tabs: ["Import", "History"] }
