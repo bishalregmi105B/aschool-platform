@@ -1,27 +1,39 @@
-# AI Teacher plugin settings (SchoolPlugin.config) — AT §D.2.
+# AI Teacher plugin settings (SchoolPlugin.config) — AT §D.2 + W4/A2 refit.
 # Rule: a setting with no consumer is a lie — the consumer is named per field.
-# Secrets (service key) are NOT here; they live in ai_teacher_service_keys
-# and are rotated from the settings screen, never displayed.
+# Secrets (service key) are NOT here: ai_teacher_service_keys holds the sha256,
+# and provisioning stores the ENCRYPTED webhook_secret envelope in this config
+# (never displayed, never echoed — type secret semantics server-side only).
+schema_version: 2
+config_version: 1
 fields:
   # ── Service wiring (service_client.py) ────────────────────────────────
   - key: service_base_url
     label: "AI Teacher service URL"
     type: string
+    format: url
     default: ""
-    help: "Base URL of the dedicated runtime service, e.g. https://aiteacher.internal. Empty = service disabled."
-    admin_only: true
+    help: "Base URL of the dedicated ATeacher runtime service, e.g. https://aiteacher.internal:6001. Empty = service disabled (lessons 503 honestly)."
+    advanced: true
   - key: player_base_url
-    label: "Player embed URL"
+    label: "Lesson player origin"
     type: string
+    format: url
     default: ""
-    help: "Where the lesson player is served from. Must be allowed by the dashboard CSP frame-src."
-    admin_only: true
+    help: "Origin of the Flutter-web player (its OWN domain), e.g. https://player.aiteacher.app — no path. create_lesson launches it via query params (?session_id&token&topic&user_id&autostart); the dashboard CSP needs frame-src for this origin, the player needs connect-src/media-src to the API origin and allow=\"microphone\"."
+    advanced: true
 
   # ── Lesson defaults (create-lesson payload, routes.py) ───────────────
   - key: default_persona_slug
     label: "Default teacher persona"
-    type: select
-    options: [aria, max, sophia, leo, nova]
+    type: enum
+    options:
+      - { value: aria, label: "ARIA (warm, analogy-first)" }
+      - { value: max, label: "Max (coach)" }
+      - { value: sophia, label: "Sophia (rigorous)" }
+      - { value: leo, label: "Leo (story-first)" }
+      - { value: nova, label: "Nova (visual-first)" }
+    default: "aria"
+    help: "Sent to the service as teacher_slug; unknown slugs 404 service-side."
     default: "aria"
     help: "ARIA (warm, analogy-first), Max (coach), Sophia (rigorous), Leo (story-first), Nova (visual-first)."
   - key: allow_student_persona_choice
@@ -30,37 +42,45 @@ fields:
     default: true
   - key: default_language
     label: "Default lesson language"
-    type: select
-    options: [en, ne, mixed]
+    type: enum
+    options:
+      - { value: en, label: "English" }
+      - { value: ne, label: "Nepali" }
+      - { value: mixed, label: "Mixed (Nepali speech, English terms)" }
     default: "ne"
-    help: "mixed = Nepali speech with English subject terms (via the content glossary)."
+    help: "Sent to the service mapped en→English, ne→Nepali, mixed→English (no mixed mode service-side)."
   - key: default_voice
     label: "Default voice"
-    type: select
-    options: [ne-NP-HemkalaNeural, ne-NP-SagarNeural, en-US-AriaNeural, en-US-GuyNeural, hi-IN-SwaraNeural]
+    type: enum
+    options:
+      - { value: ne-NP-HemkalaNeural, label: "Hemkala (Nepali F)" }
+      - { value: ne-NP-SagarNeural, label: "Sagar (Nepali M)" }
+      - { value: en-US-AriaNeural, label: "Aria (English F)" }
+      - { value: en-US-GuyNeural, label: "Guy (English M)" }
+      - { value: hi-IN-SwaraNeural, label: "Swara (Hindi F)" }
     default: "ne-NP-HemkalaNeural"
 
   # ── Lesson shape / cost drivers (create clamp + service payload) ─────
   - key: lesson_max_minutes
     label: "Max lesson length (minutes)"
-    type: integer
+    type: int
     min: 5
     max: 90
     default: 25
   - key: lesson_target_chapters
     label: "Target chapters per lesson"
-    type: integer
+    type: int
     min: 1
     max: 8
     default: 4
     help: "The main cost driver — every chapter is one planner pass + streamed teach."
   - key: max_questions_per_lesson
     label: "Max student questions per lesson"
-    type: integer
+    type: int
     default: 40
   - key: attention_reset_minutes
     label: "Attention reset every N minutes (0 disables)"
-    type: integer
+    type: int
     default: 10
 
   # ── Create gates (the create gate reads these) ────────────────────────
@@ -71,19 +91,35 @@ fields:
     help: "Off (recommended) = lessons must teach published curriculum content; the AI refuses to improvise a syllabus."
   - key: allowed_grades
     label: "Grades AI Teacher may teach"
-    type: multiselect
-    options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
+    type: multi-enum
+    options:
+      - { value: "1", label: "Grade 1" }
+      - { value: "2", label: "Grade 2" }
+      - { value: "3", label: "Grade 3" }
+      - { value: "4", label: "Grade 4" }
+      - { value: "5", label: "Grade 5" }
+      - { value: "6", label: "Grade 6" }
+      - { value: "7", label: "Grade 7" }
+      - { value: "8", label: "Grade 8" }
+      - { value: "9", label: "Grade 9" }
+      - { value: "10", label: "Grade 10" }
+      - { value: "11", label: "Grade 11" }
+      - { value: "12", label: "Grade 12" }
     default: ["6","7","8","9","10"]
   - key: allowed_subjects
     label: "Subjects AI Teacher may teach"
-    type: multiselect
-    options: []
+    type: json
+    json_schema:
+      type: object
     default: []
-    help: "Empty = every subject that has published content. Options populate from your school's subjects."
+    help: "JSON array of subject ids, e.g. [\"<uuid>\"]. Empty = every subject that has published content."
   - key: allowed_roles
     label: "Roles who may start lessons"
-    type: multiselect
-    options: [student, teacher, school_admin]
+    type: multi-enum
+    options:
+      - { value: student, label: "Student" }
+      - { value: teacher, label: "Teacher" }
+      - { value: school_admin, label: "School admin" }
     default: ["student", "teacher"]
   - key: student_hours_window
     label: "Students may take lessons between"
@@ -99,8 +135,10 @@ fields:
     help: "Platform enforces this regardless for students under 13."
   - key: moderation_strictness
     label: "Moderation strictness"
-    type: select
-    options: [standard, strict]
+    type: enum
+    options:
+      - { value: standard, label: "Standard" }
+      - { value: strict, label: "Strict" }
     default: "standard"
     help: "strict = medium-severity flags pause the lesson and notify a teacher."
   - key: kill_switch
@@ -113,7 +151,7 @@ fields:
   # ── Retention + cost (tasks + reservation check) ─────────────────────
   - key: transcript_retention_days
     label: "Transcript retention (days)"
-    type: integer
+    type: int
     min: 7
     max: 1095
     default: 180
@@ -124,19 +162,19 @@ fields:
     default: true
   - key: monthly_cost_ceiling_npr
     label: "Monthly cost ceiling (NPR, 0 = platform quota only)"
-    type: integer
+    type: int
     default: 3000
     help: "Lesson creation reserves against this; a school at its ceiling gets a clean 429."
   - key: monthly_minutes_per_student
     label: "Monthly minutes per student"
-    type: integer
+    type: int
     default: 240
   - key: max_concurrent_lessons
     label: "Max concurrent lessons (school-wide)"
-    type: integer
+    type: int
     default: 25
   - key: cost_alert_percent
     label: "Cost alert at % of ceiling"
-    type: integer
+    type: int
     default: 80
     help: "Fires the ai_teacher.cost_ceiling_reached event."
