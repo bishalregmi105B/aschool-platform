@@ -46,13 +46,12 @@ def test_all_service_modules_use_existing_hub_methods():
     sentiment, translator, social_ai, wellbeing_ai, admission_bot,
     attendance_ai, fee_predictor, plagiarism) were deleted — zero importers,
     confirmed by grep — so they leave this list. The modules kept are the
-    ones actually mounted by routes/tasks.
+    ones actually mounted by routes/tasks. risk_detector/benchmarking_ai
+    joined them (benchmarking /rankings is set-based SQL, no AI).
     """
     import importlib
 
     modules = [
-        "app.services.ai.risk_detector",
-        "app.services.ai.benchmarking_ai",
         "app.services.ai.adaptive_learning",
         "app.services.ai.question_paper",
         "app.services.ai.question_paper_v2",

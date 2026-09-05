@@ -11,6 +11,11 @@ description: "Medical records, vaccination tracking, allergy alerts, health chec
 api_blueprint: "app.api.v1.health_records"
 models_module: "app.models.health_records"
 
+owns_tables:
+  - health_profiles
+  - medical_visits
+  - immunizations
+
 depends_on: []
 conflicts_with: []
 
