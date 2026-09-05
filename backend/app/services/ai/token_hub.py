@@ -254,6 +254,49 @@ def _call_groq(messages: list, model_key: str, max_tokens: int, temperature: flo
     }
 
 
+def _call_groq_stream(messages: list, model_key: str, max_tokens: int, temperature: float):
+    """Streaming Groq call — yields text deltas; final yield is the usage dict.
+
+    Same normalisation contract as ``_call_groq``: the last yielded item is a
+    dict with token counts so the caller can log/meter exactly what streamed.
+    Streaming responses carry usage only when ``stream_options`` requests it.
+    """
+    client = _get_groq_client()
+    model_id = _groq_model_id(model_key)
+    timeout = current_app.config.get("AI_TIMEOUT_FAST" if model_key == "fast" else "AI_TIMEOUT_QUALITY", 60)
+    t0 = time.time()
+    stream = client.chat.completions.create(
+        model=model_id,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        timeout=timeout,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    prompt_tokens = 0
+    completion_tokens = 0
+    for chunk in stream:
+        if getattr(chunk, "usage", None):
+            prompt_tokens = chunk.usage.prompt_tokens or prompt_tokens
+            completion_tokens = chunk.usage.completion_tokens or completion_tokens
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        piece = getattr(delta, "content", None)
+        if piece:
+            yield piece
+    yield {
+        "text": "",  # the deltas carried the text; this signals completion
+        "model": model_id,
+        "provider": "groq",
+        "prompt_tokens": prompt_tokens,
+        # Fallback estimate when the provider omits usage: chars/4 heuristic.
+        "completion_tokens": completion_tokens,
+        "latency_ms": int((time.time() - t0) * 1000),
+    }
+
+
 def _call_anthropic(messages: list, model_key: str, max_tokens: int, temperature: float) -> dict:
     """Call Anthropic Claude and return a normalised response dict."""
     client = _get_anthropic_client()
@@ -751,6 +794,118 @@ class AITokenHub:
             metadata=metadata,
         )
         return result.get("text", "")
+
+    @staticmethod
+    def stream_request(
+        school_id,
+        user_id,
+        feature: str,
+        messages: list[dict],
+        model: str = "fast",
+        max_tokens: int = 1500,
+        temperature: float = 0.7,
+        metadata: dict | None = None,
+    ):
+        """Token-streaming sibling of :meth:`request` (AI Teacher board/caption
+        sync needs first-token latency, not one-shot completion).
+
+        Yields ``str`` deltas, then one final ``dict`` with the same metering
+        fields as ``request()``. Quota: the FULL max_tokens estimate is
+        reserved up front (atomic, like request()) and reconciled to the
+        measured usage after the stream ends — a mid-stream client that
+        disappears still pays for what the provider generated.
+        """
+        if user_id is None:
+            user_id = _resolve_user_id(school_id)
+
+        est_cost = estimate_cost_usd(
+            "groq", _groq_model_id(model),
+            sum(len(str(m.get("content", ""))) for m in messages) // 4,
+            max_tokens,
+        )
+        try:
+            _check_quota(school_id, est_cost_usd=est_cost)
+        except QuotaExceededError as exc:
+            _log_call(
+                school_id=school_id,
+                user_id=user_id,
+                feature=feature,
+                model="none",
+                provider="none",
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0,
+                latency_ms=0,
+                status="quota_exceeded",
+                error_message=str(exc),
+                metadata=metadata,
+            )
+            raise
+
+        groq_key = current_app.config.get("GROQ_API_KEY", "")
+        if not groq_key:
+            raise AIProviderError(
+                "Streaming requires GROQ_API_KEY (the stream path has a "
+                "single provider — no Anthropic fallback)."
+            )
+
+        prompt_sha = hashlib.sha256(
+            "\n".join(str(m.get("content", "")) for m in messages).encode()
+        ).hexdigest()[:16]
+        log_meta = dict(metadata or {})
+        log_meta.setdefault("prompt_sha256", prompt_sha)
+
+        prompt_tokens = 0
+        completion_tokens = 0
+        model_id = _groq_model_id(model)
+        latency_ms = 0
+        status = "success"
+        error_message = None
+        try:
+            for piece in _call_groq_stream(
+                messages=messages, model_key=model,
+                max_tokens=max_tokens, temperature=temperature,
+            ):
+                if isinstance(piece, str):
+                    yield piece
+                else:
+                    prompt_tokens = piece["prompt_tokens"]
+                    completion_tokens = piece["completion_tokens"]
+                    latency_ms = piece["latency_ms"]
+        except Exception as exc:  # noqa: BLE001 — meter the failure honestly
+            status = "error"
+            error_message = str(exc)
+            raise
+        finally:
+            actual_cost = estimate_cost_usd(
+                "groq", model_id, prompt_tokens, completion_tokens
+            )
+            _log_call(
+                school_id=school_id,
+                user_id=user_id,
+                feature=feature,
+                model=model_id,
+                provider="groq",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=prompt_tokens + completion_tokens,
+                latency_ms=latency_ms,
+                status=status,
+                error_message=error_message,
+                cost_usd=actual_cost,
+                metadata=log_meta,
+            )
+            reconcile_quota_reservation(school_id, est_cost, actual_cost)
+
+        yield {
+            "text": "",
+            "model": model_id,
+            "provider": "groq",
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "latency_ms": latency_ms,
+            "cost_usd": actual_cost,
+        }
 
     # ------------------------------------------------------------------
     # Convenience helpers for admin stats

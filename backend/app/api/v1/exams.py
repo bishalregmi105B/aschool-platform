@@ -649,6 +649,15 @@ def submit_marks(exam_id):
     exam = Exam.query.get(exam_id)
     if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
         return error_response("Exam not found", 404)
+    # Marks lock: once results are published, the record is what parents and
+    # students have already seen. Editing needs an explicit admin unlock
+    # (POST /<exam_id>/marks/unlock), not a silent overwrite.
+    if exam.status == "result_published":
+        return error_response(
+            "Marks are locked: results for this exam are published. "
+            "Unlock via POST /exams/<exam_id>/marks/unlock first.",
+            409,
+        )
 
     allowed_subject_ids = []
     allowed_class_ids = []
@@ -1407,6 +1416,30 @@ def publish_results(exam_id):
     return success_response({"message": "Results published", "exam_id": str(exam_id)})
 
 
+@exams_bp.route("/<uuid:exam_id>/marks/unlock", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+@role_required("school_admin")
+def unlock_marks(exam_id):
+    """Re-open mark entry after publication (E18-marks-lock).
+
+    Deliberately explicit and admin-only: published marks may already be in
+    parents' hands, so the second, separate action is the audit trail. The
+    exam returns to `completed` — it must be re-published to go live again.
+    """
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+    if exam.status != "result_published":
+        return error_response("Marks for this exam are not locked", 400)
+    exam.status = "completed"
+    db.session.commit()
+    return success_response(
+        {"message": "Marks unlocked; re-publish results when done", "exam_id": str(exam_id)}
+    )
+
+
 # ── Report Cards ───────────────────────────────────────────
 
 
@@ -1700,6 +1733,24 @@ def _exam_dict(e):
     }
 
 
+def _student_safe_questions(questions):
+    """Strip answer keys from exam questions for non-staff tokens.
+
+    GET /exams/online/<id> serves any authenticated school member — students
+    included — so the stored `correct_answer` must never reach them. Only
+    `correct_answer` is removed (option order is kept so the student's saved
+    answer indices stay valid); grading happens server-side in
+    `_score_online_exam`, which reads the original list.
+    """
+    safe = []
+    for q in questions or []:
+        if isinstance(q, dict):
+            safe.append({k: v for k, v in q.items() if k != "correct_answer"})
+        else:
+            safe.append(q)
+    return safe
+
+
 def _online_exam_dict(exam, include_questions=False):
     data = {
         "id": str(exam.id),
@@ -1720,7 +1771,13 @@ def _online_exam_dict(exam, include_questions=False):
         "instructions": exam.instructions,
     }
     if include_questions:
-        data["questions"] = exam.questions or []
+        # Students take the exam through this endpoint; the answer key must
+        # not leave the server. Staff-side editing goes through the admin
+        # exam routes instead.
+        if g.role in ("school_admin", "teacher"):
+            data["questions"] = exam.questions or []
+        else:
+            data["questions"] = _student_safe_questions(exam.questions)
     return data
 
 

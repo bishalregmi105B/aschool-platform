@@ -526,8 +526,26 @@ def list_teacher_attendance():
     return success_response([_teacher_att_dict(a) for a in items], meta={"pagination": meta})
 
 
+@attendance_bp.route("/me", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+def my_attendance():
+    """The current staff member's own attendance records.
 
-# ── Leave Requests ─────────────────────────────────────────
+    Consumed by flutter_teacher's MyAttendanceScreen (`/attendance/me`), which
+    404'd since launch because no route served it. Same shape as /teachers/list
+    but scoped to the caller — no user_id param, no role gate beyond staff.
+    """
+    query = TeacherAttendance.query.filter_by(
+        school_id=g.school_id, user_id=g.user_id, is_deleted=False
+    )
+    attendance_date = request.args.get("date")
+    if attendance_date:
+        query = query.filter_by(date=attendance_date)
+    query = query.order_by(TeacherAttendance.date.desc())
+    items, meta = paginate(query)
+    return success_response([_teacher_att_dict(a) for a in items], meta={"pagination": meta})
 
 
 @attendance_bp.route("/leave-requests", methods=["GET"])
