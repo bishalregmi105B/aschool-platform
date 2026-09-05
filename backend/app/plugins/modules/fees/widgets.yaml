@@ -1,0 +1,248 @@
+# Widgets contributed by the fees plugin.
+#
+# Endpoints verified against app/api/v1/fees.py:
+#   /fees/summary      fees.py:387   (expected/collected/rate + by_class)
+#   /fees/recent       fees.py:549   (latest receipts)
+#   /fees/outstanding  fees.py:583   (unpaid + partial collections)
+#   /fees/defaulters   fees.py:1117  (defaulter list with contact info)
+#
+# Money widgets are the one place where a wrong number is worse than no number,
+# so every value below is bound to a server-computed field — the spec dialect
+# has no arithmetic on purpose.
+schema_version: 1
+
+widgets:
+  - key: collection_summary
+    title: "Fee Collection"
+    title_i18n: widget.collection_summary.title
+    description: "Expected vs collected, collection rate, this month"
+    type: stat-group
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.main, default: true, order: 20 }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 6, h: 2 }
+      min: { w: 3, h: 2 }
+      breakpoints:
+        sm: { w: 12, h: 2 }
+        md: { w: 6, h: 2 }
+        xl: { w: 4, h: 2 }
+    data:
+      source: api
+      endpoint: /fees/summary
+      refresh: { mode: poll, interval_s: 600 }
+      cache_ttl_s: 120
+      select: data
+    spec:
+      items:
+        - { label: "Collected", value: "$.total_collected", format: npr, tone: success, icon: Banknote }
+        - { label: "Outstanding", value: "$.total_outstanding", format: npr, tone: danger, icon: Receipt }
+        - { label: "Collection rate", value: "$.collection_rate", format: percent, tone: primary, icon: TrendingUp }
+        - { label: "This month", value: "$.this_month_collected", format: npr, tone: muted, icon: CreditCard }
+      link: { label: "Open fees", href: /dashboard/fees }
+    states:
+      empty:
+        title: "No fees raised yet"
+        body: "Create a fee structure and apply it to a class."
+        action: { label: "Fee structure", href: /dashboard/fees/structure }
+      error: { title: "Couldn't load fee summary", retry: true }
+      loading: skeleton
+      locked: { title: "Fees not installed", cta: marketplace }
+    telemetry: { impression: true, click: true }
+
+  - key: collection_by_class
+    title: "Collection by Class"
+    title_i18n: widget.collection_by_class.title
+    description: "Per-class collection rate, worst first — where to chase"
+    type: chart
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: dashboard.wide, order: 30 }
+      - { id: plugin_page.main, default: true, order: 20 }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 6, h: 4 }
+      min: { w: 4, h: 3 }
+    data:
+      source: api
+      endpoint: /fees/summary
+      select: data.by_class
+    spec:
+      chart: bar
+      x: { key: class_name, label: Class }
+      series:
+        - { key: rate, label: "Collection %", format: percent, tone: primary }
+      sort: { by: rate, direction: asc }
+    states:
+      empty: { title: "No class has fees yet" }
+      error: { title: "Couldn't load collection chart", retry: true }
+      loading: skeleton
+
+  - key: recent_payments
+    title: "Recent Payments"
+    title_i18n: widget.recent_payments.title
+    description: "The last receipts issued, newest first"
+    type: list
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.side, default: true, order: 20 }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 4, h: 4 }
+      min: { w: 3, h: 3 }
+    data:
+      source: api
+      endpoint: /fees/recent
+      params: { limit: 8 }
+      refresh: { mode: poll, interval_s: 300 }
+      select: data
+    spec:
+      item:
+        title: "$.student_name"
+        subtitle: "$.fee_type"
+        meta: "$.amount"
+        meta_format: npr
+        timestamp: "$.paid_at"
+        link: "/dashboard/students/$.student_id"
+      link: { label: "All collections", href: /dashboard/fees }
+    states:
+      empty: { title: "No payments yet", body: "Receipts appear here as fees are collected." }
+      error: { title: "Couldn't load payments", retry: true }
+      loading: skeleton
+
+  - key: defaulters_panel
+    title: "Fee Defaulters"
+    title_i18n: widget.defaulters_panel.title
+    description: "Students with outstanding fees, largest due first"
+    type: table-panel
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: plugin_page.main, order: 30 }
+      - { id: dashboard.wide, order: 40 }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 12, h: 5 }
+      min: { w: 8, h: 4 }
+    data:
+      source: api
+      endpoint: /fees/defaulters
+      pagination: { mode: server, page_param: page, size_param: per_page, default_size: 25 }
+      filters:
+        - { key: class_id, type: entity-picker, entity: class, label: Class, label_ne: "कक्षा" }
+      select: data
+    spec:
+      columns:
+        - { key: student_name, label: Student, width: 200, link: "/dashboard/students/$.student_id" }
+        - { key: class_name, label: Class, width: 120 }
+        - { key: guardian_phone, label: Guardian }
+        - { key: total_due, label: Due, format: npr, align: right, sortable: true }
+        - { key: days_overdue, label: "Days overdue", align: right, sortable: true }
+      row_actions:
+        - key: remind
+          label: "Send reminder"
+          icon: Bell
+          action:
+            kind: post
+            endpoint: "/fees/defaulters/$.student_id/remind"
+            confirm: true
+            confirm_body: "Send an SMS fee reminder to this guardian? It uses one SMS credit."
+      bulk_actions:
+        - key: remind_all
+          label: "Remind selected"
+          action:
+            kind: post_each
+            endpoint: "/fees/defaulters/$.student_id/remind"
+            confirm: true
+            confirm_body: "Send reminders to every selected guardian? One SMS credit each."
+      export: { csv: true, print: true }
+    states:
+      empty: { title: "No defaulters", body: "Every raised fee has been settled." }
+      error: { title: "Couldn't load defaulters", retry: true }
+      loading: skeleton
+
+  - key: collect_fee_action
+    title: "Collect Fee"
+    title_i18n: widget.collect_fee_action.title
+    description: "Open the counter/POS collection screen"
+    type: quick-action
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.actions, default: true, order: 20 }
+      - { id: mobile.quick_actions, order: 30 }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 3, h: 1 }
+      min: { w: 2, h: 1 }
+    spec:
+      icon: CreditCard
+      tone: success
+      label: "Collect Fee"
+      label_i18n: widget.collect_fee_action.label
+      href: /dashboard/fees/collect
+      mobile_route: /fees/collect
+
+  - key: student_fee_status
+    title: "Fees"
+    title_i18n: widget.student_fee_status.title
+    description: "This student's dues and paid total"
+    type: stat-group
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - id: student_profile.tab
+        default: true
+        order: 20
+        params_from: { student_id: "$route.id" }
+    roles: [school_admin, accountant]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 6, h: 2 }
+    data:
+      source: api
+      endpoint: /fees/outstanding
+      params: { student_id: "$context.student_id" }
+      select: data
+    spec:
+      items:
+        - { label: "Outstanding", value: "$.total_due", format: npr, tone: danger }
+        - { label: "Unpaid items", value: "$.count", tone: warning }
+      link: { label: "Collect fee", href: /dashboard/fees/collect }
+    states:
+      empty: { title: "No dues", body: "This student has nothing outstanding." }
+      error: { title: "Couldn't load fee status", retry: true }
+      loading: skeleton
+
+  - key: mobile_fee_card
+    title: "Fees"
+    title_i18n: widget.mobile_fee_card.title
+    description: "My child's outstanding fees, with a pay action"
+    type: mobile-card
+    renderer: spec
+    surfaces: [mobile]
+    slots:
+      - { id: mobile.home, default: true, order: 10 }
+    roles: [parent, student]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 12, h: 2 }
+    data:
+      source: api
+      endpoint: /parent-app/fees/summary
+      select: data
+    spec:
+      layout: stat_row
+      items:
+        - { label: "Due", value: "$.total_due", format: npr, tone: danger }
+        - { label: "Paid", value: "$.total_paid", format: npr, tone: success }
+      tap: { route: /fees }
+      action: { label: "Pay now", route: /fees/pay, tone: primary }
+    states:
+      empty: { title: "Nothing due", body: "All fees are settled." }
+      error: { title: "Couldn't load fees", retry: true }
+      loading: skeleton

@@ -1,0 +1,247 @@
+# Widgets contributed by the attendance plugin.
+#
+# Reference implementation for the widget contract
+# (audits/research/PLUGIN_THEME_TEMPLATE_ARCHITECTURE.md §2). Every endpoint
+# below is a real GET route of app/api/v1/attendance.py — verified, not
+# aspirational:
+#   /attendance/summary          attendance.py:305  (class+date counts)
+#   /attendance/school-overview  attendance.py:358  (today/week/month + by class)
+#   /attendance/list             attendance.py:260  (paginated register)
+#   /attendance/leave-requests   attendance.py:533  (approval queue)
+#   /attendance/student/<id>/summary attendance.py:232
+schema_version: 1
+
+widgets:
+  # ── Admin dashboard: the one number a head teacher opens the app for ──
+  - key: today_attendance
+    title: "Today's Attendance"
+    title_i18n: widget.today_attendance.title
+    description: "School-wide present / absent rate for today"
+    type: stat-group
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.main, default: true, order: 10 }
+    roles: [school_admin, teacher]
+    requires_permissions: []
+    size:
+      default: { w: 6, h: 2 }
+      min: { w: 3, h: 2 }
+      breakpoints:
+        sm: { w: 12, h: 2 }
+        md: { w: 6, h: 2 }
+        xl: { w: 4, h: 2 }
+    data:
+      source: api
+      endpoint: /attendance/school-overview
+      refresh: { mode: poll, interval_s: 300 }
+      cache_ttl_s: 60
+      select: data
+    spec:
+      items:
+        - { label: "Today", value: "$.summary.today_pct", format: percent, tone: primary, icon: UserCheck }
+        - { label: "This week", value: "$.summary.week_pct", format: percent, tone: success, icon: CalendarDays }
+        - { label: "This month", value: "$.summary.month_pct", format: percent, tone: muted, icon: Calendar }
+      link: { label: "Open attendance", href: /dashboard/attendance }
+    states:
+      empty:
+        title: "No attendance yet"
+        body: "Mark today's attendance to see the rate."
+        action: { label: "Mark now", href: /dashboard/attendance/mark }
+      error: { title: "Couldn't load attendance", retry: true }
+      loading: skeleton
+      locked: { title: "Attendance not installed", cta: marketplace }
+    telemetry: { impression: true, click: true }
+
+  # ── The class-by-class breakdown that tells an admin WHERE the gap is ──
+  - key: class_attendance_today
+    title: "Attendance by Class"
+    title_i18n: widget.class_attendance_today.title
+    description: "Today's present count per class, worst first"
+    type: table-panel
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: dashboard.wide, default: true, order: 20 }
+      - { id: plugin_page.main, order: 20 }
+    roles: [school_admin]
+    size:
+      default: { w: 12, h: 4 }
+      min: { w: 6, h: 3 }
+    data:
+      source: api
+      endpoint: /attendance/school-overview
+      refresh: { mode: poll, interval_s: 300 }
+      select: data.class_wise
+    spec:
+      columns:
+        - { key: class_name, label: Class, sortable: true, width: 180 }
+        - { key: total_students, label: Students, align: right }
+        - { key: present_today, label: Present, align: right }
+        - { key: present_pct, label: "%", format: percent, align: right, sortable: true }
+      export: { csv: true, print: true }
+    states:
+      empty:
+        title: "No classes with students"
+        body: "Add students to a class to see its attendance."
+        action: { label: "Open classes", href: /dashboard/academics/classes }
+      error: { title: "Couldn't load class attendance", retry: true }
+      loading: skeleton
+
+  # ── The register itself, as a plugin-page widget ──
+  - key: attendance_register
+    title: "Attendance Register"
+    title_i18n: widget.attendance_register.title
+    description: "Server-paginated attendance rows with class and date filters"
+    type: table-panel
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: plugin_page.main, default: true, order: 10 }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 12, h: 6 }
+      min: { w: 8, h: 4 }
+    data:
+      source: api
+      endpoint: /attendance/list
+      pagination: { mode: server, page_param: page, size_param: per_page, default_size: 25 }
+      filters:
+        - { key: class_id, type: entity-picker, entity: class, label: Class, label_ne: "कक्षा" }
+        - { key: date, type: date, label: Date, label_ne: "मिति", calendar: bs }
+        - { key: status, type: enum, label: Status, options: [present, absent, late, half_day, leave] }
+      select: data
+    spec:
+      columns:
+        - { key: student_name, label: Student, width: 220, link: "/dashboard/students/$.student_id" }
+        - { key: date, label: Date, format: bs_date }
+        - { key: status, label: Status, format: status_pill, map: { present: success, absent: danger, late: warning, half_day: warning, leave: muted } }
+        - { key: remarks, label: Remarks }
+      export: { csv: true, print: true }
+    states:
+      empty:
+        title: "Nothing marked for this filter"
+        body: "Pick another class or date, or mark attendance now."
+        action: { label: "Mark attendance", href: /dashboard/attendance/mark }
+      error: { title: "Couldn't load the register", retry: true }
+      loading: skeleton
+
+  # ── The approval queue that has a full backend and zero UI today ──
+  - key: pending_leave_requests
+    title: "Leave Requests"
+    title_i18n: widget.pending_leave_requests.title
+    description: "Pending leave requests awaiting approval"
+    type: list
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.side, default: true, order: 30 }
+      - { id: plugin_page.main, order: 30 }
+    roles: [school_admin]
+    size:
+      default: { w: 4, h: 4 }
+      min: { w: 3, h: 3 }
+    data:
+      source: api
+      endpoint: /attendance/leave-requests
+      params: { status: pending }
+      refresh: { mode: poll, interval_s: 600 }
+      select: data
+    spec:
+      item:
+        title: "$.applicant_name"
+        subtitle: "$.leave_type · $.from_date → $.to_date"
+        meta: "$.days"
+        badge: { value: "$.status", format: status_pill, map: { pending: warning, approved: success, rejected: danger } }
+      actions:
+        - { key: approve, label: Approve, tone: success, action: { kind: post, endpoint: "/attendance/leave-requests/$.id/approve", confirm: false } }
+        - { key: reject, label: Reject, tone: danger, action: { kind: form, fields: [{ key: reason, type: text, label: "Reason", required: true }], endpoint: "/attendance/leave-requests/$.id/reject" } }
+      link: { label: "All leave requests", href: /dashboard/attendance/leave-requests }
+    states:
+      empty: { title: "No pending requests", body: "Every leave request has been decided." }
+      error: { title: "Couldn't load leave requests", retry: true }
+      loading: skeleton
+
+  # ── Student profile tab: one student's attendance history ──
+  - key: student_attendance_summary
+    title: "Attendance"
+    title_i18n: widget.student_attendance_summary.title
+    description: "This student's attendance rate and absence count"
+    type: stat-group
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - id: student_profile.tab
+        default: true
+        order: 10
+        params_from: { student_id: "$route.id" }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 6, h: 2 }
+    data:
+      source: api
+      endpoint: /attendance/student/$context.student_id/summary
+      select: data
+    spec:
+      items:
+        - { label: "Attendance", value: "$.attendance_rate", format: percent, tone: primary }
+        - { label: "Present days", value: "$.present", tone: success }
+        - { label: "Absent days", value: "$.absent", tone: danger }
+        - { label: "Late", value: "$.late", tone: warning }
+    states:
+      empty: { title: "No attendance records", body: "This student has no marked days yet." }
+      error: { title: "Couldn't load attendance", retry: true }
+      loading: skeleton
+
+  # ── Quick action: the daily flow, one tap from anywhere ──
+  - key: mark_attendance_action
+    title: "Mark Attendance"
+    title_i18n: widget.mark_attendance_action.title
+    description: "Jump straight to today's marking grid"
+    type: quick-action
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.actions, default: true, order: 10 }
+      - { id: mobile.quick_actions, default: true, order: 10 }
+    roles: [school_admin, teacher]
+    size:
+      default: { w: 3, h: 1 }
+      min: { w: 2, h: 1 }
+    spec:
+      icon: ClipboardCheck
+      tone: primary
+      label: "Mark Attendance"
+      label_i18n: widget.mark_attendance_action.label
+      href: /dashboard/attendance/mark
+      mobile_route: /attendance/mark
+
+  # ── Parent/student mobile home card ──
+  - key: mobile_attendance_card
+    title: "Attendance"
+    title_i18n: widget.mobile_attendance_card.title
+    description: "My/my child's attendance this month"
+    type: mobile-card
+    renderer: spec
+    surfaces: [mobile]
+    slots:
+      - { id: mobile.home, default: true, order: 20 }
+    roles: [parent, student]
+    size:
+      default: { w: 12, h: 2 }
+      min: { w: 12, h: 2 }
+    data:
+      source: api
+      endpoint: /attendance/student/$context.student_id/summary
+      select: data
+    spec:
+      layout: stat_row
+      items:
+        - { label: "This month", value: "$.attendance_rate", format: percent }
+        - { label: "Absences", value: "$.absent" }
+      tap: { route: /attendance }
+    states:
+      empty: { title: "No records yet" }
+      error: { title: "Couldn't load attendance", retry: true }
+      loading: skeleton

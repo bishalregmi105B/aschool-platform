@@ -79,3 +79,9 @@ gui-test-screenshots/
 backend/tmp_*_verify.py
 .playwright-mcp/
 nginx/app-web/
+
+# Next.js local build isolation dir (dist overridden out of the tree via tsconfig)
+frontend/tmp/
+
+# Nepal textbook source corpus (content-entry source data, not platform code)
+nepal_textbooks/
