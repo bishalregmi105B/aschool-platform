@@ -393,15 +393,41 @@ def create_lesson():
     lesson.status = "ready"
     db.session.commit()
 
+    # Player embed: the player is a Flutter-web build on ITS OWN origin,
+    # launched by query params (W4/A2 §5) — context is pulled service-side
+    # from the session row, so nothing content-bearing goes in the URL.
+    # The 24h service token must reach the browser for the player's API
+    # calls; the dashboard CSP needs frame-src for the player origin.
     player_base = (_cfg("player_base_url", "") or "").rstrip("/")
-    player_url = (
-        f"{player_base}/embed#lesson={lesson.id}" if player_base else None
-    )
+    player_url = None
+    service_token = result.get("service_token")
+    if player_base and lesson.service_session_id:
+        from urllib.parse import urlencode
+
+        player_url = (
+            f"{player_base}?"
+            + urlencode(
+                {
+                    "session_id": lesson.service_session_id,
+                    "token": service_token or "",
+                    "topic": lesson.topic,
+                    "user_id": str(lesson.student_user_id or lesson.created_by_id),
+                    "autostart": "true",
+                }
+            )
+        )
     return created_response(
         {
             "lesson_id": str(lesson.id),
             "player_url": player_url,
-            "socket_room": f"lesson:{lesson.id}",
+            "service_session_id": lesson.service_session_id,
+            # Live monitoring rooms are the service's own socket rooms
+            # (keyed by service_session_id), not host-invented lesson rooms.
+            "socket_room": (
+                f"lesson:{lesson.service_session_id}"
+                if lesson.service_session_id
+                else None
+            ),
             "status": lesson.status,
             "estimated_cost_npr": estimated_npr,
             "grounded": grounded,
@@ -589,6 +615,12 @@ def webhook_lesson_event():
     secrets_map = current_app.config.get("ASCHOOL_AI_TEACHER_WEBHOOK_SECRETS", {})
     secret = secrets_map.get(key_id)
     if not secret:
+        # Deployment map not populated → fall back to the encrypted envelope
+        # provisioning stored in the school's ai_teacher plugin config
+        # (hooks._provision_school). HMAC needs the plaintext, which sha256
+        # can never recover — hence the decryptable copy.
+        secret = _webhook_secret_for_key(key_id)
+    if not secret:
         return error_response("Unknown service key", 401)
     try:
         ts = int(timestamp)
@@ -725,6 +757,27 @@ def webhook_lesson_event():
     )
     db.session.commit()
     return success_response({"received": True})
+
+
+def _webhook_secret_for_key(key_id: str) -> str | None:
+    """Plaintext webhook secret for a service key_id, from the encrypted
+    envelope provisioning stored in the owning school's plugin config.
+    None when the key is unknown or the envelope is unreadable (rotated
+    platform key) — the caller then 401s honestly."""
+    from app.models.ai_teacher import AITeacherServiceKey
+    from app.models.plugin import SchoolPlugin
+    from app.plugins.config_schema import decrypt_secret
+
+    key = AITeacherServiceKey.query.filter_by(key_id=key_id).first()
+    if not key:
+        return None
+    sp = SchoolPlugin.query.filter_by(
+        school_id=key.school_id, plugin_slug="ai_teacher"
+    ).first()
+    envelope = (sp.config or {}).get("webhook_secret") if sp else None
+    if not isinstance(envelope, dict):
+        return None
+    return decrypt_secret(envelope)
 
 
 def _upsert_mastery(lesson, payload):
