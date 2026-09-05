@@ -1,31 +1,36 @@
 slug: biometric
-name: "Biometric Integration"
-name_nepali: "बायोमेट्रिक इन्टिग्रेसन"
+name: Biometric Integration
+name_nepali: बायोमेट्रिक इन्टिग्रेसन
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "✋"
-icon: "Fingerprint"
-description: "ZKTeco fingerprint attendance"
-
-api_blueprint: "app.plugins.modules.biometric.routes"
-models_module: "app.models.attendance"
-
+emoji: ✋
+icon: Fingerprint
+description: ZKTeco fingerprint attendance
 depends_on:
-  - attendance
+- attendance
 conflicts_with: []
-
-frontend:
-  route: "/biometric"
-  sidebar:
-    section: "Operations"
-    label: "Biometric"
-    label_nepali: "बायोमेट्रिक"
-    icon: "Fingerprint"
+capabilities:
+  api_blueprint: app.plugins.modules.biometric.routes
+  models_module: app.models.attendance
+ui:
+  nav:
+    route: /biometric
+    section: Operations
+    label: Biometric
+    label_nepali: बायोमेट्रिक
+    icon: Fingerprint
+    visible_to:
+    - school_admin
     subitems:
-      - { label: "Devices", route: "/biometric/devices" }
-      - { label: "Sync Logs", route: "/biometric/logs" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app: { feature_folder: "biometric", tabs: ["Devices", "Sync Logs"] }
+    - label: Devices
+      route: /biometric/devices
+    - label: Sync Logs
+      route: /biometric/logs
+mobile:
+  admin:
+    feature_folder: biometric
+    tabs:
+    - Devices
+    - Sync Logs
+schema_version: 2

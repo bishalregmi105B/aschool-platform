@@ -1,48 +1,53 @@
 slug: website_builder
-name: "Advanced Website Builder"
-name_nepali: "उन्नत वेबसाइट निर्माता"
+name: Advanced Website Builder
+name_nepali: उन्नत वेबसाइट निर्माता
 category: premium
 price_monthly: 299
 price_yearly: 2990
-emoji: "🎨"
-icon: "PaintBucket"
-description: "10 open-source school themes, drag-drop Craft.js editor, custom CSS, AI content generation, SEO tools, contact forms"
-
-api_blueprint: "app.api.v1.website_builder"
-models_module: "app.models.website"
-services:
-  - "app.services.website.theme_engine"
-  - "app.services.website.website_builder"
-
+emoji: 🎨
+icon: PaintBucket
+description: 10 open-source school themes, drag-drop Craft.js editor, custom CSS,
+  AI content generation, SEO tools, contact forms
 depends_on:
-  - basic_website
+- basic_website
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/website-builder"
-  sidebar:
-    section: "Design & Web"
-    label: "Website"
-    label_nepali: "वेबसाइट"
-    icon: "Globe"
-    subitems:
-      - { label: "Editor", route: "/dashboard/website-builder/editor" }
-      - { label: "Pages", route: "/dashboard/website-builder/pages" }
-      - { label: "Themes", route: "/dashboard/website-builder/themes" }
-      - { label: "SEO", route: "/dashboard/website-builder/seo" }
-      - { label: "AI Builder", route: "/dashboard/website-builder/ai-builder" }
-      - { label: "Website Settings", route: "/dashboard/settings/website-design" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "website_builder", tabs: ["Preview", "Quick Edit"] }
-  teacher_app: null
-  parent_app: null
-  student_app: null
-
 events:
   emits:
-    - "website.page_published"
+  - website.page_published
   listens:
-    - "notice.published"
+  - notice.published
+capabilities:
+  api_blueprint: app.api.v1.website_builder
+  models_module: app.models.website
+  services:
+  - app.services.website.theme_engine
+  - app.services.website.website_builder
+ui:
+  nav:
+    route: /dashboard/website-builder
+    section: Design & Web
+    label: Website
+    label_nepali: वेबसाइट
+    icon: Globe
+    visible_to:
+    - school_admin
+    subitems:
+    - label: Editor
+      route: /dashboard/website-builder/editor
+    - label: Pages
+      route: /dashboard/website-builder/pages
+    - label: Themes
+      route: /dashboard/website-builder/themes
+    - label: SEO
+      route: /dashboard/website-builder/seo
+    - label: AI Builder
+      route: /dashboard/website-builder/ai-builder
+    - label: Website Settings
+      route: /dashboard/settings/website-design
+mobile:
+  admin:
+    feature_folder: website_builder
+    tabs:
+    - Preview
+    - Quick Edit
+schema_version: 2

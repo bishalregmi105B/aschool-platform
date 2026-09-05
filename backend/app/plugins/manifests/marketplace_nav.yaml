@@ -1,23 +1,20 @@
 slug: marketplace_nav
-name: "Plugin Marketplace"
-name_nepali: "मार्केटप्लेस"
+name: Plugin Marketplace
+name_nepali: मार्केटप्लेस
 category: core
 price_monthly: 0
 price_yearly: 0
 is_free: true
-emoji: "🛒"
-icon: "Package"
-description: "Browse and install school management plugins"
-
+emoji: 🛒
+icon: Package
+description: Browse and install school management plugins
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/marketplace"
-  sidebar:
-    label: "Marketplace"
-    label_nepali: "मार्केटप्लेस"
-    icon: "Package"
-    section: "bottom_nav"
-    subitems: []
-    visible_to: []
+ui:
+  nav:
+    route: /marketplace
+    section: bottom_nav
+    label: Marketplace
+    label_nepali: मार्केटप्लेस
+    icon: Package
+schema_version: 2

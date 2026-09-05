@@ -1,28 +1,34 @@
 slug: settings_core
-name: "Settings"
-name_nepali: "सेटिङ"
+name: Settings
+name_nepali: सेटिङ
 category: core
 price_monthly: 0
 price_yearly: 0
 is_free: true
-emoji: "⚙️"
-icon: "Settings"
-description: "School settings, notifications, roles, integrations"
-
+emoji: ⚙️
+icon: Settings
+description: School settings, notifications, roles, integrations
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/settings"
-  sidebar:
-    label: "Settings"
-    label_nepali: "सेटिङ"
-    icon: "Settings"
-    section: "bottom_nav"
+ui:
+  nav:
+    route: /settings
+    section: bottom_nav
+    label: Settings
+    label_nepali: सेटिङ
+    icon: Settings
+    visible_to:
+    - superadmin
+    - school_admin
     subitems:
-      - { label: "General Settings",      route: "/settings" }
-      - { label: "Notification Settings", route: "/settings/notifications" }
-      - { label: "Roles & Permissions",   route: "/settings/roles" }
-      - { label: "Integrations",          route: "/settings/integrations" }
-      - { label: "Database Backup",       route: "/settings/backup" }
-    visible_to: ["superadmin", "school_admin"]
+    - label: General Settings
+      route: /settings
+    - label: Notification Settings
+      route: /settings/notifications
+    - label: Roles & Permissions
+      route: /settings/roles
+    - label: Integrations
+      route: /settings/integrations
+    - label: Database Backup
+      route: /settings/backup
+schema_version: 2

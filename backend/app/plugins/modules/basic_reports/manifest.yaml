@@ -1,44 +1,44 @@
 slug: basic_reports
-name: "Basic Reports"
-name_nepali: "आधारभूत प्रतिवेदन"
+name: Basic Reports
+name_nepali: आधारभूत प्रतिवेदन
 category: core
 price_monthly: 0
 price_yearly: 0
 is_free: true
-emoji: "📊"
-icon: "BarChart3"
-description: "Attendance summaries, fee collection overview, student count reports"
-
-api_blueprint: "app.api.v1.reports"
-models_module: "app.models.analytics"
-
+emoji: 📊
+icon: BarChart3
+description: Attendance summaries, fee collection overview, student count reports
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/reports"
-  sidebar:
-    section: "Insights"
-    label: "Reports"
-    label_nepali: "प्रतिवेदन"
-    icon: "BarChart3"
-    # E236: only exam/expense/teacher report pages exist — the
-    # attendance/fees/students child routes were 404s.
-    subitems:
-      - { label: "Exam Reports", route: "/dashboard/reports/exam" }
-      - { label: "Expense Reports", route: "/dashboard/reports/expense" }
-      - { label: "Teacher Reports", route: "/dashboard/reports/teacher" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "reports", tabs: ["Overview", "Attendance", "Fees"] }
-  teacher_app: null
-  parent_app: null
-  student_app: null
-
 events:
   emits: []
   listens:
-    - "attendance.marked"
-    - "fees.collected"
+  - attendance.marked
+  - fees.collected
+capabilities:
+  api_blueprint: app.api.v1.reports
+  models_module: app.models.analytics
+ui:
+  nav:
+    route: /dashboard/reports
+    section: Insights
+    label: Reports
+    label_nepali: प्रतिवेदन
+    icon: BarChart3
+    visible_to:
+    - school_admin
+    subitems:
+    - label: Exam Reports
+      route: /dashboard/reports/exam
+    - label: Expense Reports
+      route: /dashboard/reports/expense
+    - label: Teacher Reports
+      route: /dashboard/reports/teacher
+mobile:
+  admin:
+    feature_folder: reports
+    tabs:
+    - Overview
+    - Attendance
+    - Fees
+schema_version: 2

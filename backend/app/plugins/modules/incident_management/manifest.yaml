@@ -1,39 +1,44 @@
 slug: incident_management
-name: "Full Incident Management"
-name_nepali: "पूर्ण घटना व्यवस्थापन"
+name: Full Incident Management
+name_nepali: पूर्ण घटना व्यवस्थापन
 category: growth
 price_monthly: 199
 price_yearly: 1990
-emoji: "📋"
-icon: "ShieldAlert"
-description: "Full behavior management — witnesses, escalation, parent conferences"
-
-api_blueprint: "app.plugins.modules.incident_management.routes"
-models_module: "app.models.incident"
-
+emoji: 📋
+icon: ShieldAlert
+description: Full behavior management — witnesses, escalation, parent conferences
 depends_on:
-  - incidents
+- incidents
 conflicts_with: []
-
-frontend:
-  route: "/incident-management"
-  sidebar:
-    section: "Safety & Compliance"
-    section: "Safety & Compliance"
-    label: "Incident Mgmt"
-    label_nepali: "घटना व्यवस्थापन"
-    icon: "ShieldAlert"
+capabilities:
+  api_blueprint: app.plugins.modules.incident_management.routes
+  models_module: app.models.incident
+ui:
+  nav:
+    route: /incident-management
+    section: Safety & Compliance
+    label: Incident Mgmt
+    label_nepali: घटना व्यवस्थापन
+    icon: ShieldAlert
+    visible_to:
+    - school_admin
     subitems:
-      - { label: "Active Cases", route: "/incident-management/active" }
-      - { label: "Escalations", route: "/incident-management/escalations" }
-      - { label: "Reports", route: "/incident-management/reports" }
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    {
-      feature_folder: "incident_management",
-      tabs: ["Cases", "Escalations", "Reports"],
-    }
-  teacher_app:
-    { feature_folder: "incident_management", tabs: ["Report", "My Cases"] }
+    - label: Active Cases
+      route: /incident-management/active
+    - label: Escalations
+      route: /incident-management/escalations
+    - label: Reports
+      route: /incident-management/reports
+mobile:
+  admin:
+    feature_folder: incident_management
+    tabs:
+    - Cases
+    - Escalations
+    - Reports
+  teacher:
+    feature_folder: incident_management
+    tabs:
+    - Report
+    - My Cases
+schema_version: 2

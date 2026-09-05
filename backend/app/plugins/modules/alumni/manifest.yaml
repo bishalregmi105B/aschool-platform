@@ -1,31 +1,31 @@
 slug: alumni
-name: "Alumni Network"
-name_nepali: "पूर्व विद्यार्थी नेटवर्क"
+name: Alumni Network
+name_nepali: पूर्व विद्यार्थी नेटवर्क
 category: growth
 price_monthly: 149
 price_yearly: 1490
-emoji: "🎓"
-icon: "Users"
-description: "Alumni portal, mentoring, events, donation tracking"
-
-api_blueprint: "app.api.v1.alumni"
-models_module: "app.models.alumni"
-
+emoji: 🎓
+icon: Users
+description: Alumni portal, mentoring, events, donation tracking
 depends_on: []
 conflicts_with: []
-
-frontend:
-  route: "/dashboard/alumni"
-  sidebar:
-    section: "Growth"
-    label: "Alumni"
-    label_nepali: "पूर्व विद्यार्थी"
-    icon: "GraduationCap"
-    # E236: single-page feature — the directory/events/donations child
-    # routes never existed as pages (404). No subitems → direct link.
-    subitems: []
-    visible_to: ["school_admin"]
-
-flutter:
-  admin_app:
-    { feature_folder: "alumni", tabs: ["Directory", "Events", "Donations"] }
+capabilities:
+  api_blueprint: app.api.v1.alumni
+  models_module: app.models.alumni
+ui:
+  nav:
+    route: /dashboard/alumni
+    section: Growth
+    label: Alumni
+    label_nepali: पूर्व विद्यार्थी
+    icon: GraduationCap
+    visible_to:
+    - school_admin
+mobile:
+  admin:
+    feature_folder: alumni
+    tabs:
+    - Directory
+    - Events
+    - Donations
+schema_version: 2
