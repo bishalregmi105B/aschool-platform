@@ -100,6 +100,25 @@ class AIToolRegistry(BaseModel):
     status = Column(String(20), default="beta")         # beta|ga|disabled
     is_fixture = Column(Boolean, default=False)         # the AW-01 CI fixture tool
 
+    # ── Catalog columns (D1 §C.3 + D3 §D.1) ────────────────────────────
+    # trigger_phrases: JSON array — the claude-skills "description is the
+    # router" convention; the AI chat routes intent → tool via these.
+    trigger_phrases = Column(JSONB, nullable=False, default=list)
+    # budget: tier0 deterministic … tier4 audio/batch — cost badge + caps
+    budget = Column(String(10), nullable=False, default="tier1")
+    failure_modes = Column(Text)                        # recorded pitfalls
+    reference_pack = Column(String(80))                 # app/prompts/refs/<pack>/
+    # output_document_type routes the result to a document emitter
+    output_document_type = Column(String(20), nullable=False, default="none")
+    # ui_type decides which result component renders (web + apps)
+    ui_type = Column(String(30), nullable=False, default="form")
+    icon = Column(String(16))                           # catalog glyph (emoji)
+    sort_order = Column(Integer, default=0)
+    badge = Column(String(20))                          # popular|new|smart|beta|free
+    input_schema_name = Column(String(100))             # drives the generated form
+    # grounding: required (422 without published chapter) | optional | none
+    grounding = Column(String(12), nullable=False, default="optional")
+
     def to_dict(self):
         return {
             "tool_key": self.tool_key,
@@ -107,8 +126,16 @@ class AIToolRegistry(BaseModel):
             "name_ne": self.name_ne,
             "category": self.category,
             "description": self.description,
+            "description_ne": self.description_ne,
             "min_plan_tier": self.min_plan_tier,
             "status": self.status,
+            "ui_type": self.ui_type,
+            "icon": self.icon,
+            "badge": self.badge,
+            "budget": self.budget,
+            "grounding": self.grounding,
+            "sort_order": self.sort_order or 0,
+            "output_document_type": self.output_document_type,
         }
 
 

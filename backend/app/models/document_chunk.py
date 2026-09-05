@@ -7,11 +7,16 @@ filter school_id (tenant isolation, CI gate d).
 from sqlalchemy import Column, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from app.models.base import SchoolModel
+from app.models.base import BaseModel, SchoolModel
 
 
-class DocumentChunk(SchoolModel):
+class DocumentChunk(BaseModel):
+    """RAG chunk. school_id NULL = platform content (PD framework, CDC
+    policy) — retrievable by every school alongside its own rows."""
+
     __tablename__ = "document_chunks"
+
+    school_id = Column(UUID(as_uuid=True), ForeignKey("schools.id"), nullable=True, index=True)
 
     source_type = Column(
         String(30), nullable=False

@@ -162,6 +162,51 @@ SCHEMAS = {
         "required": ["echo"],
         "properties": {"echo": {"type": "string"}},
     },
+    # ── Generic document schema (D-2): one shape for the text-output tools ──
+    # {title, sections:[{heading, body:[...]}], follow_ups?} — the result
+    # template renders it; per-tool prompts define the content contract.
+    "doc_sections": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "heading": {"type": "string"},
+                        "body": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["heading", "body"],
+                },
+            },
+            "follow_ups": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["title", "sections"],
+    },
+    # item_analysis: deterministic-leaning analysis of question performance
+    "item_analysis": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question_ref": {"type": "string"},
+                        "difficulty_index": {"type": "number"},
+                        "discrimination": {"type": "number"},
+                        "verdict": {"type": "string"},
+                        "action": {"type": "string"},
+                    },
+                    "required": ["question_ref", "verdict", "action"],
+                },
+            },
+            "summary": {"type": "string"},
+        },
+        "required": ["title", "items", "summary"],
+    },
 }
 
 REQUIRED = {
