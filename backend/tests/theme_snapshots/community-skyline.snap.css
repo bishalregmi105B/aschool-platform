@@ -1,0 +1,53 @@
+:root {
+  --color-primary: #4aa0d7;
+  --color-secondary: #21577a;
+  --color-accent: #474b4e;
+  --color-bg: #f9fcff;
+  --color-text: #393939;
+  --font-heading: 'Roboto', sans-serif;
+  --font-body: 'Roboto', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--color-primary);
+}
+
+a { color: var(--color-secondary); }
+a:hover { color: var(--color-primary); }
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.navbar {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: white;
+  padding: 1rem 2rem;
+}
+
+.footer {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 2rem;
+}
