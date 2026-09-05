@@ -49,7 +49,21 @@ def get_plugin_config(school_id: str, plugin_slug: str) -> dict:
 def plugin_config_value(
     school_id: str, plugin_slug: str, dotted_key: str, default=None
 ):
-    """Value of one (possibly nested) plugin-config key, or the default."""
-    return get_dotted(
-        get_plugin_config(school_id, plugin_slug), dotted_key, default
-    )
+    """Value of one (possibly nested) plugin-config key, or the default.
+
+    Delegates to config_schema.resolve_config so schema defaults apply at
+    read time — consumers never need hardcoded fallbacks (PTTA §3.7).
+    """
+    try:
+        from app.plugins import config_schema
+
+        resolved = config_schema.resolve_config(plugin_slug, school_id)
+        value = get_dotted(resolved, dotted_key, _MISSING)
+        return default if value is _MISSING else value
+    except Exception:  # noqa: BLE001 — config reads are best-effort
+        return get_dotted(
+            get_plugin_config(school_id, plugin_slug), dotted_key, default
+        )
+
+
+_MISSING = object()
