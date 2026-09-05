@@ -682,6 +682,7 @@ def _leave_dict(lr):
     return {
         "id": str(lr.id),
         "user_id": str(lr.user_id) if lr.user_id else None,
+        "staff_name": lr.user.full_name if getattr(lr, "user", None) else None,
         "leave_type": lr.leave_type,
         "start_date": str(lr.start_date),
         "end_date": str(lr.end_date),
