@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,15 +157,13 @@ function AttendanceContent() {
     }
   }, [existing, date, classId]);
 
-  // Default all to present when new class/date selected
+  // A fresh roster starts with NO status anywhere — the old silent
+  // all-present default fabricated attendance for students the teacher
+  // never saw. Save refuses until every student is marked explicitly.
   useEffect(() => {
     if (students?.length && !existing?.length) {
-      const map: Record<string, AttendanceStatus> = {};
-      students.forEach((s: any) => {
-        map[s.id] = "present";
-      });
-      setRecords(map);
-      setHasChanges(true);
+      setRecords({});
+      setHasChanges(false);
     }
   }, [students, existing]);
 
@@ -199,6 +198,34 @@ function AttendanceContent() {
   const leave = studentList.filter(
     (s: any) => records[s.id] === "leave",
   ).length;
+  const unmarkedCount = studentList.filter((s: any) => !records[s.id]).length;
+
+  /** Row keyboard marking: with a row focused, P/A/L/E (or 1-4) set the
+   *  status and jump to the next row — the typist flow, no mouse needed. */
+  const onRowKeyDown = useCallback(
+    (e: ReactKeyboardEvent, index: number) => {
+      const key = e.key.toLowerCase();
+      const byKey: Record<string, AttendanceStatus> = {
+        p: "present", "1": "present",
+        a: "absent", "2": "absent",
+        l: "late", "3": "late",
+        e: "leave", "4": "leave",
+      };
+      const status = byKey[key];
+      const rows = document.querySelectorAll<HTMLElement>("[data-att-row]");
+      if (status && studentList[index]) {
+        e.preventDefault();
+        setStatus(studentList[index].id, status);
+        rows[index + 1]?.focus();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        rows[index + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+      }
+    },
+    [setStatus, studentList],
+  );
   // Matches the backend uniform late rule (/attendance/summary): a late
   // student DID attend, so the rate counts present + late.
   const percentage =
@@ -212,7 +239,9 @@ function AttendanceContent() {
         class_id: s.class_id || classId,
         section_id:
           s.section_id || (sectionId !== "all" ? sectionId : undefined),
-        status: records[s.id] || "present",
+        // Save is gated on unmarkedCount === 0; the record map always has a
+        // real status when this runs (no silent present-default).
+        status: records[s.id],
         date,
       }));
       return api.post("/attendance/mark", {
@@ -233,6 +262,7 @@ function AttendanceContent() {
   });
 
   const isReady = classId !== "none";
+  const confirm = useConfirm();
 
   return (
     <div className="space-y-5">
@@ -343,7 +373,17 @@ function AttendanceContent() {
                   ✓ All Present
                 </button>
                 <button
-                  onClick={() => markAll("absent")}
+                  onClick={async () => {
+                    // One mis-click here sends absence alerts to every
+                    // guardian (push+SMS+in-app) — it must be confirmed.
+                    const ok = await confirm({
+                      title: "Mark ALL students absent?",
+                      body: `${total} students will be marked absent and guardians will be notified. This is rarely what you want — use it only when the whole class is genuinely out.`,
+                      confirmLabel: "Mark all absent",
+                      tone: "danger",
+                    });
+                    if (ok) markAll("absent");
+                  }}
                   disabled={!isReady || !total}
                   className="flex-1 h-9 rounded-md bg-red-500 text-white text-xs font-medium hover:bg-red-600 disabled:opacity-40"
                 >
@@ -450,15 +490,23 @@ function AttendanceContent() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {studentList.map((s: any) => {
-                        const status: AttendanceStatus =
-                          records[s.id] || "present";
+                      {studentList.map((s: any, index: number) => {
+                        const status: AttendanceStatus | undefined =
+                          records[s.id];
                         const current = STATUS_OPTIONS.find(
                           (o) => o.value === status,
-                        )!;
+                        );
 
                         return (
-                          <TableRow key={s.id}>
+                          <TableRow
+                            key={s.id}
+                            data-att-row
+                            tabIndex={0}
+                            onKeyDown={(e) => onRowKeyDown(e, index)}
+                            className={`focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+                              !status ? "bg-amber-50/50 dark:bg-amber-950/20" : ""
+                            }`}
+                          >
                             <TableCell className="text-center font-mono text-xs text-muted-foreground">
                               {s.roll_number || "—"}
                             </TableCell>
@@ -506,10 +554,23 @@ function AttendanceContent() {
                 <div className="text-sm text-muted-foreground">
                   {present} present, {absent} absent, {late} late, {leave} on
                   leave
+                  {unmarkedCount > 0 && (
+                    <span className="ml-2 font-medium text-amber-600">
+                      · {unmarkedCount} UNMARKED
+                    </span>
+                  )}
                 </div>
                 <Button
-                  onClick={() => saveMutation.mutate()}
-                  disabled={saveMutation.isPending}
+                  onClick={() => {
+                    if (unmarkedCount > 0) {
+                      toast.error(
+                        `${unmarkedCount} student${unmarkedCount === 1 ? "" : "s"} not marked yet — every student needs an explicit status before saving.`,
+                      );
+                      return;
+                    }
+                    saveMutation.mutate();
+                  }}
+                  disabled={saveMutation.isPending || unmarkedCount > 0}
                   className="gap-2"
                 >
                   {saveMutation.isPending ? (
