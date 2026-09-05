@@ -24,7 +24,18 @@ def _backend() -> str:
 
 
 def _local_upload_dir() -> str:
-    base = os.getenv("LOCAL_UPLOAD_DIR", "/app/uploads")
+    """Upload root, in priority order:
+    1. LOCAL_UPLOAD_DIR env (prod compose pins /app/uploads);
+    2. /app/uploads when running inside the container (/app exists);
+    3. <repo>/backend/uploads for host-side dev/tests — the previous
+       unconditional /app default made every local PDF export 500 with a
+       PermissionError trying to create /app/uploads."""
+    base = os.getenv("LOCAL_UPLOAD_DIR")
+    if not base:
+        if os.path.isdir("/app"):
+            base = "/app/uploads"
+        else:
+            base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
     os.makedirs(base, exist_ok=True)
     return base
 
