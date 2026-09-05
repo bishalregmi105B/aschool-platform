@@ -1,5 +1,12 @@
 """Pytest configuration and shared fixtures for ASchool backend tests."""
+import os
+import tempfile
 import uuid
+
+# Uploads must land in a per-run temp dir BEFORE create_app runs: the default
+# dirs (/app/uploads in containers, backend/uploads on the host) may not be
+# writable by the user running tests, which 500'd every PDF-export test.
+os.environ.setdefault("LOCAL_UPLOAD_DIR", tempfile.mkdtemp(prefix="aschool-test-uploads-"))
 
 import pytest
 from sqlalchemy import text

@@ -32,6 +32,7 @@ STATICALLY_MOUNTED_MODULES = {
     "app.api.v1.benchmarking",
     "app.api.v1.design_studio",
     "app.api.v1.ai_usage",
+    "app.api.v1.ai_tools",
     "app.api.v1.notifications",
     "app.api.v1.faqs",
     "app.api.v1.db_backup_api",
@@ -107,6 +108,14 @@ api_v1_bp.register_blueprint(design_studio_bp)
 # Additional plugin API routes are registered dynamically by PluginLoader.discover_and_register()
 # See: app/plugins/loader.py
 # Plugin blueprints: attendance_bp, notices_bp, fees_bp, exams_bp, reports_bp, website_bp, etc.
+
+# AI tools routes (W0 close fix): the ai_suite consolidation deleted the old
+# ai_tools/ai_tutor/ai_insights MODULES but their routes never moved — this
+# blueprint hosts /ai-tools/* (lesson-plan, flashcards, question-paper v2,
+# remarks, insights, question-bank …) and must stay mounted; access gating is
+# @plugin_required("ai_suite") per route (ai_suite owns the gate, not this file).
+from app.api.v1.ai_tools import ai_tools_bp
+api_v1_bp.register_blueprint(ai_tools_bp)
 
 # AI Token Hub — admin stats & quota management (always registered, not plugin-gated)
 from app.api.v1.ai_usage import ai_usage_bp
