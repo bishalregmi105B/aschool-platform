@@ -9,6 +9,16 @@
 
 | Date | Audit Document | Description | Scope |
 | :--- | :--- | :--- | :--- |
+| **2026-09-05** | [**`research/UNIFIED_ROADMAP_2026-09.md`**](research/UNIFIED_ROADMAP_2026-09.md) | **Roadmap v3 FINAL** — reconciled plan of record after the full re-audit; build progress ledger included. | Full Stack, Plan |
+| **2026-09-05** | [`research/_digest/D1_AITEACHER_AND_TOOLS.md`](research/_digest/D1_AITEACHER_AND_TOOLS.md) | AI Teacher plugin contract (topology, endpoints, DDL, catalog 153 tools, deck/document emitter contract) + staleness ledger vs the 2026-09-04 corpus. | AI Teacher, ai_suite, teaching-content |
+| **2026-09-05** | [`research/_digest/D2_ARCHITECTURE_AND_ENGINE.md`](research/_digest/D2_ARCHITECTURE_AND_ENGINE.md) | Plugin/theme/widget/config v2 contract + ATeacher engine internals (board grammar, prompts, defect list) + public-site parity lock. | Plugin Architecture, ATeacher |
+| **2026-09-05** | [`research/_digest/D3_SAHAYATRI_PLUGIN_SPEC.md`](research/_digest/D3_SAHAYATRI_PLUGIN_SPEC.md) | Sahayatri→ASchool implementation spec: scope table (PORT/SKIP per no-whiteboard/no-OCR constraints), one new plugin `nepal_curriculum`, 16-table de-dup verdicts, result templates, sockets, admin entry UI, slices. | Sahayatri Port, Content Model |
+| **2026-09-05** | [`research/_digest/D4_COMPETITOR_REFRESH.md`](research/_digest/D4_COMPETITOR_REFRESH.md) | Live verification of Veda/Paathshala (2026-09-05): Veda's 1300-vs-900 school-count contradiction; Paathshala module list; confirms roadmap unchanged. | Competitors |
+| **2026-09-05** | [`research/_digest/D5_DAY_IN_THE_LIFE_REVIEW.md`](research/_digest/D5_DAY_IN_THE_LIFE_REVIEW.md) | Click-by-click day-in-the-life traces for teacher/student/parent/admin against real routes+endpoints; mock /student finding; fix order that drove B3. | UX, Portals, Scenarios |
+
+
+| Date | Audit Document | Description | Scope |
+| :--- | :--- | :--- | :--- |
 | **2026-08-27** | [**`MARKET_COMPETITOR_ANALYSIS.md`**](MARKET_COMPETITOR_ANALYSIS.md) | Exhaustive competitive analysis against Veda, Teachmint, PowerSchool, ManageBac, and Toddle. | Market Analysis, Features, Competitors, Pricing |
 | **2026-08-27** | [**`FRONTEND_QA_AUDIT.md`**](FRONTEND_QA_AUDIT.md) | Next.js QA Audit detailing broken 404 links, PluginGate mismatches, and UI contrast flaws. | Next.js Frontend, Tailwind, Authentication |
 | **2026-08-27** | [**`BACKEND_QA_AUDIT.md`**](BACKEND_QA_AUDIT.md) | Python Backend QA detailing mathematical fixes for GPA/Payroll and solved ImportError bugs. | Python Backend, Math Logic, PDFs, Exceptions |
