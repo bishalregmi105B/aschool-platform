@@ -16,6 +16,7 @@ from app.models.academic import (
     Subject,
 )
 from app.models.user import User
+from app.models.money import ClassSubject, SectionSubjectTeacher
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import (
@@ -615,6 +616,236 @@ def list_class_subjects(class_id):
 
     items = query.order_by(Subject.name).all()
     return success_response([_subject_dict(s) for s in items])
+
+
+# ── Per-(class, subject) teachers (D-06 cutover, first consumer API) ───────
+#
+# Subject.teacher_ids is a school-global ARRAY: a subject taught in five
+# classes by five different teachers has exactly one "teacher" everywhere
+# (`teacher_ids[0]`), which feeds timetable, teacher scope and reports wrong.
+# ClassSubject/SectionSubjectTeacher (app/models/money.py) are the normalized
+# replacement; these routes are their first consumers, so assignment starts
+# here and the legacy ARRAY remains a display fallback until the full sweep.
+
+
+def _current_or_given_year(school_id, given_id=None):
+    if given_id:
+        year = AcademicYear.query.filter_by(
+            id=given_id, school_id=school_id
+        ).first()
+        if not year:
+            return None
+        return year
+    return AcademicYear.query.filter_by(
+        school_id=school_id, is_current=True
+    ).first()
+
+
+def _class_subject_teachers(class_subject):
+    """Teacher dicts for one ClassSubject row, primary first."""
+    rows = (
+        SectionSubjectTeacher.query.filter_by(
+            school_id=class_subject.school_id,
+            class_subject_id=class_subject.id,
+            is_deleted=False,
+        )
+        .order_by(SectionSubjectTeacher.is_primary.desc())
+        .all()
+    )
+    out = []
+    for row in rows:
+        teacher = row.teacher
+        out.append(
+            {
+                "teacher_id": str(row.teacher_id),
+                "teacher_name": teacher.full_name if teacher else None,
+                "section_id": str(row.section_id),
+                "is_primary": bool(row.is_primary),
+            }
+        )
+    return out
+
+
+def _class_subject_dict(cs):
+    subject = cs.subject
+    return {
+        "id": str(cs.id),
+        "class_id": str(cs.class_id),
+        "subject_id": str(cs.subject_id),
+        "subject_name": subject.name if subject else None,
+        "subject_code": getattr(subject, "code", None),
+        "academic_year_id": str(cs.academic_year_id) if cs.academic_year_id else None,
+        "subject_type": cs.subject_type,
+        "credit_hours": float(cs.credit_hours) if cs.credit_hours is not None else None,
+        "theory_full": cs.theory_full,
+        "theory_pass": cs.theory_pass,
+        "practical_full": cs.practical_full,
+        "practical_pass": cs.practical_pass,
+        "is_active": bool(cs.is_active),
+        "teachers": _class_subject_teachers(cs),
+        "primary_teacher_id": next(
+            (
+                t["teacher_id"]
+                for t in _class_subject_teachers(cs)
+                if t["is_primary"]
+            ),
+            None,
+        ),
+    }
+
+
+@academics_bp.route("/classes/<uuid:class_id>/subject-teachers", methods=["GET"])
+@jwt_required()
+@school_required
+def list_class_subject_teachers(class_id):
+    """Who teaches what in this class — the per-(class, subject) truth."""
+    klass = Class.query.get(class_id)
+    if not klass or klass.is_deleted or str(klass.school_id) != str(g.school_id):
+        return error_response("Class not found", 404)
+
+    query = ClassSubject.query.filter_by(
+        school_id=g.school_id, class_id=class_id, is_deleted=False
+    )
+    year_id = request.args.get("academic_year_id")
+    if year_id:
+        query = query.filter_by(academic_year_id=year_id)
+
+    items = query.all()
+    by_subject = {}
+    for cs in items:
+        existing = by_subject.get(cs.subject_id)
+        # Prefer the row matching the requested/current year; otherwise the
+        # first row seen. One dict per subject keeps the payload stable for
+        # the frontend grid.
+        if existing is None or (
+            year_id and cs.academic_year_id and str(cs.academic_year_id) == year_id
+        ):
+            by_subject[cs.subject_id] = cs
+        elif existing is not None and existing.academic_year_id is None:
+            by_subject[cs.subject_id] = cs
+    return success_response(
+        [
+            _class_subject_dict(cs)
+            for cs in sorted(
+                by_subject.values(),
+                key=lambda c: (c.subject.name or "").lower() if c.subject else "",
+            )
+        ]
+    )
+
+
+@academics_bp.route("/classes/<uuid:class_id>/subject-teachers", methods=["PUT"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def set_class_subject_teachers(class_id):
+    """Set the teachers for one subject in one class.
+
+    Body: {subject_id, teacher_ids: [user_id, ...], academic_year_id?}.
+    The first teacher is primary. Upserts the ClassSubject row, then
+    replaces the SectionSubjectTeacher assignments for every section of
+    the class (one row per section — the normalized model's grain).
+    """
+    klass = Class.query.get(class_id)
+    if not klass or klass.is_deleted or str(klass.school_id) != str(g.school_id):
+        return error_response("Class not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    subject_uuid = _parse_uuid_value(data.get("subject_id"))
+    if not subject_uuid:
+        return error_response("subject_id is required", 400)
+
+    subject = Subject.query.filter_by(
+        id=subject_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not subject:
+        return error_response("Subject not found", 404)
+
+    year = _current_or_given_year(
+        g.school_id, _parse_uuid_value(data.get("academic_year_id"))
+    )
+    if year is None and (
+        data.get("academic_year_id")
+        or not AcademicYear.query.filter_by(school_id=g.school_id).first()
+    ):
+        return error_response("academic_year_id not found", 404)
+
+    raw_teacher_ids = data.get("teacher_ids")
+    if not isinstance(raw_teacher_ids, list):
+        return error_response("teacher_ids must be a list of user ids", 400)
+    teacher_uuids = []
+    for tid in raw_teacher_ids:
+        tuuid = _parse_uuid_value(tid)
+        if not tuuid:
+            return error_response(f"teacher id {tid!r} is not a valid id", 400)
+        if tuuid not in teacher_uuids:
+            teacher_uuids.append(tuuid)
+    for tuuid in teacher_uuids:
+        if not User.query.filter_by(
+            id=tuuid, school_id=g.school_id, is_deleted=False
+        ).first():
+            return error_response(
+                "teacher_ids contains a user outside this school", 400
+            )
+
+    sections = Section.query.filter_by(
+        class_id=class_id, is_deleted=False
+    ).all()
+
+    cs = ClassSubject.query.filter_by(
+        school_id=g.school_id,
+        class_id=class_id,
+        subject_id=subject_uuid,
+        academic_year_id=year.id if year else None,
+        is_deleted=False,
+    ).first()
+    if not cs:
+        cs = ClassSubject(
+            school_id=g.school_id,
+            class_id=class_id,
+            subject_id=subject_uuid,
+            academic_year_id=year.id if year else None,
+        )
+        db.session.add(cs)
+        db.session.flush()
+
+    # Replace the assignment set at the model's grain: one row per
+    # (section, teacher). Soft-deleting keeps history for reports.
+    existing_rows = SectionSubjectTeacher.query.filter_by(
+        school_id=g.school_id, class_subject_id=cs.id, is_deleted=False
+    ).all()
+    wanted = {
+        (section.id, tuuid)
+        for section in sections
+        for tuuid in teacher_uuids
+    }
+    seen = {(row.section_id, row.teacher_id) for row in existing_rows}
+    for row in existing_rows:
+        if (row.section_id, row.teacher_id) not in wanted:
+            row.soft_delete()
+    for section in sections:
+        for idx, tuuid in enumerate(teacher_uuids):
+            row = next(
+                (
+                    r
+                    for r in existing_rows
+                    if r.section_id == section.id and r.teacher_id == tuuid
+                ),
+                None,
+            )
+            if row:
+                row.is_deleted = False
+            else:
+                row = SectionSubjectTeacher(
+                    school_id=g.school_id,
+                    section_id=section.id,
+                    class_subject_id=cs.id,
+                    teacher_id=tuuid,
+                )
+                db.session.add(row)
+            row.is_primary = idx == 0
+    db.session.commit()
+    return success_response(_class_subject_dict(cs))
 
 
 @academics_bp.route("/classes/<uuid:class_id>/subjects", methods=["POST"])
