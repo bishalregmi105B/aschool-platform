@@ -131,6 +131,28 @@ SCHEMAS = {
             "tone_note": {"type": "string"},
         },
     },
+    "meeting_minutes": {
+        "type": "object",
+        "required": ["title", "discussion"],
+        "properties": {
+            "title": {"type": "string"},
+            "date_note": {"type": "string"},
+            "discussion": {"type": "array", "items": {"type": "string"}},
+            "decisions": {"type": "array", "items": {"type": "string"}},
+            "action_items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["task"],
+                    "properties": {
+                        "task": {"type": "string"},
+                        "owner": {"type": "string"},
+                        "due": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
