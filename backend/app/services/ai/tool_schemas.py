@@ -232,6 +232,45 @@ SCHEMAS = {
             },
         },
     },
+    # ── Comms + PD pack (wave-2) ──────────────────────────────────────────
+    "attendance_outreach": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+            "messages": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["student", "message"],
+                    "properties": {
+                        "student": {"type": "string"},
+                        "message": {"type": "string"},
+                        "escalation": {"type": "string", "enum": ["gentle", "concern", "urgent"]},
+                    },
+                },
+            },
+        },
+    },
+    "progress_conference": {
+        "type": "object",
+        "required": ["agenda"],
+        "properties": {
+            "agenda": {"type": "array", "items": {"type": "string"}},
+            "talking_points": {"type": "array", "items": {"type": "string"}},
+            "questions_to_ask": {"type": "array", "items": {"type": "string"}},
+            "follow_up_note": {"type": "string"},
+        },
+    },
+    "lesson_observation": {
+        "type": "object",
+        "required": ["strengths", "growth_areas"],
+        "properties": {
+            "strengths": {"type": "array", "items": {"type": "string"}},
+            "growth_areas": {"type": "array", "items": {"type": "string"}},
+            "suggestions": {"type": "array", "items": {"type": "string"}},
+            "summary": {"type": "string"},
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
