@@ -76,6 +76,38 @@ def handle_worksheet(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_blueprint_builder(parsed: dict, payload: dict) -> dict:
+    """Deterministic re-check of the model's blueprint: section totals are
+    recomputed (count × marks_each) and the declared paper total is corrected
+    to the computed value — the same marks-sum rule A-03 enforces at
+    generation time, so a blueprint that passes here can always be generated."""
+    sections = parsed.get("sections") or []
+    computed = 0.0
+    for section in sections:
+        per_section = float(section.get("count", 0)) * float(
+            section.get("marks_each", 0)
+        )
+        section["section_total"] = per_section
+        computed += per_section
+    parsed["total_marks"] = computed
+    parsed["total_questions"] = sum(
+        int(s.get("count", 0)) for s in sections
+    )
+    requested = payload.get("total_marks")
+    if requested:
+        try:
+            if abs(float(requested) - computed) > 0.01:
+                diff = computed - float(requested)
+                parsed["notes"] = (
+                    f"Sections sum to {computed:g} marks, not the requested "
+                    f"{float(requested):g} (difference {diff:+g}). Adjust a "
+                    "section's count or marks to match exactly."
+                )
+        except (TypeError, ValueError):
+            pass
+    return parsed
+
+
 def handle_flashcards(parsed: dict, payload: dict) -> dict:
     cards = parsed.get("cards") or []
     parsed["count"] = len(cards)
