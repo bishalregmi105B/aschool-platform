@@ -14,6 +14,7 @@ const AI_TOOLS = [
   { key: "vocab-support", label: "Vocabulary Builder", desc: "Bilingual EN/NE word banks for any unit", icon: Languages, color: "bg-cyan-500" },
   { key: "lesson-hook", label: "Lesson Hook", desc: "5-minute openers that make a topic impossible to ignore", icon: Lightbulb, color: "bg-amber-500" },
   { key: "email-responder", label: "Email Responder", desc: "Professional parent/stakeholder replies from your bullet points", icon: Mail, color: "bg-rose-500" },
+  { key: "meeting-minutes", label: "Meeting Minutes", desc: "Raw notes → decisions and action items", icon: ClipboardList, color: "bg-slate-500" },
   { key: "meeting-minutes", label: "Meeting Minutes", desc: "Raw staff-meeting notes → decisions and action items", icon: ClipboardList, color: "bg-slate-500" },
   { key: "timetable", label: "AI Timetable Generator", desc: "Clash-free timetable in 30 seconds", icon: Calendar, color: "bg-purple-500" },
   { key: "report-remarks", label: "AI Report Remarks", desc: "Personalized report card comments per student", icon: MessageSquare, color: "bg-yellow-500" },
