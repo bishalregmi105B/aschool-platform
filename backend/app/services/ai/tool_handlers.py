@@ -155,6 +155,14 @@ def handle_udl_board(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_practical_exam(parsed: dict, payload: dict) -> dict:
+    """Deterministic marks total for the practical paper."""
+    parsed["total_marks"] = sum(
+        float(t.get("marks", 0)) for t in parsed.get("tasks", [])
+    )
+    return parsed
+
+
 def handle_generic_count(parsed: dict, payload: dict) -> dict:
     """Count the tool's primary list so results show 'N items' without
     schema work. Shared by list-shaped wave-2 tools."""
