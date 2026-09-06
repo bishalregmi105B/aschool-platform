@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageLoader } from "@/components/ui/spinner";
@@ -70,7 +71,7 @@ function Content() {
               <>
                 {(result.conflicts || []).length > 0 && (
                   <p className="flex gap-1.5 rounded-md bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {result.conflicts.join(" · ")}
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {(result.conflicts ?? []).join(" · ")}
                   </p>
                 )}
                 {result.days?.map((d, i) => (
