@@ -3,7 +3,7 @@
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileQuestion, BookOpen, Calendar, MessageSquare, PenLine, Brain, Grid3X3, Gauge, Languages, Lightbulb, Mail, ClipboardList, ListOrdered, Accessibility, Rocket, Target, Megaphone, Users, Search } from "lucide-react";
+import { FileQuestion, BookOpen, Calendar, MessageSquare, PenLine, Brain, Grid3X3, Gauge, Languages, Lightbulb, Mail, ClipboardList, ListOrdered, Accessibility, Rocket, Target, Megaphone, Users, Search, CalendarRange, Compass, CalendarDays, FlaskConical } from "lucide-react";
 import Link from "next/link";
 
 const AI_TOOLS = [
@@ -22,6 +22,10 @@ const AI_TOOLS = [
   { key: "attendance-outreach", label: "Attendance Outreach", desc: "Kind, escalating guardian follow-up drafts", icon: Megaphone, color: "bg-orange-600" },
   { key: "conference-prep", label: "Conference Prep", desc: "PT meeting agendas with open questions", icon: Users, color: "bg-indigo-400" },
   { key: "observation-feedback", label: "Observation Feedback", desc: "Balanced teacher feedback from your notes", icon: Search, color: "bg-zinc-500" },
+  { key: "annual-scheme", label: "Annual Scheme", desc: "Units across the Nepali academic year, festival-aware", icon: CalendarRange, color: "bg-green-600" },
+  { key: "transition-guide", label: "Transition Guide", desc: "Grade-transition prep for students and guardians", icon: Compass, color: "bg-sky-600" },
+  { key: "exam-timetable-draft", label: "Exam Timetable Drafter", desc: "Draft schedules with clash checks — solver owns the final", icon: CalendarDays, color: "bg-violet-500" },
+  { key: "practical-exam", label: "Practical Exam Builder", desc: "Lab tasks, materials and marking criteria", icon: FlaskConical, color: "bg-red-500" },
   { key: "meeting-minutes", label: "Meeting Minutes", desc: "Raw staff-meeting notes → decisions and action items", icon: ClipboardList, color: "bg-slate-500" },
   { key: "timetable", label: "AI Timetable Generator", desc: "Clash-free timetable in 30 seconds", icon: Calendar, color: "bg-purple-500" },
   { key: "report-remarks", label: "AI Report Remarks", desc: "Personalized report card comments per student", icon: MessageSquare, color: "bg-yellow-500" },

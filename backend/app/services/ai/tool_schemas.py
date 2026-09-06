@@ -271,6 +271,78 @@ SCHEMAS = {
             "summary": {"type": "string"},
         },
     },
+    # ── Planning + assessment pack (wave-2) ───────────────────────────────
+    "annual_scheme": {
+        "type": "object",
+        "required": ["units"],
+        "properties": {
+            "units": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["month", "topics"],
+                    "properties": {
+                        "month": {"type": "string"},
+                        "topics": {"type": "array", "items": {"type": "string"}},
+                        "assessment": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    "transition_guide": {
+        "type": "object",
+        "required": ["sections"],
+        "properties": {
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["heading", "content"],
+                    "properties": {"heading": {"type": "string"}, "content": {"type": "string"}},
+                },
+            },
+        },
+    },
+    "exam_timetable": {
+        "type": "object",
+        "required": ["days"],
+        "properties": {
+            "days": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["date", "subjects"],
+                    "properties": {
+                        "date": {"type": "string"},
+                        "subjects": {"type": "array", "items": {"type": "string"}},
+                        "notes": {"type": "string"},
+                    },
+                },
+            },
+            "conflicts": {"type": "array", "items": {"type": "string"}},
+        },
+    },
+    "practical_exam": {
+        "type": "object",
+        "required": ["tasks"],
+        "properties": {
+            "tasks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["task", "marks"],
+                    "properties": {
+                        "task": {"type": "string"},
+                        "marks": {"type": "number"},
+                        "materials": {"type": "array", "items": {"type": "string"}},
+                        "criteria": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "total_marks": {"type": "number"},
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
