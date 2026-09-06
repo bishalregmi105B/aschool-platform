@@ -150,7 +150,7 @@ def handle_generic_count(parsed: dict, payload: dict) -> dict:
     schema work. Shared by list-shaped wave-2 tools."""
     for key in ("steps", "messages", "agenda", "units", "activities",
                 "sections", "days", "tasks", "accommodations", "terms",
-                "cells", "action_items"):
+                "cells", "action_items", "key_points"):
         if isinstance(parsed.get(key), list):
             parsed["count"] = len(parsed[key])
             break
