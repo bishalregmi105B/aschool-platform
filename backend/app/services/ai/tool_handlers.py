@@ -145,6 +145,16 @@ def handle_vocab_support(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_udl_board(parsed: dict, payload: dict) -> dict:
+    """UDL boards are 3×3: derive the column labels so the page can render
+    a grid without schema work."""
+    parsed = handle_generic_count(parsed, payload)
+    cells = parsed.get("cells") or []
+    cols = {str(c.get("column")) for c in cells if isinstance(c, dict) and c.get("column")}
+    parsed["columns"] = sorted(cols)
+    return parsed
+
+
 def handle_generic_count(parsed: dict, payload: dict) -> dict:
     """Count the tool's primary list so results show 'N items' without
     schema work. Shared by list-shaped wave-2 tools."""
