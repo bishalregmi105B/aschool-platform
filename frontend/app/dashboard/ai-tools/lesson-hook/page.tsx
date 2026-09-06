@@ -78,7 +78,7 @@ function LessonHookContent() {
         <div>
           <h1 className="text-2xl font-bold">Lesson Hook</h1>
           <p className="text-muted-foreground">
-            A 3–7 minute opener students can't ignore
+            A 3–7 minute opener students can&apos;t ignore
           </p>
         </div>
       </div>
@@ -86,7 +86,7 @@ function LessonHookContent() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Today's lesson</CardTitle>
+            <CardTitle>Today&apos;s lesson</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
