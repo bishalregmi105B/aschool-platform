@@ -130,6 +130,21 @@ def handle_text_leveler(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_vocab_support(parsed: dict, payload: dict) -> dict:
+    """Dedupe terms case-insensitively (the model loves repeating entry
+    variants) and count the bank."""
+    seen: set[str] = set()
+    unique = []
+    for term in parsed.get("terms") or []:
+        key = str(term.get("term", "")).strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(term)
+    parsed["terms"] = unique
+    parsed["count"] = len(unique)
+    return parsed
+
+
 def handle_fixture_test(parsed: dict, payload: dict) -> dict:
     """AW-01 CI gate (b): the fixture tool's handler — echo with proof the
     generic runner executed the full pipeline."""

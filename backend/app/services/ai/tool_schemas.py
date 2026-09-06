@@ -88,6 +88,27 @@ SCHEMAS = {
             },
         },
     },
+    "vocab_support": {
+        "type": "object",
+        "required": ["terms"],
+        "properties": {
+            "terms": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["term", "definition"],
+                    "properties": {
+                        "term": {"type": "string"},
+                        "definition": {"type": "string"},
+                        "definition_ne": {"type": "string"},
+                        "example": {"type": "string"},
+                        "example_ne": {"type": "string"},
+                    },
+                },
+            },
+            "title": {"type": "string"},
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
