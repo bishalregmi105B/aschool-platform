@@ -3,7 +3,7 @@
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileQuestion, BookOpen, Calendar, MessageSquare, PenLine, Brain, Grid3X3, Gauge } from "lucide-react";
+import { FileQuestion, BookOpen, Calendar, MessageSquare, PenLine, Brain, Grid3X3, Gauge, Languages } from "lucide-react";
 import Link from "next/link";
 
 const AI_TOOLS = [
@@ -11,6 +11,7 @@ const AI_TOOLS = [
   { key: "blueprint-builder", label: "Blueprint Builder", desc: "Design the marks grid of a paper before generating it", icon: Grid3X3, color: "bg-teal-500" },
   { key: "lesson-plan", label: "AI Lesson Plan", desc: "Generate structured lesson plans for any subject and grade", icon: BookOpen, color: "bg-green-500" },
   { key: "text-leveler", label: "Text Leveler", desc: "Rewrite any passage up or down reading levels for mixed-ability classes", icon: Gauge, color: "bg-orange-500" },
+  { key: "vocab-support", label: "Vocabulary Builder", desc: "Bilingual EN/NE word banks for any unit", icon: Languages, color: "bg-cyan-500" },
   { key: "timetable", label: "AI Timetable Generator", desc: "Clash-free timetable in 30 seconds", icon: Calendar, color: "bg-purple-500" },
   { key: "report-remarks", label: "AI Report Remarks", desc: "Personalized report card comments per student", icon: MessageSquare, color: "bg-yellow-500" },
   { key: "letter-writer", label: "AI Letter Writer", desc: "Generate school letters, notices, and circulars", icon: PenLine, color: "bg-red-500" },
