@@ -114,6 +114,22 @@ def handle_flashcards(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_text_leveler(parsed: dict, payload: dict) -> dict:
+    """Pin the level actually delivered + readability stats the teacher can
+    compare at a glance (sentence length is the honest proxy — no fake
+    Flesch score without a real syllable counter)."""
+    text = str(parsed.get("text") or "")
+    sentences = [s for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
+    words = text.split()
+    parsed["stats"] = {
+        "sentences": len(sentences),
+        "words": len(words),
+        "avg_sentence_words": round(len(words) / len(sentences), 1) if sentences else 0,
+    }
+    parsed.setdefault("level", payload.get("direction") or "easier")
+    return parsed
+
+
 def handle_fixture_test(parsed: dict, payload: dict) -> dict:
     """AW-01 CI gate (b): the fixture tool's handler — echo with proof the
     generic runner executed the full pipeline."""
