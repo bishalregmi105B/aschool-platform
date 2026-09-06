@@ -153,6 +153,85 @@ SCHEMAS = {
             },
         },
     },
+    # ── Differentiation pack (wave-2) ─────────────────────────────────────
+    "text_scaffolder": {
+        "type": "object",
+        "required": ["title", "steps"],
+        "properties": {
+            "title": {"type": "string"},
+            "steps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["prompt", "support"],
+                    "properties": {
+                        "prompt": {"type": "string"},
+                        "support": {"type": "string"},
+                        "sentence_starter": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    "accommodation_finder": {
+        "type": "object",
+        "required": ["accommodations"],
+        "properties": {
+            "summary": {"type": "string"},
+            "accommodations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["barrier", "accommodation"],
+                    "properties": {
+                        "barrier": {"type": "string"},
+                        "accommodation": {"type": "string"},
+                        "category": {
+                            "type": "string",
+                            "enum": ["presentation", "response", "setting", "timing", "materials"],
+                        },
+                    },
+                },
+            },
+        },
+    },
+    "enrichment_plan": {
+        "type": "object",
+        "required": ["activities"],
+        "properties": {
+            "activities": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["title", "description"],
+                    "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "difficulty": {"type": "string", "enum": ["stretch", "challenge", "project"]},
+                    },
+                },
+            },
+        },
+    },
+    "udl_choice_board": {
+        "type": "object",
+        "required": ["cells"],
+        "properties": {
+            "instructions": {"type": "string"},
+            "cells": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["row", "column", "task"],
+                    "properties": {
+                        "row": {"type": "string"},
+                        "column": {"type": "string"},
+                        "task": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
