@@ -29,6 +29,42 @@ SCHEMAS = {
             "materials": {"type": "array", "items": {"type": "string"}},
         },
     },
+    "blueprint_builder": {
+        "type": "object",
+        "required": ["title", "sections"],
+        "properties": {
+            "title": {"type": "string"},
+            "total_marks": {"type": "number"},
+            "duration_minutes": {"type": "integer"},
+            "notes": {"type": "string"},
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "question_type", "count", "marks_each"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "question_type": {
+                            "type": "string",
+                            "enum": [
+                                "mcq", "short_answer", "long_answer", "fill_in_the_blanks",
+                                "true_false", "matching", "very_short", "case_study",
+                                "source_based", "diagram_based", "proof", "construction",
+                                "comprehension", "numerical",
+                            ],
+                        },
+                        "count": {"type": "integer", "minimum": 1},
+                        "marks_each": {"type": "number", "minimum": 0.5},
+                        "difficulty": {
+                            "type": "string",
+                            "enum": ["easy", "medium", "hard"],
+                        },
+                        "unit_hint": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],

@@ -188,6 +188,27 @@ widgets:
       href: /dashboard/exams/marks
       mobile_route: /marks
 
+  - key: blueprint_builder_action
+    title: "Blueprint Builder"
+    title_i18n: widget.blueprint_builder_action.title
+    description: "Design a paper's marks grid with AI before generating it"
+    type: quick-action
+    renderer: spec
+    surfaces: [web]  # mobile joins when flutter_user ships the screen
+    slots:
+      - { id: dashboard.actions, default: true, order: 32 }
+    roles: [school_admin, teacher]
+    requires_plugins: [ai_suite]
+    size:
+      default: { w: 3, h: 1 }
+      min: { w: 2, h: 1 }
+    spec:
+      icon: Grid3X3
+      tone: outline
+      label: "Blueprint Builder"
+      label_i18n: widget.blueprint_builder_action.label
+      href: /dashboard/ai-tools/blueprint-builder
+
   - key: mobile_result_card
     title: "Latest Result"
     title_i18n: widget.mobile_result_card.title
