@@ -65,6 +65,29 @@ SCHEMAS = {
             },
         },
     },
+    "text_leveler": {
+        "type": "object",
+        "required": ["text", "level"],
+        "properties": {
+            "text": {"type": "string"},
+            "level": {"type": "string", "enum": ["easier", "same", "harder"]},
+            "grade_band": {"type": "string"},
+            "changes_made": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["kind", "detail"],
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "enum": ["vocabulary", "sentence_length", "structure", "added_support"],
+                        },
+                        "detail": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
