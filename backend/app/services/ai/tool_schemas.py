@@ -121,6 +121,16 @@ SCHEMAS = {
             "alternatives": {"type": "array", "items": {"type": "string"}},
         },
     },
+    "email_responder": {
+        "type": "object",
+        "required": ["reply"],
+        "properties": {
+            "reply": {"type": "string"},
+            "subject_line": {"type": "string"},
+            "key_points": {"type": "array", "items": {"type": "string"}},
+            "tone_note": {"type": "string"},
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],
