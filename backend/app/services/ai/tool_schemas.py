@@ -109,6 +109,18 @@ SCHEMAS = {
             "title": {"type": "string"},
         },
     },
+    "lesson_hook": {
+        "type": "object",
+        "required": ["hook"],
+        "properties": {
+            "hook": {"type": "string"},
+            "timing_minutes": {"type": "integer"},
+            "materials": {"type": "array", "items": {"type": "string"}},
+            "steps": {"type": "array", "items": {"type": "string"}},
+            "bridge_to_lesson": {"type": "string"},
+            "alternatives": {"type": "array", "items": {"type": "string"}},
+        },
+    },
     "worksheet": {
         "type": "object",
         "required": ["title", "items"],

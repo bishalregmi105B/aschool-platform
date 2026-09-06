@@ -145,6 +145,18 @@ def handle_vocab_support(parsed: dict, payload: dict) -> dict:
     return parsed
 
 
+def handle_generic_count(parsed: dict, payload: dict) -> dict:
+    """Count the tool's primary list so results show 'N items' without
+    schema work. Shared by list-shaped wave-2 tools."""
+    for key in ("steps", "messages", "agenda", "units", "activities",
+                "sections", "days", "tasks", "accommodations", "terms",
+                "cells", "action_items"):
+        if isinstance(parsed.get(key), list):
+            parsed["count"] = len(parsed[key])
+            break
+    return parsed
+
+
 def handle_fixture_test(parsed: dict, payload: dict) -> dict:
     """AW-01 CI gate (b): the fixture tool's handler — echo with proof the
     generic runner executed the full pipeline."""
