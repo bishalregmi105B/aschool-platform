@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../utils/constants.dart';
 import 'api_client.dart';
 import 'notification_service.dart';
+import 'socket_service.dart';
 
 /// Auth state: holds current user + tokens
 class AuthState {
@@ -183,6 +184,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
+    // M9: full teardown — push tags, socket and the tenancy header are all
+    // per-account state; leaving them set leaks the previous user's school
+    // and role-targeted notifications to the next one on a shared device.
+    try {
+      NotificationService().clearUserIdentity();
+    } catch (_) {}
+    try {
+      SocketService.instance.disconnect();
+    } catch (_) {}
+    ApiClient.setSchoolSlug('');
     await _storage.deleteAll();
     state = const AuthState();
   }

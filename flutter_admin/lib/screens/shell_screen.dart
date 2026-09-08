@@ -218,7 +218,7 @@ class ShellScreen extends ConsumerWidget {
             icon: Icons.local_library_rounded,
             title: 'Library',
             path: '/library',
-            isLocked: !plugins.isInstalled('library'),
+            isLocked: !plugins.isInstalled('library_management'),
           ),
         ],
       ),
