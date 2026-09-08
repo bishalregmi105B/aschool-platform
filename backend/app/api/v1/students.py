@@ -26,6 +26,7 @@ students_bp = Blueprint("students", __name__, url_prefix="/students")
 @students_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
+@role_required("superadmin", "school_admin", "teacher", "staff")
 def list_students():
     """List students for the current school."""
     query = Student.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -88,6 +89,7 @@ def list_students():
 @students_bp.route("/<uuid:student_id>", methods=["GET"])
 @jwt_required()
 @school_required
+@role_required("superadmin", "school_admin", "teacher", "staff")
 def get_student(student_id):
     """Get a single student with guardians."""
     student = Student.query.get(student_id)
@@ -230,6 +232,37 @@ def update_student(student_id):
 
     db.session.commit()
     return success_response(student.to_dict())
+
+
+@students_bp.route("/<uuid:student_id>/reveal-default-password", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def reveal_default_password(student_id):
+    """Reveal the student's deterministic default password (B1).
+
+    The credential must never ride along roster/detail serialization, so this
+    is the only read path — an explicit admin action, audited like the
+    sibling POST /users/<id>/reset-default-password. Non-mutating: it computes
+    the same value the reset flow would set, without touching the account.
+    """
+    from app.models.user import User
+    from app.utils.password import generate_default_password
+
+    student = Student.query.get(student_id)
+    if not student or student.is_deleted or str(student.school_id) != str(g.school_id):
+        return error_response("Student not found", 404)
+    if not student.user_id:
+        return error_response("Student has no login account", 404)
+
+    user = User.query.get(student.user_id)
+    if not user or user.is_deleted:
+        return error_response("Student login not found", 404)
+
+    return success_response({
+        "login_id": user.email or user.phone or student.student_id,
+        "default_password": generate_default_password(user, student),
+    })
 
 
 @students_bp.route("/<uuid:student_id>", methods=["DELETE"])

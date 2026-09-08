@@ -65,10 +65,26 @@ def _signed_headers(key_id: str, secret: str, body: bytes) -> dict:
     }
 
 
+def _assert_not_metadata(url: str) -> None:
+    """F3 SSRF guard: `service_base_url` is school-admin-settable config.
+    Cloud metadata / link-local targets are never legitimate ATeacher
+    endpoints — block them before any signed request leaves the process.
+    (Loopback/RFC1918 stays allowed: the shim may legitimately run on the
+    same VPS; full host allowlisting is an owner decision.)"""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    if host in ("metadata.google.internal", "instance-data", ""):
+        raise ServiceUnavailableError("ai_teacher service host not allowed")
+    if host.startswith("169.254.") or host.endswith(".internal"):
+        raise ServiceUnavailableError("ai_teacher service host not allowed")
+
+
 def _request(method: str, url: str, key_id: str, secret: str,
              payload: dict | None = None) -> dict:
     import json as _json
 
+    _assert_not_metadata(url)
     body = _json.dumps(payload or {}).encode()
     headers = _signed_headers(key_id, secret, body)
     last_exc: Exception | None = None
@@ -79,7 +95,7 @@ def _request(method: str, url: str, key_id: str, secret: str,
             )
             if resp.status_code >= 500:
                 raise ServiceUnavailableError(
-                    f"ai_teacher service {resp.status_code}: {resp.text[:200]}"
+                    f"ai_teacher service {resp.status_code}"
                 )
             data = resp.json() if resp.content else {}
             if resp.status_code >= 400:

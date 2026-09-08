@@ -693,19 +693,25 @@ def apply_event(lesson, etype: str, payload: dict, event_id=None) -> dict:
             sequence=payload.get("sequence"),
         )
         db.session.add(message)
+        db.session.flush()  # assign message.id — the flag's source_id needs it
         lesson.questions_asked = (lesson.questions_asked or 0) + 1
-        # moderation on every student utterance
+        # moderation on every student utterance (A1: moderate() returns
+        # (severity, category); the flag must carry the message's own id so
+        # the wellbeing queue can route it back to the student)
         from app.services.ai.workbench import moderate
 
-        category, _ = moderate(payload.get("text", ""))
+        severity, category = moderate(payload.get("text", ""))
         if category in ("self_harm", "violence"):
             from app.models.ai_workbench import ModerationFlag
 
             db.session.add(
                 ModerationFlag(
                     school_id=lesson.school_id,
-                    tool_key="ai_teacher_lesson",
-                    severity="critical",
+                    source_type="ai_teacher_message",
+                    source_id=message.id,
+                    student_id=lesson.student_id,
+                    severity=severity,
+                    category=category,
                     snippet=(payload.get("text", "") or "")[:500],
                 )
             )

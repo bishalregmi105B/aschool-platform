@@ -152,8 +152,17 @@ class School(BaseModel):
     owner = relationship("User", foreign_keys=[owner_id])
     is_active = Column(Boolean, default=True)
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_sensitive: bool = False):
+        """Serialize the school profile.
+
+        F1 (P0): the JSONB config blobs carry payment-gateway signing secrets
+        (fee_config.payment_methods[].secret_key) and provider credentials.
+        They must never ride the default serializer — any authenticated user
+        can call GET /schools/current. Admin contexts pass
+        include_sensitive=True; gateway credentials are edited via the
+        role-gated /fees/payment-methods endpoints, which mask on read.
+        """
+        data = {
             "id": str(self.id),
             "name": self.name,
             "name_nepali": self.name_nepali,
@@ -182,14 +191,19 @@ class School(BaseModel):
             "fee_collection_rate": float(self.fee_collection_rate) if self.fee_collection_rate else None,
             "default_language": self.default_language,
             "settings": self.settings or {},
-            "fee_config": self.fee_config or {},
-            "notification_config": self.notification_config or {},
             "academic_year_start_bs": self.academic_year_start_bs,
             "academic_year_end_bs": self.academic_year_end_bs,
             "working_days": self.working_days,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+        if include_sensitive:
+            data["fee_config"] = self.fee_config or {}
+            data["notification_config"] = self.notification_config or {}
+            data["website_config"] = self.website_config or {}
+            data["ai_config"] = self.ai_config or {}
+            data["exam_config"] = self.exam_config or {}
+        return data
 
 
 class SchoolWebsite(BaseModel):

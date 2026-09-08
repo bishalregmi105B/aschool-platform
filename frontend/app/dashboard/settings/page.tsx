@@ -48,7 +48,7 @@ export default function SettingsPage() {
   const { data: school, isLoading, isError, refetch } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse>("/schools/current");
+      const res = await api.get<ApiResponse>("/schools/current/settings");
       return res.data.data as SchoolSettings;
     },
     retry: 1,

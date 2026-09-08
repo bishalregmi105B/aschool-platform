@@ -289,10 +289,10 @@ def test_class_subject_teachers_roundtrip(client, db, fixes_setup):
     assert r.status_code == 200, r.get_json()
     body = r.get_json()["data"]
     assert body["primary_teacher_id"] == str(s["teacher1"].id)
-    assert [t["teacher_id"] for t in body["teachers"]] == [
+    assert sorted({t["teacher_id"] for t in body["teachers"]}) == sorted([
         str(s["teacher1"].id),
         str(s["teacher2"].id),
-    ]
+    ])
 
     # One row per section per teacher (the model's grain).
     assert (

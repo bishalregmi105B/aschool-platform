@@ -158,8 +158,7 @@ export default function UsersPage() {
                       )}
                       <div className="mt-2 text-[11px] text-muted-foreground bg-muted/50 p-1.5 rounded">
                         <span className="font-semibold block mb-0.5">Login Credentials:</span>
-                        ID: <span className="font-mono text-primary">{u.login_id || u.email || u.phone}</span><br/>
-                        PW: <span className="font-mono text-primary">{u.default_password_hint || "Custom"}</span>
+                        ID: <span className="font-mono text-primary">{u.login_id || u.email || u.phone}</span>
                       </div>
                     </TableCell>
                     <TableCell>

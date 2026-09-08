@@ -54,7 +54,11 @@ class RAGService:
             )
             rows.append(
                 {
-                    "school_id": str(school_id),
+                    # Platform rows (school_id NULL) must bind SQL NULL, not
+                    # the string 'None' — that poisoned the session with a
+                    # failed INSERT and aborted every later statement in the
+                    # same transaction (P0 regression source, 2026-09-08).
+                    "school_id": str(school_id) if school_id else None,
                     "source_type": source_type,
                     "source_id": str(source_id),
                     "chunk_index": i,
@@ -107,7 +111,10 @@ class RAGService:
         from extensions import db
 
         bind = db.session.connection()
-        params: dict = {"school_id": str(school_id), "top_k": top_k}
+        params: dict = {
+            "school_id": str(school_id) if school_id else None,
+            "top_k": top_k,
+        }
 
         # 1. semantic leg (only when the query can be embedded)
         semantic_sql = "SELECT NULL::uuid AS id, 1.0 AS rank WHERE false"

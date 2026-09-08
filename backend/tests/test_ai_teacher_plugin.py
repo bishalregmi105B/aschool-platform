@@ -346,6 +346,50 @@ class TestWebhookResults:
         assert row is not None
         assert row.mastery_level == "advanced"
 
+    def test_webhook_self_harm_flag_created(self, client, app, db, admin_user, school, ai_teacher_installed):
+        """A1 regression: a self-harm student utterance must produce a
+        ModerationFlag (source_type/source_id/student_id set) and still 200."""
+        from datetime import datetime, timezone
+
+        from app.models.ai_teacher import AITeacherLesson
+        from app.models.ai_workbench import ModerationFlag
+
+        app.config.setdefault("ASCHOOL_AI_TEACHER_WEBHOOK_SECRETS", {})["ask_test"] = "whsec_test"
+        user, student = TestCreateLessonGates._make_student(self, db, school)
+        lesson = AITeacherLesson(
+            school_id=school.id, student_id=student.id,
+            student_user_id=user.id, created_by_id=admin_user.id,
+            topic="Light", status="teaching",
+            started_at=datetime.now(timezone.utc),
+        )
+        db.session.add(lesson)
+        db.session.commit()
+
+        event = {
+            "event_id": "evt_sh_1", "lesson_id": str(lesson.id),
+            "type": "question.asked",
+            "payload": {"text": "I want to kill myself", "sequence": 1},
+        }
+        import json as _json
+        raw = _json.dumps(event).encode()
+        r = client.post(
+            "/api/v1/ai-teacher/webhooks/lesson-event",
+            data=raw, headers=self._sign(app, "ask_test", raw),
+        )
+        assert r.status_code == 200, r.get_json()
+
+        flag = ModerationFlag.query.filter_by(
+            school_id=school.id, source_type="ai_teacher_message"
+        ).first()
+        assert flag is not None, "self-harm utterance produced no ModerationFlag"
+        assert flag.category == "self_harm"
+        assert flag.severity == "critical"
+        assert str(flag.student_id) == str(student.id)
+        assert flag.source_id is not None
+        msg = __import__("app.models.ai_teacher", fromlist=["AITeacherMessage"]) \
+            .AITeacherMessage.query.filter_by(event_id="evt_sh_1").first()
+        assert msg is not None and str(flag.source_id) == str(msg.id)
+
     def test_webhook_rejects_bad_signature(self, client, app, db, school):
         app.config.setdefault("ASCHOOL_AI_TEACHER_WEBHOOK_SECRETS", {})["ask_test"] = "whsec_test"
         r = client.post(

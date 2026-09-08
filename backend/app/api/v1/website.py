@@ -416,11 +416,27 @@ def update_website_config():
         website = SchoolWebsite(school_id=g.school_id)
         db.session.add(website)
 
+    from app.utils.tracking_ids import valid_ga_id, valid_pixel_id
+
     for key in ("theme_slug", "customizations", "is_published",
                 "google_analytics_id", "facebook_pixel_id", "meta_title",
                 "meta_description", "og_image_url"):
-        if key in data:
-            setattr(website, key, data[key])
+        if key not in data:
+            continue
+        value = data[key]
+        # F4: GA/pixel ids land in inline <script> on the public site —
+        # allowlist their exact formats, reject anything else.
+        if key == "google_analytics_id" and value:
+            if not valid_ga_id(value):
+                return error_response(
+                    "google_analytics_id must look like G-XXXXXXXXXX", 400
+                )
+        if key == "facebook_pixel_id" and value:
+            if not valid_pixel_id(value):
+                return error_response(
+                    "facebook_pixel_id must be a numeric Meta pixel id", 400
+                )
+        setattr(website, key, value)
 
     # S-11: customizations.colors is interpolated into the public <style>
     # block — allowlist its keys and require real color values.

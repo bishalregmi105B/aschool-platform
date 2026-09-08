@@ -224,9 +224,27 @@ def decrypt_secret(envelope: dict) -> str | None:
         return None
 
 
+def _redact_secret_envelopes(node):
+    """Redact ANY `__secret__` envelope found at any depth — including keys a
+    plugin's schema does not declare (e.g. ai_teacher's provisioned
+    webhook_secret). Defense against schema-drift secret leakage (F2)."""
+    if isinstance(node, dict):
+        for k, v in list(node.items()):
+            if isinstance(v, dict) and v.get("__secret__"):
+                node[k] = {"__secret__": True, "last4": v.get("last4", "••••")}
+            else:
+                _redact_secret_envelopes(v)
+    elif isinstance(node, list):
+        for item in node:
+            _redact_secret_envelopes(item)
+
+
 def redact_config(schema: Schema | None, config: dict, role: str) -> dict:
     """GET /config view: never echo a secret, only its last4 marker."""
     out = copy.deepcopy(config or {})
+    # Envelope sweep first — schema-declared or not, a secret envelope is a
+    # secret (F24: ai_teacher webhook_secret is not a schema field).
+    _redact_secret_envelopes(out)
     if not schema:
         return out
     for f in schema.fields:

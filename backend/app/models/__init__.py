@@ -89,8 +89,29 @@ from app.models.incident_management import IncidentEscalation, IncidentWorkflowE
 from app.models.faq import FAQ  # noqa: F401
 from app.models.webhook import ProcessedWebhookEvent  # noqa: F401
 from app.models.system import SystemSetting  # noqa: F401
-from app.models.question_bank import QuestionBankItem, PaperBlueprint, GeneratedPaper  # noqa: F401
+from app.models.question_bank import (
+    QuestionBankItem,
+    QuestionSubpart,
+    QuestionRubricStep,
+    PaperBlueprint,
+    GeneratedPaper,
+)  # noqa: F401
 from app.models.curriculum import CurriculumFramework, CurriculumUnit, LearningOutcome, SubjectOffering  # noqa: F401
+# W5-B #7 / W5-C A3: textbook_* + curriculum_* tables are referenced by FK from
+# question_bank_items/question_subparts — these imports must stay registered in
+# db.metadata or create_all/alembic autogenerate raise NoReferencedTableError.
+from app.models.textbook import (  # noqa: F401
+    TextbookCorpus,
+    TextbookPage,
+    TextbookChapter,
+    TextbookSection,
+    TextbookAsset,
+)
+from app.models.curriculum_graph import (  # noqa: F401
+    CurriculumConcept,
+    ConceptPrerequisite,
+    ConceptMisconception,
+)
 from app.models.document_chunk import DocumentChunk  # noqa: F401
 from app.models.money import ClassSubject, SectionSubjectTeacher, FeeStructureItem  # noqa: F401
 from app.models.contact import ContactMessage  # noqa: F401

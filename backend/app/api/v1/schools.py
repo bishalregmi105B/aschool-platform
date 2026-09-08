@@ -57,10 +57,24 @@ def get_school(school_id):
 @schools_bp.route("/current", methods=["GET"])
 @jwt_required()
 def get_current_school():
-    """Get current school from subdomain context."""
+    """Get current school from subdomain context (safe profile — F1:
+    no fee_config/notification_config; secrets never serialize here)."""
     if not g.get("school"):
         return error_response("No school context", 400)
     return success_response(g.school.to_dict())
+
+
+@schools_bp.route("/current/settings", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def get_current_school_settings():
+    """Full school settings (config blobs incl. gateway credentials) —
+    admin-only counterpart of GET /schools/current, consumed by the
+    dashboard settings pages."""
+    if not g.get("school"):
+        return error_response("No school context", 400)
+    return success_response(g.school.to_dict(include_sensitive=True))
 
 
 @schools_bp.route("/current", methods=["PATCH", "PUT"])
@@ -78,7 +92,7 @@ def update_current_school():
     data = {k: v for k, v in data.items() if k not in ("slug", "custom_domain", "plan", "max_students", "is_active")}
     _populate_school(school, data)
     db.session.commit()
-    return success_response(school.to_dict())
+    return success_response(school.to_dict(include_sensitive=True))
 
 
 @schools_bp.route("", methods=["POST"])
@@ -136,7 +150,7 @@ def update_school(school_id):
         data = {k: v for k, v in data.items() if k not in ("slug", "custom_domain", "plan", "max_students", "is_active")}
     _populate_school(school, data)
     db.session.commit()
-    return success_response(school.to_dict())
+    return success_response(school.to_dict(include_sensitive=True))
 
 
 @schools_bp.route("/<uuid:school_id>", methods=["DELETE"])

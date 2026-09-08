@@ -117,7 +117,9 @@ class EsewaGateway:
         sign_message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
         expected_sig = cls._generate_signature(sign_message, secret_key)
 
-        if data.get("signature") != expected_sig:
+        import hmac as _hmac
+
+        if not _hmac.compare_digest(str(data.get("signature") or ""), str(expected_sig)):
             return {"verified": False, "error": "Signature mismatch"}
 
         return {

@@ -841,6 +841,7 @@ DEFAULT_ROBOTS_TXT = "User-agent: *\nAllow: /"
 @website_builder_bp.route("/seo", methods=["GET"])
 @jwt_required()
 @school_required
+@role_required("superadmin", "school_admin")
 @plugin_required("website_builder")
 def get_seo_settings():
     """Get SEO settings for the school website.
@@ -898,7 +899,14 @@ def update_seo_settings():
     if "og_image" in data or "og_image_url" in data:
         website.og_image_url = str(data.get("og_image") or data.get("og_image_url") or "")
     if "google_analytics_id" in data:
-        website.google_analytics_id = str(data.get("google_analytics_id") or "")[:50]
+        from app.utils.tracking_ids import valid_ga_id
+
+        _ga = str(data.get("google_analytics_id") or "")[:50]
+        if _ga and not valid_ga_id(_ga):
+            return error_response(
+                "google_analytics_id must look like G-XXXXXXXXXX", 400
+            )
+        website.google_analytics_id = _ga
 
     customizations = dict(website.customizations or {})
     if "google_site_verification" in data:
