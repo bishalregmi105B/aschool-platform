@@ -138,10 +138,9 @@ class Student(SchoolModel):
         if self.section:
             section_name = self.section.name
 
-        from app.utils.password import generate_default_password
-        default_pw = None
-        if self.user:
-            default_pw = generate_default_password(self.user, self)
+        # B1 (P0): the deterministic default password must never serialize —
+        # it IS the student's login credential. Admins reveal it explicitly
+        # via POST /students/<id>/reveal-default-password instead.
 
         return {
             "id": str(self.id),
@@ -189,7 +188,6 @@ class Student(SchoolModel):
             "current_streak": self.current_streak or 0,
             "school_id": str(self.school_id),
             "login_id": self.student_id,
-            "default_password_hint": default_pw,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

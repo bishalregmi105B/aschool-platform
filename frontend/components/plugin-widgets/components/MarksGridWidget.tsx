@@ -197,6 +197,30 @@ export default function MarksGridWidget({
   const overLimit = (value: string, limit: number) =>
     value !== "" && Number(value) > limit;
 
+  /** Excel-paste: a TSV cell ("12<TAB>8") fills theory+practical of the row;
+   *  a single value pastes natively. Spreadsheet column-paste is the fastest
+   *  entry path staff know. */
+  const onPaste = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    index: number,
+    field: keyof Draft
+  ) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text || !text.includes("\t")) return;
+    const cols = text.replace(/\r/g, "").split("\n")[0].split("\t");
+    const theoryIdx = field === "theory" ? 0 : 1;
+    const theory = cols[theoryIdx]?.trim() ?? "";
+    const practical = cols[theoryIdx + 1]?.trim() ?? "";
+    if (theory === "" && practical === "") return;
+    e.preventDefault();
+    const row = rows[index];
+    if (!row) return;
+    setDrafts((prev) => ({
+      ...prev,
+      [row.student_id]: { theory, practical },
+    }));
+  };
+
   return (
     <div className="space-y-2">
       <div className="rounded-lg border">
@@ -237,6 +261,7 @@ export default function MarksGridWidget({
                       inputMode="decimal"
                       onChange={(e) => setDraft(row.student_id, "theory", e.target.value)}
                       onKeyDown={(e) => onKeyDown(e, index, "theory")}
+                      onPaste={(e) => onPaste(e, index, "theory")}
                       className={cn(
                         "h-7 w-20 text-right",
                         overLimit(draft.theory, fullMarks) &&
@@ -257,6 +282,7 @@ export default function MarksGridWidget({
                         setDraft(row.student_id, "practical", e.target.value)
                       }
                       onKeyDown={(e) => onKeyDown(e, index, "practical")}
+                      onPaste={(e) => onPaste(e, index, "practical")}
                       className="h-7 w-20 text-right"
                       aria-label={`Practical marks for ${row.student_name ?? "student"}`}
                     />

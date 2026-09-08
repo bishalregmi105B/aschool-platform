@@ -15,6 +15,13 @@ db_backup_api_bp = __import__("flask", fromlist=["Blueprint"]).Blueprint(
 @db_backup_api_bp.route("", methods=["GET"])
 @jwt_required()
 def backup_status():
+    """Return last backup info and scheduled next backup time (superadmin
+    only — F5: platform ops data must not serve tenant tokens)."""
+    from app.utils.decorators import superadmin_required as _sa
+    from app.utils.response import error_response as _er
+    from flask_jwt_extended import get_jwt as _gj
+    if _gj().get("role") != "superadmin":
+        return _er("Superadmin only", 403)
     """Return last backup info and scheduled next backup time."""
     from datetime import datetime, timezone, timedelta
     import os

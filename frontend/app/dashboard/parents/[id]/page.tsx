@@ -44,7 +44,6 @@ interface ParentUser {
   phone: string;
   is_active: boolean;
   login_id?: string;
-  default_password_hint?: string;
   children_count?: number;
   children?: ParentChild[];
 }
@@ -301,13 +300,6 @@ export default function ParentDetailPage() {
               <p className="text-sm text-muted-foreground">Login ID</p>
               <p className="font-medium break-all">{parent.login_id || parent.email || parent.phone}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Default Password Hint</p>
-              <p className="font-mono text-sm bg-muted rounded px-2 py-1 inline-block break-all">
-                {parent.default_password_hint || "Custom"}
-              </p>
-            </div>
-
             <div className="pt-2 border-t space-y-2">
               <Label>Reset Password</Label>
               <Input

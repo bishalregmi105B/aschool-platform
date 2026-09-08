@@ -74,6 +74,18 @@ export default function StudentDetailPage() {
     onError: () => toast.error("Could not reset password"),
   });
 
+  // B1: the default password no longer serializes with student payloads —
+  // admins reveal it explicitly (POST /students/<id>/reveal-default-password).
+  const [revealPwData, setRevealPwData] = useState<any>(null);
+  const revealPw = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/students/${studentId}/reveal-default-password`);
+      return res.data?.data;
+    },
+    onSuccess: () => toast.success("Default password revealed"),
+    onError: () => toast.error("Could not reveal password"),
+  });
+
   if (isLoading) return <PageLoader />;
   if (!data) return <div className="text-center py-16">Student not found</div>;
 
@@ -128,10 +140,24 @@ export default function StudentDetailPage() {
               <p className="font-medium">{s.login_id || s.student_id || "Not set"}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Default Password Hint</p>
-              <p className="font-mono text-sm bg-muted p-1.5 rounded inline-block break-all">
-                {s.default_password_hint || "Not generated"}
-              </p>
+              <p className="text-sm text-muted-foreground">Default Password</p>
+              {revealPwData ? (
+                <div className="mt-1 rounded-md bg-emerald-50 border border-emerald-200 p-2.5 text-xs">
+                  <span className="font-mono font-semibold">{revealPwData.default_password}</span>
+                  <p className="text-muted-foreground mt-1">Shown once — copy it before leaving this page.</p>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={revealPw.isPending || !s.user_id}
+                    onClick={() => revealPw.mutate()}
+                  >
+                    {revealPw.isPending ? "Revealing…" : "Reveal default password"}
+                  </Button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
                 Pattern: <span className="font-mono">{"{class}{section}{roll}.{first}"}</span> — parents use {"p{roll}.{first}{last4}"}
               </p>

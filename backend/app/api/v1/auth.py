@@ -374,6 +374,7 @@ def forgot_password():
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
+@limiter.limit("5/minute")
 def reset_password():
     """Consume a single-use reset token and set a new password.
 

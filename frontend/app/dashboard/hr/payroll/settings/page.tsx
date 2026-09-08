@@ -39,7 +39,7 @@ export default function PayrollSettingsPage() {
   const { data: school, isLoading } = useQuery<any>({
     queryKey: ["current-school"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<School>>("/schools/current");
+      const res = await api.get<ApiResponse<School>>("/schools/current/settings");
       return res.data.data;
     },
   });

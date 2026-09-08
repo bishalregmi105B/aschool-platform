@@ -59,7 +59,6 @@ interface ParentUser {
   phone: string;
   is_active: boolean;
   login_id?: string;
-  default_password_hint?: string;
   children_count?: number;
   children?: ParentChild[];
 }
@@ -427,9 +426,6 @@ export default function ParentsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-xs text-muted-foreground">ID: {parent.login_id || parent.email || parent.phone}</div>
-                      <div className="text-xs text-muted-foreground">
-                        PW: {parent.default_password_hint || "Custom"}
-                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

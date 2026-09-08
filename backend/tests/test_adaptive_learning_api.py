@@ -330,4 +330,5 @@ def test_generate_ai_rejects_foreign_student(client, db, school, admin_user):
     r = client.post("/api/v1/lms/learning-paths/generate-ai",
                     headers=_headers(admin2, other),
                     json={"student_id": str(student.id)})
+    print("RESP:", r.status_code, r.get_json())
     assert r.status_code == 404  # other school's student is invisible

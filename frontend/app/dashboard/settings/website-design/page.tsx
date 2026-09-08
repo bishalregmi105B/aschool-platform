@@ -61,7 +61,7 @@ export default function WebsiteDesignSettingsPage() {
   const { data: school, isLoading: loadingSchool } = useQuery({
     queryKey: ["school-settings", "website-design"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<SchoolSettings>>("/schools/current");
+      const res = await api.get<ApiResponse<SchoolSettings>>("/schools/current/settings");
       return res.data.data;
     },
   });

@@ -422,6 +422,7 @@ def create_app(config_name: str | None = None) -> Flask:
                             is_deleted=False,
                         ).first()
                     except Exception:
+                        g.current_user_lookup_failed = True
                         db.session.rollback()
                         g.current_user = None
             except Exception:
@@ -438,10 +439,44 @@ def create_app(config_name: str | None = None) -> Flask:
             Subdomains and the X-School-Slug header are untrusted request
             data: a valid school-A token + school-B header must not grant
             school-B access. Unauthenticated requests (public website,
-            login) pass through — endpoint auth handles those.
+            login) pass through — endpoint auth handles those. A signed JWT
+            whose user row is missing (deleted account, lookup failure) is
+            denied: the token must not ride a resolved school context (B2).
             """
             user = g.current_user
-            if user is None or g.role == "superadmin":
+            if user is None:
+                # Deny ONLY a verifiable-but-missing identity: a signed JWT
+                # whose sub parses to a UUID but whose user row is gone
+                # (deleted account / stale token) must not ride a resolved
+                # school context (B2). An unparseable or absent sub passes
+                # through — endpoint auth handles it, as for anonymous
+                # requests; our login never issues such tokens.
+                if g.role is None or g.user_id is None or not isinstance(
+                    g.user_id, UUID
+                ):
+                    return None
+                if g.get("current_user_lookup_failed"):
+                    # A failed lookup can mean an aborted session (e.g. a
+                    # failed startup seed) rather than a deleted user —
+                    # retry once on a clean session before denying.
+                    try:
+                        from app.models.user import User as _U
+
+                        db.session.rollback()
+                        g.current_user = _U.query.filter_by(
+                            id=g.user_id, is_deleted=False
+                        ).first()
+                        g.current_user_lookup_failed = False
+                    except Exception:
+                        db.session.rollback()
+                    user = g.current_user
+                if user is None:
+                    from app.utils.response import error_response
+
+                    return error_response(
+                        "Your account does not belong to this school.", 403
+                    )
+            if g.role == "superadmin":
                 return None
             user_school_id = getattr(user, "school_id", None)
             if user_school_id is not None and str(user_school_id) == str(school.id):
@@ -482,12 +517,19 @@ def create_app(config_name: str | None = None) -> Flask:
             claims = _get_jwt()
             school_id = claims.get("school_id")
             if school_id:
-                school = School.query.filter_by(id=school_id, is_active=True).first()
-                if school:
-                    denial = _cross_tenant_response(school)
-                    if denial is not None:
-                        return denial
-                    _set_school_context(school)
+                # The claim is data, not a key: a non-UUID value ("reports")
+                # must skip resolution, not 500 on a Postgres uuid cast.
+                try:
+                    school_uuid = UUID(str(school_id))
+                except (TypeError, ValueError, AttributeError):
+                    school_uuid = None
+                if school_uuid is not None:
+                    school = School.query.filter_by(id=school_uuid, is_active=True).first()
+                    if school:
+                        denial = _cross_tenant_response(school)
+                        if denial is not None:
+                            return denial
+                        _set_school_context(school)
         except Exception:
             # Resolution is best-effort; roll back so the request's handlers
             # start from a clean transaction instead of an aborted one.

@@ -370,6 +370,8 @@ def get_sidebar_config():
 @jwt_required()
 @school_required
 def installed_plugins():
+    # F2/F7: config blobs (incl. secret envelopes) reach admins only —
+    # other roles get install state without the config payload.
     """Get all installed plugins for the current school."""
     # Lazy backfill first (idempotent, no-op when fully provisioned) so
     # pre-existing schools get their plan-tier plugins ACTIVE on first load.
@@ -378,26 +380,33 @@ def installed_plugins():
         school_id=g.school_id, active=True, is_deleted=False
     ).all()
 
+    is_admin = g.role in ("superadmin", "school_admin")
     result = []
     for sp in installed:
-        result.append(
-            {
-                "plugin_slug": sp.plugin_slug,
-                "active": sp.active,
-                "installed_at": sp.installed_at.isoformat()
-                if sp.installed_at
-                else None,
-                "is_trial": sp.is_trial,
-                "trial_ends_at": sp.trial_ends_at.isoformat()
-                if sp.trial_ends_at
-                else None,
-                "billing_cycle": sp.billing_cycle,
-                "next_billing_date": sp.next_billing_date.isoformat()
-                if sp.next_billing_date
-                else None,
-                "config": sp.config or {},
-            }
-        )
+        entry = {
+            "plugin_slug": sp.plugin_slug,
+            "active": sp.active,
+            "installed_at": sp.installed_at.isoformat()
+            if sp.installed_at
+            else None,
+            "is_trial": sp.is_trial,
+            "trial_ends_at": sp.trial_ends_at.isoformat()
+            if sp.trial_ends_at
+            else None,
+            "billing_cycle": sp.billing_cycle,
+            "next_billing_date": sp.next_billing_date.isoformat()
+            if sp.next_billing_date
+            else None,
+        }
+        if is_admin:
+            try:
+                schema = plugin_config_schema.load_schema(sp.plugin_slug)
+            except ValueError:
+                schema = None
+            entry["config"] = plugin_config_schema.redact_config(
+                schema, sp.config or {}, g.role
+            )
+        result.append(entry)
 
     return success_response(result)
 
@@ -807,12 +816,17 @@ def deactivate(slug):
             return error_response(result["error"], 404)
         return error_response(result["error"], 409)
 
+    # Engine F2: the deactivate hook was never invoked — ai_teacher ships
+    # `deactivate(db)` to stop live lessons and it silently never ran.
+    _run_plugin_hook(slug, "deactivate")
+
     return success_response({**result, "active": False, "already_inactive": False})
 
 
 @plugins_bp.route("/<slug>/config", methods=["GET"])
 @jwt_required()
 @school_required
+@role_required("superadmin", "school_admin")
 def get_plugin_config(slug):
     """Get plugin configuration for the current school.
 

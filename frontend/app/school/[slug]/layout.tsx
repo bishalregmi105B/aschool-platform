@@ -160,6 +160,16 @@ export default async function SchoolLayout({
   const surfaceOverride = colorOverrides.surface
     ? `:root { --color-surface: ${colorOverrides.surface}; }`
     : "";
+
+  // F4: allowlist tracking ids at render time (stored values may predate
+  // server-side validation — defense in depth for the inline-script sink).
+  const sanitizedGaId = (website?.google_analytics_id || "").match(
+    /^G-[A-Z0-9]{4,12}$/,
+  )?.[0];
+  const sanitizedPixelId = (website?.facebook_pixel_id || "").match(
+    /^\d{6,20}$/,
+  )?.[0];
+
   const customCss = sanitizeCss(website?.customizations?.custom_css || "");
 
   const navLinks = [
@@ -205,24 +215,25 @@ export default async function SchoolLayout({
           }),
         }}
       />
-      {/* W-03: stored-but-never-rendered analytics ids */}
-      {website?.google_analytics_id && (
+      {/* W-03 analytics ids + F4: re-allowlist at render — the id lands in
+          inline <script>, so anything outside GA/pixel formats never renders. */}
+      {sanitizedGaId && (
         <script
           async
-          src={`https://www.googletagmanager.com/gtag/js?id=${website.google_analytics_id}`}
+          src={`https://www.googletagmanager.com/gtag/js?id=${sanitizedGaId}`}
         />
       )}
-      {website?.google_analytics_id && (
+      {sanitizedGaId && (
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${website.google_analytics_id}');`,
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${sanitizedGaId}');`,
           }}
         />
       )}
-      {website?.facebook_pixel_id && (
+      {sanitizedPixelId && (
         <script
           dangerouslySetInnerHTML={{
-            __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${website.facebook_pixel_id}');fbq('track','PageView');`,
+            __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${sanitizedPixelId}');fbq('track','PageView');`,
           }}
         />
       )}
