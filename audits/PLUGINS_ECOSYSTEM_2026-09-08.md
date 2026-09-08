@@ -104,9 +104,42 @@ Modules delegate to `app/api/v1/*.py` blueprints via manifest pointers (7 carry 
 
 **Genuinely good:** server-absolute widget gating, FormRenderer (18 typed controls incl. secrets/cron/BS-dates), all 9 config-schema plugins have working settings UIs, marketplace install→nav→page flow is sound, theme parity lock holds, MarksGridWidget is the strongest component (Enter/arrow nav, TSV paste, dirty-guard).
 
-## 8. Mobile — ⏳ audit in flight (findings will append here)
+## 8. Mobile — full audit (all 5 apps + aschool_shared)
 
-Known from prior verification: manifest `mobile:` keys consumed by nothing; `mobile.py` hardcoded; 5 flutter apps' plugin-awareness unverified this pass.
+The five apps are **genuinely distinct role products** (not copies; all 2.0.0+2, last touched 2026-09-01). `flutter_user` is a unified host embedding student/parent/teacher as path packages. Plugin-awareness is real: shared `PluginGate` + `pluginProvider` (caches `/plugins/installed` + `/mobile/bootstrap` to secure storage) gates ~40 screens. But **no Flutter app calls `/plugins/widgets`, `/plugins/sidebar`, or consumes manifest `mobile:` keys** — those feed web only; `/mobile/bootstrap` visibility is a hardcoded Python role table (`mobile.py:159-431`).
+
+**App × capability:** all use `FlutterSecureStorage` for tokens (no SharedPreferences), shared tenancy via `X-School-Slug`, i18n **zero** (no .arb, no l10n.yaml, ~87 hardcoded titles in the student app alone), offline **cache-only** (no sqflite/hive/outbox anywhere), plugin-aware everywhere.
+
+### Plugin × mobile coverage (top plugins)
+
+| Plugin | Student | Parent | Teacher | Admin |
+|---|---|---|---|---|
+| fees | ✅ | ✅ (eSewa/Khalti WebView — handles browser-POST quirk) | — | ✅ |
+| attendance | ✅ | ✅ | ✅ (no offline queue) | ✅ |
+| exams | ✅🔒 | ✅🔒 | ✅🔒 | ✅🔒 |
+| notices | ✅ | ✅ | ✅ | ✅ |
+| lms | ✅🔒 | — | ✅🔒 | ✅🔒 |
+| gps_tracking | route list | ✅ map+15s-polling (was ⛔ broken slug) | — | ✅ |
+| ai_suite | ⛔→fixed | — | ⛔→fixed | ✅ |
+| library_management | ✅🔒 | ✅🔒 (elibrary) | ✅🔒 | ⛔→fixed |
+
+### Mobile findings & fixes
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| MO1 | **P0** | Push dead in every app as configured: no `google-services.json`/gradle plugin in any of the 5 apps → `Firebase.initializeApp()` throws; OneSignal needs a `--dart-define` nobody sets. Backend registration endpoints exist but nothing calls them | ⚠️ **OWNER ACTION** — needs Firebase project config per app (cannot be code-fixed); make OneSignal config mandatory in release docs + fail loudly |
+| MO2 | **P0** | `flutter_student`/`flutter_admin` (and `aschool_shared`) declare `assets/images/`+`assets/lottie/` that don't exist → fresh-clone `flutter build` fails | ✅ FIXED — dead declarations removed; `flutter analyze` clean on all touched packages |
+| MO3 | P1 | Broken gate slugs permanently lock screens for fresh installs: `bus_tracking` (parent), `ai_tutor` (student/teacher), `ai_tools` (teacher/admin), `library` (admin) — legacy slugs no install row can ever carry | ✅ FIXED — shared `isInstalled` now alias-aware (`_legacySlugAliases` mirroring backend expansion); admin library slug corrected |
+| MO4 | P1 | i18n zero — all copy hardcoded English | Mobile wave |
+| MO5 | P1 | No offline layer — teacher attendance comment literally says "there is no offline queue"; flaky-connectivity submissions fail hard | Mobile wave |
+| MO6 | P2 | Notification tap callback wired to nothing (`setOnTapCallback` 0 callers); no app-links intent filters | Mobile wave |
+| MO7 | P2 | Logout leaks identity: OneSignal tags (school/role/user) never cleared, socket never disconnected, `X-School-Slug` header kept → shared-device cross-account push leak | ✅ FIXED — logout now clears tags, disconnects socket, resets header |
+| MO8 | P2 | `flutter_admin` assignments screen is a static stub with hardcoded fake metrics ('24','6') among 38 real screens | Mobile wave (hide or build) |
+| MO9 | P2 | ~0% app-layer tests (5 × trivial SizedBox pumps); real tests only in `aschool_shared` (4 files incl. plugin-gate behavior) | Mobile wave |
+| MO10 | P3 | `/mobile/bootstrap` visibility hardcoded in Python while 41 manifests declare `mobile:` blocks consumed by nothing | Mobile wave (manifest-driven visibility) |
+| MO11 | P3 | pubspec.locks untracked → non-reproducible payment-WebView builds; `connectivity_plus` declared but never imported (student) | Mobile wave |
+
+**Verified good on mobile:** single-flight token refresh, secure token storage, real divergent codebases, force-update loop fully wired client+server, consistent shimmer/error/empty triads, parent fee payment correct.
 
 ---
 
@@ -122,3 +155,4 @@ Known from prior verification: manifest `mobile:` keys consumed by nothing; `mob
 | E1 deactivate hook | `api/v1/plugins.py` |
 | rag NULL-bind root cause (session poisoning) | `services/ai/rag.py` (ingest + search) |
 | Tests | `tests/test_sec_wave_fixes.py` (7) — **15/15 wave tests green**; tsc clean; plugin_doctor 0/0 |
+| Mobile MO2/MO3/MO5→quick fixes | `aschool_shared/lib/services/plugin_provider.dart` (alias-aware gates), `auth_service.dart` + `notification_service.dart` (logout teardown), admin shell slug, dead asset decls ×3 pubspecs — `flutter analyze`: **0 issues** shared, 0 errors all 4 apps |

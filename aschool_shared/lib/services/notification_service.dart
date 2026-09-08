@@ -183,6 +183,21 @@ class NotificationService {
     }
   }
 
+  /// M9: clear per-identity OneSignal tags on logout so a shared device's
+  /// next user stops receiving the previous user's school/role pushes.
+  void clearUserIdentity() {
+    try {
+      OneSignal.User.removeTags([
+        'school_id',
+        'role',
+        'user_id',
+      ]);
+      _logger.i('OneSignal identity tags cleared');
+    } catch (e) {
+      _logger.w('Failed to clear OneSignal tags: $e');
+    }
+  }
+
   /// Register FCM token with backend (fallback channel)
   Future<void> _registerFcmToken(String token) async {
     try {

@@ -21,8 +21,27 @@ class PluginState {
     this.isLoading = false,
   });
 
-  /// Check if a plugin is installed by slug
+  /// Legacy slugs some gates still use — expanded so a school that installed
+  /// the canonical plugin (e.g. gps_tracking) unlocks screens gated on the
+  /// old name (bus_tracking). Mirrors backend alias expansion (M3-M5).
+  static const Map<String, List<String>> _legacySlugAliases = {
+    'bus_tracking': ['gps_tracking', 'transport'],
+    'transport': ['gps_tracking'],
+    'ai_tutor': ['ai_suite', 'ai_tutor'],
+    'ai_tools': ['ai_suite', 'ai_tools'],
+    'library': ['library_management', 'library'],
+    'portfolio': ['student_portfolio', 'portfolio'],
+    'basic_website': ['basic_website', 'website_builder'],
+  };
+
+  /// Check if a plugin is installed by slug (legacy aliases expanded).
   bool isInstalled(String slug) {
+    return plugins.any((p) =>
+        p.slug == slug && p.isActive) ||
+        (_legacySlugAliases[slug]?.any(_isActiveSlug) ?? false);
+  }
+
+  bool _isActiveSlug(String slug) {
     return plugins.any((p) => p.slug == slug && p.isActive);
   }
 
