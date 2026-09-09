@@ -25,6 +25,11 @@ class WebsitePage(SchoolModel):
     seo_description = Column(Text)
     og_image_url = Column(Text)
     custom_css = Column(Text)
+    # W-02 draft/live: editor autosaves land here (sections + saved_at +
+    # dirty flag); the live `sections` column keeps rendering until an
+    # explicit publish copies draft → live. (L-01: this column was missing
+    # from the model AND table, so every autosave 500ed.)
+    draft_config = Column(JSONB, default=dict)
 
 
 class WebsiteTheme(SchoolModel):

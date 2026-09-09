@@ -68,6 +68,12 @@ class BookIssue(SchoolModel):
         Enum("issued", "returned", "overdue", "lost", name="book_issue_status"),
         default="issued",
     )
+    # Fine assessed at return (per-day rate × days overdue, capped by plugin
+    # config). Persisted so unpaid fines survive the return and can be tracked
+    # and paid later — previously this was set on the instance and never saved
+    # (L-01: serialized here on every /library/issues GET → AttributeError 500).
+    fine_amount = Column(Numeric(8, 2))
+    fine_paid = Column(Boolean, nullable=False, default=False)
 
     book = relationship("Book", backref="issues")
     student = relationship("Student", backref="book_issues")
