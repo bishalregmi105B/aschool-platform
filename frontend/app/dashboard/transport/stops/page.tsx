@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,7 +72,25 @@ function StopsContent() {
     onError: () => toast.error("Failed to remove stop"),
   });
 
-  if (isLoading) return <PageLoader />;
+  const STOP_COLUMNS: Column<any>[] = [
+    { key: "sequence_number", label: "#", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span className="text-muted-foreground">{s.sequence_number}</span> },
+    { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name ?? "", render: (s) => <div className="flex items-center gap-2 font-medium"><MapPin className="h-4 w-4 text-muted-foreground" />{s.name}</div> },
+    { key: "route", label: "Route", sortable: true, value: (s) => routeNameById[s.route_id] ?? "", render: (s) => <span className="text-sm">{routeNameById[s.route_id] || "—"}</span> },
+    { key: "coords", label: "Coordinates", value: (s) => (s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : ""), render: (s) => <span className="text-xs text-muted-foreground">{s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : "—"}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (s) => (
+        <span className="text-right space-x-1">
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(s); }}><Pencil className="h-4 w-4" /></Button>
+          <Button size="sm" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }} disabled={remove.isPending}><Trash2 className="h-4 w-4" /></Button>
+        </span>
+      ),
+    },
+  ];
+
+  if (isLoading) return <PageLoader />;  if (isLoading) return <PageLoader />;
 
   return (
     <div className="space-y-6">
@@ -90,33 +108,15 @@ function StopsContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Stop Name</TableHead>
-              <TableHead>Route</TableHead>
-              <TableHead>Coordinates</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {stops.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No stops defined yet</TableCell></TableRow>
-            ) : stops.map((s: any) => (
-              <TableRow key={s.id}>
-                <TableCell className="text-muted-foreground">{s.sequence_number}</TableCell>
-                <TableCell className="font-medium"><div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{s.name}</div></TableCell>
-                <TableCell className="text-sm">{routeNameById[s.route_id] || "—"}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : "—"}</TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove.mutate(s.id)} disabled={remove.isPending}><Trash2 className="h-4 w-4" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={STOP_COLUMNS}
+          rows={stops}
+          rowKey={(s: any) => s.id}
+          searchable
+          searchPlaceholder="Search stops…"
+          exportFileName="transport-stops"
+          empty={{ icon: MapPin, title: "No stops defined yet", body: "Add stops to build your routes." }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

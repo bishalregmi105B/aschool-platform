@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,6 +67,30 @@ function VisitorsContent() {
     onError: () => toast.error("Check-out failed"),
   });
 
+  const VISITOR_COLUMNS: Column<any>[] = [
+    { key: "name", label: "Name", sortable: true, value: (v) => v.name ?? "", render: (v) => <div className="flex items-center gap-2 font-medium"><UserCheck className="h-4 w-4 text-muted-foreground" />{v.name}</div> },
+    { key: "phone", label: "Phone", value: (v) => v.phone ?? "", render: (v) => v.phone || "—" },
+    { key: "purpose", label: "Purpose", sortable: true, value: (v) => v.purpose ?? "", render: (v) => <Badge variant="outline">{v.purpose}</Badge> },
+    { key: "visiting", label: "Visiting", value: (v) => v.visiting_staff_id ?? "", render: (v) => v.visiting_staff_id || "—" },
+    { key: "checked_in_at", label: "Check In", sortable: true, value: (v) => v.checked_in_at ?? "", render: (v) => <span className="text-sm">{v.checked_in_at ? new Date(v.checked_in_at).toLocaleTimeString() : "—"}</span> },
+    { key: "checked_out_at", label: "Check Out", sortable: true, value: (v) => v.checked_out_at ?? "", render: (v) => <span className="text-sm">{v.checked_out_at ? new Date(v.checked_out_at).toLocaleTimeString() : "—"}</span> },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (v) => (v.checked_out_at ? "left" : "in-campus"),
+      render: (v) => <Badge variant={v.checked_out_at ? "default" : "secondary"}>{v.checked_out_at ? "Left" : "In Campus"}</Badge>,
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (v) => (!v.checked_out_at ? (
+        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); checkOut.mutate(v.id); }}><LogOut className="h-4 w-4" /></Button>
+      ) : null),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   return (
@@ -86,25 +110,17 @@ function VisitorsContent() {
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Purpose</TableHead><TableHead>Visiting</TableHead><TableHead>Check In</TableHead><TableHead>Check Out</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader>
-            <TableBody>
-              {visitors.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No visitors recorded</TableCell></TableRow>
-              ) : visitors.map((v: any) => (
-                <TableRow key={v.id}>
-                  <TableCell className="font-medium"><div className="flex items-center gap-2"><UserCheck className="h-4 w-4 text-muted-foreground" />{v.name}</div></TableCell>
-                  <TableCell>{v.phone || "—"}</TableCell>
-                  <TableCell><Badge variant="outline">{v.purpose}</Badge></TableCell>
-                  <TableCell>{v.visiting_staff_id || "—"}</TableCell>
-                  <TableCell className="text-sm">{v.checked_in_at ? new Date(v.checked_in_at).toLocaleTimeString() : "—"}</TableCell>
-                  <TableCell className="text-sm">{v.checked_out_at ? new Date(v.checked_out_at).toLocaleTimeString() : "—"}</TableCell>
-                  <TableCell><Badge variant={v.checked_out_at ? "default" : "secondary"}>{v.checked_out_at ? "Left" : "In Campus"}</Badge></TableCell>
-                  <TableCell>{!v.checked_out_at && <Button variant="ghost" size="sm" onClick={() => checkOut.mutate(v.id)}><LogOut className="h-4 w-4" /></Button>}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={VISITOR_COLUMNS}
+            rows={visitors}
+            rowKey={(v: any) => v.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search visitors..."
+            exportFileName="visitors"
+            empty={{ icon: UserCheck, title: "No visitors recorded", body: "Check in visitors to start the log." }}
+          />
         </CardContent>
       </Card>
 

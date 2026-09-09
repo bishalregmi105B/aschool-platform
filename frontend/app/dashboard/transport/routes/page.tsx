@@ -10,9 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -87,6 +85,62 @@ export default function RoutesPage() {
     r.description?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const ROUTE_COLUMNS: Column<TransportRoute>[] = [
+    {
+      key: "name",
+      label: "Route Name",
+      sortable: true,
+      value: (r) => r.name ?? "",
+      render: (r) => (
+        <div>
+          <div className="font-medium flex items-center gap-2">
+            <Map className="h-4 w-4 text-muted-foreground" />
+            {r.name}
+          </div>
+          {r.description && <div className="text-xs text-muted-foreground mt-1 max-w-md truncate">{r.description}</div>}
+        </div>
+      ),
+    },
+    { key: "distance_km", label: "Distance", align: "right", sortable: true, value: (r) => r.distance_km ?? 0, render: (r) => (r.distance_km ? `${r.distance_km} km` : "—") },
+    { key: "estimated_time_mins", label: "Est. Time", align: "right", sortable: true, value: (r) => r.estimated_time_mins ?? 0, render: (r) => (r.estimated_time_mins ? `${r.estimated_time_mins} mins` : "—") },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (r) => (r.is_active ? "active" : "inactive"),
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={r.is_active}
+            onCheckedChange={(checked) => toggleStatusMutation.mutate({ id: r.id, is_active: checked })}
+            disabled={toggleStatusMutation.isPending}
+          />
+          <Badge variant={r.is_active ? "success" : "secondary"}>
+            {r.is_active ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (r) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditItem(r); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            if(confirm("Are you sure you want to delete this route?")) deleteMutation.mutate(r.id);
+          }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -101,75 +155,19 @@ export default function RoutesPage() {
         </Button>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search routes..."
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Route Name</TableHead>
-                <TableHead>Distance</TableHead>
-                <TableHead>Est. Time</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {routesList.map((r: TransportRoute) => (
-                <TableRow key={r.id}>
-                  <TableCell>
-                    <div className="font-medium flex items-center gap-2">
-                      <Map className="h-4 w-4 text-muted-foreground" />
-                      {r.name}
-                    </div>
-                    {r.description && <div className="text-xs text-muted-foreground mt-1 max-w-md truncate">{r.description}</div>}
-                  </TableCell>
-                  <TableCell>{r.distance_km ? `${r.distance_km} km` : "—"}</TableCell>
-                  <TableCell>{r.estimated_time_mins ? `${r.estimated_time_mins} mins` : "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch 
-                        checked={r.is_active} 
-                        onCheckedChange={(checked) => toggleStatusMutation.mutate({ id: r.id, is_active: checked })}
-                        disabled={toggleStatusMutation.isPending}
-                      />
-                      <Badge variant={r.is_active ? "success" : "secondary"}>
-                        {r.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => setEditItem(r)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if(confirm("Are you sure you want to delete this route?")) deleteMutation.mutate(r.id);
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {routesList.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    No routes found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<TransportRoute>
+            columns={ROUTE_COLUMNS}
+            rows={routesList}
+            rowKey={(r) => r.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search routes..."
+            exportFileName="transport-routes"
+            empty={{ icon: Route, title: "No routes found", body: "Add bus routes to organize student transport.", action: { label: "Add Route", onClick: () => setShowAdd(true) } }}
+          />
         </CardContent>
       </Card>
 
