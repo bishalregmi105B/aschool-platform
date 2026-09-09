@@ -3,14 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getHistory, type ImportLog } from "@/lib/services/iemis.service";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
@@ -47,6 +40,38 @@ export default function IemisHistoryPage() {
     },
     retry: 1,
   });
+
+  const LOG_COLUMNS: Column<any>[] = [
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (l) => l.status ?? "",
+      render: (l) => (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[l.status] ?? ""}`}>
+          {STATUS_ICON[l.status]}
+          {l.status}
+        </span>
+      ),
+    },
+    { key: "format", label: "Format", value: (l) => FORMAT_LABELS[l.format_code] ?? l.format_code ?? "", render: (l) => <span className="text-sm">{FORMAT_LABELS[l.format_code] ?? l.format_code}</span> },
+    { key: "filename", label: "File", value: (l) => l.filename ?? "", render: (l) => <span className="text-xs text-muted-foreground max-w-[160px] truncate block">{l.filename ?? "—"}</span> },
+    { key: "total_rows", label: "Total", align: "right", sortable: true, value: (l) => l.total_rows ?? 0 },
+    { key: "imported_rows", label: "Imported", align: "right", sortable: true, value: (l) => l.imported_rows ?? 0, render: (l) => <span className="text-sm text-green-700 font-medium">{l.imported_rows}</span> },
+    { key: "skipped_rows", label: "Skipped", align: "right", sortable: true, value: (l) => l.skipped_rows ?? 0, render: (l) => <span className="text-sm text-muted-foreground">{l.skipped_rows}</span> },
+    { key: "error_rows", label: "Errors", align: "right", sortable: true, value: (l) => l.error_rows ?? 0, render: (l) => <span className="text-sm text-red-600">{l.error_rows}</span> },
+    {
+      key: "date",
+      label: "Date",
+      sortable: true,
+      value: (l) => l.completed_at ?? l.created_at ?? "",
+      render: (l) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {l.completed_at ? new Date(l.completed_at).toLocaleString() : new Date(l.created_at).toLocaleString()}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -86,45 +111,15 @@ export default function IemisHistoryPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Format</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Imported</TableHead>
-                  <TableHead className="text-right">Skipped</TableHead>
-                  <TableHead className="text-right">Errors</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[log.status] ?? ""}`}>
-                        {STATUS_ICON[log.status]}
-                        {log.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm">{FORMAT_LABELS[log.format_code] ?? log.format_code}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">
-                      {log.filename ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-sm">{log.total_rows}</TableCell>
-                    <TableCell className="text-right text-sm text-green-700 font-medium">{log.imported_rows}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">{log.skipped_rows}</TableCell>
-                    <TableCell className="text-right text-sm text-red-600">{log.error_rows}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {log.completed_at
-                        ? new Date(log.completed_at).toLocaleString()
-                        : new Date(log.created_at).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={LOG_COLUMNS}
+              rows={logs}
+              rowKey={(l) => l.id}
+              searchable
+              searchPlaceholder="Search imports…"
+              exportFileName="iemis-import-history"
+              dense
+            />
           </CardContent>
         </Card>
       )}

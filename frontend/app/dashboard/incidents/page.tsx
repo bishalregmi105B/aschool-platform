@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +64,15 @@ function IncidentsContent() {
 
   const severityColor = (s: string) => s === "high" ? "destructive" : s === "medium" ? "secondary" : "outline";
 
+  const INCIDENT_COLUMNS: Column<any>[] = [
+    { key: "created_at", label: "Date", sortable: true, value: (i) => i.created_at ?? "", render: (i) => (i.created_at ? displayBS(i.created_at) : "—") },
+    { key: "title", label: "Title", sortable: true, value: (i) => i.title ?? "", render: (i) => <span className="font-medium">{i.title}</span> },
+    { key: "incident_type", label: "Type", sortable: true, value: (i) => i.incident_type ?? "", render: (i) => <Badge variant="outline">{i.incident_type}</Badge> },
+    { key: "severity", label: "Severity", sortable: true, value: (i) => i.severity ?? "", render: (i) => <Badge variant={severityColor(i.severity)}>{i.severity}</Badge> },
+    { key: "student_name", label: "Student", value: (i) => i.student_name ?? "", render: (i) => i.student_name || "—" },
+    { key: "status", label: "Status", sortable: true, value: (i) => i.status ?? "open", render: (i) => <Badge variant={i.status === "resolved" ? "default" : "secondary"}>{i.status || "open"}</Badge> },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -71,27 +80,19 @@ function IncidentsContent() {
         <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Report Incident</Button>
       </div>
 
-      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search incidents..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Severity</TableHead><TableHead>Student</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {incidents.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No incidents recorded</TableCell></TableRow>
-              ) : incidents.map((i: any) => (
-                <TableRow key={i.id}>
-                  <TableCell>{i.created_at ? displayBS(i.created_at) : "—"}</TableCell>
-                  <TableCell className="font-medium">{i.title}</TableCell>
-                  <TableCell><Badge variant="outline">{i.incident_type}</Badge></TableCell>
-                  <TableCell><Badge variant={severityColor(i.severity)}>{i.severity}</Badge></TableCell>
-                  <TableCell>{i.student_name || "—"}</TableCell>
-                  <TableCell><Badge variant={i.status === "resolved" ? "default" : "secondary"}>{i.status || "open"}</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={INCIDENT_COLUMNS}
+            rows={incidents}
+            rowKey={(i: any) => i.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search incidents..."
+            exportFileName="incidents"
+            empty={{ icon: AlertCircle, title: "No incidents recorded", body: "Record incidents to build the disciplinary history.", action: { label: "Report Incident", onClick: () => setShowDialog(true) } }}
+          />
         </CardContent>
       </Card>
 

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +79,38 @@ function InventoryContent() {
     onError: () => toast.error("Failed to add asset"),
   });
 
+  const ASSET_COLUMNS: Column<any>[] = [
+    {
+      key: "name",
+      label: "Asset",
+      sortable: true,
+      value: (a) => a.name ?? "",
+      render: (a) => (
+        <div className="flex items-center gap-2 font-medium">
+          <Package className="h-4 w-4 text-muted-foreground" />
+          {a.name}
+          {a.asset_code ? <span className="text-xs text-muted-foreground">({a.asset_code})</span> : null}
+        </div>
+      ),
+    },
+    { key: "category", label: "Category", sortable: true, value: (a) => a.category ?? "", render: (a) => <Badge variant="outline">{a.category || "—"}</Badge> },
+    { key: "condition", label: "Condition", sortable: true, value: (a) => a.condition ?? "good", render: (a) => a.condition || "good" },
+    { key: "purchase_price", label: "Purchase Price", align: "right", sortable: true, value: (a) => a.purchase_price ?? 0, render: (a) => <>Rs. {(a.purchase_price || 0).toLocaleString()}</> },
+    { key: "current_value", label: "Current Value", align: "right", sortable: true, value: (a) => a.current_value ?? 0, render: (a) => <>Rs. {(a.current_value || 0).toLocaleString()}</> },
+    { key: "location", label: "Location", value: (a) => a.location ?? "", render: (a) => a.location || "—" },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (a) => (!a.is_active || a.condition === "disposed" ? "disposed" : a.condition === "poor" ? "attention" : "in-use"),
+      render: (a) => (
+        <Badge variant={a.condition === "poor" || a.condition === "disposed" || !a.is_active ? "destructive" : "default"}>
+          {!a.is_active || a.condition === "disposed" ? "Disposed" : a.condition === "poor" ? (<><AlertTriangle className="inline mr-1 h-3 w-3" />Needs attention</>) : "In use"}
+        </Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   return (
@@ -98,32 +130,19 @@ function InventoryContent() {
         <Card><CardContent className="py-10 text-center text-muted-foreground">Failed to load inventory. <Button variant="link" onClick={() => queryClient.invalidateQueries({ queryKey: ["inventory"] })}>Retry</Button></CardContent></Card>
       ) : (
         <>
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search assets..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-
           <Card>
             <CardContent className="pt-6">
-              <Table>
-                <TableHeader><TableRow><TableHead>Asset</TableHead><TableHead>Category</TableHead><TableHead>Condition</TableHead><TableHead>Purchase Price</TableHead><TableHead>Current Value</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {items.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No assets recorded</TableCell></TableRow>
-                  ) : items.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" />{a.name}{a.asset_code ? <span className="text-xs text-muted-foreground">({a.asset_code})</span> : null}</div></TableCell>
-                      <TableCell><Badge variant="outline">{a.category || "—"}</Badge></TableCell>
-                      <TableCell>{a.condition || "good"}</TableCell>
-                      <TableCell>Rs. {(a.purchase_price || 0).toLocaleString()}</TableCell>
-                      <TableCell>Rs. {(a.current_value || 0).toLocaleString()}</TableCell>
-                      <TableCell>{a.location || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={a.condition === "poor" || a.condition === "disposed" || !a.is_active ? "destructive" : "default"}>
-                          {!a.is_active || a.condition === "disposed" ? "Disposed" : a.condition === "poor" ? (<><AlertTriangle className="inline mr-1 h-3 w-3" />Needs attention</>) : "In use"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={ASSET_COLUMNS}
+                rows={items}
+                rowKey={(a) => a.id}
+                searchable
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search assets..."
+                exportFileName="inventory"
+                empty={{ icon: Package, title: "No assets recorded", body: "Add furniture, electronics and other school assets.", action: { label: "Add Asset", onClick: () => setShowDialog(true) } }}
+              />
             </CardContent>
           </Card>
         </>
