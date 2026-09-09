@@ -10,14 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogContent,
@@ -192,6 +185,78 @@ export default function ParentsPage() {
   if (isLoading) return <PageLoader />;
 
   const parents = Array.isArray(data?.data) ? data.data : [];
+
+  const PARENT_COLUMNS: Column<ParentUser>[] = [
+    { key: "full_name", label: "Parent", sortable: true, value: (pr) => pr.full_name, render: (pr) => <span className="font-medium">{pr.full_name}</span> },
+    {
+      key: "contact",
+      label: "Contact",
+      value: (pr) => pr.phone ?? pr.email ?? "",
+      render: (pr) => (
+        <div>
+          <div className="text-sm">{pr.phone || "-"}</div>
+          {pr.email && <div className="text-xs text-muted-foreground">{pr.email}</div>}
+        </div>
+      ),
+    },
+    {
+      key: "children",
+      label: "Children",
+      align: "right",
+      sortable: true,
+      value: (pr) => pr.children_count || 0,
+      render: (pr) => (
+        <div>
+          <Badge variant="secondary">{pr.children_count || 0} children</Badge>
+          {(pr.children || []).slice(0, 2).map((child) => (
+            <div key={child.id} className="text-xs text-muted-foreground mt-1">
+              {child.name}
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (pr) => (pr.is_active ? "active" : "inactive"),
+      render: (pr) => (
+        <Badge variant={pr.is_active ? "success" : "destructive"}>
+          {pr.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "credentials",
+      label: "Credentials",
+      value: (pr) => pr.login_id ?? pr.email ?? pr.phone ?? "",
+      render: (pr) => <div className="text-xs text-muted-foreground">ID: {pr.login_id || pr.email || pr.phone}</div>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (pr) => (
+        <div className="flex justify-end gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/dashboard/parents/${pr.id}`}>
+              <ShieldCheck className="h-4 w-4 mr-1" /> Manage
+            </Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate(pr.id); }}
+            disabled={toggleStatusMutation.isPending}
+          >
+            {pr.is_active ? "Deactivate" : "Activate"}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const pagination = data?.meta?.pagination;
 
   return (
@@ -297,7 +362,9 @@ export default function ParentsPage() {
                       const studentName = student.full_name || `${student.first_name || ""} ${student.last_name || ""}`.trim();
                       const checked = selectedStudentIds.includes(student.id);
 
-                      return (
+                    
+
+  return (
                         <label
                           key={student.id}
                           className="flex items-center justify-between gap-3 p-2 rounded hover:bg-muted/40 cursor-pointer"
@@ -383,99 +450,28 @@ export default function ParentsPage() {
           <CardTitle className="text-base">Parent Accounts</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Parent</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Children</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Credentials</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {parents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No parent accounts found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                parents.map((parent) => (
-                  <TableRow key={parent.id}>
-                    <TableCell className="font-medium">{parent.full_name}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">{parent.phone || "-"}</div>
-                      {parent.email && (
-                        <div className="text-xs text-muted-foreground">{parent.email}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{parent.children_count || 0} children</Badge>
-                      {(parent.children || []).slice(0, 2).map((child) => (
-                        <div key={child.id} className="text-xs text-muted-foreground mt-1">
-                          {child.name}
-                        </div>
-                      ))}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={parent.is_active ? "success" : "destructive"}>
-                        {parent.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-xs text-muted-foreground">ID: {parent.login_id || parent.email || parent.phone}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/dashboard/parents/${parent.id}`}>
-                            <ShieldCheck className="h-4 w-4 mr-1" /> Manage
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => toggleStatusMutation.mutate(parent.id)}
-                          disabled={toggleStatusMutation.isPending}
-                        >
-                          {parent.is_active ? "Deactivate" : "Activate"}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<ParentUser>
+            columns={PARENT_COLUMNS}
+            rows={parents}
+            rowKey={(pr) => pr.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search parents…"
+            exportFileName="parents"
+            pagination={pagination ? {
+              page: pagination.page,
+              pages: pagination.pages,
+              total: pagination.total,
+              per_page: pagination.per_page,
+              has_next: pagination.has_next,
+              has_prev: pagination.has_prev,
+            } : undefined}
+            onPageChange={setPage}
+            empty={{ icon: ShieldCheck, title: "No parent accounts found", body: "Parent accounts are created from guardian records." }}
+          />
         </CardContent>
 
-        {pagination && pagination.pages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-            <p className="text-sm text-muted-foreground">
-              Page {pagination.page} of {pagination.pages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.has_prev}
-                onClick={() => setPage((prev) => prev - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.has_next}
-                onClick={() => setPage((prev) => prev + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </Card>
     </div>
   );

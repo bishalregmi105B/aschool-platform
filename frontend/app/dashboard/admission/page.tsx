@@ -7,9 +7,7 @@ import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { PlusCircle, UserPlus, BarChart3, Eye } from "lucide-react";
 
 interface Inquiry {
@@ -232,6 +231,99 @@ function AdmissionContent() {
   const pipeline = dashboard?.pipeline || {};
   const inquiryStages = ["new", "contacted", "followed_up", "converted", "lost"];
 
+  const INQUIRY_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (i) => i.student_name ?? "", render: (i) => <span className="font-medium">{i.student_name}</span> },
+    { key: "guardian_name", label: "Guardian", value: (i) => i.guardian_name ?? "" },
+    { key: "phone", label: "Phone", value: (i) => i.phone ?? "" },
+    { key: "class_applied", label: "Class", sortable: true, value: (i) => i.class_applied ?? "" },
+    { key: "source", label: "Source", sortable: true, value: (i) => i.source ?? "" },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (i) => i.status ?? "",
+      render: (i) => (
+        <AdvancedSelect
+          className="w-36"
+          triggerClassName="h-8 text-xs"
+          value={i.status}
+          onChange={(val) => inquiryStatusMut.mutate({ id: i.id, status: val })}
+          options={inquiryStages.map((st) => ({ value: st, label: statusLabel(st) }))}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (i) =>
+        i.status !== "converted" ? (
+          <Button size="sm" onClick={(e) => { e.stopPropagation(); convertMut.mutate(i); }} disabled={convertMut.isPending}>
+            Convert to Application
+          </Button>
+        ) : null,
+    },
+  ];
+
+  const APPLICATION_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (a) => a.student_name ?? "", render: (a) => <span className="font-medium">{a.student_name}</span> },
+    { key: "guardian", label: "Guardian", value: (a) => a.guardian_name ?? a.parent_name ?? "", render: (a) => a.guardian_name || a.parent_name },
+    { key: "class_applied", label: "Class", sortable: true, value: (a) => a.class_applied ?? "" },
+    { key: "status", label: "Status", sortable: true, value: (a) => a.status ?? "", render: (a) => <Badge>{a.status}</Badge> },
+    {
+      key: "next",
+      label: "Next Step",
+      render: (a) => {
+        const next = NEXT_STAGE[a.status];
+        const sideOptions = PIPELINE_STAGES.filter((s) =>
+          (s === "rejected" || s === "waitlisted") && s !== a.status &&
+          a.status !== "enrolled",
+        );
+        return next && a.status !== "enrolled" ? (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              onClick={() => statusMut.mutate({ id: a.id, status: next.status, current: a.status })}
+              disabled={statusMut.isPending}
+            >
+              {next.label}
+              {next.status === "accepted" ? " (creates login)" : ""}
+            </Button>
+            {sideOptions.length > 0 && (
+              <AdvancedSelect
+                className="w-28"
+                triggerClassName="h-8"
+                onValueChange={(val) => statusMut.mutate({ id: a.id, status: val, current: a.status })}
+                placeholder="More…"
+                options={sideOptions.map((s) => ({ value: s, label: s === "rejected" ? "Reject" : "Waitlist" }))}
+              />
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (a) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          title="View applicant details"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDetailApp(a);
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -390,45 +482,15 @@ function AdmissionContent() {
       {tab === "inquiries" && (loadingInq ? <PageLoader /> : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Guardian</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {inquiries?.map((inq: any) => (
-                  <TableRow key={inq.id}>
-                    <TableCell className="font-medium">{inq.student_name}</TableCell>
-                    <TableCell>{inq.guardian_name}</TableCell>
-                    <TableCell>{inq.phone}</TableCell>
-                    <TableCell>{inq.class_applied}</TableCell>
-                    <TableCell>{inq.source}</TableCell>
-                    <TableCell>
-                      <Select onValueChange={(val) => inquiryStatusMut.mutate({ id: inq.id, status: val })}>
-                        <SelectTrigger className="w-32 h-8"><SelectValue placeholder={inq.status} /></SelectTrigger>
-                        <SelectContent>
-                          {inquiryStages.map((st) => <SelectItem key={st} value={st} className="capitalize">{statusLabel(st)}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {inq.status !== "converted" && (
-                        <Button size="sm" onClick={() => convertMut.mutate(inq)} disabled={convertMut.isPending}>
-                          Convert to Application
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={INQUIRY_COLUMNS}
+              rows={inquiries ?? []}
+              rowKey={(inq: any) => inq.id}
+              searchable
+              searchPlaceholder="Search inquiries…"
+              exportFileName="admission-inquiries"
+              empty={{ icon: UserPlus, title: "No inquiries yet", body: "Log your first admission inquiry." }}
+            />
           </CardContent>
         </Card>
       ))}
@@ -436,81 +498,16 @@ function AdmissionContent() {
       {tab === "applications" && (loadingApps ? <PageLoader /> : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Guardian</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Next Step</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {applications?.map((app: any) => {
-                  const next = NEXT_STAGE[app.status];
-                  const sideOptions = PIPELINE_STAGES.filter((s) =>
-                    (s === "rejected" || s === "waitlisted") && s !== app.status &&
-                    // Enrolled applications are final server-side.
-                    app.status !== "enrolled",
-                  );
-                  return (
-                    <TableRow
-                      key={app.id}
-                      className="cursor-pointer"
-                      onClick={() => setDetailApp(app)}
-                    >
-                      <TableCell className="font-medium">{app.student_name}</TableCell>
-                      <TableCell>{app.guardian_name || app.parent_name}</TableCell>
-                      <TableCell>{app.class_applied}</TableCell>
-                      <TableCell><Badge>{app.status}</Badge></TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        {next && app.status !== "enrolled" ? (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => statusMut.mutate({ id: app.id, status: next.status, current: app.status })}
-                              disabled={statusMut.isPending}
-                            >
-                              {next.label}
-                              {next.status === "accepted" ? " (creates login)" : ""}
-                            </Button>
-                            {sideOptions.length > 0 && (
-                              <Select onValueChange={(val) => statusMut.mutate({ id: app.id, status: val, current: app.status })}>
-                                <SelectTrigger className="w-24 h-8"><SelectValue placeholder="More…" /></SelectTrigger>
-                                <SelectContent>
-                                  {sideOptions.map((s) => (
-                                    <SelectItem key={s} value={s} className="capitalize">
-                                      {s === "rejected" ? "Reject" : "Waitlist"}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="View applicant details"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDetailApp(app);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={APPLICATION_COLUMNS}
+              rows={applications ?? []}
+              rowKey={(a: any) => a.id}
+              onRowClick={(a) => setDetailApp(a)}
+              searchable
+              searchPlaceholder="Search applications…"
+              exportFileName="admission-applications"
+              empty={{ icon: UserPlus, title: "No applications yet", body: "Convert inquiries or create applications directly." }}
+            />
           </CardContent>
         </Card>
       ))}
