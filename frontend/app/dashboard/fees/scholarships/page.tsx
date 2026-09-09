@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSMonthInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -363,22 +364,16 @@ function ScholarshipsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valid From (BS)</Label>
-                <Input
-                  placeholder="2081-04"
+                <BSMonthInput
                   value={form.valid_from_bs}
-                  onChange={(e) =>
-                    setForm({ ...form, valid_from_bs: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, valid_from_bs: v })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Valid Until (BS, blank = open-ended)</Label>
-                <Input
-                  placeholder="2082-03"
+                <BSMonthInput
                   value={form.valid_until_bs}
-                  onChange={(e) =>
-                    setForm({ ...form, valid_until_bs: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, valid_until_bs: v })}
                 />
               </div>
             </div>

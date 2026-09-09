@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Calendar, Wand2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -329,11 +330,11 @@ function AddSlotDialog({
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
                 <Label>Start</Label>
-                <Input name="start_time" type="time" placeholder="10:00" />
+                <TimePicker name="start_time" placeholder="10:00" step={5} />
               </div>
               <div className="space-y-2">
                 <Label>End</Label>
-                <Input name="end_time" type="time" placeholder="10:45" />
+                <TimePicker name="end_time" placeholder="10:45" step={5} />
               </div>
             </div>
           </div>

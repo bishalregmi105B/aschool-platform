@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Mukta } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Devanagari UI font — every Nepali label renders in Mukta instead of the
+// system fallback (which mixed serif Devanagari with sans Latin).
+const mukta = Mukta({
+  subsets: ["devanagari", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-mukta",
+});
 
 export const metadata: Metadata = {
   title: "ASchool — School Management OS for Nepal",
@@ -18,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ne" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${mukta.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

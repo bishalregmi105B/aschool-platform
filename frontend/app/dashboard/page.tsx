@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { useInstalledPlugins, getPluginDisplayName } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { SkeletonStat } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { WidgetSlot } from "@/components/plugin-widgets/PluginWidgetHost";
+import { ThemedBarChart, ThemedLineChart } from "@/components/ui/charts";
 import { formatCurrency } from "@/lib/utils";
 import {
   GraduationCap,
@@ -20,6 +22,10 @@ import {
   Calendar,
 } from "lucide-react";
 
+interface TrendPoint {
+  [key: string]: string | number | null | undefined;
+}
+
 interface DashboardData {
   total_students: number;
   total_teachers: number;
@@ -29,6 +35,20 @@ interface DashboardData {
   upcoming_events: number;
   pending_fee_amount: number;
   active_plugins: number;
+  attendance_summary?: {
+    average_percentage?: number;
+    best_class?: string | null;
+    worst_class?: string | null;
+    by_class?: Array<{ class_name: string; percentage: number }>;
+  };
+  fee_summary?: {
+    by_month?: Array<{ month: string; collected: number; pending: number }>;
+    by_fee_type?: Array<{ type: string; amount: number; percentage: number }>;
+  };
+  exam_summary?: {
+    top_subject?: string | null;
+    by_subject?: Array<{ subject: string; average: number }>;
+  };
 }
 
 /**
@@ -156,6 +176,82 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Trends — real charts over the overview payload's richer halves
+          (attendance by class, fee monthly trend, subject averages). Each
+          panel hides itself when its series is empty instead of showing a
+          hollow frame. */}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {(data?.fee_summary?.by_month?.length ?? 0) > 0 && (
+            <Card className="shadow-sm">
+              <CardHeader className="px-4 pb-1 pt-3">
+                <CardTitle className="text-[13px] font-semibold">
+                  Fee Collection Trend
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground">Collected vs pending, last months</p>
+              </CardHeader>
+              <CardContent className="px-2 pb-3">
+                <ThemedLineChart
+                  data={(data?.fee_summary?.by_month ?? []) as unknown as TrendPoint[]}
+                  xKey="month"
+                  lines={[
+                    { key: "collected", name: "Collected", ne: "संकलित" },
+                    { key: "pending", name: "Pending", ne: "बाँकी" },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {(data?.attendance_summary?.by_class?.length ?? 0) > 0 && (
+            <Card className="shadow-sm">
+              <CardHeader className="px-4 pb-1 pt-3">
+                <CardTitle className="text-[13px] font-semibold">
+                  Attendance by Class
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground">
+                  Best: {data?.attendance_summary?.best_class ?? "—"}
+                  {data?.attendance_summary?.worst_class ? ` · Needs attention: ${data.attendance_summary.worst_class}` : ""}
+                </p>
+              </CardHeader>
+              <CardContent className="px-2 pb-3">
+                <ThemedBarChart
+                  data={(data?.attendance_summary?.by_class ?? []).map((c) => ({
+                    class_name: c.class_name,
+                    percentage: c.percentage,
+                  }))}
+                  xKey="class_name"
+                  bars={[{ key: "percentage", name: "Attendance %", ne: "उपस्थिति %" }]}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {(data?.exam_summary?.by_subject?.length ?? 0) > 0 && (
+            <Card className="shadow-sm lg:col-span-2">
+              <CardHeader className="px-4 pb-1 pt-3">
+                <CardTitle className="text-[13px] font-semibold">
+                  Subject Averages
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground">
+                  Latest exam · avg score per subject
+                  {data?.exam_summary?.top_subject ? ` · top: ${data.exam_summary.top_subject}` : ""}
+                </p>
+              </CardHeader>
+              <CardContent className="px-2 pb-3">
+                <ThemedBarChart
+                  data={(data?.exam_summary?.by_subject ?? []).map((s) => ({
+                    subject: s.subject,
+                    average: s.average,
+                  }))}
+                  xKey="subject"
+                  bars={[{ key: "average", name: "Average score", ne: "औसत अंक" }]}
+                  height={240}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

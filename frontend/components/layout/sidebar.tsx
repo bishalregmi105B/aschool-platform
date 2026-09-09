@@ -95,6 +95,7 @@ import { cn } from "@/lib/utils";
 import { useInstalledPlugins, type PluginSidebarItem } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar } from "@/components/ui/avatar";
+import { useI18n } from "@/lib/i18n";
 import { useState, useEffect, useMemo } from "react";
 
 // ── Icon Registry (maps YAML icon string → Lucide component) ───────────────
@@ -272,35 +273,41 @@ function rankInSection(section: string | null, slug: string): number {
 
 // ── Helper — convert a PluginSidebarItem to NavItem ───────────────────────
 // N-01: the manifests carry label_nepali for all 155 nav items; the backend
-// already transmits them — they were simply never read. Nepali shows when
-// the user's preferred_language is "ne" (the product default).
-function pickLabel(english: string, nepali?: string | null): string {
-  const lang =
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("preferred_language") ||
-        localStorage.getItem("lang"))) ||
-    "ne";
+// already transmits them — they were simply never read. Language now comes
+// from the I18nProvider (header toggle) with the legacy localStorage keys as
+// fallback so pre-toggle users keep their old preference.
+function readLegacyLang(): "en" | "ne" {
+  if (typeof window === "undefined") return "en";
+  const v = window.localStorage.getItem("preferred_language");
+  return v === "ne" ? "ne" : "en";
+}
+
+function pickLabel(english: string, nepali: string | null | undefined, lang: "en" | "ne"): string {
   return lang === "ne" && nepali ? nepali : english;
 }
 
-function pluginToNavItem(item: PluginSidebarItem): NavItem {
+function pluginToNavItem(
+  item: PluginSidebarItem,
+  lang: "en" | "ne"
+): NavItem {
   const icon = resolveIcon(item.icon);
   if (item.subitems && item.subitems.length > 0) {
     return {
-      label: pickLabel(item.label, item.label_nepali),
+      label: pickLabel(item.label, item.label_nepali, lang),
       icon,
       pluginSlug: item.slug,
       children: item.subitems.map((sub) => ({
         label: pickLabel(
           sub.label,
-          (sub as unknown as { label_nepali?: string | null }).label_nepali
+          (sub as unknown as { label_nepali?: string | null }).label_nepali,
+          lang
         ),
         href: sub.route,
       })),
     };
   }
   return {
-    label: pickLabel(item.label, item.label_nepali),
+    label: pickLabel(item.label, item.label_nepali, lang),
     icon,
     href: item.route,
     pluginSlug: item.slug,
@@ -312,6 +319,15 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { sidebarItems, pluginBottomNav, isLoading } = useInstalledPlugins();
+  const { lang: i18nLang } = useI18n();
+  // Legacy fallback: honour a stored "ne" preference even if the provider
+  // hasn't hydrated yet, so the sidebar never flashes English for Nepali
+  // users. After hydration both agree.
+  const [legacyLang, setLegacyLang] = useState<"en" | "ne">("en");
+  useEffect(() => {
+    setLegacyLang(readLegacyLang());
+  }, []);
+  const lang = i18nLang === "ne" || legacyLang === "ne" ? "ne" : "en";
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -348,7 +364,7 @@ export function Sidebar() {
     for (const item of sidebarItems) {
       const sec = (item.section as string | null) ?? null;
       if (!bySection.has(sec)) bySection.set(sec, []);
-      bySection.get(sec)!.push(pluginToNavItem(item));
+      bySection.get(sec)!.push(pluginToNavItem(item, lang));
     }
 
     // E232: stable within-section ordering (user-approved reading order);
@@ -385,7 +401,7 @@ export function Sidebar() {
       }
     }
     return sections;
-  }, [sidebarItems, isLoading]);
+  }, [sidebarItems, isLoading, lang]);
 
   // Bottom nav driven entirely by plugin manifests (settings_core, marketplace_nav, etc.)
   const bottomNavItems = useMemo((): NavItem[] => {

@@ -310,19 +310,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Academic Session'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: startCtrl,
-              decoration: const InputDecoration(labelText: 'Start Date (BS)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: endCtrl,
-              decoration: const InputDecoration(labelText: 'End Date (BS)'),
-            ),
-          ],
+        content: StatefulBuilder(
+          builder: (context, setDialogState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BsDateField(
+                label: 'Start Date',
+                ne: 'सुरु मिति',
+                initialValue: startCtrl.text.trim(),
+                emitBs: true,
+                onChanged: (v) => startCtrl.text = v,
+              ),
+              const SizedBox(height: 12),
+              BsDateField(
+                label: 'End Date',
+                ne: 'अन्त्य मिति',
+                initialValue: endCtrl.text.trim(),
+                emitBs: true,
+                onChanged: (v) => endCtrl.text = v,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

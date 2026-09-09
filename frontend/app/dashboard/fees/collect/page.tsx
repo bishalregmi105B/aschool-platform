@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSMonthInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -1579,23 +1580,24 @@ function StudentAccountWorkbench({
                 </div>
                 <div className="space-y-1.5">
                   <Label>BS month</Label>
-                  <Input
+                  <BSMonthInput
                     value={billForm.monthBs}
-                    onChange={(e) =>
-                      setBillForm({ ...billForm, monthBs: e.target.value })
-                    }
-                    placeholder="2083-05"
+                    onChange={(v) => setBillForm({ ...billForm, monthBs: v })}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>BS year</Label>
-                  <Input
+                  <Select
                     value={billForm.yearBs}
-                    onChange={(e) =>
-                      setBillForm({ ...billForm, yearBs: e.target.value })
-                    }
-                    placeholder="2083"
-                  />
+                    onValueChange={(v) => setBillForm({ ...billForm, yearBs: v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="2083" /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 15 }, (_, i) => 2075 + i).map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y} BS</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">

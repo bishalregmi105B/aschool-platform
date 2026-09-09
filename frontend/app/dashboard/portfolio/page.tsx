@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Award, BadgeCheck, Plus, Search, Star, Trophy, Loader2, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 
 // Contract: backend /portfolio/students/<uuid>/items (E-numbering: E72).
 // Item serializer fields: id, portfolio_id, title, description, item_type,
@@ -523,13 +524,12 @@ function PortfolioContent() {
               </div>
               <div>
                 <label className="text-sm font-medium">Issued on</label>
-                <input
-                  type="date"
+                <BSDateInput
                   value={credForm.issued_at}
-                  onChange={(e) =>
-                    setCredForm((d) => ({ ...d, issued_at: e.target.value }))
+                  onChange={(v) =>
+                    setCredForm((d) => ({ ...d, issued_at: v }))
                   }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full mt-1"
                 />
               </div>
             </div>

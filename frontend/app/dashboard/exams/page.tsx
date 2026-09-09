@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -733,18 +734,18 @@ function ExamsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date (BS)</Label>
-                <Input
+                <BSDateInput
                   value={formData.start_date_bs}
-                  onChange={(e) => setFormData({ ...formData, start_date_bs: e.target.value })}
-                  placeholder="2082-06-15"
+                  onChange={(v) => setFormData({ ...formData, start_date_bs: v })}
+                  emit="bs"
                 />
               </div>
               <div className="space-y-2">
                 <Label>End Date (BS)</Label>
-                <Input
+                <BSDateInput
                   value={formData.end_date_bs}
-                  onChange={(e) => setFormData({ ...formData, end_date_bs: e.target.value })}
-                  placeholder="2082-06-30"
+                  onChange={(v) => setFormData({ ...formData, end_date_bs: v })}
+                  emit="bs"
                 />
               </div>
             </div>

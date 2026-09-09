@@ -83,6 +83,10 @@ api_v1_bp.register_blueprint(teacher_bp)
 api_v1_bp.register_blueprint(sse_bp)
 api_v1_bp.register_blueprint(webhooks_v1_bp)
 
+# Server meta — authoritative time for header clocks, form "today", pickers
+from app.api.v1.meta import meta_bp
+api_v1_bp.register_blueprint(meta_bp)
+
 # Unified search (core, not plugin-gated)
 from app.api.v1.search import search_bp
 api_v1_bp.register_blueprint(search_bp)

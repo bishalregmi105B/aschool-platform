@@ -10,6 +10,9 @@ export 'widgets/role_app_host.dart' show ASchoolUnifiedUserApp;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Bilingual UI + server-authoritative clocks (M-01).
+  unawaited(I18nService.instance.load());
+  ServerTimeService.instance.startSync();
   // Push notifications: init FCM/OneSignal at startup so tokens are captured
   // before login; AuthService registers them with the backend after login.
   unawaited(NotificationService().init());

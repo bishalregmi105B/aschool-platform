@@ -18,23 +18,33 @@ ui:
     icon: GraduationCap
     subitems:
     - label: Student Details
+      label_nepali: विद्यार्थी विवरण
       route: /students
     - label: Add Student
+      label_nepali: नयाँ विद्यार्थी थप्नुहोस्
       route: /students/new
     - label: Bulk Import
+      label_nepali: सामूहिक आयात
       route: /students/bulk-import
     - label: Parents & Guardians
+      label_nepali: अभिभावकहरू
       route: /parents
     - label: Admission Inquiries
+      label_nepali: भर्ना सोधपुछ
       route: /admission
     - label: Assign Roll Numbers
+      label_nepali: रोल नम्बर तोक्नुहोस्
       route: /students/roll-numbers
     - label: Upload Profile Images
+      label_nepali: प्रोफाइल फोटो अपलोड
       route: /students/profile-images
     - label: Transfer Student
+      label_nepali: विद्यार्थी सार्नुहोस्
       route: /students/transfers
     - label: Promote Students
+      label_nepali: विद्यार्थी प्रमोसन
       route: /students/promote
     - label: Reset Password
+      label_nepali: पासवर्ड रिसेट
       route: /students/reset-password
 schema_version: 2

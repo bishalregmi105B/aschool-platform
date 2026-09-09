@@ -7,6 +7,9 @@ import 'router.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Bilingual UI + server-authoritative clocks (M-01).
+  unawaited(I18nService.instance.load());
+  ServerTimeService.instance.startSync();
   // Push notifications: init FCM/OneSignal at startup. Token registration with
   // the backend uses any stored session token; AuthService retries after login.
   unawaited(NotificationService().init());

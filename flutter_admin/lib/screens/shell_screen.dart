@@ -23,6 +23,10 @@ class ShellScreen extends ConsumerWidget {
               title: Text(_titleFor(location,
                   fallback: user?.schoolName ?? 'ASchool Admin')),
               actions: [
+                const ServerClock(compact: true),
+                const SizedBox(width: 6),
+                const LanguageToggle(),
+                const SizedBox(width: 4),
                 NotificationBell(
                   tooltip: 'Notifications',
                   onTap: () => context.push('/notifications'),

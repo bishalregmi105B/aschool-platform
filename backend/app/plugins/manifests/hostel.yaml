@@ -29,6 +29,7 @@ ui:
     - school_admin
     subitems:
     - label: Overview
+      label_nepali: सार्वजनिक
       route: /hostel
 mobile:
   admin:

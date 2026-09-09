@@ -21,7 +21,9 @@ ui:
     - school_admin
     subitems:
     - label: Manage Teachers
+      label_nepali: शिक्षक व्यवस्थापन
       route: /teachers
     - label: Bulk Upload
+      label_nepali: सामूहिक अपलोड
       route: /teachers/bulk-upload
 schema_version: 2

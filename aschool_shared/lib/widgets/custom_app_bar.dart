@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/i18n_service.dart';
 import '../theme/app_theme.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -7,6 +8,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final bool showBackButton;
   final VoidCallback? onBackPressed;
+  /// Server clock + EN⇄ने language toggle rendered before [actions]. Screens
+  /// that need the full width can pass false; most want both by default.
+  final bool showUtilities;
 
   const CustomAppBar({
     super.key,
@@ -15,6 +19,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.showBackButton = true,
     this.onBackPressed,
+    this.showUtilities = true,
   });
 
   @override
@@ -78,7 +83,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                           data: const IconThemeData(color: Colors.white),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: actions ?? const [],
+                            children: [
+                              if (showUtilities) ...[
+                                const _AppBarLanguageToggle(),
+                                const SizedBox(width: 6),
+                              ],
+                              ...(actions ?? const <Widget>[]),
+                            ],
                           ),
                         ),
                       ),
@@ -135,6 +146,55 @@ class _CircleActionButton extends StatelessWidget {
           width: 36,
           height: 36,
           child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Compact EN⇄ने switch styled for the deep-green app bar.
+class _AppBarLanguageToggle extends StatelessWidget {
+  const _AppBarLanguageToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final i18n = I18nService.instance;
+    return AnimatedBuilder(
+      animation: i18n,
+      builder: (context, _) => GestureDetector(
+        onTap: () => i18n.toggle(),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'EN',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white
+                      .withValues(alpha: i18n.isNepali ? 0.5 : 1),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'ने',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white
+                      .withValues(alpha: i18n.isNepali ? 1 : 0.5),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

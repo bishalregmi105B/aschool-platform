@@ -11,6 +11,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -226,26 +227,24 @@ function WhatsAppAiSettingsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={settings.working_hours.start}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     update((current) => ({
                       ...current,
-                      working_hours: { ...current.working_hours, start: e.target.value },
+                      working_hours: { ...current.working_hours, start: v },
                     }))
                   }
                 />
               </div>
               <div className="space-y-2">
                 <Label>End</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={settings.working_hours.end}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     update((current) => ({
                       ...current,
-                      working_hours: { ...current.working_hours, end: e.target.value },
+                      working_hours: { ...current.working_hours, end: v },
                     }))
                   }
                 />

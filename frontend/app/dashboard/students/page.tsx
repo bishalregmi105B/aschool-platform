@@ -7,6 +7,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar } from "@/components/ui/avatar";
@@ -757,7 +758,7 @@ function AddStudentDialog({
           </div>
           <div className="space-y-4 pt-4 border-t">
             <Label htmlFor="dob_bs">Date of Birth (BS)</Label>
-            <Input id="dob_bs" name="dob_bs" placeholder="2065-04-15" />
+            <BSDateInput name="dob_bs" emit="bs" />
           </div>
           <div className="border-t pt-4">
             <p className="text-sm font-medium mb-3">Guardian Information</p>
@@ -1025,10 +1026,10 @@ function EditStudentDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Date of Birth (BS)</Label>
-              <Input
+              <BSDateInput
                 value={dobBs}
-                onChange={(e) => setDobBs(e.target.value)}
-                placeholder="2065-04-15"
+                onChange={(v) => setDobBs(v)}
+                emit="bs"
               />
             </div>
             <div className="space-y-2">
