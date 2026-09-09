@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Building2, BedDouble, Users, Plus, UserX } from "lucide-react";
 
 // Backend GET /hostel/summary returns an array of per-hostel stats:
@@ -144,10 +145,8 @@ function HostelContent() {
 
         <TabsContent value="rooms" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <select className="rounded border bg-background px-3 py-1.5 text-sm" value={selHostel} onChange={(e) => setSelHostel(e.target.value)}>
-              <option value="">All Hostels</option>
-              {hostels.map((h) => <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>)}
-            </select>
+            <AdvancedSelect className="w-44" value={selHostel} onChange={(v) => setSelHostel(v)} clearable placeholder="All Hostels"
+              options={hostels.map((h) => ({ value: h.hostel_id, label: h.hostel_name }))} />
             <Button size="sm" onClick={() => setShowAddRoom(true)}><Plus className="mr-1.5 h-3.5 w-3.5" />Add Room</Button>
           </div>
           {rl ? <PageLoader /> : re ? (
@@ -223,7 +222,11 @@ function AddHostelDialog({ open, onClose, onSaved }: { open: boolean; onClose: (
       <DialogContent><DialogHeader><DialogTitle>Add Hostel</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1.5"><Label>Name *</Label><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Boys Hostel Block A" /></div>
-          <div className="space-y-1.5"><Label>Gender</Label><select className="w-full rounded border bg-background px-3 py-2 text-sm" value={f.gender} onChange={(e) => setF({ ...f, gender: e.target.value })}><option value="male">Male</option><option value="female">Female</option><option value="mixed">Mixed</option></select></div>
+          <div className="space-y-1.5"><Label>Gender</Label><AdvancedSelect
+          value={f.gender}
+          onChange={(v) => setF({ ...f, gender: v })}
+          options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'mixed', label: 'Mixed' }]}
+        /></div>
           <div className="space-y-1.5"><Label>Warden Name</Label><Input value={f.warden_name} onChange={(e) => setF({ ...f, warden_name: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label>Phone</Label><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div></div>
           <div className="space-y-1.5"><Label>Address</Label><Input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
@@ -249,7 +252,8 @@ function AddRoomDialog({ open, hostels, defaultHostelId, onClose, onSaved }: { o
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent><DialogHeader><DialogTitle>Add Room</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="space-y-1.5"><Label>Hostel *</Label><select className="w-full rounded border bg-background px-3 py-2 text-sm" value={f.hostel_id} onChange={(e) => setF({ ...f, hostel_id: e.target.value })}>{hostels.map((h) => <option key={h.hostel_id} value={h.hostel_id}>{h.hostel_name}</option>)}</select></div>
+          <div className="space-y-1.5"><Label>Hostel *</Label><AdvancedSelect value={f.hostel_id} onChange={(v) => setF({ ...f, hostel_id: v })}
+            options={hostels.map((h) => ({ value: h.hostel_id, label: h.hostel_name }))} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>Room Number *</Label><Input value={f.room_number} onChange={(e) => setF({ ...f, room_number: e.target.value })} placeholder="e.g. 101" /></div>
             <div className="space-y-1.5"><Label>Capacity (beds)</Label><Input type="number" value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} min={1} /></div>
@@ -258,7 +262,11 @@ function AddRoomDialog({ open, hostels, defaultHostelId, onClose, onSaved }: { o
             <div className="space-y-1.5"><Label>Floor</Label><Input type="number" value={f.floor} onChange={(e) => setF({ ...f, floor: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Monthly Fee (Rs)</Label><Input type="number" value={f.monthly_fee} onChange={(e) => setF({ ...f, monthly_fee: e.target.value })} placeholder="e.g. 3000" /></div>
           </div>
-          <div className="space-y-1.5"><Label>Room Type</Label><select className="w-full rounded border bg-background px-3 py-2 text-sm" value={f.room_type} onChange={(e) => setF({ ...f, room_type: e.target.value })}><option value="standard">Standard</option><option value="premium">Premium</option><option value="dormitory">Dormitory</option><option value="single">Single</option></select></div>
+          <div className="space-y-1.5"><Label>Room Type</Label><AdvancedSelect
+          value={f.room_type}
+          onChange={(v) => setF({ ...f, room_type: v })}
+          options={[{ value: 'standard', label: 'Standard' }, { value: 'premium', label: 'Premium' }, { value: 'dormitory', label: 'Dormitory' }, { value: 'single', label: 'Single' }]}
+        /></div>
         </div>
         <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Add"}</Button></DialogFooter>
       </DialogContent>

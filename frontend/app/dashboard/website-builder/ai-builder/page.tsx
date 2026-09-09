@@ -1,4 +1,5 @@
 "use client";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -59,17 +60,18 @@ export default function AIBuilderPage() {
       <div className="border rounded-lg p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">School Type</label>
-          <select
+          <AdvancedSelect
             value={schoolType}
-            onChange={(e) => setSchoolType(e.target.value)}
-            className="border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="government">Government School</option>
-            <option value="private">Private School</option>
-            <option value="montessori">Montessori / Pre-school</option>
-            <option value="college">College / +2</option>
-            <option value="boarding">Boarding School</option>
-          </select>
+            onChange={(v) => setSchoolType(v)}
+            className="w-56"
+            options={[
+              { value: "government", label: "Government School" },
+              { value: "private", label: "Private School" },
+              { value: "montessori", label: "Montessori / Pre-school" },
+              { value: "college", label: "College / +2" },
+              { value: "boarding", label: "Boarding School" },
+            ]}
+          />
         </div>
 
         <div>

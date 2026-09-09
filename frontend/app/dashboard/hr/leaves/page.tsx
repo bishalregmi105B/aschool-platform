@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, Check, X, Calendar, Plus } from "lucide-react";
 import Link from "next/link";
 import { displayBS } from "@/lib/nepali_date";
@@ -189,33 +190,29 @@ function ApplyLeaveDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Staff Member</Label>
-            <select
-              className="w-full border rounded-md p-2"
+            <AdvancedSelect
               value={staffId}
-              onChange={(e) => setStaffId(e.target.value)}
-            >
-              <option value="">Select staff</option>
-              {staffOptions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name} ({s.role})
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setStaffId(v)}
+              clearable
+              searchable
+              placeholder="Select staff"
+              options={staffOptions.map((s) => ({ value: s.id, label: `${s.full_name} (${s.role})` }))}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Leave Type</Label>
-              <select
-                className="w-full border rounded-md p-2"
+              <AdvancedSelect
                 value={leaveType}
-                onChange={(e) => setLeaveType(e.target.value)}
-              >
-                <option value="sick">Sick</option>
-                <option value="casual">Casual</option>
-                <option value="emergency">Emergency</option>
-                <option value="maternity">Maternity</option>
-                <option value="other">Other</option>
-              </select>
+                onChange={(v) => setLeaveType(v)}
+                options={[
+                  { value: "sick", label: "Sick" },
+                  { value: "casual", label: "Casual" },
+                  { value: "emergency", label: "Emergency" },
+                  { value: "maternity", label: "Maternity" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
             </div>
             <div className="space-y-2">
               <Label>Days</Label>

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
   GraduationCap,
   Building2,
@@ -303,16 +304,17 @@ function SchoolInfoStep({
           </Label>
           <div className="relative">
             <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <select
+            <AdvancedSelect
               id="district"
-              className="w-full h-11 pl-10 pr-3 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              {...register("district")}
-            >
-              <option value="">Select District</option>
-              {NEPAL_DISTRICTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+              className="h-11"
+              triggerClassName="h-11 rounded-xl text-[13px]"
+              value={form.watch("district") ?? ""}
+              onChange={(v) => form.setValue("district", v)}
+              clearable
+              searchable
+              placeholder="Select District"
+              options={NEPAL_DISTRICTS.map((d) => ({ value: d, label: d }))}
+            />
           </div>
           {errors.district && (
             <p className="text-xs text-destructive mt-1">{errors.district.message}</p>
@@ -338,15 +340,17 @@ function SchoolInfoStep({
           <Label htmlFor="type" className="text-xs font-bold">
             School Type *
           </Label>
-          <select
+          <AdvancedSelect
             id="type"
-            className="w-full h-11 px-3 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            {...register("type")}
-          >
-            <option value="private">Private / Institutional</option>
-            <option value="public">Government / Public</option>
-            <option value="community">Community / Trust</option>
-          </select>
+            triggerClassName="h-11 rounded-xl text-[13px]"
+            value={form.watch("type") ?? "private"}
+            onChange={(v) => form.setValue("type", v as SchoolInfoForm["type"])}
+            options={[
+              { value: "private", label: "Private / Institutional" },
+              { value: "public", label: "Government / Public" },
+              { value: "community", label: "Community / Trust" },
+            ]}
+          />
           {errors.type && (
             <p className="text-xs text-destructive mt-1">{errors.type.message}</p>
           )}
@@ -356,16 +360,18 @@ function SchoolInfoStep({
           <Label htmlFor="level" className="text-xs font-bold">
             School Level *
           </Label>
-          <select
+          <AdvancedSelect
             id="level"
-            className="w-full h-11 px-3 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            {...register("level")}
-          >
-            <option value="higher_secondary">Higher Secondary (+2 / College)</option>
-            <option value="secondary">Secondary (Class 1-10)</option>
-            <option value="lower_secondary">Lower Secondary (Class 1-8)</option>
-            <option value="primary">Primary (Class 1-5 / Montessori)</option>
-          </select>
+            triggerClassName="h-11 rounded-xl text-[13px]"
+            value={form.watch("level") ?? "higher_secondary"}
+            onChange={(v) => form.setValue("level", v as SchoolInfoForm["level"])}
+            options={[
+              { value: "higher_secondary", label: "Higher Secondary (+2 / College)" },
+              { value: "secondary", label: "Secondary (Class 1-10)" },
+              { value: "lower_secondary", label: "Lower Secondary (Class 1-8)" },
+              { value: "primary", label: "Primary (Class 1-5 / Montessori)" },
+            ]}
+          />
           {errors.level && (
             <p className="text-xs text-destructive mt-1">{errors.level.message}</p>
           )}

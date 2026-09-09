@@ -20,6 +20,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { CalendarOff, Plus, Pencil, Trash2 } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 interface Holiday {
   id: string;
   title: string;
@@ -182,11 +183,15 @@ function HolidaysContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Date</Label><BSDateInput name="date" required value={editing?.start_date || undefined} /></div>
               <div className="space-y-2"><Label>Type</Label>
-                <select name="type" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={editing?.event_type || "holiday"}>
-                  <option value="holiday">Holiday</option>
-                  <option value="vacation">Vacation</option>
-                  <option value="festival">Festival</option>
-                </select>
+                <AdvancedSelect
+                  name="type"
+                  defaultValue={editing?.event_type || "holiday"}
+                  options={[
+                    { value: "holiday", label: "Holiday" },
+                    { value: "vacation", label: "Vacation" },
+                    { value: "festival", label: "Festival" },
+                  ]}
+                />
               </div>
             </div>
             <div className="space-y-2"><Label>Description</Label><Input name="description" placeholder="Optional description" defaultValue={editing?.description} /></div>

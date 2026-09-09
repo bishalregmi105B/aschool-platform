@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { AlertCircle, Palette, Save } from "lucide-react";
 
 const DEFAULT_FORM = {
@@ -84,9 +85,8 @@ function ThemeContent() {
   const SelectField = ({ label, field, options }: { label: string; field: string; options: { value: string; label: string }[] }) => (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <select className="w-full border rounded-md px-3 py-2 text-sm" value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })}>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <AdvancedSelect value={form[field]} onChange={(v) => setForm({ ...form, [field]: v })}
+        options={options.map((o) => ({ value: o.value, label: o.label }))} />
     </div>
   );
 

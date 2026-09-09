@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { GraduationCap, Search, Plus, Mail, Phone, MapPin } from "lucide-react";
 
 export default function AlumniPage() {
@@ -90,10 +91,8 @@ function AlumniContent() {
 
       <div className="flex gap-4">
         <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search alumni..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <select className="border rounded-md px-3" value={batch} onChange={(e) => setBatch(e.target.value)}>
-          <option value="">All Batches</option>
-          {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <AdvancedSelect className="w-40" value={batch} onChange={(v) => setBatch(v)} clearable placeholder="All Batches"
+          options={batchYears.map((y) => ({ value: String(y), label: String(y) }))} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

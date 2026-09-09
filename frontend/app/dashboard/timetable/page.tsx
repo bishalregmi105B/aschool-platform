@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TimePicker } from "@/components/ui/time-picker";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Calendar, Wand2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -222,6 +223,11 @@ function AddSlotDialog({
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [teacherId, setTeacherId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [day, setDay] = useState(DAYS[0] ?? "Sunday");
+  const [period, setPeriod] = useState("1");
   const selectedClass = classes.find((c) => c.id === classId);
 
   const { data: subjects } = useQuery({
@@ -288,44 +294,54 @@ function AddSlotDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Subject</Label>
-              <select name="subject_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="">— None —</option>
-                {(subjects || []).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <AdvancedSelect
+                value={subjectId}
+                onChange={setSubjectId}
+                clearable
+                placeholder="None"
+                options={(subjects || []).map((s) => ({ value: s.id, label: s.name }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Teacher</Label>
-              <select name="teacher_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="">— None —</option>
-                {(teachers || []).map((t) => (
-                  <option key={t.id} value={t.id}>{t.full_name}</option>
-                ))}
-              </select>
+              <AdvancedSelect
+                value={teacherId}
+                onChange={setTeacherId}
+                clearable
+                searchable
+                placeholder="None"
+                options={(teachers || []).map((t) => ({ value: t.id, label: t.full_name }))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Section</Label>
-              <select name="section_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="">All sections</option>
-                {(selectedClass?.sections || []).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <AdvancedSelect
+                value={sectionId}
+                onChange={setSectionId}
+                clearable
+                placeholder="All sections"
+                options={(selectedClass?.sections || []).map((s) => ({ value: s.id, label: s.name }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Period</Label>
-              <Input name="period_number" type="number" min={1} max={12} defaultValue={1} required />
+              <AdvancedSelect
+                value={period}
+                onChange={setPeriod}
+                options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `P${i + 1}` }))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Day</Label>
-              <select name="day_of_week" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
+              <AdvancedSelect
+                value={day}
+                onChange={setDay}
+                options={DAYS.map((d) => ({ value: d, label: d }))}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
@@ -338,6 +354,12 @@ function AddSlotDialog({
               </div>
             </div>
           </div>
+          {/* Hidden inputs keep FormData-based submit working with controlled selects */}
+          <input type="hidden" name="subject_id" value={subjectId} />
+          <input type="hidden" name="teacher_id" value={teacherId} />
+          <input type="hidden" name="section_id" value={sectionId} />
+          <input type="hidden" name="day_of_week" value={day} />
+          <input type="hidden" name="period_number" value={period} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={saving || !classId}>

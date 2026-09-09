@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import Link from "next/link";
 
@@ -40,9 +41,13 @@ export default function FinancialAnalyticsPage() {
       <div className="flex items-center gap-4">
         <Link href="/dashboard/analytics"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
         <div className="flex-1"><h1 className="text-2xl font-bold">Financial Analytics</h1><p className="text-muted-foreground">Revenue, collections, and financial trends</p></div>
-        <select className="border rounded-md px-3 py-2" value={period} onChange={(e) => setPeriod(e.target.value)}>
-          <option value="monthly">This Month</option><option value="quarterly">This Quarter</option><option value="yearly">This Year</option>
-        </select>
+        <AdvancedSelect className="w-40" value={period} onChange={(v) => setPeriod(v)}
+          options={[
+            { value: "monthly", label: "This Month" },
+            { value: "quarterly", label: "This Quarter" },
+            { value: "yearly", label: "This Year" },
+          ]}
+        />
         
       </div>
 

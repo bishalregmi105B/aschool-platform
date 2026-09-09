@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Plus, Trash2, Pencil, GraduationCap } from "lucide-react";
 
 interface Scholarship {
@@ -320,19 +321,14 @@ function ScholarshipsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Discount Type</Label>
-                <select
-                  className="w-full border rounded-md p-2"
+                <AdvancedSelect
                   value={form.discount_type}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      discount_type: e.target.value as "percent" | "fixed",
-                    })
-                  }
-                >
-                  <option value="percent">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount (Rs.)</option>
-                </select>
+                  onChange={(v) => setForm({ ...form, discount_type: v as "percent" | "fixed" })}
+                  options={[
+                    { value: "percent", label: "Percentage (%)" },
+                    { value: "fixed", label: "Fixed Amount (Rs.)" },
+                  ]}
+                />
               </div>
               <div className="space-y-2">
                 <Label>

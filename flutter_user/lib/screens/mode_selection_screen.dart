@@ -100,7 +100,7 @@ class _ModeSelectionBackground extends StatelessWidget {
       children: [
         // flat background — no gradient (simpler look)
         Positioned.fill(
-          child: ColoredBox(color: Color(0xFFF8FAFC)),
+          child: const ColoredBox(color: Colors.white),
         ),
       ],
     );
@@ -142,7 +142,7 @@ class _ModeCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: mode.accent.withValues(alpha: 0.25),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -159,9 +159,9 @@ class _ModeCard extends StatelessWidget {
                     height: 54,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: mode.accent.withValues(alpha: 0.12),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
                     ),
-                    child: Icon(mode.icon, color: mode.accent),
+                    child: Icon(mode.icon, color: Theme.of(context).colorScheme.primary),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -186,7 +186,7 @@ class _ModeCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, color: mode.accent),
+                  Icon(Icons.arrow_forward_rounded, color: Theme.of(context).colorScheme.primary),
                 ],
               ),
             ),

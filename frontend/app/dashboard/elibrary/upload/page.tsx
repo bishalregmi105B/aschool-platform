@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Upload, FileText, CheckCircle } from "lucide-react";
 
 export default function UploadResourcesPage() {
@@ -87,13 +88,11 @@ function UploadContent() {
           <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. SEE Mathematics 2079 Question Paper" /></div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Resource Type</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                <option value="past_paper">Past Paper</option>
-                <option value="ebook">E-Book</option>
-                <option value="oer">OER Resource</option>
-                <option value="worksheet">Worksheet</option>
-                <option value="notes">Notes</option>
-              </select>
+              <AdvancedSelect
+          value={form.type}
+          onChange={(v) => setForm({ ...form, type: v })}
+          options={[{ value: 'past_paper', label: 'Past Paper' }, { value: 'ebook', label: 'E-Book' }, { value: 'oer', label: 'OER Resource' }, { value: 'worksheet', label: 'Worksheet' }, { value: 'notes', label: 'Notes' }]}
+        />
             </div>
             <div className="space-y-2"><Label>Subject</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="e.g. Mathematics" /></div>
           </div>
@@ -103,9 +102,11 @@ function UploadContent() {
           </div>
           {form.type === "past_paper" && (
             <div className="space-y-2"><Label>Exam Type</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.exam_type} onChange={(e) => setForm({ ...form, exam_type: e.target.value })}>
-                <option value="final">Final Exam</option><option value="mid_term">Mid-Term</option><option value="pre_board">Pre-Board</option><option value="see">SEE</option>
-              </select>
+              <AdvancedSelect
+          value={form.exam_type}
+          onChange={(v) => setForm({ ...form, exam_type: v })}
+          options={[{ value: 'final', label: 'Final Exam' }, { value: 'mid_term', label: 'Mid-Term' }, { value: 'pre_board', label: 'Pre-Board' }, { value: 'see', label: 'SEE' }]}
+        />
             </div>
           )}
           <div className="space-y-2"><Label>Description (optional)</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>

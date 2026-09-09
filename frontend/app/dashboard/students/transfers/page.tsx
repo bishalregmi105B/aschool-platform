@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeftRight, Plus, Search } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -129,25 +130,26 @@ export default function TransfersPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Student *</Label>
-              <select
-                className="w-full border rounded-md p-2 text-sm"
+              <AdvancedSelect
                 value={form.student_id}
-                onChange={(e) => setForm({ ...form, student_id: e.target.value })}
-              >
-                <option value="">Select a student…</option>
-                {(studentOptions || []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.first_name} {s.last_name}{s.class_name ? ` — ${s.class_name}` : ""}{s.student_id ? ` (${s.student_id})` : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setForm({ ...form, student_id: v })}
+                clearable
+                searchable
+                placeholder="Select a student…"
+                options={(studentOptions || []).map((s) => ({
+                  value: s.id,
+                  label: `${s.first_name} ${s.last_name}${s.class_name ? ` — ${s.class_name}` : ""}${s.student_id ? ` (${s.student_id})` : ""}`,
+                }))}
+              />
               <p className="text-xs text-muted-foreground">Only active students at your school are listed.</p>
             </div>
             <div className="space-y-2">
               <Label>Transfer Type</Label>
-              <select className="w-full border rounded-md p-2" value={form.transfer_type} onChange={(e) => setForm({ ...form, transfer_type: e.target.value })}>
-                <option value="tc">Transfer Certificate</option><option value="withdrawal">Withdrawal</option><option value="migration">Migration</option>
-              </select>
+              <AdvancedSelect
+          value={form.transfer_type}
+          onChange={(v) => setForm({ ...form, transfer_type: v })}
+          options={[{ value: 'tc', label: 'Transfer Certificate' }, { value: 'withdrawal', label: 'Withdrawal' }, { value: 'migration', label: 'Migration' }]}
+        />
             </div>
             <div className="space-y-2"><Label>Destination School</Label><Input value={form.destination_school} onChange={(e) => setForm({ ...form, destination_school: e.target.value })} /></div>
             <div className="space-y-2"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>

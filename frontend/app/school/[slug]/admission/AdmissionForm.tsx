@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { api } from "@/lib/api";
 
 export function AdmissionForm({ slug }: { slug: string }) {
   const [sending, setSending] = useState(false);
+  const [classApplied, setClassApplied] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,7 +21,7 @@ export function AdmissionForm({ slug }: { slug: string }) {
       guardian_name: fd.get("guardian_name"),
       phone: fd.get("phone"),
       email: fd.get("email"),
-      class_applied: fd.get("class_applied"),
+      class_applied: classApplied,
       previous_school: fd.get("previous_school"),
       notes: fd.get("notes"),
     };
@@ -107,17 +109,20 @@ export function AdmissionForm({ slug }: { slug: string }) {
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Applying for Class *</label>
-            <select name="class_applied" className="w-full border rounded-md px-3 py-2 text-sm" required>
-              <option value="">Select class...</option>
-              <option value="nursery">Nursery</option>
-              <option value="lkg">LKG</option>
-              <option value="ukg">UKG</option>
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={`class-${i + 1}`}>
-                  Class {i + 1}
-                </option>
-              ))}
-            </select>
+            <AdvancedSelect
+              value={classApplied}
+              onChange={(v) => setClassApplied(v)}
+              placeholder="Select class..."
+              options={[
+                { value: "nursery", label: "Nursery" },
+                { value: "lkg", label: "LKG" },
+                { value: "ukg", label: "UKG" },
+                ...Array.from({ length: 12 }, (_, i) => ({
+                  value: `class-${i + 1}`,
+                  label: `Class ${i + 1}`,
+                })),
+              ]}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Previous School</label>

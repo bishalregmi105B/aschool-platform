@@ -183,19 +183,14 @@ class _HeroCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              accentColor,
-              Color.lerp(accentColor, Colors.black, 0.16)!,
-            ],
-          ),
+          // Flat brand color — hero gradients (accent→dark diagonal) read as
+          // promotional, not operational. Whisper shadow keeps depth.
+          color: accentColor,
           boxShadow: [
             BoxShadow(
-              color: accentColor.withAlpha(58),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+              color: Colors.black.withAlpha(18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

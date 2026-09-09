@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Brain, Plus } from "lucide-react";
 
 export default function CounselorPage() {
@@ -104,12 +105,11 @@ function CounselorContent() {
               <div className="space-y-2"><Label>Student ID</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} placeholder="STU-2023-001" /></div>
               <div className="space-y-2">
                 <Label>Session Type</Label>
-                <select className="w-full border rounded-md p-2" value={form.session_type} onChange={(e) => setForm({ ...form, session_type: e.target.value })}>
-                  <option value="individual">Individual</option>
-                  <option value="group">Group</option>
-                  <option value="parent">Parent Meeting</option>
-                  <option value="referral">External Referral</option>
-                </select>
+                <AdvancedSelect
+          value={form.session_type}
+          onChange={(v) => setForm({ ...form, session_type: v })}
+          options={[{ value: 'individual', label: 'Individual' }, { value: 'group', label: 'Group' }, { value: 'parent', label: 'Parent Meeting' }, { value: 'referral', label: 'External Referral' }]}
+        />
               </div>
             </div>
             <div className="space-y-2"><Label>Note</Label><Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} /></div>

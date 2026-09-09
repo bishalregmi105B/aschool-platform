@@ -37,14 +37,16 @@ import {
 } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { DataTable, type Column, type BulkAction } from "@/components/ui/data-table";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
   Trash2,
   Pencil,
-  X,
+  Upload,
+  ImagePlus,
+  Users,
 } from "lucide-react";
 
 const GRADES = [
@@ -112,6 +114,7 @@ interface StudentListResponse {
 
 export default function StudentsPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
   const [filterGender, setFilterGender] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -121,6 +124,8 @@ export default function StudentsPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editStudent, setEditStudent] = useState<Student | null>(null);
+  // Row drill-in drawer — replaces full-page navigation for a quick look.
+  const [viewStudent, setViewStudent] = useState<Student | null>(null);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const router = useRouter();
@@ -160,7 +165,7 @@ export default function StudentsPage() {
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        per_page: "20",
+        per_page: String(pageSize),
       });
       if (search) params.set("search", search);
       if (filterGender !== "all") params.set("gender", filterGender);
@@ -260,6 +265,110 @@ export default function StudentsPage() {
       </div>
     );
 
+  // ── DataTable wiring ──────────────────────────────────────────────────
+  const COLUMNS: Column<Student>[] = [
+    {
+      key: "student",
+      label: "Student",
+      sortable: true,
+      value: (s) => `${s.first_name} ${s.last_name}`,
+      render: (s) => (
+        <div className="flex items-center gap-3">
+          <Avatar
+            src={s.photo_url}
+            name={`${s.first_name} ${s.last_name}`}
+            size="sm"
+          />
+          <span className="font-medium">
+            {s.first_name} {s.last_name}
+          </span>
+        </div>
+      ),
+    },
+    { key: "enrollment_number", label: "Enrollment No.", sortable: true, value: (s) => s.enrollment_number },
+    {
+      key: "class_name",
+      label: "Class",
+      sortable: true,
+      value: (s) => s.class_name ?? "",
+      render: (s) =>
+        // E204: class names can already carry the "Class " prefix (legacy
+        // rows store "Class 10") — strip before prepending.
+        s.class_name
+          ? `Class ${s.class_name.replace(/^\s*class\s+/i, "")}${s.section_name ? ` - ${s.section_name}` : ""}`
+          : "-",
+    },
+    { key: "gender", label: "Gender", sortable: true, value: (s) => s.gender ?? "", render: (s) => <span className="capitalize">{s.gender || "-"}</span> },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (s) => s.status,
+      render: (s) => (
+        <Badge variant={s.status === "active" ? "success" : s.status === "graduated" ? "secondary" : "destructive"}>
+          {STATUS_LABELS[s.status] ?? s.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (s) => (
+        <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEditStudent(s)}
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={() => {
+              void (async () => {
+                const ok = await confirm({
+                  title: "Delete this student?",
+                  body: "Their login and guardian links are removed. This cannot be undone.",
+                  confirmLabel: "Delete student",
+                  tone: "danger",
+                });
+                if (ok) deleteMutation.mutate(s.id);
+              })();
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const BULK_ACTIONS: BulkAction<Student>[] = [
+    {
+      key: "delete",
+      label: "Delete selected",
+      tone: "danger",
+      onClick: (rows) => {
+        setSelected(new Set(rows.map((r) => r.id)));
+        void handleBulkDelete();
+      },
+    },
+    {
+      key: "promote",
+      label: "Promote…",
+      onClick: () => router.push("/dashboard/students/promote"),
+    },
+    {
+      key: "reset-pw",
+      label: "Reset passwords…",
+      onClick: () => router.push("/dashboard/students/reset-password"),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -275,299 +384,194 @@ export default function StudentsPage() {
         </Button>
       </div>
 
-      {/* Search + Filters */}
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or enrollment number..."
-              className="pl-9"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Class filter using actual class objects */}
-            <Select
+      {/* Students table — one component for selection, sort, pagination,
+          export; row click opens the detail drawer (no full-page hop). */}
+      <DataTable<Student>
+        columns={COLUMNS}
+        rows={students}
+        rowKey={(s) => s.id}
+        loading={false}
+        searchable
+        searchValue={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search by name or enrollment number..."
+        selectable
+        bulkActions={BULK_ACTIONS}
+        onRowClick={(s) => setViewStudent(s)}
+        activeRowKey={viewStudent?.id ?? null}
+        pagination={pagination ? {
+          page: pagination.page,
+          pages: pagination.pages,
+          total: pagination.total,
+          per_page: pagination.per_page,
+          has_next: pagination.has_next ?? pagination.page < pagination.pages,
+          has_prev: pagination.has_prev ?? pagination.page > 1,
+        } : undefined}
+        onPageChange={(p) => setPage(p)}
+        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        exportFileName="students"
+        empty={{
+          icon: Users,
+          title: "No students found",
+          body: hasFilters ? "Try clearing the filters — or enroll your first student." : "Enroll your first student to get started.",
+          action: { label: "Add Student", href: "/dashboard/students/new" },
+        }}
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <AdvancedSelect
+              className="w-36"
               value={filterClassId}
-              onValueChange={(v) => {
-                setFilterClassId(v);
+              onChange={(v) => {
+                setFilterClassId(v || "all");
                 setFilterSectionId("all");
                 setFilterGrade("all");
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="w-40 h-9">
-                <SelectValue placeholder="All Classes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Section filter — only when a class is selected */}
+              clearable
+              placeholder="All Classes"
+              options={classes.map((c) => ({ value: c.id, label: c.name }))}
+            />
             {filterClassId !== "all" && sections.length > 0 && (
-              <Select
+              <AdvancedSelect
+                className="w-32"
                 value={filterSectionId}
-                onValueChange={(v) => {
-                  setFilterSectionId(v);
+                onChange={(v) => {
+                  setFilterSectionId(v || "all");
                   setPage(1);
                 }}
-              >
-                <SelectTrigger className="w-32 h-9">
-                  <SelectValue placeholder="All Sections" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sections</SelectItem>
-                  {sections.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                clearable
+                placeholder="All Sections"
+                options={sections.map((sec) => ({ value: sec.id, label: sec.name }))}
+              />
             )}
-
-            <Select
+            <AdvancedSelect
+              className="w-32"
               value={filterGender}
-              onValueChange={(v) => {
-                setFilterGender(v);
+              onChange={(v) => {
+                setFilterGender(v || "all");
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="w-32 h-9">
-                <SelectValue placeholder="Gender" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Genders</SelectItem>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="female">Female</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
+              clearable
+              placeholder="All Genders"
+              options={[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+              ]}
+            />
+            <AdvancedSelect
+              className="w-36"
               value={filterStatus}
-              onValueChange={(v) => {
-                setFilterStatus(v);
+              onChange={(v) => {
+                setFilterStatus(v || "all");
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="w-40 h-9">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                  <SelectItem key={val} value={val}>
-                    {label}
-                  </SelectItem>
+              clearable
+              placeholder="All Statuses"
+              options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
+            />
+            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/bulk-import")}>
+              <Upload className="h-3.5 w-3.5 mr-1" /> Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/profile-images")}>
+              <ImagePlus className="h-3.5 w-3.5 mr-1" /> Photos
+            </Button>
+            <Button onClick={() => router.push("/dashboard/students/new")}>
+              <Plus className="h-4 w-4 mr-1" /> Add Student
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Detail drawer — the quick view without leaving the list */}
+      <Sheet open={!!viewStudent} onOpenChange={(open) => !open && setViewStudent(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <div className="border-b px-4 py-3">
+            <SheetTitle className="text-[15px] font-semibold">Student Details</SheetTitle>
+          </div>
+          {viewStudent && (
+            <div className="space-y-5 px-4 pb-6">
+              <div className="flex items-center gap-4">
+                <Avatar
+                  src={viewStudent.photo_url}
+                  name={`${viewStudent.first_name} ${viewStudent.last_name}`}
+                  size="lg"
+                />
+                <div className="min-w-0">
+                  <p className="text-base font-semibold truncate">
+                    {viewStudent.first_name} {viewStudent.last_name}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground">
+                    {viewStudent.enrollment_number || "No enrollment no."}
+                  </p>
+                  <Badge
+                    variant={viewStudent.status === "active" ? "success" : viewStudent.status === "graduated" ? "secondary" : "destructive"}
+                    className="mt-1"
+                  >
+                    {STATUS_LABELS[viewStudent.status] ?? viewStudent.status}
+                  </Badge>
+                </div>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+                {[
+                  ["Class", viewStudent.class_name ? `Class ${viewStudent.class_name.replace(/^\s*class\s+/i, "")}${viewStudent.section_name ? ` - ${viewStudent.section_name}` : ""}` : "—"],
+                  ["Gender", viewStudent.gender ? viewStudent.gender.charAt(0).toUpperCase() + viewStudent.gender.slice(1) : "—"],
+                  ["Guardian", viewStudent.guardians?.[0]?.full_name || "—"],
+                  ["Guardian Phone", viewStudent.guardians?.[0]?.phone || "—"],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{k}</dt>
+                    <dd className="mt-0.5 font-medium">{v}</dd>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-
-            {hasFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="h-9 text-muted-foreground"
-              >
-                <X className="h-3.5 w-3.5 mr-1" />
-                Clear filters
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bulk action bar */}
-      {someSelected && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-muted rounded-lg border">
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleBulkDelete}
-            disabled={bulkDeleteMutation.isPending}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete Selected
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSelected(new Set())}
-          >
-            Clear
-          </Button>
-        </div>
-      )}
-
-      {/* Students Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Enrollment No.</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center py-10 text-muted-foreground"
-                  >
-                    No students found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                students.map((student) => (
-                  <TableRow
-                    key={student.id}
-                    data-state={
-                      selected.has(student.id) ? "selected" : undefined
-                    }
-                    className={
-                      selected.has(student.id) ? "bg-muted/50" : undefined
-                    }
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.has(student.id)}
-                        onCheckedChange={() => toggleOne(student.id)}
-                        aria-label={`Select ${student.first_name}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          src={student.photo_url}
-                          name={`${student.first_name} ${student.last_name}`}
-                          size="sm"
-                        />
-                        <span className="font-medium">
-                          {student.first_name} {student.last_name}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {student.enrollment_number || "-"}
-                    </TableCell>
-                    <TableCell>
-                      {/* E204: class names can already carry the "Class " prefix
-                          (legacy rows store "Class 10") — strip it before
-                          prepending so the cell never shows "Class Class 10". */}
-                      {student.class_name
-                        ? `Class ${student.class_name.replace(/^\s*class\s+/i, "")}${student.section_name ? ` - ${student.section_name}` : ""}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {student.gender || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          student.status === "active"
-                            ? "success"
-                            : student.status === "graduated"
-                              ? "secondary"
-                              : "destructive"
-                        }
-                      >
-                        {STATUS_LABELS[student.status] ?? student.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={`/dashboard/students/${student.id}`}>View</a>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditStudent(student)}
-                        >
-                          <Pencil className="h-3.5 w-3.5 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => {
-                            void (async () => {
-                              const ok = await confirm({
-                                title: "Delete this student?",
-                                body: "Their login and guardian links are removed. This cannot be undone.",
-                                confirmLabel: "Delete student",
-                                tone: "danger",
-                              });
-                              if (ok) deleteMutation.mutate(student.id);
-                            })();
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-
-        {pagination && pagination.pages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-            <p className="text-sm text-muted-foreground">
-              Page {pagination.page} of {pagination.pages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.has_prev}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.has_next}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              </dl>
+              <div className="flex gap-2 border-t pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setEditStudent(viewStudent);
+                    setViewStudent(null);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => router.push(`/dashboard/students/${viewStudent.id}`)}
+                >
+                  Full Profile
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => {
+                    const target = viewStudent;
+                    setViewStudent(null);
+                    void (async () => {
+                      const ok = await confirm({
+                        title: "Delete this student?",
+                        body: "Their login and guardian links are removed. This cannot be undone.",
+                        confirmLabel: "Delete student",
+                        tone: "danger",
+                      });
+                      if (ok) deleteMutation.mutate(target.id);
+                    })();
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </Card>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <AddStudentDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
       {editStudent && (

@@ -163,10 +163,10 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF0EA5E9).withAlpha(20),
+                  backgroundColor: ASchoolTheme.primary.withAlpha(20),
                   child: const Icon(
                     Icons.event_rounded,
-                    color: Color(0xFF0EA5E9),
+                    color: ASchoolTheme.primary,
                   ),
                 ),
                 title: Text(

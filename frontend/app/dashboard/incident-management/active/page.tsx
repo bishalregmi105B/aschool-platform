@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Search, TrendingUp, Plus, Users } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -96,14 +97,18 @@ function ActiveCasesContent() {
             <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief incident description" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Type</Label>
-                <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="behavior">Behavior</option><option value="bullying">Bullying</option><option value="violence">Violence</option><option value="academic">Academic</option><option value="other">Other</option>
-                </select>
+                <AdvancedSelect
+          value={form.type}
+          onChange={(v) => setForm({ ...form, type: v })}
+          options={[{ value: 'behavior', label: 'Behavior' }, { value: 'bullying', label: 'Bullying' }, { value: 'violence', label: 'Violence' }, { value: 'academic', label: 'Academic' }, { value: 'other', label: 'Other' }]}
+        />
               </div>
               <div className="space-y-2"><Label>Severity</Label>
-                <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
-                  <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-                </select>
+                <AdvancedSelect
+          value={form.severity}
+          onChange={(v) => setForm({ ...form, severity: v })}
+          options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
+        />
               </div>
             </div>
             <div className="space-y-2"><Label>Student ID</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} /></div>

@@ -103,9 +103,7 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-        ),
+        color: ASchoolTheme.primary,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

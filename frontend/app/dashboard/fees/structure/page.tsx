@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Plus, RefreshCw, Trash2, Banknote } from "lucide-react";
 
 interface FeeStructure {
@@ -214,25 +215,30 @@ function FeeStructureContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type</Label>
-                <select className="w-full border rounded-md p-2" value={form.fee_type} onChange={(e) => setForm({ ...form, fee_type: e.target.value })}>
-                  <option value="tuition">Tuition</option><option value="admission">Admission</option><option value="exam">Exam</option><option value="transport">Transport</option><option value="hostel">Hostel</option><option value="library">Library</option><option value="lab">Lab</option><option value="sports">Sports</option><option value="other">Other</option>
-                </select>
+                <AdvancedSelect
+          value={form.fee_type}
+          onChange={(v) => setForm({ ...form, fee_type: v })}
+          options={[{ value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' }, { value: 'exam', label: 'Exam' }, { value: 'transport', label: 'Transport' }, { value: 'hostel', label: 'Hostel' }, { value: 'library', label: 'Library' }, { value: 'lab', label: 'Lab' }, { value: 'sports', label: 'Sports' }, { value: 'other', label: 'Other' }]}
+        />
               </div>
               <div className="space-y-2"><Label>Amount (Rs.)</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Class</Label>
-                <select className="w-full border rounded-md p-2" value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>
-                  <option value="">All Classes</option>
-                  {(classes || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <AdvancedSelect
+          value={form.class_id}
+          onChange={(v) => setForm({ ...form, class_id: v })}
+          options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+        />
               </div>
               <div className="space-y-2">
                 <Label>Frequency</Label>
-                <select className="w-full border rounded-md p-2" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>
-                  <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semi-annual">Semi-Annual</option><option value="annual">Annual</option><option value="one-time">One-Time</option>
-                </select>
+                <AdvancedSelect
+          value={form.frequency}
+          onChange={(v) => setForm({ ...form, frequency: v })}
+          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'semi-annual', label: 'Semi-Annual' }, { value: 'annual', label: 'Annual' }, { value: 'one-time', label: 'One-Time' }]}
+        />
               </div>
             </div>
             <div className="space-y-2"><Label>Due Day of Cycle</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
@@ -255,16 +261,13 @@ function FeeStructureContent() {
           </p>
           <div className="space-y-2">
             <Label>Filter by Class (optional)</Label>
-            <select
-              className="w-full border rounded-md p-2"
+            <AdvancedSelect
               value={batchClassId}
-              onChange={(e) => setBatchClassId(e.target.value)}
-            >
-              <option value="">All Classes</option>
-              {(classes || []).map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={(v) => setBatchClassId(v)}
+              clearable
+              placeholder="All Classes"
+              options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Cancel</Button>

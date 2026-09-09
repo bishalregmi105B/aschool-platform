@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { MapPin, Plus, Pencil, Trash2, Search } from "lucide-react";
 
 export default function StopsPage() {
@@ -128,10 +129,11 @@ function StopsContent() {
             </div>
             <div className="space-y-2">
               <Label>Route</Label>
-              <select className="w-full border rounded-md p-2" value={form.route_id} onChange={(e) => setForm({ ...form, route_id: e.target.value })}>
-                <option value="">Select a route…</option>
-                {(routesData || []).map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
+              <AdvancedSelect
+          value={form.route_id}
+          onChange={(v) => setForm({ ...form, route_id: v })}
+          options={(routesData || []).map((r: any) => ({ value: r.id, label: r.name }))}
+        />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="27.7172" /></div>

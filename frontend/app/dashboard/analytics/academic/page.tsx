@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, BookOpen, Trophy, TrendingUp, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
@@ -47,10 +48,11 @@ export default function AcademicAnalyticsPage() {
       <div className="flex items-center gap-4">
         <Link href="/dashboard/analytics"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
         <div className="flex-1"><h1 className="text-2xl font-bold">Academic Analytics</h1><p className="text-muted-foreground">Student performance analysis and trends</p></div>
-        <select className="border rounded-md px-3 py-2" value={examId} onChange={(e) => setExamId(e.target.value)}>
-          <option value="">All Exams</option>
-          {(exams || []).map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
+        <AdvancedSelect
+          value={examId}
+          onChange={(v) => setExamId(v)}
+          options={(exams || []).map((e: any) => ({ value: e.id, label: e.name }))}
+        />
         
       </div>
 

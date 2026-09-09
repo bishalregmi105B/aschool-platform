@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 interface AutoReplyRule {
   keyword: string;
@@ -171,15 +172,11 @@ function WhatsAppTemplatesContent() {
                       </div>
                       <div className="space-y-1">
                         <Label>Match Type</Label>
-                        <select
+                        <AdvancedSelect
                           value={editDraft.match_type}
-                          onChange={(e) => setEditDraft({ ...editDraft, match_type: e.target.value })}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          {MATCH_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setEditDraft({ ...editDraft, match_type: v })}
+                          options={MATCH_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                        />
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={submitEdit} disabled={updateMutation.isPending}>
@@ -261,15 +258,11 @@ function WhatsAppTemplatesContent() {
             </div>
             <div className="space-y-1">
               <Label>Match Type</Label>
-              <select
+              <AdvancedSelect
                 value={draft.match_type}
-                onChange={(e) => setDraft({ ...draft, match_type: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {MATCH_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+                onChange={(v) => setDraft({ ...draft, match_type: v })}
+                options={MATCH_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+              />
             </div>
             <Button onClick={submitCreate} disabled={createMutation.isPending}>
               {createMutation.isPending ? <Spinner className="mr-2" /> : <Plus className="mr-2 h-4 w-4" />}

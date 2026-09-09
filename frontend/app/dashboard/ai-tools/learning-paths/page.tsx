@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Brain, Plus, Search } from "lucide-react";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
@@ -146,10 +147,11 @@ function LearningPathsContent() {
             </div>
             <div className="space-y-2"><Label>Subject (optional)</Label><Input value={genForm.subject} onChange={(e) => setGenForm({ ...genForm, subject: e.target.value })} placeholder="e.g. Mathematics" /></div>
             <div className="space-y-2"><Label>Difficulty</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={genForm.difficulty} onChange={(e) => setGenForm({ ...genForm, difficulty: e.target.value })}>
-                <option value="adaptive">Adaptive (AI decides)</option>
-                <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
-              </select>
+              <AdvancedSelect
+          value={genForm.difficulty}
+          onChange={(v) => setGenForm({ ...genForm, difficulty: v })}
+          options={[{ value: 'adaptive', label: 'Adaptive (AI decides)' }, { value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }]}
+        />
             </div>
             <p className="text-xs text-muted-foreground">The path is built from the student&apos;s real assessment data. If no AI provider is configured, a deterministic rule-based path is generated instead (labeled in the table).</p>
           </div>
@@ -170,9 +172,11 @@ function LearningPathsContent() {
               <div className="space-y-2"><Label>Class</Label><Input value={form.class_name} onChange={(e) => setForm({ ...form, class_name: e.target.value })} placeholder="e.g. Class 5" /></div>
             </div>
             <div className="space-y-2"><Label>Difficulty</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })}>
-                <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="adaptive">Adaptive</option>
-              </select>
+              <AdvancedSelect
+          value={form.difficulty}
+          onChange={(v) => setForm({ ...form, difficulty: v })}
+          options={[{ value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }, { value: 'adaptive', label: 'Adaptive' }]}
+        />
             </div>
           </div>
           <DialogFooter>

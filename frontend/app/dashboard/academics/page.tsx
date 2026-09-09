@@ -46,6 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { displayBS } from "@/lib/nepali_date";
 import {
   BookMarked,
@@ -1039,14 +1040,14 @@ function SubjectsTab() {
               </div>
               <div className="space-y-2">
                 <Label>Type</Label>
-                <select
+                <AdvancedSelect
                   name="is_optional"
                   defaultValue={String(Boolean(editItem?.is_optional))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="false">Compulsory</option>
-                  <option value="true">Optional</option>
-                </select>
+                  options={[
+                    { value: "false", label: "Compulsory" },
+                    { value: "true", label: "Optional" },
+                  ]}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1073,14 +1074,14 @@ function SubjectsTab() {
             </div>
             <div className="space-y-2">
               <Label>Practical Component</Label>
-              <select
+              <AdvancedSelect
                 name="has_practical"
                 defaultValue={String(Boolean(editItem?.has_practical))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="false">No practical</option>
-                <option value="true">Has practical</option>
-              </select>
+                options={[
+                  { value: "false", label: "No practical" },
+                  { value: "true", label: "Has practical" },
+                ]}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
