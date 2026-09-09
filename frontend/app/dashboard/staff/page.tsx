@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -134,6 +134,72 @@ export default function StaffPage() {
     setShowDialog(true);
   }
 
+  const STAFF_COLUMNS: Column<any>[] = [
+    { key: "full_name", label: "Name", sortable: true, value: (st) => st.full_name ?? "", render: (st) => <span className="font-medium">{st.full_name}</span> },
+    { key: "role", label: "Role", sortable: true, value: (st) => st.role ?? "", render: (st) => <Badge variant="outline">{st.role}</Badge> },
+    {
+      key: "contact",
+      label: "Contact",
+      value: (st) => st.email ?? st.phone ?? "",
+      render: (st) => (
+        <div className="text-sm space-y-1">
+          <div className="flex items-center gap-1">
+            <Mail className="h-3 w-3" /> {st.email || "—"}
+          </div>
+          {st.phone ? <div className="flex items-center gap-1 text-muted-foreground"><Phone className="h-3 w-3" /> {st.phone}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (st) => (st.is_active ? "active" : "inactive"),
+      render: (st) => <Badge variant={st.is_active ? "success" : "secondary"}>{st.is_active ? "Active" : "Inactive"}</Badge>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (st) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEditDialog(st); }}>
+            <Pencil className="h-4 w-4 mr-2" /> Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate(st.id); }}
+            disabled={toggleStatusMutation.isPending}
+          >
+            {st.is_active ? "Disable" : "Enable"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              void (async () => {
+                const ok = await confirm({
+                  title: `Delete ${st.full_name}?`,
+                  body: "The staff account is removed; payroll history is kept.",
+                  confirmLabel: "Delete staff member",
+                  tone: "danger",
+                });
+                if (ok) {
+                  deleteMutation.mutate(st.id);
+                }
+              })();
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   if (isError) {
@@ -172,69 +238,17 @@ export default function StaffPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search staff..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Contact</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {staff.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No staff found</TableCell></TableRow>
-              ) : staff.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.full_name}</TableCell>
-                  <TableCell><Badge variant="outline">{s.role}</Badge></TableCell>
-                  <TableCell>
-                    <div className="text-sm space-y-1">
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" /> {s.email || "—"}
-                      </div>
-                      {s.phone ? <div className="flex items-center gap-1 text-muted-foreground"><Phone className="h-3 w-3" /> {s.phone}</div> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell><Badge variant={s.is_active ? "success" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(s)}>
-                        <Pencil className="h-4 w-4 mr-2" /> Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleStatusMutation.mutate(s.id)}
-                        disabled={toggleStatusMutation.isPending}
-                      >
-                        {s.is_active ? "Disable" : "Enable"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          void (async () => {
-                          const ok = await confirm({
-                            title: `Delete ${s.full_name}?`,
-                            body: "The staff account is removed; payroll history is kept.",
-                            confirmLabel: "Delete staff member",
-                            tone: "danger",
-                          });
-                          if (ok) {
-                            deleteMutation.mutate(s.id);
-                          }
-                          })();
-                        }}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="p-0">
+          <DataTable
+            columns={STAFF_COLUMNS}
+            rows={staff}
+            rowKey={(st: any) => st.id}
+            searchable
+            searchPlaceholder="Search staff..."
+            exportFileName="staff"
+            dense
+            empty={{ icon: Users, title: "No staff found", body: "Add staff members or bulk-upload them.", action: { label: "Add Staff", onClick: openCreateDialog } }}
+          />
         </CardContent>
       </Card>
 

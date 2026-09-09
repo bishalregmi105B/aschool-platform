@@ -16,9 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -103,6 +101,111 @@ export default function TeachersPage() {
       </div>
     );
 
+  const TEACHER_COLUMNS: Column<Teacher>[] = [
+    { key: "full_name", label: "Name", sortable: true, value: (t) => t.full_name ?? "", render: (t) => <span className="font-medium">{t.full_name}</span> },
+    {
+      key: "contact",
+      label: "Contact",
+      value: (t) => t.phone ?? t.email ?? "",
+      render: (t) => (
+        <div className="space-y-1">
+          {t.phone && (
+            <div className="flex items-center gap-1 text-sm">
+              <Phone className="h-3 w-3" /> {t.phone}
+            </div>
+          )}
+          {t.email && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Mail className="h-3 w-3" /> {t.email}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "subjects",
+      label: "Subjects",
+      value: (t) => (t.subjects || []).join(", "),
+      render: (t) => (
+        <div className="flex flex-wrap gap-1">
+          {(t.subjects || []).map((s) => (
+            <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+          ))}
+          {(!t.subjects || t.subjects.length === 0) && (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "class_sections",
+      label: "Class Sections",
+      value: (t) => (t.class_sections || []).join(", "),
+      render: (t) => (
+        <div className="flex flex-wrap gap-1">
+          {(t.class_sections || []).map((section) => (
+            <Badge key={section} variant="outline" className="text-xs">{section}</Badge>
+          ))}
+          {(!t.class_sections || t.class_sections.length === 0) && (
+            <span className="text-muted-foreground text-sm">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (t) => (t.is_active ? "active" : "inactive"),
+      render: (t) => (
+        <Badge variant={t.is_active ? "success" : "destructive"}>
+          {t.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (t) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditItem(t); }}>
+            <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); toggleActiveMutation.mutate(t.id); }}
+            disabled={toggleActiveMutation.isPending}
+          >
+            {t.is_active ? "Disable" : "Enable"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              void (async () => {
+                const ok = await confirm({
+                  title: `Delete teacher "${t.full_name}"?`,
+                  body: "Their classes keep running — reassign a class teacher afterwards.",
+                  confirmLabel: "Delete teacher",
+                  tone: "danger",
+                });
+                if (ok) {
+                  deleteMutation.mutate(t.id);
+                }
+              })();
+            }}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const teachers = (data || []).filter((t: Teacher) =>
     t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     t.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -130,119 +233,19 @@ export default function TeachersPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, email, or phone..."
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Subjects</TableHead>
-                <TableHead>Class Sections</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teachers.map((t: Teacher) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.full_name}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {t.phone && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <Phone className="h-3 w-3" /> {t.phone}
-                        </div>
-                      )}
-                      {t.email && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Mail className="h-3 w-3" /> {t.email}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(t.subjects || []).map((s) => (
-                        <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
-                      ))}
-                      {(!t.subjects || t.subjects.length === 0) && (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(t.class_sections || []).map((section) => (
-                        <Badge key={section} variant="outline" className="text-xs">{section}</Badge>
-                      ))}
-                      {(!t.class_sections || t.class_sections.length === 0) && (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={t.is_active ? "success" : "destructive"}>
-                      {t.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setEditItem(t)}>
-                        <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleActiveMutation.mutate(t.id)}
-                        disabled={toggleActiveMutation.isPending}
-                      >
-                        {t.is_active ? "Disable" : "Enable"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => {
-                          void (async () => {
-                          const ok = await confirm({
-                            title: `Delete teacher "${t.full_name}"?`,
-                            body: "Their classes keep running — reassign a class teacher afterwards.",
-                            confirmLabel: "Delete teacher",
-                            tone: "danger",
-                          });
-                          if (ok) {
-                            deleteMutation.mutate(t.id);
-                          }
-                          })();
-                        }}
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {teachers.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No teachers found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<Teacher>
+            columns={TEACHER_COLUMNS}
+            rows={teachers}
+            rowKey={(t) => t.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by name, email, or phone..."
+            exportFileName="teachers"
+            empty={{ icon: UserCog, title: "No teachers found", body: "Add teachers or bulk-upload your staff list.", action: { label: "Add Teacher", onClick: () => setShowAdd(true) } }}
+          />
         </CardContent>
       </Card>
 
