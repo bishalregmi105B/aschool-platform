@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +62,25 @@ function SurveysContent() {
     );
   }
 
+  const SURVEY_COLUMNS: Column<any>[] = [
+    {
+      key: "title",
+      label: "Survey",
+      sortable: true,
+      value: (sv) => sv.title ?? "",
+      render: (sv) => (
+        <div>
+          <p className="font-medium">{sv.title}</p>
+          {sv.description && <p className="text-xs text-muted-foreground mt-0.5 max-w-xs truncate">{sv.description}</p>}
+        </div>
+      ),
+    },
+    { key: "target_audience", label: "Target Group", sortable: true, value: (sv) => sv.target_audience ?? "", render: (sv) => <Badge variant="outline" className="capitalize">{sv.target_audience || "all"}</Badge> },
+    { key: "is_anonymous", label: "Anonymous", sortable: true, value: (sv) => (sv.is_anonymous ? "anonymous" : "named"), render: (sv) => <Badge variant={sv.is_anonymous ? "secondary" : "outline"}>{sv.is_anonymous ? "Anonymous" : "Named"}</Badge> },
+    { key: "response_count", label: "Responses", align: "right", sortable: true, value: (sv) => sv.response_count || 0 },
+    { key: "created_at", label: "Created", sortable: true, value: (sv) => sv.created_at ?? "", render: (sv) => <span className="text-sm">{sv.created_at ? new Date(sv.created_at).toLocaleDateString() : "—"}</span> },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -75,33 +94,15 @@ function SurveysContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Survey</TableHead>
-              <TableHead>Target Group</TableHead>
-              <TableHead>Anonymous</TableHead>
-              <TableHead>Responses</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {surveys.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No surveys created yet</TableCell></TableRow>
-            ) : surveys.map((s: any) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <p className="font-medium">{s.title}</p>
-                  {s.description && <p className="text-xs text-muted-foreground mt-0.5 max-w-xs truncate">{s.description}</p>}
-                </TableCell>
-                <TableCell><Badge variant="outline" className="capitalize">{s.target_audience || "all"}</Badge></TableCell>
-                <TableCell><Badge variant={s.is_anonymous ? "secondary" : "outline"}>{s.is_anonymous ? "Anonymous" : "Named"}</Badge></TableCell>
-                <TableCell>{s.response_count || 0}</TableCell>
-                <TableCell className="text-sm">{s.created_at ? new Date(s.created_at).toLocaleDateString() : "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={SURVEY_COLUMNS}
+          rows={surveys}
+          rowKey={(sv: any) => sv.id}
+          searchable
+          searchPlaceholder="Search surveys…"
+          exportFileName="wellbeing-surveys"
+          empty={{ icon: ClipboardList, title: "No surveys created yet", body: "Create a survey to check in on student wellbeing.", action: { label: "New Survey", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

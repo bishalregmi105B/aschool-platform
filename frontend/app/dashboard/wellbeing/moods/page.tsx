@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Smile, Frown, Meh, Brain, TrendingUp } from "lucide-react";
@@ -53,6 +53,24 @@ function MoodsContent() {
 
 
   const moodEntries: any[] = Array.isArray(entries) ? entries : [];
+
+  const MOOD_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (e) => e.student_name ?? "", render: (e) => <span className="font-medium">{e.student_name || e.student_id}</span> },
+    {
+      key: "mood",
+      label: "Mood",
+      sortable: true,
+      value: (e) => e.mood ?? "",
+      render: (e) => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${moodColor[e.mood] || "bg-muted"}`}>
+          {moodIcon[e.mood]} {e.mood}
+        </span>
+      ),
+    },
+    { key: "energy_level", label: "Energy", align: "right", sortable: true, value: (e) => e.energy_level ?? 0, render: (e) => (e.energy_level != null ? `${e.energy_level}/5` : "—") },
+    { key: "notes", label: "Notes", value: (e) => e.notes ?? "", render: (e) => <span className="text-sm text-muted-foreground max-w-xs truncate block">{e.notes || "—"}</span> },
+    { key: "created_at", label: "Date", sortable: true, value: (e) => e.created_at ?? "", render: (e) => <span className="text-sm">{e.created_at ? new Date(e.created_at).toLocaleDateString() : "—"}</span> },
+  ];
   const dist: Record<string, number> = summary?.mood_distribution || {};
   const total = summary?.total_entries || 0;
 
@@ -81,34 +99,15 @@ function MoodsContent() {
       <Card>
         <CardHeader><CardTitle>Recent Check-ins</CardTitle></CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Mood</TableHead>
-                <TableHead>Energy</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {moodEntries.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No mood entries yet</TableCell></TableRow>
-              ) : moodEntries.map((e: any) => (
-                <TableRow key={e.id}>
-                  <TableCell className="font-medium">{e.student_name || e.student_id}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${moodColor[e.mood] || "bg-muted"}`}>
-                      {moodIcon[e.mood]} {e.mood}
-                    </span>
-                  </TableCell>
-                  <TableCell>{e.energy_level != null ? `${e.energy_level}/5` : "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{e.notes || "—"}</TableCell>
-                  <TableCell className="text-sm">{e.created_at ? new Date(e.created_at).toLocaleDateString() : "—"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+<DataTable
+            columns={MOOD_COLUMNS}
+            rows={moodEntries}
+            rowKey={(e: any) => e.id}
+            searchable
+            searchPlaceholder="Search students…"
+            exportFileName="mood-checkins"
+            empty={{ icon: TrendingUp, title: "No mood entries yet", body: "Check-ins from the student app appear here." }}
+          />
         </CardContent>
       </Card>
     </div>

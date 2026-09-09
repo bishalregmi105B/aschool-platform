@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +92,26 @@ export default function TransfersPage() {
       </div>
     );
 
+  const TRANSFER_COLUMNS: Column<any>[] = [
+    {
+      key: "student",
+      label: "Student",
+      sortable: true,
+      value: (t) => t.student_name ?? "",
+      render: (t) => (
+        <span className="font-medium">
+          {t.student_name || "—"}
+          {t.student_code && <span className="ml-2 text-xs text-muted-foreground">{t.student_code}</span>}
+        </span>
+      ),
+    },
+    { key: "type", label: "Type", sortable: true, value: (t) => t.transfer_type ?? "", render: (t) => <Badge variant="outline">{TYPE_LABEL[t.transfer_type] || t.transfer_type}</Badge> },
+    { key: "reason", label: "Reason", value: (t) => t.reason ?? "", render: (t) => t.reason || "—" },
+    { key: "destination_school", label: "Destination", value: (t) => t.destination_school ?? "", render: (t) => t.destination_school || "—" },
+    { key: "created_at", label: "Date", sortable: true, value: (t) => t.created_at ?? "", render: (t) => (t.created_at ? displayBS(t.created_at) : "—") },
+    { key: "status", label: "Status", sortable: true, value: (t) => t.status ?? "", render: (t) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -99,28 +119,20 @@ export default function TransfersPage() {
         <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> New Transfer</Button>
       </div>
 
-      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search transfers by student name or ID..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-
       <Card>
         <CardHeader className="pb-0"><CardTitle className="text-base">Transfer Records</CardTitle></CardHeader>
         <CardContent className="pt-4">
-          <Table>
-            <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Type</TableHead><TableHead>Reason</TableHead><TableHead>Destination</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {transfers.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No transfers found</TableCell></TableRow>
-              ) : transfers.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.student_name || "—"}{t.student_code && <span className="ml-2 text-xs text-muted-foreground">{t.student_code}</span>}</TableCell>
-                  <TableCell><Badge variant="outline">{TYPE_LABEL[t.transfer_type] || t.transfer_type}</Badge></TableCell>
-                  <TableCell>{t.reason || "—"}</TableCell>
-                  <TableCell>{t.destination_school || "—"}</TableCell>
-                  <TableCell>{t.created_at ? displayBS(t.created_at) : "—"}</TableCell>
-                  <TableCell><Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={TRANSFER_COLUMNS}
+            rows={transfers}
+            rowKey={(t) => t.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search transfers by student name or ID..."
+            exportFileName="student-transfers"
+            empty={{ icon: ArrowLeftRight, title: "No transfers found", body: "Issue transfer certificates and record withdrawals here." }}
+          />
         </CardContent>
       </Card>
 

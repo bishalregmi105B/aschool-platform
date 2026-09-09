@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,25 @@ function DevicesContent() {
     onError: () => toast.error("Sync failed"),
   });
 
+  const DEVICE_COLUMNS: Column<any>[] = [
+    { key: "name", label: "Name", sortable: true, value: (d) => d.name ?? "", render: (d) => <span className="font-medium flex items-center gap-2"><Monitor className="h-4 w-4" />{d.name}</span> },
+    { key: "endpoint", label: "IP Address", value: (d) => `${d.ip_address ?? ""}:${d.port ?? 4370}`, render: (d) => <span className="font-mono">{d.ip_address}:{d.port ?? 4370}</span> },
+    { key: "location", label: "Location", sortable: true, value: (d) => d.location ?? "", render: (d) => d.location ?? "—" },
+    { key: "serial_number", label: "Serial No.", value: (d) => d.serial_number ?? "", render: (d) => <span className="font-mono text-xs">{d.serial_number ?? "—"}</span> },
+    { key: "status", label: "Status", sortable: true, value: (d) => d.status ?? "", render: (d) => <Badge variant={d.status === "online" ? "default" : "destructive"}>{d.status ?? "unknown"}</Badge> },
+    { key: "last_sync", label: "Last Sync", value: (d) => d.last_sync ?? "", render: (d) => d.last_sync ?? "Never" },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (d) => (
+        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); syncDevice.mutate(d.id); }} disabled={syncDevice.isPending}>
+          <RefreshCw className="h-3 w-3 mr-1" />Sync
+        </Button>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   return (
@@ -68,24 +87,15 @@ function DevicesContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>IP Address</TableHead><TableHead>Location</TableHead><TableHead>Serial No.</TableHead><TableHead>Status</TableHead><TableHead>Last Sync</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {devices.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No devices configured</TableCell></TableRow>
-            ) : devices.map((d: any) => (
-              <TableRow key={d.id}>
-                <TableCell className="font-medium flex items-center gap-2"><Monitor className="h-4 w-4" />{d.name}</TableCell>
-                <TableCell className="font-mono">{d.ip_address}:{d.port ?? 4370}</TableCell>
-                <TableCell>{d.location ?? "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{d.serial_number ?? "—"}</TableCell>
-                <TableCell><Badge variant={d.status === "online" ? "default" : "destructive"}>{d.status ?? "unknown"}</Badge></TableCell>
-                <TableCell>{d.last_sync ?? "Never"}</TableCell>
-                <TableCell><Button size="sm" variant="outline" onClick={() => syncDevice.mutate(d.id)} disabled={syncDevice.isPending}><RefreshCw className="h-3 w-3 mr-1" />Sync</Button></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={DEVICE_COLUMNS}
+          rows={devices}
+          rowKey={(d: any) => d.id}
+          searchable
+          searchPlaceholder="Search devices…"
+          exportFileName="biometric-devices"
+          empty={{ icon: Monitor, title: "No devices configured", body: "Add a ZKTeco device — the API key is shown once at creation.", action: { label: "Add Device", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       {/* One-time API key dialog (E141) */}

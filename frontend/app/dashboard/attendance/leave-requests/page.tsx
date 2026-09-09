@@ -20,14 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { CheckCircle2, XCircle, Clock, CalendarDays } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -113,6 +106,62 @@ function LeaveRequestsInner() {
   const requests = data || [];
   const pendingCount = requests.filter((r) => r.status === "pending").length;
 
+  const REQUEST_COLUMNS: Column<any>[] = [
+    { key: "staff_name", label: "Staff", sortable: true, value: (lr) => lr.staff_name ?? "", render: (lr) => <span className="font-medium">{lr.staff_name || "Unknown staff"}</span> },
+    { key: "leave_type", label: "Type", sortable: true, value: (lr) => lr.leave_type ?? "", render: (lr) => LEAVE_TYPE_LABELS[lr.leave_type || ""] || lr.leave_type || "—" },
+    { key: "dates", label: "Dates", sortable: true, value: (lr) => lr.start_date ?? "", render: (lr) => <span className="whitespace-nowrap">{lr.start_date} → {lr.end_date}</span> },
+    { key: "days", label: "Days", align: "right", sortable: true, value: (lr) => leaveDays(lr), render: (lr) => leaveDays(lr) },
+    { key: "reason", label: "Reason", value: (lr) => lr.reason ?? "", render: (lr) => <span className="max-w-[280px] truncate block">{lr.reason || "—"}</span> },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (lr) => lr.status ?? "",
+      render: (lr) => (
+        <StatusPill
+          status={lr.status === "approved" ? "approved" : lr.status === "rejected" ? "rejected" : "pending"}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (lr) =>
+        lr.status === "pending" ? (
+          <div className="flex justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+              disabled={approve.isPending}
+              onClick={(e) => { e.stopPropagation(); approve.mutate(lr.id); }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 border-red-300 text-red-700 hover:bg-red-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setRejecting(lr);
+                setRejectionReason("");
+              }}
+            >
+              <XCircle className="h-3.5 w-3.5" />
+              Reject
+            </Button>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">
+            {lr.status === "rejected" && lr.rejection_reason ? lr.rejection_reason : "—"}
+          </span>
+        ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -163,85 +212,15 @@ function LeaveRequestsInner() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead>Days</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.map((lr) => (
-                  <TableRow key={lr.id}>
-                    <TableCell className="font-medium">
-                      {lr.staff_name || "Unknown staff"}
-                    </TableCell>
-                    <TableCell>
-                      {LEAVE_TYPE_LABELS[lr.leave_type || ""] ||
-                        lr.leave_type ||
-                        "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {lr.start_date} → {lr.end_date}
-                    </TableCell>
-                    <TableCell>{leaveDays(lr)}</TableCell>
-                    <TableCell className="max-w-[280px] truncate">
-                      {lr.reason || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <StatusPill
-                        status={
-                          lr.status === "approved"
-                            ? "approved"
-                            : lr.status === "rejected"
-                              ? "rejected"
-                              : "pending"
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {lr.status === "pending" ? (
-                        <div className="flex justify-end gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
-                            disabled={approve.isPending}
-                            onClick={() => approve.mutate(lr.id)}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 border-red-300 text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              setRejecting(lr);
-                              setRejectionReason("");
-                            }}
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Reject
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">
-                          {lr.status === "rejected" && lr.rejection_reason
-                            ? lr.rejection_reason
-                            : "—"}
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={REQUEST_COLUMNS}
+              rows={requests}
+              rowKey={(lr) => lr.id}
+              searchable
+              searchPlaceholder="Search leave requests…"
+              exportFileName="leave-requests"
+              dense
+            />
           </CardContent>
         </Card>
       )}

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,13 @@ function CounselorContent() {
     );
   }
 
+  const NOTE_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (n) => n.student_name ?? "", render: (n) => <span className="font-medium">{n.student_name || n.student_id}</span> },
+    { key: "note_type", label: "Type", sortable: true, value: (n) => n.note_type ?? "", render: (n) => <span className="capitalize text-sm">{n.note_type || "general"}</span> },
+    { key: "content", label: "Note", value: (n) => n.content ?? "", render: (n) => <span className="text-sm max-w-xs truncate block">{n.content || "—"}</span> },
+    { key: "created_at", label: "Date", sortable: true, value: (n) => n.created_at ?? "", render: (n) => <span className="text-sm">{n.created_at ? new Date(n.created_at).toLocaleDateString() : "—"}</span> },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -73,28 +80,15 @@ function CounselorContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Note</TableHead>
-              <TableHead>Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {notes.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No counselor notes yet</TableCell></TableRow>
-            ) : notes.map((n: any) => (
-              <TableRow key={n.id}>
-                <TableCell className="font-medium">{n.student_name || n.student_id}</TableCell>
-                <TableCell className="capitalize text-sm">{n.note_type || "general"}</TableCell>
-                <TableCell className="text-sm max-w-xs truncate">{n.content || "—"}</TableCell>
-                <TableCell className="text-sm">{n.created_at ? new Date(n.created_at).toLocaleDateString() : "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={NOTE_COLUMNS}
+          rows={notes}
+          rowKey={(n: any) => n.id}
+          searchable
+          searchPlaceholder="Search notes…"
+          exportFileName="counselor-notes"
+          empty={{ icon: Brain, title: "No counselor notes yet", body: "Record a session to start the counseling log.", action: { label: "New Note", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
