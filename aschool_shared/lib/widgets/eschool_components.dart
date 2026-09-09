@@ -6,6 +6,8 @@ class ESchoolCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry margin;
   final Color? color;
+  /// Optional tap handler — wraps the card in an InkWell when set.
+  final VoidCallback? onTap;
 
   const ESchoolCard({
     super.key,
@@ -13,11 +15,12 @@ class ESchoolCard extends StatelessWidget {
     this.padding,
     this.margin = EdgeInsets.zero,
     this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final card = Container(
       margin: margin,
       padding: padding ?? const EdgeInsets.all(14),
       decoration: ASchoolTheme.elevatedBox(
@@ -27,6 +30,12 @@ class ESchoolCard extends StatelessWidget {
             : null,
       ),
       child: child,
+    );
+    if (onTap == null) return card;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: card,
     );
   }
 }

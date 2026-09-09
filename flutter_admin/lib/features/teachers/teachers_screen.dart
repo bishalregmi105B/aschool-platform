@@ -69,6 +69,11 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
                 title: Text(t['full_name']?.toString() ?? 'Teacher'),
                 subtitle: Text(
                     t['email']?.toString() ?? t['phone']?.toString() ?? ''),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                onTap: () => _showTeacherActions(t),
               ),
             );
           },
@@ -78,6 +83,116 @@ class _TeachersScreenState extends ConsumerState<TeachersScreen> {
         onPressed: _showCreateDialog,
         icon: const Icon(Icons.add),
         label: const Text('Add Teacher'),
+      ),
+    );
+  }
+
+  /// Manage sheet for one teacher: activate/deactivate, delete.
+  void _showTeacherActions(Map<String, dynamic> t) {
+    final userId = t['id']?.toString();
+    final isActive = t['is_active'] == true;
+    final name = t['full_name']?.toString() ?? 'Teacher';
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(name,
+                  style: Theme.of(sheetContext).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(
+                t['email']?.toString() ?? t['phone']?.toString() ?? '',
+                style: Theme.of(sheetContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  isActive
+                      ? Icons.block_outlined
+                      : Icons.check_circle_outline,
+                  size: 20,
+                ),
+                title: Text(isActive ? 'Deactivate account' : 'Activate account'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  try {
+                    await ApiClient.instance
+                        .post('/users/$userId/toggle-active');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(isActive
+                            ? 'Teacher deactivated'
+                            : 'Teacher activated')));
+                    _load();
+                  } catch (_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Failed to update teacher')));
+                  }
+                },
+              ),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.delete_outline,
+                    size: 20, color: Theme.of(sheetContext).colorScheme.error),
+                title: Text('Delete teacher',
+                    style: TextStyle(
+                        color: Theme.of(sheetContext).colorScheme.error)),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text('Delete $name?'),
+                      content: const Text(
+                          'Their login is removed. Class assignments need a new teacher afterwards.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor:
+                                Theme.of(dialogContext).colorScheme.error,
+                          ),
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok != true) return;
+                  try {
+                    await ApiClient.instance.delete('/users/$userId');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Teacher deleted')));
+                    _load();
+                  } catch (_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text(
+                            'Failed to delete — the teacher may have class assignments')));
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

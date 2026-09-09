@@ -42,7 +42,102 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }
   }
 
-  @override
+    /// Manage sheet: adjust stock, delete asset.
+  void _showItemActions(Map<String, dynamic> item) {
+    final itemId = item['id']?.toString();
+    final nameCtrl = TextEditingController(text: safeStringOrNull(item['name']) ?? '');
+    final qtyCtrl = TextEditingController(text: '${safeIntOrNull(item['quantity']) ?? 0}');
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 14,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 14,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                safeStringOrNull(item['name']) ?? 'Asset',
+                style: Theme.of(sheetContext).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Asset Name'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Quantity'),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await ApiClient.instance.put('/inventory/$itemId', data: {
+                      'name': nameCtrl.text.trim(),
+                      'quantity': int.tryParse(qtyCtrl.text.trim()) ?? 0,
+                    });
+                    if (!sheetContext.mounted) return;
+                    Navigator.of(sheetContext).pop();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Asset updated')));
+                    _load();
+                  } catch (_) {
+                    if (!sheetContext.mounted) return;
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                        const SnackBar(content: Text('Failed to update asset')));
+                  }
+                },
+                child: const Text('Save Changes'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(sheetContext).colorScheme.error,
+                  side: BorderSide(
+                      color: Theme.of(sheetContext)
+                          .colorScheme
+                          .error
+                          .withValues(alpha: 0.4)),
+                ),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Delete asset'),
+                onPressed: () async {
+                  Navigator.of(sheetContext).pop();
+                  try {
+                    await ApiClient.instance.delete('/inventory/$itemId');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Asset deleted')));
+                    _load();
+                  } catch (_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to delete asset')));
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+@override
   Widget build(BuildContext context) {
     final filtered = _items
         .where(
@@ -104,6 +199,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                 index: i,
                                 child: ESchoolCard(
                                   margin: const EdgeInsets.only(bottom: 10),
+                                  onTap: () => _showItemActions(item),
                                   child: ListTile(
                                     contentPadding: EdgeInsets.zero,
                                     leading: CircleAvatar(
