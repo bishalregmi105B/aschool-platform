@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,24 @@ function ELibraryContent() {
     onError: () => toast.error("Failed to add book"),
   });
 
+  const RESOURCE_COLUMNS: Column<any>[] = [
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div> },
+    { key: "author", label: "Author", sortable: true, value: (b) => b.author ?? "", render: (b) => b.author || "—" },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "subject", label: "Subject", value: (b) => b.subject ?? "", render: (b) => b.subject || "—" },
+    { key: "class_name", label: "Class", sortable: true, value: (b) => b.class_name ?? "", render: (b) => b.class_name || "All" },
+    {
+      key: "file_url",
+      label: "Actions",
+      noExport: true,
+      render: (b) => (b.file_url ? (
+        <Button variant="ghost" size="sm" asChild onClick={(e) => e.stopPropagation()}>
+          <a href={b.file_url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+        </Button>
+      ) : "—"),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   if (isError) {
@@ -83,23 +101,17 @@ function ELibraryContent() {
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>Category</TableHead><TableHead>Subject</TableHead><TableHead>Class</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {books.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No resources found</TableCell></TableRow>
-              ) : books.map((b: any) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-medium"><div className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div></TableCell>
-                  <TableCell>{b.author || "—"}</TableCell>
-                  <TableCell><Badge variant="outline">{b.category}</Badge></TableCell>
-                  <TableCell>{b.subject || "—"}</TableCell>
-                  <TableCell>{b.class_name || "All"}</TableCell>
-                  <TableCell>{b.file_url ? <Button variant="ghost" size="sm" asChild><a href={b.file_url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a></Button> : "—"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={RESOURCE_COLUMNS}
+            rows={books}
+            rowKey={(b: any) => b.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search books, authors..."
+            exportFileName="elibrary"
+            empty={{ icon: BookOpen, title: "No resources found", body: "Add digital books, e-books and journals to the library.", action: { label: "Add Resource", onClick: () => setShowDialog(true) } }}
+          />
         </CardContent>
       </Card>
 

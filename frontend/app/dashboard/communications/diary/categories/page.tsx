@@ -9,12 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, BookOpen, Search, Pencil, Trash2, Tag } from "lucide-react";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { Plus, BookOpen, Pencil, Trash2, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 
@@ -97,9 +95,56 @@ export default function DiaryCategoriesPage() {
     setShowAdd(true);
   };
 
-  const filtered = categories.filter((category) =>
-    category.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const CATEGORY_COLUMNS: Column<DiaryCategory>[] = [
+    {
+      key: "name",
+      label: "Category Name",
+      sortable: true,
+      value: (c) => c.name,
+      render: (c) => (
+        <span className="font-medium flex items-center gap-2">
+          <Tag className="h-4 w-4 text-muted-foreground" /> {c.name}
+        </span>
+      ),
+    },
+    {
+      key: "color",
+      label: "Color Tag",
+      value: (c) => c.color,
+      render: (c) => <div className={`w-4 h-4 rounded-full ${colorClass[c.color] ?? colorClass.blue}`} />,
+    },
+    {
+      key: "active",
+      label: "Status",
+      sortable: true,
+      value: (c) => (c.active ? "active" : "inactive"),
+      render: (c) => (
+        <Badge variant={c.active ? "success" : "secondary"}>
+          {c.active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (c) => (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(c); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); deleteCategory.mutate(c.id); }}
+            disabled={deleteCategory.isPending}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   if (isLoading) return <PageLoader />;
 
@@ -117,65 +162,24 @@ export default function DiaryCategoriesPage() {
         </Button>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search categories..."
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category Name</TableHead>
-                <TableHead>Color Tag</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((category) => (
-                <TableRow key={category.id}>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" /> {category.name}
-                  </TableCell>
-                  <TableCell>
-                    <div className={`w-4 h-4 rounded-full ${colorClass[category.color] ?? colorClass.blue}`} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={category.active ? "success" : "secondary"}>
-                      {category.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(category)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteCategory.mutate(category.id)}
-                      disabled={deleteCategory.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    No diary categories found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<DiaryCategory>
+            columns={CATEGORY_COLUMNS}
+            rows={categories}
+            rowKey={(c) => c.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search categories..."
+            exportFileName="diary-categories"
+            empty={{
+              icon: BookOpen,
+              title: "No diary categories found",
+              body: "Create categories like Health Issue, Good Work, Needs Attention.",
+              action: { label: "Add Category", onClick: openCreate },
+            }}
+          />
         </CardContent>
       </Card>
 

@@ -17,14 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Award, Medal, Plus, Star, Trophy, Users } from "lucide-react";
 
@@ -174,47 +167,47 @@ function GamificationContent() {
 }
 
 function LeaderboardTab({ data }: { data: LeaderEntry[] }) {
+  const LEADER_COLUMNS: Column<LeaderEntry>[] = [
+    {
+      key: "rank",
+      label: "Rank",
+      sortable: true,
+      value: (e) => e.rank ?? 0,
+      render: (e, i) =>
+        i < 3 ? (
+          <span className="text-xl">{["🥇", "🥈", "🥉"][i]}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">#{e.rank || i + 1}</span>
+        ),
+    },
+    { key: "student_name", label: "Student", sortable: true, value: (e) => e.student_name, render: (e) => <span className="font-medium">{e.student_name}</span> },
+    {
+      key: "total_points",
+      label: "Points",
+      align: "right",
+      sortable: true,
+      value: (e) => e.total_points,
+      render: (e) => (
+        <Badge variant="outline">
+          <Star className="h-3 w-3 mr-1 text-yellow-500" /> {e.total_points}
+        </Badge>
+      ),
+    },
+  ];
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Top Students</CardTitle>
       </CardHeader>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Student</TableHead>
-            <TableHead className="text-right">Points</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                No points awarded yet
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.map((entry, i) => (
-              <TableRow key={entry.student_id}>
-                <TableCell>
-                  {i < 3 ? (
-                    <span className="text-xl">{["🥇", "🥈", "🥉"][i]}</span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">#{entry.rank || i + 1}</span>
-                  )}
-                </TableCell>
-                <TableCell className="font-medium">{entry.student_name}</TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="outline">
-                    <Star className="h-3 w-3 mr-1 text-yellow-500" /> {entry.total_points}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <DataTable<LeaderEntry>
+        columns={LEADER_COLUMNS}
+        rows={data}
+        rowKey={(e) => e.student_id}
+        searchable
+        searchPlaceholder="Search students…"
+        exportFileName="leaderboard"
+        dense
+      />
     </Card>
   );
 }

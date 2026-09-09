@@ -8,9 +8,7 @@ import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -115,6 +113,37 @@ function LibraryContent() {
       );
     }
 
+  const BOOK_COLUMNS: Column<Book>[] = [
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title, render: (b) => <span className="font-medium">{b.title}</span> },
+    { key: "author", label: "Author", sortable: true, value: (b) => b.author },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category, render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "available", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies, render: (b) => <>{b.available_copies}/{b.total_copies}</> },
+    { key: "shelf_location", label: "Location", value: (b) => b.shelf_location },
+  ];
+
+  const ISSUE_COLUMNS: Column<BookIssue>[] = [
+    { key: "id", label: "Issue ID", value: (i) => i.id.slice(0, 8), render: (i) => <span className="font-mono text-xs">{i.id.slice(0, 8)}</span> },
+    { key: "book", label: "Book", value: (i) => (i as any).book_title ?? i.book_id, render: (i) => (i as any).book_title || i.book_id },
+    { key: "student", label: "Student", value: (i) => (i as any).student_name ?? i.student_id, render: (i) => (i as any).student_name || i.student_id },
+    { key: "due_date", label: "Due Date", sortable: true, value: (i) => i.due_date, render: (i) => displayBS(i.due_date) },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (i) => i.status,
+      render: (i) => <Badge variant={i.status === "returned" ? "default" : "destructive"}>{i.status}</Badge>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (i) =>
+        i.status !== "returned" ? (
+          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); returnMut.mutate(i.id); }}>Return</Button>
+        ) : null,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -143,68 +172,33 @@ function LibraryContent() {
       </div>
 
       {tab === "books" && (
-        <>
-          <Input placeholder="Search books..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Available</TableHead>
-                    <TableHead>Location</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {books?.map((book) => (
-                    <TableRow key={book.id}>
-                      <TableCell className="font-medium">{book.title}</TableCell>
-                      <TableCell>{book.author}</TableCell>
-                      <TableCell><Badge variant="outline">{book.category}</Badge></TableCell>
-                      <TableCell>{book.available_copies}/{book.total_copies}</TableCell>
-                      <TableCell>{book.shelf_location}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
+        <Card>
+          <CardContent className="p-0">
+            <DataTable<Book>
+              columns={BOOK_COLUMNS}
+              rows={books ?? []}
+              rowKey={(b) => b.id}
+              searchable
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Search books..."
+              exportFileName="library-books"
+            />
+          </CardContent>
+        </Card>
       )}
 
       {tab === "issues" && (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Issue ID</TableHead>
-                  <TableHead>Book</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {issues?.map((issue) => (
-                  <TableRow key={issue.id}>
-                    <TableCell className="font-mono text-xs">{issue.id.slice(0, 8)}</TableCell>
-                    <TableCell>{(issue as any).book_title || issue.book_id}</TableCell>
-                    <TableCell>{(issue as any).student_name || issue.student_id}</TableCell>
-                    <TableCell>{displayBS(issue.due_date)}</TableCell>
-                    <TableCell><Badge variant={issue.status === "returned" ? "default" : "destructive"}>{issue.status}</Badge></TableCell>
-                    <TableCell>
-                      {issue.status !== "returned" && (
-                        <Button size="sm" variant="outline" onClick={() => returnMut.mutate(issue.id)}>Return</Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable<BookIssue>
+              columns={ISSUE_COLUMNS}
+              rows={issues ?? []}
+              rowKey={(i) => i.id}
+              searchable
+              searchPlaceholder="Search issues…"
+              exportFileName="library-issues"
+            />
           </CardContent>
         </Card>
       )}

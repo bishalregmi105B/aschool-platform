@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -38,6 +39,26 @@ interface ExamSubject {
   total_full_marks: number;
   total_pass_marks: number;
 }
+
+const SCHEDULE_COLUMNS: Column<ExamSubject>[] = [
+  { key: "name", label: "Subject", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
+  { key: "code", label: "Code", sortable: true, value: (s) => s.code ?? "", render: (s) => <span className="text-muted-foreground">{s.code || "—"}</span> },
+  { key: "full", label: "Full Marks", align: "right", sortable: true, value: (s) => s.total_full_marks ?? s.full_marks, render: (s) => <>{s.total_full_marks ?? s.full_marks}</> },
+  { key: "pass", label: "Pass Marks", align: "right", sortable: true, value: (s) => s.total_pass_marks ?? s.pass_marks, render: (s) => <>{s.total_pass_marks ?? s.pass_marks}</> },
+  {
+    key: "practical",
+    label: "Practical",
+    value: (s) => (s.has_practical ? "yes" : "no"),
+    render: (s) =>
+      s.has_practical ? (
+        <Badge variant="outline" className="text-xs">
+          {s.practical_full_marks ? `${s.practical_full_marks} marks` : "Yes"}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground text-sm">—</span>
+      ),
+  },
+];
 
 export default function ExamSchedulePage() {
   return (
@@ -148,36 +169,15 @@ function ExamCard({ exam }: { exam: Exam }) {
         ) : !subjects || subjects.length === 0 ? (
           <p className="text-sm text-muted-foreground">No subjects assigned for this exam.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Subject</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Full Marks</TableHead>
-                <TableHead>Pass Marks</TableHead>
-                <TableHead>Practical</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {subjects.map((s: ExamSubject) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{s.code || "—"}</TableCell>
-                  <TableCell>{s.total_full_marks ?? s.full_marks}</TableCell>
-                  <TableCell>{s.total_pass_marks ?? s.pass_marks}</TableCell>
-                  <TableCell>
-                    {s.has_practical ? (
-                      <Badge variant="outline" className="text-xs">
-                        {s.practical_full_marks ? `${s.practical_full_marks} marks` : "Yes"}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable<ExamSubject>
+            columns={SCHEDULE_COLUMNS}
+            rows={subjects}
+            rowKey={(s) => s.id}
+            searchable
+            searchPlaceholder="Search subjects…"
+            exportFileName={`exam-schedule-${exam.name}`}
+            empty={{ icon: Calendar, title: "No subjects assigned", body: "Add subjects to this exam to build the schedule." }}
+          />
         )}
       </CardContent>
     </Card>

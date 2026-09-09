@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +51,32 @@ function BadgesContent() {
     onError: () => toast.error("Failed to save badge"),
   });
 
+  const BADGE_COLUMNS: Column<any>[] = [
+    {
+      key: "name",
+      label: "Badge",
+      sortable: true,
+      value: (b) => b.name ?? "",
+      render: (b) => (
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{b.icon_url || "🏅"}</span>
+          <span className="font-medium">{b.name}</span>
+        </div>
+      ),
+    },
+    { key: "description", label: "Description", value: (b) => b.description ?? "", render: (b) => <span className="text-sm text-muted-foreground max-w-xs truncate block">{b.description || "—"}</span> },
+    { key: "criteria", label: "Criteria", value: (b) => b.criteria ?? "", render: (b) => <span className="text-sm">{b.criteria || "—"}</span> },
+    { key: "points_value", label: "Points", align: "right", sortable: true, value: (b) => b.points_value ?? 0, render: (b) => <Badge variant="outline">{b.points_value} pts</Badge> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (b) => (
+        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(b); }}><Pencil className="h-4 w-4" /></Button>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -72,37 +98,15 @@ function BadgesContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Badge</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Criteria</TableHead>
-              <TableHead>Points</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {badges.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No badges created yet</TableCell></TableRow>
-            ) : badges.map((b: any) => (
-              <TableRow key={b.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{b.icon_url || "🏅"}</span>
-                    {b.name}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{b.description || "—"}</TableCell>
-                <TableCell className="text-sm">{b.criteria || "—"}</TableCell>
-                <TableCell><Badge variant="outline">{b.points_value} pts</Badge></TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={BADGE_COLUMNS}
+          rows={badges}
+          rowKey={(b: any) => b.id}
+          searchable
+          searchPlaceholder="Search badges…"
+          exportFileName="badges"
+          empty={{ icon: Award, title: "No badges created yet", body: "Badges motivate students — create your first one.", action: { label: "New Badge", onClick: openAdd } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

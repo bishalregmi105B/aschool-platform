@@ -584,6 +584,98 @@ function ClassesTab() {
   if (isLoading) return <PageLoader />;
 
   const classes = data || [];
+
+  const CLASS_COLUMNS: Column<ClassItem>[] = [
+    {
+      key: "name",
+      label: "Class",
+      sortable: true,
+      value: (k) => k.name,
+      render: (k) => (
+        <div>
+          <div className="font-medium">{k.name}</div>
+          <div className="text-xs text-muted-foreground">
+            Manage sections and teacher assignments from here.
+          </div>
+        </div>
+      ),
+    },
+    { key: "numeric_grade", label: "Grade", align: "right", sortable: true, value: (k) => k.numeric_grade ?? 0, render: (k) => <Badge variant="outline">Grade {k.numeric_grade ?? "-"}</Badge> },
+    {
+      key: "sections",
+      label: "Sections",
+      value: (k) => (k.sections || []).length,
+      render: (k) => (
+        <div className="space-y-2">
+          {(k.sections || []).map((section) => (
+            <div
+              key={section.id}
+              className="flex items-center justify-between rounded-md border px-3 py-2"
+            >
+              <div>
+                <div className="font-medium">Section {section.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  Capacity: {section.capacity ?? "-"}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => { e.stopPropagation(); setEditSection({ klass: k, section }); }}
+                  aria-label={`Edit section ${section.name}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void (async () => {
+                      const ok = await confirm({
+                        title: `Delete section "${section.name}"?`,
+                        body: `It will be removed from ${k.name}. Students stay enrolled in the class.`,
+                        confirmLabel: "Delete section",
+                        tone: "danger",
+                      });
+                      if (ok) {
+                        deleteSectionMutation.mutate({ classId: k.id, sectionId: section.id });
+                      }
+                    })();
+                  }}
+                  aria-label={`Delete section ${section.name}`}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          {(k.sections || []).length === 0 && (
+            <div className="text-sm text-muted-foreground">No sections yet.</div>
+          )}
+          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setAddSectionFor(k); }}>
+            <Plus className="mr-2 h-3.5 w-3.5" /> Add Section
+          </Button>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (k) => (
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <RowActions
+            onEdit={() => setEditClass(k)}
+            onDelete={() => deleteClassMutation.mutate(k.id)}
+            deleteLabel={`Delete class "${k.name}"?`}
+            deleting={deleteClassMutation.isPending}
+          />
+        </div>
+      ),
+    },
+  ];
   const sectionDialogClass = addSectionFor || editSection?.klass || null;
   const sectionDialogItem = editSection?.section || null;
 
@@ -596,99 +688,20 @@ function ClassesTab() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Class</TableHead>
-                <TableHead>Grade</TableHead>
-                <TableHead>Sections</TableHead>
-                <TableHead className="w-[120px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {classes.map((klass) => (
-                <TableRow key={klass.id}>
-                  <TableCell>
-                    <div className="font-medium">{klass.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Manage sections and teacher assignments from here.
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">Grade {klass.numeric_grade ?? "-"}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-2">
-                      {(klass.sections || []).map((section) => (
-                        <div
-                          key={section.id}
-                          className="flex items-center justify-between rounded-md border px-3 py-2"
-                        >
-                          <div>
-                            <div className="font-medium">Section {section.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Capacity: {section.capacity ?? "-"}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setEditSection({ klass, section })}
-                              aria-label={`Edit section ${section.name}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                void (async () => {
-                              const ok = await confirm({
-                                title: `Delete section "${section.name}"?`,
-                                body: `It will be removed from ${klass.name}. Students stay enrolled in the class.`,
-                                confirmLabel: "Delete section",
-                                tone: "danger",
-                              });
-                              if (ok) {
-                                deleteSectionMutation.mutate({ classId: klass.id, sectionId: section.id });
-                              }
-                              })();
-                            }}
-                              aria-label={`Delete section ${section.name}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      {(klass.sections || []).length === 0 && (
-                        <div className="text-sm text-muted-foreground">No sections yet.</div>
-                      )}
-                      <Button variant="outline" size="sm" onClick={() => setAddSectionFor(klass)}>
-                        <Plus className="mr-2 h-3.5 w-3.5" /> Add Section
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <RowActions
-                      onEdit={() => setEditClass(klass)}
-                      onDelete={() => deleteClassMutation.mutate(klass.id)}
-                      deleteLabel={`Delete class \"${klass.name}\"?`}
-                      deleting={deleteClassMutation.isPending}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {classes.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    No classes created yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<ClassItem>
+            columns={CLASS_COLUMNS}
+            rows={classes}
+            rowKey={(k) => k.id}
+            searchable
+            searchPlaceholder="Search classes…"
+            exportFileName="classes-sections"
+            empty={{
+              icon: Users,
+              title: "No classes created yet",
+              body: "Create your first class — sections and teachers hang off it.",
+              action: { label: "Add Class", onClick: () => setShowAddClass(true) },
+            }}
+          />
         </CardContent>
       </Card>
 

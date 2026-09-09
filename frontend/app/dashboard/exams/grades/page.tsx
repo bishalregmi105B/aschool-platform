@@ -6,9 +6,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader } from "@/components/ui/spinner";
 import { Star } from "lucide-react";
 
@@ -19,6 +17,13 @@ interface Grade {
   min_pct: number;
   description?: string;
 }
+
+const GRADE_COLUMNS: Column<Grade>[] = [
+  { key: "grade", label: "Grade", sortable: true, value: (g) => g.grade, render: (g) => <span className="font-bold text-lg">{g.grade}</span> },
+  { key: "min_pct", label: "Min %", align: "right", sortable: true, value: (g) => g.min_pct, render: (g) => <>{g.min_pct}%</> },
+  { key: "gpa", label: "Grade Point (GPA)", align: "right", sortable: true, value: (g) => g.gpa, render: (g) => <Badge>{g.gpa}</Badge> },
+  { key: "description", label: "Description", value: (g) => g.description ?? "", render: (g) => g.description || "—" },
+];
 
 export default function ExamGradesPage() {
   return (
@@ -67,26 +72,15 @@ function ExamGradesContent() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader><TableRow><TableHead>Grade</TableHead><TableHead>Min %</TableHead><TableHead>Grade Point (GPA)</TableHead><TableHead>Description</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(data || []).map((g, i) => (
-                <TableRow key={`${g.grade}-${i}`}>
-                  <TableCell className="font-bold text-lg">{g.grade}</TableCell>
-                  <TableCell>{g.min_pct}%</TableCell>
-                  <TableCell><Badge>{g.gpa}</Badge></TableCell>
-                  <TableCell>{g.description || "—"}</TableCell>
-                </TableRow>
-              ))}
-              {(!data || data.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    Grade table unavailable.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<Grade>
+            columns={GRADE_COLUMNS}
+            rows={data || []}
+            rowKey={(g) => g.grade}
+            searchable
+            searchPlaceholder="Search grades…"
+            exportFileName="neb-grade-scale"
+            empty={{ icon: Star, title: "Grade table unavailable", body: "The backend grade reference returned nothing." }}
+          />
         </CardContent>
       </Card>
 

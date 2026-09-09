@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -58,6 +58,33 @@ function DrillsContent() {
     );
   }
 
+  const DRILL_COLUMNS: Column<any>[] = [
+    { key: "title", label: "Title", sortable: true, value: (d) => d.title ?? "", render: (d) => <span className="font-medium">{d.title}</span> },
+    { key: "type", label: "Type", sortable: true, value: (d) => d.drill_type ?? d.type ?? "", render: (d) => <Badge variant="outline">{d.drill_type ?? d.type}</Badge> },
+    { key: "scheduled_date", label: "Scheduled Date", sortable: true, value: (d) => d.scheduled_date ?? "", render: (d) => (d.scheduled_date ? displayBS(d.scheduled_date) : "—") },
+    { key: "duration_minutes", label: "Duration", align: "right", sortable: true, value: (d) => d.duration_minutes ?? 0, render: (d) => (d.duration_minutes ? `${d.duration_minutes} min` : "—") },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (d) => d.status ?? "scheduled",
+      render: (d) => (
+        <Badge variant={d.status === "completed" ? "default" : d.status === "missed" ? "destructive" : "secondary"}>
+          {d.status ?? "scheduled"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (d) =>
+        d.status !== "completed" ? (
+          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); markComplete.mutate(d.id); }}>Mark Done</Button>
+        ) : null,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -66,23 +93,15 @@ function DrillsContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Scheduled Date</TableHead><TableHead>Duration</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {drills.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No drills scheduled</TableCell></TableRow>
-            ) : drills.map((d: any) => (
-              <TableRow key={d.id}>
-                <TableCell className="font-medium">{d.title}</TableCell>
-                <TableCell><Badge variant="outline">{d.drill_type ?? d.type}</Badge></TableCell>
-                <TableCell>{d.scheduled_date ? displayBS(d.scheduled_date) : "—"}</TableCell>
-                <TableCell>{d.duration_minutes ? `${d.duration_minutes} min` : "—"}</TableCell>
-                <TableCell><Badge variant={d.status === "completed" ? "default" : d.status === "missed" ? "destructive" : "secondary"}>{d.status ?? "scheduled"}</Badge></TableCell>
-                <TableCell>{d.status !== "completed" && <Button size="sm" variant="outline" onClick={() => markComplete.mutate(d.id)}>Mark Done</Button>}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={DRILL_COLUMNS}
+          rows={drills}
+          rowKey={(d: any) => d.id}
+          searchable
+          searchPlaceholder="Search drills…"
+          exportFileName="drills"
+          empty={{ icon: Plus, title: "No drills scheduled", body: "Schedule evacuation drills to stay prepared.", action: { label: "Schedule Drill", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

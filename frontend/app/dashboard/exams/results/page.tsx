@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Table,
   TableBody,
@@ -35,6 +36,7 @@ import {
   Download,
   TableIcon,
   ChevronRight,
+  GraduationCap,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -290,6 +292,38 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
     }
   };
 
+  const RESULT_COLUMNS: Column<StudentResult>[] = [
+    {
+      key: "rank",
+      label: "Rank",
+      sortable: true,
+      value: (r) => r.rank,
+      render: (r) =>
+        r.rank <= 3 ? (
+          <Badge variant={r.rank === 1 ? "default" : "secondary"}>#{r.rank}</Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">#{r.rank}</span>
+        ),
+    },
+    { key: "roll_number", label: "Roll", sortable: true, value: (r) => r.roll_number },
+    { key: "student_name", label: "Student", sortable: true, value: (r) => r.student_name, render: (r) => <span className="font-medium">{r.student_name}</span> },
+    { key: "obtained", label: "Obtained / Total", align: "right", value: (r) => r.total_obtained, render: (r) => <>{r.total_obtained} / {r.total_marks}</> },
+    { key: "percentage", label: "Percentage", align: "right", sortable: true, value: (r) => r.percentage ?? 0, render: (r) => <>{r.percentage?.toFixed(1)}%</> },
+    { key: "grade", label: "Grade", sortable: true, value: (r) => r.grade, render: (r) => <Badge variant="outline">{r.grade}</Badge> },
+    { key: "gpa", label: "GPA", align: "right", sortable: true, value: (r) => r.gpa ?? 0, render: (r) => r.gpa?.toFixed(1) },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (r) => r.status,
+      render: (r) => (
+        <Badge className={r.status === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+          {r.status?.toUpperCase()}
+        </Badge>
+      ),
+    },
+  ];
+
   const stats =
     results && results.length > 0
       ? {
@@ -501,74 +535,16 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                     No results found. Enter marks first.
                   </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-16">Rank</TableHead>
-                        <TableHead className="w-16">Roll</TableHead>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Obtained / Total</TableHead>
-                        <TableHead>Percentage</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>GPA</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {results.map((r: StudentResult) => (
-                        <TableRow
-                          key={r.student_id}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => openMarksheet(r.student_id)}
-                        >
-                          <TableCell>
-                            {r.rank <= 3 ? (
-                              <Badge
-                                variant={r.rank === 1 ? "default" : "secondary"}
-                              >
-                                #{r.rank}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                #{r.rank}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>{r.roll_number}</TableCell>
-                          <TableCell className="font-medium">
-                            {r.student_name}
-                          </TableCell>
-                          <TableCell>
-                            {r.total_obtained} / {r.total_marks}
-                          </TableCell>
-                          <TableCell>{r.percentage?.toFixed(1)}%</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{r.grade}</Badge>
-                          </TableCell>
-                          <TableCell>{r.gpa?.toFixed(1)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={
-                                r.status === "pass"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-700"
-                              }
-                            >
-                              {r.status?.toUpperCase()}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {loadingMarksheet === r.student_id ? (
-                              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <DataTable
+                    columns={RESULT_COLUMNS}
+                    rows={results}
+                    rowKey={(r: StudentResult) => r.student_id}
+                    onRowClick={(r) => openMarksheet(r.student_id)}
+                    searchable
+                    searchPlaceholder="Search students…"
+                    exportFileName="exam-results"
+                    empty={{ icon: GraduationCap, title: "No results found", body: "Enter marks first — results appear here with NEB grades." }}
+                  />
                 )}
               </CardContent>
             </Card>

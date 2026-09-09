@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +55,26 @@ function AppraisalContent() {
     onError: () => toast.error("Failed to save"),
   });
 
+  const APPRAISAL_COLUMNS: Column<any>[] = [
+    { key: "staff_name", label: "Staff", sortable: true, value: (a) => a.staff_name ?? "", render: (a) => <span className="font-medium">{a.staff_name}</span> },
+    { key: "period", label: "Period", sortable: true, value: (a) => a.period ?? "" },
+    { key: "teaching_score", label: "Teaching", align: "center", sortable: true, value: (a) => a.teaching_score ?? 0, render: (a) => renderStars(a.teaching_score || 0) },
+    { key: "attendance_score", label: "Attendance", align: "center", sortable: true, value: (a) => a.attendance_score ?? 0, render: (a) => renderStars(a.attendance_score || 0) },
+    { key: "teamwork_score", label: "Teamwork", align: "center", sortable: true, value: (a) => a.teamwork_score ?? 0, render: (a) => renderStars(a.teamwork_score || 0) },
+    {
+      key: "overall",
+      label: "Overall",
+      align: "right",
+      sortable: true,
+      value: (a) => ((a.teaching_score || 0) + (a.attendance_score || 0) + (a.teamwork_score || 0)) / 3,
+      render: (a) => {
+        const avg = ((a.teaching_score || 0) + (a.attendance_score || 0) + (a.teamwork_score || 0)) / 3;
+        return <Badge variant={avg >= 4 ? "default" : avg >= 3 ? "secondary" : "destructive"}>{avg.toFixed(1)}/5</Badge>;
+      },
+    },
+    { key: "comments", label: "Comments", value: (a) => a.comments ?? "", render: (a) => <span className="max-w-[200px] truncate block">{a.comments || "—"}</span> },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   const renderStars = (score: number) => (
@@ -71,27 +91,15 @@ function AppraisalContent() {
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Staff</TableHead><TableHead>Period</TableHead><TableHead>Teaching</TableHead><TableHead>Attendance</TableHead><TableHead>Teamwork</TableHead><TableHead>Overall</TableHead><TableHead>Comments</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {appraisals.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No appraisals found</TableCell></TableRow>
-              ) : appraisals.map((a: any) => {
-                const avg = ((a.teaching_score || 0) + (a.attendance_score || 0) + (a.teamwork_score || 0)) / 3;
-                return (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.staff_name}</TableCell>
-                    <TableCell>{a.period}</TableCell>
-                    <TableCell>{renderStars(a.teaching_score || 0)}</TableCell>
-                    <TableCell>{renderStars(a.attendance_score || 0)}</TableCell>
-                    <TableCell>{renderStars(a.teamwork_score || 0)}</TableCell>
-                    <TableCell><Badge variant={avg >= 4 ? "default" : avg >= 3 ? "secondary" : "destructive"}>{avg.toFixed(1)}/5</Badge></TableCell>
-                    <TableCell className="max-w-[200px] truncate">{a.comments || "—"}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={APPRAISAL_COLUMNS}
+            rows={appraisals}
+            rowKey={(a: any) => a.id}
+            searchable
+            searchPlaceholder="Search appraisals…"
+            exportFileName="appraisals"
+            empty={{ icon: Plus, title: "No appraisals found", body: "Record performance reviews per staff member.", action: { label: "New Appraisal", onClick: () => setShowDialog(true) } }}
+          />
         </CardContent>
       </Card>
 

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,15 @@ function DismissalContent() {
     onError: () => toast.error("Verification failed — invalid or expired QR"),
   });
 
+  const DISMISSAL_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (q) => q.student_name ?? "", render: (q) => <span className="font-medium">{q.student_name || "—"}</span> },
+    { key: "class_name", label: "Class", sortable: true, value: (q) => q.class_name ?? "", render: (q) => q.class_name || "—" },
+    { key: "picked_up_by", label: "Guardian", value: (q) => q.picked_up_by ?? "", render: (q) => q.picked_up_by || "—" },
+    { key: "dismissed_at", label: "Time", sortable: true, value: (q) => q.dismissed_at ?? "", render: (q) => (q.dismissed_at ? new Date(q.dismissed_at).toLocaleTimeString() : "—") },
+    // A DismissalRecord only exists once the student has been released
+    { key: "status", label: "Status", value: () => "released", render: () => <Badge variant="default">released</Badge> },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   return (
@@ -64,21 +73,17 @@ function DismissalContent() {
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Guardian</TableHead><TableHead>Time</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {queue.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No dismissal records today</TableCell></TableRow> : queue.map((q: any) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-medium">{q.student_name || "—"}</TableCell>
-                  <TableCell>{q.class_name || "—"}</TableCell>
-                  <TableCell>{q.picked_up_by || "—"}</TableCell>
-                  <TableCell>{q.dismissed_at ? new Date(q.dismissed_at).toLocaleTimeString() : "—"}</TableCell>
-                  {/* A DismissalRecord only exists once the student has been released */}
-                  <TableCell><Badge variant="default">released</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={DISMISSAL_COLUMNS}
+            rows={queue}
+            rowKey={(q: any) => q.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search student..."
+            exportFileName="dismissals-today"
+            empty={{ icon: UserCheck, title: "No dismissal records today", body: "Records appear as students are released via QR verification." }}
+          />
         </CardContent>
       </Card>
     </div>

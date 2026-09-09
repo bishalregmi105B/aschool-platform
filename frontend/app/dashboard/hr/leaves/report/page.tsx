@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -28,6 +29,29 @@ interface LeaveRequest {
   reason: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
 }
+
+const REQUEST_COLUMNS: Column<LeaveRequest>[] = [
+  { key: "staff_name", label: "Staff Name", sortable: true, value: (l) => l.staff_name, render: (l) => <span className="font-medium">{l.staff_name || "Unknown Staff"}</span> },
+  { key: "leave_type", label: "Type", sortable: true, value: (l) => l.leave_type, render: (l) => <span className="capitalize">{l.leave_type}</span> },
+  { key: "duration", label: "Duration", value: (l) => l.start_date, render: (l) => (
+    <span className="text-sm whitespace-nowrap">
+      {l.start_date ? displayBS(l.start_date) : "—"} - {l.end_date ? displayBS(l.end_date) : "—"}
+    </span>
+  ) },
+  { key: "days", label: "Days", align: "right", sortable: true, value: (l) => l.days ?? 0, render: (l) => l.days || "—" },
+  { key: "reason", label: "Reason", value: (l) => l.reason ?? "", render: (l) => <span className="text-sm text-muted-foreground max-w-[200px] truncate block">{l.reason || "No reason provided"}</span> },
+  {
+    key: "status",
+    label: "Status",
+    sortable: true,
+    value: (l) => l.status,
+    render: (l) => (
+      <Badge variant={l.status === "approved" ? "success" : l.status === "rejected" ? "destructive" : "secondary"}>
+        {l.status}
+      </Badge>
+    ),
+  },
+];
 
 export default function LeaveReportPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -382,72 +406,15 @@ export default function LeaveReportPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Staff Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((l: LeaveRequest) => (
-                <TableRow key={l.id}>
-                  <TableCell className="font-medium">{l.staff_name || "Unknown Staff"}</TableCell>
-                  <TableCell className="capitalize">{l.leave_type}</TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">
-                    {l.start_date ? displayBS(l.start_date) : "—"} -{" "}
-                    {l.end_date ? displayBS(l.end_date) : "—"}
-                  </TableCell>
-                  <TableCell>{l.days || "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                    {l.reason || "No reason provided"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      l.status === "approved" ? "success" :
-                      l.status === "rejected" ? "destructive" : "secondary"
-                    }>
-                      {l.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {l.status === "pending" && (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-green-600 hover:text-green-700"
-                          onClick={() => updateStatusMutation.mutate({ id: l.id, status: "approved" })}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => updateStatusMutation.mutate({ id: l.id, status: "rejected" })}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No leave requests found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<LeaveRequest>
+            columns={REQUEST_COLUMNS}
+            rows={filtered}
+            rowKey={(l) => l.id}
+            searchable
+            searchPlaceholder="Search leave requests…"
+            exportFileName="leave-requests"
+            empty={{ icon: Download, title: "No leave requests found" }}
+          />
         </CardContent>
       </Card>
     </div>

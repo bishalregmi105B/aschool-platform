@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,14 @@ function RecordsContent() {
     onError: () => toast.error("Failed to save visit"),
   });
 
+  const VISIT_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (v) => v.student_name ?? "", render: (v) => <span className="font-medium">{v.student_name || v.student_id}</span> },
+    { key: "visit_date", label: "Visit Date", sortable: true, value: (v) => v.visit_date ?? "", render: (v) => <span className="text-sm">{v.visit_date ? displayBS(v.visit_date) : "—"}</span> },
+    { key: "reason", label: "Reason", value: (v) => v.reason ?? "", render: (v) => <span className="text-sm">{v.reason || "—"}</span> },
+    { key: "diagnosis", label: "Diagnosis", value: (v) => v.diagnosis ?? "", render: (v) => <span className="text-sm">{v.diagnosis || "—"}</span> },
+    { key: "treatment", label: "Treatment", value: (v) => v.treatment ?? "", render: (v) => <span className="text-sm">{v.treatment || "—"}</span> },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -76,30 +84,17 @@ function RecordsContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student</TableHead>
-              <TableHead>Visit Date</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Diagnosis</TableHead>
-              <TableHead>Treatment</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visits.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No visit records found</TableCell></TableRow>
-            ) : visits.map((v: any) => (
-              <TableRow key={v.id}>
-                <TableCell className="font-medium">{v.student_name || v.student_id}</TableCell>
-                <TableCell className="text-sm">{v.visit_date ? displayBS(v.visit_date) : "—"}</TableCell>
-                <TableCell className="text-sm">{v.reason || "—"}</TableCell>
-                <TableCell className="text-sm">{v.diagnosis || "—"}</TableCell>
-                <TableCell className="text-sm">{v.treatment || "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={VISIT_COLUMNS}
+          rows={visits}
+          rowKey={(v: any) => v.id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by student or reason..."
+          exportFileName="health-visits"
+          empty={{ icon: Stethoscope, title: "No visit records found", body: "Record a visit to start the health history.", action: { label: "Record Visit", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

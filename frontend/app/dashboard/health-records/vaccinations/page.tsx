@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,15 @@ function VaccinationsContent() {
     onError: () => toast.error("Failed to record vaccination"),
   });
 
+  const VACCINATION_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (r) => r.student_name ?? "", render: (r) => <span className="font-medium">{r.student_name || r.student_id}</span> },
+    { key: "vaccine_name", label: "Vaccine", sortable: true, value: (r) => r.vaccine_name ?? "" },
+    { key: "dose_number", label: "Dose", align: "right", sortable: true, value: (r) => r.dose_number ?? 0, render: (r) => <Badge variant="outline">Dose {r.dose_number}</Badge> },
+    { key: "date_administered", label: "Date Given", sortable: true, value: (r) => r.date_administered ?? "", render: (r) => <span className="text-sm">{r.date_administered ? displayBS(r.date_administered) : "—"}</span> },
+    { key: "administered_by", label: "Given By", value: (r) => r.administered_by ?? "", render: (r) => <span className="text-sm">{r.administered_by || "—"}</span> },
+    { key: "next_due_date", label: "Next Due", sortable: true, value: (r) => r.next_due_date ?? "", render: (r) => <span className="text-sm">{r.next_due_date ? displayBS(r.next_due_date) : "—"}</span> },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -70,32 +79,15 @@ function VaccinationsContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student</TableHead>
-              <TableHead>Vaccine</TableHead>
-              <TableHead>Dose</TableHead>
-              <TableHead>Date Given</TableHead>
-              <TableHead>Given By</TableHead>
-              <TableHead>Next Due</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {records.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No vaccination records found</TableCell></TableRow>
-            ) : records.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.student_name || r.student_id}</TableCell>
-                <TableCell>{r.vaccine_name}</TableCell>
-                <TableCell><Badge variant="outline">Dose {r.dose_number}</Badge></TableCell>
-                <TableCell className="text-sm">{r.date_administered ? displayBS(r.date_administered) : "—"}</TableCell>
-                <TableCell className="text-sm">{r.administered_by || "—"}</TableCell>
-                <TableCell className="text-sm">{r.next_due_date ? displayBS(r.next_due_date) : "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={VACCINATION_COLUMNS}
+          rows={records}
+          rowKey={(r: any) => r.id}
+          searchable
+          searchPlaceholder="Search vaccinations…"
+          exportFileName="vaccinations"
+          empty={{ icon: Syringe, title: "No vaccination records found", body: "Record immunizations to keep student health histories complete.", action: { label: "Record Vaccination", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

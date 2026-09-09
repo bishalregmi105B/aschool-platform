@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -51,6 +51,39 @@ function OverdueContent() {
 
   const overdue = data || [];
 
+  const OVERDUE_COLUMNS: Column<any>[] = [
+    { key: "book", label: "Book", sortable: true, value: (i) => i.book_title ?? "", render: (i) => (
+      <div className="flex items-center gap-2 font-medium">
+        <BookOpen className="h-4 w-4 text-muted-foreground" />
+        {i.book_title || i.book_id}
+      </div>
+    ) },
+    { key: "student", label: "Student", sortable: true, value: (i) => i.student_name ?? "", render: (i) => i.student_name || i.student_id },
+    { key: "issued_date", label: "Issue Date", sortable: true, value: (i) => i.issued_date ?? "", render: (i) => <span className="text-sm">{i.issued_date ? displayBS(i.issued_date) : "—"}</span> },
+    { key: "due_date", label: "Due Date", sortable: true, value: (i) => i.due_date ?? "", render: (i) => <span className="text-sm">{i.due_date ? displayBS(i.due_date) : "—"}</span> },
+    {
+      key: "days_overdue",
+      label: "Days Overdue",
+      align: "right",
+      sortable: true,
+      value: (i) => Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000),
+      render: (i) => {
+        const daysOverdue = Math.floor((Date.now() - new Date(i.due_date).getTime()) / (1000 * 60 * 60 * 24));
+        return <Badge variant="destructive">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""}</Badge>;
+      },
+    },
+    {
+      key: "action",
+      label: "Action",
+      noExport: true,
+      render: (i) => (
+        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); returnMutation.mutate(i.id); }} disabled={returnMutation.isPending}>
+          <RotateCcw className="h-3 w-3 mr-1" /> Return
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -70,44 +103,14 @@ function OverdueContent() {
         </CardContent></Card>
       ) : (
         <Card><CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book</TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Days Overdue</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {overdue.map((issue: any) => {
-                const daysOverdue = Math.floor((new Date().getTime() - new Date(issue.due_date).getTime()) / (1000 * 60 * 60 * 24));
-                return (
-                  <TableRow key={issue.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        {issue.book_title || issue.book_id}
-                      </div>
-                    </TableCell>
-                    <TableCell>{issue.student_name || issue.student_id}</TableCell>
-                    <TableCell className="text-sm">{issue.issued_date ? displayBS(issue.issued_date) : "—"}</TableCell>
-                    <TableCell className="text-sm">{issue.due_date ? displayBS(issue.due_date) : "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="destructive">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" onClick={() => returnMutation.mutate(issue.id)} disabled={returnMutation.isPending}>
-                        <RotateCcw className="h-3 w-3 mr-1" /> Return
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={OVERDUE_COLUMNS}
+            rows={overdue}
+            rowKey={(i: any) => i.id}
+            searchable
+            searchPlaceholder="Search books or students…"
+            exportFileName="library-overdue"
+          />
         </CardContent></Card>
       )}
     </div>
