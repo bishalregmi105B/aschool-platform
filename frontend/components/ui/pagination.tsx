@@ -1,4 +1,5 @@
 "use client";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -73,18 +74,12 @@ function Pagination({
         {onPageSizeChange && (
           <label className="flex items-center gap-1.5 text-muted-foreground">
             <span className="hidden sm:inline">Rows</span>
-            <select
-              value={per_page}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-7 rounded-md border border-input bg-background px-1.5 text-[12px]"
-              aria-label="Rows per page"
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
+            <AdvancedSelect
+              value={String(per_page)}
+              onChange={(v) => onPageSizeChange(Number(v))}
+              triggerClassName="h-7 w-[68px] px-2 text-[12px]"
+              options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
+            />
           </label>
         )}
 

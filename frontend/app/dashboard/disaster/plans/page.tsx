@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Map, Plus, ArrowRight } from "lucide-react";
 
 export default function EvacuationPlansPage() {
@@ -91,9 +92,11 @@ function PlansContent() {
           <div className="space-y-4">
             <div className="space-y-2"><Label>Plan Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Earthquake Evacuation Plan" /></div>
             <div className="space-y-2"><Label>Type</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                <option value="earthquake">Earthquake</option><option value="fire">Fire</option><option value="flood">Flood</option><option value="other">Other</option>
-              </select>
+              <AdvancedSelect
+          value={form.type}
+          onChange={(v) => setForm({ ...form, type: v })}
+          options={[{ value: 'earthquake', label: 'Earthquake' }, { value: 'fire', label: 'Fire' }, { value: 'flood', label: 'Flood' }, { value: 'other', label: 'Other' }]}
+        />
             </div>
             <div className="space-y-2"><Label>Assembly Point</Label><Input value={form.assembly_point} onChange={(e) => setForm({ ...form, assembly_point: e.target.value })} placeholder="e.g. School Ground / Open Field" /></div>
             <div className="space-y-2"><Label>Evacuation Route</Label><Input value={form.evacuation_route} onChange={(e) => setForm({ ...form, evacuation_route: e.target.value })} placeholder="e.g. North Exit → Ground" /></div>

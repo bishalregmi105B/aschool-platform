@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { UserCheck, Plus, LogIn, LogOut, Search } from "lucide-react";
 
 export default function VisitorsPage() {
@@ -118,18 +119,22 @@ function VisitorsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Purpose</Label>
-                <select className="w-full border rounded-md p-2" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })}>
-                  <option value="meeting">Meeting</option><option value="parent_visit">Parent Visit</option><option value="delivery">Delivery</option><option value="official">Official Visit</option><option value="maintenance">Maintenance</option><option value="other">Other</option>
-                </select>
+                <AdvancedSelect
+          value={form.purpose}
+          onChange={(v) => setForm({ ...form, purpose: v })}
+          options={[{ value: 'meeting', label: 'Meeting' }, { value: 'parent_visit', label: 'Parent Visit' }, { value: 'delivery', label: 'Delivery' }, { value: 'official', label: 'Official Visit' }, { value: 'maintenance', label: 'Maintenance' }, { value: 'other', label: 'Other' }]}
+        />
               </div>
               <div className="space-y-2"><Label>Visiting Whom</Label><Input value={form.visiting_whom} onChange={(e) => setForm({ ...form, visiting_whom: e.target.value })} placeholder="Name/Department" /></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>ID Type</Label>
-                <select className="w-full border rounded-md p-2" value={form.id_type} onChange={(e) => setForm({ ...form, id_type: e.target.value })}>
-                  <option value="citizenship">Citizenship</option><option value="license">License</option><option value="passport">Passport</option><option value="other">Other</option>
-                </select>
+                <AdvancedSelect
+          value={form.id_type}
+          onChange={(v) => setForm({ ...form, id_type: v })}
+          options={[{ value: 'citizenship', label: 'Citizenship' }, { value: 'license', label: 'License' }, { value: 'passport', label: 'Passport' }, { value: 'other', label: 'Other' }]}
+        />
               </div>
               <div className="space-y-2"><Label>ID Number</Label><Input value={form.id_number} onChange={(e) => setForm({ ...form, id_number: e.target.value })} /></div>
               <div className="space-y-2"><Label>Vehicle No.</Label><Input value={form.vehicle_no} onChange={(e) => setForm({ ...form, vehicle_no: e.target.value })} /></div>

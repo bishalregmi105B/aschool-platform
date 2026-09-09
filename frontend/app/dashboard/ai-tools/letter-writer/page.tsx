@@ -13,6 +13,7 @@ import { ArrowLeft, Sparkles, Copy, FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AiResultView } from "@/components/ai/ai-result-view";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 export default function LetterWriterPage() {
   return (
@@ -59,18 +60,19 @@ function LetterContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Letter Type</Label>
-                <select className="w-full border rounded-md p-2" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  {types.map((t: any) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <AdvancedSelect
+                  value={form.type}
+                  onChange={(v) => setForm({ ...form, type: v })}
+                  options={(types || []).map((t: any) => ({ value: t.value, label: t.label }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Tone</Label>
-                <select className="w-full border rounded-md p-2" value={form.tone} onChange={(e) => setForm({ ...form, tone: e.target.value })}>
-                  <option value="formal">Formal</option>
-                  <option value="semi-formal">Semi-formal</option>
-                  <option value="friendly">Friendly</option>
-                  <option value="strict">Strict</option>
-                </select>
+                <AdvancedSelect
+          value={form.tone}
+          onChange={(v) => setForm({ ...form, tone: v })}
+          options={[{ value: 'formal', label: 'Formal' }, { value: 'semi-formal', label: 'Semi-formal' }, { value: 'friendly', label: 'Friendly' }, { value: 'strict', label: 'Strict' }]}
+        />
               </div>
             </div>
             <div className="space-y-2"><Label>Recipient</Label><Input value={form.recipient} onChange={(e) => setForm({ ...form, recipient: e.target.value })} placeholder="e.g. All Parents, Mr. Sharma, Class 10 Students" /></div>

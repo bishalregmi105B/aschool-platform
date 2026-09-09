@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:aschool_shared/aschool_shared.dart' show ASchoolTheme;
 
 enum UserRoleTarget { student, parent, teacher, unsupported }
 
@@ -63,16 +64,10 @@ extension LoginFlowView on LoginFlow {
     }
   }
 
-  Color get accent {
-    switch (this) {
-      case LoginFlow.student:
-        return const Color(0xFF2563EB);
-      case LoginFlow.parent:
-        return const Color(0xFF0E9F6E);
-      case LoginFlow.teacher:
-        return const Color(0xFFD97706);
-    }
-  }
+  // One brand accent everywhere — role-tinted rainbows (blue/green/amber)
+  // fought the product's deep-green identity and made the login feel like
+  // three different apps. Labels and icons still differentiate roles.
+  Color get accent => ASchoolTheme.primary;
 }
 
 const String onboardingSeenKey = 'user_onboarding_seen_v1';

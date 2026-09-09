@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, Star, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -101,12 +102,9 @@ function AppraisalContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Staff Member</Label>
-                <select className="w-full border rounded-md p-2" value={form.staff_id} onChange={(e) => setForm({ ...form, staff_id: e.target.value })}>
-                  <option value="">Select staff</option>
-                  {staffOptions.map((staff: any) => (
-                    <option key={staff.id} value={staff.id}>{staff.full_name} ({staff.role})</option>
-                  ))}
-                </select>
+                <AdvancedSelect value={form.staff_id} onChange={(v) => setForm({ ...form, staff_id: v })}
+                  clearable searchable placeholder="Select staff"
+                  options={(staffOptions || []).map((staff: any) => ({ value: staff.id, label: `${staff.full_name} (${staff.role})` }))} />
               </div>
               <div className="space-y-2"><Label>Period</Label><Input value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} placeholder="e.g. 2024" /></div>
             </div>

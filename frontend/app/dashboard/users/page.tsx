@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface User {
@@ -258,12 +259,16 @@ function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Role</Label>
-              <select name="role" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
-                <option value="teacher">Teacher</option>
-                <option value="accountant">Accountant</option>
-                <option value="staff">Staff</option>
-                <option value="school_admin">School Admin</option>
-              </select>
+              <AdvancedSelect
+                name="role"
+                defaultValue="teacher"
+                options={[
+                  { value: "teacher", label: "Teacher" },
+                  { value: "accountant", label: "Accountant" },
+                  { value: "staff", label: "Staff" },
+                  { value: "school_admin", label: "School Admin" },
+                ]}
+              />
             </div>
             <div className="space-y-2">
               <Label>Password</Label>

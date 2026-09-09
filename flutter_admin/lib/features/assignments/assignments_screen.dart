@@ -10,7 +10,7 @@ class AssignmentsScreen extends StatelessWidget {
       subtitle:
           'Plan, publish, and track assignments with operational clarity.',
       heroIcon: Icons.assignment_outlined,
-      accentColor: Color(0xFF0EA5E9),
+      accentColor: ASchoolTheme.primary,
       insights: [
         ModuleInsightItem(
             label: 'Open Tasks',

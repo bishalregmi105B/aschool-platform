@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { PluginGate } from "@/lib/plugins";
 import { api, type ApiResponse } from "@/lib/api";
 import { GraduationCap, History, Play, ShieldAlert, TrendingUp } from "lucide-react";
@@ -115,58 +116,50 @@ function CreateLessonForm() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="space-y-1">
             <span className="text-sm font-medium">Chapter section</span>
-            <select
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            <AdvancedSelect
               value={sectionId}
-              onChange={(e) => setSectionId(e.target.value)}
-            >
-              <option value="">Choose a section…</option>
-              {published.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title_en}
-                  {s.title_ne ? ` — ${s.title_ne}` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setSectionId(v)}
+              clearable
+              placeholder="Choose a section…"
+              options={published.map((s) => ({ value: s.id, label: s.title_en + (s.title_ne ? ` — ${s.title_ne}` : "") }))}
+            />
           </label>
           <label className="space-y-1">
             <span className="text-sm font-medium">Student</span>
-            <select
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            <AdvancedSelect
               value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-            >
-              <option value="">Choose a student…</option>
-              {(students.data || []).map((st) => (
-                <option key={st.id} value={st.id}>{st.full_name}</option>
-              ))}
-            </select>
+              onChange={(v) => setStudentId(v)}
+              clearable
+              searchable
+              placeholder="Choose a student…"
+              options={(students.data || []).map((st) => ({ value: st.id, label: st.full_name }))}
+            />
           </label>
           <label className="space-y-1">
             <span className="text-sm font-medium">Language</span>
-            <select
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            <AdvancedSelect
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option value="ne">नेपाली (Nepali)</option>
-              <option value="mixed">Mixed (Nepali speech, English terms)</option>
-              <option value="en">English</option>
-            </select>
+              onChange={(v) => setLanguage(v)}
+              options={[
+                { value: "ne", label: "नेपाली (Nepali)" },
+                { value: "mixed", label: "Mixed (Nepali speech, English terms)" },
+                { value: "en", label: "English" },
+              ]}
+            />
           </label>
           <label className="space-y-1">
             <span className="text-sm font-medium">Teacher persona</span>
-            <select
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            <AdvancedSelect
               value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-            >
-              <option value="aria">ARIA — warm, analogy-first</option>
-              <option value="max">Max — coach energy</option>
-              <option value="sophia">Sophia — rigorous, first-principles</option>
-              <option value="leo">Leo — story-first</option>
-              <option value="nova">Nova — visual, data-first</option>
-            </select>
+              onChange={(v) => setPersona(v)}
+              options={[
+                { value: "aria", label: "ARIA — warm, analogy-first" },
+                { value: "max", label: "Max — coach energy" },
+                { value: "sophia", label: "Sophia — rigorous, first-principles" },
+                { value: "leo", label: "Leo — story-first" },
+                { value: "nova", label: "Nova — visual, data-first" },
+              ]}
+            />
           </label>
           <div className="md:col-span-2 flex items-center gap-3">
             <Button

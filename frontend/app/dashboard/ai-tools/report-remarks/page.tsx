@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, Sparkles, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -111,26 +112,32 @@ function RemarksContent() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Exam</Label>
-              <select className="w-full border rounded-md p-2" value={examId} onChange={(e) => setExamId(e.target.value)}>
-                <option value="">Select Exam</option>
-                {(exams || []).map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
+              <AdvancedSelect
+          value={examId}
+          onChange={(v) => setExamId(v)}
+          options={(exams || []).map((e: any) => ({ value: e.id, label: e.name }))}
+        />
             </div>
             <div className="space-y-2">
               <Label>Class</Label>
-              <select className="w-full border rounded-md p-2" value={classId} onChange={(e) => setClassId(e.target.value)}>
-                <option value="">Select Class</option>
-                {(classes || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.section && ` - ${c.section}`}</option>)}
-              </select>
+              <AdvancedSelect
+                value={classId}
+                onChange={(v) => setClassId(v)}
+                options={(classes || []).map((c: any) => ({ value: c.id, label: c.section ? `${c.name} - ${c.section}` : c.name }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Tone</Label>
-              <select className="w-full border rounded-md p-2" value={tone} onChange={(e) => setTone(e.target.value)}>
-                <option value="encouraging">Encouraging</option>
-                <option value="professional">Professional</option>
-                <option value="constructive">Constructive</option>
-                <option value="detailed">Detailed</option>
-              </select>
+              <AdvancedSelect
+                value={tone}
+                onChange={(v) => setTone(v)}
+                options={[
+                  { value: "encouraging", label: "Encouraging" },
+                  { value: "professional", label: "Professional" },
+                  { value: "constructive", label: "Constructive" },
+                  { value: "detailed", label: "Detailed" },
+                ]}
+              />
             </div>
           </div>
           <div className="flex gap-2 mt-4">

@@ -1,4 +1,5 @@
 "use client";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import * as React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -131,19 +132,16 @@ function FilterBar({
             </label>
 
             {f.type === "select" ? (
-              <select
+              <AdvancedSelect
                 id={id}
+                className="min-w-[140px]"
+                triggerClassName="h-8 text-[12px]"
                 value={value}
-                onChange={(e) => onChange({ [f.key]: e.target.value })}
-                className="h-8 min-w-[140px] rounded-md border border-input bg-background px-2 text-[12px]"
-              >
-                <option value="">{f.placeholder ?? `All ${f.label.toLowerCase()}`}</option>
-                {f.options?.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => onChange({ [f.key]: v })}
+                clearable
+                placeholder={f.placeholder ?? `All ${f.label.toLowerCase()}`}
+                options={(f.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
+              />
             ) : f.type === "bs-date" ? (
               <BSDateInput
                 value={value}

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Package, Search, Plus, AlertTriangle } from "lucide-react";
 
 interface Asset {
@@ -136,9 +137,8 @@ function InventoryContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <select className="w-full border rounded-md p-2" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  <option value="furniture">Furniture</option><option value="electronics">Electronics</option><option value="stationery">Stationery</option><option value="sports">Sports</option><option value="lab">Lab Equipment</option><option value="cleaning">Cleaning</option><option value="other">Other</option>
-                </select>
+                <AdvancedSelect value={form.category} onChange={(v) => setForm({ ...form, category: v })}
+                  options={[{ value: 'furniture', label: 'Furniture' }, { value: 'electronics', label: 'Electronics' }, { value: 'stationery', label: 'Stationery' }, { value: 'sports', label: 'Sports' }, { value: 'lab', label: 'Lab Equipment' }, { value: 'cleaning', label: 'Cleaning' }, { value: 'other', label: 'Other' }]} />
               </div>
               <div className="space-y-2"><Label>Asset Code</Label><Input value={form.asset_code} onChange={(e) => setForm({ ...form, asset_code: e.target.value })} placeholder="e.g. AST-001" /></div>
             </div>

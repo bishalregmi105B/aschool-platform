@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
   fetchFeeReports,
   getFeeReportRange,
@@ -117,15 +118,16 @@ function ReportsContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            className="border rounded-md px-3 py-2"
+          <AdvancedSelect
+            className="w-40"
             value={period}
-            onChange={(e) => setPeriod(e.target.value as FeeReportPeriod)}
-          >
-            <option value="monthly">This Month</option>
-            <option value="quarterly">This Quarter</option>
-            <option value="yearly">This Year</option>
-          </select>
+            onChange={(v) => setPeriod(v as FeeReportPeriod)}
+            options={[
+              { value: "monthly", label: "This Month" },
+              { value: "quarterly", label: "This Quarter" },
+              { value: "yearly", label: "This Year" },
+            ]}
+          />
           <Button
             variant="outline"
             disabled={exportingCsv}

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Smile, Frown, Meh, Brain, TrendingUp, FileHeart } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -198,12 +199,8 @@ function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; e
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">Log on behalf of</label>
-          <select className="w-full border rounded-md p-2" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            <option value="">Select student…</option>
-            {(students || []).map((s) => (
-              <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-            ))}
-          </select>
+          <AdvancedSelect value={studentId} onChange={(v) => setStudentId(v)} clearable searchable placeholder="Select student…"
+            options={(students || []).map((s) => ({ value: s.id, label: `${s.first_name} ${s.last_name}` }))} />
           <p className="text-xs text-muted-foreground">Wellbeing check-ins are recorded per student.</p>
         </div>
 

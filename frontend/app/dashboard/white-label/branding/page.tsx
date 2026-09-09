@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { AlertCircle, Palette, Save } from "lucide-react";
 
 const DEFAULT_FORM = {
@@ -114,9 +115,11 @@ function BrandingContent() {
             </div>
             <div className="space-y-2">
               <Label>Font Family</Label>
-              <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.font_family} onChange={(e) => setForm({ ...form, font_family: e.target.value })}>
-                <option value="Inter">Inter</option><option value="Poppins">Poppins</option><option value="Roboto">Roboto</option><option value="Open Sans">Open Sans</option><option value="Nunito">Nunito</option>
-              </select>
+              <AdvancedSelect
+          value={form.font_family}
+          onChange={(v) => setForm({ ...form, font_family: v })}
+          options={[{ value: 'Inter', label: 'Inter' }, { value: 'Poppins', label: 'Poppins' }, { value: 'Roboto', label: 'Roboto' }, { value: 'Open Sans', label: 'Open Sans' }, { value: 'Nunito', label: 'Nunito' }]}
+        />
             </div>
           </CardContent>
         </Card>

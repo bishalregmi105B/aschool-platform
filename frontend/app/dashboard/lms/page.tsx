@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { BookOpen, Video, FileText, GraduationCap } from "lucide-react";
 
 interface Course {
@@ -232,19 +233,13 @@ function LmsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Class</Label>
-                <select name="class_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">— Optional —</option>
-                  {(classes || []).map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.sections ? ` (${c.sections.length})` : ""}</option>
-                  ))}
-                </select>
+                <AdvancedSelect name="class_id" clearable placeholder="— Optional —"
+                  options={(classes || []).map((c: any) => ({ value: c.id, label: c.sections ? `${c.name} (${c.sections.length})` : c.name }))} />
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <select name="status" defaultValue="draft" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                </select>
+                <AdvancedSelect name="status" defaultValue="draft"
+                  options={[{ value: "draft", label: "Draft" }, { value: "published", label: "Published" }]} />
               </div>
             </div>
             <DialogFooter>

@@ -115,7 +115,7 @@ class _UnifiedLoginScreenState extends ConsumerState<UnifiedLoginScreen> {
                           Theme.of(context).cardColor.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: _loginFlow.accent.withValues(alpha: 0.22),
+                        color: Theme.of(context).colorScheme.outlineVariant,
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -224,7 +224,7 @@ class _UnifiedLoginScreenState extends ConsumerState<UnifiedLoginScreen> {
                           ElevatedButton(
                             onPressed: authState.isLoading ? null : _submit,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _loginFlow.accent,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -275,18 +275,18 @@ class _SelectedModeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: mode.accent.withValues(alpha: 0.1),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(mode.icon, size: 18, color: mode.accent),
+          Icon(mode.icon, size: 18, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
           Text(
             mode.label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: mode.accent,
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w700,
                 ),
           ),

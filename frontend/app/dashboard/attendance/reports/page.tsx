@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Download, Users, Calendar, TrendingUp } from "lucide-react";
 
 export default function AttendanceReportsPage() {
@@ -94,10 +95,11 @@ function ReportsContent() {
       </div>
 
       <div className="flex gap-4">
-        <select className="border rounded-md px-3 py-2" value={classId} onChange={(e) => setClassId(e.target.value)}>
-          <option value="">All Classes</option>
-          {(classes || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <AdvancedSelect
+          value={classId}
+          onChange={(v) => setClassId(v)}
+          options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+        />
         <input type="month" className="border rounded-md px-3 py-2" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
 

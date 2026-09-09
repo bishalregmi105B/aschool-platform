@@ -35,7 +35,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       details:
           'Stay connected to classes, announcements, assignments, and progress with smooth real-time updates.',
       icon: Icons.auto_awesome_rounded,
-      color: Color(0xFF2563EB),
+      color: ASchoolTheme.primary,
     ),
     _OnboardingSlide(
       title: 'Fast and Focused',
@@ -43,7 +43,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       details:
           'Navigate quickly between attendance, timetable, fees, marks, and communication tools with a modern interface.',
       icon: Icons.bolt_rounded,
-      color: Color(0xFF0E9F6E),
+      color: ASchoolTheme.primary,
     ),
     _OnboardingSlide(
       title: 'Pick Your Mode',
@@ -51,7 +51,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       details:
           'Choose your mode first, then sign in and continue with a role-specific experience tailored to your workflow.',
       icon: Icons.hub_rounded,
-      color: Color(0xFFD97706),
+      color: ASchoolTheme.primary,
     ),
   ];
 
@@ -156,7 +156,7 @@ class _OnboardingBackdrop extends StatelessWidget {
     return const Stack(
       children: [
         Positioned.fill(
-          child: ColoredBox(color: Color(0xFFF7FBFF)),
+          child: const ColoredBox(color: Colors.white),
         ),
       ],
     );

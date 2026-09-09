@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Bus, MapPin, Plus, Route } from "lucide-react";
 
 interface TransportRoute {
@@ -275,12 +276,12 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
                   driver from staff on the Buses page once staff accounts exist;
                   a free-text driver_name was silently dropped by the API. */}
               <Input name="gps_device_id" placeholder="GPS device ID (optional)" />
-              <select name="route_id" className="w-full border rounded-md px-3 py-2 text-sm">
-                <option value="">Assign to route (optional)</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
+              <AdvancedSelect
+                name="route_id"
+                clearable
+                placeholder="Assign to route (optional)"
+                options={(routes || []).map((r) => ({ value: r.id, label: r.name }))}
+              />
               <Button type="submit" disabled={createMut.isPending} className="w-full">
                 {createMut.isPending ? "Adding..." : "Add Bus"}
               </Button>

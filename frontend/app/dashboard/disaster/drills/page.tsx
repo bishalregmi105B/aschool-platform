@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Calendar, Plus } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -91,9 +92,11 @@ function DrillsContent() {
             <div className="space-y-2"><Label>Drill Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Annual Earthquake Drill" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Type</Label>
-                <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.drill_type} onChange={(e) => setForm({ ...form, drill_type: e.target.value })}>
-                  <option value="earthquake">Earthquake</option><option value="fire">Fire</option><option value="flood">Flood</option><option value="general">General</option>
-                </select>
+                <AdvancedSelect
+          value={form.drill_type}
+          onChange={(v) => setForm({ ...form, drill_type: v })}
+          options={[{ value: 'earthquake', label: 'Earthquake' }, { value: 'fire', label: 'Fire' }, { value: 'flood', label: 'Flood' }, { value: 'general', label: 'General' }]}
+        />
               </div>
               <div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div>
             </div>

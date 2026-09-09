@@ -1,4 +1,5 @@
 "use client";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -201,18 +202,14 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
       {templates && templates.length > 0 && (
         <div className="space-y-2">
           <label className="text-sm font-medium">Use Template (optional)</label>
-          <select
+          <AdvancedSelect
             value={selectedTemplate}
-            onChange={(e) => handleTemplateSelect(e.target.value)}
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="">— Select a template —</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.category})
-              </option>
-            ))}
-          </select>
+            onChange={(v) => handleTemplateSelect(v)}
+            clearable
+            searchable
+            placeholder="— Select a template —"
+            options={templates.map((t) => ({ value: t.id, label: `${t.name} (${t.category})` }))}
+          />
         </div>
       )}
 
@@ -336,19 +333,17 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Category</label>
-              <select
+              <AdvancedSelect
                 value={formData.category}
-                onChange={(e) =>
-                  setFormData((d) => ({ ...d, category: e.target.value }))
-                }
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="general">General</option>
-                <option value="attendance">Attendance</option>
-                <option value="fees">Fees</option>
-                <option value="exam">Exam</option>
-                <option value="notice">Notice</option>
-              </select>
+                onChange={(v) => setFormData((d) => ({ ...d, category: v }))}
+                options={[
+                  { value: "general", label: "General" },
+                  { value: "attendance", label: "Attendance" },
+                  { value: "fees", label: "Fees" },
+                  { value: "exam", label: "Exam" },
+                  { value: "notice", label: "Notice" },
+                ]}
+              />
             </div>
           </div>
           <div className="space-y-1.5">

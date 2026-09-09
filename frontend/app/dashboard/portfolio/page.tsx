@@ -9,6 +9,7 @@ import { Award, BadgeCheck, Plus, Search, Star, Trophy, Loader2, X } from "lucid
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 // Contract: backend /portfolio/students/<uuid>/items (E-numbering: E72).
 // Item serializer fields: id, portfolio_id, title, description, item_type,
@@ -198,20 +199,20 @@ function PortfolioContent() {
 
       {/* Student selector + Search */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <select
+        <AdvancedSelect
+          className="sm:max-w-xs"
           value={selectedStudentId}
-          onChange={(e) => setSelectedStudentId(e.target.value)}
-          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 sm:max-w-xs"
-        >
-          <option value="">Select student…</option>
-          {(students || []).map(
-            (s: { id: string; first_name: string; last_name: string }) => (
-              <option key={s.id} value={s.id}>
-                {s.first_name} {s.last_name}
-              </option>
-            ),
+          onChange={(v) => setSelectedStudentId(v)}
+          clearable
+          searchable
+          placeholder="Select student…"
+          options={(students || []).map(
+            (s: { id: string; first_name: string; last_name: string }) => ({
+              value: s.id,
+              label: `${s.first_name} ${s.last_name}`,
+            }),
           )}
-        </select>
+        />
         <div className="relative sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -415,19 +416,11 @@ function PortfolioContent() {
 
               <div>
                 <label className="text-sm font-medium">Category</label>
-                <select
+                <AdvancedSelect
                   value={formData.item_type}
-                  onChange={(e) =>
-                    setFormData((d) => ({ ...d, item_type: e.target.value }))
-                  }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {categories.map((c) => (
-                    <option key={c} value={c} className="capitalize">
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setFormData((d) => ({ ...d, item_type: v }))}
+                  options={(categories || []).map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))}
+                />
               </div>
 
               <div>

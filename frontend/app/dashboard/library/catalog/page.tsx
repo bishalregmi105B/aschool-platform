@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { BookOpen, Search, Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function CatalogPage() {
@@ -179,14 +180,11 @@ function CatalogContent() {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <select className="w-full border rounded-md p-2" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  <option value="general">General</option>
-                  <option value="textbook">Textbook</option>
-                  <option value="fiction">Fiction</option>
-                  <option value="reference">Reference</option>
-                  <option value="science">Science</option>
-                  <option value="nepali">Nepali</option>
-                </select>
+                <AdvancedSelect
+          value={form.category}
+          onChange={(v) => setForm({ ...form, category: v })}
+          options={[{ value: 'general', label: 'General' }, { value: 'textbook', label: 'Textbook' }, { value: 'fiction', label: 'Fiction' }, { value: 'reference', label: 'Reference' }, { value: 'science', label: 'Science' }, { value: 'nepali', label: 'Nepali' }]}
+        />
               </div>
               <div className="space-y-2"><Label>Copies</Label><Input type="number" value={form.copies} onChange={(e) => setForm({ ...form, copies: e.target.value })} /></div>
               <div className="space-y-2"><Label>Shelf</Label><Input value={form.shelf_location} onChange={(e) => setForm({ ...form, shelf_location: e.target.value })} placeholder="A-1" /></div>

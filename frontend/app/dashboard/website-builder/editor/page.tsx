@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { sanitizeCss } from "@/lib/sanitize";
 import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/lib/school-website/registry";
 import { EditorSectionRenderer } from "@/components/website/EditorSectionRenderer";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
 import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
 
@@ -185,11 +186,8 @@ function ControlRenderer({ control, value, onChange }: {
       );
     case "select":
       return (
-        <select value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          {(control.options || []).map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <AdvancedSelect value={(value as string) ?? ""} onChange={(v) => onChange(v)}
+          options={(control.options || []).map((opt) => ({ value: opt.value, label: opt.label }))} />
       );
     case "stats": {
       const items = (value as { value: string; label: string }[]) ?? [];

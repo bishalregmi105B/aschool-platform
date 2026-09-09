@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Plus, Copy, Trash2 } from "lucide-react";
 
 export default function TemplatesPage() {
@@ -85,15 +86,19 @@ function TemplatesContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <select className="w-full border rounded-md p-2" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  <option value="general">General</option><option value="fee">Fee</option><option value="attendance">Attendance</option><option value="exam">Exam</option><option value="event">Event</option><option value="emergency">Emergency</option>
-                </select>
+                <AdvancedSelect
+          value={form.category}
+          onChange={(v) => setForm({ ...form, category: v })}
+          options={[{ value: 'general', label: 'General' }, { value: 'fee', label: 'Fee' }, { value: 'attendance', label: 'Attendance' }, { value: 'exam', label: 'Exam' }, { value: 'event', label: 'Event' }, { value: 'emergency', label: 'Emergency' }]}
+        />
               </div>
               <div className="space-y-2">
                 <Label>Channel</Label>
-                <select className="w-full border rounded-md p-2" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
-                  <option value="sms">SMS</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="push">Push</option>
-                </select>
+                <AdvancedSelect
+          value={form.channel}
+          onChange={(v) => setForm({ ...form, channel: v })}
+          options={[{ value: 'sms', label: 'SMS' }, { value: 'email', label: 'Email' }, { value: 'whatsapp', label: 'WhatsApp' }, { value: 'push', label: 'Push' }]}
+        />
               </div>
             </div>
             <div className="space-y-2"><Label>Content</Label><Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={5} placeholder="Use {{student_name}}, {{parent_name}}, {{school_name}} etc." /></div>

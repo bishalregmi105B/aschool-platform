@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Award, Medal, Plus, Star, Trophy, Users } from "lucide-react";
 
 interface BadgeItem {
@@ -393,20 +394,15 @@ function useStudents() {
 function StudentSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const { data: students, isLoading } = useStudents();
   return (
-    <select
-      className="w-full border rounded-md p-2"
+    <AdvancedSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(v) => onChange(v)}
       disabled={isLoading}
-      required
-    >
-      <option value="">{isLoading ? "Loading students…" : "Select student…"}</option>
-      {(students || []).map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.first_name} {s.last_name}
-        </option>
-      ))}
-    </select>
+      clearable
+      searchable
+      placeholder={isLoading ? "Loading students…" : "Select student…"}
+      options={(students || []).map((s) => ({ value: s.id, label: `${s.first_name} ${s.last_name}` }))}
+    />
   );
 }
 
@@ -467,9 +463,8 @@ function AwardPointsDialog({ onAwarded }: { onAwarded?: () => void }) {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Category</label>
-              <select className="w-full border rounded-md p-2" value={category} onChange={(e) => setCategory(e.target.value)}>
-                {POINT_CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
-              </select>
+              <AdvancedSelect value={category} onChange={(v) => setCategory(v)}
+                options={POINT_CATEGORIES.map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))} />
             </div>
           </div>
           <div className="space-y-2">
