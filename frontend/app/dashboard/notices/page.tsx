@@ -22,6 +22,7 @@ import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Plus, Pin, Calendar, Bell } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { displayBS } from "@/lib/nepali_date";
 interface Notice {
   id: string;
@@ -256,10 +257,7 @@ function NoticesContent() {
               <Label>Content</Label>
               <Textarea name="content" required rows={5} />
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="is_pinned" name="is_pinned" className="rounded" />
-              <Label htmlFor="is_pinned">Pin this notice</Label>
-            </div>
+            <FormCheckbox id="is_pinned" name="is_pinned" label="Pin this notice" />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddNotice(false)}>Cancel</Button>
               <Button type="submit" disabled={createNoticeMutation.isPending}>
@@ -308,10 +306,7 @@ function NoticesContent() {
                 <BSDateInput name="end_date" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="is_holiday" name="is_holiday" className="rounded" />
-              <Label htmlFor="is_holiday">Mark as holiday</Label>
-            </div>
+            <FormCheckbox id="is_holiday" name="is_holiday" label="Mark as holiday" />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddEvent(false)}>Cancel</Button>
               <Button type="submit" disabled={createEventMutation.isPending}>

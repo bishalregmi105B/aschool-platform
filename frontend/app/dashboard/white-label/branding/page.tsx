@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
+import { ColorField } from "@/components/ui/color-field";
 import { AlertCircle, Palette, Save } from "lucide-react";
 
 const DEFAULT_FORM = {
@@ -94,7 +96,7 @@ function BrandingContent() {
             <div className="space-y-2"><Label>Tagline</Label><Input value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} placeholder="Your school tagline" /></div>
             <div className="space-y-2"><Label>Footer Text</Label><Input value={form.footer_text} onChange={(e) => setForm({ ...form, footer_text: e.target.value })} placeholder="Footer copyright text" /></div>
             <div className="flex items-center gap-3">
-              <input type="checkbox" id="hide_brand" checked={form.hide_aschool_branding} onChange={(e) => setForm({ ...form, hide_aschool_branding: e.target.checked })} />
+              <FormCheckbox id="hide_brand" label="Hide ASchool branding" checked={form.hide_aschool_branding} onCheckedChange={(v) => setForm({ ...form, hide_aschool_branding: v })} />
               <Label htmlFor="hide_brand">Hide &quot;Powered by ASchool&quot; branding</Label>
             </div>
           </CardContent>
@@ -106,11 +108,11 @@ function BrandingContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Primary Color</Label>
-                <div className="flex gap-2"><Input type="color" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} className="w-16 h-10 p-1" /><Input value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} /></div>
+                <ColorField value={form.primary_color} onChange={(v) => setForm({ ...form, primary_color: v })} />
               </div>
               <div className="space-y-2">
                 <Label>Secondary Color</Label>
-                <div className="flex gap-2"><Input type="color" value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} className="w-16 h-10 p-1" /><Input value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} /></div>
+                <ColorField value={form.secondary_color} onChange={(v) => setForm({ ...form, secondary_color: v })} />
               </div>
             </div>
             <div className="space-y-2">

@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { Megaphone, Plus, Trash2, Pin, Eye } from "lucide-react";
 import Link from "next/link";
 
@@ -255,12 +256,11 @@ function AnnouncementsContent() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <FormCheckbox
                 id="is_pinned"
+                label="Pin to top"
                 checked={form.is_pinned}
-                onChange={(e) => setForm((p) => ({ ...p, is_pinned: e.target.checked }))}
-                className="rounded"
+                onCheckedChange={(v) => setForm((p: any) => ({ ...p, is_pinned: v }))}
               />
               <Label htmlFor="is_pinned">Pin this announcement</Label>
             </div>

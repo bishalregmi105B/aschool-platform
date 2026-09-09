@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 
 type Slider = {
   id: string;
@@ -209,14 +210,13 @@ function SlidersContent() {
                 <Label>Sort Order</Label>
                 <Input type="number" value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: event.target.value })} />
               </div>
-              <label className="flex items-center gap-2 rounded-md border px-3 py-2 mt-6">
-                <input
-                  type="checkbox"
+              <div className="rounded-md border px-3 py-2.5 mt-6">
+                <FormCheckbox
+                  label="Active"
                   checked={form.is_active}
-                  onChange={(event) => setForm({ ...form, is_active: event.target.checked })}
+                  onCheckedChange={(v) => setForm({ ...form, is_active: v })}
                 />
-                <span className="text-sm">Active</span>
-              </label>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -21,6 +21,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plus, Link2 } from "lucide-react";
 
 export default function ClassSubjectsPage() {
@@ -78,6 +80,63 @@ export default function ClassSubjectsPage() {
     (classSubjects || []).map((subject: any) => subject.id || subject.subject_id)
   );
 
+  const CLASS_SUBJECT_COLUMNS: Column<any>[] = [
+    { key: "name", label: "Subject", sortable: true, value: (cs) => cs.subject_name || cs.name || "", render: (cs) => <span className="font-medium">{cs.subject_name || cs.name}</span> },
+    { key: "code", label: "Code", sortable: true, value: (cs) => cs.code || "" },
+    {
+      key: "is_optional",
+      label: "Type",
+      value: (cs) => (cs.is_optional ? "optional" : "compulsory"),
+      render: (cs) => (
+        <Badge variant={cs.is_optional ? "outline" : "secondary"}>
+          {cs.is_optional ? "Optional" : "Compulsory"}
+        </Badge>
+      ),
+    },
+    {
+      key: "teacher_id",
+      label: "Teacher",
+      render: (cs) => (
+        <AdvancedSelect
+          className="w-52"
+          triggerClassName="h-8 text-[12px]"
+          value={cs.teacher_id || ""}
+          onChange={(teacherId) => {
+            updateSubjectMutation.mutate({
+              subjectId: cs.id || cs.subject_id,
+              data: { teacher_id: teacherId || null },
+            });
+          }}
+          clearable
+          searchable
+          placeholder="Assign teacher"
+          options={(teachers || []).map((teacher: any) => ({ value: teacher.id, label: teacher.full_name }))}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (cs) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const classIds = (cs.class_ids || []).filter((id: string) => id !== selectedClass);
+            updateSubjectMutation.mutate({
+              subjectId: cs.id || cs.subject_id,
+              data: { class_ids: classIds },
+            });
+          }}
+          disabled={updateSubjectMutation.isPending}
+        >
+          Remove
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -95,16 +154,14 @@ export default function ClassSubjectsPage() {
           <CardTitle className="text-base">Select Class</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Choose a class..." />
-            </SelectTrigger>
-            <SelectContent>
-              {(classes || []).map((cls: any) => (
-                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AdvancedSelect
+            className="max-w-xs"
+            value={selectedClass}
+            onChange={setSelectedClass}
+            searchable
+            placeholder="Choose a class..."
+            options={(classes || []).map((cls: any) => ({ value: cls.id, label: cls.name }))}
+          />
         </CardContent>
       </Card>
 
@@ -120,76 +177,18 @@ export default function ClassSubjectsPage() {
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Teacher</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(classSubjects || []).map((cs: any) => (
-                      <TableRow key={cs.id || cs.subject_id}>
-                        <TableCell className="font-medium">{cs.subject_name || cs.name}</TableCell>
-                        <TableCell>{cs.code || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={cs.is_optional ? "outline" : "secondary"}>
-                            {cs.is_optional ? "Optional" : "Compulsory"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={cs.teacher_id || "unassigned"}
-                            onValueChange={(teacherId) => {
-                              updateSubjectMutation.mutate({
-                                subjectId: cs.id || cs.subject_id,
-                                data: { teacher_id: teacherId === "unassigned" ? null : teacherId },
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-52">
-                              <SelectValue placeholder="Assign teacher" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Not assigned</SelectItem>
-                              {(teachers || []).map((teacher: any) => (
-                                <SelectItem key={teacher.id} value={teacher.id}>
-                                  {teacher.full_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const classIds = (cs.class_ids || []).filter((id: string) => id !== selectedClass);
-                              updateSubjectMutation.mutate({
-                                subjectId: cs.id || cs.subject_id,
-                                data: { class_ids: classIds },
-                              });
-                            }}
-                            disabled={updateSubjectMutation.isPending}
-                          >
-                            Remove
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!classSubjects || classSubjects.length === 0) && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No subjects assigned to this class yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                <DataTable
+                  columns={CLASS_SUBJECT_COLUMNS}
+                  rows={(classSubjects || []) as any[]}
+                  rowKey={(cs: any) => cs.id || cs.subject_id}
+                  searchable
+                  searchPlaceholder="Search assigned subjects…"
+                  empty={{
+                    icon: Link2,
+                    title: "No subjects assigned",
+                    body: "Use Quick Assign below to map subjects to this class.",
+                  }}
+                />
 
                 {/* Available subjects to assign */}
                 {subjects && subjects.length > 0 && (

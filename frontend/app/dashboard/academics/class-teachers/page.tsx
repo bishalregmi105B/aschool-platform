@@ -13,10 +13,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Users, UserCog, Layers } from "lucide-react";
 
 export default function ClassSectionsTeachersPage() {
@@ -87,16 +85,14 @@ export default function ClassSectionsTeachersPage() {
           <CardTitle className="text-base">Select Class</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Choose a class..." />
-            </SelectTrigger>
-            <SelectContent>
-              {(classes || []).map((cls: any) => (
-                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AdvancedSelect
+            className="max-w-xs"
+            value={selectedClass}
+            onChange={setSelectedClass}
+            searchable
+            placeholder="Choose a class..."
+            options={(classes || []).map((cls: any) => ({ value: cls.id, label: cls.name }))}
+          />
         </CardContent>
       </Card>
 
@@ -115,25 +111,19 @@ export default function ClassSectionsTeachersPage() {
                 {/* Class Teacher */}
                 <div>
                   <p className="text-sm font-medium mb-1.5">Class Teacher</p>
-                  <Select
-                    value={section.class_teacher_id || "unassigned"}
-                    onValueChange={(teacherId) => {
+                  <AdvancedSelect
+                    value={section.class_teacher_id || ""}
+                    onChange={(teacherId) => {
                       updateSectionMutation.mutate({
                         sectionId: section.id,
-                        classTeacherId: teacherId === "unassigned" ? null : teacherId,
+                        classTeacherId: teacherId || null,
                       });
                     }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Assign class teacher..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Not assigned</SelectItem>
-                      {(teachers || []).map((t: any) => (
-                        <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    clearable
+                    searchable
+                    placeholder="Assign class teacher..."
+                    options={(teachers || []).map((t: any) => ({ value: t.id, label: t.full_name }))}
+                  />
                 </div>
 
                 {/* Subject Teachers */}
@@ -172,25 +162,20 @@ export default function ClassSectionsTeachersPage() {
                       <div className="font-medium">{subject.name}</div>
                       <div className="text-sm text-muted-foreground">{subject.code || "No code"}</div>
                     </div>
-                    <Select
-                      value={subject.teacher_id || "unassigned"}
-                      onValueChange={(teacherId) => {
+                    <AdvancedSelect
+                      className="w-full md:w-64"
+                      value={subject.teacher_id || ""}
+                      onChange={(teacherId) => {
                         updateSubjectTeacherMutation.mutate({
                           subjectId: subject.id,
-                          teacherId: teacherId === "unassigned" ? null : teacherId,
+                          teacherId: teacherId || null,
                         });
                       }}
-                    >
-                      <SelectTrigger className="w-full md:w-64">
-                        <SelectValue placeholder="Assign subject teacher" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Not assigned</SelectItem>
-                        {(teachers || []).map((teacher: any) => (
-                          <SelectItem key={teacher.id} value={teacher.id}>{teacher.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      clearable
+                      searchable
+                      placeholder="Assign subject teacher"
+                      options={(teachers || []).map((teacher: any) => ({ value: teacher.id, label: teacher.full_name }))}
+                    />
                   </div>
                 ))}
                 {(classSubjects || []).length === 0 && (

@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { Plus, Trash2, Pencil, GraduationCap } from "lucide-react";
 
 interface Scholarship {
@@ -374,16 +375,12 @@ function ScholarshipsContent() {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+            <FormCheckbox
+                label="Scholarship active"
+                description="Will be auto-applied during fee generation"
                 checked={form.is_active}
-                onChange={(e) =>
-                  setForm({ ...form, is_active: e.target.checked })
-                }
+                onCheckedChange={(v) => setForm({ ...form, is_active: v })}
               />
-              Active (will be auto-applied during fee generation)
-            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>

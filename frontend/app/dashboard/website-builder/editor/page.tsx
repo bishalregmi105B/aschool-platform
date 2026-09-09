@@ -12,6 +12,7 @@ import { sanitizeCss } from "@/lib/sanitize";
 import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/lib/school-website/registry";
 import { EditorSectionRenderer } from "@/components/website/EditorSectionRenderer";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { ColorField } from "@/components/ui/color-field";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
 import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
 
@@ -166,10 +167,11 @@ function ControlRenderer({ control, value, onChange }: {
       );
     case "color":
       return (
-        <div className="flex items-center gap-2">
-          <input type="color" value={(value as string) || "#000000"} onChange={(e) => onChange(e.target.value)} className="h-9 w-16 border rounded cursor-pointer" />
-          <input type="text" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="#000000" className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+        <ColorField
+          value={(value as string) ?? ""}
+          onChange={(v) => onChange(v)}
+          className="flex-1"
+        />
       );
     case "number":
       return (

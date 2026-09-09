@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { Plus, RefreshCw, Trash2, Banknote } from "lucide-react";
 
 interface FeeStructure {
@@ -242,7 +243,7 @@ function FeeStructureContent() {
               </div>
             </div>
             <div className="space-y-2"><Label>Due Day of Cycle</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_optional} onChange={(e) => setForm({ ...form, is_optional: e.target.checked })} /> Optional fee</label>
+            <FormCheckbox label="Optional fee" checked={form.is_optional} onCheckedChange={(v) => setForm({ ...form, is_optional: v })} />
           </div>
           <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Create Structure</Button></DialogFooter>
         </DialogContent>

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { Plus, UserCog, Mail, Phone, Search, Upload, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -303,15 +304,11 @@ export default function TeachersPage() {
                 placeholder={editItem ? "Leave blank to keep current password" : "Initial password"}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
+            <FormCheckbox
+                label="Active teacher account"
                 name="is_active"
                 defaultChecked={editItem ? editItem.is_active : true}
-                className="h-4 w-4 rounded border-input"
               />
-              Active teacher account
-            </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
