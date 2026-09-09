@@ -47,6 +47,8 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { displayBS } from "@/lib/nepali_date";
 import {
   BookMarked,
@@ -262,6 +264,7 @@ function AcademicYearsTab() {
   // accepting a submission once the user has actually picked both dates
   // (edit dialogs start from the stored dates instead).
   const [pickedDates, setPickedDates] = useState<{ start?: string; end?: string }>({});
+  const [isCurrentYear, setIsCurrentYear] = useState(false);
 
   const openYearDialog = (year: AcademicYear | null) => {
     setPickedDates(
@@ -269,6 +272,7 @@ function AcademicYearsTab() {
         ? { start: getDateInputValue(year.start_date) || undefined, end: getDateInputValue(year.end_date) || undefined }
         : {}
     );
+    setIsCurrentYear(Boolean(year?.is_current));
     if (year) {
       setEditItem(year);
     } else {
@@ -323,6 +327,38 @@ function AcademicYearsTab() {
 
   const years = data || [];
 
+  const YEAR_COLUMNS: Column<AcademicYear>[] = [
+    { key: "name", label: "Name", sortable: true, value: (y) => y.name, render: (y) => <span className="font-medium">{y.name}</span> },
+    { key: "start_date", label: "Start Date", sortable: true, value: (y) => y.start_date, render: (y) => displayBS(y.start_date) || "-" },
+    { key: "end_date", label: "End Date", sortable: true, value: (y) => y.end_date, render: (y) => displayBS(y.end_date) || "-" },
+    {
+      key: "is_current",
+      label: "Status",
+      sortable: true,
+      value: (y) => (y.is_current ? "current" : "past"),
+      render: (y) => (
+        <Badge variant={y.is_current ? "success" : "secondary"}>
+          {y.is_current ? "Current" : "Past"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (y) => (
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <RowActions
+            onEdit={() => openYearDialog(y)}
+            onDelete={() => deleteMutation.mutate(y.id)}
+            deleteLabel={`Delete academic year "${y.name}"?`}
+            deleting={deleteMutation.isPending}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="flex justify-end">
@@ -330,50 +366,20 @@ function AcademicYearsTab() {
           <Plus className="mr-2 h-4 w-4" /> Add Year
         </Button>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[120px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {years.map((year) => (
-                <TableRow key={year.id}>
-                  <TableCell className="font-medium">{year.name}</TableCell>
-                  <TableCell>{displayBS(year.start_date) || "-"}</TableCell>
-                  <TableCell>{displayBS(year.end_date) || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={year.is_current ? "success" : "secondary"}>
-                      {year.is_current ? "Current" : "Past"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <RowActions
-                      onEdit={() => openYearDialog(year)}
-                      onDelete={() => deleteMutation.mutate(year.id)}
-                      deleteLabel={`Delete academic year \"${year.name}\"?`}
-                      deleting={deleteMutation.isPending}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {years.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    No academic years yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable<AcademicYear>
+        columns={YEAR_COLUMNS}
+        rows={years}
+        rowKey={(y) => y.id}
+        searchable
+        searchPlaceholder="Search years…"
+        exportFileName="academic-years"
+        empty={{
+          icon: BookOpen,
+          title: "No academic years yet",
+          body: "Create your first academic year — everything (classes, exams, fees) hangs off it.",
+          action: { label: "Add Year", onClick: () => openYearDialog(null) },
+        }}
+      />
 
       <Dialog
         open={showAdd || !!editItem}
@@ -440,14 +446,15 @@ function AcademicYearsTab() {
               BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).
             </p>
             <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                name="is_current"
-                type="checkbox"
-                defaultChecked={Boolean(editItem?.is_current)}
-                className="h-4 w-4 rounded border-input"
+              <Checkbox
+                checked={isCurrentYear}
+                onCheckedChange={(v) => setIsCurrentYear(v === true)}
+                aria-label="Set as current academic year"
               />
               Set as current academic year
             </label>
+            {/* Radix Checkbox doesn't submit — mirror into FormData */}
+            <input type="hidden" name="is_current" value={isCurrentYear ? "on" : ""} />
             <DialogFooter>
               <Button
                 type="button"
@@ -899,6 +906,67 @@ function SubjectsTab() {
 
   const subjects = data || [];
 
+  const SUBJECT_COLUMNS: Column<Subject>[] = [
+    { key: "name", label: "Name", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
+    { key: "code", label: "Code", sortable: true, value: (s) => s.code || "" },
+    { key: "credit_hours", label: "Credit Hours", sortable: true, align: "right", value: (s) => s.credit_hours ?? 0 },
+    {
+      key: "marks",
+      label: "Marks",
+      render: (s) =>
+        s.has_practical && (s.practical_full_marks ?? 0) > 0 ? (
+          <div className="text-sm leading-tight">
+            <p>
+              Th {s.full_marks ?? 0} / {s.pass_marks ?? 0}
+            </p>
+            <p className="text-muted-foreground">
+              Pr {s.practical_full_marks} / {s.practical_pass_marks ?? 0}
+            </p>
+          </div>
+        ) : (
+          <span className="text-sm">
+            {s.full_marks ?? 100} / {s.pass_marks ?? 32}
+          </span>
+        ),
+    },
+    {
+      key: "is_optional",
+      label: "Type",
+      sortable: true,
+      value: (s) => (s.is_optional ? "optional" : "compulsory"),
+      render: (s) => (
+        <Badge variant={s.is_optional ? "outline" : "secondary"}>
+          {s.is_optional ? "Optional" : "Compulsory"}
+        </Badge>
+      ),
+    },
+    {
+      key: "has_practical",
+      label: "Practical",
+      value: (s) => (s.has_practical ? "yes" : "no"),
+      render: (s) => (
+        <Badge variant={s.has_practical ? "default" : "secondary"}>
+          {s.has_practical ? "Yes" : "No"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (s) => (
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <RowActions
+            onEdit={() => setEditItem(s)}
+            onDelete={() => deleteMutation.mutate(s.id)}
+            deleteLabel={`Delete subject "${s.name}"?`}
+            deleting={deleteMutation.isPending}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="flex justify-end">
@@ -906,73 +974,20 @@ function SubjectsTab() {
           <Plus className="mr-2 h-4 w-4" /> Add Subject
         </Button>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Credit Hours</TableHead>
-                <TableHead>Marks</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Practical</TableHead>
-                <TableHead className="w-[120px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {subjects.map((subject) => (
-                <TableRow key={subject.id}>
-                  <TableCell className="font-medium">{subject.name}</TableCell>
-                  <TableCell>{subject.code || "-"}</TableCell>
-                  <TableCell>{subject.credit_hours ?? "-"}</TableCell>
-                  <TableCell>
-                    {subject.has_practical && (subject.practical_full_marks ?? 0) > 0 ? (
-                      <div className="text-sm leading-tight">
-                        <p>
-                          Th {subject.full_marks ?? 0} / {subject.pass_marks ?? 0}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Pr {subject.practical_full_marks} / {subject.practical_pass_marks ?? 0}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-sm">
-                        {subject.full_marks ?? 100} / {subject.pass_marks ?? 32}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={subject.is_optional ? "outline" : "secondary"}>
-                      {subject.is_optional ? "Optional" : "Compulsory"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={subject.has_practical ? "default" : "secondary"}>
-                      {subject.has_practical ? "Yes" : "No"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <RowActions
-                      onEdit={() => setEditItem(subject)}
-                      onDelete={() => deleteMutation.mutate(subject.id)}
-                      deleteLabel={`Delete subject \"${subject.name}\"?`}
-                      deleting={deleteMutation.isPending}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {subjects.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No subjects yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable<Subject>
+        columns={SUBJECT_COLUMNS}
+        rows={subjects}
+        rowKey={(s) => s.id}
+        searchable
+        searchPlaceholder="Search subjects…"
+        exportFileName="subjects"
+        empty={{
+          icon: BookMarked,
+          title: "No subjects yet",
+          body: "Add your first subject to start recording marks.",
+          action: { label: "Add Subject", onClick: () => setShowAdd(true) },
+        }}
+      />
 
       <Dialog
         open={showAdd || !!editItem}

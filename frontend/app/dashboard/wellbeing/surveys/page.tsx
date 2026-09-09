@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { ClipboardList, Plus } from "lucide-react";
 
 export default function SurveysPage() {
@@ -112,7 +113,7 @@ function SurveysContent() {
             <div className="space-y-2">
               <Label>Anonymity</Label>
               <div className="flex items-center gap-2 h-10">
-                <input type="checkbox" id="anon" checked={form.is_anonymous} onChange={(e) => setForm({ ...form, is_anonymous: e.target.checked })} className="w-4 h-4" />
+                <FormCheckbox id="anon" label="Anonymous responses" checked={form.is_anonymous} onCheckedChange={(v) => setForm({ ...form, is_anonymous: v })} />
                 <label htmlFor="anon" className="text-sm">Anonymous responses</label>
               </div>
             </div>

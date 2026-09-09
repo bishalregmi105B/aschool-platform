@@ -6,11 +6,11 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Download, Users, Calendar, TrendingUp } from "lucide-react";
 
 export default function AttendanceReportsPage() {
@@ -22,6 +22,16 @@ function ReportsContent() {
   const isTeacher = user?.role === "teacher";
   const [classId, setClassId] = useState("");
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+
+  // Last 24 months as "YYYY-MM" — replaces the native <input type="month">
+  // (English-only chrome, inconsistent across browsers).
+  const MONTH_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleString("en", { month: "long", year: "numeric" });
+    return { value: key, label };
+  });
 
   const { data: classes } = useQuery({
     queryKey: ["classes", isTeacher ? "class_teacher" : "all"],
@@ -87,6 +97,26 @@ function ReportsContent() {
     URL.revokeObjectURL(url);
   }
 
+  const REPORT_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (s) => s.student_name || "", render: (s) => <span className="font-medium">{s.student_name}</span> },
+    { key: "present", label: "Present", align: "right", sortable: true, value: (s) => s.present || 0, render: (s) => <span className="text-green-600">{s.present || 0}</span> },
+    { key: "absent", label: "Absent", align: "right", sortable: true, value: (s) => s.absent || 0, render: (s) => <span className="text-red-600">{s.absent || 0}</span> },
+    { key: "late", label: "Late", align: "right", sortable: true, value: (s) => s.late || 0, render: (s) => <span className="text-yellow-600">{s.late || 0}</span> },
+    { key: "leave", label: "Leave", align: "right", value: (s) => s.leave || 0 },
+    {
+      key: "percentage",
+      label: "Attendance %",
+      align: "right",
+      sortable: true,
+      value: (s) => s.percentage || 0,
+      render: (s) => (
+        <Badge variant={(s.percentage || 0) >= 75 ? "default" : "destructive"}>
+          {s.percentage?.toFixed?.(1) ?? s.percentage ?? 0}%
+        </Badge>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -100,7 +130,12 @@ function ReportsContent() {
           onChange={(v) => setClassId(v)}
           options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
         />
-        <input type="month" className="border rounded-md px-3 py-2" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <AdvancedSelect
+          className="w-44"
+          value={month}
+          onChange={(v) => setMonth(v)}
+          options={MONTH_OPTIONS}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -113,28 +148,15 @@ function ReportsContent() {
       <Card>
         <CardHeader><CardTitle>Student-wise Attendance</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>#</TableHead><TableHead>Student</TableHead><TableHead>Present</TableHead><TableHead>Absent</TableHead><TableHead>Late</TableHead><TableHead>Leave</TableHead><TableHead>Attendance %</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {students.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No data available</TableCell></TableRow>
-              ) : students.map((s: any, i: number) => (
-                <TableRow key={s.student_id || i}>
-                  <TableCell>{i + 1}</TableCell>
-                  <TableCell className="font-medium">{s.student_name}</TableCell>
-                  <TableCell className="text-green-600">{s.present || 0}</TableCell>
-                  <TableCell className="text-red-600">{s.absent || 0}</TableCell>
-                  <TableCell className="text-yellow-600">{s.late || 0}</TableCell>
-                  <TableCell>{s.leave || 0}</TableCell>
-                  <TableCell>
-                    <Badge variant={(s.percentage || 0) >= 75 ? "default" : "destructive"}>
-                      {s.percentage?.toFixed(1) || 0}%
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={REPORT_COLUMNS}
+            rows={students}
+            rowKey={(s: any) => s.student_id || s.student_name || Math.random().toString(36).slice(2)}
+            searchable
+            searchPlaceholder="Search students…"
+            exportFileName={`attendance-${month}`}
+            empty={{ icon: Users, title: "No data available", body: "Pick a class and month with recorded attendance." }}
+          />
         </CardContent>
       </Card>
     </div>

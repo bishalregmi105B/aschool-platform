@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { toast } from "sonner";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteHost, schoolSiteUrl } from "@/lib/site-domain";
@@ -227,15 +228,12 @@ export default function SeoPage() {
         <div className="border rounded-lg p-5 space-y-4">
           <h3 className="font-medium text-sm">Sitemap & Crawling</h3>
 
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
+          <FormCheckbox
+              label="Auto-generate sitemap.xml"
+              description="Sitemap & crawling"
               checked={form.sitemap_enabled}
-              onChange={(e) => updateField("sitemap_enabled", e.target.checked)}
-              className="rounded"
+              onCheckedChange={(v) => updateField("sitemap_enabled", v)}
             />
-            <span className="text-sm">Auto-generate sitemap.xml</span>
-          </label>
 
           <div>
             <label className="block text-sm font-medium mb-1">Custom robots.txt</label>

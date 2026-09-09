@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { TimePicker } from "@/components/ui/time-picker";
@@ -281,14 +282,12 @@ function MultiEnumControl({ field, id, value, disabled, onChange }: ControlProps
     <div id={id} className="flex flex-wrap gap-3">
       {(field.options || []).map((o) => (
         <label key={o.value} className="flex cursor-pointer items-center gap-1.5 text-sm">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
+          <Checkbox
             disabled={disabled}
             checked={selected.includes(o.value)}
-            onChange={(e) =>
+            onCheckedChange={(checked) =>
               onChange(
-                e.target.checked
+                checked
                   ? [...selected, o.value]
                   : selected.filter((v) => v !== o.value)
               )
