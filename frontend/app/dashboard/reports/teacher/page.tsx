@@ -6,9 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Download, Star, ClipboardCheck, GraduationCap, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 
 export default function TeacherReportsPage() {
@@ -21,7 +19,51 @@ export default function TeacherReportsPage() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  const TEACHER_REPORT_COLUMNS: Column<any>[] = [
+    { key: "name", label: "Teacher Name", sortable: true, value: (r) => r.fields?.name ?? r.name ?? "", render: (r) => <span className="font-medium">{r.fields?.name}</span> },
+    { key: "designation", label: "Designation", sortable: true, value: (r) => r.fields?.designation ?? "", render: (r) => <span className="capitalize">{(r.fields?.designation || "—").replace("_", " ")}</span> },
+    { key: "department", label: "Department", sortable: true, value: (r) => r.fields?.department ?? "", render: (r) => r.fields?.department || "—" },
+    {
+      key: "attendance",
+      label: "Attendance %",
+      align: "center",
+      sortable: true,
+      value: (r) => metricValue(r, ["attendance_pct", "attendance_percentage", "attendance"]) ?? -1,
+      render: (r) => {
+        const attendance = metricValue(r, ["attendance_pct", "attendance_percentage", "attendance"]);
+        return attendance == null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <Badge variant={attendance > 90 ? "success" : "secondary"}>{attendance}%</Badge>
+        );
+      },
+    },
+    {
+      key: "classes",
+      label: "Classes Taken",
+      align: "center",
+      sortable: true,
+      value: (r) => metricValue(r, ["classes_taken", "total_classes"]) ?? -1,
+      render: (r) => metricValue(r, ["classes_taken", "total_classes"]) ?? "—",
+    },
+    {
+      key: "rating",
+      label: "Student Rating",
+      align: "right",
+      sortable: true,
+      value: (r) => metricValue(r, ["student_rating", "rating"]) ?? -1,
+      render: (r) => {
+        const rating = metricValue(r, ["student_rating", "rating"]);
+        return (
+          <span className="inline-flex justify-end items-center gap-1">
+            {rating == null ? "—" : rating} {rating != null && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+          </span>
+        );
+      },
+    },
+  ];
+
+  if (isLoading) return <PageLoader />;  if (isLoading) return <PageLoader />;
     if (isError) {
       return (
         <div className="max-w-2xl mx-auto p-6">
@@ -129,44 +171,14 @@ export default function TeacherReportsPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher Name</TableHead>
-                <TableHead>Designation</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead className="text-center">Attendance %</TableHead>
-                <TableHead className="text-center">Classes Taken</TableHead>
-                <TableHead className="text-right">Student Rating</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((teacher) => {
-                const attendance = metricValue(teacher, ["attendance_pct", "attendance_percentage", "attendance"]);
-                const classes = metricValue(teacher, ["classes_taken", "total_classes"]);
-                const rating = metricValue(teacher, ["student_rating", "rating"]);
-
-                return (
-                  <TableRow key={teacher.id}>
-                    <TableCell className="font-medium">{teacher.fields.name}</TableCell>
-                    <TableCell className="capitalize">{(teacher.fields.designation || "—").replace("_", " ")}</TableCell>
-                    <TableCell>{teacher.fields.department || "—"}</TableCell>
-                    <TableCell className="text-center">
-                      {attendance == null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <Badge variant={attendance > 90 ? "success" : "secondary"}>{attendance}%</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">{classes ?? "—"}</TableCell>
-                    <TableCell className="text-right flex justify-end items-center gap-1">
-                      {rating == null ? "—" : rating} {rating != null && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={TEACHER_REPORT_COLUMNS}
+            rows={rows}
+            rowKey={(r: any) => r.id ?? r.name}
+            searchable
+            searchPlaceholder="Search teachers…"
+            exportFileName="teacher-report"
+          />
         </CardContent>
       </Card>
     </div>

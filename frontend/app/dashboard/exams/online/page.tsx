@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateTimeField } from "@/components/ui/datetime-field";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Spinner } from "@/components/ui/spinner";
 import { Monitor, Plus, Play, Clock, CheckCircle2, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +47,7 @@ const EMPTY_FORM = {
 };
 
 export default function OnlineExamPage() {
+
   return (
     <PluginGate slug="exams">
       <OnlineExamContent />
@@ -105,6 +106,37 @@ function OnlineExamContent() {
       status: "upcoming",
     });
   };
+
+  const ONLINE_EXAM_COLUMNS: Column<any>[] = [
+    { key: "title", label: "Title", sortable: true, value: (e) => e.title ?? "", render: (e) => <span className="font-medium">{e.title}</span> },
+    { key: "subject_name", label: "Subject", sortable: true, value: (e) => e.subject_name ?? "", render: (e) => e.subject_name ?? "—" },
+    { key: "duration_minutes", label: "Duration", align: "right", sortable: true, value: (e) => e.duration_minutes ?? 0, render: (e) => <>{e.duration_minutes} min</> },
+    { key: "total_marks", label: "Marks", align: "right", sortable: true, value: (e) => e.total_marks ?? 0 },
+    { key: "total_questions", label: "Questions", align: "right", sortable: true, value: (e) => e.total_questions ?? 0 },
+    {
+      key: "window",
+      label: "Window",
+      sortable: true,
+      value: (e) => e.start_date ?? "",
+      render: (e) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {e.start_date ? new Date(e.start_date).toLocaleString() : "—"}
+          {e.end_date ? ` → ${new Date(e.end_date).toLocaleString()}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (e) => e.status ?? "",
+      render: (e) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[e.status] ?? "bg-gray-100 text-gray-800"}`}>
+          {e.status}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -242,39 +274,14 @@ function OnlineExamContent() {
               <p className="text-sm mt-1">Create your first online exam to get started with auto-grading</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Marks</TableHead>
-                  <TableHead>Questions</TableHead>
-                  <TableHead>Window</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {exams.map((exam: any) => (
-                  <TableRow key={exam.id}>
-                    <TableCell className="font-medium">{exam.title}</TableCell>
-                    <TableCell>{exam.subject_name ?? "—"}</TableCell>
-                    <TableCell>{exam.duration_minutes} min</TableCell>
-                    <TableCell>{exam.total_marks}</TableCell>
-                    <TableCell>{exam.total_questions ?? 0}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {exam.start_date ? new Date(exam.start_date).toLocaleString() : "—"}
-                      {exam.end_date ? ` → ${new Date(exam.end_date).toLocaleString()}` : ""}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[exam.status] ?? "bg-gray-100 text-gray-800"}`}>
-                        {exam.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={ONLINE_EXAM_COLUMNS}
+              rows={exams}
+              rowKey={(exam: any) => exam.id}
+              searchable
+              searchPlaceholder="Search online exams…"
+              exportFileName="online-exams"
+            />
           )}
         </CardContent>
       </Card>

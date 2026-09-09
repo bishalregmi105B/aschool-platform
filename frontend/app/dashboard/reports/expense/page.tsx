@@ -4,14 +4,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Download, IndianRupee } from "lucide-react";
+import { PieChart, Download, IndianRupee, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 
 interface Expense {
   id: string;
@@ -94,6 +92,12 @@ export default function ExpenseReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const EXPENSE_DIST_COLUMNS: Column<any>[] = [
+    { key: "name", label: "Category", sortable: true, value: (d) => d.name ?? "", render: (d) => <span className="font-medium">{d.name}</span> },
+    { key: "amount", label: "Total Amount", align: "right", sortable: true, value: (d) => d.amount ?? 0, render: (d) => <span className="font-semibold">Rs. {d.amount.toLocaleString()}</span> },
+    { key: "percentage", label: "Share", align: "right", sortable: true, value: (d) => d.percentage ?? 0, render: (d) => `${d.percentage?.toFixed?.(1) ?? d.percentage ?? 0}%` },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -145,31 +149,15 @@ export default function ExpenseReportsPage() {
             <CardTitle>Expenditure by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Total Amount</TableHead>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {distribution.map((item) => (
-                    <TableRow key={item.catId}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        Rs. {item.amount.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                {distribution.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center py-4 text-muted-foreground">
-                      No expenses recorded for this period.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={EXPENSE_DIST_COLUMNS}
+              rows={distribution}
+              rowKey={(d: any) => d.catId}
+              searchable
+              searchPlaceholder="Search categories…"
+              exportFileName="expense-by-category"
+              empty={{ icon: Receipt, title: "No expenses recorded for this period." }}
+            />
           </CardContent>
         </Card>
 

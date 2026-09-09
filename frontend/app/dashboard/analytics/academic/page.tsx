@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
@@ -31,9 +31,17 @@ export default function AcademicAnalyticsPage() {
   const subjectWise = analytics.subject_wise || [];
   const atRisk = analytics.at_risk_students || [];
 
+  const AT_RISK_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (s) => s.student_name ?? "", render: (s) => <span className="font-medium">{s.student_name}</span> },
+    { key: "class_name", label: "Class", sortable: true, value: (s) => s.class_name ?? "" },
+    { key: "avg_percentage", label: "Average", align: "right", sortable: true, value: (s) => s.avg_percentage ?? 0, render: (s) => <>{s.avg_percentage}%</> },
+    { key: "failed_subjects", label: "Failed Subjects", align: "right", sortable: true, value: (s) => s.failed_subjects ?? 0 },
+    { key: "risk_level", label: "Risk Level", sortable: true, value: (s) => s.risk_level ?? "", render: (s) => <Badge variant="destructive">{s.risk_level || "High"}</Badge> },
+  ];
+
   if (isLoading) return <PageLoader />;
     if (isError) {
-      return (
+  return (
         <div className="max-w-2xl mx-auto p-6">
           <Card><CardContent className="py-10 text-center space-y-3">
             <p className="text-sm text-destructive">Failed to load academic analytics. Please try again.</p>
@@ -103,20 +111,15 @@ export default function AcademicAnalyticsPage() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> At-Risk Students</CardTitle></CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Average</TableHead><TableHead>Failed Subjects</TableHead><TableHead>Risk Level</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {atRisk.map((s: any, i: number) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{s.student_name}</TableCell>
-                    <TableCell>{s.class_name}</TableCell>
-                    <TableCell>{s.avg_percentage}%</TableCell>
-                    <TableCell>{s.failed_subjects || 0}</TableCell>
-                    <TableCell><Badge variant="destructive">{s.risk_level || "High"}</Badge></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={AT_RISK_COLUMNS}
+              rows={atRisk}
+              rowKey={(s: any) => `${s.student_name}-${s.class_name}`}
+              searchable
+              searchPlaceholder="Search students…"
+              exportFileName="at-risk-students"
+              dense
+            />
           </CardContent>
         </Card>
       )}

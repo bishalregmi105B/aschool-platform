@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,21 @@ function BranchesContent() {
 
   if (isLoading) return <PageLoader />;
 
+  const BRANCH_COLUMNS: Column<any>[] = [
+    { key: "code", label: "Code", sortable: true, value: (b) => b.code ?? "", render: (b) => <Badge variant="outline">{b.code}</Badge> },
+    { key: "name", label: "Name", sortable: true, value: (b) => b.name ?? "", render: (b) => <span className="font-medium">{b.name}</span> },
+    { key: "address", label: "Address", value: (b) => b.address ?? "", render: (b) => b.address ?? "—" },
+    { key: "principal_name", label: "Principal", value: (b) => b.principal_name ?? "", render: (b) => b.principal_name ?? "—" },
+    { key: "contact", label: "Contact", value: (b) => b.phone ?? b.email ?? "", render: (b) => b.phone ?? b.email ?? "—" },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (b) => (b.is_active ? "active" : "inactive"),
+      render: (b) => <Badge variant={b.is_active ? "default" : "secondary"}>{b.is_active ? "Active" : "Inactive"}</Badge>,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -50,23 +65,17 @@ function BranchesContent() {
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search branches..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Address</TableHead><TableHead>Principal</TableHead><TableHead>Contact</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {branches.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No branches found</TableCell></TableRow>
-            ) : branches.map((b: any) => (
-              <TableRow key={b.id}>
-                <TableCell><Badge variant="outline">{b.code}</Badge></TableCell>
-                <TableCell className="font-medium">{b.name}</TableCell>
-                <TableCell>{b.address ?? "—"}</TableCell>
-                <TableCell>{b.principal_name ?? "—"}</TableCell>
-                <TableCell>{b.phone ?? b.email ?? "—"}</TableCell>
-                <TableCell><Badge variant={b.is_active ? "default" : "secondary"}>{b.is_active ? "Active" : "Inactive"}</Badge></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={BRANCH_COLUMNS}
+          rows={branches}
+          rowKey={(b: any) => b.id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search branches..."
+          exportFileName="branches"
+          empty={{ icon: Building2, title: "No branches found", body: "Add branch campuses to manage them from one console." }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BSMonthInput } from "@/components/ui/bs-date-input";
@@ -153,6 +153,65 @@ function ScholarshipsContent() {
     },
   });
 
+  const SCHOLARSHIP_COLUMNS: Column<any>[] = [
+    {
+      key: "student_name",
+      label: "Student",
+      sortable: true,
+      value: (sc) => sc.student_name ?? "",
+      render: (sc) => (
+        <div>
+          <p className="font-medium">{sc.student_name}</p>
+          {sc.roll_number && <p className="text-xs text-muted-foreground">#{sc.roll_number}</p>}
+        </div>
+      ),
+    },
+    { key: "class_name", label: "Class", sortable: true, value: (sc) => sc.class_name ?? "", render: (sc) => sc.class_name || "—" },
+    { key: "fee_type", label: "Fee Type", value: (sc) => sc.fee_type ?? "", render: (sc) => <Badge variant="outline">{sc.fee_type || "All Types"}</Badge> },
+    {
+      key: "discount_value",
+      label: "Discount",
+      align: "right",
+      sortable: true,
+      value: (sc) => sc.discount_value ?? 0,
+      render: (sc) => (
+        <span className="font-semibold text-emerald-700">
+          {sc.discount_type === "percent" ? `${sc.discount_value}%` : `Rs. ${sc.discount_value.toLocaleString()}`}
+        </span>
+      ),
+    },
+    { key: "reason", label: "Reason", value: (sc) => sc.reason ?? "", render: (sc) => sc.reason || "—" },
+    {
+      key: "valid_until_bs",
+      label: "Valid Until",
+      sortable: true,
+      value: (sc) => sc.valid_until_bs ?? "",
+      render: (sc) => (sc.valid_until_bs ? <span className="text-sm">{sc.valid_until_bs}</span> : <Badge variant="secondary">Open-ended</Badge>),
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      value: (sc) => (sc.is_active ? "active" : "inactive"),
+      render: (sc) => <Badge variant={sc.is_active ? "success" : "secondary"}>{sc.is_active ? "Active" : "Inactive"}</Badge>,
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (sc) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(sc); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(sc.id); }} disabled={remove.isPending}>
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   const isMutating = create.isPending || update.isPending;
@@ -182,79 +241,14 @@ function ScholarshipsContent() {
               <p>No scholarships defined. Add one to auto-discount student fees.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Fee Type</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Valid Until</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scholarships.map((sc) => (
-                  <TableRow key={sc.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{sc.student_name}</p>
-                        {sc.roll_number && (
-                          <p className="text-xs text-muted-foreground">
-                            #{sc.roll_number}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{sc.class_name || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {sc.fee_type || "All Types"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold text-emerald-700">
-                      {sc.discount_type === "percent"
-                        ? `${sc.discount_value}%`
-                        : `Rs. ${sc.discount_value.toLocaleString()}`}
-                    </TableCell>
-                    <TableCell>{sc.reason || "—"}</TableCell>
-                    <TableCell>
-                      {sc.valid_until_bs ? (
-                        <span className="text-sm">{sc.valid_until_bs}</span>
-                      ) : (
-                        <Badge variant="secondary">Open-ended</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={sc.is_active ? "success" : "secondary"}>
-                        {sc.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(sc)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove.mutate(sc.id)}
-                          disabled={remove.isPending}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={SCHOLARSHIP_COLUMNS}
+              rows={scholarships}
+              rowKey={(sc) => sc.id}
+              searchable
+              searchPlaceholder="Search scholarships…"
+              exportFileName="scholarships"
+            />
           )}
         </CardContent>
       </Card>

@@ -9,14 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import { Plug, Settings, Store, Trash2 } from "lucide-react";
@@ -123,6 +116,98 @@ export default function InstalledPluginsPage() {
     deactivateMutation.isPending ||
     uninstallMutation.isPending;
 
+  const PLUGIN_COLUMNS: Column<any>[] = [
+    {
+      key: "name",
+      label: "Plugin",
+      sortable: true,
+      value: (p) => p.name ?? "",
+      render: (p) => (
+        <div className="flex items-center gap-3">
+          <PluginIcon emoji={p.emoji} />
+          <div className="min-w-0">
+            <p className="font-medium truncate">{p.name}</p>
+            <p className="text-xs text-muted-foreground line-clamp-1">{p.description}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: "category", label: "Category", sortable: true, value: (p) => p.category ?? "", render: (p) => <Badge variant="secondary" className="capitalize">{p.category || "add_on"}</Badge> },
+    {
+      key: "state",
+      label: "Status",
+      sortable: true,
+      value: (p) => p.install_state ?? "",
+      render: (p) => {
+        const state = p.install_state!;
+        const isActive = state === "active";
+        const onTrial = isActive && p.is_trial === true;
+        return onTrial ? (
+          <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-none">
+            Trial{typeof p.trial_days_left === "number" ? ` · ${p.trial_days_left}d left` : ""}
+          </Badge>
+        ) : p.is_free ? (
+          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Free</Badge>
+        ) : (
+          <Badge variant="secondary" className="font-semibold">{formatCurrency(p.price_monthly)}/mo</Badge>
+        );
+      },
+    },
+    {
+      key: "active",
+      label: "Active",
+      align: "center",
+      render: (p) => {
+        const isActive = p.install_state === "active";
+        return (
+          <Switch
+            checked={isActive}
+            disabled={busy}
+            aria-label={`Activate or deactivate ${p.name}`}
+            onCheckedChange={(checked) =>
+              checked ? activateMutation.mutate(p.slug) : deactivateMutation.mutate(p.slug)
+            }
+          />
+        );
+      },
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (p) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/dashboard/plugins/${p.slug}/settings`}>
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Settings
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            disabled={busy}
+            title="Uninstall (plugin data is preserved)"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (
+                window.confirm(
+                  `Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`
+                )
+              ) {
+                uninstallMutation.mutate(p.slug);
+              }
+            }}
+          >
+            {uninstallMutation.isPending && "…"}
+            Uninstall
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   return (
@@ -158,107 +243,14 @@ export default function InstalledPluginsPage() {
               to add some.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[38%]">Plugin</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Active</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {installed.map((plugin) => {
-                  const state = plugin.install_state!;
-                  const isActive = state === "active";
-                  const onTrial = isActive && plugin.is_trial === true;
-                  return (
-                    <TableRow key={plugin.slug} className={isActive ? "" : "opacity-70"}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <PluginIcon emoji={plugin.emoji} />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{plugin.name}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">
-                              {plugin.description}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {plugin.category || "add_on"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {onTrial ? (
-                          <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-none">
-                            Trial{typeof plugin.trial_days_left === "number" ? ` · ${plugin.trial_days_left}d left` : ""}
-                          </Badge>
-                        ) : plugin.is_free ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">
-                            Free
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="font-semibold">
-                            {formatCurrency(plugin.price_monthly)}/mo
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={isActive}
-                          disabled={busy}
-                          aria-label={`Activate or deactivate ${plugin.name}`}
-                          onCheckedChange={(checked) =>
-                            checked
-                              ? activateMutation.mutate(plugin.slug)
-                              : deactivateMutation.mutate(plugin.slug)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/dashboard/plugins/${plugin.slug}/settings`}>
-                              <Settings className="h-3.5 w-3.5 mr-1" />
-                              Settings
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                            disabled={busy}
-                            title="Uninstall (plugin data is preserved)"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Uninstall ${plugin.name}? Its data is preserved and it can be reinstalled later.`
-                                )
-                              ) {
-                                uninstallMutation.mutate(plugin.slug);
-                              }
-                            }}
-                          >
-                            {uninstallMutation.isPending &&
-                            uninstallMutation.variables === plugin.slug ? (
-                              <Spinner size="sm" />
-                            ) : (
-                              <>
-                                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                Uninstall
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={PLUGIN_COLUMNS}
+              rows={installed}
+              rowKey={(p) => p.slug}
+              searchable
+              searchPlaceholder="Search plugins…"
+              exportFileName="installed-plugins"
+            />
           )}
         </CardContent>
       </Card>
