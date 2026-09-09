@@ -112,6 +112,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final i18n = I18nService.instance;
     return Scaffold(
       body: (_error != null && !_loading && _notices.isEmpty)
           ? Center(child: Text(_error!))
@@ -119,13 +120,85 @@ class _NoticesScreenState extends State<NoticesScreen> {
               notices: _notices,
               isLoading: _loading,
               onRefresh: _load,
-              emptyTitle: 'No notices published yet',
-              emptySubtitle: 'Tap Add Notice to publish your first notice.',
+              emptyTitle: i18n.t('No notices published yet', 'कुनै सूचना छैन'),
+              emptySubtitle: i18n.t('Tap Add Notice to publish your first notice.', 'सूचना थप्न थिच्नुहोस्'),
+              onNoticeTap: (notice) => _showNoticeActions(notice),
             ),
       floatingActionButton: FloatingActionButton.extended(
           onPressed: _createNotice,
           icon: const Icon(Icons.add),
-          label: const Text('Add Notice')),
+          label: Text(i18n.t('Add Notice', 'सूचना थप्नुहोस्'))),
+    );
+  }
+
+  /// Detail + manage sheet: read the full notice, delete (admin).
+  void _showNoticeActions(Map<String, dynamic> notice) {
+    final noticeId = notice['id']?.toString();
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${notice['title'] ?? ''}',
+                style: Theme.of(sheetContext)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${notice['published_at'] ?? notice['created_at'] ?? ''}',
+                style: Theme.of(sheetContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${notice['content'] ?? ''}',
+                style: Theme.of(sheetContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(sheetContext).colorScheme.error,
+                  side: BorderSide(
+                      color: Theme.of(sheetContext)
+                          .colorScheme
+                          .error
+                          .withValues(alpha: 0.4)),
+                ),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: () async {
+                  if (noticeId == null) return;
+                  Navigator.of(sheetContext).pop();
+                  try {
+                    await ApiClient.instance.delete('/notices/$noticeId');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(I18nService.instance
+                              .t('Notice deleted', 'सूचना मेटियो'))),
+                    );
+                    _load();
+                  } catch (_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to delete notice')),
+                    );
+                  }
+                },
+                label: Text(I18nService.instance.t('Delete notice', 'सूचना मेटाउनुहोस्')),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

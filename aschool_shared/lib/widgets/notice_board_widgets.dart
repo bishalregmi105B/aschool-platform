@@ -6,6 +6,9 @@ class NoticeBoardList extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final String emptyTitle;
   final String emptySubtitle;
+  /// Custom tap handler — defaults to the built-in details sheet. Admin
+  /// screens pass one to add manage actions (delete, edit).
+  final void Function(Map<String, dynamic> notice)? onNoticeTap;
 
   const NoticeBoardList({
     super.key,
@@ -14,6 +17,7 @@ class NoticeBoardList extends StatelessWidget {
     required this.onRefresh,
     this.emptyTitle = 'No notices yet',
     this.emptySubtitle = 'Published notices will appear here.',
+    this.onNoticeTap,
   });
 
   @override
@@ -76,6 +80,7 @@ class NoticeBoardList extends StatelessWidget {
           return _AnimatedNoticeCard(
             notice: notice,
             index: index,
+            onNoticeTap: onNoticeTap,
           );
         },
       ),
@@ -86,10 +91,12 @@ class NoticeBoardList extends StatelessWidget {
 class _AnimatedNoticeCard extends StatelessWidget {
   final Map<String, dynamic> notice;
   final int index;
+  final void Function(Map<String, dynamic> notice)? onNoticeTap;
 
   const _AnimatedNoticeCard({
     required this.notice,
     required this.index,
+    this.onNoticeTap,
   });
 
   @override
@@ -130,7 +137,8 @@ class _AnimatedNoticeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: () => showNoticeDetailsSheet(context, notice),
+            onTap: () =>
+                (onNoticeTap ?? (n) => showNoticeDetailsSheet(context, n))(notice),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
