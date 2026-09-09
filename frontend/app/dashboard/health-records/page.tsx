@@ -7,9 +7,7 @@ import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +82,21 @@ function HealthRecordsContent() {
     },
   });
 
+  const HUB_VISIT_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (v) => v.student_name ?? "", render: (v) => v.student_name || v.student_id },
+    { key: "visit_date", label: "Date", sortable: true, value: (v) => v.visit_date ?? "", render: (v) => displayBS(v.visit_date) },
+    { key: "reason", label: "Reason", value: (v) => v.reason ?? "" },
+    { key: "diagnosis", label: "Diagnosis", value: (v) => v.diagnosis ?? "" },
+    { key: "treatment", label: "Treatment", value: (v) => v.treatment ?? "" },
+  ];
+
+  const HUB_IMMUNIZATION_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (i) => i.student_name ?? "", render: (i) => i.student_name || i.student_id },
+    { key: "vaccine_name", label: "Vaccine", sortable: true, value: (i) => i.vaccine_name ?? "", render: (i) => <span className="font-medium">{i.vaccine_name}</span> },
+    { key: "dose_number", label: "Dose", align: "center", sortable: true, value: (i) => i.dose_number ?? 0, render: (i) => <Badge variant="outline">Dose {i.dose_number}</Badge> },
+    { key: "date_administered", label: "Date", sortable: true, value: (i) => i.date_administered ?? "" },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -138,28 +151,14 @@ function HealthRecordsContent() {
       {tab === "visits" && (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Diagnosis</TableHead>
-                  <TableHead>Treatment</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visits?.map((v: any) => (
-                  <TableRow key={v.id}>
-                    <TableCell>{v.student_name || v.student_id}</TableCell>
-                    <TableCell>{displayBS(v.visit_date)}</TableCell>
-                    <TableCell>{v.reason}</TableCell>
-                    <TableCell>{v.diagnosis}</TableCell>
-                    <TableCell>{v.treatment}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={HUB_VISIT_COLUMNS}
+              rows={visits ?? []}
+              rowKey={(v: any) => v.id}
+              searchable
+              searchPlaceholder="Search visits…"
+              exportFileName="health-visits"
+            />
           </CardContent>
         </Card>
       )}
@@ -167,26 +166,14 @@ function HealthRecordsContent() {
       {tab === "immunizations" && (
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Vaccine</TableHead>
-                  <TableHead>Dose</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {immunizations?.map((imm: any) => (
-                  <TableRow key={imm.id}>
-                    <TableCell>{imm.student_name || imm.student_id}</TableCell>
-                    <TableCell className="font-medium">{imm.vaccine_name}</TableCell>
-                    <TableCell><Badge variant="outline">Dose {imm.dose_number}</Badge></TableCell>
-                    <TableCell>{imm.date_administered}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={HUB_IMMUNIZATION_COLUMNS}
+              rows={immunizations ?? []}
+              rowKey={(imm: any) => imm.id}
+              searchable
+              searchPlaceholder="Search immunizations…"
+              exportFileName="immunizations"
+            />
           </CardContent>
         </Card>
       )}
