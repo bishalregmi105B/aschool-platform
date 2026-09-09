@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +53,22 @@ function BusesContent() {
     onError: () => toast.error("Failed to save bus"),
   });
 
-  if (isLoading) return <PageLoader />;
+  const BUS_COLUMNS: Column<any>[] = [
+    { key: "vehicle_number", label: "Number Plate", sortable: true, value: (b) => b.vehicle_number ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><Bus className="h-4 w-4 text-muted-foreground" />{b.vehicle_number}</div> },
+    { key: "model", label: "Model", sortable: true, value: (b) => b.model ?? "", render: (b) => b.model || "—" },
+    { key: "capacity", label: "Capacity", align: "right", sortable: true, value: (b) => b.capacity ?? 0, render: (b) => <Badge variant="outline">{b.capacity} seats</Badge> },
+    { key: "gps_device_id", label: "GPS Device", value: (b) => b.gps_device_id ?? "", render: (b) => b.gps_device_id || "—" },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (b) => (
+        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(b); }}><Pencil className="h-4 w-4" /></Button>
+      ),
+    },
+  ];
+
+  if (isLoading) return <PageLoader />;  if (isLoading) return <PageLoader />;
 
   return (
     <div className="space-y-6">
@@ -71,32 +86,17 @@ function BusesContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Number Plate</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Capacity</TableHead>
-              <TableHead>GPS Device</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {buses.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No buses found</TableCell></TableRow>
-            ) : buses.map((b: any) => (
-              <TableRow key={b.id}>
-                <TableCell className="font-medium"><div className="flex items-center gap-2"><Bus className="h-4 w-4 text-muted-foreground" />{b.vehicle_number}</div></TableCell>
-                <TableCell>{b.model || "—"}</TableCell>
-                <TableCell><Badge variant="outline">{b.capacity} seats</Badge></TableCell>
-                <TableCell>{b.gps_device_id || "—"}</TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={BUS_COLUMNS}
+          rows={buses}
+          rowKey={(b: any) => b.id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search buses..."
+          exportFileName="buses"
+          empty={{ icon: Bus, title: "No buses found", body: "Add your first bus to start transport management.", action: { label: "Add Bus", onClick: openAdd } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

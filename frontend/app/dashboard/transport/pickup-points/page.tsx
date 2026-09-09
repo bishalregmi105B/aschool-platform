@@ -12,9 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -91,7 +89,39 @@ export default function PickupPointsPage() {
     onError: () => toast.error("Failed to delete pickup point"),
   });
 
-  if (isLoading) return <PageLoader />;
+  const STOP_COLUMNS: Column<BusStop>[] = [
+    { key: "sequence_number", label: "Seq", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span className="text-muted-foreground">{s.sequence_number}</span> },
+    { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
+    {
+      key: "route",
+      label: "Route",
+      sortable: true,
+      value: (s) => routes?.find((r: any) => r.id === s.route_id)?.name ?? "",
+      render: (s) => routes?.find((r: any) => r.id === s.route_id)?.name || "Unknown Route",
+    },
+    { key: "arrival_time_am", label: "Morning Time", sortable: true, value: (s) => s.arrival_time_am ?? "", render: (s) => (s.arrival_time_am ? s.arrival_time_am.slice(0, 5) : "—") },
+    { key: "arrival_time_pm", label: "Afternoon Time", sortable: true, value: (s) => s.arrival_time_pm ?? "", render: (s) => (s.arrival_time_pm ? s.arrival_time_pm.slice(0, 5) : "—") },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (s) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditItem(s); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            if(confirm("Are you sure you want to delete this stop?")) deleteMutation.mutate(s.id);
+          }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  if (isLoading) return <PageLoader />;  if (isLoading) return <PageLoader />;
 
   const stopsList = (data || []).filter((s: BusStop) =>
     s.name?.toLowerCase().includes(search.toLowerCase())
@@ -136,51 +166,15 @@ export default function PickupPointsPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Seq</TableHead>
-                <TableHead>Stop Name</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>Morning Time</TableHead>
-                <TableHead>Afternoon Time</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stopsList.map((s: BusStop) => {
-                const routeName = routes?.find((r: any) => r.id === s.route_id)?.name || "Unknown Route";
-                return (
-                  <TableRow key={s.id}>
-                    <TableCell className="text-muted-foreground">{s.sequence_number}</TableCell>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell>{routeName}</TableCell>
-                    <TableCell>{s.arrival_time_am ? s.arrival_time_am.slice(0, 5) : "—"}</TableCell>
-                    <TableCell>{s.arrival_time_pm ? s.arrival_time_pm.slice(0, 5) : "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => setEditItem(s)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => {
-                          if(confirm("Are you sure you want to delete this stop?")) deleteMutation.mutate(s.id);
-                        }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {stopsList.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No pickup points found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<BusStop>
+            columns={STOP_COLUMNS}
+            rows={stopsList}
+            rowKey={(s) => s.id}
+            searchable
+            searchPlaceholder="Search stops…"
+            exportFileName="pickup-points"
+            empty={{ icon: MapPin, title: "No pickup points found", body: "Add stops with AM/PM arrival times." }}
+          />
         </CardContent>
       </Card>
 
