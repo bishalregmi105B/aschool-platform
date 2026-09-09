@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,6 +103,38 @@ function CatalogContent() {
     );
   }
 
+  const CATALOG_COLUMNS: Column<any>[] = [
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div> },
+    { key: "author", label: "Author", sortable: true, value: (b) => b.author ?? "", render: (b) => b.author || "—" },
+    { key: "isbn", label: "ISBN", value: (b) => b.isbn ?? "", render: (b) => <span className="text-sm">{b.isbn || "—"}</span> },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "total_copies", label: "Copies", align: "right", sortable: true, value: (b) => b.total_copies ?? 0 },
+    { key: "available_copies", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies ?? 0, render: (b) => <Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge> },
+    { key: "shelf_location", label: "Shelf", value: (b) => b.shelf_location ?? "", render: (b) => <span className="text-sm">{b.shelf_location || "—"}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (b) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEdit(b); }} title="Edit">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+            title="Delete"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`Delete "${b.title}" from the catalog?`)) remove.mutate(b.id);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -119,53 +151,17 @@ function CatalogContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Author</TableHead>
-              <TableHead>ISBN</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Copies</TableHead>
-              <TableHead>Available</TableHead>
-              <TableHead>Shelf</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {books.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No books found</TableCell></TableRow>
-            ) : books.map((b: any) => (
-              <TableRow key={b.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div>
-                </TableCell>
-                <TableCell>{b.author || "—"}</TableCell>
-                <TableCell className="text-sm">{b.isbn || "—"}</TableCell>
-                <TableCell><Badge variant="outline">{b.category}</Badge></TableCell>
-                <TableCell>{b.total_copies || 0}</TableCell>
-                <TableCell><Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge></TableCell>
-                <TableCell className="text-sm">{b.shelf_location || "—"}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(b)} title="Edit">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Delete"
-                      onClick={() => {
-                        if (window.confirm(`Delete "${b.title}" from the catalog?`)) remove.mutate(b.id);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={CATALOG_COLUMNS}
+          rows={books}
+          rowKey={(b: any) => b.id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by title, author, ISBN..."
+          exportFileName="library-catalog"
+          empty={{ icon: BookOpen, title: "No books found", body: "Add books to build the catalog.", action: { label: "Add Book", onClick: openCreate } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

@@ -6,7 +6,6 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plus, RefreshCw, Trash2, Banknote } from "lucide-react";
 
 interface FeeStructure {
@@ -133,6 +133,67 @@ function FeeStructureContent() {
 
   if (isLoading) return <PageLoader />;
 
+  const STRUCTURE_COLUMNS: Column<FeeStructure>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      value: (s) => s.name,
+      render: (s) => (
+        <div>
+          <p className="font-medium">{s.name}</p>
+          {s.scope_label && <p className="text-xs text-muted-foreground">{s.scope_label}</p>}
+          {s.effective_note && <p className="text-xs text-muted-foreground mt-1">{s.effective_note}</p>}
+        </div>
+      ),
+    },
+    { key: "fee_type", label: "Type", sortable: true, value: (s) => s.fee_type, render: (s) => <Badge variant="outline">{formatLabel(s.fee_type)}</Badge> },
+    { key: "class_name", label: "Class", sortable: true, value: (s) => s.class_name ?? "", render: (s) => s.class_name || "All" },
+    { key: "amount", label: "Amount", align: "right", sortable: true, value: (s) => s.amount, render: (s) => <>Rs. {s.amount?.toLocaleString()}</> },
+    {
+      key: "frequency",
+      label: "Frequency",
+      sortable: true,
+      value: (s) => s.frequency,
+      render: (s) => (
+        <div>
+          <p>{formatLabel(s.frequency)}</p>
+          <p className="text-xs text-muted-foreground">Due day: {s.due_day || "—"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "applied",
+      label: "Effective",
+      sortable: true,
+      value: (s) => s.applied_count ?? 0,
+      render: (s) => (
+        <div className="space-y-1">
+          <Badge variant={s.applied_count ? "success" : "secondary"}>
+            {s.applied_count ? "Active Now" : "Template Only"}
+          </Badge>
+          <p className="text-xs text-muted-foreground">
+            {s.applied_count ? `${s.applied_count} billed` : "Not billed yet"}
+          </p>
+        </div>
+      ),
+    },
+    { key: "is_optional", label: "Optional", value: (s) => (s.is_optional ? "optional" : "required"), render: (s) => (s.is_optional ? <Badge variant="secondary">Optional</Badge> : "Required") },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (s) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); apply.mutate(s.id); }} disabled={apply.isPending}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Apply Now
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -155,56 +216,15 @@ function FeeStructureContent() {
 
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Class</TableHead><TableHead>Amount</TableHead><TableHead>Frequency</TableHead><TableHead>Effective</TableHead><TableHead>Optional</TableHead><TableHead></TableHead></TableRow></TableHeader>
-            <TableBody>
-              {structures.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No fee structures defined</TableCell></TableRow>
-              ) : structures.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{s.name}</p>
-                      {s.scope_label ? (
-                        <p className="text-xs text-muted-foreground">{s.scope_label}</p>
-                      ) : null}
-                      {s.effective_note ? (
-                        <p className="text-xs text-muted-foreground mt-1">{s.effective_note}</p>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell><Badge variant="outline">{formatLabel(s.fee_type)}</Badge></TableCell>
-                  <TableCell>{s.class_name || "All"}</TableCell>
-                  <TableCell>Rs. {s.amount?.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p>{formatLabel(s.frequency)}</p>
-                      <p className="text-xs text-muted-foreground">Due day: {s.due_day || "—"}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant={s.applied_count ? "success" : "secondary"}>
-                        {s.applied_count ? "Active Now" : "Template Only"}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground">
-                        {s.applied_count ? `${s.applied_count} billed` : "Not billed yet"}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>{s.is_optional ? <Badge variant="secondary">Optional</Badge> : "Required"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => apply.mutate(s.id)} disabled={apply.isPending}>
-                        <RefreshCw className="h-3.5 w-3.5 mr-1" /> Apply Now
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove.mutate(s.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable<FeeStructure>
+            columns={STRUCTURE_COLUMNS}
+            rows={structures}
+            rowKey={(s) => s.id}
+            searchable
+            searchPlaceholder="Search structures…"
+            exportFileName="fee-structures"
+            empty={{ icon: Banknote, title: "No fee structures defined", body: "Add your first structure — new ones bill matching students immediately." }}
+          />
         </CardContent>
       </Card>
 

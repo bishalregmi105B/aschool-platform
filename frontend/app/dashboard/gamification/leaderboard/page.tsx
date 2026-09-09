@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Trophy, Medal, Star } from "lucide-react";
@@ -27,6 +27,32 @@ function LeaderboardContent() {
     queryFn: async () => (await api.get("/gamification/leaderboard", { params: { top: 50 } })).data?.data || [],
   });
 
+  const entries: any[] = Array.isArray(data) ? data : [];
+
+  const LEADERBOARD_COLUMNS: Column<any>[] = [
+    {
+      key: "rank",
+      label: "Rank",
+      sortable: true,
+      value: (e) => e.rank ?? 0,
+      render: (e, i) => <div className="flex justify-center">{rankIcon(e.rank || (i ?? 0) + 1)}</div>,
+    },
+    { key: "student_name", label: "Student", sortable: true, value: (e) => e.student_name ?? "", render: (e) => <span className="font-medium">{e.student_name || e.student_id}</span> },
+    { key: "class_name", label: "Class", sortable: true, value: (e) => e.class_name ?? "", render: (e) => <span className="text-sm text-muted-foreground">{e.class_name || "—"}</span> },
+    {
+      key: "total_points",
+      label: "Total Points",
+      align: "right",
+      sortable: true,
+      value: (e) => e.total_points ?? 0,
+      render: (e, i) => (
+        <Badge variant={(i ?? 0) === 0 ? "default" : "outline"} className="font-mono">
+          {e.total_points?.toLocaleString() || 0} XP
+        </Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -36,9 +62,6 @@ function LeaderboardContent() {
       </CardContent></Card>
     );
   }
-
-
-  const entries: any[] = Array.isArray(data) ? data : [];
 
   return (
     <div className="space-y-6">
@@ -55,32 +78,15 @@ function LeaderboardContent() {
         </CardContent></Card>
       ) : (
         <Card><CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Rank</TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead className="text-right">Total Points</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map((entry: any, i: number) => (
-                <TableRow key={entry.student_id || i} className={i < 3 ? "bg-muted/30" : ""}>
-                  <TableCell>
-                    <div className="flex justify-center">{rankIcon(entry.rank || i + 1)}</div>
-                  </TableCell>
-                  <TableCell className="font-medium">{entry.student_name || entry.student_id}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{entry.class_name || "—"}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={i === 0 ? "default" : "outline"} className="font-mono">
-                      {entry.total_points?.toLocaleString() || 0} XP
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={LEADERBOARD_COLUMNS}
+            rows={entries}
+            rowKey={(e: any) => e.student_id || `rank-${e.rank}`}
+            searchable
+            searchPlaceholder="Search students…"
+            exportFileName="leaderboard"
+            dense
+          />
         </CardContent></Card>
       )}
     </div>

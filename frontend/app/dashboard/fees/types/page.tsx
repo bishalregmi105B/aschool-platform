@@ -17,14 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plus, Pencil, Trash2, Tag, Info } from "lucide-react";
 
 interface FeeType {
@@ -114,6 +107,45 @@ function FeeTypesContent() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const FEE_TYPE_COLUMNS: Column<FeeType>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      value: (ft) => ft.name,
+      render: (ft) => (
+        <div className="flex items-center gap-2">
+          <Tag className="h-3.5 w-3.5 text-primary" />
+          <span className="font-medium">{ft.name}</span>
+        </div>
+      ),
+    },
+    { key: "description", label: "Description", value: (ft) => ft.description ?? "", render: (ft) => <span className="text-muted-foreground text-sm">{ft.description || "—"}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (ft) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(ft); }}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              ft.id && deleteMutation.mutate(ft.id);
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -186,51 +218,15 @@ function FeeTypesContent() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customTypes.map((ft) => (
-                  <TableRow key={ft.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Tag className="h-3.5 w-3.5 text-primary" />
-                        {ft.name}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {ft.description || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(ft)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            ft.id && deleteMutation.mutate(ft.id)
-                          }
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable<FeeType>
+              columns={FEE_TYPE_COLUMNS}
+              rows={customTypes}
+              rowKey={(ft) => ft.id || ft.name}
+              searchable
+              searchPlaceholder="Search fee types…"
+              exportFileName="fee-types"
+              empty={{ icon: Tag, title: "No custom fee types yet", body: "Add custom types for school-specific fee categories." }}
+            />
           )}
         </CardContent>
       </Card>

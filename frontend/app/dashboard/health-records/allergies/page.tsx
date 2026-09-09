@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,6 +66,13 @@ function AllergiesContent() {
     onError: () => toast.error("Failed to update profile"),
   });
 
+  const ALLERGY_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (v) => v.student_name ?? "", render: (v) => <span className="font-medium">{v.student_name || v.student_id}</span> },
+    { key: "blood_group", label: "Blood Group", sortable: true, value: (v) => v.blood_group ?? "", render: (v) => <Badge variant="outline">{v.blood_group || "—"}</Badge> },
+    { key: "allergies", label: "Allergies", value: (v) => (Array.isArray(v.allergies) ? v.allergies.join(", ") : ""), render: (v) => <span className="text-sm">{Array.isArray(v.allergies) && v.allergies.length ? v.allergies.join(", ") : "None recorded"}</span> },
+    { key: "medical_conditions", label: "Medical Conditions", value: (v) => (Array.isArray(v.medical_conditions) ? v.medical_conditions.join(", ") : ""), render: (v) => <span className="text-sm">{Array.isArray(v.medical_conditions) && v.medical_conditions.length ? v.medical_conditions.join(", ") : "None recorded"}</span> },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   if (isError) {
@@ -99,28 +106,17 @@ function AllergiesContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student</TableHead>
-              <TableHead>Blood Group</TableHead>
-              <TableHead>Allergies</TableHead>
-              <TableHead>Medical Conditions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No health profiles found</TableCell></TableRow>
-            ) : filtered.map((v: any) => (
-              <TableRow key={v.student_id}>
-                <TableCell className="font-medium">{v.student_name || v.student_id}</TableCell>
-                <TableCell><Badge variant="outline">{v.blood_group || "—"}</Badge></TableCell>
-                <TableCell className="text-sm">{Array.isArray(v.allergies) && v.allergies.length ? v.allergies.join(", ") : "None recorded"}</TableCell>
-                <TableCell className="text-sm">{Array.isArray(v.medical_conditions) && v.medical_conditions.length ? v.medical_conditions.join(", ") : "None recorded"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={ALLERGY_COLUMNS}
+          rows={filtered}
+          rowKey={(v: any) => v.student_id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search students..."
+          exportFileName="allergies-conditions"
+          empty={{ icon: AlertTriangle, title: "No health profiles found", body: "Update a student profile to register allergies and conditions." }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

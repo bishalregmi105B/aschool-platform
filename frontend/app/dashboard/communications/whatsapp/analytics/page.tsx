@@ -14,6 +14,7 @@ import {
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/spinner";
@@ -40,6 +41,35 @@ interface TopSender {
   handled_count: number;
   last_message_at: string | null;
 }
+
+const SENDER_COLUMNS: Column<TopSender>[] = [
+  { key: "phone", label: "Phone", sortable: true, value: (s) => s.phone, render: (s) => <span className="font-medium">{s.phone}</span> },
+  { key: "inbound_count", label: "Inbound Messages", align: "right", sortable: true, value: (s) => s.inbound_count },
+  { key: "handled_count", label: "Handled", align: "right", sortable: true, value: (s) => s.handled_count },
+  {
+    key: "coverage",
+    label: "Coverage",
+    align: "right",
+    sortable: true,
+    value: (s) => (s.inbound_count > 0 ? s.handled_count / s.inbound_count : 0),
+    render: (s) => (
+      <Badge variant={s.handled_count >= s.inbound_count ? "secondary" : "destructive"}>
+        {s.inbound_count > 0 ? `${Math.round((s.handled_count / s.inbound_count) * 100)}%` : "—"}
+      </Badge>
+    ),
+  },
+  {
+    key: "last_message_at",
+    label: "Last Message",
+    sortable: true,
+    value: (s) => s.last_message_at ?? "",
+    render: (s) => (
+      <span className="text-muted-foreground">
+        {s.last_message_at ? new Date(s.last_message_at).toLocaleString() : "—"}
+      </span>
+    ),
+  },
+];
 
 interface WhatsAppAnalytics {
   days: number;
@@ -171,36 +201,15 @@ function WhatsAppAnalyticsContent() {
           {stats.top_senders.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No inbound messages yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    {["Phone", "Inbound Messages", "Handled", "Coverage", "Last Message"].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.top_senders.map((sender) => (
-                    <tr key={sender.phone} className="border-b hover:bg-muted/30">
-                      <td className="px-3 py-2 font-medium">{sender.phone}</td>
-                      <td className="px-3 py-2">{sender.inbound_count}</td>
-                      <td className="px-3 py-2">{sender.handled_count}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant={sender.handled_count >= sender.inbound_count ? "secondary" : "destructive"}>
-                          {sender.inbound_count > 0
-                            ? `${Math.round((sender.handled_count / sender.inbound_count) * 100)}%`
-                            : "—"}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {sender.last_message_at ? new Date(sender.last_message_at).toLocaleString() : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<TopSender>
+              columns={SENDER_COLUMNS}
+              rows={stats.top_senders}
+              rowKey={(s) => s.phone}
+              searchable
+              searchPlaceholder="Search phone numbers…"
+              exportFileName="whatsapp-top-senders"
+              empty={{ icon: Users, title: "No inbound messages yet" }}
+            />
           )}
         </CardContent>
       </Card>

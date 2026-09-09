@@ -30,6 +30,8 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
   Plus, FileText, BarChart3, ClipboardList, Calendar, GraduationCap,
   MoreHorizontal, Pencil, Trash2, Eye, BookOpen, Trophy, Printer,
@@ -84,6 +86,76 @@ export default function ExamsPage() {
   return <ExamsContent />;
 }
 
+/** Row actions dropdown — extracted so DataTable cells can render it.
+ *  Edit/status/delete mutations stay in ExamsContent and arrive as props. */
+function ExamRowActions({
+  exam,
+  isAdmin,
+  onEdit,
+  onStatus,
+  onDelete,
+}: {
+  exam: any;
+  isAdmin: boolean;
+  onEdit: (exam: any) => void;
+  onStatus: (id: string, status: string) => void;
+  onDelete: (exam: any) => void;
+}) {
+  return (
+    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {isAdmin && (
+            <DropdownMenuItem onClick={() => onEdit(exam)}>
+              <Pencil className="h-4 w-4 mr-2" /> Edit
+            </DropdownMenuItem>
+          )}
+          <Link href={`/dashboard/exams/marks?exam=${exam.id}`}>
+            <DropdownMenuItem>
+              <ClipboardList className="h-4 w-4 mr-2" /> Enter Marks
+            </DropdownMenuItem>
+          </Link>
+          <Link href={`/dashboard/exams/results?exam=${exam.id}`}>
+            <DropdownMenuItem>
+              <BarChart3 className="h-4 w-4 mr-2" /> View Results
+            </DropdownMenuItem>
+          </Link>
+          <Link href={`/dashboard/exams/report-cards?exam=${exam.id}`}>
+            <DropdownMenuItem>
+              <Printer className="h-4 w-4 mr-2" /> Report Cards
+            </DropdownMenuItem>
+          </Link>
+          {isAdmin && exam.status === "scheduled" && (
+            <DropdownMenuItem onClick={() => onStatus(exam.id, "ongoing")}>
+              <Eye className="h-4 w-4 mr-2" /> Mark Ongoing
+            </DropdownMenuItem>
+          )}
+          {isAdmin && exam.status === "ongoing" && (
+            <DropdownMenuItem onClick={() => onStatus(exam.id, "completed")}>
+              <Trophy className="h-4 w-4 mr-2" /> Mark Completed
+            </DropdownMenuItem>
+          )}
+          {isAdmin && exam.status === "completed" && (
+            <DropdownMenuItem onClick={() => onStatus(exam.id, "result_published")}>
+              <BarChart3 className="h-4 w-4 mr-2" /> Publish Results
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(exam)}>
+              <Trash2 className="h-4 w-4 mr-2" /> Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 function ExamsContent() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -94,6 +166,7 @@ function ExamsContent() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
   const [academicYearFilter, setAcademicYearFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     name_nepali: "",
@@ -288,6 +361,109 @@ function ExamsContent() {
     completed: allExams.filter((e: any) => e.status === "completed" || e.status === "result_published").length,
   };
 
+  const EXAM_COLUMNS: Column<any>[] = [
+    {
+      key: "name",
+      label: "Exam Name",
+      sortable: true,
+      value: (e) => e.name,
+      render: (e) => (
+        <div>
+          <p className="font-medium">{e.name}</p>
+          {e.description && (
+            <p className="text-xs text-muted-foreground truncate max-w-xs">{e.description}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "session",
+      label: "Session",
+      sortable: true,
+      value: (e) => (e.academic_year_id ? academicYearById.get(e.academic_year_id)?.name ?? "" : "Current"),
+      render: (e) => (
+        <span className="text-xs">
+          {e.academic_year_id ? academicYearById.get(e.academic_year_id)?.name || "—" : "Current"}
+        </span>
+      ),
+    },
+    {
+      key: "exam_type",
+      label: "Type",
+      sortable: true,
+      value: (e) => e.exam_type,
+      render: (e) => {
+        const et = EXAM_TYPES.find((t: any) => t.value === e.exam_type);
+        return <span className="text-xs">{et?.icon} {et?.label || e.exam_type}</span>;
+      },
+    },
+    { key: "class_name", label: "Class", sortable: true, value: (e) => e.class_name || "", render: (e) => <span className="text-sm">{e.class_name || "—"}</span> },
+    {
+      key: "dates",
+      label: "Dates",
+      value: (e) => e.start_date || e.start_date_bs || "",
+      render: (e) => (
+        <div className="text-xs">
+          <p>{displayExamDate(e.start_date_bs, e.start_date)}</p>
+          <p className="text-muted-foreground">
+            to {displayExamDate(e.end_date_bs, e.end_date)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "marks",
+      label: "Marks",
+      align: "right",
+      value: (e) => e.total_marks || 0,
+      render: (e) => (
+        <div className="text-xs">
+          <p>Full: {e.total_marks || "—"}</p>
+          <p className="text-muted-foreground">Pass: {e.pass_marks || "35"}</p>
+          {e.is_practical && <p className="text-blue-600">Practical: {e.practical_marks}</p>}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (e) => e.status,
+      render: (e) => {
+        const sc = STATUS_CONFIG[e.status] || STATUS_CONFIG.scheduled;
+        return (
+          <Badge variant={sc.variant as any} className="capitalize">
+            {sc.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (e) => (
+        <ExamRowActions
+          exam={e}
+          isAdmin={isAdmin}
+          onEdit={(ex) => { openEdit(ex); }}
+          onStatus={(id, status) => statusMutation.mutate({ id, status })}
+          onDelete={(ex) => {
+            void (async () => {
+              const ok = await confirm({
+                title: "Delete this exam?",
+                body: "Marks and report cards already recorded stay in the archive.",
+                confirmLabel: "Delete exam",
+                tone: "danger",
+              });
+              if (ok) deleteMutation.mutate(ex.id);
+            })();
+          }}
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -377,193 +553,59 @@ function ExamsContent() {
         </Link>
       </div>
 
-      {/* Filters + Exam List */}
+      {/* Filters + Exam List — DataTable owns search/filters/actions */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Exams</CardTitle>
-            <div className="flex gap-2">
-              <Select value={academicYearFilter} onValueChange={setAcademicYearFilter}>
-                <SelectTrigger className="w-44 h-8 text-xs">
-                  <SelectValue placeholder="All Sessions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sessions</SelectItem>
-                  {(academicYears || []).map((year) => (
-                    <SelectItem key={year.id} value={year.id}>
-                      {year.name}{year.is_current ? " (Current)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-36 h-8 text-xs">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {EXAM_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={classFilter} onValueChange={setClassFilter}>
-                <SelectTrigger className="w-36 h-8 text-xs">
-                  <SelectValue placeholder="All Classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {(classes || []).map((c: { id: string; name: string }) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Exam Name</TableHead>
-                <TableHead>Session</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Marks</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                    <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No exams found. Create your first exam.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((exam) => {
-                  const sc = STATUS_CONFIG[exam.status] || STATUS_CONFIG.scheduled;
-                  const et = EXAM_TYPES.find((t: any) => t.value === exam.exam_type);
-                  return (
-                    <TableRow key={exam.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{exam.name}</p>
-                          {exam.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-xs">{exam.description}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs">
-                          {exam.academic_year_id
-                            ? academicYearById.get(exam.academic_year_id)?.name || "—"
-                            : "Current"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs">{et?.icon} {et?.label || exam.exam_type}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{exam.class_name || "—"}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs">
-                          <p>
-                            {displayExamDate(exam.start_date_bs, exam.start_date)}
-                          </p>
-                          <p className="text-muted-foreground">
-                            to {displayExamDate(exam.end_date_bs, exam.end_date)}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs">
-                          <p>Full: {exam.total_marks || "—"}</p>
-                          <p className="text-muted-foreground">Pass: {exam.pass_marks || "35"}</p>
-                          {exam.is_practical && (
-                            <p className="text-blue-600">Practical: {exam.practical_marks}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={sc.variant as any} className="capitalize">
-                          {sc.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {isAdmin && (
-                              <DropdownMenuItem onClick={() => openEdit(exam)}>
-                                <Pencil className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                            )}
-                            <Link href={`/dashboard/exams/marks?exam=${exam.id}`}>
-                              <DropdownMenuItem>
-                                <ClipboardList className="h-4 w-4 mr-2" /> Enter Marks
-                              </DropdownMenuItem>
-                            </Link>
-                            <Link href={`/dashboard/exams/results?exam=${exam.id}`}>
-                              <DropdownMenuItem>
-                                <BarChart3 className="h-4 w-4 mr-2" /> View Results
-                              </DropdownMenuItem>
-                            </Link>
-                            <Link href={`/dashboard/exams/report-cards?exam=${exam.id}`}>
-                              <DropdownMenuItem>
-                                <Printer className="h-4 w-4 mr-2" /> Report Cards
-                              </DropdownMenuItem>
-                            </Link>
-                            {isAdmin && exam.status === "scheduled" && (
-                              <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "ongoing" })}>
-                                <Eye className="h-4 w-4 mr-2" /> Mark Ongoing
-                              </DropdownMenuItem>
-                            )}
-                            {isAdmin && exam.status === "ongoing" && (
-                              <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "completed" })}>
-                                <Trophy className="h-4 w-4 mr-2" /> Mark Completed
-                              </DropdownMenuItem>
-                            )}
-                            {isAdmin && exam.status === "completed" && (
-                              <DropdownMenuItem onClick={() => statusMutation.mutate({ id: exam.id, status: "result_published" })}>
-                                <BarChart3 className="h-4 w-4 mr-2" /> Publish Results
-                              </DropdownMenuItem>
-                            )}
-                            {isAdmin && (
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  void (async () => {
-                                  const ok = await confirm({
-                                    title: "Delete this exam?",
-                                    body: "Marks and report cards already recorded stay in the archive.",
-                                    confirmLabel: "Delete exam",
-                                    tone: "danger",
-                                  });
-                                  if (ok) deleteMutation.mutate(exam.id);
-                                })();
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={EXAM_COLUMNS}
+            rows={filtered}
+            rowKey={(e) => e.id}
+            searchable
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search exams…"
+            exportFileName="exams"
+            toolbar={
+              <div className="flex gap-2">
+                <AdvancedSelect
+                  className="w-40"
+                  triggerClassName="h-8 text-xs"
+                  value={academicYearFilter}
+                  onChange={setAcademicYearFilter}
+                  clearable
+                  placeholder="All Sessions"
+                  options={(academicYears || []).map((year) => ({
+                    value: year.id,
+                    label: year.name + (year.is_current ? " (Current)" : ""),
+                  }))}
+                />
+                <AdvancedSelect
+                  className="w-36"
+                  triggerClassName="h-8 text-xs"
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  clearable
+                  placeholder="All Types"
+                  options={EXAM_TYPES.map((t: any) => ({ value: t.value, label: `${t.icon} ${t.label}` }))}
+                />
+                <AdvancedSelect
+                  className="w-36"
+                  triggerClassName="h-8 text-xs"
+                  value={classFilter}
+                  onChange={setClassFilter}
+                  clearable
+                  placeholder="All Classes"
+                  options={(classes || []).map((c: { id: string; name: string }) => ({ value: c.id, label: c.name }))}
+                />
+              </div>
+            }
+            empty={{
+              icon: GraduationCap,
+              title: "No exams found",
+              body: "Create your first exam to start recording marks.",
+              action: isAdmin ? { label: "Create Exam", onClick: () => setCreateOpen(true) } : undefined,
+            }}
+          />
         </CardContent>
       </Card>
 

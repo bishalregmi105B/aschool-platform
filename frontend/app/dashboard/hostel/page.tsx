@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Building2, BedDouble, Users, Plus, UserX } from "lucide-react";
 
 // Backend GET /hostel/summary returns an array of per-hostel stats:
@@ -24,6 +25,8 @@ interface HostelStat { hostel_id: string; hostel_name: string; type: string; tot
 interface HostelSummary { total_hostels: number; total_capacity: number; total_occupied: number; total_available: number; occupancy_rate: number; hostels: HostelStat[]; }
 interface HostelRoom { id: string; hostel_id: string; room_number: string; floor?: number | string; room_type?: string; capacity: number; occupied_count: number; is_full: boolean; monthly_fee?: number; }
 interface HostelAllocation { id: string; student_id: string; room_id: string; student_name: string; student_roll?: number; hostel_name?: string; room_number?: string; check_in_date?: string; check_out_date?: string; status?: string; monthly_fee?: number; }
+
+
 
 function deriveSummary(stats: HostelStat[] | null | undefined): HostelSummary | null {
   if (!stats) return null;
@@ -51,6 +54,76 @@ export default function HostelPage() {
 }
 
 function HostelContent() {
+
+const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
+  {
+    key: "student_name",
+    label: "Student",
+    sortable: true,
+    value: (a) => a.student_name,
+    render: (a) => (
+      <div>
+        <p className="font-medium">{a.student_name}</p>
+        {a.student_roll != null && <p className="text-xs text-muted-foreground">Roll: {a.student_roll}</p>}
+      </div>
+    ),
+  },
+  {
+    key: "room",
+    label: "Hostel / Room",
+    sortable: true,
+    value: (a) => `${a.hostel_name ?? ""} ${a.room_number ?? ""}`,
+    render: (a) => (
+      <div>
+        <p>{a.hostel_name || "—"}</p>
+        <p className="text-xs text-muted-foreground">Room {a.room_number || "—"}</p>
+      </div>
+    ),
+  },
+  {
+    key: "check_in_date",
+    label: "Allocated",
+    sortable: true,
+    value: (a) => a.check_in_date ?? "",
+    render: (a) => (
+      <span className="text-muted-foreground">
+        {a.check_in_date ? new Date(a.check_in_date).toLocaleDateString("ne-NP") : "—"}
+      </span>
+    ),
+  },
+  { key: "monthly_fee", label: "Fee", align: "right", sortable: true, value: (a) => a.monthly_fee ?? 0, render: (a) => <span className="text-green-700 font-medium">{fmt(a.monthly_fee)}</span> },
+  {
+    key: "status",
+    label: "Status",
+    sortable: true,
+    value: (a) => a.status ?? "",
+    render: (a) =>
+      a.status === "checked_out" || a.check_out_date ? (
+        <Badge variant="outline" className="text-xs">Checked Out</Badge>
+      ) : (
+        <Badge variant="success" className="text-xs">Active</Badge>
+      ),
+  },
+  {
+    key: "action",
+    label: "Action",
+    noExport: true,
+    render: (a) =>
+      !(a.status === "checked_out" || a.check_out_date) ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-destructive border-destructive/30 h-7 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id);
+          }}
+        >
+          <UserX className="mr-1 h-3 w-3" />Checkout
+        </Button>
+      ) : null,
+  },
+];
   const qc = useQueryClient();
   const [tab, setTab] = useState("overview");
   const [showAddHostel, setShowAddHostel] = useState(false);
@@ -170,6 +243,8 @@ function HostelContent() {
           )}
         </TabsContent>
 
+
+
         <TabsContent value="allocations" className="mt-4">
           {al ? <PageLoader /> : ae ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -179,23 +254,15 @@ function HostelContent() {
           ) : !allocs?.length ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center"><Users className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No allocations</p><p className="text-sm text-muted-foreground">Students have not been allocated to hostel rooms yet</p></div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50"><tr><th className="px-4 py-3 text-left">Student</th><th className="px-4 py-3 text-left">Hostel / Room</th><th className="px-4 py-3 text-left">Allocated</th><th className="px-4 py-3 text-left">Fee</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Action</th></tr></thead>
-                <tbody>
-                  {allocs.map((a, i) => (
-                    <tr key={a.id} className={i % 2 ? "bg-muted/20" : ""}>
-                      <td className="px-4 py-2.5"><p className="font-medium">{a.student_name}</p>{a.student_roll != null && <p className="text-xs text-muted-foreground">Roll: {a.student_roll}</p>}</td>
-                      <td className="px-4 py-2.5"><p>{a.hostel_name || "—"}</p><p className="text-xs text-muted-foreground">Room {a.room_number || "—"}</p></td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{a.check_in_date ? new Date(a.check_in_date).toLocaleDateString("ne-NP") : "—"}</td>
-                      <td className="px-4 py-2.5 text-green-700 font-medium">{fmt(a.monthly_fee)}</td>
-                      <td className="px-4 py-2.5">{(a.status === "checked_out" || a.check_out_date) ? <Badge variant="outline" className="text-xs">Checked Out</Badge> : <Badge variant="success" className="text-xs">Active</Badge>}</td>
-                      <td className="px-4 py-2.5">{!(a.status === "checked_out" || a.check_out_date) && <Button size="sm" variant="outline" className="text-destructive border-destructive/30 h-7 text-xs" onClick={() => { if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id); }}><UserX className="mr-1 h-3 w-3" />Checkout</Button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={ALLOCATION_COLUMNS}
+              rows={allocs}
+              rowKey={(a: any) => a.id}
+              searchable
+              searchPlaceholder="Search students…"
+              exportFileName="hostel-allocations"
+              dense
+            />
           )}
         </TabsContent>
       </Tabs>

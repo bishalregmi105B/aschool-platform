@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -97,6 +95,34 @@ export default function ExpensesPage() {
     e.category_name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const EXPENSE_COLUMNS: Column<Expense>[] = [
+    { key: "date", label: "Date", sortable: true, value: (e) => e.date, render: (e) => <span className="whitespace-nowrap">{e.date ? displayBS(e.date) : "—"}</span> },
+    { key: "title", label: "Title", sortable: true, value: (e) => e.title, render: (e) => <span className="font-medium">{e.title}</span> },
+    { key: "category_name", label: "Category", sortable: true, value: (e) => e.category_name ?? "", render: (e) => (
+      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">{e.category_name}</span>
+    ) },
+    { key: "amount", label: "Amount (Rs.)", align: "right", sortable: true, value: (e) => e.amount, render: (e) => <span className="font-bold">Rs. {e.amount.toLocaleString()}</span> },
+    { key: "recorded_by_name", label: "Recorded By", value: (e) => e.recorded_by_name ?? "", render: (e) => <span className="text-muted-foreground text-sm">{e.recorded_by_name}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (e) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={(ev) => { ev.stopPropagation(); setEditItem(e); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(ev) => {
+            ev.stopPropagation();
+            if(confirm("Are you sure?")) deleteMutation.mutate(e.id);
+          }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -123,54 +149,17 @@ export default function ExpensesPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Amount (Rs.)</TableHead>
-                <TableHead>Recorded By</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.map((e: Expense) => (
-                <TableRow key={e.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {e.date ? displayBS(e.date) : "—"}
-                  </TableCell>
-                  <TableCell className="font-medium">{e.title}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">
-                      {e.category_name}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-bold">Rs. {e.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{e.recorded_by_name}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => setEditItem(e)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if(confirm("Are you sure?")) deleteMutation.mutate(e.id);
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {expenses.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No expenses found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<Expense>
+            columns={EXPENSE_COLUMNS}
+            rows={expenses}
+            rowKey={(e) => e.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search expenses..."
+            exportFileName="expenses"
+            empty={{ icon: Receipt, title: "No expenses found", body: "Record your first school expenditure.", action: { label: "Record Expense", onClick: () => setShowAdd(true) } }}
+          />
         </CardContent>
       </Card>
 

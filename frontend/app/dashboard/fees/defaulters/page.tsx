@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader } from "@/components/ui/spinner";
 import { AlertTriangle, Loader2, Phone, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,48 @@ function DefaultersContent() {
   const defaulters = data?.data || [];
   const totalDue = defaulters.reduce((sum: number, d: any) => sum + (d.total_due || 0), 0);
 
+  const DEFAULTER_COLUMNS: Column<any>[] = [
+    { key: "student_name", label: "Student", sortable: true, value: (d) => d.student_name || "", render: (d) => <span className="font-medium">{d.student_name}</span> },
+    { key: "class_name", label: "Class", sortable: true, value: (d) => d.class_name ?? "", render: (d) => d.class_name || "—" },
+    { key: "total_due", label: "Due Amount", align: "right", sortable: true, value: (d) => d.total_due || 0, render: (d) => <span className="font-bold text-red-600">Rs. {d.total_due?.toLocaleString()}</span> },
+    { key: "overdue_since", label: "Overdue Since", sortable: true, value: (d) => d.overdue_since ?? "", render: (d) => (d.overdue_since ? displayBS(d.overdue_since) : "—") },
+    {
+      key: "contact",
+      label: "Parent Contact",
+      value: (d) => d.parent_phone || d.parent_email || "",
+      render: (d) => (
+        <div className="text-sm">
+          {d.parent_phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {d.parent_phone}</span>}
+          {d.parent_email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {d.parent_email}</span>}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (d) => (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1"
+          disabled={remindingId === d.id}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRemind(d.id);
+          }}
+        >
+          {remindingId === d.id ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Send className="h-3 w-3" />
+          )}
+          {remindingId === d.id ? "Sending…" : "Send Reminder"}
+        </Button>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
     if (isError) {
       return (
@@ -82,43 +124,15 @@ function DefaultersContent() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> Defaulters List</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Due Amount</TableHead><TableHead>Overdue Since</TableHead><TableHead>Parent Contact</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {defaulters.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No defaulters — great!</TableCell></TableRow>
-              ) : defaulters.map((d: any) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.student_name}</TableCell>
-                  <TableCell>{d.class_name || "—"}</TableCell>
-                  <TableCell className="font-bold text-red-600">Rs. {d.total_due?.toLocaleString()}</TableCell>
-                  <TableCell>{d.overdue_since ? displayBS(d.overdue_since) : "—"}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {d.parent_phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {d.parent_phone}</span>}
-                      {d.parent_email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {d.parent_email}</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      disabled={remindingId === d.id}
-                      onClick={() => handleRemind(d.id)}
-                    >
-                      {remindingId === d.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Send className="h-3 w-3" />
-                      )}
-                      {remindingId === d.id ? "Sending…" : "Send Reminder"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={DEFAULTER_COLUMNS}
+            rows={defaulters}
+            rowKey={(d: any) => d.id}
+            searchable
+            searchPlaceholder="Search students…"
+            exportFileName="fee-defaulters"
+            empty={{ icon: AlertTriangle, title: "No defaulters — great!", body: "Every student is up to date on fees." }}
+          />
         </CardContent>
       </Card>
     </div>

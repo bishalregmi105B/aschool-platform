@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -66,6 +64,29 @@ export default function ExpenseCategoriesPage() {
     onError: () => toast.error("Failed to delete category"),
   });
 
+  const CATEGORY_COLUMNS: Column<Category>[] = [
+    { key: "name", label: "Category Name", sortable: true, value: (c) => c.name ?? "", render: (c) => <span className="font-medium">{c.name}</span> },
+    { key: "description", label: "Description", value: (c) => c.description ?? "", render: (c) => <span className="text-muted-foreground">{c.description || "—"}</span> },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (c) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditItem(c); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            if(confirm("Are you sure?")) deleteMutation.mutate(c.id);
+          }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageLoader />;
 
   const categories = (data || []).filter((c: Category) =>
@@ -99,42 +120,17 @@ export default function ExpenseCategoriesPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {categories.map((c: Category) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.description || "—"}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => setEditItem(c)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        if(confirm("Are you sure?")) deleteMutation.mutate(c.id);
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {categories.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                    No categories found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<Category>
+            columns={CATEGORY_COLUMNS}
+            rows={categories}
+            rowKey={(c) => c.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search categories..."
+            exportFileName="expense-categories"
+            empty={{ icon: Tags, title: "No categories found", body: "Add categories like Transport, Utilities, Maintenance.", action: { label: "Add Category", onClick: () => setShowAdd(true) } }}
+          />
         </CardContent>
       </Card>
 

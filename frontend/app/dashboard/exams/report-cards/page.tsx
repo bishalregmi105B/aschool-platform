@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { FileText, Download, Printer, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -32,6 +33,40 @@ interface ReportCard {
   pdf_url: string;
   generated_at: string;
 }
+
+const REPORT_CARD_COLUMNS: Column<ReportCard>[] = [
+  { key: "rank_in_class", label: "Rank", sortable: true, value: (rc) => rc.rank_in_class, render: (rc) => <>#{rc.rank_in_class}</> },
+  {
+    key: "student_name",
+    label: "Student",
+    sortable: true,
+    value: (rc) => rc.student_name,
+    render: (rc) => (
+      <div>
+        <span className="font-medium">{rc.student_name}</span>
+        <br />
+        <span className="text-xs text-muted-foreground">Roll: {rc.roll_number}</span>
+      </div>
+    ),
+  },
+  { key: "total_percentage", label: "Percentage", align: "right", sortable: true, value: (rc) => rc.total_percentage ?? 0, render: (rc) => <>{rc.total_percentage?.toFixed(1)}%</> },
+  { key: "overall_grade", label: "Grade", sortable: true, value: (rc) => rc.overall_grade, render: (rc) => <Badge variant="outline">{rc.overall_grade}</Badge> },
+  { key: "overall_gpa", label: "GPA", align: "right", sortable: true, value: (rc) => rc.overall_gpa ?? 0, render: (rc) => rc.overall_gpa?.toFixed(1) },
+  { key: "ai_remarks", label: "AI Remarks", value: (rc) => rc.ai_remarks ?? "", render: (rc) => <span className="max-w-xs truncate text-sm text-muted-foreground block">{rc.ai_remarks || "—"}</span> },
+  {
+    key: "actions",
+    label: "Actions",
+    noExport: true,
+    render: (rc) =>
+      rc.pdf_url ? (
+        <Button variant="ghost" size="sm" onClick={() => window.open(rc.pdf_url, "_blank")}>
+          <Printer className="h-4 w-4" />
+        </Button>
+      ) : (
+        <span className="text-xs text-muted-foreground">Pending</span>
+      ),
+  },
+];
 
 export default function ReportCardsPage() {
   return (
@@ -181,48 +216,14 @@ function ReportCardsContent() {
                 </p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Rank</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Percentage</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>GPA</TableHead>
-                    <TableHead>AI Remarks</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportCards.map((rc: ReportCard) => (
-                    <TableRow key={rc.id}>
-                      <TableCell>#{rc.rank_in_class}</TableCell>
-                      <TableCell>
-                        <div>
-                          <span className="font-medium">{rc.student_name}</span>
-                          <br />
-                          <span className="text-xs text-muted-foreground">Roll: {rc.roll_number}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{rc.total_percentage?.toFixed(1)}%</TableCell>
-                      <TableCell><Badge variant="outline">{rc.overall_grade}</Badge></TableCell>
-                      <TableCell>{rc.overall_gpa?.toFixed(1)}</TableCell>
-                      <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                        {rc.ai_remarks || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {rc.pdf_url ? (
-                          <Button variant="ghost" size="sm" onClick={() => window.open(rc.pdf_url, "_blank")}>
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Pending</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={REPORT_CARD_COLUMNS}
+                rows={reportCards}
+                rowKey={(rc: ReportCard) => rc.id}
+                searchable
+                searchPlaceholder="Search students…"
+                exportFileName="report-cards"
+              />
             )}
           </CardContent>
         </Card>

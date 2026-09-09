@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Megaphone, Plus, Trash2, Pin, Eye } from "lucide-react";
 import Link from "next/link";
 
@@ -113,6 +114,72 @@ function AnnouncementsContent() {
     );
   }
 
+  const ANNOUNCEMENT_COLUMNS: Column<any>[] = [
+    {
+      key: "title",
+      label: "Title",
+      sortable: true,
+      value: (a) => a.title,
+      render: (a) => (
+        <div>
+          <div className="flex items-center gap-2">
+            {a.is_pinned && <Pin className="h-3.5 w-3.5 text-primary" />}
+            <span className="font-medium text-sm">{a.title}</span>
+          </div>
+          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{a.content}</p>
+        </div>
+      ),
+    },
+    {
+      key: "target_audience",
+      label: "Audience",
+      value: (a) => (a.target_audience ?? []).join(", "),
+      render: (a) => (
+        <div className="flex flex-wrap gap-1">
+          {(a.target_audience ?? []).map((aud: string) => (
+            <Badge key={aud} variant="secondary" className="text-xs capitalize">{aud}</Badge>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "published_at",
+      label: "Status",
+      sortable: true,
+      value: (a) => (a.published_at ? "published" : "draft"),
+      render: (a) => (
+        <Badge variant={a.published_at ? "default" : "secondary"}>
+          {a.published_at ? "Published" : "Draft"}
+        </Badge>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Date",
+      sortable: true,
+      value: (a) => a.created_at ?? "",
+      render: (a) => <span className="text-xs text-muted-foreground">{a.created_at ? new Date(a.created_at).toLocaleDateString() : "—"}</span>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      noExport: true,
+      render: (a) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+            <Link href="/dashboard/notices"><Eye className="h-3.5 w-3.5" /></Link>
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+            onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(a.id); }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -149,67 +216,15 @@ function AnnouncementsContent() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Audience</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!announcements?.length ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    <Megaphone className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    No announcements yet. Create one to notify your school community.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                announcements.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {a.is_pinned && <Pin className="h-3.5 w-3.5 text-primary" />}
-                        <span className="font-medium text-sm">{a.title}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{a.content}</p>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {(a.target_audience ?? []).map((aud) => (
-                          <Badge key={aud} variant="secondary" className="text-xs capitalize">{aud}</Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={a.published_at ? "default" : "secondary"}>
-                        {a.published_at ? "Published" : "Draft"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {a.created_at ? new Date(a.created_at).toLocaleDateString() : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                          <Link href="/dashboard/notices"><Eye className="h-3.5 w-3.5" /></Link>
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7 text-destructive"
-                          onClick={() => deleteMutation.mutate(a.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={ANNOUNCEMENT_COLUMNS}
+            rows={announcements ?? []}
+            rowKey={(a) => a.id}
+            searchable
+            searchPlaceholder="Search announcements…"
+            exportFileName="announcements"
+            empty={{ icon: Megaphone, title: "No announcements yet", body: "Create one to notify your school community.", action: { label: "New Announcement", onClick: () => setShowDialog(true) } }}
+          />
         </CardContent>
       </Card>
 

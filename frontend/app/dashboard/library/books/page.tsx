@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,16 @@ function BooksContent() {
     onError: () => toast.error("Failed to add book"),
   });
 
+  const BOOK_COLUMNS: Column<any>[] = [
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div> },
+    { key: "author", label: "Author", sortable: true, value: (b) => b.author ?? "", render: (b) => b.author || "—" },
+    { key: "isbn", label: "ISBN", value: (b) => b.isbn ?? "", render: (b) => <span className="text-sm">{b.isbn || "—"}</span> },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "total_copies", label: "Copies", align: "right", sortable: true, value: (b) => b.total_copies ?? 0 },
+    { key: "available_copies", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies ?? 0, render: (b) => <Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge> },
+    { key: "shelf_location", label: "Shelf", value: (b) => b.shelf_location ?? "", render: (b) => <span className="text-sm">{b.shelf_location || "—"}</span> },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -60,24 +70,17 @@ function BooksContent() {
       <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search by title, author, ISBN..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>ISBN</TableHead><TableHead>Category</TableHead><TableHead>Copies</TableHead><TableHead>Available</TableHead><TableHead>Shelf</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {books.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No books found</TableCell></TableRow>
-            ) : books.map((b: any) => (
-              <TableRow key={b.id}>
-                <TableCell className="font-medium"><div className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div></TableCell>
-                <TableCell>{b.author || "—"}</TableCell>
-                <TableCell className="text-sm">{b.isbn || "—"}</TableCell>
-                <TableCell><Badge variant="outline">{b.category}</Badge></TableCell>
-                <TableCell>{b.total_copies || 0}</TableCell>
-                <TableCell><Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge></TableCell>
-                <TableCell className="text-sm">{b.shelf_location || "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={BOOK_COLUMNS}
+          rows={books}
+          rowKey={(b: any) => b.id}
+          searchable
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by title, author, ISBN..."
+          exportFileName="library-books"
+          empty={{ icon: BookOpen, title: "No books found", body: "Add books to build the library catalog.", action: { label: "Add Book", onClick: () => setShowDialog(true) } }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

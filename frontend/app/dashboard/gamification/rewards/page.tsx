@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,21 @@ function RewardsContent() {
     onError: () => toast.error("Failed to create reward"),
   });
 
+  const REWARD_COLUMNS: Column<any>[] = [
+    {
+      key: "name",
+      label: "Reward",
+      sortable: true,
+      value: (r) => r.name ?? "",
+      render: (r) => (
+        <div className="flex items-center gap-2 font-medium"><Gift className="h-4 w-4 text-muted-foreground" />{r.name}</div>
+      ),
+    },
+    { key: "description", label: "Description", value: (r) => r.description ?? "", render: (r) => <span className="text-sm text-muted-foreground">{r.description || "—"}</span> },
+    { key: "points_required", label: "Points Required", align: "right", sortable: true, value: (r) => r.points_required ?? 0, render: (r) => <Badge variant="outline"><Star className="h-3 w-3 mr-1" />{r.points_required?.toLocaleString()} XP</Badge> },
+    { key: "quantity_available", label: "Available", align: "right", sortable: true, value: (r) => r.quantity_available ?? -1, render: (r) => (r.quantity_available != null ? r.quantity_available : "Unlimited") },
+  ];
+
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
@@ -73,30 +88,15 @@ function RewardsContent() {
       </div>
 
       <Card><CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reward</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Points Required</TableHead>
-              <TableHead>Available</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rewards.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No rewards defined yet</TableCell></TableRow>
-            ) : rewards.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2"><Gift className="h-4 w-4 text-muted-foreground" />{r.name}</div>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.description || "—"}</TableCell>
-                <TableCell><Badge variant="outline"><Star className="h-3 w-3 mr-1" />{r.points_required?.toLocaleString()} XP</Badge></TableCell>
-                <TableCell>{r.quantity_available != null ? r.quantity_available : "Unlimited"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={REWARD_COLUMNS}
+          rows={rewards}
+          rowKey={(r: any) => r.id}
+          searchable
+          searchPlaceholder="Search rewards…"
+          exportFileName="rewards"
+          empty={{ icon: Gift, title: "No rewards defined yet", body: "Rewards give students something to spend XP on." }}
+        />
       </CardContent></Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
