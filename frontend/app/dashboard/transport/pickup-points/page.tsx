@@ -6,6 +6,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -230,11 +231,11 @@ export default function PickupPointsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Arrival (Morning)</Label>
-                <Input name="arrival_time_am" type="time" defaultValue={editItem?.arrival_time_am} />
+                <TimePicker name="arrival_time_am" value={editItem?.arrival_time_am} />
               </div>
               <div className="space-y-2">
                 <Label>Arrival (Afternoon)</Label>
-                <Input name="arrival_time_pm" type="time" defaultValue={editItem?.arrival_time_pm} />
+                <TimePicker name="arrival_time_pm" value={editItem?.arrival_time_pm} />
               </div>
             </div>
             <DialogFooter>

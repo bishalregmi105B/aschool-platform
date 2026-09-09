@@ -10,6 +10,8 @@ export 'services/notification_service.dart';
 export 'services/socket_service.dart';
 export 'services/notices_service.dart';
 export 'services/mobile_version_service.dart';
+export 'services/i18n_service.dart';
+export 'services/server_time_service.dart';
 export 'services/file_upload_service.dart';
 
 // Models
@@ -30,6 +32,11 @@ export 'widgets/notice_board_widgets.dart';
 export 'widgets/module_screen_template.dart';
 export 'widgets/responsive_action_grid.dart';
 export 'widgets/nepali_date_display.dart';
+export 'widgets/bs_date_field.dart';
+export 'widgets/language_toggle.dart';
+export 'widgets/server_clock.dart';
+export 'widgets/form_fields.dart';
+export 'widgets/ai_form_assist_sheet.dart';
 export 'widgets/dynamic_bottom_nav.dart';
 export 'widgets/app_drawer.dart';
 export 'widgets/shared_chat_screen.dart';

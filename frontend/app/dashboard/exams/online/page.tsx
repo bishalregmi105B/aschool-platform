@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateTimeField } from "@/components/ui/datetime-field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { Monitor, Plus, Play, Clock, CheckCircle2, Sparkles } from "lucide-react";
@@ -171,11 +172,11 @@ function OnlineExamContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Start Date/Time</Label>
-                    <Input type="datetime-local" value={form.start_at} onChange={e => setForm(f => ({ ...f, start_at: e.target.value }))} />
+                    <DateTimeField value={form.start_at} onChange={v => setForm(f => ({ ...f, start_at: v }))} />
                   </div>
                   <div>
                     <Label>End Date/Time</Label>
-                    <Input type="datetime-local" value={form.end_at} onChange={e => setForm(f => ({ ...f, end_at: e.target.value }))} />
+                    <DateTimeField value={form.end_at} onChange={v => setForm(f => ({ ...f, end_at: v }))} />
                   </div>
                 </div>
                 <div>

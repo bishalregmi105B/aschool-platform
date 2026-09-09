@@ -201,18 +201,18 @@ class _LeaveScreenState extends ConsumerState<LeaveScreen> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
-              ESchoolTextEditor(
-                controller: startCtrl,
+              BsDateField(
                 label: 'Start Date',
-                hintText: 'YYYY-MM-DD',
-                textInputAction: TextInputAction.next,
+                ne: 'सुरु मिति',
+                initialValue: startCtrl.text.trim(),
+                onChanged: (v) => startCtrl.text = v,
               ),
               const SizedBox(height: 10),
-              ESchoolTextEditor(
-                controller: endCtrl,
+              BsDateField(
                 label: 'End Date',
-                hintText: 'YYYY-MM-DD',
-                textInputAction: TextInputAction.next,
+                ne: 'अन्त्य मिति',
+                initialValue: endCtrl.text.trim(),
+                onChanged: (v) => endCtrl.text = v,
               ),
               const SizedBox(height: 10),
               ESchoolTextEditor(

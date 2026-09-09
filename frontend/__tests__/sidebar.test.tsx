@@ -5,6 +5,7 @@
  */
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { I18nProvider } from "@/lib/i18n";
 
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
@@ -75,33 +76,33 @@ describe("Sidebar", () => {
   });
 
   it("renders items supplied by the plugins API", () => {
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Students")).toBeInTheDocument();
     expect(screen.getByText("Users")).toBeInTheDocument();
   });
 
   it("renders Marketplace and Settings from the bottom-nav config", () => {
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.getByText("Marketplace")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
   it("shows a plugin nav item when the plugin is installed", () => {
     mockSidebarState.sidebarItems.push(coreItem("attendance", "Attendance"));
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.getByText("Attendance")).toBeInTheDocument();
   });
 
   it("hides a plugin nav item when the plugin is not installed", () => {
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.queryByText("Attendance")).not.toBeInTheDocument();
   });
 
   it("renders nothing from stale data while loading", () => {
     // Realistic loading state: items have not arrived yet.
     mockSidebarState = { sidebarItems: [], pluginBottomNav: [], isLoading: true };
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("Marketplace")).not.toBeInTheDocument();
   });
@@ -117,13 +118,13 @@ describe("Sidebar", () => {
         route: "/dashboard/library",
       },
     ];
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     expect(screen.getByText("Library")).toBeInTheDocument();
     expect(screen.getByText("Campus Services")).toBeInTheDocument();
   });
 
   it("renders the brand subtitle", () => {
-    render(<Sidebar />);
+    render(<I18nProvider><Sidebar /></I18nProvider>);
     // Brand is rendered as split spans (A/S/chool); assert the stable subtitle.
     expect(screen.getByText("Management System")).toBeInTheDocument();
   });

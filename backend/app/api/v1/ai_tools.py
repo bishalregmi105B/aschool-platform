@@ -471,3 +471,113 @@ def get_generated_paper(paper_id):
         return error_response("Paper not found", 404)
     include_answers = request.args.get("include_answer_key") == "true"
     return success_response(paper.to_dict(include_answers=include_answers))
+
+
+@ai_tools_bp.route("/form-assist", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("ai_suite")
+@role_required("superadmin", "school_admin", "teacher")
+@ai_rate_limit()
+def form_assist():
+    """Universal AI form assistant — one endpoint any form can plug into.
+
+    The client sends a field schema (what each field means, allowed values)
+    plus either a free-text instruction ("a girl born 2018-04-15, admits to
+    class 4 tomorrow, father 98XXXXXXXX") or the current partial form. The
+    LLM returns ONLY valid JSON matching the schema; the client applies it
+    field-by-field so this stays form-agnostic (web + Flutter share it).
+
+    Request:  { form_id, fields: [{key,label,type,required,options,hint}],
+                instruction, current? , language? }
+    Response: { values: {key: value}, confidence, notes, missing: [keys] }
+    """
+    data = request.get_json(silent=True) or {}
+    fields = data.get("fields") or []
+    instruction = (data.get("instruction") or "").strip()
+    if not fields:
+        return error_response("fields[] schema is required")
+    if len(fields) > 80:
+        return error_response("Too many fields (max 80)")
+    if not instruction and not data.get("current"):
+        return error_response("Provide an instruction or the current form values")
+
+    from app.services.ai.token_hub import AITokenHub
+
+    lang = (data.get("language") or "english").lower()
+    schema_lines = []
+    for f in fields[:80]:
+        line = f"- {f.get('key')}: {f.get('label','')} (type={f.get('type','text')}"
+        if f.get("required"):
+            line += ", required"
+        if f.get("options"):
+            opts = ", ".join(str(o) for o in f["options"][:20])
+            line += f"; one of: {opts}"
+        if f.get("hint"):
+            line += f"; hint: {str(f['hint'])[:120]}"
+        line += ")"
+        schema_lines.append(line)
+
+    current_dump = ""
+    if isinstance(data.get("current"), dict):
+        try:
+            current_dump = json.dumps(data["current"], ensure_ascii=False)[:4000]
+        except Exception:
+            current_dump = ""
+
+    system_prompt = (
+        "You are a data-entry assistant inside a Nepali school management "
+        "system. Fill form fields from the user's description. Respond with "
+        "ONLY a JSON object, no markdown fence, of shape "
+        '{"values": {field_key: value}, "notes": string}. '
+        "Rules: use exactly the field keys given; omit fields you cannot "
+        "determine; respect option values verbatim; dates as YYYY-MM-DD "
+        "(convert BS dates like 2080-01-15 to AD); times as HH:MM 24h; "
+        "numbers as numbers; keep names in the requested language. Notes max "
+        "2 sentences, concise."
+        + (f" Reply language for notes: {lang}." if lang else "")
+    )
+    user_prompt = (
+        f"Form: {data.get('form_id', 'unknown')}\n"
+        f"Fields:\n" + "\n".join(schema_lines)
+        + (f"\n\nCurrent values:\n{current_dump}" if current_dump else "")
+        + f"\n\nUser request: {instruction[:2000]}"
+    )
+
+    try:
+        raw = AITokenHub.generate(
+            school_id=g.school_id,
+            user_id=g.user_id,
+            prompt=user_prompt,
+            action="form-assist",
+            system_prompt=system_prompt,
+            max_tokens=1200,
+            model="fast",
+            temperature=0.2,
+        )
+    except Exception as exc:
+        current_app.logger.warning("form-assist AI failed: %s", exc)
+        return error_response("AI assistant unavailable right now", 503)
+
+    # Model output → strict JSON (strip fences, find outermost object)
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        text = text.split("\n", 1)[-1] if "\n" in text else text
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        return error_response("AI returned an unparseable response", 502)
+    try:
+        parsed = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return error_response("AI returned an unparseable response", 502)
+
+    allowed = {f.get("key") for f in fields}
+    values = {k: v for k, v in (parsed.get("values") or {}).items() if k in allowed}
+    return success_response(
+        {
+            "values": values,
+            "notes": (parsed.get("notes") or "")[:500],
+            "filled": len(values),
+        }
+    )

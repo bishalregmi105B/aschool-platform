@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { LanguageToggle } from "@/components/layout/language-toggle";
+import { ServerClock } from "@/components/layout/server-clock";
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -173,8 +175,14 @@ export function Header() {
         )}
       </div>
 
-      {/* Right: school greeting + actions */}
+      {/* Right: server clock + language + greeting + actions */}
       <div className="flex items-center gap-1.5 ml-4">
+        {/* Server time (backend clock, not the browser's) */}
+        <ServerClock />
+
+        {/* Language toggle — drives sidebar, labels and forms */}
+        <LanguageToggle />
+
         {/* School greeting */}
         {user && (
           <div className="hidden sm:flex items-center gap-1.5 mr-2 border-r pr-3">

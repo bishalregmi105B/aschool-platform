@@ -22,13 +22,18 @@ ui:
     - school_admin
     subitems:
     - label: General Settings
+      label_nepali: सामान्य सेटिङ
       route: /settings
     - label: Notification Settings
+      label_nepali: सूचना सेटिङ
       route: /settings/notifications
     - label: Roles & Permissions
+      label_nepali: भूमिका र अनुमति
       route: /settings/roles
     - label: Integrations
+      label_nepali: एकीकरण
       route: /settings/integrations
     - label: Database Backup
+      label_nepali: डाटाबेस ब्याकअप
       route: /settings/backup
 schema_version: 2

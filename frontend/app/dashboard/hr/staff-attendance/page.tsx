@@ -6,6 +6,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -157,25 +158,23 @@ export default function StaffAttendancePage() {
                     <TableCell className="font-medium">{staff.full_name}</TableCell>
                     <TableCell className="capitalize text-muted-foreground">{staff.role.replace("_", " ")}</TableCell>
                     <TableCell>
-                      <Input 
-                        type="time" 
+                      <TimePicker 
                         value={record.check_in_time || ""} 
-                        onChange={(e) => setRecords(prev => ({
+                        onChange={(v) => setRecords(prev => ({
                           ...prev,
-                          [staff.id]: { ...prev[staff.id], user_id: staff.id, check_in_time: e.target.value }
+                          [staff.id]: { ...prev[staff.id], user_id: staff.id, check_in_time: v }
                         }))}
-                        className="w-32 h-8" 
+                        className="w-32" 
                       />
                     </TableCell>
                     <TableCell>
-                      <Input 
-                        type="time" 
+                      <TimePicker 
                         value={record.check_out_time || ""} 
-                        onChange={(e) => setRecords(prev => ({
+                        onChange={(v) => setRecords(prev => ({
                           ...prev,
-                          [staff.id]: { ...prev[staff.id], user_id: staff.id, check_out_time: e.target.value }
+                          [staff.id]: { ...prev[staff.id], user_id: staff.id, check_out_time: v }
                         }))}
-                        className="w-32 h-8" 
+                        className="w-32" 
                       />
                     </TableCell>
                     <TableCell className="text-right">

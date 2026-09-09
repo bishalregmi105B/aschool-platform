@@ -7,6 +7,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageLoader } from "@/components/ui/spinner";
@@ -54,7 +55,7 @@ function Content() {
                 placeholder={"Nepali\nEnglish\nMaths\nScience\nSocial"} />
             </div>
             <div className="space-y-2"><Label>Start date (optional)</Label>
-              <Input value={startDate} onChange={(e) => setStartDate(e.target.value)} placeholder="e.g. 2082-06-01" /></div>
+              <BSDateInput value={startDate} onChange={(v) => setStartDate(v)} emit="bs" /></div>
             <Button className="w-full" onClick={() => gen.mutate()} disabled={!subjects.trim() || gen.isPending}>
               <Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Drafting…" : "Draft timetable"}
             </Button>

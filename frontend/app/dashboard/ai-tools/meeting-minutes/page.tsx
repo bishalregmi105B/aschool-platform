@@ -12,6 +12,7 @@ import { PluginGate } from "@/lib/plugins";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageLoader } from "@/components/ui/spinner";
@@ -98,10 +99,10 @@ function MinutesContent() {
               </div>
               <div className="space-y-2">
                 <Label>Date (optional)</Label>
-                <Input
+                <BSDateInput
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  placeholder="e.g. 2082-05-20"
+                  onChange={(v) => setDate(v)}
+                  emit="bs"
                 />
               </div>
             </div>

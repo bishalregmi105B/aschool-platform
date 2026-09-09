@@ -4,20 +4,51 @@ import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormSection,
+  FormGrid,
+  FormFull,
+  FormActions,
+} from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowLeft, UserPlus, Upload, X } from "lucide-react";
+import { BSDateInput } from "@/components/ui/bs-date-input";
+import {
+  AiFormAssist,
+  type AiFieldSchema,
+} from "@/components/ai/ai-form-assist";
+import { ArrowLeft, UserPlus, Upload, User, GraduationCap, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BSDateInput } from "@/components/ui/bs-date-input";
+import { useI18n } from "@/lib/i18n";
+
+/** Field schema doubles for the AI assistant — the same metadata drives the
+ *  rendered form, so AI can never target a field the form doesn't have. */
+const AI_FIELDS: AiFieldSchema[] = [
+  { key: "first_name", label: "First Name", ne: "पहिलो नाम", type: "text", required: true },
+  { key: "last_name", label: "Last Name", ne: "थर", type: "text", required: true },
+  { key: "gender", label: "Gender", ne: "लिङ्ग", type: "select", options: ["male", "female", "other"] },
+  { key: "date_of_birth", label: "Date of Birth (AD)", ne: "जन्म मिति", type: "date", hint: "BS dates are converted to AD" },
+  { key: "blood_group", label: "Blood Group", ne: "रक्त समूह", type: "text" },
+  { key: "religion", label: "Religion", ne: "धर्म", type: "select", options: ["Hindu", "Buddhist", "Christian", "Muslim", "Kirant", "Other"] },
+  { key: "ethnicity", label: "Ethnicity", ne: "जाति", type: "text" },
+  { key: "address", label: "Address", ne: "ठेगाना", type: "textarea" },
+  { key: "phone", label: "Phone", ne: "फोन", type: "text" },
+  { key: "email", label: "Email", ne: "इमेल", type: "email" },
+  { key: "previous_school", label: "Previous School", ne: "अघिल्लो विद्यालय", type: "text" },
+  { key: "roll_number", label: "Roll Number", ne: "रोल नम्बर", type: "number" },
+  { key: "guardian_name", label: "Guardian Name", ne: "अभिभावकको नाम", type: "text" },
+  { key: "guardian_phone", label: "Guardian Phone", ne: "अभिभावक फोन", type: "text" },
+  { key: "guardian_relation", label: "Relation", ne: "नाता", type: "select", options: ["father", "mother", "guardian"] },
+];
 
 export default function NewStudentPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [form, setForm] = useState({
@@ -140,288 +171,267 @@ export default function NewStudentPage() {
   const set = (k: string, v: string) => setForm((prev) => ({ ...prev, [k]: v }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl">
       <div className="flex items-center gap-4">
         <Link href="/dashboard/students">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Enroll New Student</h1>
-          <p className="text-muted-foreground">Add a new student to the system</p>
+          <h1 className="text-2xl font-bold">{t("Enroll New Student", "नयाँ विद्यार्थी भर्ना")}</h1>
+          <p className="text-muted-foreground">{t("Add a new student to the system", "प्रणालीमा नयाँ विद्यार्थी थप्नुहोस्")}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* AI Quick Fill — schema-driven, works on any field below */}
+      <AiFormAssist
+        formId="student_admission"
+        schema={AI_FIELDS}
+        values={form}
+        applyValues={(vals) => {
+          for (const [k, v] of Object.entries(vals)) {
+            if (k in form) set(k, v === null || v === undefined ? "" : String(v));
+          }
+        }}
+      />
+
+      <div className="space-y-6">
         {/* ── Personal Information ── */}
-        <Card>
-          <CardHeader><CardTitle>Personal Information</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {/* Photo upload */}
-            <div className="space-y-2">
-              <Label>Profile Photo</Label>
-              <div className="flex items-center gap-3">
-                {form.photo_url ? (
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={form.photo_url} alt="Student photo" className="h-16 w-16 rounded-full object-cover border" />
-                    <button
-                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-5 w-5 flex items-center justify-center text-xs"
-                      onClick={() => set("photo_url", "")}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-16 w-16 rounded-full border-2 border-dashed flex items-center justify-center bg-muted">
-                    <UserPlus className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                >
-                  {uploadingPhoto ? <Spinner className="mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                  {uploadingPhoto ? "Uploading…" : "Upload Photo"}
-                </Button>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handlePhotoUpload(file);
-                  }}
-                />
-              </div>
-            </div>
+        <FormSection
+          title="Personal Information"
+          ne="व्यक्तिगत जानकारी"
+          description="Student identity as it appears on official documents"
+          neDescription="आधिकारिक कागजातमा देखिने विद्यार्थीको पहिचान"
+          icon={User}
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? <Spinner className="mr-2 h-3 w-3" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+              {uploadingPhoto ? t("Uploading…", "अपलोड हुँदै…") : t("Photo", "फोटो")}
+            </Button>
+          }
+        >
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handlePhotoUpload(file);
+            }}
+          />
+          <FormGrid cols={3}>
+            <FormField label="First Name" ne="पहिलो नाम" required>
+              <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
+            </FormField>
+            <FormField label="Last Name" ne="थर" required>
+              <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} />
+            </FormField>
+            <FormField
+              label="Date of Birth"
+              ne="जन्म मिति"
+              hint="Pick in BS — the AD equivalent is kept automatically"
+              neHint="बि.सं.मा छान्नुहोस् — ई.सं. स्वतः सुरक्षित हुन्छ"
+            >
+              <BSDateInput value={form.date_of_birth} onChange={(v) => set("date_of_birth", v)} />
+            </FormField>
+            <FormField label="First Name (Nepali)" ne="पहिलो नाम (नेपाली)">
+              <Input value={form.first_name_nepali} onChange={(e) => set("first_name_nepali", e.target.value)} placeholder="पहिलो नाम" />
+            </FormField>
+            <FormField label="Last Name (Nepali)" ne="थर (नेपाली)">
+              <Input value={form.last_name_nepali} onChange={(e) => set("last_name_nepali", e.target.value)} placeholder="थर" />
+            </FormField>
+            <FormField label="Gender" ne="लिङ्ग">
+              <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">{t("Male", "पुरुष")}</SelectItem>
+                  <SelectItem value="female">{t("Female", "महिला")}</SelectItem>
+                  <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Blood Group" ne="रक्त समूह">
+              <Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} placeholder="A+" />
+            </FormField>
+            <FormField label="Religion" ne="धर्म">
+              <Select value={form.religion} onValueChange={(v) => set("religion", v)}>
+                <SelectTrigger><SelectValue placeholder={t("Select", "छान्नुहोस्")} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Hindu">{t("Hindu", "हिन्दू")}</SelectItem>
+                  <SelectItem value="Buddhist">{t("Buddhist", "बौद्ध")}</SelectItem>
+                  <SelectItem value="Christian">{t("Christian", "इसाई")}</SelectItem>
+                  <SelectItem value="Muslim">{t("Muslim", "मुस्लिम")}</SelectItem>
+                  <SelectItem value="Kirant">{t("Kirant", "किराँत")}</SelectItem>
+                  <SelectItem value="Other">{t("Other", "अन्य")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Ethnicity" ne="जाति">
+              <Input value={form.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} placeholder={t("e.g. Brahmin", "जस्तै: ब्राह्मण")} />
+            </FormField>
+            <FormField label="Nationality" ne="राष्ट्रियता">
+              <Input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} />
+            </FormField>
+            <FormField label="Phone" ne="फोन">
+              <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="98XXXXXXXX" />
+            </FormField>
+            <FormField label="Email" ne="इमेल">
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+            </FormField>
+            <FormFull>
+              <FormField label="Address" ne="ठेगाना">
+                <Textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={2} />
+              </FormField>
+            </FormFull>
+            <FormFull>
+              <FormField label="Previous School" ne="अघिल्लो विद्यालय">
+                <Input value={form.previous_school} onChange={(e) => set("previous_school", e.target.value)} placeholder={t("Name of previous institution", "अघिल्लो संस्थाको नाम")} />
+              </FormField>
+            </FormFull>
+          </FormGrid>
+        </FormSection>
 
-            {/* English names */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>First Name (English) *</Label>
-                <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Last Name (English) *</Label>
-                <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} />
-              </div>
-            </div>
-            {/* Nepali names */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>पहिलो नाम (नेपाली)</Label>
-                <Input value={form.first_name_nepali} onChange={(e) => set("first_name_nepali", e.target.value)} placeholder="पहिलो नाम" />
-              </div>
-              <div className="space-y-2">
-                <Label>थर (नेपाली)</Label>
-                <Input value={form.last_name_nepali} onChange={(e) => set("last_name_nepali", e.target.value)} placeholder="थर" />
-              </div>
-            </div>
+        {/* ── Academic Information ── */}
+        <FormSection
+          title="Academic Information"
+          ne="शैक्षिक जानकारी"
+          description="Class placement and identification numbers"
+          neDescription="कक्षा तथा पहिचान नम्बर"
+          icon={GraduationCap}
+        >
+          <FormGrid cols={3}>
+            <FormField label="Class" ne="कक्षा">
+              <Select
+                value={form.class_id}
+                onValueChange={(v) => {
+                  set("class_id", v);
+                  set("section_id", "");
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder={t("Select class", "कक्षा छान्नुहोस्")} /></SelectTrigger>
+                <SelectContent>
+                  {(classes || []).map((klass: { id: string; name: string }) => (
+                    <SelectItem key={klass.id} value={klass.id}>{klass.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Section" ne="खण्ड">
+              <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>
+                <SelectTrigger><SelectValue placeholder={t("Select section", "खण्ड छान्नुहोस्")} /></SelectTrigger>
+                <SelectContent>
+                  {((selectedClass as { sections?: { id: string; name: string }[] })?.sections || []).map((section) => (
+                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Admission Date" ne="भर्ना मिति">
+              <BSDateInput value={form.admission_date} onChange={(v) => set("admission_date", v)} />
+            </FormField>
+            <FormField
+              label="Enrollment No."
+              ne="भर्ना नम्बर"
+              hint={t("Leave blank to auto-assign the next number", "खाली छोड्दा अर्को नम्बर स्वतः दिइन्छ")}
+            >
+              <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder={t("Auto-generated", "स्वतः तयार हुने")} />
+            </FormField>
+            <FormField
+              label="Roll Number"
+              ne="रोल नम्बर"
+              hint={t("Leave blank to auto-assign within the class", "खाली छोड्दा कक्षाभित्रै स्वतः दिइन्छ")}
+            >
+              <Input type="number" value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder={t("Auto-assigned", "स्वतः तयार हुने")} />
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
+        {/* ── Guardian Information ── */}
+        <FormSection
+          title="Guardian Information"
+          ne="अभिभावकको जानकारी"
+          description="Primary contact for notices, fees and emergencies"
+          neDescription="सूचना, शुल्क र आपतकालीन सम्पर्कको लागि"
+          icon={Users}
+        >
+          <FormGrid cols={3}>
+            <FormField label="Guardian Name" ne="अभिभावकको नाम" required>
+              <Input value={form.guardian_name} onChange={(e) => set("guardian_name", e.target.value)} />
+            </FormField>
+            <FormField label="Relation" ne="नाता">
+              <Select value={form.guardian_relation} onValueChange={(v) => set("guardian_relation", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="father">{t("Father", "बुबा")}</SelectItem>
+                  <SelectItem value="mother">{t("Mother", "आमा")}</SelectItem>
+                  <SelectItem value="guardian">{t("Guardian", "अभिभावक")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Phone" ne="फोन" hint={t("SMS notices go to this number", "यो नम्बरमा SMS सूचना जान्छ")}>
+              <Input value={form.guardian_phone} onChange={(e) => set("guardian_phone", e.target.value)} placeholder="98XXXXXXXX" />
+            </FormField>
+            <FormFull>
+              <FormField label="Email" ne="इमेल">
+                <Input type="email" value={form.guardian_email} onChange={(e) => set("guardian_email", e.target.value)} />
+              </FormField>
+            </FormFull>
+          </FormGrid>
+
+          <div className="mt-5 border-t pt-4">
+            <p className="mb-3 text-[12px] font-medium text-muted-foreground">
+              {t("Second Guardian (optional)", "दोस्रो अभिभावक (ऐच्छिक)")}
+            </p>
+            <FormGrid cols={3}>
+              <FormField label="Name" ne="नाम">
+                <Input value={form.guardian2_name} onChange={(e) => set("guardian2_name", e.target.value)} />
+              </FormField>
+              <FormField label="Relation" ne="नाता">
+                <Select value={form.guardian2_relation} onValueChange={(v) => set("guardian2_relation", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="father">{t("Father", "बुबा")}</SelectItem>
+                    <SelectItem value="mother">{t("Mother", "आमा")}</SelectItem>
+                    <SelectItem value="guardian">{t("Guardian", "अभिभावक")}</SelectItem>
+                    <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Date of Birth</Label>
-                <BSDateInput value={form.date_of_birth} onChange={(v) => set("date_of_birth", v)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Blood Group</Label>
-                <Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} placeholder="e.g. A+" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Religion</Label>
-                <Select value={form.religion} onValueChange={(v) => set("religion", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Hindu">Hindu</SelectItem>
-                    <SelectItem value="Buddhist">Buddhist</SelectItem>
-                    <SelectItem value="Christian">Christian</SelectItem>
-                    <SelectItem value="Muslim">Muslim</SelectItem>
-                    <SelectItem value="Kirant">Kirant</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Ethnicity</Label>
-                <Input value={form.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} placeholder="e.g. Brahmin" />
-              </div>
-              <div className="space-y-2">
-                <Label>Nationality</Label>
-                <Input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={2} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Previous School</Label>
-              <Input value={form.previous_school} onChange={(e) => set("previous_school", e.target.value)} placeholder="Name of previous institution" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          {/* ── Academic Information ── */}
-          <Card>
-            <CardHeader><CardTitle>Academic Information</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Class</Label>
-                  <Select
-                    value={form.class_id}
-                    onValueChange={(v) => {
-                      set("class_id", v);
-                      set("section_id", "");
-                    }}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                    <SelectContent>
-                      {(classes || []).map((klass: { id: string; name: string }) => (
-                        <SelectItem key={klass.id} value={klass.id}>{klass.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Section</Label>
-                  <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
-                    <SelectContent>
-                      {((selectedClass as { sections?: { id: string; name: string }[] })?.sections || []).map((section) => (
-                        <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Admission / Enrollment No.</Label>
-                  <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder="Auto-generated" />
-                  <p className="text-xs text-muted-foreground">Leave blank to auto-assign the next number.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Roll Number</Label>
-                  <Input type="number" value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder="Auto-assigned" />
-                  <p className="text-xs text-muted-foreground">Leave blank to auto-assign within the class.</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Admission Date (BS)</Label>
-                <BSDateInput value={form.admission_date} onChange={(v) => set("admission_date", v)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Guardian Information ── */}
-          <Card>
-            <CardHeader><CardTitle>Guardian Information</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Guardian Name</Label>
-                  <Input value={form.guardian_name} onChange={(e) => set("guardian_name", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Relation</Label>
-                  <Select value={form.guardian_relation} onValueChange={(v) => set("guardian_relation", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="father">Father</SelectItem>
-                      <SelectItem value="mother">Mother</SelectItem>
-                      <SelectItem value="guardian">Guardian</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input value={form.guardian_phone} onChange={(e) => set("guardian_phone", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={form.guardian_email} onChange={(e) => set("guardian_email", e.target.value)} />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t">
-                <p className="text-sm font-medium mb-3">Second Guardian (Optional)</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Guardian Name</Label>
-                    <Input value={form.guardian2_name} onChange={(e) => set("guardian2_name", e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Relation</Label>
-                    <Select value={form.guardian2_relation} onValueChange={(v) => set("guardian2_relation", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="father">Father</SelectItem>
-                        <SelectItem value="mother">Mother</SelectItem>
-                        <SelectItem value="guardian">Guardian</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input value={form.guardian2_phone} onChange={(e) => set("guardian2_phone", e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" value={form.guardian2_email} onChange={(e) => set("guardian2_email", e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </FormField>
+              <FormField label="Phone" ne="फोन">
+                <Input value={form.guardian2_phone} onChange={(e) => set("guardian2_phone", e.target.value)} placeholder="98XXXXXXXX" />
+              </FormField>
+              <FormFull>
+                <FormField label="Email" ne="इमेल">
+                  <Input type="email" value={form.guardian2_email} onChange={(e) => set("guardian2_email", e.target.value)} />
+                </FormField>
+              </FormFull>
+            </FormGrid>
+          </div>
+        </FormSection>
       </div>
 
-      <div className="flex justify-end">
+      <FormActions>
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/dashboard/students")}
+        >
+          {t("Cancel", "रद्द")}
+        </Button>
         <Button
           size="lg"
           onClick={() => create.mutate()}
           disabled={!form.first_name || !form.last_name || !form.class_id || create.isPending}
         >
           {create.isPending ? <Spinner className="mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-          Enroll Student
+          {t("Enroll Student", "विद्यार्थी भर्ना गर्नुहोस्")}
         </Button>
-      </div>
+      </FormActions>
     </div>
   );
 }

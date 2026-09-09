@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -264,8 +265,8 @@ function AdmissionContent() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="app-dob">Date of Birth (AD)</Label>
-                    <Input id="app-dob" name="dob" type="date" />
+                    <Label htmlFor="app-dob">Date of Birth</Label>
+                    <BSDateInput name="dob" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Gender</Label>

@@ -25,6 +25,10 @@ const publicSiteCsp = [
 ].join("; ");
 
 const nextConfig = {
+  // Host builds (CI / local verify) use a separate distDir so they never
+  // fight over .next with the root-owned dev container running on this
+  // checkout (EACCES unlink errors during `next build`).
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   async headers() {
     return [
       {

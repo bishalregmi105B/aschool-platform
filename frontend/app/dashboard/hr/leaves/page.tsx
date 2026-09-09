@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -224,18 +225,16 @@ function ApplyLeaveDialog({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>From</Label>
-              <Input
-                type="date"
+              <BSDateInput
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(v) => setFromDate(v)}
               />
             </div>
             <div className="space-y-2">
               <Label>To</Label>
-              <Input
-                type="date"
+              <BSDateInput
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(v) => setToDate(v)}
               />
             </div>
           </div>

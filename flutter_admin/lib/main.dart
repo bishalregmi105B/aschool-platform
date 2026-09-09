@@ -10,6 +10,10 @@ void main() {
   // Push notifications: init FCM/OneSignal at startup. Token registration with
   // the backend uses any stored session token; AuthService retries after login.
   unawaited(NotificationService().init());
+  // Bilingual UI: restore the stored language, then keep app-bar clocks on the
+  // authoritative server time (M-01).
+  unawaited(I18nService.instance.load());
+  ServerTimeService.instance.startSync();
   runApp(const ProviderScope(child: ASchoolAdminApp()));
 }
 

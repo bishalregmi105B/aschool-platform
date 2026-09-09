@@ -994,13 +994,16 @@ class _CreateAssignmentSheetState
             const SizedBox(height: 14),
             InkWell(
               onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now().add(const Duration(days: 1)),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                // BS-first picker; keep _dueDate as AD for the API payload.
+                final bs = await showBsDatePicker(
+                  context,
+                  initialAd: _dueDate != null
+                      ? '${_dueDate!.year.toString().padLeft(4, '0')}-'
+                          '${_dueDate!.month.toString().padLeft(2, '0')}-'
+                          '${_dueDate!.day.toString().padLeft(2, '0')}'
+                      : null,
                 );
-                if (date != null) setState(() => _dueDate = date);
+                if (bs != null) setState(() => _dueDate = bsToAd(bs));
               },
               child: Container(
                 padding:

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageLoader } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, User, Phone, Mail, MapPin, Calendar } from "lucide-react";
@@ -398,7 +399,7 @@ function StudentProfileEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>DOB (BS)</Label>
-              <Input value={dobBs} onChange={(e) => setDobBs(e.target.value)} placeholder="2065-04-15" />
+              <BSDateInput value={dobBs} onChange={(v) => setDobBs(v)} emit="bs" />
             </div>
             <div className="space-y-2">
               <Label>Blood Group</Label>

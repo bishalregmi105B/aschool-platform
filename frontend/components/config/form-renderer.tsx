@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { TimePicker } from "@/components/ui/time-picker";
 import {
   Card,
   CardContent,
@@ -649,12 +650,10 @@ function DateControl({ field, id, value, disabled, onChange }: ControlProps) {
     );
   }
   return (
-    <Input
-      id={id}
-      type="date"
+    <BSDateInput
       value={typeof value === "string" ? value : ""}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(v) => onChange(v)}
     />
   );
 }
@@ -787,12 +786,10 @@ export function FormRenderer({
         break;
       case "time":
         control = (
-          <Input
-            type="time"
-            id={baseId}
+          <TimePicker
             value={typeof value === "string" ? value : ""}
             disabled={disabledHere}
-            onChange={(e) => change(f.key, e.target.value)}
+            onChange={(v) => change(f.key, v)}
           />
         );
         break;
