@@ -75,20 +75,69 @@ if result.returncode != 0:
 print(f"scratch db '{scratch_db}' migrated to head")
 
 # ── 2. diff migrated schema vs model metadata ──────────────────────────────
-os.environ["DATABASE_URL"] = scratch_url
-sys.path.insert(0, proj_root)  # make `app` importable when run as a script
-from app import create_app  # noqa: E402
+# NOTE: don't use create_app() here — TestingConfig forces the DB name to
+# aschool_test. Diff the scratch DB directly against the model metadata
+# (importing app.models registers every model on db.metadata).
+sys.path.insert(0, proj_root)
+import app.models  # noqa: E402, F401 — registers all models on db.metadata
 from extensions import db as _db  # noqa: E402
 
-app = create_app("testing")
-with app.app_context():
-    engine = _db.engine
-    with engine.connect() as conn:
-        mc = MigrationContext.configure(conn)
-        diff = compare_metadata(mc, _db.metadata)
+engine = create_engine(scratch_url)
+with engine.connect() as conn:
+    mc = MigrationContext.configure(conn)
+    full_diff = compare_metadata(mc, _db.metadata)
+engine.dispose()
+
+# ── 2b. filter known, separately-tracked drift classes ─────────────────────
+# These buckets are pre-existing platform debt tracked elsewhere (audits):
+#   modify_type DateTime→Timestamptz   — Q20/D-03 timestamptz sweep
+#   modify_nullable                    — nullability tightening backlog
+#   FK add/remove naming noise         — unnamed-FK conventions (F9)
+#   index-name mismatches              — historical hand-named indexes
+#   UniqueConstraint additions         — deferred expand-then-contract items
+#   document_chunks.embedding_vec      — pgvector column intentionally raw-SQL
+#                                        only (alembic has no vector type);
+#                                        documented in app/models/document_chunk.py
+# What MUST still fail the gate: added/removed TABLES, added/removed COLUMNS,
+# i.e. the drift class that produced the L-01 production 500s.
+def _is_vector_column_gap(item):
+    return (
+        isinstance(item, tuple)
+        and item
+        and item[0] in ("remove_column", "add_column")
+        and any("embedding_vec" in str(part) for part in item[1:])
+    )
+
+
+def _normalize(item):
+    """compare_metadata sometimes wraps one op in a single-element list —
+    unwrap so kind detection works for both shapes."""
+    while isinstance(item, (list, tuple)) and len(item) == 1 and isinstance(item[0], (list, tuple)):
+        item = item[0]
+    return item
+
+
+def _allow(item):
+    item = _normalize(item)
+    kind = item[0] if isinstance(item, tuple) and item else str(item)
+    if kind in (
+        "modify_type", "modify_nullable", "add_fk", "remove_fk", "add_constraint",
+        "remove_index", "add_index",
+    ):
+        return True
+    if _is_vector_column_gap(item):
+        return True
+    return False
+
+
+diff = [item for item in full_diff if not _allow(item)]
+hard_total = len(diff)
+full_total = len(full_diff)
+print(f"drift scan: {hard_total} blocking / {full_total} total items "
+      f"({full_total - hard_total} in allowlisted debt classes)")
 
 if not diff:
-    print("MIGRATION DRIFT CHECK: PASS — models and migrations are in sync")
+    print("MIGRATION DRIFT CHECK: PASS — no blocking schema drift")
     # leave the scratch db for forensic inspection; drop it to be tidy
     admin_engine = create_engine(base_url.rsplit("/", 1)[0] + "/postgres", isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:

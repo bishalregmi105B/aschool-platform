@@ -8,7 +8,7 @@ from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.exam import Marks, ReportCard
 from app.models.academic import Subject
 from app.models.fee import FeeCollection
-from app.models.library import Book, BookIssue
+from app.models.library import Book, BookFine, BookIssue, BookReservation
 from app.models.lms import Course, Lesson, Quiz, QuizAttempt, StudentProgress
 from app.models.notice import Notice
 from app.models.portfolio import StudentPortfolio, PortfolioItem
@@ -18,7 +18,7 @@ from app.models.wellbeing import MoodEntry
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import school_required
 from app.utils.nepali_date import ad_to_bs
-from app.utils.response import success_response, error_response
+from app.utils.response import created_response, success_response, error_response
 from extensions import db
 
 student_app_bp = Blueprint("student_app", __name__, url_prefix="/student")
@@ -423,8 +423,30 @@ def student_library():
     if not student:
         return error_response("Student profile not found", 404)
 
-    books = Book.query.filter_by(school_id=g.school_id, is_deleted=False).order_by(Book.title.asc()).all()
-    issues = BookIssue.query.filter_by(school_id=g.school_id, student_id=student.id, is_deleted=False).all()
+    search = (request.args.get("search") or "").strip()
+    query = Book.query.filter_by(school_id=g.school_id, is_deleted=False)
+    if search:
+        like = f"%{search}%"
+        from sqlalchemy import or_ as _or
+
+        query = query.filter(_or(Book.title.ilike(like), Book.author.ilike(like)))
+    books = query.order_by(Book.title.asc()).limit(100).all()
+    issues = (
+        BookIssue.query.filter_by(school_id=g.school_id, student_id=student.id, is_deleted=False)
+        .order_by(BookIssue.due_date.asc())
+        .all()
+    )
+    # FC-B: the student's own holds so the UI can show queue state
+    reservations = (
+        BookReservation.query.filter_by(school_id=g.school_id, student_id=student.id, is_deleted=False)
+        .filter(BookReservation.status.in_(("requested", "ready")))
+        .all()
+    )
+    from app.models.library import BookReservation as _BR
+
+    my_fines = BookFine.query.filter_by(
+        school_id=g.school_id, student_id=student.id, is_deleted=False,
+    ).filter(BookFine.status.in_(("unpaid", "partial"))).all()
 
     return success_response(
         {
@@ -434,6 +456,7 @@ def student_library():
                     "title": b.title,
                     "author": b.author,
                     "category": b.category,
+                    "cover_url": b.cover_url,
                     "available_copies": b.available_copies,
                 }
                 for b in books
@@ -445,9 +468,23 @@ def student_library():
                     "author": i.book.author if i.book else None,
                     "due_date": i.due_date.isoformat() if i.due_date else None,
                     "is_overdue": bool(i.due_date and i.due_date < date.today() and i.status == "issued"),
+                    "renewal_count": i.renewal_count or 0,
                 }
                 for i in issues
+                if i.status in ("issued", "overdue")
             ],
+            "holds": [
+                {
+                    "id": str(r.id),
+                    "book_id": str(r.book_id),
+                    "title": r.book.title if r.book else None,
+                    "status": r.status,
+                    "queue_pos": r.queue_pos,
+                    "pickup_deadline": r.pickup_deadline.isoformat() if r.pickup_deadline else None,
+                }
+                for r in reservations
+            ],
+            "outstanding_fines": float(sum(f.amount or 0 for f in my_fines)),
         }
     )
 
@@ -470,7 +507,37 @@ def student_library_request():
     if not book or book.is_deleted or str(book.school_id) != str(g.school_id):
         return error_response("Book not found", 404)
 
-    return success_response({"requested": True})
+    # FC-B: this endpoint used to return {"requested": true} without
+    # persisting anything — a fake success. It now creates a real
+    # BookReservation (queue position included) when the book is unavailable;
+    # if a copy is on the shelf the student is told to borrow it directly.
+    if (book.available_copies or 0) > 0:
+        return error_response("This book is available right now — please borrow it from the library", 400)
+    from app.models.library import BookReservation
+
+    dup = BookReservation.query.filter_by(
+        school_id=g.school_id, book_id=book.id, student_id=student.id, status="requested",
+    ).first()
+    if dup:
+        return error_response("You already have a pending request for this book", 409)
+    from sqlalchemy import func as _fn
+
+    queue_pos = (
+        db.session.query(_fn.coalesce(_fn.max(BookReservation.queue_pos), 0) + 1)
+        .filter_by(school_id=g.school_id, book_id=book.id, status="requested")
+        .scalar()
+    )
+    res = BookReservation(
+        school_id=g.school_id, book_id=book.id, student_id=student.id,
+        queue_pos=queue_pos, status="requested",
+    )
+    db.session.add(res)
+    db.session.commit()
+    return created_response({
+        "requested": True,
+        "reservation_id": str(res.id),
+        "queue_pos": queue_pos,
+    })
 
 
 @student_app_bp.route("/elibrary", methods=["GET"])

@@ -1,0 +1,59 @@
+# Widgets contributed by the library_management plugin (FC-B).
+#
+# Every endpoint below is a real GET route of app/api/v1/library.py — the
+# reports/summary endpoints were added with the v2 rebuild and are covered by
+# tests/test_fc_b_library_v2.py.
+schema_version: 1
+
+widgets:
+  # ── Librarian/admin home: circulation snapshot ──
+  - key: library_circulation_stats
+    title: "Library"
+    title_i18n: widget.library_circulation_stats.title
+    description: "Issued today, overdue, available copies, pending holds"
+    type: stat-group
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: dashboard.main, default: true, order: 40 }
+    roles: [school_admin, teacher]
+    requires_permissions: []
+    data:
+      source: api
+      endpoint: /library/reports/collection_stats
+      refresh: { mode: poll, interval_s: 300 }
+      cache_ttl_s: 120
+      select: data
+    spec:
+      stats:
+        - label: Titles
+          value_path: titles
+        - label: Total Copies
+          value_path: total_copies
+        - label: Available
+          value_path: available_copies
+
+  # ── Overdue panel for the wide dashboard slot ──
+  - key: library_overdue
+    title: "Overdue Books"
+    title_i18n: widget.library_overdue.title
+    description: "Issued books past their due date, with per-class overdue counts"
+    type: table-panel
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: dashboard.wide, default: true, order: 40 }
+    roles: [school_admin, teacher]
+    data:
+      source: api
+      endpoint: /library/reports/overdue_by_class
+      refresh: { mode: poll, interval_s: 600 }
+      cache_ttl_s: 300
+      select: data
+    spec:
+      columns:
+        - key: class_name
+          label: Class
+        - key: overdue
+          label: Overdue
+          align: right

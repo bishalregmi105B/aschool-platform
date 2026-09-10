@@ -9,6 +9,16 @@ icon: Library
 description: Book catalog, issue/return, overdue tracking
 depends_on: []
 conflicts_with: []
+events:
+  emits:
+  - library.issued
+  - library.returned
+  - library.overdue
+  - library.hold_requested
+  - library.hold_ready
+  - library.fine_created
+  - library.fine_paid
+  listens: []
 capabilities:
   api_blueprint: app.api.v1.library
   models_module: app.models.library
@@ -26,6 +36,14 @@ ui:
       route: /library/checkout
     - label: Overdue
       route: /library/overdue
+    - label: Holds
+      route: /library/reservations
+    - label: Fines
+      route: /library/fines
+    - label: Stock-take
+      route: /library/stocktake
+    - label: Reports
+      route: /library/reports
 mobile:
   admin:
     feature_folder: library

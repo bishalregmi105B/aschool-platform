@@ -33,3 +33,15 @@ fields:
     default: 0
     min: 0
     help: "How many books one student may have out at once; 0 = no limit."
+  - key: circulation.renewal_limit
+    label: "Renewals allowed"
+    type: number
+    default: 2
+    min: 0
+    help: "How many times a borrower may extend a loan before returning."
+  - key: circulation.reservation_pickup_days
+    label: "Hold pickup window (days)"
+    type: number
+    default: 3
+    min: 1
+    help: "Days a reserved copy is held at the desk before the hold expires."

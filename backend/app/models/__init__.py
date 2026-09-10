@@ -23,7 +23,21 @@ from app.models.slider import SchoolSlider  # noqa: F401
 from app.models.diary import DiaryCategory, DiaryEntry  # noqa: F401
 from app.models.assignment import Assignment, AssignmentSubmission  # noqa: F401
 from app.models.transport import Route, Bus, BusStop, GPSLog  # noqa: F401
-from app.models.library import Book, BookTransaction, BookIssue  # noqa: F401
+from app.models.library import (  # noqa: F401
+    Book,
+    BookCopy,
+    BookFine,
+    BookFinePayment,
+    BookIssue,
+    BookPurchaseOrder,
+    BookPurchaseOrderItem,
+    BookRack,
+    BookReservation,
+    BookTransaction,
+    BookVendor,
+    StocktakeItem,
+    StocktakeSession,
+)
 from app.models.lms import Course, Lesson, Topic, StudyMaterial, LiveClass, StudentProgress, Quiz, QuizAttempt, Enrollment  # noqa: F401
 from app.models.admission import AdmissionForm, AdmissionApplication, AdmissionLead, AdmissionInquiry  # noqa: F401
 from app.models.notification import SMSLog, WhatsAppMessage, PushNotification, NotificationTemplate, WhatsAppBotConfig  # noqa: F401
