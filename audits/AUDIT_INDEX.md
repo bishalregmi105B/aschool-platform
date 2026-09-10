@@ -123,3 +123,20 @@ architecture. Deliverables:
 
 No code changes. S12 (spine migration + thin loader + review queue + golden-set scaffold) awaits
 founder go; founder starts extracting pilot books (Grade 10 Science + Math) with the prompt pack meanwhile.
+
+## 2026-09-10 — AI Workspace v2: agent-operated ingestion + question-paper archive (planning only)
+
+Founder redirect v2: operator = **Claude Code / Gemini Code** (agentic CLI), DB stores **full
+verbatim text** (not image URLs), printed question papers/model sets must be **fully organized**
+(question numbers, groups, marks, sub-parts, answers, spec grids). Deliverables:
+
+- `docs/ai_workspace_prompts/AGENT_INGESTION_BRIEF.md` (v2.0) — the master task brief for the agent:
+  per-book workflow (register→render→extract→self-verify→guards→audit→ingest→ledger), book-kind
+  routing, `aw-question-paper@1` + `aw-spec-grid@1` contracts reprinting papers 1:1, teacher-guide
+  conventions, verification protocol, Devanagari sample self-check, scale order, definition of done.
+- `docs/AI_WORKSPACE_FINAL_PLAN_2026-09-10.md` updated: pipeline v2 (agent-operated), new
+  `question_papers` + `paper_questions` archive schema (immutable verbatim layer feeding
+  `question_bank_items`; spec grids materialize `paper_blueprints`), S12 now builds `content_loader`
+  CLI + paper tables; agent pilot on Grade 10 Science + Math.
+
+No code changes. S12 build (loader + tables + review queue + eval scaffold) awaits founder go.

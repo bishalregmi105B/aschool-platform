@@ -33,36 +33,36 @@ manifests, golden-set gates), never by trust.
 | Grounding UI | citations column | **NotebookLM-style: every tutor answer cites chunk → highlighted bbox on page image** | EduGuard; product requirement |
 | Eval | acceptance list | **Golden set per grade×subject (50 items, NE/EN mix) + CI gates** (recall@20 ≥0.95, groundedness ≥0.90, NE-gap ≤10 pts) | RAGAS/DeepEval practice |
 
-## 3. The extraction pipeline (founder-operated)
+## 3. The extraction pipeline (v2 — agent-operated)
+
+> **v2 change (2026-09-10, founder direction):** the operator is **Claude Code / Gemini Code** — an
+> agentic CLI given `docs/ai_workspace_prompts/AGENT_INGESTION_BRIEF.md` as its task brief. The agent
+> reads every PDF page (vision for Preeti/scanned pages, clean Unicode text-layer fast-path for
+> English books), structures it, self-verifies, and inserts through the deterministic loader. The
+> human reviews samples, not pages. Everything else (contracts, verification layers, storage spine)
+> is unchanged. The DB stores **full verbatim text content** — `text_display` is the complete book;
+> page images are provenance for the citation UI, not the content itself.
 
 ```
-PDF ──pdftoppm 200dpi──► page images ──► PASS A (structure map, 1 call/book)
-                                             │  book manifest JSON = extraction contract
-                                             ▼
-        PASS B per page (Gemini Flash, image + position context + schema)
-             ├──► page JSON (blocks, bbox, verbatim NE/EN, LaTeX, exercises)
-             ├──► Mistral OCR 4 anchor (char-count + confidence + block boxes)   [cheap]
-             └──► PASS C self-reread (same page + own JSON → corrected JSON + discrepancies)
-                        │
-                        ▼
-        deterministic guards (coverage ratio, length anomaly, exercise-count vs manifest,
-                              structural-error regexes, bbox-emptiness, schema validation)
-                        │  flag
-                        ▼
-        PASS D judge = Claude Sonnet 5 (all flagged + 10% sample; chrF++ per page vs extractor)
-                        │
-                        ▼
-        human review queue (bbox-highlighted side-by-side) ──► staging folder
-                        │
-                        ▼
-        THIN LOADER (the only code): schema-validate → idempotent upsert on natural keys
+nepal_textbooks/ ──► AGENT (Claude Code / Gemini Code) with AGENT_INGESTION_BRIEF.md
+                      │  per book: render → read → structure (PROMPT A/B/C discipline)
+                      │  → self-verify → guards → stage JSON
+                      ▼
+        THIN LOADER (only code): schema-validate → idempotent upsert on natural keys
         (source_id, unit_path, ordinal) → draft → embed (BGE-M3) + BM25 index → reviewed
         → manifest gate (≥98% pages, 100% exercise numbers) → published snapshot
+                      ▲
+        human review queue (bbox-highlighted side-by-side) — sampled, not exhaustive
 ```
 
-- **Model assignments**: extraction = Gemini 2.5/3 Flash (A/B on 20 pilot pages; loser becomes consensus voice; ~5% hardest pages escalate to Gemini Pro); self-reread = same model; judge = Claude Sonnet 5 (structured outputs, constrained decoding); anchor = Mistral OCR 4 (Nepali officially supported, $1/1k pages, gives confidence scores + block boxes); optional free third voice = Qwen3-VL-8B self-hosted.
-- **Cost (whole 656-file corpus ≈ 195k pages)**: ≈ **$1,700–2,500 one-time** all layers (batch −50%), ~8–12% of pages human-touched. Pilot (2 books) ≈ $5–10.
-- **Prompt pack**: `docs/ai_workspace_prompts/EXTRACTION_PROMPT_PACK.md` — runbook + 4 prompts + JSON contracts. The founder runs it model-by-model; outputs land in a staging folder; no parsing code exists anywhere.
+- **Agent model assignment**: Claude Code (Sonnet/Opus) or Gemini Code (Flash/Pro) — both multimodal
+  and shell-capable. Cross-model audit is available by running the judge prompt from the *other*
+  agent family on sampled pages.
+- **Book-kind routing** (the brief instructs this): textbook → content spine; teacher guide →
+  teaching blocks (`audience=teacher`); **spec grid → `paper_blueprints`; model questions / board
+  / past papers → `question_papers` + `paper_questions`** (the printed-paper archive).
+- **Cost**: unchanged (~$1.7–2.5k one-time corpus, batch APIs where the agent uses them); agent
+  tokens for orchestration are minor relative to vision tokens.
 
 ## 4. Storage spine (final schema deltas on top of P-D §P-D.1)
 
@@ -78,6 +78,23 @@ PDF ──pdftoppm 200dpi──► page images ──► PASS A (structure map, 
 - Curriculum graph: `learning_outcomes` (real CDC), `outcome_prereq` DAG (human-curated, few hundred edges/subject), `unit_outcome`, `mastery_state(student, outcome, p_known)`.
 - `question_bank_items` — as P-D + `blueprint_cell_id` (NOT NULL for generated items — mismatch becomes a constraint violation), `evidence_chunk_id` (answer traceable to a published chunk), `stem_hash` + `stem_embedding` (dedup gate: hash + cosine ≥0.90 within grade+subject), `status ai_draft→auto_checks→teacher_review→published`, `distractor_meta` (misconception-based).
 - `golden_sets` + `eval_runs` — the regression harness.
+- **Printed question-paper archive (v2, first-class organization)**:
+  - `question_papers` — one printed paper: `source_id` FK, `paper_kind ∈ model_question | see | neb | board | school_exam | spec_grid`, title (ne/en), `exam_year_bs/ad`, grade, subject_code, total marks + duration **as printed**, provenance page range, `status`.
+  - `paper_questions` — the verbatim organized archive of every question in a printed paper:
+    `paper_id` FK, `group_name` (e.g. "Group A / समूह ख"), `question_no_printed` ("१०") +
+    `question_no_ascii` (10), `sub_label` ("(क)"), `parent_question_id` (self-FK for sub-parts),
+    `question_type ∈ mcq|short|long|numerical|true_false|fill_blank|match|practical|essay`,
+    `marks` + `marks_printed` (as printed, never computed), `stem_ne/en` (verbatim),
+    `options` jsonb (verbatim MCQ options), `answer_ne/en` + `answer_source ∈ printed | answer_key | none`,
+    `unit_hint` (chapter reference as printed), `blueprint_cell_id` FK (when the paper derives from
+    a spec grid), `page_no`, `bbox`, `extraction_run_id`, `prompt_version`, `sha256`, `status`.
+  - Organization invariants enforced by the loader: question numbers per group are contiguous as
+    printed; sub-parts belong to their parent; marks always match print; a paper's question tree
+    renders 1:1 to the printed page (this is what "question papers stored properly" means — the
+    archive can reprint the original paper).
+  - Flow: `paper_questions` (immutable verbatim archive) → curated into `question_bank_items`
+    (tagged, outcome-linked, deduped, approved). `spec_grid` papers additionally materialize
+    `paper_blueprints` rows (unit × type × marks × count × Bloom) that constrain generation.
 - Existing tables that survive unchanged: `document_chunks` (dual-write target for RAGService compat), `paper_blueprints`/`generated_papers` (+set fields from P-D), `teaching_sections` (+`content_unit_id` FK).
 
 Unicode contract: NFC normalization + ZWNJ policy enforced in the loader; identical normalizer runs on queries (double-encoding is the #1 silent mismatch).
@@ -114,8 +131,9 @@ Stored in `eval_runs`; any embedding/chunker/prompt change re-runs the matrix (b
 
 | Sprint | Work |
 |---|---|
-| **S12 — Foundation + pilot** | Build: spine migration (tables above), thin loader CLI/API (validate→upsert→embed→index→manifest gate), staging-folder ingest, review-queue page (bbox-highlighted), golden-set harness scaffold. **Founder runs the prompt pack on 2 pilot books** (Grade 10 Science + Grade 10 Math, EN + NE) using the runbook; we tune prompts on the results |
+| **S12 — Foundation + agent pilot** | Build: spine migration (incl. `question_papers` + `paper_questions`), `content_loader` CLI (`validate` / `ingest` / `status` — schema-validate → idempotent upsert → embed → BM25 index → manifest gate), review-queue page (bbox-highlighted), golden-set harness scaffold. **Founder runs Claude Code / Gemini Code with `AGENT_INGESTION_BRIEF.md` on 2 pilot books** (Grade 10 Science + Math); prompts tuned against real output |
 | **S13 — Wiring + eval** | Retrieval service upgrade (rerank + CRAG + packs + NE/EN expansion); workbench/tutor/paper-v2 grounded through it; citations persisted; grounding-required 422; golden sets authored for pilot grades; CI eval gate live |
-| **S14 — Question engine** | Spec-grid → blueprint import (from ingested grids); blueprint-cell-bound generation (KAQG loop: retrieve→generate→verify→calibrate); misconception distractors; dedup gate; model sets (P-D L5); mastery loop + outer-fringe recommendations; then corpus scale-out book-by-book under the same gates |
+| **S14 — Question engine** | Paper archive curation UI (browse `question_papers`/`paper_questions`, promote to bank); spec-grid → blueprint materialization; blueprint-cell-bound generation (KAQG loop); misconception distractors; dedup gate; model sets; mastery loop; then corpus scale-out book-by-book by the agent under the same gates |
 
-Each sprint ends with tests (drift gate, pytest, tsc) — extraction itself never blocks code sprints; books flow through the loader as the founder completes them.
+Each sprint ends with tests (drift gate, pytest, tsc). The agent's extraction never blocks code
+sprints — books flow through the loader as the agent completes them, book by book, ledger tracked.
