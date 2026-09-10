@@ -1,0 +1,32 @@
+# Widgets contributed by the ai_suite plugin (FC-H1).
+#
+# GET /ai-tools/insights/risk-alerts (ai_tools.py:213) is a real endpoint —
+# the composite early-warning list already computed by the AI insights
+# service. Surfacing it on the admin home is the plan's "early-warning
+# composite" differentiator (Panorama/Aeries pattern) at zero frontend cost.
+schema_version: 1
+
+widgets:
+  - key: at_risk_students
+    title: "Students at Risk"
+    title_i18n: widget.at_risk_students.title
+    description: "Composite early-warning flags from attendance, grades and AI insights"
+    type: list
+    renderer: spec
+    surfaces: [web]
+    slots:
+      - { id: dashboard.side, default: true, order: 40 }
+    roles: [school_admin]
+    requires_plugins: [ai_suite]
+    data:
+      source: api
+      endpoint: /ai-tools/insights/risk-alerts
+      refresh: { mode: poll, interval_s: 900 }
+      cache_ttl_s: 600
+      select: data
+    spec:
+      item:
+        title: student_name
+        subtitle: risk_level
+      limit: 6
+      empty_text: "No risk flags — all clear"
