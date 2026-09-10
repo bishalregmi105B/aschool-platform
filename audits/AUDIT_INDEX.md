@@ -100,3 +100,26 @@ Plan: `docs/MASTER_PLAN_2026-09-10_FULL_PLATFORM_V2.md` (Part 2 backlog, Sprint 
 Deferred from S0: B-20 (`/website-builder/sections/available` dead vocabulary — removal belongs to the P-C W-07 sweep), B-08 (gallery repo verified clean; album upload UX is F-14), student-app classmates switch (S9 M-C2).
 
 **Verification:** targeted backend suites 56/56 (plugin widgets 20, plugin contract 10, S0 6, fc_mob 4, fc_b 13, fc_a05 3); drift gate PASS 0/455 allowlisted (scratch on 5435 — note: script's local default port 5433 now collides with aacademy-postgres); `tsc --noEmit` clean; jest 47/47; `flutter analyze` 0 errors (admin 12 warnings → 8 after sweep, parent 13 → 8, shared 0, student 12 pre-existing); aschool_shared tests 49/49.
+
+## 2026-09-10 — AI Workspace: final architecture re-research + extraction prompt pack (planning only)
+
+Founder redirect: NO scripted ingestion — extraction intelligence moves into a human-operated
+vision-LLM flow; code only validates and stores. Two fresh research waves (Devanagari OCR-VLM
+benchmark arXiv 2606.29213; Nepali RAG studies 2606.07523/2603.13320; Anthropic contextual retrieval;
+title-chain chunking 2608.00824; HippoRAG 2; KAQG; EduGuard; live vendor pricing) drove the final
+architecture. Deliverables:
+
+- `docs/AI_WORKSPACE_FINAL_PLAN_2026-09-10.md` — supersedes P-D's ingestion portion: Gemini Flash
+  extraction (GPT/olmOCR ruled out on Devanagari evidence), 3-layer verification (deterministic guards
+  + self-reread + Claude judge, Mistral OCR 4 anchor), 200-DPI page images only (never the mojibake
+  PDF), structure-first chunking with title-chain + contextualizer, BGE-M3 dense+sparse with BM25 as
+  first-class Nepali leg, bge-reranker-v2-m3, outcome DAG + HippoRAG-lite (no GraphRAG),
+  blueprint-cell-bound question engine, golden-set eval gates, per-tool context packs,
+  ~$1.7–2.5k one-time corpus cost, S12–S14 execution.
+- `docs/ai_workspace_prompts/EXTRACTION_PROMPT_PACK.md` (prompt_version v1.0) — operator runbook +
+  universal preamble + PROMPT A (structure map), B (per-page extraction, verbatim discipline,
+  bbox grounding, exercise continuity), C (self-verification), D (cross-model judge), JSON contracts,
+  storage contract, prompt-version policy.
+
+No code changes. S12 (spine migration + thin loader + review queue + golden-set scaffold) awaits
+founder go; founder starts extracting pilot books (Grade 10 Science + Math) with the prompt pack meanwhile.
