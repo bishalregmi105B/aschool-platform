@@ -108,6 +108,30 @@ def checkout_visitor(visitor_id):
 # ── Appointments ───────────────────────────────────────────
 
 
+@visitor_bp.route("/badge/<badge_code>", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("visitor_management")
+def lookup_badge(badge_code):
+    """Badge scan lookup — resolve a printed badge/QR code to its visitor.
+
+    Serves the mobile admin app's badge scanner (it POSTs check-in, then
+    scans badges to see who is on campus; previously this route did not
+    exist and every scan 404ed).
+    """
+    visitor = (
+        Visitor.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .filter(Visitor.badge_number == badge_code)
+        .order_by(Visitor.checked_in_at.desc())
+        .first()
+    )
+    if not visitor:
+        return error_response("No visitor found for this badge code", 404)
+    d = _visitor_dict(visitor)
+    d["visitor_name"] = d["name"]  # mobile contract reads visitor_name
+    return success_response(d)
+
+
 @visitor_bp.route("/appointments", methods=["GET"])
 @jwt_required()
 @school_required

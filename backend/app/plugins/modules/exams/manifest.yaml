@@ -50,6 +50,8 @@ ui:
       route: /dashboard/ai-tools/question-paper
     - label: Online Exams
       route: /dashboard/exams/online
+    - label: Online Question Bank
+      route: /dashboard/exams/online/questions
     - label: Grade Table
       route: /dashboard/exams/grades
 mobile:

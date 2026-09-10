@@ -25,6 +25,8 @@ ui:
     subitems:
     - label: AI Tools
       route: /dashboard/ai-tools
+    - label: AI Workbench
+      route: /dashboard/ai-workbench
     - label: Analytics
       route: /dashboard/analytics
     - label: Benchmarking

@@ -64,12 +64,6 @@ ui:
     subitems:
     - label: Start a Lesson
       route: /dashboard/ai-teacher
-    - label: Lesson History
-      route: /dashboard/ai-teacher/history
-    - label: Mastery
-      route: /dashboard/ai-teacher/mastery
-    - label: Teaching Content
-      route: /dashboard/ai-teacher/content
     - label: Usage & Cost
       route: /dashboard/analytics/ai-usage
 mobile:

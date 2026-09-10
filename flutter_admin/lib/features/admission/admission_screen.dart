@@ -40,8 +40,9 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/admission/applications?per_page=20'),
-        ApiClient.instance.get('/admission/leads?per_page=20'),
-        ApiClient.instance.get('/admission/stats'),
+        // FC-MOB: real route is /admission/inquiries (never /admission/leads)
+        ApiClient.instance.get('/admission/inquiries?per_page=20'),
+        ApiClient.instance.get('/admission/dashboard'),
       ]);
       setState(() {
         _applications =

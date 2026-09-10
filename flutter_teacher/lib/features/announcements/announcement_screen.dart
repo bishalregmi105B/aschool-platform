@@ -7,7 +7,9 @@ import 'package:aschool_shared/aschool_shared.dart';
 
 final announcementsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final resp = await ApiClient.instance.get('/announcements');
+  // FC-MOB: there is no /announcements blueprint — announcements ARE
+  // notices (/notices). The old path 404ed on every load.
+  final resp = await ApiClient.instance.get('/notices');
   if (resp.data['success'] == true) {
     return List<Map<String, dynamic>>.from(resp.data['data'] ?? []);
   }
@@ -248,9 +250,10 @@ class _CreateAnnouncementSheetState
     }
     setState(() => _saving = true);
     try {
-      await ApiClient.instance.post('/announcements', data: {
+      await ApiClient.instance.post('/notices', data: {
         'title': title,
-        'message': message,
+        // notices API requires `content`; the web UI renders message ?? content
+        'content': message,
         if (_uploadedFileUrl != null)
           'attachment_urls': [_uploadedFileUrl],
       });

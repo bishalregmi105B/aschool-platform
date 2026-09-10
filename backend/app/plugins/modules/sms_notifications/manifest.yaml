@@ -27,11 +27,26 @@ ui:
   nav:
     route: /dashboard/sms
     section: Communication
-    label: SMS Notifications
-    label_nepali: एसएमएस सूचना
+    label: SMS & Communications
+    label_nepali: एसएमएस र सञ्चार
     icon: MessageSquare
     visible_to:
     - school_admin
+    subitems:
+    - label: SMS Center
+      route: /dashboard/sms
+    - label: Announcements
+      route: /dashboard/communications/announcements
+    - label: Broadcast
+      route: /dashboard/communications/broadcast
+    - label: Diary
+      route: /dashboard/communications/diary
+    - label: Gallery
+      route: /dashboard/communications/gallery
+    - label: Home Sliders
+      route: /dashboard/communications/sliders
+    - label: Message Templates
+      route: /dashboard/communications/templates
 mobile:
   admin:
     feature_folder: sms

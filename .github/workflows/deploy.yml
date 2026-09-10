@@ -55,6 +55,19 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-asyncio httpx
 
+      - name: Migration drift gate (FC-A02)
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/aschool_test
+          FLASK_APP: wsgi.py
+          SECRET_KEY: test-secret-key-drift-gate-32-bytes-long!
+          JWT_SECRET_KEY: test-jwt-key-drift-gate-32-bytes!
+          FLASK_ENV: testing
+        run: |
+          # The L-01 prod-500 class: models/ and migrations/ maintained by
+          # hand with no check. This fails CI when they drift apart.
+          python scripts/check_migration_drift.py
+
       - name: Run tests
         working-directory: backend
         env:

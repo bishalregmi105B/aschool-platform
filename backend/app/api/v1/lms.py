@@ -8,6 +8,7 @@ from app.models.lms import (
     Course,
     Enrollment,
     Lesson,
+    LiveClass,
     Quiz,
     QuizAttempt,
     StudentProgress,
@@ -208,6 +209,50 @@ def list_study_materials():
         query = query.filter_by(lesson_id=lesson_id)
     materials = query.order_by(StudyMaterial.sort_order, StudyMaterial.created_at).all()
     return success_response([_material_dict(material) for material in materials])
+
+
+@lms_bp.route("/live-classes", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("lms")
+def list_live_classes():
+    """Live classes for the school — serves the Flutter admin/teacher apps.
+
+    `status=upcoming` returns scheduled/live in schedule order; teachers pass
+    `mine=1` to scope to their own sessions. The LiveClass model existed with
+    no route, so both apps' live-classes tabs always 404ed.
+    """
+    query = LiveClass.query.filter_by(school_id=g.school_id)
+    status = request.args.get("status")
+    if status == "upcoming":
+        query = query.filter(LiveClass.status.in_(["scheduled", "live"]))
+    elif status:
+        query = query.filter_by(status=status)
+    if request.args.get("mine") in ("1", "true"):
+        query = query.filter_by(teacher_id=g.current_user.id)
+    query = query.order_by(LiveClass.scheduled_at.asc())
+    limit = min(int(request.args.get("per_page", 20) or 20), 100)
+    items = query.limit(limit).all()
+    return success_response([_live_class_dict(lc) for lc in items])
+
+
+def _live_class_dict(lc):
+    teacher = lc.teacher if hasattr(lc, "teacher") else None
+    return {
+        "id": str(lc.id),
+        "title": lc.title,
+        "course_id": str(lc.course_id) if lc.course_id else None,
+        "teacher_id": str(lc.teacher_id) if lc.teacher_id else None,
+        "teacher_name": teacher.full_name if teacher else None,
+        "class_id": str(lc.class_id) if lc.class_id else None,
+        "section_id": str(lc.section_id) if lc.section_id else None,
+        "scheduled_at": lc.scheduled_at.isoformat() if lc.scheduled_at else None,
+        "duration_mins": lc.duration_mins,
+        "jitsi_room_id": lc.jitsi_room_id,
+        "recording_url": lc.recording_url,
+        "status": lc.status,
+        "attendee_count": lc.attendee_count,
+    }
 
 
 @lms_bp.route("/materials", methods=["POST"])

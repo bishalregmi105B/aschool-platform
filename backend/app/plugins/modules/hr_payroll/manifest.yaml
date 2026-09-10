@@ -37,6 +37,8 @@ ui:
       route: /dashboard/hr/appraisal
     - label: Expenses
       route: /dashboard/hr/expenses
+    - label: Expense Categories
+      route: /dashboard/hr/expense-categories
 mobile:
   admin:
     feature_folder: hr_payroll

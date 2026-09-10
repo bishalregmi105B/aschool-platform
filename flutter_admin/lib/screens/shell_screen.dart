@@ -281,12 +281,6 @@ class ShellScreen extends ConsumerWidget {
             path: '/alumni',
             isLocked: !plugins.isInstalled('alumni'),
           ),
-          DrawerItemData(
-            icon: Icons.hub_rounded,
-            title: 'Social Hub',
-            path: '/social-hub',
-            isLocked: !plugins.isInstalled('social_hub'),
-          ),
         ],
       ),
       DrawerSection(
@@ -375,8 +369,6 @@ class ShellScreen extends ConsumerWidget {
         return 'Reports';
       case '/analytics':
         return 'Analytics';
-      case '/social-hub':
-        return 'Social Hub';
       case '/library':
         return 'Library';
       case '/ai-tools':
