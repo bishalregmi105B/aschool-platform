@@ -1,0 +1,55 @@
+# Widgets contributed by the notices plugin (FC-H1).
+#
+# Endpoints are real GET routes of app/api/v1/notices.py:
+#   GET /notices        notices.py:43   (latest notices)
+#   GET /notices/events notices.py:151  (school events)
+schema_version: 1
+
+widgets:
+  - key: recent_notices
+    title: "Recent Notices"
+    title_i18n: widget.recent_notices.title
+    description: "Latest notices posted for the school"
+    type: list
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.side, default: true, order: 30 }
+    roles: [school_admin, teacher, staff]
+    requires_permissions: []
+    data:
+      source: api
+      endpoint: /notices
+      refresh: { mode: poll, interval_s: 300 }
+      cache_ttl_s: 120
+      select: data
+    spec:
+      item:
+        title: title
+        subtitle: created_at
+      limit: 6
+      empty_text: "No notices posted yet"
+
+  - key: upcoming_events
+    title: "Upcoming Events"
+    title_i18n: widget.upcoming_events.title
+    description: "Next events on the school calendar"
+    type: list
+    renderer: spec
+    surfaces: [web, mobile]
+    slots:
+      - { id: dashboard.side, default: true, order: 35 }
+    roles: [school_admin, teacher, staff, parent, student]
+    requires_permissions: []
+    data:
+      source: api
+      endpoint: /notices/events
+      refresh: { mode: poll, interval_s: 600 }
+      cache_ttl_s: 300
+      select: data
+    spec:
+      item:
+        title: title
+        subtitle: start_date
+      limit: 5
+      empty_text: "No upcoming events"
