@@ -4,7 +4,7 @@ name_nepali: अभिभावक-शिक्षक भेटघाट
 category: growth
 price_monthly: 199
 price_yearly: 1990
-coming_soon: true
+coming_soon: false
 emoji: 🤝
 icon: Users
 description: Online booking for PT conferences, time slot management, video calls,
@@ -30,8 +30,6 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: Schedule
-      route: /dashboard/conferences
 mobile:
   admin:
     feature_folder: conferences

@@ -21,9 +21,6 @@ ui:
     - superadmin
     - school_admin
     subitems:
-    - label: General Settings
-      label_nepali: सामान्य सेटिङ
-      route: /settings
     - label: Notification Settings
       label_nepali: सूचना सेटिङ
       route: /settings/notifications

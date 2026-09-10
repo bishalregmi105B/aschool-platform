@@ -436,3 +436,83 @@ def _coerce_uuid(value):
         return UUID(str(value))
     except (TypeError, ValueError, AttributeError):
         return None
+
+
+@teacher_bp.route("/portfolios", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("student_portfolio")
+def teacher_portfolios():
+    """Portfolio summaries for the students this teacher teaches (B-05).
+
+    The Flutter teacher app has shipped a portfolios screen against this path
+    for a while; without the route every visit 404'd.
+    """
+    from sqlalchemy import func
+
+    from app.models.portfolio import PortfolioItem, StudentPortfolio
+
+    class_ids = teacher_allowed_class_ids(g.school_id, g.user_id) if g.role == "teacher" else None
+    if g.role == "teacher" and not class_ids:
+        return success_response([])
+
+    item_counts = (
+        PortfolioItem.query.filter(
+            PortfolioItem.school_id == g.school_id,
+            PortfolioItem.is_deleted.is_(False),
+        )
+        .with_entities(
+            PortfolioItem.portfolio_id,
+            func.count(PortfolioItem.id).label("item_count"),
+        )
+        .group_by(PortfolioItem.portfolio_id)
+        .subquery()
+    )
+
+    query = (
+        StudentPortfolio.query.filter(
+            StudentPortfolio.school_id == g.school_id,
+            StudentPortfolio.is_deleted.is_(False),
+        )
+        .join(Student, Student.id == StudentPortfolio.student_id)
+        .outerjoin(item_counts, item_counts.c.portfolio_id == StudentPortfolio.id)
+        .filter(
+            Student.is_deleted.is_(False),
+            Student.status == "active",
+            Student.class_id.in_(class_ids) if class_ids else True,
+        )
+        .add_columns(
+            Student.first_name,
+            Student.last_name,
+            Student.roll_number,
+            Student.photo_url,
+            Class.name.label("class_name"),
+            func.coalesce(item_counts.c.item_count, 0).label("item_count"),
+        )
+        .outerjoin(Class, Class.id == Student.class_id)
+    )
+
+    rows = query.order_by(Class.name, Student.roll_number.asc().nullslast()).limit(200).all()
+    portfolios = []
+    for (
+        portfolio,
+        first_name,
+        last_name,
+        roll_number,
+        photo_url,
+        class_name,
+        item_count,
+    ) in rows:
+        portfolios.append(
+            {
+                "portfolio_id": str(portfolio.id),
+                "student_id": str(portfolio.student_id),
+                "student_name": f"{first_name or ''} {last_name or ''}".strip() or "Student",
+                "roll_number": roll_number,
+                "photo_url": photo_url,
+                "class_name": class_name,
+                "item_count": int(item_count or 0),
+                "updated_at": portfolio.updated_at.isoformat() if portfolio.updated_at else None,
+            }
+        )
+    return success_response(portfolios)

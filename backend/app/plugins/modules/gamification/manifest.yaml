@@ -33,8 +33,6 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: Dashboard
-      route: /dashboard/gamification
     - label: Badges
       route: /dashboard/gamification/badges
     - label: Leaderboard

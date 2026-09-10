@@ -267,3 +267,64 @@ def _record_dict(r):
         "dismissed_by_id": str(r.dismissed_by_id) if r.dismissed_by_id else None,
         "notes": r.notes,
     }
+
+
+@dismissal_bp.route("/summary", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("dismissal")
+def dismissal_summary():
+    """Today's dismissal rollup for the admin app overview tab (B-09)."""
+    from datetime import date as date_cls
+
+    from app.models.academic import Class
+    from sqlalchemy import func
+
+    today = date_cls.today()
+
+    total_enrolled = Student.query.filter(
+        Student.school_id == g.school_id,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+    ).count()
+
+    dismissed_rows = (
+        db.session.query(Student.class_id, func.count(DismissalRecord.id))
+        .join(DismissalRecord, DismissalRecord.student_id == Student.id)
+        .filter(
+            DismissalRecord.school_id == g.school_id,
+            DismissalRecord.is_deleted.is_(False),
+            func.date(DismissalRecord.dismissed_at) == today,
+        )
+        .group_by(Student.class_id)
+        .all()
+    )
+    dismissed_by_class = {class_id: count for class_id, count in dismissed_rows}
+    dismissed_today = sum(dismissed_by_class.values())
+
+    class_breakdown = []
+    classes = Class.query.filter_by(school_id=g.school_id, is_deleted=False).all()
+    for klass in classes:
+        class_total = Student.query.filter(
+            Student.school_id == g.school_id,
+            Student.class_id == klass.id,
+            Student.is_deleted.is_(False),
+            Student.status == "active",
+        ).count()
+        class_breakdown.append(
+            {
+                "class_id": str(klass.id),
+                "class_name": klass.name,
+                "total": class_total,
+                "dismissed": int(dismissed_by_class.get(klass.id, 0)),
+            }
+        )
+
+    return success_response(
+        {
+            "total_enrolled": total_enrolled,
+            "dismissed_today": dismissed_today,
+            "pending": max(total_enrolled - dismissed_today, 0),
+            "class_breakdown": class_breakdown,
+        }
+    )

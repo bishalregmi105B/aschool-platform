@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:aschool_shared/aschool_shared.dart';
@@ -46,6 +47,19 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/dashboard',
+    errorBuilder: (context, state) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: NoDataContainer(
+              title: 'Page not found',
+              subtitle: state.uri.toString(),
+            ),
+          ),
+        ),
+      );
+    },
     redirect: (context, state) {
       final isAuth = authUser != null;
       final isLoginRoute = state.matchedLocation == '/login';

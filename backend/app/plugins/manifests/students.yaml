@@ -17,9 +17,6 @@ ui:
     label_nepali: विद्यार्थी
     icon: GraduationCap
     subitems:
-    - label: Student Details
-      label_nepali: विद्यार्थी विवरण
-      route: /students
     - label: Add Student
       label_nepali: नयाँ विद्यार्थी थप्नुहोस्
       route: /students/new

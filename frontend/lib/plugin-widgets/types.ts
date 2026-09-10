@@ -143,6 +143,8 @@ export interface WidgetSpecBody {
   title?: string;
   tap?: { route: string };
   action?: { label: string; route: string; tone?: string };
+  /** Max rows a list widget renders (the endpoint may return more). */
+  limit?: number;
 }
 
 export interface WidgetStateSpec {

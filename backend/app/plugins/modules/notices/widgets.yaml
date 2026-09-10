@@ -25,10 +25,13 @@ widgets:
       select: data
     spec:
       item:
-        title: title
-        subtitle: created_at
+        title: "$.title"
+        subtitle: "$.author_name"
+        timestamp: "$.created_at"
       limit: 6
-      empty_text: "No notices posted yet"
+    states:
+      empty:
+        title: "No notices posted yet"
 
   - key: upcoming_events
     title: "Upcoming Events"
@@ -49,7 +52,10 @@ widgets:
       select: data
     spec:
       item:
-        title: title
-        subtitle: start_date
+        title: "$.title"
+        subtitle: "$.location"
+        timestamp: "$.start_date"
       limit: 5
-      empty_text: "No upcoming events"
+    states:
+      empty:
+        title: "No upcoming events"

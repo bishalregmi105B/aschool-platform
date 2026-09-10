@@ -996,3 +996,42 @@ def student_fees():
             "invoices": invoices,
         }
     )
+
+
+@student_app_bp.route("/classmates", methods=["GET"])
+@jwt_required()
+@school_required
+def student_classmates():
+    """Roster of the current student's own class (and section when set).
+
+    B-07: the Flutter student app used to work around the missing endpoint by
+    fetching `GET /students?per_page=100`, which leaks the whole school roster.
+    """
+    student = _current_student()
+    if not student:
+        return error_response("Student profile not found", 404)
+    if not student.class_id:
+        return success_response([])
+
+    query = Student.query.filter(
+        Student.school_id == g.school_id,
+        Student.class_id == student.class_id,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+    )
+    if student.section_id:
+        query = query.filter(Student.section_id == student.section_id)
+
+    classmates = query.order_by(Student.roll_number.asc().nullslast(), Student.first_name).all()
+    return success_response(
+        [
+            {
+                "id": str(mate.id),
+                "name": f"{mate.first_name or ''} {mate.last_name or ''}".strip() or "Student",
+                "roll_number": mate.roll_number,
+                "photo_url": mate.photo_url,
+                "is_me": mate.id == student.id,
+            }
+            for mate in classmates
+        ]
+    )

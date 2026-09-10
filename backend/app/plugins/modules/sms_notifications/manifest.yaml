@@ -33,8 +33,6 @@ ui:
     visible_to:
     - school_admin
     subitems:
-    - label: SMS Center
-      route: /dashboard/sms
     - label: Announcements
       route: /dashboard/communications/announcements
     - label: Broadcast

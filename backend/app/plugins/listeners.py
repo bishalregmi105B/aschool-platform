@@ -478,10 +478,14 @@ def on_file_deleted(school_id: str, file_id: str, **kwargs):
 # IEMIS EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-@on("iemis.imported")
+@on("iemis.import_completed")
 def on_iemis_imported(school_id: str, **kwargs):
-    """Log IEMIS data import completion."""
-    logger.info("[EVENT] iemis.imported — school=%s", school_id)
+    """Log IEMIS data import completion.
+
+    B-13: the listener was registered as `iemis.imported` while the importer
+    emits `iemis.import_completed` — the push never fired.
+    """
+    logger.info("[EVENT] iemis.import_completed — school=%s", school_id)
     try:
         from app.tasks.push_notifications import send_push_to_school
 

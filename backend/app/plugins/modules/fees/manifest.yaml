@@ -36,8 +36,6 @@ ui:
     - school_admin
     - accountant
     subitems:
-    - label: Overview
-      route: /dashboard/fees
     - label: Fee Types
       route: /dashboard/fees/types
     - label: Fee Structure

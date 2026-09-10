@@ -129,14 +129,17 @@ class TestEndpointOwnership:
         """A widget must not fetch another plugin's API.
 
         Endpoints are checked loosely (first path segment) because several
-        plugins legitimately serve role-scoped prefixes such as /parent-app.
+        plugins legitimately serve role-scoped prefixes such as /parent.
         """
-        allowed_extra = {"parent-app", "student-app", "teacher-app"}
+        allowed_extra = {"parent-app", "parent", "student-app", "student", "teacher-app", "teacher"}
         aliases = {
             "library_management": {"library"},
             "gps_tracking": {"transport"},
             "sms_notifications": {"communications", "sms"},
             "hr_payroll": {"hr"},
+            # ai_suite is a bundle: the ai_tools/workbench/tutor blueprints are
+            # all gated with plugin_required("ai_suite").
+            "ai_suite": {"ai-tools", "ai", "tutor", "benchmarking"},
         }
         for slug in PluginLoader.get_all_manifests():
             for widget in load_plugin_widgets(slug):
@@ -147,6 +150,91 @@ class TestEndpointOwnership:
                 acceptable = {slug, slug.replace("_", "-")} | aliases.get(slug, set())
                 assert first in acceptable | allowed_extra, (
                     f"{widget['id']} fetches /{first}, which is not its own domain"
+                )
+
+    def test_every_widget_endpoint_exists_in_the_url_map(self, app):
+        """B-04 regression class: a widget whose endpoint 404s at runtime.
+
+        Endpoint tokens (`$context.exam_id`) and rule path params
+        (`<exam_id>`) are both wildcards; every other segment must match
+        positionally against an /api/v1 rule of the same length.
+        """
+        rule_variants = []
+        for rule in app.url_map.iter_rules():
+            if not rule.rule.startswith("/api/v1"):
+                continue
+            body = rule.rule[len("/api/v1"):]
+            rule_variants.append([seg for seg in body.split("/") if seg])
+
+        def _matches(endpoint: str) -> bool:
+            ep = [seg for seg in endpoint.strip("/").split("/") if seg]
+            for segs in rule_variants:
+                if len(segs) != len(ep):
+                    continue
+                ok = True
+                for a, b in zip(ep, segs):
+                    a_dynamic = a.startswith("$")
+                    b_dynamic = b.startswith("<") and b.endswith(">")
+                    if a_dynamic or b_dynamic:
+                        continue
+                    if a != b:
+                        ok = False
+                        break
+                if ok:
+                    return True
+            return False
+
+        for slug in PluginLoader.get_all_manifests():
+            for widget in load_plugin_widgets(slug):
+                endpoint = (widget.get("data") or {}).get("endpoint")
+                if not endpoint:
+                    continue
+                assert _matches(endpoint), (
+                    f"{widget['id']} fetches {endpoint}, which matches no backend route"
+                )
+
+
+class TestSpecContract:
+    """B-01/B-02 regression class: the spec dialect the renderers actually read.
+
+    `resolveToken` passes non-`$` strings through untouched, so a bare key in a
+    list item renders the literal field name instead of the value. The working
+    dialect is `$`-prefixed tokens for every value reference.
+    """
+
+    @staticmethod
+    def _spec_widgets():
+        for slug in PluginLoader.get_all_manifests():
+            for widget in load_plugin_widgets(slug):
+                if widget.get("renderer") == "spec":
+                    yield widget
+
+    def test_list_item_fields_are_tokens(self):
+        for widget in self._spec_widgets():
+            if widget.get("type") != "list":
+                continue
+            item = (widget.get("spec") or {}).get("item") or {}
+            for field in ("title", "meta", "timestamp"):
+                value = item.get(field)
+                assert value is None or str(value).startswith("$"), (
+                    f"{widget['id']} spec.item.{field}={value!r} must be a $-token "
+                    "(bare keys render the literal field name)"
+                )
+            subtitle = item.get("subtitle")
+            assert subtitle is None or "$" in str(subtitle), (
+                f"{widget['id']} spec.item.subtitle={subtitle!r} must interpolate a $-token"
+            )
+
+    def test_stat_group_items_are_tokens(self):
+        for widget in self._spec_widgets():
+            if widget.get("type") != "stat-group":
+                continue
+            items = (widget.get("spec") or {}).get("items")
+            assert items, f"{widget['id']} stat-group needs spec.items"
+            for entry in items:
+                value = entry.get("value")
+                assert value is None or str(value).startswith("$"), (
+                    f"{widget['id']} stat item value={value!r} must be a $-token"
                 )
 
 

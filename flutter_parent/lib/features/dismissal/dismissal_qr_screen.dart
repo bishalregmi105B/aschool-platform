@@ -83,7 +83,7 @@ class _StatusCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isReleased
                     ? Colors.green.shade50
-                    : ASchoolTheme.primary.withOpacity(0.1),
+                    : ASchoolTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -184,7 +184,7 @@ class _QrCard extends StatelessWidget {
         ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -240,7 +240,7 @@ class _AuthorizedPickupsCard extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: ASchoolTheme.primary.withOpacity(0.1),
+                        backgroundColor: ASchoolTheme.primary.withValues(alpha: 0.1),
                         backgroundImage: p['photo_url'] != null
                             ? NetworkImage(p['photo_url'].toString())
                             : null,

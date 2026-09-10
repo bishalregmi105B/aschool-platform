@@ -31,8 +31,6 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: All Assignments
-      route: /dashboard/assignments
 mobile:
   teacher:
     feature_folder: assignments

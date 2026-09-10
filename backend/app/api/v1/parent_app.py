@@ -485,6 +485,49 @@ def parent_outstanding_fees():
     return success_response(rows)
 
 
+@parent_app_bp.route("/fees/summary", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("parent", "school_admin", "superadmin")
+def parent_fees_summary():
+    """Aggregate due/paid totals across the parent's wards (mobile fee card)."""
+    parent_user_id = _current_parent_user_id()
+    wards = _wards_for_parent(parent_user_id)
+    selected_students = _pick_students(wards, request.args.get("student_id"))
+    if not selected_students:
+        return success_response(
+            {"total_due": 0, "total_paid": 0, "outstanding_count": 0, "ward_count": 0}
+        )
+
+    student_ids = [student.id for student in selected_students]
+    collections = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.student_id.in_(student_ids),
+        FeeCollection.is_deleted.is_(False),
+    ).all()
+
+    total_due = 0.0
+    total_paid = 0.0
+    outstanding_count = 0
+    for collection in collections:
+        total_amount = float(collection.amount or 0)
+        paid_amount = _extract_partial_paid(collection)
+        total_paid += min(paid_amount, total_amount)
+        due_amount = max(total_amount - paid_amount, 0)
+        if due_amount > 0:
+            total_due += due_amount
+            outstanding_count += 1
+
+    return success_response(
+        {
+            "total_due": round(total_due, 2),
+            "total_paid": round(total_paid, 2),
+            "outstanding_count": outstanding_count,
+            "ward_count": len(selected_students),
+        }
+    )
+
+
 @parent_app_bp.route("/child-wellbeing", methods=["GET"])
 @jwt_required()
 @school_required

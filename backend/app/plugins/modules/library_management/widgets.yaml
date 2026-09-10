@@ -25,13 +25,13 @@ widgets:
       cache_ttl_s: 120
       select: data
     spec:
-      stats:
-        - label: Titles
-          value_path: titles
-        - label: Total Copies
-          value_path: total_copies
-        - label: Available
-          value_path: available_copies
+      items:
+        - { label: Titles, value: "$.titles" }
+        - { label: "Total Copies", value: "$.total_copies" }
+        - { label: Available, value: "$.available_copies", tone: success }
+      link: { label: "Open library", href: /dashboard/library }
+    states:
+      empty: { title: "No books catalogued yet" }
 
   # ── Overdue panel for the wide dashboard slot ──
   - key: library_overdue

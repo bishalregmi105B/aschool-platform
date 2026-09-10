@@ -235,7 +235,7 @@ class _ConferenceCardState extends State<_ConferenceCard> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: ASchoolTheme.secondary.withOpacity(0.1),
+                    color: ASchoolTheme.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
