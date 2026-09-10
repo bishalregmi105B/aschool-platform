@@ -226,6 +226,92 @@ def _class_dict(klass):
     }
 
 
+@teacher_bp.route("/wellbeing", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("teacher", "school_admin", "superadmin")
+@plugin_required("wellbeing")
+def teacher_wellbeing():
+    """Recent mood check-ins + alerts + summary for the teacher app.
+
+    The flutter_teacher student-wellbeing screen called this route which did
+    not exist — every load errored. Composed from mood_entries (FC-MOB).
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    from app.models.wellbeing import MoodEntry
+
+    days = int(request.args.get("days", 7))
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    checkins = (
+        MoodEntry.query.filter_by(school_id=g.school_id)
+        .filter(MoodEntry.created_at >= since)
+        .order_by(MoodEntry.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    latest = (
+        db.session.query(
+            MoodEntry.student_id,
+            func.max(MoodEntry.created_at).label("latest_at"),
+        )
+        .filter(MoodEntry.school_id == g.school_id, MoodEntry.created_at >= since)
+        .group_by(MoodEntry.student_id)
+        .subquery()
+    )
+    alert_rows = (
+        db.session.query(MoodEntry, Student)
+        .join(latest, latest.c.student_id == MoodEntry.student_id)
+        .join(Student, Student.id == MoodEntry.student_id)
+        .filter(
+            MoodEntry.school_id == g.school_id,
+            MoodEntry.created_at == latest.c.latest_at,
+            MoodEntry.mood.in_(("sad", "anxious", "angry")),
+        )
+        .all()
+    )
+
+    distribution = dict(
+        db.session.query(MoodEntry.mood, func.count(MoodEntry.id))
+        .filter(MoodEntry.school_id == g.school_id, MoodEntry.created_at >= since)
+        .group_by(MoodEntry.mood)
+        .all()
+    )
+    happy = int(distribution.get("happy", 0))
+    neutral = int(distribution.get("okay", 0)) + int(distribution.get("neutral", 0))
+
+    def _mood_row(m, s):
+        return {
+            "mood": m.mood,
+            "student_name": f"{s.first_name} {s.last_name}".strip() if s else None,
+            "note": (m.notes or "").strip() or None,
+            "date": m.created_at.date().isoformat() if m.created_at else None,
+        }
+
+    return success_response({
+        "checkins": [_mood_row(m, getattr(m, "student", None)) for m in checkins],
+        "alerts": [
+            {
+                "student_name": f"{s.first_name} {s.last_name}".strip(),
+                "reason": f"Latest mood: {m.mood}" + (f" — {(m.notes or '').strip()}" if (m.notes or '').strip() else ""),
+                "alert_type": m.mood,
+                "date": m.created_at.date().isoformat() if m.created_at else None,
+            }
+            for m, s in alert_rows
+        ],
+        "summary": {
+            "happy": happy,
+            "neutral": neutral,
+            "at_risk": len(alert_rows),
+            "total_entries": sum(distribution.values()),
+        },
+    })
+
+
 def _student_dict(student):
     total = len([record for record in student.attendance_records if not record.is_deleted])
     present = len([

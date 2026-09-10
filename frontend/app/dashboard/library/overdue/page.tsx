@@ -1,11 +1,13 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import type { PaginationMeta } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -18,14 +20,21 @@ export default function OverduePage() {
 
 function OverdueContent() {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
 
+  // FC-A04: the backend computes overdue live (status=overdue = issued AND
+  // due_date < today). The old client-side filter fetched every issued issue,
+  // dropped the pagination envelope, and only ever showed page 1.
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["library-overdue"],
+    queryKey: ["library-overdue", page],
     queryFn: async () => {
-      const r = await api.get("/library/issues", { params: { status: "issued" } });
-      const all: any[] = r.data?.data || [];
-      const today = new Date();
-      return all.filter((issue: any) => issue.due_date && new Date(issue.due_date) < today);
+      const r = await api.get("/library/issues", {
+        params: { status: "overdue", page },
+      });
+      return {
+        rows: (r.data?.data || []) as any[],
+        meta: (r.data?.meta as any)?.pagination as PaginationMeta | undefined,
+      };
     },
     retry: 1,
   });
@@ -49,7 +58,8 @@ function OverdueContent() {
     );
   }
 
-  const overdue = data || [];
+  const overdue = data?.rows || [];
+  const meta = data?.meta;
 
   const OVERDUE_COLUMNS: Column<any>[] = [
     { key: "book", label: "Book", sortable: true, value: (i) => i.book_title ?? "", render: (i) => (
@@ -91,7 +101,7 @@ function OverdueContent() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <AlertCircle className="h-6 w-6 text-destructive" /> Overdue Books
           </h1>
-          <p className="text-muted-foreground">Books past their due date — {overdue.length} overdue</p>
+          <p className="text-muted-foreground">Books past their due date — {meta?.total ?? overdue.length} overdue</p>
         </div>
       </div>
 
@@ -110,6 +120,8 @@ function OverdueContent() {
             searchable
             searchPlaceholder="Search books or students…"
             exportFileName="library-overdue"
+            pagination={meta}
+            onPageChange={setPage}
           />
         </CardContent></Card>
       )}

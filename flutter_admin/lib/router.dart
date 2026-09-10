@@ -16,7 +16,6 @@ import 'features/assignments/assignments_screen.dart';
 import 'features/exams/exams_screen.dart';
 import 'features/fees/fees_management.dart';
 import 'features/analytics/analytics_screen.dart';
-import 'features/social_hub/social_hub_screen.dart';
 import 'features/ai_tools/ai_tools_screen.dart';
 import 'features/marketplace/marketplace_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -156,9 +155,6 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/certificates',
                   builder: (_, __) => const CertificatesScreen()),
-              GoRoute(
-                  path: '/social-hub',
-                  builder: (_, __) => const SocialHubScreen()),
               GoRoute(
                   path: '/library', builder: (_, __) => const LibraryScreen()),
               GoRoute(

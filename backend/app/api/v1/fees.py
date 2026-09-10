@@ -11,6 +11,7 @@ from io import BytesIO
 from flask import Blueprint, Response, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload
 
 from app.models.fee import (
     FeeCollection,
@@ -558,14 +559,17 @@ def list_recent_fees():
         return error_response("limit must be a positive integer", 400)
     recent_receipts = (
         FeeReceipt.query.filter_by(school_id=g.school_id, is_deleted=False)
+        .options(joinedload(FeeReceipt.collection), joinedload(FeeReceipt.student))
         .order_by(FeeReceipt.created_at.desc())
         .limit(limit)
         .all()
     )
     result = []
     for r in recent_receipts:
-        collection = FeeCollection.query.get(r.collection_id) if r.collection_id else None
-        student = Student.query.get(r.student_id) if r.student_id else None
+        # FC-A05: collection + student were re-fetched per receipt inside this
+        # loop (2N extra queries); relationships are eager-loaded above now.
+        collection = r.collection
+        student = r.student
         result.append({
             "id": str(r.id),
             "student_name": (
@@ -603,7 +607,11 @@ def list_outstanding_fees():
             query.join(Student, Student.id == FeeCollection.student_id)
             .filter(Student.class_id == class_id, Student.is_deleted.is_(False))
         )
-    query = query.order_by(FeeCollection.created_at.asc()).limit(limit)
+    query = (
+        query.options(joinedload(FeeCollection.student).joinedload(Student.klass))
+        .order_by(FeeCollection.created_at.asc())
+        .limit(limit)
+    )
     collections = query.all()
 
     result = []
@@ -613,7 +621,8 @@ def list_outstanding_fees():
         due = max(payable - paid, 0.0)
         if due <= 0:
             continue
-        student = Student.query.get(c.student_id) if c.student_id else None
+        # FC-A05: student was re-fetched per collection inside this loop.
+        student = c.student if c.student_id else None
         klass = student.klass if student else None
         result.append({
             "id": str(c.id),

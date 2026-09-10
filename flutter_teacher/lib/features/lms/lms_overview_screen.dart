@@ -39,7 +39,7 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/lms/courses?created_by=me&per_page=30'),
-        ApiClient.instance.get('/lms/live-classes?created_by=me&per_page=20'),
+        ApiClient.instance.get('/lms/live-classes?mine=1&per_page=20'),
       ]);
       if (!mounted) return;
       final coursesRaw = results[0].data;

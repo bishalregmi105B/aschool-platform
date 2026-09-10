@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -19,6 +20,10 @@ from app.models.base import SchoolModel
 
 class Book(SchoolModel):
     __tablename__ = "books"
+    __table_args__ = (
+        # FC-A06: every catalog query filters school+is_deleted and sorts by title
+        Index("ix_books_school_deleted_title", "school_id", "is_deleted", "title"),
+    )
 
     title = Column(String(500), nullable=False)
     author = Column(String(300))
@@ -56,6 +61,13 @@ class BookTransaction(SchoolModel):
 
 class BookIssue(SchoolModel):
     __tablename__ = "book_issues"
+    __table_args__ = (
+        # FC-A06: checkout desk looks up the active issue for a book; the
+        # overdue page filters school+status+due_date. Previously only a
+        # school+student index existed and both scans were sequential.
+        Index("ix_book_issues_school_book", "school_id", "book_id"),
+        Index("ix_book_issues_school_status_due", "school_id", "status", "due_date"),
+    )
 
     book_id = Column(UUID(as_uuid=True), ForeignKey("books.id"), nullable=False)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"))

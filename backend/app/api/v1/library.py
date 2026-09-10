@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 
 from app.models.library import Book, BookIssue
 from app.models.student import Student
@@ -141,6 +142,9 @@ def delete_book(book_id):
 @plugin_required("library_management")
 def list_issues():
     query = BookIssue.query.filter_by(school_id=g.school_id)
+    # FC-A05: _issue_dict touches book.title and student.first/last_name per
+    # row — without eager loading that was 2 extra queries per issue.
+    query = query.options(joinedload(BookIssue.book), joinedload(BookIssue.student))
     status = request.args.get("status")
     if status == "overdue":
         # overdue = issued and past due (status column is a snapshot; compute
@@ -324,6 +328,7 @@ def teacher_library():
     )
     issues = (
         BookIssue.query.filter_by(school_id=g.school_id, status="issued")
+        .options(joinedload(BookIssue.book), joinedload(BookIssue.student))
         .order_by(BookIssue.due_date.asc())
         .limit(200)
         .all()

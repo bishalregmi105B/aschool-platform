@@ -53,7 +53,7 @@ ui:
     - teacher
     subitems:
     - label: Sections
-      route: /dashboard/ai-teacher/content
+      route: /dashboard/ai-teacher
     - label: Exercise Bank
       route: /dashboard/ai-tools
 mobile:

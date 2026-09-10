@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
-/// Inventory & Assets — items, stock tracking, purchase requests
+/// Inventory & Assets — asset register CRUD against /inventory/assets.
+///
+/// FC-MOB: this screen previously called /inventory (a path that never
+/// existed) and was written against a consumable-stock model (quantity /
+/// min_quantity / unit) that the Asset backend does not have. Rewritten to
+/// the real asset model: name, category, location, condition.
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
 
@@ -28,7 +33,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       _error = null;
     });
     try {
-      final res = await ApiClient.instance.get('/inventory?per_page=50');
+      final res = await ApiClient.instance.get('/inventory/assets?per_page=50');
       setState(() {
         _items = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
         _loading = false;
@@ -42,11 +47,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }
   }
 
-    /// Manage sheet: adjust stock, delete asset.
+  /// Manage sheet: edit asset fields, delete asset.
   void _showItemActions(Map<String, dynamic> item) {
     final itemId = item['id']?.toString();
     final nameCtrl = TextEditingController(text: safeStringOrNull(item['name']) ?? '');
-    final qtyCtrl = TextEditingController(text: '${safeIntOrNull(item['quantity']) ?? 0}');
+    final categoryCtrl = TextEditingController(text: safeStringOrNull(item['category']) ?? '');
+    final locationCtrl = TextEditingController(text: safeStringOrNull(item['location']) ?? '');
+    String condition = safeStringOrNull(item['condition']) ?? 'good';
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -77,17 +84,36 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: qtyCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Quantity'),
+                controller: categoryCtrl,
+                decoration: const InputDecoration(labelText: 'Category'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: locationCtrl,
+                decoration: const InputDecoration(labelText: 'Location'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: condition,
+                decoration: const InputDecoration(labelText: 'Condition'),
+                items: const [
+                  DropdownMenuItem(value: 'new', child: Text('New')),
+                  DropdownMenuItem(value: 'good', child: Text('Good')),
+                  DropdownMenuItem(value: 'fair', child: Text('Fair')),
+                  DropdownMenuItem(value: 'poor', child: Text('Poor')),
+                  DropdownMenuItem(value: 'damaged', child: Text('Damaged')),
+                ],
+                onChanged: (v) => condition = v ?? condition,
               ),
               const SizedBox(height: 14),
               FilledButton(
                 onPressed: () async {
                   try {
-                    await ApiClient.instance.put('/inventory/$itemId', data: {
+                    await ApiClient.instance.put('/inventory/assets/$itemId', data: {
                       'name': nameCtrl.text.trim(),
-                      'quantity': int.tryParse(qtyCtrl.text.trim()) ?? 0,
+                      'category': categoryCtrl.text.trim(),
+                      'location': locationCtrl.text.trim(),
+                      'condition': condition,
                     });
                     if (!sheetContext.mounted) return;
                     Navigator.of(sheetContext).pop();
@@ -118,7 +144,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 onPressed: () async {
                   Navigator.of(sheetContext).pop();
                   try {
-                    await ApiClient.instance.delete('/inventory/$itemId');
+                    await ApiClient.instance.delete('/inventory/assets/$itemId');
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Asset deleted')));
@@ -157,7 +183,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _showAddItemDialog(context),
-          tooltip: 'Add Item',
+          tooltip: 'Add Asset',
           child: const Icon(Icons.add_rounded),
         ),
         body: Column(
@@ -166,7 +192,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: SearchBarWidget(
-                hintText: 'Search items...',
+                hintText: 'Search assets...',
                 onChanged: (v) => setState(() => _search = v),
               ),
             ),
@@ -177,9 +203,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ? ErrorContainer(errorMessage: _error!, onRetry: _load)
                       : filtered.isEmpty
                       ? const NoDataContainer(
-                          title: 'No inventory items',
+                          title: 'No assets',
                           subtitle:
-                              'Add items to track school assets and stock',
+                              'Add assets to track school property',
                           icon: Icons.inventory_2_rounded,
                         )
                       : PullToRefresh(
@@ -189,11 +215,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             itemCount: filtered.length,
                             itemBuilder: (_, i) {
                               final item = filtered[i];
-                              final qty =
-                                  safeIntOrNull(item['quantity']) ?? 0;
-                              final minQty =
-                                  safeIntOrNull(item['min_quantity']) ?? 0;
-                              final isLow = qty <= minQty && minQty > 0;
+                              final condition =
+                                  safeStringOrNull(item['condition']) ?? 'good';
+                              final needsAttention =
+                                  condition == 'poor' || condition == 'damaged';
 
                               return ESchoolAnimatedEntry(
                                 index: i,
@@ -203,13 +228,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   child: ListTile(
                                     contentPadding: EdgeInsets.zero,
                                     leading: CircleAvatar(
-                                      backgroundColor: (isLow
+                                      backgroundColor: (needsAttention
                                               ? ASchoolTheme.danger
                                               : ASchoolTheme.primary)
                                           .withAlpha(20),
                                       child: Icon(
                                         Icons.inventory_2_rounded,
-                                        color: isLow
+                                        color: needsAttention
                                             ? ASchoolTheme.danger
                                             : ASchoolTheme.primary,
                                         size: 20,
@@ -221,35 +246,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                           fontWeight: FontWeight.w600),
                                     ),
                                     subtitle: Text(
-                                      '${item['category'] ?? ''} • ${item['location'] ?? 'No location'}',
+                                      '${safeStringOrNull(item['category']) ?? 'Uncategorised'} • ${safeStringOrNull(item['location']) ?? 'No location'}',
                                       style: const TextStyle(
                                           fontSize: 12,
                                           color: ASchoolTheme.mutedText),
                                     ),
-                                    trailing: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '$qty',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: isLow
-                                                ? ASchoolTheme.danger
-                                                : ASchoolTheme.secondary,
-                                            fontSize: 18,
-                                          ),
-                                        ),
-                                        Text(
-                                          'in stock',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: ASchoolTheme.mutedText,
-                                          ),
-                                        ),
-                                      ],
+                                    trailing: Text(
+                                      condition,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: needsAttention
+                                            ? ASchoolTheme.danger
+                                            : ASchoolTheme.secondary,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -266,15 +276,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   void _showAddItemDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
-    final qtyCtrl = TextEditingController(text: '0');
-    final minQtyCtrl = TextEditingController(text: '0');
-    final unitCtrl = TextEditingController(text: 'pcs');
+    final categoryCtrl = TextEditingController();
+    final locationCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add Inventory Item'),
+        title: const Text('Add Asset'),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
@@ -283,37 +292,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               children: [
                 TextFormField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Item Name *'),
+                  decoration: const InputDecoration(labelText: 'Asset Name *'),
                   validator: (v) =>
                       (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: qtyCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Quantity'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: unitCtrl,
-                        decoration: const InputDecoration(labelText: 'Unit'),
-                      ),
-                    ),
-                  ],
+                TextFormField(
+                  controller: categoryCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Category (furniture, IT, sports…)'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: minQtyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Min Quantity (for low-stock alert)',
-                  ),
-                  keyboardType: TextInputType.number,
+                  controller: locationCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Location'),
                 ),
               ],
             ),
@@ -329,18 +322,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               if (!formKey.currentState!.validate()) return;
               Navigator.pop(context);
               try {
-                await ApiClient.instance.post('/inventory', data: {
+                await ApiClient.instance.post('/inventory/assets', data: {
                   'name': nameCtrl.text.trim(),
-                  'quantity': int.tryParse(qtyCtrl.text) ?? 0,
-                  'min_quantity': int.tryParse(minQtyCtrl.text) ?? 0,
-                  'unit': unitCtrl.text.trim(),
+                  'category': categoryCtrl.text.trim(),
+                  'location': locationCtrl.text.trim(),
                 });
                 _load();
               } catch (e, st) {
                 debugPrint('InventoryScreen addItem failed: $e\n$st');
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to add item')),
+                    const SnackBar(content: Text('Failed to add asset')),
                   );
                 }
               }

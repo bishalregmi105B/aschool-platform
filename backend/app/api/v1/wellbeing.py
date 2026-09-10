@@ -1,7 +1,9 @@
-from datetime import timezone
 """Wellbeing API — mood tracking, counselor notes, wellbeing surveys."""
+from datetime import datetime, timedelta, timezone
+
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
+from sqlalchemy import case, func
 
 from app.models.wellbeing import MoodEntry, CounselorNote, WellbeingSurvey
 from app.models.student import Student
@@ -12,6 +14,9 @@ from app.utils.response import created_response, error_response, success_respons
 from extensions import db
 
 wellbeing_bp = Blueprint("wellbeing", __name__, url_prefix="/wellbeing")
+
+# Moods the admin dashboard treats as "needs attention". 'okay' is neutral.
+_NEGATIVE_MOODS = ("sad", "anxious", "angry")
 
 
 # ── Mood Tracking ─────────────────────────────────────────
@@ -75,9 +80,6 @@ def submit_mood():
 @plugin_required("wellbeing")
 def mood_summary():
     """Aggregate mood summary for a class or school."""
-    from sqlalchemy import func, cast
-    from datetime import datetime, timedelta
-
     days = int(request.args.get("days", 7))
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
@@ -93,6 +95,133 @@ def mood_summary():
         "mood_distribution": {mood: count for mood, count in results},
         "total_entries": sum(c for _, c in results),
     })
+
+
+# ── Admin rollup (serves the flutter_admin wellbeing screen) ────────────────
+
+@wellbeing_bp.route("/dashboard", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("wellbeing")
+@role_required("superadmin", "school_admin", "teacher")
+def wellbeing_dashboard():
+    """Per-class wellbeing rollup.
+
+    The flutter_admin wellbeing screen reads `class_summaries` (class name,
+    student count, average mood, at-risk count) from this route — previously
+    the route did not exist and the screen 404ed on every load.
+    """
+    days = int(request.args.get("days", 7))
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    # Mood labels aren't numeric — score them (happy=5 … negative=1) so the
+    # per-class average is meaningful.
+    mood_scores = case(
+        (MoodEntry.mood == "happy", 5),
+        (MoodEntry.mood == "okay", 4),
+        (MoodEntry.mood == "neutral", 3),
+        else_=1,
+    )
+    rows = (
+        db.session.query(
+            Student.class_id,
+            func.count(func.distinct(MoodEntry.student_id)).label("students"),
+            func.avg(mood_scores).label("avg_mood"),
+        )
+        .join(Student, Student.id == MoodEntry.student_id)
+        .filter(
+            MoodEntry.school_id == g.school_id,
+            MoodEntry.created_at >= since,
+        )
+        .group_by(Student.class_id)
+        .all()
+    )
+
+    class_ids = [r.class_id for r in rows if r.class_id]
+    class_names = {}
+    if class_ids:
+        from app.models.academic import Class
+
+        for c in Class.query.filter(Class.id.in_(class_ids)).all():
+            class_names[str(c.id)] = c.name
+
+    # at-risk = students whose most recent mood is negative in the window.
+    # Key by "" when class_id is NULL (matches the summaries key below) so
+    # unassigned-class students are still counted.
+    at_risk_rows = (
+        db.session.query(Student.class_id, func.count(func.distinct(MoodEntry.student_id)))
+        .join(Student, Student.id == MoodEntry.student_id)
+        .filter(
+            MoodEntry.school_id == g.school_id,
+            MoodEntry.created_at >= since,
+            MoodEntry.mood.in_(_NEGATIVE_MOODS),
+        )
+        .group_by(Student.class_id)
+        .all()
+    )
+    at_risk_by_class = {str(cid) if cid else "": n for cid, n in at_risk_rows}
+
+    summaries = [
+        {
+            "class_id": str(r.class_id) if r.class_id else None,
+            "class_name": class_names.get(str(r.class_id) if r.class_id else "", "Unassigned"),
+            "student_count": int(r.students or 0),
+            "avg_mood": round(float(r.avg_mood or 0), 2),
+            "at_risk_count": at_risk_by_class.get(str(r.class_id) if r.class_id else "", 0),
+        }
+        for r in rows
+    ]
+    return success_response({
+        "period_days": days,
+        "class_summaries": summaries,
+        "at_risk_total": sum(s["at_risk_count"] for s in summaries),
+    })
+
+
+@wellbeing_bp.route("/alerts", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("wellbeing")
+@role_required("superadmin", "school_admin", "teacher")
+def wellbeing_alerts():
+    """Students whose latest mood in the window is negative — the admin
+    app's alerts tab. Honest flagging from mood_entries (not AI)."""
+    days = int(request.args.get("days", 7))
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    latest = (
+        db.session.query(
+            MoodEntry.student_id,
+            func.max(MoodEntry.created_at).label("latest_at"),
+        )
+        .filter(MoodEntry.school_id == g.school_id, MoodEntry.created_at >= since)
+        .group_by(MoodEntry.student_id)
+        .subquery()
+    )
+    alerts = (
+        db.session.query(MoodEntry, Student)
+        .join(latest, latest.c.student_id == MoodEntry.student_id)
+        .join(Student, Student.id == MoodEntry.student_id)
+        .filter(
+            MoodEntry.school_id == g.school_id,
+            MoodEntry.created_at == latest.c.latest_at,
+            MoodEntry.mood.in_(_NEGATIVE_MOODS),
+        )
+        .all()
+    )
+    data = [
+        {
+            "student_id": str(s.id),
+            "student_name": f"{s.first_name} {s.last_name}".strip(),
+            "mood": m.mood,
+            "energy_level": m.energy_level,
+            "message": (m.notes or "").strip() or None,
+            "severity": "high" if m.mood == "angry" else ("medium" if m.mood == "anxious" else "low"),
+            "recorded_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m, s in alerts
+    ]
+    return success_response(data)
 
 
 # ── Counselor Notes ───────────────────────────────────────

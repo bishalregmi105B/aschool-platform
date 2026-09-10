@@ -21,7 +21,8 @@ class NoticeRepository {
 
   Future<List<Announcement>> getAnnouncements(String classId, String sectionId) async {
     try {
-      final response = await ApiClient.instance.get('/announcements?class_id=$classId&section_id=$sectionId');
+      // FC-MOB: announcements live under /notices (no /announcements blueprint)
+      final response = await ApiClient.instance.get('/notices?class_id=$classId&section_id=$sectionId');
       if (envelopeOk(response.data)) {
         return envelopeRows(response.data, source: 'NoticeRepository.getAnnouncements')
             .map(Announcement.fromJson)

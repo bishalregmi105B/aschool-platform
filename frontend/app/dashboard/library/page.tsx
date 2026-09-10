@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import type { PaginationMeta } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
@@ -37,6 +38,7 @@ interface BookIssue {
   due_date: string;
   returned_date: string | null;
   status: string;
+  fine_amount?: number;
 }
 
 export default function LibraryPage() {
@@ -50,29 +52,42 @@ export default function LibraryPage() {
 function LibraryContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
+  const [bookPage, setBookPage] = useState(1);
+  const [issuePage, setIssuePage] = useState(1);
   const [showAddBook, setShowAddBook] = useState(false);
   const initialTab = searchParams.get("tab") === "issues" ? "issues" : "books";
   const [tab, setTab] = useState<"books" | "issues">(initialTab);
   const queryClient = useQueryClient();
 
-  const { data: books, isLoading, isError, refetch } = useQuery({
+  const { data: bookData, isLoading, isError, refetch } = useQuery({
     retry: 1,
-    queryKey: ["library-books", search],
+    queryKey: ["library-books", search, bookPage],
     queryFn: async () => {
-      const params = search ? `?search=${encodeURIComponent(search)}` : "";
-      const res = await api.get<ApiResponse>(`/library/books${params}`);
-      return (res.data.data as Book[]) || [];
+      const params = new URLSearchParams({ page: String(bookPage) });
+      if (search) params.set("search", search);
+      const res = await api.get<ApiResponse>(`/library/books?${params}`);
+      return {
+        rows: (res.data.data as Book[]) || [],
+        meta: (res.data.meta as any)?.pagination as PaginationMeta | undefined,
+      };
     },
   });
+  const books = bookData?.rows;
+  const bookMeta = bookData?.meta;
 
-  const { data: issues } = useQuery({
-    queryKey: ["library-issues"],
+  const { data: issueData } = useQuery({
+    queryKey: ["library-issues", issuePage],
     queryFn: async () => {
-      const res = await api.get<ApiResponse>("/library/issues");
-      return (res.data.data as BookIssue[]) || [];
+      const res = await api.get<ApiResponse>(`/library/issues?page=${issuePage}`);
+      return {
+        rows: (res.data.data as BookIssue[]) || [],
+        meta: (res.data.meta as any)?.pagination as PaginationMeta | undefined,
+      };
     },
     enabled: tab === "issues",
   });
+  const issues = issueData?.rows;
+  const issueMeta = issueData?.meta;
 
   const addBookMut = useMutation({
     mutationFn: async (data: Partial<Book>) => {
@@ -164,10 +179,10 @@ function LibraryContent() {
 
       <div className="flex gap-2">
         <Button variant={tab === "books" ? "default" : "outline"} onClick={() => setTab("books")}>
-          <BookOpen className="h-4 w-4 mr-2" /> Books ({books?.length || 0})
+          <BookOpen className="h-4 w-4 mr-2" /> Books ({bookMeta?.total ?? books?.length ?? 0})
         </Button>
         <Button variant={tab === "issues" ? "default" : "outline"} onClick={() => setTab("issues")}>
-          <RotateCcw className="h-4 w-4 mr-2" /> Issues
+          <RotateCcw className="h-4 w-4 mr-2" /> Issues{issueMeta ? ` (${issueMeta.total})` : ""}
         </Button>
       </div>
 
@@ -180,9 +195,11 @@ function LibraryContent() {
               rowKey={(b) => b.id}
               searchable
               searchValue={search}
-              onSearchChange={setSearch}
+              onSearchChange={(v) => { setSearch(v); setBookPage(1); }}
               searchPlaceholder="Search books..."
               exportFileName="library-books"
+              pagination={bookMeta}
+              onPageChange={setBookPage}
             />
           </CardContent>
         </Card>
@@ -198,6 +215,8 @@ function LibraryContent() {
               searchable
               searchPlaceholder="Search issues…"
               exportFileName="library-issues"
+              pagination={issueMeta}
+              onPageChange={setIssuePage}
             />
           </CardContent>
         </Card>

@@ -32,10 +32,6 @@ ui:
     subitems:
     - label: Schedule
       route: /dashboard/conferences
-    - label: Time Slots
-      route: /dashboard/conferences/slots
-    - label: History
-      route: /dashboard/conferences/history
 mobile:
   admin:
     feature_folder: conferences

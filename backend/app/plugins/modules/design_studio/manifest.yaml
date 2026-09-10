@@ -32,6 +32,8 @@ ui:
       route: /dashboard/designer/editor
     - label: Bulk ID Cards
       route: /dashboard/designer/bulk
+    - label: Certificates
+      route: /dashboard/certificates
 mobile:
   admin:
     feature_folder: design_studio
