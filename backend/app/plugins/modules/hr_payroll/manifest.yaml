@@ -23,8 +23,6 @@ ui:
     - school_admin
     - accountant
     subitems:
-    - label: Overview
-      route: /dashboard/hr
     - label: Payroll
       route: /dashboard/hr/payroll
     - label: Payroll Settings

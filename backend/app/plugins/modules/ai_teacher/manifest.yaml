@@ -62,8 +62,6 @@ ui:
     - teacher
     - student
     subitems:
-    - label: Start a Lesson
-      route: /dashboard/ai-teacher
     - label: Usage & Cost
       route: /dashboard/analytics/ai-usage
 mobile:

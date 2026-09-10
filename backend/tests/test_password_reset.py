@@ -202,7 +202,11 @@ class TestResetPassword:
             if _rc is not None:
                 _rc.delete(f"pwreset_cooldown:{reset_target.email}")
 
-            fresh = _create_app().test_client()
+            # Same "testing" config as the session `app` fixture — a bare
+            # _create_app() defaults to development and points at DATABASE_URL
+            # (port 5432), not TEST_DATABASE_URL, so the request 500'd on
+            # connection auth.
+            fresh = _create_app("testing").test_client()
             resp = fresh.post(
                 "/api/v1/auth/forgot-password",
                 json={"email": reset_target.email},

@@ -24,8 +24,6 @@ ui:
     - teacher
     - student
     subitems:
-    - label: Browse Books
-      route: /dashboard/elibrary
     - label: Past Papers
       route: /dashboard/elibrary/past-papers
 mobile:

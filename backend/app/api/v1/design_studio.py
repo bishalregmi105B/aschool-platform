@@ -585,7 +585,7 @@ def bulk_attendance_ledger():
 @design_studio_bp.route("/ai/question-paper", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_question_paper():
     """AI-generate an exam paper."""
@@ -607,7 +607,7 @@ def generate_question_paper():
 @design_studio_bp.route("/ai/lesson-plan", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@plugin_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_lesson_plan():
     """AI-generate a lesson plan."""

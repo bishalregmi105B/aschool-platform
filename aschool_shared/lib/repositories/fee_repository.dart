@@ -7,13 +7,22 @@ import 'exceptions.dart';
 class FeeRepository {
   static const _uuid = Uuid();
 
+  /// Fee statement for a student — maps `GET /student/fees` (student domain):
+  /// `{overview: {total_fees, paid, due}, invoices: [...]}`.
   Future<FeeDetails> getFeeDetails(String studentId) async {
     try {
-      final response = await ApiClient.instance.get('/fees/student/$studentId');
+      final response = await ApiClient.instance.get('/student/fees');
       if (response.data['success'] == true) {
-        return FeeDetails.fromJson(
+        final body =
             envelopeObject(response.data, source: 'FeeRepository.getFeeDetails') ??
-                const {});
+                const {};
+        final overview = (body['overview'] as Map?) ?? const {};
+        return FeeDetails.fromJson({
+          'total_fees': overview['total_fees'],
+          'paid_amount': overview['paid'],
+          'due_amount': overview['due'],
+          'items': body['invoices'],
+        });
       }
       throw ApiException(envelopeErrorText(response.data, 'Failed to fetch fee details'));
     } catch (e) {
@@ -22,21 +31,24 @@ class FeeRepository {
     }
   }
 
-  /// Record a manual payment with idempotency key to prevent duplicates.
-  Future<bool> makePayment(
-    String studentId,
-    double amount,
-    String method,
-    String transactionId,
-  ) async {
+  /// Record a manual payment against a fee collection (admin/accountant).
+  /// `POST /fees/collections/<id>/pay` with an idempotency key to prevent
+  /// duplicates on network retries or double-clicks.
+  Future<bool> recordCollectionPayment({
+    required String collectionId,
+    required double amount,
+    required String method,
+    String? transactionId,
+    String? paymentDate,
+  }) async {
     try {
-      final idempotencyKey = _uuid.v4();
-      final response = await ApiClient.instance.post('/fees/pay', data: {
-        'student_id': studentId,
+      final response = await ApiClient.instance
+          .post('/fees/collections/$collectionId/pay', data: {
         'amount': amount,
         'payment_method': method,
-        'transaction_id': transactionId,
-        'idempotency_key': idempotencyKey,
+        if (transactionId != null) 'transaction_id': transactionId,
+        if (paymentDate != null) 'payment_date': paymentDate,
+        'idempotency_key': _uuid.v4(),
       });
       return response.data['success'] == true;
     } catch (e) {
@@ -44,9 +56,13 @@ class FeeRepository {
     }
   }
 
+  /// Payment history for a student — `GET /fees/collections?student_id=`.
   Future<List<FeePayment>> getTransactions(String studentId) async {
     try {
-      final response = await ApiClient.instance.get('/fees/transactions?student_id=$studentId');
+      final response = await ApiClient.instance.get(
+        '/fees/collections',
+        queryParameters: {'student_id': studentId},
+      );
       if (response.data['success'] == true) {
         return envelopeRows(response.data, source: 'FeeRepository.getTransactions')
             .map(FeePayment.fromJson)
@@ -69,8 +85,9 @@ class FeeRepository {
   }) async {
     try {
       final response = await ApiClient.instance.post(
-        '/fees/initiate-payment/$collectionId',
+        '/fees/initiate-payment',
         data: {
+          'fee_ids': [collectionId],
           'provider': provider,
           if (returnUrl != null) 'return_url': returnUrl,
         },

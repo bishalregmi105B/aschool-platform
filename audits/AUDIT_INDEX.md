@@ -41,3 +41,62 @@ Plan: `docs/MASTER_PLAN_2026-09-09_FULL_COVERAGE.md`. **AI workspace (Theme D/E)
 **Deferred (honest):** C-02 renderer merge (`SectionRenderer` 1019L vs `EditorSectionRenderer` 875L — the editor one is the superset; needs a dedicated session + visual regression), C-04 dynamic-first auto pages (`/notices/<slug>` etc.), C-06 bilingual page variants, A-08 column drops (expand-then-contract), incident-plugin merge (A-09).
 
 **Verification:** `test_fc_b_library_v2.py` 13/13 green (incl. fake-request regression + hold queue lifecycle + availability math); plugin_doctor 49/0/0; widget YAMLs parse; drift gate PASS; `tsc --noEmit` clean; jest 47/47.
+
+## 2026-09-10 — Full-platform exploration + Master Plan v2 (planning only, no code changes)
+
+Deliverable: `docs/MASTER_PLAN_2026-09-10_FULL_PLATFORM_V2.md` — new platform-wide plan built from
+7 exploration waves (competitive web research; backend census ~756 endpoints; web frontend census
+216 dashboard pages + 9 file-URL anti-patterns; Flutter 5-app census; plugin manifest↔frontend
+cross-check of 50 plugins; AI content architecture + `nepal_textbooks` corpus map (656 files/2.2 GB,
+Nepali sidecars Preeti-mojibake); website-builder + onboarding deep dive).
+
+Key findings logged as the Sprint-0 defect backlog (plan Part 2, B-01..B-28), notably:
+widget spec contract bugs in fc-h widgets (bare keys render literal field names — B-01/B-02),
+`fees.mobile_fee_card` → nonexistent `/parent-app/fees/summary` (B-04; corroborated by
+`test_plugin_widgets.py::test_every_api_widget_points_at_its_own_plugin_domain` failing in the
+2026-09-10 full-suite run), teacher `/teacher/portfolios` 404 (B-05), stale shared FeeRepository
+endpoints (B-06), missing `/student/classmates` (B-07), wrong `elibrary` gates on design-studio AI
+routes (B-10), missing public `/website/.../news` route (B-11), `coming_soon` hiding 3 built
+plugins (B-16), events-manifest vocabulary mostly fictional vs runtime bus (P-F), ~15 orphan pages,
+RAG service complete but with zero retrieval call sites, curriculum seed synthetic w/ zero outcomes.
+
+**AI workspace (P-D content spine: content_sources/units/chunks, 8-stage ingestion with Preeti→Unicode,
+question-bank extensions, paper model sets) is DESIGNED in the plan but GATED — founder approval
+required before any implementation (S12–S14).**
+
+Test-suite note (same date, background full run, not waited on per founder instruction):
+9 failed / 655 passed / 2 skipped in 1h58m. 1 failure = fc-h widget contract (B-04, fixed in S0).
+8 failures (`test_socket_auth` ×7, `test_password_reset` ×1) untouched by recent waves — queued for
+S0 triage (smells environmental: socket test client/redis in CI env).
+
+## 2026-09-10 — FC Sprint 0: defect sweep from Master Plan v2 (branch `feat/fc-theme-a-hygiene`)
+
+Plan: `docs/MASTER_PLAN_2026-09-10_FULL_PLATFORM_V2.md` (Part 2 backlog, Sprint 0). No AI-workspace
+(P-D/S12-14) work — still gated on founder approval.
+
+| ID | What landed | Files |
+|---|---|---|
+| B-01/B-02 | Widget specs fixed to the `$`-token dialect (ai_suite at-risk list, notices lists, library stat-group reshaped stats→items); ListWidget now honors `spec.limit`; empty states moved to `states.empty` | `modules/{ai_suite,notices,library_management}/widgets.yaml`, `frontend/components/plugin-widgets/renderers.tsx`, `frontend/lib/plugin-widgets/types.ts` |
+| Contract | Two new contract guards: every widget endpoint must match a real Flask route (B-04 regression class) and list/stat spec values must be `$`-tokens (B-01 class); domain allowlist extended with role-scoped `/parent|student|teacher` prefixes and ai_suite's owned `ai-tools` surface | `backend/tests/test_plugin_widgets.py` |
+| B-03 | Exam detail page `/dashboard/exams/[id]` (marks window, subjects, client-side result summary, top performers) — fixes `exams.upcoming_exams` widget row 404s | `frontend/app/dashboard/exams/[id]/page.tsx` |
+| B-04 | `GET /parent/fees/summary` added (ward-scoped due/paid totals); `fees.mobile_fee_card` repointed off the dead `/parent-app/fees/summary` | `backend/app/api/v1/parent_app.py`, `modules/fees/widgets.yaml` |
+| B-05 | `GET /teacher/portfolios` aggregate (class-scoped for teachers, whole school for admins) — teacher-app screen no longer 404s | `backend/app/api/v1/teacher.py` |
+| B-07 | `GET /student/classmates` (own class+section only) — replaces the roster-leaking `/students?per_page=100` workaround (app switch lands in S9) | `backend/app/api/v1/student_app.py` |
+| B-06 | Shared FeeRepository repointed to real contracts: `/student/fees`, `/fees/collections/<id>/pay` (idempotent), `/fees/collections?student_id=`, flat `/fees/initiate-payment` with `fee_ids` | `aschool_shared/lib/repositories/fee_repository.dart` |
+| B-09 | `GET /dismissal/summary` added (enrolled/dismissed-today/pending/class breakdown); admin emergency screen repointed `/emergency/evacuation-plans` → `/emergency/plans` | `backend/app/api/v1/dismissal.py`, `flutter_admin/.../emergency_screen.dart` |
+| B-10 | Design-studio AI routes gated `ai_suite` (were `elibrary`) | `backend/app/api/v1/design_studio.py` |
+| B-11 | Public news feed: `GET /website/public/<slug>/news` + `/news/<id>` (published notices as articles; drafts/garbage 404) — public news pages were fetching a dead route | `backend/app/api/v1/website.py` |
+| B-12 | `seed_pd_framework` no longer double-writes document chunks; missing rows are embedded in place via UPDATE | `backend/app/services/ai/extensions.py` |
+| B-13 | Runtime listener renamed `iemis.imported` → `iemis.import_completed` (matches the actual emit) | `backend/app/plugins/listeners.py` |
+| B-15 | nepal_curriculum: own nav route `/dashboard/teaching-content` (new compact section/versions manager page); cross-plugin subitems removed | `modules/nepal_curriculum/manifest.yaml`, `frontend/app/dashboard/teaching-content/page.tsx` |
+| B-16 | conferences / gps_tracking / whatsapp_bot unhidden (`coming_soon: false`) — all three are built end-to-end | 3 manifests |
+| N-02 | 18 self-duplicating nav subitems removed (parent route listed as its own first child) | 18 manifest files |
+| B-18 | ai-tools catalog `meeting-minutes` deduped | `frontend/app/dashboard/ai-tools/page.tsx` |
+| B-27 | Push sends now log `PushNotification` rows (best-effort, never breaks delivery) — OneSignal path wrote nothing before | `backend/app/tasks/push_notifications.py` |
+| B-28 | 12 `withOpacity` → `withValues` in admin/parent; admin router errorBuilder added | 4 flutter screens + `flutter_admin/lib/router.dart` |
+| Triage | socket_auth ×7 pass standalone (full-run failures were environmental — aschool-postgres container exited mid-suite). password_reset full-flow fixed: fresh `create_app()` defaulted to dev config/DB 5432 → now `create_app("testing")` | `backend/tests/test_password_reset.py` |
+| Tests | `tests/test_fc_s0_defects.py`: 6 regression tests (classmates scoping, portfolio scoping+counts, fees summary math, dismissal rollup, public news feed+article+draft-404, admin portfolios) | new file |
+
+Deferred from S0: B-20 (`/website-builder/sections/available` dead vocabulary — removal belongs to the P-C W-07 sweep), B-08 (gallery repo verified clean; album upload UX is F-14), student-app classmates switch (S9 M-C2).
+
+**Verification:** targeted backend suites 56/56 (plugin widgets 20, plugin contract 10, S0 6, fc_mob 4, fc_b 13, fc_a05 3); drift gate PASS 0/455 allowlisted (scratch on 5435 — note: script's local default port 5433 now collides with aacademy-postgres); `tsc --noEmit` clean; jest 47/47; `flutter analyze` 0 errors (admin 12 warnings → 8 after sweep, parent 13 → 8, shared 0, student 12 pre-existing); aschool_shared tests 49/49.

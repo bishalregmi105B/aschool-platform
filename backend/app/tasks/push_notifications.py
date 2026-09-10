@@ -4,10 +4,51 @@ OneSignal handles both Android (FCM) and iOS (APNs) delivery automatically.
 Legacy FCM direct sending is preserved as a fallback if OneSignal is not configured.
 """
 import logging
+from datetime import datetime
 
 from extensions import celery
 
 logger = logging.getLogger(__name__)
+
+
+def _log_push(school_id, title, body, data=None, fcm_token=None, status="sent"):
+    """Best-effort PushNotification row (B-27).
+
+    The OneSignal path used to deliver pushes without ever writing the
+    push_notifications table, so push history was invisible. Delivery must
+    never depend on logging — every failure here is swallowed.
+    """
+    if not school_id:
+        return
+    try:
+        from flask import has_app_context
+
+        if not has_app_context():
+            return
+        from app.models.notification import PushNotification
+        from extensions import db
+
+        db.session.add(
+            PushNotification(
+                school_id=school_id,
+                user_id=None,
+                title=(title or "")[:200],
+                body=body or "",
+                data=data or {},
+                fcm_token=fcm_token,
+                status=status,
+                sent_at=datetime.utcnow(),
+            )
+        )
+        db.session.commit()
+    except Exception:  # noqa: BLE001 — logging must not break delivery
+        logger.info("PushNotification log skipped", exc_info=True)
+        try:
+            from extensions import db
+
+            db.session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 @celery.task(name="send_push_notification", queue="notifications")
@@ -33,6 +74,11 @@ def send_push_notification(
             title=title,
             body=body,
             data=data,
+        )
+        _log_push(
+            (data or {}).get("school_id"), title, body,
+            data=data, fcm_token=player_id,
+            status="sent" if result.get("success") else "failed",
         )
         return result
 
@@ -65,6 +111,11 @@ def send_push_to_school(
             body=body,
             roles=roles,
             data=data,
+        )
+        _log_push(
+            school_id, title, body,
+            data={"roles": roles, **(data or {})},
+            status="sent" if result.get("success") else "failed",
         )
         return result
 

@@ -26,7 +26,11 @@ widgets:
       select: data
     spec:
       item:
-        title: student_name
-        subtitle: risk_level
+        title: "$.student_name"
+        subtitle: "$.risk_level"
+        meta: "$.risk_score"
+        link: "/dashboard/students/$.student_id"
       limit: 6
-      empty_text: "No risk flags — all clear"
+    states:
+      empty:
+        title: "No risk flags — all clear"

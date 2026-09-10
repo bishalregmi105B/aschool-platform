@@ -220,10 +220,10 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: givenDate != null
-                          ? Colors.green.withOpacity(0.15)
+                          ? Colors.green.withValues(alpha: 0.15)
                           : isOverdue
-                              ? Colors.red.withOpacity(0.15)
-                              : Colors.orange.withOpacity(0.15),
+                              ? Colors.red.withValues(alpha: 0.15)
+                              : Colors.orange.withValues(alpha: 0.15),
                       child: Icon(
                         givenDate != null
                             ? Icons.check_circle
@@ -267,10 +267,10 @@ class _HealthRecordsScreenState extends ConsumerState<HealthRecordsScreen>
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: givenDate != null
-                            ? Colors.green.withOpacity(0.1)
+                            ? Colors.green.withValues(alpha: 0.1)
                             : isOverdue
-                                ? Colors.red.withOpacity(0.1)
-                                : Colors.orange.withOpacity(0.1),
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

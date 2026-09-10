@@ -42,7 +42,6 @@ def seed_pd_framework(school_id=None) -> int:
     source_id). Returns chunks written."""
     import uuid
 
-    from app.services.ai.rag import RAGService
     from app.models.document_chunk import DocumentChunk
     from extensions import db
 
@@ -72,14 +71,39 @@ def seed_pd_framework(school_id=None) -> int:
         db.session.add(chunk)
         written += 1
     db.session.commit()
-    # embeddings are best-effort (BM25-only degradation without a key)
+    # Embeddings are best-effort (BM25-only degradation without a key).
+    # B-12: this used to call RAGService.ingest, which INSERTs — duplicating
+    # every row the idempotent block above had already written. Embed the
+    # existing rows in place instead.
     try:
-        chunks = [c.text for c in DocumentChunk.query.filter_by(
-            source_type="policy", source_id=framework_id, is_deleted=False
-        ).all() if not getattr(c, "embedding_vec", None)]
-        if chunks:
-            RAGService.ingest(school_id, "policy", framework_id,
-                              chunks)  # re-embed missing (kept simple)
+        from sqlalchemy import text as sql_text
+
+        from app.services.ai.token_hub import AITokenHub
+
+        rows = db.session.execute(
+            sql_text(
+                "SELECT id, text FROM document_chunks "
+                "WHERE source_type = 'policy' AND source_id = :sid "
+                "AND is_deleted = false AND embedding_vec IS NULL"
+            ),
+            {"sid": framework_id},
+        ).fetchall()
+        if rows:
+            vectors = AITokenHub.embed(
+                [row.text for row in rows], school_id=school_id, feature="rag-ingest"
+            )
+            for row, vec in zip(rows, vectors):
+                if not vec:
+                    continue
+                vec_sql = "[" + ",".join(f"{x:.7f}" for x in vec) + "]"
+                db.session.execute(
+                    sql_text(
+                        "UPDATE document_chunks SET embedding_vec = CAST(:v AS vector) "
+                        "WHERE id = :id"
+                    ),
+                    {"v": vec_sql, "id": str(row.id)},
+                )
+            db.session.commit()
     except Exception as exc:  # noqa: BLE001
         logger.info("PD framework embed skipped: %s", exc)
     return written

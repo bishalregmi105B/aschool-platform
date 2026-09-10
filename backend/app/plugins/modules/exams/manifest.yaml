@@ -36,8 +36,6 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: Exam Dashboard
-      route: /dashboard/exams
     - label: Schedule
       route: /dashboard/exams/schedule
     - label: Enter Marks

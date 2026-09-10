@@ -182,7 +182,7 @@ class _AlertCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: color.withOpacity(0.4), width: 1.5),
+        side: BorderSide(color: color.withValues(alpha: 0.4), width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -233,7 +233,7 @@ class _AlertCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -288,7 +288,7 @@ class _EvacuationTabState extends State<_EvacuationTab> {
 
   Future<void> _load() async {
     try {
-      final res = await ApiClient.instance.get('/emergency/evacuation-plans');
+      final res = await ApiClient.instance.get('/emergency/plans');
       if (!mounted) return;
       setState(() {
         _plans = List<Map<String, dynamic>>.from(res.data['data'] ?? []);

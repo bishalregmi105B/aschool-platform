@@ -32,8 +32,6 @@ ui:
     visible_to:
     - school_admin
     subitems:
-    - label: View
-      route: /dashboard/timetable
     - label: AI Generate
       route: /dashboard/timetable/generate
 mobile:

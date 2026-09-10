@@ -30,8 +30,6 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: Mark / View
-      route: /dashboard/attendance
     - label: Leave Requests
       route: /dashboard/attendance/leave-requests
     - label: Monthly Report

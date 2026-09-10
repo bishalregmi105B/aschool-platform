@@ -647,6 +647,78 @@ def get_public_teachers(slug):
     return success_response({"teachers": _public_teachers_payload(school)})
 
 
+def _public_news_article_dict(n) -> dict:
+    """News article shape the public news pages consume (B-11).
+
+    News is the published-notice stream: `slug` is the notice id, `excerpt`
+    is a tag-stripped preview, `image_url` stays empty until notices grow
+    cover images (P-A attachment work).
+    """
+    excerpt = re.sub(r"<[^>]+>", " ", n.content or "")
+    excerpt = re.sub(r"\s+", " ", excerpt).strip()[:200]
+    return {
+        "id": str(n.id),
+        "title": n.title,
+        "title_nepali": getattr(n, "title_nepali", None),
+        "content": n.content,
+        "content_nepali": getattr(n, "content_nepali", None),
+        "excerpt": excerpt,
+        "slug": str(n.id),
+        "image_url": None,
+        "author": n.created_by.full_name if n.created_by else None,
+        "category": getattr(n, "notice_type", None),
+        "created_at": n.published_at.isoformat()
+        if getattr(n, "published_at", None)
+        else (n.created_at.isoformat() if n.created_at else None),
+    }
+
+
+@website_bp.route("/public/<slug>/news", methods=["GET"])
+def get_public_news(slug):
+    """Public news feed — published notices as articles (no auth)."""
+    school, err = _public_site_guard(slug)
+    if err:
+        return err
+
+    articles = (
+        Notice.query.filter(
+            Notice.school_id == school.id,
+            Notice.is_deleted.is_(False),
+            Notice.published_at.isnot(None),
+        )
+        .order_by(Notice.published_at.desc(), Notice.created_at.desc())
+        .limit(30)
+        .all()
+    )
+    return success_response(
+        {"articles": [_public_news_article_dict(n) for n in articles]}
+    )
+
+
+@website_bp.route("/public/<slug>/news/<article_slug>", methods=["GET"])
+def get_public_news_article(slug, article_slug):
+    """Single public news article — resolved by notice id (no auth)."""
+    school, err = _public_site_guard(slug)
+    if err:
+        return err
+
+    if not re.fullmatch(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        article_slug or "",
+    ):
+        return error_response("Article not found", 404)
+
+    notice = Notice.query.filter(
+        Notice.id == article_slug,
+        Notice.school_id == school.id,
+        Notice.is_deleted.is_(False),
+        Notice.published_at.isnot(None),
+    ).first()
+    if not notice:
+        return error_response("Article not found", 404)
+    return success_response(_public_news_article_dict(notice))
+
+
 @website_bp.route("/public/<slug>/events", methods=["GET"])
 def get_public_events(slug):
     """Public events calendar — synced from the school's event records."""

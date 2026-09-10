@@ -43,7 +43,7 @@ capabilities:
   tasks: []
 ui:
   nav:
-    route: /dashboard/academics
+    route: /dashboard/teaching-content
     section: Academics
     label: Chapter Content
     label_nepali: अध्याय सामग्री
@@ -51,11 +51,6 @@ ui:
     visible_to:
     - school_admin
     - teacher
-    subitems:
-    - label: Sections
-      route: /dashboard/ai-teacher
-    - label: Exercise Bank
-      route: /dashboard/ai-tools
 mobile:
   student:
     feature_folder: chapter_reader

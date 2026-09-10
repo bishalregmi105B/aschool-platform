@@ -233,7 +233,7 @@ widgets:
       min: { w: 12, h: 2 }
     data:
       source: api
-      endpoint: /parent-app/fees/summary
+      endpoint: /parent/fees/summary
       select: data
     spec:
       layout: stat_row

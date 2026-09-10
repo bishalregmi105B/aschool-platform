@@ -54,8 +54,6 @@ ui:
     - teacher
     - accountant
     subitems:
-    - label: All Files
-      route: /dashboard/files
     - label: Images
       route: /dashboard/files?type=image
     - label: Documents

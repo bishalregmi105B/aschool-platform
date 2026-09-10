@@ -273,6 +273,8 @@ export function ListWidget({
 }: RendererProps) {
   const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
   const item: ListItemSpec | undefined = widget.spec.item;
+  const limit = typeof widget.spec.limit === "number" ? widget.spec.limit : undefined;
+  const visible = limit && limit > 0 ? rows.slice(0, limit) : rows;
 
   return (
     <WidgetShell
@@ -280,11 +282,11 @@ export function ListWidget({
       isLoading={isLoading}
       error={error}
       onRetry={onRetry}
-      isEmpty={!isLoading && !error && rows.length === 0}
+      isEmpty={!isLoading && !error && visible.length === 0}
       loadingNode={<SkeletonList rows={4} />}
     >
       <ul className="divide-y">
-        {rows.map((row, index) => {
+        {visible.map((row, index) => {
           const bound = { ...scope, payload: row };
           const title = item?.title ? resolveToken(item.title, bound) : null;
           const subtitle = item?.subtitle
