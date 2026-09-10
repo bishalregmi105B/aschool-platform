@@ -164,6 +164,11 @@ Target model: **9 fixed pages, every content section dynamic-first, custom pages
 
 ### P-D. AI content spine & AI workspace rethink — ⛔ GATED (founder approval required before ANY implementation)
 
+> **2026-09-10 update:** the *ingestion* portion of this section (scripted PyMuPDF/Preeti pipeline) is
+> **superseded** by the founder-approved direction in `docs/AI_WORKSPACE_FINAL_PLAN_2026-09-10.md`
+> (human-operated vision-LLM extraction; prompts in `docs/ai_workspace_prompts/EXTRACTION_PROMPT_PACK.md`).
+> The storage spine, retrieval wiring, model sets, and phasing below remain valid as amended by that doc.
+
 **Corpus reality (nepal_textbooks):** 656 files / 2.2 GB — 121 cataloged CDC textbooks (Grade 1–12), ~113 teacher guides, ~77 spec-grid/model-question PDFs, NCF 2076 docs; every PDF has a `.txt` sidecar; **all Nepali sidecars are Preeti/Kantipur 8-bit mojibake, not Unicode** (`g]kfn ;/sf/` = नेपाल सरकार). `preeti_transcoder.py` exists but is a partial map. English books are clean Unicode. The existing `ingest_textbook_catalog.py` is analysis-only (never writes DB).
 
 **Current AI stack state:** 4 disconnected content stacks (curriculum skeleton with **synthetic** units and **zero outcomes**; teaching-content spine — mature but admin-typed only; textbook tables — zero writers; `document_chunks` RAG — service complete, **zero retrieval call sites**, one double-writing seed). Workbench has no retrieval stage; `AIGeneration.citations` never populated; `grounding` registry column dead; tutor ungrounded; question-paper v2 is bank-first but banks start empty, blueprints have no CRUD, no spec-grid parsing, **no model-set/variant concept**.
