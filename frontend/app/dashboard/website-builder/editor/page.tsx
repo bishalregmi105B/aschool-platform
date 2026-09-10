@@ -393,6 +393,8 @@ export default function WebsiteEditor() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<"sections" | "widgets">("sections");
   const [draft, setDraft] = useState<Record<string, SectionDraft>>({});
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "unsaved" | "saving" | "saved" | "error">("idle");
 
   const draftRef = useRef(draft);
@@ -530,6 +532,46 @@ export default function WebsiteEditor() {
       revalidateSchoolSite();
     } catch {
       setSaveState("error");
+    }
+  }, [pageId, qc]);
+
+  // FC-C03: load history when the panel opens
+  useEffect(() => {
+    if (!showHistory || !pageId) return;
+    api.get(`/website-builder/pages/${pageId}/history`)
+      .then((r) => setHistory(Array.isArray(r.data?.data) ? r.data.data : []))
+      .catch(() => setHistory([]));
+  }, [showHistory, pageId]);
+
+  /** FC-C03: discard unsaved draft edits — the live site is untouched. */
+  const revertDraft = useCallback(async () => {
+    if (!pageId) return;
+    setSaveState("saving");
+    try {
+      await api.post(`/website-builder/pages/${pageId}/revert-draft`);
+      setDraft({});
+      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
+      setSaveState("saved");
+      toast.success("Draft reverted to the published version");
+    } catch {
+      setSaveState("error");
+    }
+  }, [pageId, qc]);
+
+  /** FC-C03: restore a snapshot from page history. */
+  const restoreHistory = useCallback(async (index: number) => {
+    if (!pageId) return;
+    setSaveState("saving");
+    try {
+      await api.post(`/website-builder/pages/${pageId}/history/${index}/restore`);
+      setDraft({});
+      qc.invalidateQueries({ queryKey: ["website-page-sections", pageId] });
+      setSaveState("saved");
+      revalidateSchoolSite();
+      toast.success("Restored from history");
+    } catch {
+      setSaveState("error");
+      toast.error("Restore failed");
     }
   }, [pageId, qc]);
 
@@ -775,6 +817,19 @@ export default function WebsiteEditor() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => void revertDraft()}
+              disabled={saveState === "saving"}
+              className="text-xs px-3 py-1.5 border rounded-lg hover:bg-muted disabled:opacity-50"
+            >
+              Revert draft
+            </button>
+            <button
+              onClick={() => void setShowHistory((v) => !v)}
+              className="text-xs px-3 py-1.5 border rounded-lg hover:bg-muted"
+            >
+              History
+            </button>
+            <button
               onClick={handleSaveNow}
               disabled={saveState === "saving"}
               className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
@@ -784,6 +839,38 @@ export default function WebsiteEditor() {
             <a href="/dashboard/website-builder" target="_blank" className="text-xs text-blue-600 hover:underline">Open Site ↗</a>
           </div>
         </div>
+
+        {/* FC-C03: publish history — restore a previous live version */}
+        {showHistory && (
+          <div className="mx-6 mt-3 rounded-lg border bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Publish history</span>
+              <button className="text-xs text-muted-foreground" onClick={() => setShowHistory(false)}>close</button>
+            </div>
+            {history.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No snapshots yet — publish to create one.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {history.map((h: any, i: number) => (
+                  <li key={i} className="flex items-center justify-between py-2">
+                    <span>
+                      {h.published_at
+                        ? new Date(h.published_at).toLocaleString()
+                        : `Snapshot ${i + 1}`}
+                      {typeof h.section_count === "number" ? (
+                        <span className="text-muted-foreground"> — {h.section_count} sections</span>
+                      ) : null}
+                    </span>
+                    <button className="text-xs text-blue-600 hover:underline"
+                      onClick={() => void restoreHistory(i)}>
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {/* Page canvas */}
         {sortedView.length === 0 ? (

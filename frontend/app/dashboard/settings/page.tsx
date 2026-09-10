@@ -237,7 +237,7 @@ export default function SettingsPage() {
               </a>
             </Button>
             <Button asChild>
-              <Link href="/dashboard/settings/website-design">
+              <Link href="/dashboard/website-builder">
                 <PenTool className="h-4 w-4 mr-2" /> Open Design Center
               </Link>
             </Button>

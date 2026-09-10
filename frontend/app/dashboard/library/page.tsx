@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
@@ -16,7 +17,10 @@ import { PageLoader } from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { BookOpen, PlusCircle, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle, BookOpen, BookmarkCheck, Banknote, PlusCircle,
+  RotateCcw, ScanLine, BarChart3,
+} from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 interface Book {
@@ -49,6 +53,9 @@ export default function LibraryPage() {
   );
 }
 
+/** FC-B: librarian dashboard — circulation KPIs + 14-day trend + quick links
+ * to the v2 surfaces (holds, fines, stock-take, reports) above the classic
+ * books/issues tables. */
 function LibraryContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
@@ -58,6 +65,19 @@ function LibraryContent() {
   const initialTab = searchParams.get("tab") === "issues" ? "issues" : "books";
   const [tab, setTab] = useState<"books" | "issues">(initialTab);
   const queryClient = useQueryClient();
+
+  const { data: stats } = useQuery({
+    queryKey: ["library-collection-stats"],
+    queryFn: async () => (await api.get("/library/reports/collection_stats")).data?.data,
+    staleTime: 60_000,
+  });
+
+  const { data: overdueByClass } = useQuery({
+    queryKey: ["library-overdue-by-class"],
+    queryFn: async () => (await api.get("/library/reports/overdue_by_class")).data?.data as
+      { class_name: string; overdue: number }[],
+    staleTime: 120_000,
+  });
 
   const { data: bookData, isLoading, isError, refetch } = useQuery({
     retry: 1,
@@ -108,7 +128,6 @@ function LibraryContent() {
       return res.data;
     },
     onSuccess: () => {
-      // element-wise prefixes: the combined key matched neither query
       queryClient.invalidateQueries({ queryKey: ["library-issues"] });
       queryClient.invalidateQueries({ queryKey: ["library-books"] });
       toast.success("Book returned");
@@ -117,16 +136,18 @@ function LibraryContent() {
   });
 
   if (isLoading) return <PageLoader />;
-    if (isError) {
-      return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load library overview. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
-      );
-    }
+  if (isError) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card><CardContent className="py-10 text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to load library overview. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent></Card>
+      </div>
+    );
+  }
+
+  const overdueTotal = (overdueByClass || []).reduce((a, r) => a + (r.overdue || 0), 0);
 
   const BOOK_COLUMNS: Column<Book>[] = [
     { key: "title", label: "Title", sortable: true, value: (b) => b.title, render: (b) => <span className="font-medium">{b.title}</span> },
@@ -154,7 +175,20 @@ function LibraryContent() {
       noExport: true,
       render: (i) =>
         i.status !== "returned" ? (
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); returnMut.mutate(i.id); }}>Return</Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); returnMut.mutate(i.id); }}>Return</Button>
+            <Button size="sm" variant="ghost" disabled={(i as any).renewal_count >= 2}
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  await api.post(`/library/issues/${i.id}/renew`);
+                  queryClient.invalidateQueries({ queryKey: ["library-issues"] });
+                  toast.success("Due date extended");
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error || "Renewal failed");
+                }
+              }}>Renew</Button>
+          </div>
         ) : null,
     },
   ];
@@ -164,7 +198,7 @@ function LibraryContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Library</h1>
-          <p className="text-muted-foreground">Manage books, issues, and returns</p>
+          <p className="text-muted-foreground">Catalog, circulation, holds, fines and stock</p>
         </div>
         <Dialog open={showAddBook} onOpenChange={setShowAddBook}>
           <DialogTrigger asChild>
@@ -175,6 +209,39 @@ function LibraryContent() {
             <AddBookForm onSubmit={(data) => addBookMut.mutate(data)} loading={addBookMut.isPending} />
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard icon={BookOpen} label="Titles / Copies"
+          value={`${stats?.titles ?? "—"} / ${stats?.total_copies ?? "—"}`} />
+        <KpiCard icon={BookOpen} label="Available now"
+          value={stats?.available_copies ?? "—"} />
+        <KpiCard icon={AlertTriangle} label="Overdue"
+          value={overdueTotal || 0}
+          tone={overdueTotal > 0 ? "destructive" : "default"} />
+        <Link href="/dashboard/library/reservations">
+          <Card className="hover:bg-muted/40 transition-colors">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-md p-2 bg-muted"><BookmarkCheck className="h-4 w-4" /></div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Holds &amp; fines</p>
+                  <p className="text-sm font-medium underline">Manage queue →</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Quick links */}
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline"><Link href="/dashboard/library/checkout"><ScanLine className="h-4 w-4 mr-2" /> Circulation desk</Link></Button>
+        <Button asChild variant="outline"><Link href="/dashboard/library/reservations"><BookmarkCheck className="h-4 w-4 mr-2" /> Holds</Link></Button>
+        <Button asChild variant="outline"><Link href="/dashboard/library/fines"><Banknote className="h-4 w-4 mr-2" /> Fines</Link></Button>
+        <Button asChild variant="outline"><Link href="/dashboard/library/stocktake"><ScanLine className="h-4 w-4 mr-2" /> Stock-take</Link></Button>
+        <Button asChild variant="outline"><Link href="/dashboard/library/reports"><BarChart3 className="h-4 w-4 mr-2" /> Reports</Link></Button>
       </div>
 
       <div className="flex gap-2">
@@ -222,6 +289,24 @@ function LibraryContent() {
         </Card>
       )}
     </div>
+  );
+}
+
+function KpiCard({ icon: Icon, label, value, tone }: any) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-md p-2 ${tone === "destructive" ? "bg-red-100 text-red-700" : "bg-muted"}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-xl font-bold">{value}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

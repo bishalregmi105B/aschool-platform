@@ -11,11 +11,63 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { BookMarked, RotateCcw, Search } from "lucide-react";
+import { BookMarked, RotateCcw, ScanLine, Search } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function CheckoutPage() {
   return <PluginGate slug="library"><CheckoutContent /></PluginGate>;
+}
+
+/** FC-B: barcode-first desk panel — scan a copy barcode/accession number and
+ * the backend resolves copy + book + active issue in one lookup. Keyboard-
+ * wedge scanners "type" into the focused input, so zero drivers are needed. */
+function ScanPanel({ onResolved }: { onResolved: (d: any) => void }) {
+  const [code, setCode] = useState("");
+  const [scan, setScan] = useState<any>(null);
+
+  const lookup = useMutation({
+    mutationFn: async (value: string) =>
+      (await api.get(`/library/copies/scan/${encodeURIComponent(value.trim())}`)).data?.data,
+    onSuccess: (d) => {
+      setScan(d);
+      onResolved(d);
+    },
+    onError: () => toast.error("No copy matches that barcode"),
+  });
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><ScanLine className="h-5 w-5" /> Scan copy</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <form
+          onSubmit={(e) => { e.preventDefault(); if (code.trim()) lookup.mutate(code); }}
+          className="flex gap-2"
+        >
+          <Input
+            autoFocus
+            placeholder="Scan or type barcode / accession no…"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Button type="submit" disabled={lookup.isPending || !code.trim()}>Look up</Button>
+        </form>
+        {scan?.copy && (
+          <div className="rounded-md border p-3 text-sm space-y-1">
+            <div className="font-medium">{scan.copy.book_title}</div>
+            <div className="text-muted-foreground">
+              {scan.copy.accession_no} • {scan.copy.status}
+            </div>
+            {scan.issue && scan.student && (
+              <div>
+                Issued to <span className="font-medium">{scan.student.name}</span> — due{" "}
+                {scan.issue.due_date ? displayBS(scan.issue.due_date) : "—"}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function CheckoutContent() {
@@ -124,6 +176,10 @@ function CheckoutContent() {
         <Button variant={mode === "checkout" ? "default" : "outline"} onClick={() => { setMode("checkout"); setResult(null); }}><BookMarked className="h-4 w-4 mr-2" /> Issue Book</Button>
         <Button variant={mode === "return" ? "default" : "outline"} onClick={() => { setMode("return"); setResult(null); }}><RotateCcw className="h-4 w-4 mr-2" /> Return Book</Button>
       </div>
+
+      <ScanPanel onResolved={(d) => {
+        if (d?.copy?.book_id && d?.copy?.status === "available") { setBookId(d.copy.book_id); }
+      }} />
 
       <Card>
         <CardHeader><CardTitle>{mode === "checkout" ? "Issue Book to Student" : "Return Book"}</CardTitle></CardHeader>
