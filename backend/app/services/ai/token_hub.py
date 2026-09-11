@@ -696,6 +696,22 @@ class AITokenHub:
                 )
                 raise AIProviderError(f"AI provider call failed: {primary_exc}") from primary_exc
 
+        # G-11: reasoning models can consume the whole budget before emitting
+        # any text (finish_reason="length", empty content). One honest retry
+        # at double budget beats returning an empty string the caller parses
+        # into a confusing error.
+        if not (result.get("text") or "").strip():
+            try:
+                retry_result = _call_with_retries(
+                    provider_fn if provider_fn else fallback_fn,
+                    model, messages, max_tokens * 2, temperature,
+                )
+                if (retry_result.get("text") or "").strip():
+                    log_meta["empty_output_retried"] = True
+                    result = retry_result
+            except Exception:  # noqa: BLE001 — retry is best-effort
+                logger.warning("empty-output retry failed", exc_info=True)
+
         # 4. Log success with cost accounting (A-01)
         cost_usd = estimate_cost_usd(
             result["provider"], result["model"],
@@ -723,6 +739,7 @@ class AITokenHub:
         return {
             "text":        result["text"],
             "tokens_used": result["total_tokens"],
+            "output_tokens": result["completion_tokens"],
             "model":       result["model"],
             "provider":    result["provider"],
             "latency_ms":  result["latency_ms"],
@@ -843,11 +860,41 @@ class AITokenHub:
             raise
 
         groq_key = current_app.config.get("GROQ_API_KEY", "")
-        if not groq_key:
+        anthropic_key = current_app.config.get("ANTHROPIC_API_KEY", "")
+        if not groq_key and not anthropic_key:
             raise AIProviderError(
-                "Streaming requires GROQ_API_KEY (the stream path has a "
-                "single provider — no Anthropic fallback)."
+                "No AI provider configured. Set GROQ_API_KEY (primary) "
+                "or ANTHROPIC_API_KEY (fallback)."
             )
+        if not groq_key:
+            # G-11: the stream path used to hard-fail without Groq even when
+            # Anthropic was configured. Degrade to a one-shot Anthropic call
+            # yielded as a single delta — same metering contract.
+            result = _call_anthropic(messages, model, max_tokens, temperature)
+            cost_usd = estimate_cost_usd(
+                result["provider"], result["model"],
+                result["prompt_tokens"], result["completion_tokens"],
+            )
+            _log_call(
+                school_id=school_id, user_id=user_id, feature=feature,
+                model=result["model"], provider=result["provider"],
+                prompt_tokens=result["prompt_tokens"],
+                completion_tokens=result["completion_tokens"],
+                total_tokens=result["total_tokens"],
+                latency_ms=result["latency_ms"], status="success",
+                cost_usd=cost_usd, metadata=metadata,
+            )
+            yield result["text"]
+            yield {
+                "text": result["text"],
+                "model": result["model"],
+                "provider": result["provider"],
+                "prompt_tokens": result["prompt_tokens"],
+                "completion_tokens": result["completion_tokens"],
+                "latency_ms": result["latency_ms"],
+                "cost_usd": cost_usd,
+            }
+            return
 
         prompt_sha = hashlib.sha256(
             "\n".join(str(m.get("content", "")) for m in messages).encode()

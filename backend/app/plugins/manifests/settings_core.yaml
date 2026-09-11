@@ -27,6 +27,9 @@ ui:
     - label: Roles & Permissions
       label_nepali: भूमिका र अनुमति
       route: /settings/roles
+    - label: AI Content Review
+      label_nepali: एआई सामग्री समीक्षा
+      route: /dashboard/content-review
     - label: Integrations
       label_nepali: एकीकरण
       route: /settings/integrations

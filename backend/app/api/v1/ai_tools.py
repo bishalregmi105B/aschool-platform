@@ -144,6 +144,7 @@ def save_timetable():
 def generate_remarks():
     """Generate AI-powered report card remarks for a student."""
     from app.services.ai.question_paper import QuestionPaperService
+    from app.services.ai.workbench import de_pseudonymize, pseudonymize
 
     data = request.get_json(silent=True) or {}
     required = ("student_name", "marks", "total", "percentage")
@@ -151,12 +152,16 @@ def generate_remarks():
     if missing:
         return error_response(f"Missing required fields: {', '.join(missing)}")
 
+    # G-08: the real student name used to travel into the prompt plaintext —
+    # pseudonymize before the model sees it, restore only in the response.
+    safe_name, name_map = pseudonymize(str(data["student_name"]), g.school_id)
     remark = QuestionPaperService.generate_remark(
-        student_name=data["student_name"],
+        student_name=safe_name,
         marks=data["marks"],
         total=data["total"],
         percentage=data["percentage"],
     )
+    remark = de_pseudonymize(str(remark), name_map)
     return success_response({"remark": remark})
 
 

@@ -133,6 +133,10 @@ api_v1_bp.register_blueprint(notifications_bp)
 from app.api.v1.faqs import faqs_bp
 api_v1_bp.register_blueprint(faqs_bp)
 
+# S12 content review — human gate over the agent-ingested AI corpus
+from app.api.v1.content_admin import content_admin_bp
+api_v1_bp.register_blueprint(content_admin_bp)
+
 # Database backup management API
 from app.api.v1.db_backup_api import db_backup_api_bp
 api_v1_bp.register_blueprint(db_backup_api_bp)
