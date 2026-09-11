@@ -140,3 +140,23 @@ verbatim text** (not image URLs), printed question papers/model sets must be **f
   CLI + paper tables; agent pilot on Grade 10 Science + Math.
 
 No code changes. S12 build (loader + tables + review queue + eval scaffold) awaits founder go.
+
+## 2026-09-11 — FINAL AI-first platform plan (deepest research round; planning only)
+
+4 more research waves (AI design/writer landscape: Canva Magic Studio/Bulk Create, Express
+text-to-template, Beautiful.ai rules engine, Figma object model, Portant/DocsAutomator variable-data,
+PosterLLaVA/VASCAR, Devanagari CTL+print; AI-in-education mobile: Doubtnut/QANDA/Photomath/Brainly,
+Khanmigo safety model, Duolingo voice gating, Gemini Nano/AICore, MagicSchool/Brisk/Eklavvya,
+WhatsApp-first, Nepal DPDP/Privacy-Act context) + 2 internal deep-dives (designer/writer internals
+G1-G20 with file paths; AI workspace internals: 41-tool registry audit — grounding unenforced,
+prompt files dead, attendance context builder missing, consent scope ignored, citations never
+written, legacy/mobile stack bypassing safety).
+
+Deliverable: `docs/FINAL_AI_PLATFORM_PLAN_2026-09-11.md` — Part I AI workspace (governance fixes
+G-01..G-12, tool-fleet 3 waves, tutor deep spec incl. photo→solve + Socratic assignment lock,
+question engine end-to-end, AI-Teacher completion, adaptive, voice/capture, safety spine);
+Part II AI Designer/Writer (D1 Nepali print correctness → D2 print-shop completeness → D3 AI leaps:
+text-to-design with VASCAR self-correction, paper→print loop, curriculum-RAG research panel);
+Part III AI per mobile role (Nepali-medium doubt solving = verified white space; parent NL-over-own-
+child; admin NL-over-SIS); Part IV AI delta per plugin; Part V waves S12–S20 + gates + costs.
+No code changes.
