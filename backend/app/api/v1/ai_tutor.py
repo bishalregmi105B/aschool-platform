@@ -48,10 +48,20 @@ def create_plan():
         student_id = st.id
 
     # consent gate (AW-04): tutor scope for this student
+    # G-04: the consent SCOPE is enforced — a tools-only grant does not
+    # unlock tutoring. Legacy NULL-scope rows stay honored as full grants.
+    from sqlalchemy import or_ as _or
+
     consent = (
-        GuardianAIConsent.query.filter_by(
-            school_id=g.school_id, student_id=student_id,
-            granted=True, is_deleted=False,
+        GuardianAIConsent.query.filter(
+            GuardianAIConsent.school_id == g.school_id,
+            GuardianAIConsent.student_id == student_id,
+            GuardianAIConsent.granted.is_(True),
+            GuardianAIConsent.is_deleted.is_(False),
+            _or(
+                GuardianAIConsent.scope.is_(None),
+                GuardianAIConsent.scope.in_(["tutor", "all"]),
+            ),
         )
         .first()
     )

@@ -145,3 +145,13 @@ from app.models.ai_workbench import (  # noqa: F401
     StudentAIProfile,
 )
 from app.models.hostel import Hostel, HostelRoom, HostelAllocation  # noqa: F401
+from app.models.content_spine import (  # noqa: F401
+    ContentSource,
+    ContentUnit,
+    ContentChunk,
+    ExtractionRun,
+    QuestionPaper,
+    PaperQuestion,
+    GoldenSetItem,
+    EvalRun,
+)

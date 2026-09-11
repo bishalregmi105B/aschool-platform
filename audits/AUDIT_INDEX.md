@@ -160,3 +160,29 @@ text-to-design with VASCAR self-correction, paper→print loop, curriculum-RAG r
 Part III AI per mobile role (Nepali-medium doubt solving = verified white space; parent NL-over-own-
 child; admin NL-over-SIS); Part IV AI delta per plugin; Part V waves S12–S20 + gates + costs.
 No code changes.
+
+## 2026-09-11 — S12: AI foundation (branch `feat/s12-ai-foundation`)
+
+Plan: `docs/FINAL_AI_PLATFORM_PLAN_2026-09-11.md` Part I.1 + I.2 (S12 row).
+
+| ID | What landed | Files |
+|---|---|---|
+| G-01 | Workbench `_system_prompt` loads the seeded bilingual prompt files (`app/prompts/<schema>_<lang>.md`) — registry `prompt_file` was written and never read | `app/services/ai/workbench.py` |
+| G-02 | `grounding="required"` enforced: empty context pack ⇒ 422 (the 7 "required" tools could run ungrounded) | `workbench.py` |
+| G-03 | `context_attendance` builder added — attendance_outreach previously ran on zero data despite "required" (declared context_builder="attendance" with no implementation) | `app/services/ai/tool_handlers.py` |
+| G-04 | GuardianAIConsent **scope** enforced (tutor\|tools\|all) at workbench + tutor gates; legacy NULL scope honored | `workbench.py`, `api/v1/ai_tutor.py` |
+| G-05 | `AIGeneration.output_tokens` + `citations` persisted (context builders may attach `_citations`; hub returns `output_tokens`) | `workbench.py`, `services/ai/token_hub.py` |
+| G-06 | Moderation emits `violence` (high) + `pii` (medium) categories — previously unreachable, downstream checks were dead code; non-critical flags persist without blocking | `workbench.py` |
+| G-08 | `/ai-tools/remarks` pseudonymizes student name before the prompt, de-pseudonymizes in response | `api/v1/ai_tools.py` |
+| G-09 | `SchoolAIToolSettings.field_overrides` applied as payload defaults; **request parameters (subject/grade/topic…) now actually reach the model** — only free-text `input` did before | `workbench.py` |
+| G-10 | Tutor exam-mode deflection fires on EVERY direct-answer turn (was turn 0 only — answer extractable on turn 2) | `services/ai/tutor_engine.py` |
+| G-11 | Token hub: empty-output retry at 2× budget (gpt-oss reasoning exhaustion); streaming Anthropic fallback (stream path was Groq-or-nothing); `output_tokens` in request() result | `services/ai/token_hub.py` |
+| G-12 | Pseudonymizer: longest-first word-boundary replacement (exact-substring pass corrupted names like Ram→Ramkrishna) | `workbench.py` |
+| Spine | Content-spine migration `s12_spine_01`: `content_sources` / `content_units` / `content_chunks` (pgvector 1024 + HNSW + tsvector, natural-key unique constraints) / `extraction_runs` (coverage manifests) / `question_papers` + `paper_questions` (printed-paper archive, 1:1 reprint contract) / `golden_set_items` + `eval_runs`; models `app/models/content_spine.py` (BaseModel + nullable school_id — NULL = platform corpus, document_chunks pattern) | `migrations/versions/s12_content_spine.py`, `app/models/content_spine.py`, `app/models/__init__.py` |
+| Loader | `app/content_loader.py` CLI (validate / ingest / status): contract checks, idempotent natural-key upserts (chunk ordinal = page×100+block deterministic; paper delete-then-reinsert), coverage publish gate (≥98% pages, zero flagged), spec-grid → PaperBlueprint (subject-gated, honest manifest deferral), best-effort embed + dual-write into document_chunks (source_type="content_chunk"); env-aware app bootstrap (TEST_DATABASE_URL ⇒ testing config — same bug class as the password_reset fix) | `app/content_loader.py` |
+| Review | `/content/*` review API (sources list/detail/chunks, chunk pass/flag/correct with audit-trail corrections, publish gate honoring flagged chunks) + `/dashboard/content-review` web page (source → units → chunks with page/bbox provenance) + settings_core nav subitem | `app/api/v1/content_admin.py`, `frontend/app/dashboard/content-review/page.tsx`, `app/plugins/manifests/settings_core.yaml` |
+| Tests | `tests/test_s12_ai_foundation.py` 10/10: loader validation+ingest round-trip+idempotency, coverage gate, grounding 422, context_attendance real data, prompt-file loading, moderation categories, pseudonymizer boundaries, tutor consent scope, review API flow | new |
+
+Deferred to S13 (per plan): G-07 full legacy `/ai-tools` migration onto the workbench pipeline.
+
+**Verification:** drift gate PASS (0 blocking / 469 allowlisted); AI-affected suites 62/62 (s12 10, workbench, token hub, quota, ai_teacher, plugin widgets); `tsc --noEmit` clean.

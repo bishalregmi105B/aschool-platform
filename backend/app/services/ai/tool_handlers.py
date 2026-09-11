@@ -184,3 +184,80 @@ def handle_fixture_test(parsed: dict, payload: dict) -> dict:
 
 def context_none(payload: dict) -> dict:
     return {}
+
+
+def context_attendance(payload: dict) -> dict:
+    """G-03: real absentee grounding for attendance_outreach — the registry
+    declared context_builder="attendance" but no builder existed, so the tool
+    silently ran on zero data.
+
+    Returns the calling teacher's (or a class's) absence record for the last
+    N days: per-student day lists, so outreach drafts name real dates."""
+    from datetime import date, timedelta
+
+    from flask import g
+
+    from app.models.attendance import Attendance
+    from app.models.student import Student
+    from app.utils.teacher_scope import teacher_allowed_class_ids
+
+    try:
+        window_days = max(1, min(int(payload.get("days") or 7), 31))
+    except (TypeError, ValueError):
+        window_days = 7
+    end = date.today()
+    start = end - timedelta(days=window_days)
+
+    query = Attendance.query.filter(
+        Attendance.school_id == g.school_id,
+        Attendance.is_deleted.is_(False),
+        Attendance.status == "absent",
+        Attendance.date >= start,
+        Attendance.date <= end,
+    )
+    class_id = payload.get("class_id")
+    if class_id:
+        query = query.filter(Attendance.class_id == class_id)
+    elif g.role == "teacher" and g.user_id:
+        allowed = teacher_allowed_class_ids(g.school_id, g.user_id)
+        if not allowed:
+            return {}
+        query = query.filter(Attendance.class_id.in_(allowed))
+
+    rows = query.all()
+    dates_by_student: dict = {}
+    for row in rows:
+        dates_by_student.setdefault(row.student_id, []).append(row.date.isoformat())
+    if not dates_by_student:
+        # Grounding contract: zero absentees = EMPTY context — the required-
+        # grounding gate must fire instead of drafting outreach for nobody.
+        return {}
+
+    students = (
+        Student.query.filter(Student.id.in_(list(dates_by_student.keys())))
+        .all()
+    )
+    absentees = []
+    for student in sorted(
+        students,
+        key=lambda s: -len(dates_by_student.get(s.id, [])),
+    )[:60]:
+        absentees.append(
+            {
+                "student_id": str(student.id),
+                "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip()
+                or "Student",
+                "class_id": str(student.class_id) if student.class_id else None,
+                "days_absent": len(dates_by_student[student.id]),
+                "dates": sorted(dates_by_student[student.id]),
+            }
+        )
+    return {
+        "range": {"start": start.isoformat(), "end": end.isoformat()},
+        "absentee_count": len(dates_by_student),
+        "absentees": absentees,
+        "_citations": [
+            {"source_type": "attendance_record", "source_id": str(sid), "ref": f"{len(d)} absences"}
+            for sid, d in list(dates_by_student.items())[:20]
+        ],
+    }

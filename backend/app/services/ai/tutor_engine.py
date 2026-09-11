@@ -143,8 +143,11 @@ class TutorEngine:
             return {"session_closed": True, "escalated": True}
 
         # exam-mode deflection check
+        # G-10: the old `turns_used == 0` gate let students extract the
+        # answer on turn 2+. In exam mode a direct-answer request is deflected
+        # on EVERY turn; the Socratic redirect stays the only path.
         wants_answer = any(p.search(student_text) for p in _DIRECT_ANSWER_PATTERNS)
-        if plan.exam_mode and wants_answer and session.turns_used == 0:
+        if plan.exam_mode and wants_answer:
             reply_text = (
                 "This one is on your exam — I can't hand you the answer, but "
                 "I can absolutely get you there. Start by telling me what the "
