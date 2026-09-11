@@ -186,3 +186,33 @@ Plan: `docs/FINAL_AI_PLATFORM_PLAN_2026-09-11.md` Part I.1 + I.2 (S12 row).
 Deferred to S13 (per plan): G-07 full legacy `/ai-tools` migration onto the workbench pipeline.
 
 **Verification:** drift gate PASS (0 blocking / 469 allowlisted); AI-affected suites 62/62 (s12 10, workbench, token hub, quota, ai_teacher, plugin widgets); `tsc --noEmit` clean.
+
+## 2026-09-11 — Competitor deep-audit round: 7 codebases, 7 agent reports + cross-audit synthesis (planning only)
+
+Extracted 7 competitor products from `Other Projects/*.rar` (InfixEdu v9.4.0, eSchool v3.3.6,
+Mighty School Pro v1.6, EduEx LMS v2.0, InstiKit v5.5.0, SchoolBusTrack v2.3, InfixEdu addon modules)
+— ~250k files. One dedicated audit agent per product; each wrote its own report with file-path
+evidence to `docs/competitor-audits/`:
+
+- `infixedu-v9.4.0.md` — fees lifecycle (installments/carry-forward/due-block), custom result-card
+  engine, print-twin discipline, DB-driven per-tenant menus, per-event notification matrix, 3-step
+  import UX; zero Nepal features.
+- `eschool-v3.3.6.md` — online-exam runner (palette/wakelock/auto-submit/retake cooldown/LaTeX),
+  mobile More-menu bottom-sheet nav, server-driven ops flags, native pay UX; live classes fake.
+- `mighty-school-pro-v1.6.md` — real double-entry accounting (GL, 11 statements, payroll posting),
+  fees fine-types+waivers, 15-dimension question taxonomy, permission-keyed sidebar, SMS credits;
+  "multibranch SaaS" claim thin, prod `migrate:fresh` cron bug.
+- `eduex-lms-v2.0.md` — sequential locking+resume, certificates with public verification, course
+  discussions, monetization engine; LMS learning core shallow, AI screens are mocks.
+- `instikit-school-v5.5.0.md` — Laravel+Vue (not WP); website+portal fusion with named blocks,
+  guest admission funnel with payments, TC verification, day-closure/vouchers, approval engine,
+  helpdesk/mess/assets; exportable site presets.
+- `schoolbustrack-v2.3.md` — 4-layer trip model (definition→schedule→instances→ride_status),
+  driver app, QR board/alight geofence, per-student notification toggles; no GPS history at all.
+- `infixedu-addon-modules.md` — addon-engineering lessons (migration maps, connection-test CTA),
+  Jitsi JWT/conflict-detection gaps, parent self-registration→approval flow.
+
+Synthesis: `docs/COMPETITOR_CROSS_AUDIT_PLAN_2026-09-11.md` — 30 deduplicated adoptions (A-01..A-30)
+prioritized P0/P1/P2, mapped onto existing waves (S13+), with explicit rejections and 4 founder
+decisions (transport trip-model re-scope, accounting plugin candidate, LMS trio priority, zip
+sideload). No code changes.
