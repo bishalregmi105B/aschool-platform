@@ -27,13 +27,13 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchUnreadCount } from "@/lib/services/notifications.service";
 import { Sparkles } from "lucide-react";
 import {
-  AOS_THEME_STORAGE_KEY,
   AOS_MODE_STORAGE_KEY,
   extractAOSModuleSlug,
   formatAOSRouteTitle,
   isAOSRootModuleRoute,
   normalizeAOSRoute,
 } from "@/lib/aos-navigation";
+import { useAOSUserSettings } from "@/lib/aos-settings";
 
 interface RouteLaunchMeta {
   moduleId: string;
@@ -61,17 +61,60 @@ export default function AOSDesktopShell() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Desktop appearance customization state
-  const [themeMode, setThemeMode] = useState<"light" | "dark">("dark");
-  const [accentColor, setAccentColor] = useState("#0078d4");
-  const [wallpaper, setWallpaper] = useState("bloom-dark");
-  const [brightness, setBrightness] = useState(100);
-  const [dockStyle, setDockStyle] = useState<"mac" | "win11">("mac");
-  const [dockSize, setDockSize] = useState<"small" | "medium" | "large">("medium");
-  const [showTopBar, setShowTopBar] = useState(true);
-  const [topBarHeight, setTopBarHeight] = useState<"compact" | "standard" | "large">("standard");
-  const [blurIntensity, setBlurIntensity] = useState(30);
-  const [taskbarAlign, setTaskbarAlign] = useState<"center" | "left">("center");
+  // Desktop customization state — DB-backed (cross-device) via
+  // useAOSUserSettings; localStorage cache provides instant first paint.
+  const { settings: aosSettings, updateSettings: updateAOSSettings } = useAOSUserSettings();
+  const themeMode = aosSettings.theme_mode;
+  const accentColor = aosSettings.accent_color;
+  const wallpaper = aosSettings.wallpaper;
+  const brightness = aosSettings.brightness;
+  const dockStyle = aosSettings.dock_style;
+  const dockSize = aosSettings.dock_size;
+  const showTopBar = aosSettings.show_top_bar;
+  const topBarHeight = aosSettings.top_bar_height;
+  const blurIntensity = aosSettings.blur_intensity;
+  const taskbarAlign = aosSettings.taskbar_align;
+
+  const setThemeMode = useCallback(
+    (mode: "light" | "dark") => updateAOSSettings({ theme_mode: mode }),
+    [updateAOSSettings]
+  );
+  const setAccentColor = useCallback(
+    (color: string) => updateAOSSettings({ accent_color: color }),
+    [updateAOSSettings]
+  );
+  const setWallpaper = useCallback(
+    (wp: string) => updateAOSSettings({ wallpaper: wp }),
+    [updateAOSSettings]
+  );
+  const setBrightness = useCallback(
+    (b: number) => updateAOSSettings({ brightness: b }),
+    [updateAOSSettings]
+  );
+  const setDockStyle = useCallback(
+    (style: "mac" | "win11") => updateAOSSettings({ dock_style: style }),
+    [updateAOSSettings]
+  );
+  const setDockSize = useCallback(
+    (size: "small" | "medium" | "large") => updateAOSSettings({ dock_size: size }),
+    [updateAOSSettings]
+  );
+  const setShowTopBar = useCallback(
+    (show: boolean) => updateAOSSettings({ show_top_bar: show }),
+    [updateAOSSettings]
+  );
+  const setTopBarHeight = useCallback(
+    (h: "compact" | "standard" | "large") => updateAOSSettings({ top_bar_height: h }),
+    [updateAOSSettings]
+  );
+  const setBlurIntensity = useCallback(
+    (v: number) => updateAOSSettings({ blur_intensity: v }),
+    [updateAOSSettings]
+  );
+  const setTaskbarAlign = useCallback(
+    (a: "center" | "left") => updateAOSSettings({ taskbar_align: a }),
+    [updateAOSSettings]
+  );
 
   // User role state
   const [currentRole, setCurrentRole] = useState<string>(user?.role || "admin");
@@ -82,27 +125,9 @@ export default function AOSDesktopShell() {
     }
   }, [user?.role]);
 
-  useEffect(() => {
-    try {
-      const storedTheme = localStorage.getItem(AOS_THEME_STORAGE_KEY);
-      if (storedTheme === "light" || storedTheme === "dark") {
-        setThemeMode(storedTheme);
-      }
-    } catch {
-      // Ignore storage access issues
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(AOS_THEME_STORAGE_KEY, themeMode);
-    } catch {
-      // Ignore storage write issues
-    }
-  }, [themeMode]);
-
-  // Manual desktop/iOS mode override — persists across reloads; absence of a
-  // stored value keeps the viewport-based decision in dashboard-layout.
+  // Manual desktop/iOS mode override — persists across reloads (DB-backed
+  // with a localStorage mirror that dashboard-layout reads synchronously);
+  // absence of a stored value keeps the viewport-based decision.
   const handleToggleSystemMode = useCallback(() => {
     try {
       const current = localStorage.getItem(AOS_MODE_STORAGE_KEY);
@@ -111,11 +136,12 @@ export default function AOSDesktopShell() {
         (current !== "desktop" && window.matchMedia("(max-width: 767px)").matches);
       const next = isMobileNow ? "desktop" : "mobile";
       localStorage.setItem(AOS_MODE_STORAGE_KEY, next);
+      updateAOSSettings({ system_mode: next });
       window.location.reload();
     } catch {
       // Ignore storage access issues
     }
-  }, []);
+  }, [updateAOSSettings]);
 
   // Flyout and modal toggles
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
@@ -575,7 +601,7 @@ export default function AOSDesktopShell() {
           accentColor={accentColor}
           onChangeAccent={setAccentColor}
           themeMode={themeMode}
-          onToggleTheme={() => setThemeMode((m) => (m === "dark" ? "light" : "dark"))}
+          onToggleTheme={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
           wallpaper={wallpaper}
           onChangeWallpaper={setWallpaper}
           dockStyle={dockStyle}
@@ -583,12 +609,12 @@ export default function AOSDesktopShell() {
           dockSize={dockSize}
           onChangeDockSize={setDockSize}
           showTopBar={showTopBar}
-          onToggleTopBar={() => setShowTopBar((prev) => !prev)}
+          onToggleTopBar={() => setShowTopBar(!showTopBar)}
           blurIntensity={blurIntensity}
           onChangeBlurIntensity={setBlurIntensity}
           taskbarAlign={taskbarAlign}
           onToggleTaskbarAlign={() =>
-            setTaskbarAlign((prev) => (prev === "center" ? "left" : "center"))
+            setTaskbarAlign(taskbarAlign === "center" ? "left" : "center")
           }
           brightness={brightness}
           onChangeBrightness={setBrightness}
