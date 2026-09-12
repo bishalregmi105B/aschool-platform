@@ -265,7 +265,7 @@ export default function AOSDesktopShell() {
 
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
-    const apps = sidebarItems.map(getAOSAppForModule);
+    const apps = sidebarItems.map((item) => getAOSAppForModule(item));
     for (const b of pluginBottomNav) {
       const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
       if (!apps.some((a) => a.id === moduleId)) {
@@ -320,6 +320,13 @@ export default function AOSDesktopShell() {
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const zIndexRef = useRef(20);
   const shellRootRef = useRef<HTMLDivElement>(null);
+
+  // Menu bar navigation source — sidebar items plus bottom-nav modules, so
+  // the focused-app menus can derive Navigate/Window/Help for every module.
+  const menubarNavItems = useMemo(
+    () => [...sidebarItems, ...pluginBottomNav],
+    [sidebarItems, pluginBottomNav]
+  );
 
   const closeAllFlyouts = useCallback(
     (
@@ -693,7 +700,7 @@ export default function AOSDesktopShell() {
           currentRole={currentRole}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
-          sidebarItems={sidebarItems}
+          sidebarItems={menubarNavItems}
           onOpenRoleSwitcher={() => {
             closeAllFlyouts("roleSwitcher");
             setIsRoleSwitcherOpen(true);
@@ -707,16 +714,6 @@ export default function AOSDesktopShell() {
             const next = !isNotificationsOpen;
             closeAllFlyouts("notifications");
             setIsNotificationsOpen(next);
-          }}
-          onToggleSearch={() => {
-            const next = !isStartOpen;
-            closeAllFlyouts("start");
-            setIsStartOpen(next);
-          }}
-          onToggleSpotlight={() => {
-            const next = !isSpotlightOpen;
-            closeAllFlyouts("spotlight");
-            setIsSpotlightOpen(next);
           }}
           onToggleWidgets={() => {
             const next = !isWidgetsOpen;
@@ -738,6 +735,20 @@ export default function AOSDesktopShell() {
           onToggleSystemMode={handleToggleSystemMode}
           unreadCount={unreadCount}
           topBarHeight={topBarHeight}
+          windows={windows}
+          activeWindowId={activeWindowId}
+          onFocusWindow={focusWindow}
+          onMinimizeActive={() => {
+            if (activeWindowId) minimizeWindow(activeWindowId);
+          }}
+          onMaximizeActive={() => {
+            if (activeWindowId) toggleMaximizeWindow(activeWindowId);
+          }}
+          onCloseActive={() => {
+            if (activeWindowId) closeWindow(activeWindowId);
+          }}
+          topbarItems={aosSettings.topbar_items}
+          onChangeTopbarItems={(items) => updateAOSSettings({ topbar_items: items })}
         />
       )}
 
