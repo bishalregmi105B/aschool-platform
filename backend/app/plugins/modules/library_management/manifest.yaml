@@ -44,6 +44,8 @@ ui:
       route: /library/stocktake
     - label: Reports
       route: /library/reports
+  aos:
+    about: "Run the school library — catalog, issue and return, holds, overdue tracking, fines, and stock-takes."
 mobile:
   admin:
     feature_folder: library

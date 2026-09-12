@@ -36,7 +36,7 @@ export default function StartMenu({
 
   if (!isOpen) return null;
 
-  const userName = user?.full_name || "Bishal Regmi";
+  const userName = user?.full_name || "User";
   const userRole = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : "Student";
   const userInitial = userName.charAt(0).toUpperCase() || "A";
 

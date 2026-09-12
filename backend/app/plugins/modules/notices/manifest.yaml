@@ -27,6 +27,8 @@ ui:
     visible_to:
     - school_admin
     - teacher
+  aos:
+    about: "Post school announcements and events on the notice board, with push notifications to keep everyone informed."
 mobile:
   admin:
     feature_folder: notices

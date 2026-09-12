@@ -29,6 +29,8 @@ ui:
       route: /incident-management/escalations
     - label: Reports
       route: /incident-management/reports
+  aos:
+    about: "Handle serious behavior cases in full — witnesses, escalation, parent conferences, and case reports."
 mobile:
   admin:
     feature_folder: incident_management

@@ -37,6 +37,8 @@ ui:
       route: /dashboard/hr/expenses
     - label: Expense Categories
       route: /dashboard/hr/expense-categories
+  aos:
+    about: "Manage staff end to end — payroll, leave, appraisals, expenses, and PF/SSF accounting."
 mobile:
   admin:
     feature_folder: hr_payroll

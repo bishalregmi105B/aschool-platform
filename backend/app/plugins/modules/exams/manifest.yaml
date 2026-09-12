@@ -57,6 +57,8 @@ ui:
       route: /dashboard/exams/online/questions
     - label: Grade Table
       route: /dashboard/exams/grades
+  aos:
+    about: "Run exams from schedule to report card — marks entry, results, tabulation, grade sheets, online exams, and AI question paper generation."
 mobile:
   admin:
     feature_folder: exams

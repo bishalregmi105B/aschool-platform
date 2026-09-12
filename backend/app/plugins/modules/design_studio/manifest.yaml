@@ -34,6 +34,8 @@ ui:
       route: /dashboard/designer/bulk
     - label: Certificates
       route: /dashboard/certificates
+  aos:
+    about: "Design school materials in a Canva-like editor — certificates, ID cards, and flyers from templates, including bulk ID card generation."
 mobile:
   admin:
     feature_folder: design_studio

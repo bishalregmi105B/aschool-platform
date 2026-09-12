@@ -27,6 +27,8 @@ ui:
     icon: ShieldCheck
     visible_to:
     - school_admin
+  aos:
+    about: "Stay audit-ready with government EMIS reporting, compliance checklists, audit trails, and regulatory document management."
 mobile:
   admin:
     feature_folder: compliance

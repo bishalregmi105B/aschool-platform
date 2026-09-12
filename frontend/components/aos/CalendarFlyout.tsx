@@ -108,7 +108,7 @@ export default function CalendarFlyout({
             >
               <Bell size={14} color={accentColor} style={{ marginTop: "2px", flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--w11-text-primary)" }}>Dr. Robert Henderson (PHY-302)</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--w11-text-primary)" }}>Physics Faculty (PHY-302)</div>
                 <div style={{ fontSize: "10px", color: "var(--w11-text-secondary)" }}>Problem Set 4 solutions uploaded to Library Vault.</div>
               </div>
             </div>

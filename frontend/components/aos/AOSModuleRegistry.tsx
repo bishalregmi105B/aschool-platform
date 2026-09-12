@@ -110,11 +110,14 @@ export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "health-records": dynamic(() => import("@/app/dashboard/health-records/page"), { loading: AOSModuleLoading }),
 
   // ── Platform Administration & System ──────────────────────────────────────
-  marketplace: dynamic(() => import("@/app/dashboard/marketplace/page"), { loading: AOSModuleLoading }),
-  plugins: dynamic(() => import("@/app/dashboard/plugins/page"), { loading: AOSModuleLoading }),
+  // marketplace & plugins both land in the unified AOS Store (Store / Installed
+  // tabs). Deep subroutes (e.g. /dashboard/plugins/<slug>/settings) still
+  // resolve to their exact pages first via AOSRouteTable.
+  marketplace: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
+  plugins: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
   users: dynamic(() => import("@/app/dashboard/users/page"), { loading: AOSModuleLoading }),
   "multi-branch": dynamic(() => import("@/app/dashboard/multi-branch/page"), { loading: AOSModuleLoading }),
-  settings: dynamic(() => import("@/app/dashboard/settings/page"), { loading: AOSModuleLoading }),
+  settings: dynamic(() => import("./apps/SettingsApp"), { loading: AOSModuleLoading }), // one-stop AOS Settings app (embeds the school/platform dashboard pages)
   "iemis-import": dynamic(() => import("@/app/dashboard/iemis-import/page"), { loading: AOSModuleLoading }),
   "bulk-uploads": dynamic(() => import("@/app/dashboard/bulk-uploads/page"), { loading: AOSModuleLoading }),
 

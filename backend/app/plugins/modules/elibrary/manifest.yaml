@@ -26,6 +26,8 @@ ui:
     subitems:
     - label: Past Papers
       route: /dashboard/elibrary/past-papers
+  aos:
+    about: "Share digital learning content — e-books, past papers, and educational resources for teachers and students."
 mobile:
   teacher:
     feature_folder: elibrary
