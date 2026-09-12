@@ -42,5 +42,6 @@ from app.tasks import (  # noqa: E402, F401
     gps_firebase_poller,
     trial_expiry,
     ai_teacher,
+    fees_depth,
 )
 

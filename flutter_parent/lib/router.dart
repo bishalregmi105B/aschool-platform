@@ -7,6 +7,10 @@ import 'screens/shell_screen.dart';
 import 'features/dashboard/parent_dashboard.dart';
 import 'features/attendance/child_attendance.dart';
 import 'features/fees/fee_payment_screen.dart';
+import 'features/fees/bank_deposit_screen.dart';
+import 'features/fees/offline_submissions_screen.dart';
+import 'features/fees/invoices_screen.dart';
+import 'features/fees/payment_verification_screen.dart';
 import 'features/results/results_screen.dart';
 import 'features/bus_tracker/bus_tracking_screen.dart';
 import 'features/chat/parent_chat_screen.dart';
@@ -61,6 +65,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (_, __) => const NotificationCenterScreen(),
+      ),
+      // Fees depth (S-A1) — full-screen fee flows, plugin-gated per screen.
+      GoRoute(
+        path: '/fees/bank-deposit',
+        builder: (_, __) => const BankDepositScreen(),
+      ),
+      GoRoute(
+        path: '/fees/submissions',
+        builder: (_, __) => const OfflineSubmissionsScreen(),
+      ),
+      GoRoute(
+        path: '/fees/invoices',
+        builder: (_, __) => const InvoicesScreen(),
+      ),
+      GoRoute(
+        path: '/fees/invoices/:invoiceId',
+        builder: (_, state) => InvoiceDetailScreen(
+          invoiceId: state.pathParameters['invoiceId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/fees/verify-payment',
+        builder: (_, state) => PaymentVerificationScreen(
+          collectionId: state.uri.queryParameters['collection_id'] ?? '',
+          studentId: state.uri.queryParameters['student_id'],
+        ),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, __, navigationShell) =>

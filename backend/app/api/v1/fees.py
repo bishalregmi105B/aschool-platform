@@ -19,6 +19,12 @@ from app.models.fee import (
     FeeStructure,
     StudentScholarship,
     FeeRefund,
+    FeeInvoice,
+    FeeInstallment,
+    FeeCarryForward,
+    FeeCarryForwardLog,
+    FeeOfflineSubmission,
+    FeeDayClosure,
 )
 from app.models.school import School
 from app.models.student import Student
@@ -1290,6 +1296,10 @@ def create_collection():
     )
 
     db.session.add(collection)
+    if collection.invoice_id:
+        invoice = FeeInvoice.query.get(collection.invoice_id)
+        if invoice is not None:
+            _recompute_invoice_status(invoice)
     db.session.commit()
     return created_response(_collection_dict(collection))
 
@@ -1357,6 +1367,10 @@ def update_collection(collection_id):
         requested_status,
     )
 
+    if collection.invoice_id:
+        invoice = FeeInvoice.query.get(collection.invoice_id)
+        if invoice is not None:
+            _recompute_invoice_status(invoice)
     db.session.commit()
     return success_response(_collection_dict(collection))
 
@@ -1458,7 +1472,31 @@ def record_payment(collection_id):
     new_paid = min(total_amount, previous_paid + amount)
     recorded_amount = min(amount, outstanding)
 
+    # ── S-A1 till lock (A-24): a collector who closed their day for the
+    # payment's BS date cannot record further desk payments until an admin
+    # reopens the closure. Gateway-anchored callbacks skip this (they are
+    # not counter cash).
+    if method in ("cash", "cheque", "bank"):
+        closure_bs = payment_date_raw or _bs_today().strftime("%Y-%m-%d")
+        closed = FeeDayClosure.query.filter(
+            FeeDayClosure.school_id == g.school_id,
+            FeeDayClosure.closure_date_bs == closure_bs,
+            FeeDayClosure.collected_by_id == g.user_id,
+            FeeDayClosure.status == "closed",
+            FeeDayClosure.is_deleted.is_(False),
+        ).first()
+        if closed is not None:
+            return error_response(
+                "Your counter for this date is closed. Ask an administrator "
+                "to reopen the day before recording more payments.",
+                423,
+            )
+
     fc.payment_method = method
+    # Attribution: who recorded the desk payment (day book + till lock key
+    # on this). Was never stamped before S-A1 — the day book showed every
+    # collection as "unknown".
+    fc.collected_by_id = g.user_id
     fc.transaction_id = data.get("transaction_id") or fc.transaction_id
     fc.notes = _merge_partial_payment_note(fc.notes, new_paid)
     if new_paid >= total_amount:
@@ -1484,6 +1522,11 @@ def record_payment(collection_id):
     fc.receipt_number = receipt.receipt_number
     fc.receipt_url = f"/api/v1/fees/receipts/{receipt.id}/pdf"
     receipt.pdf_url = fc.receipt_url
+    # S-A1: keep the parent invoice document honest after the line changed.
+    if fc.invoice_id:
+        invoice = FeeInvoice.query.get(fc.invoice_id)
+        if invoice is not None:
+            _recompute_invoice_status(invoice)
     db.session.commit()
 
     from app.plugins.events import emit
@@ -1988,6 +2031,10 @@ def refund_payment(collection_id):
     db.session.add(refund_row)
     fc.payment_status = "refunded"
     fc.notes = f"[REFUNDED: {reason}] {fc.notes or ''}".strip()
+    if fc.invoice_id:
+        invoice = FeeInvoice.query.get(fc.invoice_id)
+        if invoice is not None:
+            _recompute_invoice_status(invoice)
     db.session.commit()
 
     return success_response({
@@ -2335,6 +2382,131 @@ def _structure_collection_exists(structure, student_id, markers, item_name, year
     return query.first() is not None
 
 
+# ── S-A1: invoice grouping + status maintenance ──────────────────────────
+
+def _period_key_of(collection):
+    """The billing-cycle key an invoice groups by (mirrors the generators)."""
+    month_bs = (collection.month_bs or "").strip()
+    if re.match(r"^\d{4}-(Q\d|H\d|\d{2})$", month_bs):
+        return month_bs
+    return (collection.academic_year or collection.year_bs or "").strip() or None
+
+
+def _invoice_title_of(collection):
+    period = _period_key_of(collection)
+    if period and re.match(r"^\d{4}-\d{2}$", period):
+        try:
+            import nepali_datetime
+
+            label = nepali_datetime.date(int(period[:4]), int(period[5:7]), 1)
+            return f"{label.strftime('%B')} {period[:4]} fees"
+        except Exception:
+            return f"{period} fees"
+    if period:
+        return f"{period} fees"
+    return "Fee bill"
+
+
+def _group_collections_into_invoices(school_id, collections):
+    """Bucket fresh FeeCollection rows into per-student invoices.
+
+    One invoice per (student, period_key): an existing non-paid invoice for
+    the same period absorbs the new lines (so a manually-applied structure
+    and the cron bill for the same month land on one document); otherwise a
+    new invoice is created. Invoice status is recomputed from the lines —
+    the invoice NEVER holds its own totals (single source of truth).
+    """
+    if not collections:
+        return []
+    by_key: dict[tuple, list[FeeCollection]] = {}
+    for c in collections:
+        key = (str(c.student_id), _period_key_of(c) or "")
+        by_key.setdefault(key, []).append(c)
+
+    invoices = []
+    for (student_id, period_key), lines in by_key.items():
+        invoice = None
+        if period_key:
+            invoice = (
+                FeeInvoice.query.filter(
+                    FeeInvoice.school_id == school_id,
+                    FeeInvoice.student_id == student_id,
+                    FeeInvoice.period_key == period_key,
+                    FeeInvoice.is_deleted.is_(False),
+                    FeeInvoice.status.in_(("pending", "partial")),
+                )
+                .first()
+            )
+        if invoice is None:
+            first = lines[0]
+            due_candidates = [
+                (l.due_date_bs or "").strip() for l in lines if (l.due_date_bs or "").strip()
+            ]
+            invoice = FeeInvoice(
+                school_id=school_id,
+                student_id=student_id,
+                academic_year=first.academic_year,
+                title=_invoice_title_of(first),
+                period_key=period_key or None,
+                due_date_bs=min(due_candidates) if due_candidates else None,
+                status="pending",
+            )
+            db.session.add(invoice)
+            db.session.flush()
+        for line in lines:
+            line.invoice_id = invoice.id
+            # Inherit an explicit due date when the line has none.
+            if not (line.due_date_bs or "").strip() and invoice.due_date_bs:
+                line.due_date_bs = invoice.due_date_bs
+        _recompute_invoice_status(invoice)
+        invoices.append(invoice)
+    return invoices
+
+
+def _invoice_totals(invoice):
+    """(payable, paid) summed from the invoice's lines — never stored."""
+    payable = 0.0
+    paid = 0.0
+    for line in invoice.collections:
+        if line.is_deleted:
+            continue
+        status = (line.payment_status or "").lower()
+        if status == "waived":
+            continue
+        payable += float(_collection_payable_total(line))
+        paid += min(float(_extract_partial_paid(line)), float(_collection_payable_total(line)))
+    return round(payable, 2), round(paid, 2)
+
+
+def _recompute_invoice_status(invoice):
+    """pending → partial → paid from the line sums. Waived-only invoices are
+    'waived'. Call after ANY line mutation (payment, refund, edit, waive)."""
+    payable, paid = _invoice_totals(invoice)
+    lines = [l for l in invoice.collections if not l.is_deleted]
+    if payable <= 0 and lines and all(
+        (l.payment_status or "").lower() == "waived" for l in lines
+    ):
+        invoice.status = "waived"
+    elif paid <= 0:
+        invoice.status = "pending"
+    elif paid >= payable:
+        invoice.status = "paid"
+    else:
+        invoice.status = "partial"
+    return invoice.status
+
+
+def _recompute_invoices_for_collections(collections):
+    """Recompute every distinct invoice touched by a line mutation."""
+    seen = set()
+    for line in collections:
+        invoice = line.invoice
+        if invoice is None or invoice.id in seen:
+            continue
+        seen.add(invoice.id)
+        _recompute_invoice_status(invoice)
+
+
 def _apply_fee_structure(structure, on_date=None):
     """Generate FeeCollection rows for every billable fee item on a structure.
 
@@ -2359,6 +2531,7 @@ def _apply_fee_structure(structure, on_date=None):
     created_count = 0
     skipped_count = 0
     applied_cycles = set()
+    new_collections: list[FeeCollection] = []
 
     for item in items:
         if not isinstance(item, dict):
@@ -2393,6 +2566,12 @@ def _apply_fee_structure(structure, on_date=None):
             notes = f"{marker} [frequency:{frequency}]"
             if due_day is not None:
                 notes = f"{notes} [due_day:{due_day}]"
+
+            # S-A1: explicit BS due date on the bill (aging + fine accrual
+            # read the column; the notes marker remains the dedupe record).
+            due_date_bs = None
+            if due_day is not None and year_bs and month_bs:
+                due_date_bs = nepali_day_date(year_bs, month_bs.split("-")[1], due_day)
 
             # Auto-apply student scholarship/discount if one exists. ALL active
             # matching discounts stack additively (e.g. sibling 10% + merit 5%
@@ -2454,11 +2633,16 @@ def _apply_fee_structure(structure, on_date=None):
                 year_bs=year_bs,
                 payment_status="pending",
                 notes=notes,
+                due_date_bs=due_date_bs,
             )
+            new_collections.append(collection)
             db.session.add(collection)
             created_count += 1
 
     if created_count:
+        # S-A1: group the fresh bills into per-student invoices before
+        # committing, so the invoice document exists from day one.
+        _group_collections_into_invoices(structure.school_id, new_collections)
         db.session.commit()
 
     if not applied_cycles:
@@ -2542,14 +2726,35 @@ def nepali_day_date(bs_year, bs_month, bs_day):
         return None
 
 
-def _collection_due_date(collection):
-    """Ephemeral due date for a fee bill (FeeCollection has NO due_date column).
+def bs_to_ad_date(bs_iso):
+    """AD datetime.date for a BS ISO string ("2083-04-01") — None on failure.
 
-    Derived from the fee item's due_day — written as "[due_day:N]" in notes by
-    both the manual apply generator and the auto cron — anchored to the bill's
-    BS month. month_bs from the generators is a full BS "YYYY-MM" key; legacy
-    two-digit month values can't locate a BS month, so they yield None.
+    Used for due-date arithmetic (aging buckets, fine grace days); all
+    display remains BS-first.
     """
+    if not bs_iso:
+        return None
+    try:
+        import nepali_datetime
+
+        y, m, d = str(bs_iso).strip().split("-")
+        return nepali_datetime.date(int(y), int(m), int(d)).to_datetime_date()
+    except Exception:
+        return None
+
+
+def _collection_due_date(collection):
+    """Due date for a fee bill (BS, as an AD date for arithmetic).
+
+    S-A1: the explicit `due_date_bs` column wins (written by the generators,
+    the installment scheduler and carry-forward). Legacy rows fall back to
+    parsing "[due_day:N]" out of notes — month_bs from the generators is a
+    full BS "YYYY-MM" key; legacy two-digit month values can't locate a BS
+    month, so they yield None.
+    """
+    column_value = (collection.due_date_bs or "").strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", column_value):
+        return bs_to_ad_date(column_value)
     match = re.search(r"\[due_day:(\d{1,2})\]", collection.notes or "")
     if not match:
         return None
@@ -2704,11 +2909,16 @@ def _merge_partial_payment_note(existing_notes, paid_amount):
 
 
 def _generate_receipt_number(collection):
-    """School-level IRD-style series: {SLUG}/{FY-BS}/{seq:05d} (D-02).
+    """School-level IRD-style series: {PREFIX}/{FY-BS}/{seq:05d} (D-02).
 
     A per-school counter row is taken with SELECT … FOR UPDATE so two
     concurrent receipts can never draw the same sequence number — the old
     COUNT(*)+1 numbering raced and issued duplicates.
+
+    S-A1: the prefix and padding are school-configurable via
+    School.settings["fee_receipt_numbering"] = {"prefix": "ABC", "pad": 5}
+    (the sequence itself stays in SchoolReceiptCounter — only the format is
+    configurable, the uniqueness mechanics are not).
     """
     from app.models.school import SchoolReceiptCounter
 
@@ -2717,7 +2927,16 @@ def _generate_receipt_number(collection):
     fiscal_year_bs = f"{fy}/{str((fy + 1) % 100).zfill(2)}"
 
     school = School.query.get(g.school_id)
-    prefix = (school.slug if school else "school").upper()[:12]
+    numbering = {}
+    if school and isinstance(school.settings, dict):
+        numbering = school.settings.get("fee_receipt_numbering") or {}
+    prefix = str(numbering.get("prefix") or "").strip().upper()[:12] or (
+        (school.slug if school else "school").upper()[:12]
+    )
+    try:
+        pad = max(2, min(int(numbering.get("pad") or 5), 10))
+    except (TypeError, ValueError):
+        pad = 5
 
     counter = (
         SchoolReceiptCounter.query.filter_by(
@@ -2738,7 +2957,7 @@ def _generate_receipt_number(collection):
         )
     counter.last_seq = (counter.last_seq or 0) + 1
     seq = counter.last_seq
-    return f"{prefix}/{fiscal_year_bs}/{seq:05d}"
+    return f"{prefix}/{fiscal_year_bs}/{seq:0{pad}d}"
 
 
 def _receipt_hash(receipt_number, collection_id, amount):
@@ -2889,3 +3108,1540 @@ def _receipt_pdf_html(receipt):
   </div>
 </body>
 </html>"""
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A1 — Fees depth (MASTER_EXECUTION_PLAN A-01 + A-08 + A-24):
+# invoices, installments, carry-forward, AR aging, fines/waivers reports,
+# offline bank-slip approval queue, day closure/day book, receipt numbering
+# config, pending-payment sweeper, parent nudge.
+# ══════════════════════════════════════════════════════════════════════════
+
+# ── Fee invoices ─────────────────────────────────────────────────────────
+
+def _invoice_dict(invoice, with_lines=False):
+    payable, paid = _invoice_totals(invoice)
+    student = invoice.student
+    data = {
+        "id": str(invoice.id),
+        "student_id": str(invoice.student_id),
+        "student_name": _student_name(student),
+        "class_name": (student.to_dict() or {}).get("class_name") if student else None,
+        "title": invoice.title,
+        "academic_year": invoice.academic_year,
+        "period_key": invoice.period_key,
+        "due_date_bs": invoice.due_date_bs,
+        "status": invoice.status,
+        "total_amount": payable,
+        "paid_amount": paid,
+        "due_amount": max(payable - paid, 0.0),
+        "line_count": sum(1 for l in invoice.collections if not l.is_deleted),
+        "notes": invoice.notes,
+        "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
+    }
+    if with_lines:
+        data["lines"] = [_collection_dict(l) for l in invoice.collections if not l.is_deleted]
+    return data
+
+
+@fees_bp.route("/invoices", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def list_invoices():
+    """Per-student bill documents (grouped FeeCollection lines)."""
+    query = FeeInvoice.query.filter(
+        FeeInvoice.school_id == g.school_id, FeeInvoice.is_deleted.is_(False)
+    ).options(joinedload(FeeInvoice.student))
+    status = (request.args.get("status") or "").strip().lower()
+    if status in ("pending", "partial", "paid", "waived"):
+        query = query.filter(FeeInvoice.status == status)
+    student_id = _parse_uuid(request.args.get("student_id"))
+    if student_id:
+        query = query.filter(FeeInvoice.student_id == student_id)
+    academic_year = (request.args.get("academic_year") or "").strip()
+    if academic_year:
+        query = query.filter(FeeInvoice.academic_year == academic_year)
+    class_id = _parse_uuid(request.args.get("class_id"))
+    if class_id:
+        query = query.join(Student, Student.id == FeeInvoice.student_id).filter(
+            Student.class_id == class_id
+        )
+    query = query.order_by(FeeInvoice.created_at.desc())
+    items, meta = paginate(query)
+    return success_response(
+        {"invoices": [_invoice_dict(i) for i in items], "meta": meta}
+    )
+
+
+@fees_bp.route("/invoices/<uuid:invoice_id>", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def get_invoice(invoice_id):
+    invoice = FeeInvoice.query.filter_by(
+        id=invoice_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if invoice is None:
+        return error_response("Invoice not found", 404)
+    return success_response({"invoice": _invoice_dict(invoice, with_lines=True)})
+
+
+# ── Installments ─────────────────────────────────────────────────────────
+
+@fees_bp.route("/structures/<uuid:structure_id>/installments", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def list_installments(structure_id):
+    structure = FeeStructure.query.filter_by(
+        id=structure_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if structure is None:
+        return error_response("Fee structure not found", 404)
+    rows = (
+        FeeInstallment.query.filter_by(structure_id=structure.id, is_deleted=False)
+        .order_by(FeeInstallment.seq.asc())
+        .all()
+    )
+    scheduled_total = round(sum(float(r.amount or 0) for r in rows), 2)
+    return success_response({
+        "installments": [
+            {
+                "id": str(r.id),
+                "seq": r.seq,
+                "label": r.label,
+                "amount": float(r.amount or 0),
+                "due_date_bs": r.due_date_bs,
+                "is_generated": bool(r.is_generated),
+            }
+            for r in rows
+        ],
+        "scheduled_total": scheduled_total,
+        "structure_total": float(structure.total_annual or 0),
+        "balanced": scheduled_total == round(float(structure.total_annual or 0), 2),
+    })
+
+
+@fees_bp.route("/structures/<uuid:structure_id>/installments", methods=["PUT"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def set_installments(structure_id):
+    """Replace the structure's installment schedule.
+
+    Body: {"installments": [{"seq": 1, "label": "Term 1", "amount": 12000,
+    "due_date_bs": "2083-04-10"}, ...]}
+    The schedule must sum to the structure total (total_annual when set,
+    else the sum of fee_items) — a mismatched schedule would bill an amount
+    the structure never promised.
+    """
+    structure = FeeStructure.query.filter_by(
+        id=structure_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if structure is None:
+        return error_response("Fee structure not found", 404)
+    if any(
+        (i.is_generated for i in FeeInstallment.query.filter_by(
+            structure_id=structure.id, is_deleted=False
+        ).all())
+    ):
+        return error_response(
+            "Installments were already applied to students — delete the "
+            "generated bills first or create a new structure", 409
+        )
+
+    data = request.get_json(silent=True) or {}
+    rows = data.get("installments")
+    if not isinstance(rows, list) or not rows:
+        return error_response("installments must be a non-empty list", 400)
+
+    cleaned = []
+    for idx, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            return error_response(f"installments[{idx}] must be an object", 400)
+        amount = _coerce_fee_amount(row.get("amount"))
+        if amount <= 0:
+            return error_response(f"installments[{idx}].amount must be > 0", 400)
+        due = str(row.get("due_date_bs") or "").strip() or None
+        if due and not re.match(r"^\d{4}-\d{2}-\d{2}$", due):
+            return error_response(
+                f"installments[{idx}].due_date_bs must be YYYY-MM-DD (BS)", 400
+            )
+        label = str(row.get("label") or f"Installment {idx}").strip()[:100]
+        cleaned.append({
+            "seq": int(row.get("seq") or idx),
+            "label": label,
+            "amount": amount,
+            "due_date_bs": due,
+        })
+
+    target_total = float(structure.total_annual or 0)
+    if target_total <= 0:
+        target_total = round(
+            sum(_coerce_fee_amount(i.get("amount")) for i in (structure.fee_items or [])
+                if isinstance(i, dict)),
+            2,
+        )
+    scheduled_total = round(sum(r["amount"] for r in cleaned), 2)
+    if target_total > 0 and abs(scheduled_total - target_total) > 0.01:
+        return error_response(
+            f"Installment total ({scheduled_total}) must equal the structure "
+            f"total ({target_total})", 400
+        )
+
+    for existing in FeeInstallment.query.filter_by(
+        structure_id=structure.id, is_deleted=False
+    ).all():
+        existing.soft_delete()
+    for row in cleaned:
+        db.session.add(
+            FeeInstallment(
+                school_id=g.school_id,
+                structure_id=structure.id,
+                seq=row["seq"],
+                label=row["label"],
+                amount=row["amount"],
+                due_date_bs=row["due_date_bs"],
+                is_generated=False,
+            )
+        )
+    db.session.commit()
+    return success_response({"saved": len(cleaned), "scheduled_total": scheduled_total})
+
+
+@fees_bp.route("/structures/<uuid:structure_id>/installments/apply", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def apply_installments(structure_id):
+    """Generate one bill (FeeCollection) per installment per matched student.
+
+    Idempotent per (structure, installment, student): re-running skips
+    already-generated installments. Every bill gets the explicit BS due date
+    and lands on the student's invoice document.
+    """
+    structure = FeeStructure.query.filter_by(
+        id=structure_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if structure is None:
+        return error_response("Fee structure not found", 404)
+    installments = (
+        FeeInstallment.query.filter_by(structure_id=structure.id, is_deleted=False)
+        .order_by(FeeInstallment.seq.asc())
+        .all()
+    )
+    if not installments:
+        return error_response(
+            "No installment schedule on this structure — save one first", 400
+        )
+
+    primary_item = _structure_primary_item(structure)
+    item_name = (
+        (primary_item.get("name") or "").strip()
+        or _humanize_fee_label(primary_item.get("fee_type"))
+        or (structure.total_annual and "Fee") or "Fee"
+    )
+    students = _matching_students_query(structure).all()
+    created = 0
+    skipped = 0
+    new_collections: list[FeeCollection] = []
+
+    # Convert (not double-bill): a structure that already auto-applied its
+    # full amount retires those UNPAID bills when the school switches to an
+    # installment schedule — otherwise students are billed the total twice
+    # (full apply + installments). Paid bills are money already moved; they
+    # stay and the installment bills for them must be settled manually.
+    for old_bill in FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.installment_id.is_(None),
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+        FeeCollection.notes.ilike(f"%[fee_structure:{structure.id}%]"),
+    ).all():
+        if float(_extract_partial_paid(old_bill)) <= 0.005:
+            old_bill.soft_delete()
+
+    for inst in installments:
+        for student in students:
+            exists = FeeCollection.query.filter(
+                FeeCollection.school_id == g.school_id,
+                FeeCollection.student_id == student.id,
+                FeeCollection.installment_id == inst.id,
+                FeeCollection.is_deleted.is_(False),
+            ).first()
+            if exists:
+                skipped += 1
+                continue
+            # Scholarships apply per-bill, same as the cycle generator.
+            discount_amount = 0.0
+            is_scholarship = False
+            scholarships = StudentScholarship.query.filter(
+                StudentScholarship.school_id == g.school_id,
+                StudentScholarship.student_id == student.id,
+                StudentScholarship.is_active.is_(True),
+                StudentScholarship.is_deleted.is_(False),
+                or_(
+                    StudentScholarship.fee_type.is_(None),
+                    StudentScholarship.fee_type == item_name,
+                ),
+            ).all()
+            if scholarships:
+                combined = sum(
+                    float(inst.amount or 0) * float(sc.discount_value or 0) / 100
+                    if sc.discount_type == "percent"
+                    else float(sc.discount_value or 0)
+                    for sc in scholarships
+                )
+                discount_amount = round(min(max(combined, 0.0), float(inst.amount or 0)), 2)
+                is_scholarship = True
+            collection = FeeCollection(
+                school_id=g.school_id,
+                student_id=student.id,
+                academic_year=structure.academic_year,
+                fee_item_name=f"{item_name} — {inst.label}",
+                amount=float(inst.amount or 0),
+                discount_amount=discount_amount,
+                is_scholarship=is_scholarship,
+                month_bs=None,
+                year_bs=structure.academic_year,
+                payment_status="pending",
+                notes=f"[fee_installment:{structure.id}:{inst.seq}]",
+                due_date_bs=inst.due_date_bs,
+                installment_id=inst.id,
+            )
+            new_collections.append(collection)
+            db.session.add(collection)
+            created += 1
+        inst.is_generated = True
+    if created:
+        _group_collections_into_invoices(g.school_id, new_collections)
+    db.session.commit()
+    return success_response({
+        "created_collections": created,
+        "skipped_existing": skipped,
+        "matched_students": len(students),
+    })
+
+
+# ── Carry-forward ────────────────────────────────────────────────────────
+
+def _student_year_balance(school_id, student_id, year_bs):
+    """Signed balance for one student in one academic year:
+    (payable − paid) over that year's non-waived bills. >0 = due,
+    <0 = credit (overpayment/advance)."""
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == school_id,
+        FeeCollection.student_id == student_id,
+        FeeCollection.is_deleted.is_(False),
+        or_(
+            FeeCollection.academic_year == year_bs,
+            FeeCollection.year_bs == year_bs,
+        ),
+    ).all()
+    payable = 0.0
+    paid = 0.0
+    for row in rows:
+        if (row.payment_status or "").lower() in ("waived", "refunded"):
+            continue
+        payable += float(_collection_payable_total(row))
+        # Raw partial marker (NOT capped at payable): an amount lowered
+        # after payment overpays the line, which is exactly how a credit
+        # (advance) arises — capping here would silently erase it.
+        paid += float(_extract_partial_paid(row))
+    return round(payable - paid, 2)
+
+
+@fees_bp.route("/carry-forward/preview", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def carry_forward_preview():
+    """Signed per-student balances for a from-year (what year-close would roll)."""
+    from_year = (request.args.get("from_year_bs") or "").strip()
+    if not re.match(r"^\d{4}(/?\d{2})?$", from_year):
+        return error_response("from_year_bs is required (e.g. 2082 or 2082/83)", 400)
+    # Match either the bare BS year or the "2082/83" display form.
+    year_variants = {from_year}
+    if "/" in from_year:
+        year_variants.add(from_year.split("/")[0])
+    else:
+        year_variants.add(f"{from_year}/{str((int(from_year) + 1) % 100).zfill(2)}")
+
+    query = Student.query.filter(
+        Student.school_id == g.school_id, Student.is_deleted.is_(False)
+    )
+    class_id = _parse_uuid(request.args.get("class_id"))
+    if class_id:
+        query = query.filter(Student.class_id == class_id)
+    students = query.all()
+
+    entries = []
+    for student in students:
+        balance = 0.0
+        for variant in year_variants:
+            balance = _student_year_balance(g.school_id, student.id, variant)
+            if abs(balance) > 0.005:
+                break
+        if abs(balance) <= 0.005:
+            continue
+        entries.append({
+            "student_id": str(student.id),
+            "student_name": _student_name(student),
+            "class_name": (student.to_dict() or {}).get("class_name"),
+            "balance": abs(balance),
+            "balance_type": "due" if balance > 0 else "credit",
+            "signed_balance": balance,
+        })
+    entries.sort(key=lambda e: e["student_name"] or "")
+    return success_response({
+        "from_year_bs": from_year,
+        "students": entries,
+        "total_due": round(sum(e["balance"] for e in entries if e["balance_type"] == "due"), 2),
+        "total_credit": round(sum(e["balance"] for e in entries if e["balance_type"] == "credit"), 2),
+    })
+
+
+@fees_bp.route("/carry-forward/apply", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def carry_forward_apply():
+    """Roll selected signed balances into the new academic year.
+
+    Body: {"from_year_bs": "2082", "to_year_bs": "2083", "due_date_bs":
+    "2083-04-10", "student_ids": [...]} — every selected student with a
+    non-zero balance gets a carry-forward row (due → a pending bill in the
+    new year; credit → a self-settled credit line visible in reports).
+    Idempotent per (student, from, to): already-applied students are skipped.
+    """
+    data = request.get_json(silent=True) or {}
+    from_year = str(data.get("from_year_bs") or "").strip()
+    to_year = str(data.get("to_year_bs") or "").strip()
+    due_date_bs = str(data.get("due_date_bs") or "").strip() or None
+    if not from_year or not to_year:
+        return error_response("from_year_bs and to_year_bs are required", 400)
+    if due_date_bs and not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date_bs):
+        return error_response("due_date_bs must be YYYY-MM-DD (BS)", 400)
+    student_ids = data.get("student_ids") or []
+    if not isinstance(student_ids, list) or not student_ids:
+        return error_response("student_ids must be a non-empty list", 400)
+
+    year_variants = {from_year}
+    if "/" in from_year:
+        year_variants.add(from_year.split("/")[0])
+    else:
+        year_variants.add(f"{from_year}/{str((int(from_year) + 1) % 100).zfill(2)}")
+
+    created_bills = 0
+    applied = 0
+    skipped = 0
+    new_collections: list[FeeCollection] = []
+    for sid in student_ids:
+        parsed = _parse_uuid(sid)
+        if not parsed:
+            skipped += 1
+            continue
+        student = Student.query.filter_by(
+            id=parsed, school_id=g.school_id, is_deleted=False
+        ).first()
+        if student is None:
+            skipped += 1
+            continue
+        existing = FeeCarryForward.query.filter(
+            FeeCarryForward.school_id == g.school_id,
+            FeeCarryForward.student_id == student.id,
+            FeeCarryForward.from_year_bs == from_year,
+            FeeCarryForward.to_year_bs == to_year,
+            FeeCarryForward.is_deleted.is_(False),
+            FeeCarryForward.status.in_(("pending", "applied")),
+        ).first()
+        if existing is not None:
+            skipped += 1
+            continue
+
+        balance = 0.0
+        for variant in year_variants:
+            balance = _student_year_balance(g.school_id, student.id, variant)
+            if abs(balance) > 0.005:
+                break
+        if abs(balance) <= 0.005:
+            skipped += 1
+            continue
+
+        balance_type = "due" if balance > 0 else "credit"
+        row = FeeCarryForward(
+            school_id=g.school_id,
+            student_id=student.id,
+            from_year_bs=from_year,
+            to_year_bs=to_year,
+            balance=round(abs(balance), 2),
+            balance_type=balance_type,
+            due_date_bs=due_date_bs,
+            status="pending",
+        )
+        db.session.add(row)
+        db.session.flush()
+
+        if balance_type == "due":
+            bill = FeeCollection(
+                school_id=g.school_id,
+                student_id=student.id,
+                academic_year=to_year,
+                fee_item_name=f"Carry-forward balance ({from_year})",
+                amount=round(abs(balance), 2),
+                month_bs=None,
+                year_bs=to_year,
+                payment_status="pending",
+                notes=f"[carry_forward:{from_year}:{row.id}]",
+                due_date_bs=due_date_bs,
+            )
+        else:
+            # Credit: a self-settled line — discount nets the payable to 0 so
+            # reports show the advance without inventing a wallet.
+            bill = FeeCollection(
+                school_id=g.school_id,
+                student_id=student.id,
+                academic_year=to_year,
+                fee_item_name=f"Carry-forward credit ({from_year})",
+                amount=round(abs(balance), 2),
+                discount_amount=round(abs(balance), 2),
+                month_bs=None,
+                year_bs=to_year,
+                payment_status="waived",
+                notes=f"[carry_forward_credit:{from_year}:{row.id}]",
+            )
+        db.session.add(bill)
+        db.session.flush()
+        row.applied_collection_id = bill.id
+        row.status = "applied"
+        new_collections.append(bill)
+        db.session.add(
+            FeeCarryForwardLog(
+                school_id=g.school_id,
+                student_id=student.id,
+                action="apply",
+                balance=round(abs(balance), 2),
+                balance_type=balance_type,
+                from_year_bs=from_year,
+                to_year_bs=to_year,
+                actor_id=g.user_id,
+                detail={"collection_id": str(bill.id)},
+            )
+        )
+        applied += 1
+        created_bills += 1
+
+    if created_bills:
+        _group_collections_into_invoices(g.school_id, new_collections)
+    db.session.commit()
+    return success_response({
+        "applied": applied,
+        "skipped": skipped,
+        "bills_created": created_bills,
+    })
+
+
+@fees_bp.route("/carry-forward/log", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def carry_forward_log():
+    query = FeeCarryForwardLog.query.filter(
+        FeeCarryForwardLog.school_id == g.school_id,
+        FeeCarryForwardLog.is_deleted.is_(False),
+    ).order_by(FeeCarryForwardLog.created_at.desc())
+    items, meta = paginate(query)
+    return success_response({
+        "log": [
+            {
+                "id": str(item.id),
+                "student_id": str(item.student_id),
+                "action": item.action,
+                "balance": float(item.balance or 0),
+                "balance_type": item.balance_type,
+                "from_year_bs": item.from_year_bs,
+                "to_year_bs": item.to_year_bs,
+                "detail": item.detail,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+            for item in items
+        ],
+        "meta": meta,
+    })
+
+
+# ── AR aging ─────────────────────────────────────────────────────────────
+
+@fees_bp.route("/receivables/aging", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def receivables_aging():
+    """Accounts-receivable aging: outstanding balances bucketed by days past
+    due (current / 30 / 60 / 90 / 90+), grouped by class. BS dates in,
+    arithmetic on the converted AD dates."""
+    as_of_bs = (request.args.get("as_of_bs") or _bs_today().strftime("%Y-%m-%d")).strip()
+    as_of_ad = bs_to_ad_date(as_of_bs)
+    if as_of_ad is None:
+        return error_response("as_of_bs must be a valid BS date (YYYY-MM-DD)", 400)
+
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+    ).all()
+
+    buckets_by_class: dict[str, dict[str, float]] = {}
+    student_totals: dict[str, dict] = {}
+    for row in rows:
+        due_ad = _collection_due_date(row)
+        outstanding = float(_collection_payable_total(row)) - min(
+            float(_extract_partial_paid(row)), float(_collection_payable_total(row))
+        )
+        if outstanding <= 0.005:
+            continue
+        if due_ad is None:
+            days_overdue = -1  # not yet schedulable — "unscheduled" bucket
+        else:
+            days_overdue = (as_of_ad - due_ad).days
+            if days_overdue < 0:
+                days_overdue = 0
+        if days_overdue < 0:
+            bucket = "unscheduled"
+        elif days_overdue <= 30:
+            bucket = "current_or_30"
+        elif days_overdue <= 60:
+            bucket = "b31_60"
+        elif days_overdue <= 90:
+            bucket = "b61_90"
+        else:
+            bucket = "b90_plus"
+
+        student = row.student
+        class_name = "Unassigned"
+        if student is not None:
+            sdata = student.to_dict() or {}
+            class_name = sdata.get("class_name") or "Unassigned"
+        agg = buckets_by_class.setdefault(
+            class_name,
+            {"unscheduled": 0.0, "current_or_30": 0.0, "b31_60": 0.0,
+             "b61_90": 0.0, "b90_plus": 0.0, "total": 0.0},
+        )
+        agg[bucket] = round(agg[bucket] + outstanding, 2)
+        agg["total"] = round(agg["total"] + outstanding, 2)
+
+        sid = str(row.student_id)
+        entry = student_totals.setdefault(
+            sid, {"student_id": sid, "student_name": _student_name(student),
+                  "class_name": class_name, "total": 0.0,
+                  "oldest_overdue_days": None}
+        )
+        entry["total"] = round(entry["total"] + outstanding, 2)
+        if days_overdue is not None and days_overdue >= 0:
+            if entry["oldest_overdue_days"] is None or days_overdue > entry["oldest_overdue_days"]:
+                entry["oldest_overdue_days"] = days_overdue
+
+    return success_response({
+        "as_of_bs": as_of_bs,
+        "by_class": [
+            {"class_name": name, **totals}
+            for name, totals in sorted(buckets_by_class.items())
+        ],
+        "by_student": sorted(
+            student_totals.values(),
+            key=lambda s: -(s["oldest_overdue_days"] or 0),
+        )[:100],
+        "grand_total": round(sum(t["total"] for t in buckets_by_class.values()), 2),
+    })
+
+
+# ── Fines & waivers ──────────────────────────────────────────────────────
+
+def _fee_fine_policy(school):
+    policy = {}
+    if school and isinstance(school.settings, dict):
+        policy = school.settings.get("fees_fine_policy") or {}
+    mode = str(policy.get("mode") or "none").strip().lower()
+    if mode not in ("none", "fixed_once", "daily_percent"):
+        mode = "none"
+    try:
+        value = max(float(policy.get("value") or 0), 0.0)
+    except (TypeError, ValueError):
+        value = 0.0
+    try:
+        grace = max(int(policy.get("grace_days") or 0), 0)
+    except (TypeError, ValueError):
+        grace = 0
+    try:
+        max_amount = policy.get("max_amount")
+        max_amount = float(max_amount) if max_amount is not None else None
+    except (TypeError, ValueError):
+        max_amount = None
+    return {"mode": mode, "value": value, "grace_days": grace, "max_amount": max_amount}
+
+
+def _accrue_fines_core(school_id: str, as_of_bs: str | None = None) -> dict:
+    """Fine-accrual core shared by the admin endpoint and the daily beat
+    task. Idempotent per BS day via fine_accrued_on_bs on each bill."""
+    school = School.query.get(school_id)
+    policy = _fee_fine_policy(school)
+    if policy["mode"] == "none" or policy["value"] <= 0:
+        return {"bills_fined": 0, "fine_total": 0.0, "policy": policy, "skipped": "no_policy"}
+
+    as_of_bs = (as_of_bs or _bs_today().strftime("%Y-%m-%d")).strip()
+    as_of_ad = bs_to_ad_date(as_of_bs)
+    if as_of_ad is None:
+        return {"bills_fined": 0, "fine_total": 0.0, "policy": policy, "skipped": "bad_date"}
+
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+    ).all()
+
+    touched = 0
+    total_fine = 0.0
+    for row in rows:
+        if (row.fine_accrued_on_bs or "").strip() >= as_of_bs:
+            continue  # already accrued on/after this BS date
+        due_ad = _collection_due_date(row)
+        if due_ad is None:
+            continue
+        days_late = (as_of_ad - due_ad).days - policy["grace_days"]
+        if days_late <= 0:
+            continue
+        base = float(_collection_base_amount(row))
+        previous_fine = float(row.late_fine_amount or 0)
+        if policy["mode"] == "fixed_once":
+            if previous_fine > 0:
+                continue  # a fixed fine lands once, ever
+            new_fine = round(min(policy["value"], policy["max_amount"] or policy["value"]), 2)
+            row.late_fine_amount = round(previous_fine + new_fine, 2)
+            total_fine += new_fine
+        else:  # daily_percent — RECOMPUTE (idempotent + self-healing): the
+            # fine is a pure function of days late, never compounded by
+            # repeated runs (MSP's flat-per-sub-head double-count lesson).
+            fine = round(base * policy["value"] / 100.0 * days_late, 2)
+            if policy["max_amount"] is not None:
+                fine = min(fine, policy["max_amount"])
+            fine = round(min(max(fine, 0.0), 100000.0), 2)
+            if fine <= 0:
+                continue
+            row.late_fine_amount = fine
+            total_fine += max(fine - previous_fine, 0.0)
+        row.fine_accrued_on_bs = as_of_bs
+        touched += 1
+
+    if touched:
+        # Fines change line payables → refresh their invoices.
+        _recompute_invoices_for_collections(rows)
+    db.session.commit()
+    return {"bills_fined": touched, "fine_total": round(total_fine, 2), "policy": policy}
+
+
+@fees_bp.route("/fines/accrue", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def accrue_fines():
+    """Accrue late fines per the school's fine policy (School.settings
+    ['fees_fine_policy']): mode none|fixed_once|daily_percent, value, grace
+    days, optional max cap. Idempotent per BS day via fine_accrued_on_bs —
+    re-running the same day is a no-op; daily_percent grows per elapsed day
+    (InfixEdu's percent-or-fixed fine math, made idempotent).
+    """
+    data = request.get_json(silent=True) or {}
+    result = _accrue_fines_core(str(g.school_id), data.get("as_of_bs"))
+    if result.get("skipped") == "no_policy":
+        return error_response(
+            "No fine policy configured — set fees_fine_policy in school "
+            "settings (mode, value, grace_days, max_amount)", 409
+        )
+    if result.get("skipped") == "bad_date":
+        return error_response("as_of_bs must be a valid BS date", 400)
+    return success_response({
+        "accrued_on": (data.get("as_of_bs") or _bs_today().strftime("%Y-%m-%d")).strip(),
+        "bills_fined": result["bills_fined"],
+        "fine_total": result["fine_total"],
+        "policy": result["policy"],
+    })
+
+
+@fees_bp.route("/fines/settings", methods=["GET", "PUT"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "superadmin")
+def fines_settings():
+    """Read/update the school's late-fine policy (School.settings)."""
+    school = School.query.get(g.school_id)
+    if school is None:
+        return error_response("School not found", 404)
+    if request.method == "PUT":
+        data = request.get_json(silent=True) or {}
+        policy = _fee_fine_policy(school)
+        mode = str(data.get("mode") or policy["mode"]).strip().lower()
+        if mode not in ("none", "fixed_once", "daily_percent"):
+            return error_response("mode must be none|fixed_once|daily_percent", 400)
+        policy.update({
+            "mode": mode,
+            "value": _coerce_fee_amount(data.get("value", policy["value"])),
+            "grace_days": max(int(data.get("grace_days", policy["grace_days"]) or 0), 0),
+        })
+        if data.get("max_amount") is not None:
+            policy["max_amount"] = _coerce_fee_amount(data.get("max_amount"))
+        settings = dict(school.settings or {})
+        settings["fees_fine_policy"] = policy
+        school.settings = settings
+        db.session.commit()
+    return success_response({"policy": _fee_fine_policy(school)})
+
+
+@fees_bp.route("/reports/fines", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def fines_report():
+    """Fines collected/accrued grouped by class and BS month."""
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.late_fine_amount > 0,
+    ).all()
+    by_class: dict[str, float] = {}
+    by_month: dict[str, float] = {}
+    for row in rows:
+        student = row.student
+        class_name = "Unassigned"
+        if student is not None:
+            class_name = (student.to_dict() or {}).get("class_name") or "Unassigned"
+        by_class[class_name] = round(
+            by_class.get(class_name, 0.0) + float(row.late_fine_amount or 0), 2
+        )
+        key = row.month_bs or row.year_bs or "unscheduled"
+        by_month[key] = round(by_month.get(key, 0.0) + float(row.late_fine_amount or 0), 2)
+    return success_response({
+        "by_class": [{"class_name": k, "fine_total": v} for k, v in sorted(by_class.items())],
+        "by_month": [{"month_bs": k, "fine_total": v} for k, v in sorted(by_month.items())],
+        "grand_total": round(sum(float(r.late_fine_amount or 0) for r in rows), 2),
+    })
+
+
+@fees_bp.route("/reports/waivers", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def waivers_report():
+    """Waivers/discounts granted (scholarships + credits) grouped by class
+    and fee type — the accountability report for every NPR not collected."""
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.discount_amount > 0,
+    ).all()
+    by_class: dict[str, float] = {}
+    by_fee_type: dict[str, float] = {}
+    for row in rows:
+        student = row.student
+        class_name = "Unassigned"
+        if student is not None:
+            class_name = (student.to_dict() or {}).get("class_name") or "Unassigned"
+        by_class[class_name] = round(
+            by_class.get(class_name, 0.0) + float(row.discount_amount or 0), 2
+        )
+        key = row.fee_item_name or "unknown"
+        by_fee_type[key] = round(
+            by_fee_type.get(key, 0.0) + float(row.discount_amount or 0), 2
+        )
+    return success_response({
+        "by_class": [{"class_name": k, "waiver_total": v} for k, v in sorted(by_class.items())],
+        "by_fee_type": [{"fee_type": k, "waiver_total": v} for k, v in sorted(by_fee_type.items())],
+        "grand_total": round(sum(float(r.discount_amount or 0) for r in rows), 2),
+    })
+
+
+# ── Offline bank-slip / cheque approval queue ────────────────────────────
+
+def _offline_submission_dict(sub):
+    return {
+        "id": str(sub.id),
+        "student_id": str(sub.student_id),
+        "student_name": _student_name(sub.student),
+        "amount": float(sub.amount or 0),
+        "method": sub.method,
+        "bank_name": sub.bank_name,
+        "reference_no": sub.reference_no,
+        "paid_on_bs": sub.paid_on_bs,
+        "slip_file_id": str(sub.slip_file_id) if sub.slip_file_id else None,
+        "collection_ids": sub.collection_ids or [],
+        "status": sub.status,
+        "review_notes": sub.review_notes,
+        "created_by_id": str(sub.created_by_id) if sub.created_by_id else None,
+        "receipt_ids": sub.receipt_ids or [],
+        "created_at": sub.created_at.isoformat() if sub.created_at else None,
+        "reviewed_at": sub.updated_at.isoformat() if sub.updated_at else None,
+    }
+
+
+@fees_bp.route("/offline-submissions", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def create_offline_submission():
+    """Parent/student/teacher submits a bank-transfer or cheque slip for
+    review. Money is NOT applied here — an admin approves."""
+    data = request.get_json(silent=True) or {}
+    student_id = _parse_uuid(data.get("student_id"))
+    if not student_id:
+        return error_response("student_id is required", 400)
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if student is None:
+        return error_response("Student not found", 404)
+    # Parents may only submit for their own children; students for themselves.
+    if g.role == "parent":
+        own = Student.query.filter(
+            Student.school_id == g.school_id,
+            Student.is_deleted.is_(False),
+            Student.guardians.any(user_id=g.user_id),
+        ).all()
+        if str(student.id) not in {str(s.id) for s in own}:
+            return error_response("You can only submit slips for your own children", 403)
+    elif g.role == "student":
+        own = Student.query.filter_by(
+            user_id=g.user_id, school_id=g.school_id, is_deleted=False
+        ).first()
+        if own is None or str(own.id) != str(student.id):
+            return error_response("You can only submit slips for yourself", 403)
+
+    amount = _coerce_fee_amount(data.get("amount"))
+    if amount <= 0:
+        return error_response("amount must be greater than zero", 400)
+    method = str(data.get("method") or "").strip().lower()
+    if method not in ("bank", "cheque"):
+        return error_response("method must be bank or cheque", 400)
+    paid_on_bs = str(data.get("paid_on_bs") or "").strip() or None
+    if paid_on_bs and not re.match(r"^\d{4}-\d{2}-\d{2}$", paid_on_bs):
+        return error_response("paid_on_bs must be YYYY-MM-DD (BS)", 400)
+
+    collection_ids = data.get("collection_ids") or []
+    if not isinstance(collection_ids, list):
+        return error_response("collection_ids must be a list", 400)
+    valid_ids = []
+    for cid in collection_ids:
+        parsed = _parse_uuid(cid)
+        if not parsed:
+            continue
+        bill = FeeCollection.query.filter(
+            FeeCollection.id == parsed,
+            FeeCollection.school_id == g.school_id,
+            FeeCollection.is_deleted.is_(False),
+        ).first()
+        if bill is not None and str(bill.student_id) == str(student.id):
+            outstanding = float(_collection_payable_total(bill)) - min(
+                float(_extract_partial_paid(bill)), float(_collection_payable_total(bill))
+            )
+            if outstanding > 0.005:
+                valid_ids.append(str(bill.id))
+    if not valid_ids:
+        return error_response(
+            "No valid outstanding bills for this student in collection_ids", 400
+        )
+
+    sub = FeeOfflineSubmission(
+        school_id=g.school_id,
+        student_id=student.id,
+        amount=amount,
+        method=method,
+        bank_name=str(data.get("bank_name") or "").strip()[:200] or None,
+        reference_no=str(data.get("reference_no") or "").strip()[:200] or None,
+        paid_on_bs=paid_on_bs,
+        slip_file_id=_parse_uuid(data.get("slip_file_id")),
+        collection_ids=valid_ids,
+        status="pending",
+        created_by_id=g.user_id,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return created_response(_offline_submission_dict(sub))
+
+
+@fees_bp.route("/offline-submissions", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def list_offline_submissions():
+    """Admins see everything (filter by status); parents/students see their
+    own submissions only."""
+    query = FeeOfflineSubmission.query.filter(
+        FeeOfflineSubmission.school_id == g.school_id,
+        FeeOfflineSubmission.is_deleted.is_(False),
+    ).options(joinedload(FeeOfflineSubmission.student))
+    status = (request.args.get("status") or "").strip().lower()
+    if status in ("pending", "approved", "rejected"):
+        query = query.filter(FeeOfflineSubmission.status == status)
+    if g.role in ("parent", "student"):
+        own_student_ids = set()
+        if g.role == "parent":
+            for s in Student.query.filter(
+                Student.school_id == g.school_id,
+                Student.is_deleted.is_(False),
+                Student.guardians.any(user_id=g.user_id),
+            ).all():
+                own_student_ids.add(str(s.id))
+        else:
+            own = Student.query.filter_by(
+                user_id=g.user_id, school_id=g.school_id, is_deleted=False
+            ).first()
+            if own:
+                own_student_ids.add(str(own.id))
+        query = query.filter(
+            FeeOfflineSubmission.created_by_id == g.user_id
+            if own_student_ids
+            else FeeOfflineSubmission.id.is_(None)
+        )
+    query = query.order_by(FeeOfflineSubmission.created_at.desc())
+    items, meta = paginate(query)
+    return success_response({
+        "submissions": [_offline_submission_dict(s) for s in items], "meta": meta
+    })
+
+
+@fees_bp.route("/offline-submissions/<uuid:submission_id>/approve", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def approve_offline_submission(submission_id):
+    """Approve a slip: record the payment through the SAME desk-collection
+    core (receipts + invoice status + fee.paid event), settle the referenced
+    bills FIFO, and notify the submitter. Single-transaction."""
+    sub = FeeOfflineSubmission.query.filter_by(
+        id=submission_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if sub is None:
+        return error_response("Submission not found", 404)
+    if sub.status != "pending":
+        return error_response(f"Submission is already {sub.status}", 409)
+
+    remaining = float(sub.amount or 0)
+    receipts = []
+    allocated = 0.0
+    for cid in sub.collection_ids or []:
+        if remaining <= 0.005:
+            break
+        bill = FeeCollection.query.filter(
+            FeeCollection.id == _parse_uuid(cid),
+            FeeCollection.school_id == g.school_id,
+            FeeCollection.is_deleted.is_(False),
+        ).first()
+        if bill is None:
+            continue
+        payable = float(_collection_payable_total(bill))
+        paid_already = min(float(_extract_partial_paid(bill)), payable)
+        outstanding = max(payable - paid_already, 0.0)
+        if outstanding <= 0.005:
+            continue
+        applied = min(remaining, outstanding)
+        new_paid = paid_already + applied
+        previous_notes = bill.notes or ""
+        bill.payment_method = sub.method
+        bill.collected_by_id = g.user_id
+        bill.transaction_id = sub.reference_no or bill.transaction_id
+        if not sub.paid_on_bs or not bill.collected_at:
+            bill.collected_at = datetime.now(timezone.utc)
+        bill.notes = _merge_partial_payment_note(previous_notes, new_paid)
+        bill.payment_status = "paid" if new_paid >= payable else "partial"
+        receipt = FeeReceipt(
+            school_id=g.school_id,
+            collection_id=bill.id,
+            student_id=bill.student_id,
+            receipt_number=_generate_receipt_number(bill),
+            amount=round(applied, 2),
+            payment_method=sub.method,
+            transaction_id=sub.reference_no,
+        )
+        receipt.verified_hash = _receipt_hash(
+            receipt.receipt_number, bill.id, round(applied, 2)
+        )
+        db.session.add(receipt)
+        bill.receipt_number = receipt.receipt_number
+        bill.receipt_url = f"/api/v1/fees/receipts/{receipt.id}/pdf"
+        receipt.pdf_url = bill.receipt_url
+        receipts.append(str(receipt.id))
+        remaining -= applied
+        allocated += applied
+        if bill.invoice_id:
+            invoice = FeeInvoice.query.get(bill.invoice_id)
+            if invoice is not None:
+                _recompute_invoice_status(invoice)
+
+    if allocated <= 0.005:
+        return error_response(
+            "The referenced bills are already settled — reject this "
+            "submission instead", 400
+        )
+
+    sub.status = "approved"
+    sub.reviewed_by_id = g.user_id
+    sub.receipt_ids = receipts
+    approve_body = request.get_json(silent=True) or {}
+    sub.review_notes = str(approve_body.get("review_notes") or "")[:500] or None
+    db.session.commit()
+
+    from app.plugins.events import emit
+
+    emit(
+        "fee.paid",
+        school_id=str(g.school_id),
+        student_id=str(sub.student_id),
+        amount=allocated,
+    )
+    # In-app receipt notification for the submitter (if they have an account).
+    if sub.created_by_id:
+        from app.api.v1.notifications import create_notification
+
+        create_notification(
+            school_id=str(g.school_id),
+            user_id=str(sub.created_by_id),
+            title="Payment slip approved",
+            body=(
+                f"Your {sub.method} payment of NPR {allocated:,.2f} "
+                f"(ref {sub.reference_no or '—'}) was approved. "
+                f"{len(receipts)} receipt(s) issued."
+            ),
+            category="fee",
+            priority="normal",
+            data={"submission_id": str(sub.id), "receipt_ids": receipts},
+            action_url="/dashboard/fees",
+        )
+    return success_response({
+        "submission": _offline_submission_dict(sub),
+        "allocated_amount": round(allocated, 2),
+        "unallocated_amount": round(max(remaining, 0.0), 2),
+        "receipt_ids": receipts,
+    })
+
+
+@fees_bp.route("/offline-submissions/<uuid:submission_id>/reject", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def reject_offline_submission(submission_id):
+    sub = FeeOfflineSubmission.query.filter_by(
+        id=submission_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if sub is None:
+        return error_response("Submission not found", 404)
+    if sub.status != "pending":
+        return error_response(f"Submission is already {sub.status}", 409)
+    data = request.get_json(silent=True) or {}
+    sub.status = "rejected"
+    sub.reviewed_by_id = g.user_id
+    sub.review_notes = str(data.get("review_notes") or "")[:500] or None
+    db.session.commit()
+    if sub.created_by_id:
+        from app.api.v1.notifications import create_notification
+
+        create_notification(
+            school_id=str(g.school_id),
+            user_id=str(sub.created_by_id),
+            title="Payment slip rejected",
+            body=(
+                f"Your {sub.method} payment slip of NPR {float(sub.amount or 0):,.2f} "
+                f"was rejected. {sub.review_notes or 'Contact the accounts office.'}"
+            ),
+            category="fee",
+            priority="high",
+            data={"submission_id": str(sub.id)},
+        )
+    return success_response({"submission": _offline_submission_dict(sub)})
+
+
+# ── Day book & day closure (counter accountability) ──────────────────────
+
+@fees_bp.route("/day-book", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def day_book():
+    """Collections grouped by payment method (and collector) for one BS date
+    — the counter's take for the day."""
+    date_bs = (request.args.get("date_bs") or _bs_today().strftime("%Y-%m-%d")).strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_bs):
+        return error_response("date_bs must be YYYY-MM-DD (BS)", 400)
+    date_ad = bs_to_ad_date(date_bs)
+    if date_ad is None:
+        return error_response("date_bs must be a valid BS date", 400)
+
+    day_start = datetime(date_ad.year, date_ad.month, date_ad.day, 0, 0, 0, tzinfo=timezone.utc)
+    day_end = day_start + timedelta(days=1)
+    query = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.collected_at >= day_start,
+        FeeCollection.collected_at < day_end,
+        FeeCollection.payment_status.in_(("paid", "partial")),
+    ).options(joinedload(FeeCollection.student))
+
+    user_id = _parse_uuid(request.args.get("user_id"))
+    if user_id:
+        query = query.filter(FeeCollection.collected_by_id == user_id)
+    rows = query.all()
+
+    by_method: dict[str, dict] = {}
+    by_user: dict[str, dict] = {}
+    grand = 0.0
+    for row in rows:
+        # The collected amount for a partially-paid bill = what was actually
+        # paid (partial marker), else the full payable.
+        payable = float(_collection_payable_total(row))
+        paid = min(float(_extract_partial_paid(row)), payable) or payable
+        method = row.payment_method or "unknown"
+        entry = by_method.setdefault(
+            method, {"method": method, "count": 0, "amount": 0.0}
+        )
+        entry["count"] += 1
+        entry["amount"] = round(entry["amount"] + paid, 2)
+        uname = "unknown"
+        collector = row.collected_by
+        if collector is not None:
+            uname = (collector.full_name or "").strip() \
+                or str(collector.email or collector.id)
+        uentry = by_user.setdefault(
+            str(row.collected_by_id) if row.collected_by_id else "unknown",
+            {"user_id": str(row.collected_by_id) if row.collected_by_id else None,
+             "user_name": uname, "count": 0, "amount": 0.0},
+        )
+        uentry["count"] += 1
+        uentry["amount"] = round(uentry["amount"] + paid, 2)
+        grand += paid
+
+    closure = FeeDayClosure.query.filter(
+        FeeDayClosure.school_id == g.school_id,
+        FeeDayClosure.closure_date_bs == date_bs,
+        FeeDayClosure.is_deleted.is_(False),
+    ).all() if not user_id else FeeDayClosure.query.filter(
+        FeeDayClosure.school_id == g.school_id,
+        FeeDayClosure.closure_date_bs == date_bs,
+        FeeDayClosure.collected_by_id == user_id,
+        FeeDayClosure.is_deleted.is_(False),
+    ).all()
+
+    return success_response({
+        "date_bs": date_bs,
+        "by_method": list(by_method.values()),
+        "by_user": list(by_user.values()),
+        "grand_total": round(grand, 2),
+        "collections_count": len(rows),
+        "closures": [
+            {
+                "id": str(c.id),
+                "collected_by_id": str(c.collected_by_id),
+                "status": c.status,
+                "expected_total": float(c.expected_total or 0),
+                "counted_total": float(c.counted_total or 0),
+                "difference": float(c.difference or 0),
+            }
+            for c in closure
+        ],
+    })
+
+
+@fees_bp.route("/day-closures", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def close_day():
+    """Close the counter for one collector + BS date: the day book total is
+    frozen as expected_total; counted denominations produce the difference.
+    While closed, record_payment refuses cash/cheque/bank entries for that
+    collector+date (the till lock)."""
+    data = request.get_json(silent=True) or {}
+    date_bs = str(data.get("closure_date_bs") or _bs_today().strftime("%Y-%m-%d")).strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_bs):
+        return error_response("closure_date_bs must be YYYY-MM-DD (BS)", 400)
+    date_ad = bs_to_ad_date(date_bs)
+    if date_ad is None:
+        return error_response("closure_date_bs must be a valid BS date", 400)
+    collector_id = _parse_uuid(data.get("collected_by_id")) or g.user_id
+
+    existing = FeeDayClosure.query.filter(
+        FeeDayClosure.school_id == g.school_id,
+        FeeDayClosure.closure_date_bs == date_bs,
+        FeeDayClosure.collected_by_id == collector_id,
+        FeeDayClosure.is_deleted.is_(False),
+        FeeDayClosure.status == "closed",
+    ).first()
+    if existing is not None:
+        return error_response("This counter is already closed for the date", 409)
+
+    day_start = datetime(date_ad.year, date_ad.month, date_ad.day, tzinfo=timezone.utc)
+    day_end = day_start + timedelta(days=1)
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.collected_by_id == collector_id,
+        FeeCollection.collected_at >= day_start,
+        FeeCollection.collected_at < day_end,
+        FeeCollection.payment_status.in_(("paid", "partial")),
+    ).all()
+    expected = 0.0
+    for row in rows:
+        payable = float(_collection_payable_total(row))
+        paid = min(float(_extract_partial_paid(row)), payable) or payable
+        if (row.payment_method or "") in ("cash", "cheque", "bank", "qr_pay"):
+            expected += paid
+
+    denominations = data.get("denominations")
+    if not isinstance(denominations, dict):
+        denominations = {}
+    counted = 0.0
+    clean_denoms: dict[str, int] = {}
+    for denom, count in denominations.items():
+        try:
+            d = int(float(denom))
+            c = int(count)
+        except (TypeError, ValueError):
+            continue
+        if d <= 0 or c < 0:
+            continue
+        clean_denoms[str(d)] = c
+        counted += d * c
+
+    closure = FeeDayClosure(
+        school_id=g.school_id,
+        closure_date_bs=date_bs,
+        closure_date_ad=day_start,
+        collected_by_id=collector_id,
+        status="closed",
+        denominations=clean_denoms,
+        expected_total=round(expected, 2),
+        counted_total=round(counted, 2),
+        difference=round(counted - expected, 2),
+        closed_at=datetime.now(timezone.utc),
+        closed_by_id=g.user_id,
+        notes=str(data.get("notes") or "")[:500] or None,
+    )
+    db.session.add(closure)
+    db.session.commit()
+    return created_response({
+        "id": str(closure.id),
+        "closure_date_bs": closure.closure_date_bs,
+        "collected_by_id": str(closure.collected_by_id),
+        "status": closure.status,
+        "expected_total": float(closure.expected_total),
+        "counted_total": float(closure.counted_total),
+        "difference": float(closure.difference),
+    })
+
+
+@fees_bp.route("/day-closures", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def list_day_closures():
+    query = FeeDayClosure.query.filter(
+        FeeDayClosure.school_id == g.school_id, FeeDayClosure.is_deleted.is_(False)
+    ).order_by(FeeDayClosure.closure_date_bs.desc())
+    date_bs = (request.args.get("date_bs") or "").strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_bs):
+        query = query.filter(FeeDayClosure.closure_date_bs == date_bs)
+    items, meta = paginate(query)
+    return success_response({
+        "closures": [
+            {
+                "id": str(c.id),
+                "closure_date_bs": c.closure_date_bs,
+                "collected_by_id": str(c.collected_by_id),
+                "status": c.status,
+                "expected_total": float(c.expected_total or 0),
+                "counted_total": float(c.counted_total or 0),
+                "difference": float(c.difference or 0),
+                "denominations": c.denominations or {},
+                "notes": c.notes,
+                "closed_at": c.closed_at.isoformat() if c.closed_at else None,
+                "reopened_at": c.reopened_at.isoformat() if c.reopened_at else None,
+            }
+            for c in items
+        ],
+        "meta": meta,
+    })
+
+
+@fees_bp.route("/day-closures/<uuid:closure_id>/reopen", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "superadmin")
+def reopen_day(closure_id):
+    """Admin-only reopen — every reopen is stamped with who and when."""
+    closure = FeeDayClosure.query.filter_by(
+        id=closure_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if closure is None:
+        return error_response("Day closure not found", 404)
+    if closure.status != "closed":
+        return error_response("This counter is not closed", 409)
+    closure.status = "open"
+    closure.reopened_at = datetime.now(timezone.utc)
+    closure.reopened_by_id = g.user_id
+    db.session.commit()
+    return success_response({"id": str(closure.id), "status": closure.status})
+
+
+# ── Receipt numbering config ─────────────────────────────────────────────
+
+@fees_bp.route("/receipt-numbering", methods=["GET", "PUT"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "superadmin")
+def receipt_numbering():
+    """School-configurable receipt series (prefix + zero-pad). The sequence
+    itself stays in the locked per-school counter — only the FORMAT changes."""
+    school = School.query.get(g.school_id)
+    if school is None:
+        return error_response("School not found", 404)
+    if request.method == "PUT":
+        data = request.get_json(silent=True) or {}
+        settings = dict(school.settings or {})
+        current = settings.get("fee_receipt_numbering") or {}
+        prefix = str(data.get("prefix") or current.get("prefix") or "").strip().upper()[:12]
+        try:
+            pad = max(2, min(int(data.get("pad") or current.get("pad") or 5), 10))
+        except (TypeError, ValueError):
+            pad = 5
+        settings["fee_receipt_numbering"] = {"prefix": prefix, "pad": pad}
+        school.settings = settings
+        db.session.commit()
+    numbering = {}
+    if isinstance(school.settings, dict):
+        numbering = school.settings.get("fee_receipt_numbering") or {}
+    return success_response({
+        "prefix": numbering.get("prefix") or (school.slug or "school").upper()[:12],
+        "pad": numbering.get("pad") or 5,
+        "sample": f"{(numbering.get('prefix') or (school.slug or 'school').upper()[:12])}"
+                  f"/2083-84/{'1'.zfill(numbering.get('pad') or 5)}",
+    })
+
+
+# ── Pending-payment sweeper (A-08) ───────────────────────────────────────
+
+@fees_bp.route("/payments/sweep-pending", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+@role_required("school_admin", "accountant", "superadmin")
+def sweep_pending_payments():
+    """Fail stale gateway initiations: a PaymentInitiation stuck in
+    'initiated' past the stale window (default 1h, eSewa/Khalti/FonePay
+    sessions all expire well inside it) is marked failed so the due stays
+    honestly outstanding. The beat task runs this hourly; the endpoint is
+    the manual trigger. Idempotent."""
+    data = request.get_json(silent=True) or {}
+    try:
+        stale_hours = max(float(data.get("stale_hours") or 1.0), 0.25)
+    except (TypeError, ValueError):
+        stale_hours = 1.0
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
+
+    from app.models.fee import PaymentInitiation
+
+    stale = PaymentInitiation.query.filter(
+        PaymentInitiation.school_id == g.school_id,
+        PaymentInitiation.status == "initiated",
+        PaymentInitiation.created_at < cutoff,
+        PaymentInitiation.is_deleted.is_(False),
+    ).all()
+    swept = 0
+    amount = 0.0
+    for initiation in stale:
+        initiation.status = "failed"
+        swept += 1
+        amount += float(initiation.amount or 0)
+    if swept:
+        db.session.commit()
+    return success_response({
+        "swept": swept,
+        "amount": round(amount, 2),
+        "stale_hours": stale_hours,
+    })
+
+
+# ── Ask-parents-to-pay nudge (A-08) ──────────────────────────────────────
+
+@fees_bp.route("/students/<uuid:student_id>/nudge-parent", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("fees")
+def nudge_parent(student_id):
+    """Student (or admin on their behalf) asks the guardians to pay
+    outstanding fees — an in-app notification per guardian account with the
+    outstanding total (the eSchool 'ask parents to pay' loop, on our rails)."""
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if student is None:
+        return error_response("Student not found", 404)
+    if g.role == "student":
+        own = Student.query.filter_by(
+            user_id=g.user_id, school_id=g.school_id, is_deleted=False
+        ).first()
+        if own is None or str(own.id) != str(student.id):
+            return error_response("You can only nudge your own guardians", 403)
+
+    dues = FeeCollection.query.filter(
+        FeeCollection.school_id == g.school_id,
+        FeeCollection.student_id == student.id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+    ).all()
+    outstanding = 0.0
+    for row in dues:
+        payable = float(_collection_payable_total(row))
+        paid = min(float(_extract_partial_paid(row)), payable)
+        outstanding += max(payable - paid, 0.0)
+    if outstanding <= 0.005:
+        return error_response("No outstanding fees for this student", 400)
+
+    from app.api.v1.notifications import create_notification
+
+    notified = 0
+    for guardian in student.guardians:
+        if guardian.user_id is None:
+            continue
+        create_notification(
+            school_id=str(g.school_id),
+            user_id=str(guardian.user_id),
+            title="Fee payment requested",
+            body=(
+                f"{_student_name(student)} has requested help paying outstanding "
+                f"fees of NPR {outstanding:,.2f}."
+            ),
+            category="fee",
+            priority="normal",
+            data={"student_id": str(student.id), "outstanding": round(outstanding, 2)},
+            action_url="/parent/fees",
+        )
+        notified += 1
+    if notified == 0:
+        return error_response(
+            "No guardian accounts are linked to this student yet", 409
+        )
+    return success_response({"notified": notified, "outstanding": round(outstanding, 2)})

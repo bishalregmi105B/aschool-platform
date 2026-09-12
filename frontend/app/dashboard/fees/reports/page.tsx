@@ -1,19 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
+import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   fetchFeeReports,
   getFeeReportRange,
   type FeeReportPeriod,
 } from "@/lib/services/dashboard/fees.service";
+import { formatBSMonth } from "@/lib/nepali_date";
+import { formatNepaliCurrency } from "@/lib/nepali-utils";
 import {
   DollarSign,
   TrendingUp,
@@ -22,6 +35,10 @@ import {
   Calendar,
   Receipt,
   Users,
+  Gavel,
+  Settings2,
+  Zap,
+  HandCoins,
 } from "lucide-react";
 
 export default function FeeReportsPage() {
@@ -35,10 +52,12 @@ export default function FeeReportsPage() {
 function ReportsContent() {
   const [period, setPeriod] = useState<FeeReportPeriod>("monthly");
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [reportTab, setReportTab] = useState("collection");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["fee-reports", period],
     queryFn: () => fetchFeeReports(period),
+    enabled: reportTab === "collection",
   });
 
   const exportCollectionsCsv = async () => {
@@ -67,16 +86,96 @@ function ReportsContent() {
   };
 
   if (isLoading) return <PageLoader />;
-  if (isError || !data) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          Unable to load fee report data.
-        </CardContent>
-      </Card>
-    );
-  }
 
+  return (
+    <Tabs value={reportTab} onValueChange={setReportTab} className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Fee Reports</h1>
+          <p className="text-muted-foreground">
+            Financial overview, fines and waivers analytics
+          </p>
+        </div>
+        <TabsList>
+          <TabsTrigger value="collection">Collection</TabsTrigger>
+          <TabsTrigger value="fines">Fines</TabsTrigger>
+          <TabsTrigger value="waivers">Waivers</TabsTrigger>
+        </TabsList>
+      </div>
+
+      <TabsContent value="collection" className="mt-0 space-y-6">
+        {isError || !data ? (
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              Unable to load fee report data.
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="flex items-center justify-end gap-2">
+              <AdvancedSelect
+                className="w-40"
+                value={period}
+                onChange={(v) => setPeriod(v as FeeReportPeriod)}
+                options={[
+                  { value: "monthly", label: "This Month" },
+                  { value: "quarterly", label: "This Quarter" },
+                  { value: "yearly", label: "This Year" },
+                ]}
+              />
+              <Button
+                variant="outline"
+                disabled={exportingCsv}
+                onClick={exportCollectionsCsv}
+              >
+                {exportingCsv ? "Exporting…" : "Export CSV"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const range = getFeeReportRange(period);
+                    const res = await api.get("/reports/fees/collection/pdf", {
+                      params: range,
+                      responseType: "blob",
+                    });
+                    const url = URL.createObjectURL(res.data as Blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "fee_collection_report.pdf";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    toast.error("PDF export unavailable");
+                  }
+                }}
+              >
+                Export PDF
+              </Button>
+            </div>
+
+            <CollectionStats data={data} />
+            <CollectionDetails data={data} />
+          </>
+        )}
+      </TabsContent>
+
+      <TabsContent value="fines" className="mt-0">
+        <FinesContent />
+      </TabsContent>
+
+      <TabsContent value="waivers" className="mt-0">
+        <WaiversContent />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// ── Collection tab ──────────────────────────────────────────────────────────
+
+type FeeReportsData = NonNullable<Awaited<ReturnType<typeof fetchFeeReports>>>;
+
+function CollectionStats({ data }: { data: FeeReportsData }) {
   const overview = data.overview;
   const stats = [
     {
@@ -101,85 +200,39 @@ function ReportsContent() {
       label: "Collection Rate",
       value: `${overview.collectionRate}%`,
       icon: PieChart,
-      color: "text-purple-600",
+      color: "text-primary",
     },
   ];
 
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {stats.map((s, i) => (
+        <Card key={i}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{s.label}</p>
+                <p className={`text-2xl font-bold ${s.color}`}>
+                  {typeof s.value === "number"
+                    ? `Rs. ${s.value.toLocaleString()}`
+                    : s.value}
+                </p>
+              </div>
+              <s.icon className={`h-8 w-8 ${s.color} opacity-50`} />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function CollectionDetails({ data }: { data: FeeReportsData }) {
   const byClass = data.byClass;
   const recentPayments = data.recentPayments;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Fee Reports</h1>
-          <p className="text-muted-foreground">
-            Financial overview and collection analytics
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AdvancedSelect
-            className="w-40"
-            value={period}
-            onChange={(v) => setPeriod(v as FeeReportPeriod)}
-            options={[
-              { value: "monthly", label: "This Month" },
-              { value: "quarterly", label: "This Quarter" },
-              { value: "yearly", label: "This Year" },
-            ]}
-          />
-          <Button
-            variant="outline"
-            disabled={exportingCsv}
-            onClick={exportCollectionsCsv}
-          >
-            {exportingCsv ? "Exporting…" : "Export CSV"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                const range = getFeeReportRange(period);
-                const res = await api.get("/reports/fees/collection/pdf", {
-                  params: range,
-                  responseType: "blob",
-                });
-                const url = URL.createObjectURL(res.data as Blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "fee_collection_report.pdf";
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch {
-                toast.error("PDF export unavailable");
-              }
-            }}
-          >
-            Export PDF
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <Card key={i}>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{s.label}</p>
-                  <p className={`text-2xl font-bold ${s.color}`}>
-                    {typeof s.value === "number"
-                      ? `Rs. ${s.value.toLocaleString()}`
-                      : s.value}
-                  </p>
-                </div>
-                <s.icon className={`h-8 w-8 ${s.color} opacity-50`} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
+    <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -300,6 +353,385 @@ function ReportsContent() {
           )}
         </CardContent>
       </Card>
+    </>
+  );
+}
+
+// ── Fines tab ───────────────────────────────────────────────────────────────
+
+interface FinePolicy {
+  mode: "none" | "fixed_once" | "daily_percent";
+  value: number;
+  grace_days: number;
+  max_amount?: number | null;
+}
+
+interface FinesReport {
+  by_class: Array<{ class_name: string; fine_total: number }>;
+  by_month: Array<{ month_bs: string; fine_total: number }>;
+  grand_total: number;
+}
+
+function FinesContent() {
+  const queryClient = useQueryClient();
+  const [showSettings, setShowSettings] = useState(false);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["fee-fines-report"],
+    retry: 1,
+    queryFn: async () => {
+      const r = await api.get("/fees/reports/fines");
+      return r.data?.data as FinesReport | null;
+    },
+  });
+
+  const { data: policy } = useQuery({
+    queryKey: ["fee-fines-policy"],
+    retry: 1,
+    queryFn: async () => {
+      const r = await api.get("/fees/fines/settings");
+      return (r.data?.data?.policy as FinePolicy) ?? null;
+    },
+  });
+
+  const accrue = useMutation({
+    mutationFn: async () => (await api.post("/fees/fines/accrue", {})).data?.data,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["fee-fines-report"] });
+      toast.success(
+        `Fines accrued on ${res?.bills_fined ?? 0} bill(s) — total ${formatNepaliCurrency(res?.fine_total || 0)}.`,
+      );
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error || e?.message || "Fine accrual failed"),
+  });
+
+  if (isLoading) return <PageLoader />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Gavel className="h-4 w-4 text-primary" />
+          Late fines accrued, grouped by class and BS month
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowSettings(true)}>
+            <Settings2 className="h-4 w-4 mr-2" /> Fine Policy
+            {policy && (
+              <Badge variant="secondary" className="ml-2">
+                {policy.mode === "none"
+                  ? "No fines"
+                  : policy.mode === "fixed_once"
+                    ? `Rs. ${policy.value} once`
+                    : `${policy.value}% daily`}
+              </Badge>
+            )}
+          </Button>
+          <Button onClick={() => accrue.mutate()} disabled={accrue.isPending}>
+            {accrue.isPending ? (
+              <Spinner className="mr-2" />
+            ) : (
+              <Zap className="h-4 w-4 mr-2" />
+            )}
+            Accrue Fines Now
+          </Button>
+        </div>
+      </div>
+
+      {isError ? (
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load the fines report. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Grand Total Fines</p>
+              <p className="text-2xl font-bold text-red-600">
+                {formatNepaliCurrency(data?.grand_total || 0)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Fines by Class</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.by_class?.length ? (
+                  <div className="divide-y">
+                    {data.by_class.map((r) => (
+                      <div key={r.class_name} className="py-2.5 flex items-center justify-between">
+                        <span className="text-sm font-medium">{r.class_name}</span>
+                        <span className="text-sm font-bold text-red-600">
+                          {formatNepaliCurrency(r.fine_total || 0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No fines accrued yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Fines by Month (BS)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.by_month?.length ? (
+                  <div className="divide-y">
+                    {data.by_month.map((r) => (
+                      <div key={r.month_bs} className="py-2.5 flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {formatBSMonth(r.month_bs)}
+                        </span>
+                        <span className="text-sm font-bold text-red-600">
+                          {formatNepaliCurrency(r.fine_total || 0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No fines accrued yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+
+      <FinePolicyDialog open={showSettings} onOpenChange={setShowSettings} />
+    </div>
+  );
+}
+
+function FinePolicyDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    enabled: open,
+    queryKey: ["fee-fines-policy"],
+    retry: 1,
+    queryFn: async () => {
+      const r = await api.get("/fees/fines/settings");
+      return (r.data?.data?.policy as FinePolicy) ?? null;
+    },
+  });
+
+  const [mode, setMode] = useState<string>("none");
+  const [value, setValue] = useState("0");
+  const [graceDays, setGraceDays] = useState("0");
+  const [maxAmount, setMaxAmount] = useState("");
+
+  // Seed the form from the loaded policy (once per open).
+  useEffect(() => {
+    if (open && data) {
+      setMode(data.mode);
+      setValue(String(data.value ?? 0));
+      setGraceDays(String(data.grace_days ?? 0));
+      setMaxAmount(data.max_amount != null ? String(data.max_amount) : "");
+    }
+  }, [open, data]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const body: Record<string, unknown> = {
+        mode,
+        value: parseFloat(value) || 0,
+        grace_days: parseInt(graceDays, 10) || 0,
+      };
+      if (maxAmount && parseFloat(maxAmount) > 0) body.max_amount = parseFloat(maxAmount);
+      const r = await api.put("/fees/fines/settings", body);
+      return r.data?.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fee-fines-policy"] });
+      onOpenChange(false);
+      toast.success("Fine policy saved.");
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error || e?.message || "Could not save fine policy"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Fine Policy</DialogTitle>
+        </DialogHeader>
+        {isLoading && !data ? (
+          <PageLoader />
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Mode</Label>
+              <AdvancedSelect
+                value={mode}
+                onChange={(v) => setMode(v)}
+                options={[
+                  { value: "none", label: "No late fines" },
+                  { value: "fixed_once", label: "Fixed amount (charged once)" },
+                  { value: "daily_percent", label: "Daily percent of the due" },
+                ]}
+              />
+            </div>
+            {mode !== "none" && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    {mode === "fixed_once" ? "Amount (Rs.)" : "Percent (%)"}
+                  </Label>
+                  <Input type="number" min="0" step="0.01" value={value}
+                    onChange={(e) => setValue(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Grace Days</Label>
+                  <Input type="number" min="0" value={graceDays}
+                    onChange={(e) => setGraceDays(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Max Fine (Rs., optional)</Label>
+                  <Input type="number" min="0" step="0.01" value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)} placeholder="No cap" />
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Fines are applied to overdue bills when you press “Accrue Fines Now”
+              (or on schedule, if configured). Bills already fully paid or waived
+              are never fined.
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={save.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending && <Spinner className="mr-2" />} Save Policy
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Waivers tab ─────────────────────────────────────────────────────────────
+
+interface WaiversReport {
+  by_class: Array<{ class_name: string; waiver_total: number }>;
+  by_fee_type: Array<{ fee_type: string; waiver_total: number }>;
+  grand_total: number;
+}
+
+function WaiversContent() {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["fee-waivers-report"],
+    retry: 1,
+    queryFn: async () => {
+      const r = await api.get("/fees/reports/waivers");
+      return r.data?.data as WaiversReport | null;
+    },
+  });
+
+  if (isLoading) return <PageLoader />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <HandCoins className="h-4 w-4 text-primary" />
+        Every rupee waived (scholarships + credits) — the accountability view
+      </div>
+
+      {isError ? (
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-sm text-destructive">Failed to load the waivers report. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Grand Total Waived</p>
+              <p className="text-2xl font-bold">
+                {formatNepaliCurrency(data?.grand_total || 0)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Waivers by Class</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.by_class?.length ? (
+                  <div className="divide-y">
+                    {data.by_class.map((r) => (
+                      <div key={r.class_name} className="py-2.5 flex items-center justify-between">
+                        <span className="text-sm font-medium">{r.class_name}</span>
+                        <span className="text-sm font-bold">
+                          {formatNepaliCurrency(r.waiver_total || 0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No waivers recorded yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Waivers by Fee Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.by_fee_type?.length ? (
+                  <div className="divide-y">
+                    {data.by_fee_type.map((r) => (
+                      <div key={r.fee_type} className="py-2.5 flex items-center justify-between">
+                        <span className="text-sm font-medium">{r.fee_type}</span>
+                        <span className="text-sm font-bold">
+                          {formatNepaliCurrency(r.waiver_total || 0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No waivers recorded yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -16,6 +16,12 @@ from app.models.fee import (  # noqa: F401
     PaymentInitiation,
     StudentScholarship,
     FeeRefund,
+    FeeInvoice,
+    FeeInstallment,
+    FeeCarryForward,
+    FeeCarryForwardLog,
+    FeeOfflineSubmission,
+    FeeDayClosure,
 )
 from app.models.notice import Notice, Event  # noqa: F401
 from app.models.chat import ChatThread, ChatMessage  # noqa: F401

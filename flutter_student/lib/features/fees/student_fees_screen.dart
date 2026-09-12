@@ -17,6 +17,7 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
   List<dynamic> _invoices = [];
   bool _loading = true;
   String? _error;
+  bool _nudging = false;
 
   @override
   void initState() {
@@ -48,6 +49,55 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// "Ask parents to pay" — notifies the student's linked guardian accounts
+  /// about the outstanding total (`POST /fees/students/<id>/nudge-parent`).
+  Future<void> _nudgeParents() async {
+    final studentId = ref.read(currentStudentIdProvider);
+    if (studentId == null || studentId.isEmpty) {
+      _showSnack(
+        'We could not find your student profile. Please try again later.',
+        ASchoolTheme.danger,
+      );
+      return;
+    }
+    setState(() => _nudging = true);
+    try {
+      await ref.read(feeRepositoryProvider).nudgeParent(studentId);
+      _showSnack('Your guardians have been notified', ASchoolTheme.success);
+    } on ApiException catch (e) {
+      _showSnack(_friendlyNudgeError(e.message), ASchoolTheme.danger);
+    } catch (e) {
+      debugPrint('StudentFeesScreen nudge failed: $e');
+      _showSnack(
+        'Could not send the request. Please check your connection.',
+        ASchoolTheme.danger,
+      );
+    } finally {
+      if (mounted) setState(() => _nudging = false);
+    }
+  }
+
+  /// Turns the backend's 400/409 messages into student-friendly hints.
+  String _friendlyNudgeError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('no outstanding')) {
+      return 'Great news — you have no outstanding fees right now!';
+    }
+    if (lower.contains('guardian')) {
+      return 'No guardian accounts are linked to you yet. '
+          'Please ask the school office for help.';
+    }
+    return message;
+  }
+
+  void _showSnack(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: color,
+    ));
   }
 
   @override
@@ -100,16 +150,50 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
                       color: Colors.red.shade50,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_rounded,
-                              color: Colors.red[700], size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'You have outstanding dues. Please pay by the due date.',
-                              style: TextStyle(
-                                  color: Colors.red[800], fontSize: 13),
+                          Row(
+                            children: [
+                              Icon(Icons.warning_rounded,
+                                  color: Colors.red[700], size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'You have outstanding dues. Please pay by the due date.',
+                                  style: TextStyle(
+                                      color: Colors.red[800], fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed:
+                                  _nudging ? null : _nudgeParents,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red[700],
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(0, 40),
+                              ),
+                              icon: _nudging
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white))
+                                  : const Icon(
+                                      Icons.notifications_active_rounded,
+                                      size: 18),
+                              label: const Text(
+                                'Ask parents to pay',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.5),
+                              ),
                             ),
                           ),
                         ],

@@ -99,6 +99,20 @@ function FeeOverviewContent() {
       color: "bg-primary text-primary-foreground",
     },
     {
+      label: "Invoices",
+      desc: "Per-student bill documents",
+      href: "/dashboard/fees/invoices",
+      icon: Receipt,
+      color: "bg-muted text-foreground border",
+    },
+    {
+      label: "Slip Approvals",
+      desc: "Offline bank/cheque review",
+      href: "/dashboard/fees/approvals",
+      icon: CheckCircle2,
+      color: "bg-muted text-foreground border",
+    },
+    {
       label: "View Defaulters",
       desc: "Students with overdue fees",
       href: "/dashboard/fees/defaulters",
@@ -110,6 +124,27 @@ function FeeOverviewContent() {
       desc: "Manage fee types & amounts",
       href: "/dashboard/fees/structure",
       icon: CreditCard,
+      color: "bg-muted text-foreground border",
+    },
+    {
+      label: "AR Aging",
+      desc: "Receivables by age bucket",
+      href: "/dashboard/fees/aging",
+      icon: TrendingUp,
+      color: "bg-muted text-foreground border",
+    },
+    {
+      label: "Carry Forward",
+      desc: "Roll year-end balances",
+      href: "/dashboard/fees/carry-forward",
+      icon: ArrowRight,
+      color: "bg-muted text-foreground border",
+    },
+    {
+      label: "Day Closure",
+      desc: "Day book & till lock",
+      href: "/dashboard/fees/day-closure",
+      icon: Calendar,
       color: "bg-muted text-foreground border",
     },
     {

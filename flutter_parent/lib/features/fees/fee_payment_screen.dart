@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:aschool_shared/aschool_shared.dart';
@@ -104,6 +105,7 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
             ),
           ),
         );
+        await _showPaymentVerification(selectedChildId, feeIds.first);
       } else if (paymentUrl != null) {
         final uri = Uri.parse(paymentUrl);
         if (await canLaunchUrl(uri)) {
@@ -111,12 +113,10 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
         } else {
           throw Exception('No browser available for $paymentUrl');
         }
+        await _showPaymentVerification(selectedChildId, feeIds.first);
       } else {
         throw Exception('No payment URL returned');
       }
-
-      ref.invalidate(parentFeesProvider(selectedChildId));
-      setState(() => _selected.clear());
     } catch (e) {
       debugPrint('FeePaymentScreen initiate-payment failed: $e');
       if (mounted) {
@@ -128,6 +128,26 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
     } finally {
       if (mounted) setState(() => _paying = false);
     }
+  }
+
+  /// Opens the payment verification screen after the gateway flow returns —
+  /// it re-fetches the collection status (spinner → receipt → still-pending
+  /// guidance) and refreshes the outstanding list on the way back.
+  Future<void> _showPaymentVerification(
+    String? selectedChildId,
+    String collectionId,
+  ) async {
+    if (!mounted) return;
+    final query = Uri(
+      queryParameters: {
+        'collection_id': collectionId,
+        if (selectedChildId != null) 'student_id': selectedChildId,
+      },
+    ).query;
+    await context.push('/fees/verify-payment?$query');
+    if (!mounted) return;
+    ref.invalidate(parentFeesProvider(selectedChildId));
+    setState(() => _selected.clear());
   }
 
   /// Pulls the backend `error` message out of an HTTP failure's response
@@ -178,9 +198,12 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
                     ref.refresh(parentFeesProvider(selectedChildId).future),
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: fees.length,
+                  // Index 0 carries the quick actions (bank deposit,
+                  // submissions, invoices); the rest are outstanding bills.
+                  itemCount: fees.length + 1,
                   itemBuilder: (_, i) {
-                    final f = fees[i];
+                    if (i == 0) return _quickActions(context);
+                    final f = fees[i - 1];
                     final feeId = f['id']?.toString() ?? '';
                     final checked = _selected.contains(feeId);
                     final studentName = f['student_name']?.toString();
@@ -306,6 +329,76 @@ class _FeePaymentScreenState extends ConsumerState<FeePaymentScreen> {
           ],
         );
       },
+    );
+  }
+
+  /// Quick actions row above the outstanding list: bank/cheque deposit,
+  /// offline submission tracking and per-child invoices.
+  Widget _quickActions(BuildContext context) {
+    return ESchoolCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          _quickAction(
+            context,
+            icon: Icons.account_balance_rounded,
+            label: 'Bank / cheque\ndeposit',
+            onTap: () => context.push('/fees/bank-deposit'),
+          ),
+          _verticalDivider(),
+          _quickAction(
+            context,
+            icon: Icons.fact_check_outlined,
+            label: 'My\nsubmissions',
+            onTap: () => context.push('/fees/submissions'),
+          ),
+          _verticalDivider(),
+          _quickAction(
+            context,
+            icon: Icons.receipt_long_rounded,
+            label: 'Invoices',
+            onTap: () => context.push('/fees/invoices'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(ASchoolTheme.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 24, color: ASchoolTheme.primary),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11.5, height: 1.25),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _verticalDivider() {
+    return Container(
+      width: 1,
+      height: 40,
+      color: Colors.black.withAlpha(18),
     );
   }
 
