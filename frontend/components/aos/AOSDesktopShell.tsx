@@ -34,6 +34,7 @@ import {
   normalizeAOSRoute,
 } from "@/lib/aos-navigation";
 import { useAOSUserSettings } from "@/lib/aos-settings";
+import { AOSNavigateProvider } from "@/lib/aos-window-route";
 import {
   getDefaultFolders,
   parseDesktopFolders,
@@ -318,6 +319,7 @@ export default function AOSDesktopShell() {
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const zIndexRef = useRef(20);
+  const shellRootRef = useRef<HTMLDivElement>(null);
 
   const closeAllFlyouts = useCallback(
     (
@@ -640,8 +642,46 @@ export default function AOSDesktopShell() {
     }
   }, [pathname, searchParams, openRouteInAOS, router]);
 
+  // In-process navigation: the single entry point every link in the shell
+  // goes through (window content, widgets, flyouts, menubar). The browser
+  // URL never leaves /dashboard.
+  const navigate = useCallback(
+    (route: string) => {
+      const normalized = normalizeAOSRoute(route);
+      if (!normalized) return;
+      openRouteInAOS(normalized);
+    },
+    [openRouteInAOS]
+  );
+
+  // Global anchor interception — capture phase on the shell root catches
+  // EVERY in-app link (windows, widgets, flyouts, dropdowns) before the
+  // router navigates, so the URL bar never changes.
+  useEffect(() => {
+    const root = shellRootRef.current;
+    if (!root) return;
+    const onClickCapture = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      const href = anchor.getAttribute("href") || "";
+      const normalized = normalizeAOSRoute(href);
+      if (!normalized) return; // external/other-prefix links pass through
+      e.preventDefault();
+      e.stopPropagation();
+      navigate(normalized);
+    };
+    root.addEventListener("click", onClickCapture, true);
+    return () => root.removeEventListener("click", onClickCapture, true);
+  }, [navigate]);
+
   return (
+    <AOSNavigateProvider navigate={navigate}>
     <div
+      ref={shellRootRef}
       className={`aos-desktop win11 ${themeMode}`}
       data-theme={themeMode}
       style={shellStyle}
@@ -984,5 +1024,6 @@ export default function AOSDesktopShell() {
         accentColor={accentColor}
       />
     </div>
+    </AOSNavigateProvider>
   );
 }

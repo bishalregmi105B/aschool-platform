@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Minus, Square, Copy, X } from "lucide-react";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
+import { resolveRouteComponent } from "./AOSRouteTable";
+import { AOSWindowRouteProvider } from "@/lib/aos-window-route";
 import { SchoolRole } from "./RoleSwitcherModal";
 import type { EducationalPlugin } from "./apps/AppStoreApp";
 import { normalizeAOSRoute } from "@/lib/aos-navigation";
@@ -338,8 +340,13 @@ export default function WindowManager({
           contain: "layout",
         };
 
-        const resolverKey = win.route ? `route:${win.route}` : win.moduleId || win.id;
-        const ResolvedComponent = resolveModuleComponent(resolverKey);
+        // Exact-route resolution first (the route table maps every path to
+        // its exact page — subroutes swap content within the same window),
+        // then the module registry, iframe as a last resort.
+        const routeComponent = win.route ? resolveRouteComponent(win.route) : null;
+        const ResolvedComponent = routeComponent
+          ? routeComponent
+          : resolveModuleComponent(win.route ? `route:${win.route}` : win.moduleId || win.id);
 
         return (
           <div
@@ -386,20 +393,63 @@ export default function WindowManager({
               </>
             )}
 
-            {/* Titlebar */}
+            {/* Titlebar — 38px, macOS-grade icon + title arrangement */}
             <div
               className="win11-titlebar"
               onPointerDown={(e) => handleTitlebarPointerDown(e, win)}
               onDoubleClick={() => onToggleMaximizeWindow(win.id)}
-              style={{ cursor: win.isMaximized ? "default" : "move" }}
+              style={{
+                cursor: win.isMaximized ? "default" : "move",
+                height: "38px",
+                paddingLeft: "14px",
+                paddingRight: "0px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+              }}
             >
-              <div className="win11-titlebar-title">
-                {win.icon}
-                <span>{win.title}</span>
+              <div
+                className="win11-titlebar-title"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "22px",
+                    height: "22px",
+                    flexShrink: 0,
+                  }}
+                >
+                  {win.icon}
+                </span>
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                  title={win.title}
+                >
+                  {win.title}
+                </span>
               </div>
 
               {/* Titlebar Window Controls */}
-              <div className="win11-titlebar-controls" style={{ position: "relative" }}>
+              <div
+                className="win11-titlebar-controls"
+                style={{ position: "relative", height: "38px", alignSelf: "stretch", flexShrink: 0 }}
+              >
                 <button
                   aria-label="Minimize"
                   onClick={(e) => {
@@ -517,6 +567,7 @@ export default function WindowManager({
                 pointerEvents: isInteracting ? "none" : "auto",
               }}
             >
+              <AOSWindowRouteProvider route={win.route || `/dashboard/${win.moduleId || win.id}`}>
               <ResolvedComponent
                 window={win}
                 pluginId={win.id}
@@ -550,6 +601,7 @@ export default function WindowManager({
                 onUpdatePluginRoles={onUpdatePluginRoles}
                 onLaunchPluginDemo={onLaunchPluginDemo}
               />
+              </AOSWindowRouteProvider>
             </div>
           </div>
         );
