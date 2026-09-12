@@ -32,6 +32,8 @@ export interface AOSUserSettings {
    * means the user never customized it — DEFAULT_TOPBAR_ITEMS applies.
    */
   topbar_items?: string[];
+  /** Free-form desktop arrangement: icon/folder positions + widget layout. */
+  desktop_layout: Record<string, unknown>;
 }
 
 /** Default left-side menu bar items (used when topbar_items is absent). */
@@ -57,6 +59,7 @@ export const AOS_SETTINGS_DEFAULTS: AOSUserSettings = {
   pinned_apps: [],
   desktop_folders: [],
   home_widgets: [],
+  desktop_layout: {},
 };
 
 const CACHE_KEY = "aschool_aos_settings_cache";
@@ -96,6 +99,10 @@ function coerce(raw: RawAOS | null | undefined): AOSUserSettings {
     topbar_items: Array.isArray(raw.topbar_items)
       ? (raw.topbar_items as unknown[]).filter((v): v is string => typeof v === "string")
       : undefined,
+    desktop_layout:
+      raw.desktop_layout && typeof raw.desktop_layout === "object" && !Array.isArray(raw.desktop_layout)
+        ? (raw.desktop_layout as Record<string, unknown>)
+        : {},
   };
 }
 

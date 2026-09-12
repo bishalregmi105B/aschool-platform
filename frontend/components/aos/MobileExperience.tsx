@@ -17,8 +17,6 @@ import {
   type AOSApp,
 } from "@/lib/aos-app-adapter";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
-import AOSAppFrame from "./AOSAppFrame";
-import type { WindowInstance } from "./WindowManager";
 import IOSControlCenter from "./IOSControlCenter";
 import IOSNotificationCenter from "./IOSNotificationCenter";
 import { useAuth } from "@/lib/auth-context";
@@ -312,27 +310,7 @@ export default function MobileExperience({
     return { moduleId: activeApp, route: undefined };
   }, [activeApp]);
 
-  // Minimal window descriptor for the universal AOSAppFrame drawer.
-  const frameWindow = useMemo<WindowInstance>(
-    () => ({
-      id: activeApp || "mobile-app",
-      moduleId: activeAppRouteInfo.moduleId,
-      route: activeAppRouteInfo.route,
-      title: activeAppMeta?.name || activeApp || "AOS",
-      icon: null,
-      isOpen: true,
-      isMinimized: false,
-      isMaximized: true,
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      zIndex: 0,
-    }),
-    [activeApp, activeAppRouteInfo, activeAppMeta]
-  );
-
-  // In-process navigation for the app frame drawer (and any embedded links).
+  // In-process navigation for the sheet (and any embedded links).
   const mobileNavigate = useCallback(
     (route: string) => {
       openRouteInMobile(route);
@@ -821,10 +799,8 @@ export default function MobileExperience({
             </button>
           </div>
 
-          {/* Module Body Frame — the sheet content gets the SAME manifest
-              subitem navigation as the desktop drawer via AOSAppFrame (on
-              phones the drawer collapses into an overlay opened from the
-              edge; modules without manifest entries render unframed). */}
+          {/* Module Body — the sheet content renders directly (the top menu
+              bar / springboard provide navigation; no per-app drawer). */}
           <div
             className="aos-window-content flex-1 h-full overflow-auto"
             style={{ minHeight: 0 }}
@@ -836,18 +812,16 @@ export default function MobileExperience({
                 `/dashboard/${activeAppRouteInfo.moduleId || activeApp}`
               }
             >
-              <AOSAppFrame window={frameWindow}>
-                {activeAppComponent ? (
-                  React.createElement(activeAppComponent, {})
-                ) : (
-                  <div
-                    className="p-8 text-center text-sm"
-                    style={{ color: "var(--w11-text-secondary)" }}
-                  >
-                    Loading module {activeApp}...
-                  </div>
-                )}
-              </AOSAppFrame>
+              {activeAppComponent ? (
+                React.createElement(activeAppComponent, {})
+              ) : (
+                <div
+                  className="p-8 text-center text-sm"
+                  style={{ color: "var(--w11-text-secondary)" }}
+                >
+                  Loading module {activeApp}...
+                </div>
+              )}
             </AOSWindowRouteProvider>
           </div>
         </div>

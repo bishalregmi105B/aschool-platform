@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Search,
   Upload,
   Image as ImageIcon,
   FileText,
@@ -36,6 +35,12 @@ import {
   type ManagedFile,
   type FileType,
 } from "@/lib/services/files.service";
+import {
+  isVaultFileDrag,
+  setVaultDragData,
+  useVaultFileDrop,
+  type VaultDragPayload,
+} from "./dnd";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +142,30 @@ function apiErrorDescription(err: unknown, fallback: string): string {
   );
 }
 
+/**
+ * Build a minimal ManagedFile from a cross-app drag payload — used when the
+ * dropped vault file lives outside the folder currently being listed.
+ */
+function managedFromPayload(p: VaultDragPayload): ManagedFile {
+  const ext = p.name.includes(".") ? (p.name.split(".").pop() ?? "") : "";
+  return {
+    id: p.id,
+    url: p.url,
+    original_name: p.name,
+    mime_type: "",
+    size_bytes: 0,
+    extension: ext.toLowerCase(),
+    folder: "",
+    folder_id: null,
+    file_type: (p.file_type as FileType) || "other",
+    tags: [],
+    linked_module: null,
+    is_public: "",
+    uploaded_by: null,
+    created_at: "",
+  };
+}
+
 // ── File Tile (110px grid card, FileManagerApp style) ──────────────────────
 
 function FileTile({
@@ -160,6 +189,8 @@ function FileTile({
     <div
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      draggable
+      onDragStart={(e) => setVaultDragData(e, file)}
       title={file.original_name}
       style={{
         display: "flex",
@@ -167,14 +198,14 @@ function FileTile({
         alignItems: "center",
         justifyContent: "flex-start",
         padding: "10px 6px",
-        borderRadius: "8px",
+        borderRadius: "var(--w11-radius-lg)",
         cursor: "pointer",
         position: "relative",
         background: selected ? "var(--w11-accent-light)" : "transparent",
         border: selected
           ? "1px solid var(--w11-accent)"
           : "1px solid transparent",
-        transition: "all 0.15s ease",
+        transition: "all var(--w11-transition-fast)",
       }}
       onMouseEnter={(e) => {
         if (!selected) e.currentTarget.style.background = "var(--w11-control-hover)";
@@ -192,7 +223,7 @@ function FileTile({
             right: "4px",
             width: "18px",
             height: "18px",
-            borderRadius: multiple ? "4px" : "50%",
+        borderRadius: multiple ? "var(--w11-radius-sm)" : "50%",
             background: "var(--w11-accent)",
             color: "var(--w11-accent-text)",
             display: "flex",
@@ -215,7 +246,7 @@ function FileTile({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: "6px",
+          borderRadius: "var(--w11-radius-md)",
           overflow: "hidden",
           background: "var(--w11-control-bg)",
         }}
@@ -279,6 +310,10 @@ export function FilePicker({
   );
   const [dragOver, setDragOver] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  // Vault files dropped from the AOS File Manager that aren't in the current listing.
+  const [droppedFiles, setDroppedFiles] = useState<Map<string, ManagedFile>>(
+    () => new Map(),
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -299,6 +334,7 @@ export function FilePicker({
       setSearchQuery("");
       setTypeFilter(fileType || "all");
       setUploadQueue([]);
+      setDroppedFiles(new Map());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -442,10 +478,49 @@ export function FilePicker({
     [multiple],
   );
 
-  const selectedFiles = useMemo(
-    () => files.filter((f) => selectedIds.has(f.id)),
-    [files, selectedIds],
+  /** Select a vault file dragged in from the AOS File Manager (or this picker). */
+  const handleVaultDrop = useCallback(
+    (payload: VaultDragPayload) => {
+      if (fileType && payload.file_type && payload.file_type !== fileType) {
+        toast.error(`This picker only accepts ${fileType} files`);
+        return;
+      }
+      setSelectedIds((prev) => {
+        if (prev.has(payload.id)) return prev;
+        if (multiple) {
+          const next = new Set(prev);
+          next.add(payload.id);
+          return next;
+        }
+        return new Set([payload.id]);
+      });
+      if (!files.some((f) => f.id === payload.id)) {
+        setDroppedFiles((prev) =>
+          new Map(prev).set(payload.id, managedFromPayload(payload)),
+        );
+      }
+    },
+    [fileType, multiple, files],
   );
+
+  const {
+    isOver: vaultDragOver,
+    dropProps: vaultDropProps,
+  } = useVaultFileDrop({ onFile: handleVaultDrop });
+
+  const selectedFiles = useMemo(() => {
+    const out: ManagedFile[] = [];
+    for (const id of selectedIds) {
+      const listed = files.find((f) => f.id === id);
+      if (listed) {
+        out.push(listed);
+        continue;
+      }
+      const dropped = droppedFiles.get(id);
+      if (dropped) out.push(dropped);
+    }
+    return out;
+  }, [files, selectedIds, droppedFiles]);
 
   const handleConfirm = () => {
     if (selectedFiles.length === 0) {
@@ -456,7 +531,7 @@ export function FilePicker({
     onOpenChange(false);
   };
 
-  /** Single mode: double-click confirms instantly with that file. */
+  /** Single mode: activating a tile confirms the picker instantly. */
   const handleFileDoubleClick = (file: ManagedFile) => {
     if (!multiple) {
       onSelect([file]);
@@ -505,16 +580,26 @@ export function FilePicker({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    // Vault-file drags select on drop; OS file drags upload.
+    if (isVaultFileDrag(e)) {
+      vaultDropProps.onDragOver(e);
+      return;
+    }
     if (!e.dataTransfer.types.includes("Files")) return;
     e.preventDefault();
     setDragOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    vaultDropProps.onDragLeave(e);
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    if (isVaultFileDrag(e)) {
+      vaultDropProps.onDrop(e);
+      return;
+    }
     if (!e.dataTransfer.types.includes("Files")) return;
     e.preventDefault();
     setDragOver(false);
@@ -552,15 +637,18 @@ export function FilePicker({
           accept={acceptAttr}
         />
 
-        <DialogHeader className="px-4 pt-4 pb-2 border-b" style={{ borderColor: "var(--w11-border-subtle)" }}>
-          <DialogTitle className="flex items-center gap-2 text-base">
+        <DialogHeader
+          className="flex-row items-center gap-2 border-b sm:text-left"
+          style={{ borderColor: "var(--w11-border-subtle)" }}
+        >
+          <DialogTitle className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4" style={{ color: "#f59e0b" }} />
             {title}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Body: mini sidebar + content area */}
-        <div className="flex flex-1 min-h-0">
+        {/* Body: mini sidebar + content area (full-bleed explorer surface) */}
+        <div className="flex flex-1 min-h-0 !px-0">
           {/* Left mini-sidebar (folder tree) */}
           <div
             className="hidden sm:flex flex-col shrink-0"
@@ -574,10 +662,11 @@ export function FilePicker({
           >
             <div
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 fontWeight: 700,
                 color: "var(--w11-text-secondary)",
                 textTransform: "uppercase",
+                letterSpacing: "0.05em",
                 padding: "0 8px 6px",
               }}
             >
@@ -590,9 +679,8 @@ export function FilePicker({
                 style={{
                   justifyContent: "flex-start",
                   gap: "6px",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   padding: "5px 8px",
-                  borderRadius: "6px",
                 }}
               >
                 <Cloud size={14} color="#0284c7" /> My Vault
@@ -617,7 +705,7 @@ export function FilePicker({
                           size={11}
                           style={{
                             transform: isExpanded ? "rotate(90deg)" : "none",
-                            transition: "transform 0.12s ease",
+                            transition: "transform var(--w11-transition-fast)",
                           }}
                         />
                       </button>
@@ -627,9 +715,8 @@ export function FilePicker({
                         style={{
                           justifyContent: "flex-start",
                           gap: "6px",
-                          fontSize: "11px",
+                          fontSize: "12px",
                           padding: "5px 8px 5px 4px",
-                          borderRadius: "6px",
                           flex: 1,
                           minWidth: 0,
                         }}
@@ -663,53 +750,44 @@ export function FilePicker({
           <div className="flex-1 flex flex-col min-w-0">
             {/* Toolbar: breadcrumb + search + pills + upload */}
             <div
-              className="px-3 py-2 border-b flex items-center gap-2 flex-wrap"
+              className="win11-commandbar flex-wrap px-3 py-2"
               style={{ borderColor: "var(--w11-border-subtle)" }}
             >
               {/* Breadcrumb path bar */}
-              <div
-                className="flex items-center gap-1 order-1 basis-full"
+              <nav
+                className="win11-breadcrumb order-1 basis-full min-w-0"
+                aria-label="Folder path"
                 style={{
                   background: "var(--w11-control-bg)",
                   border: "1px solid var(--w11-control-border)",
-                  borderRadius: "6px",
+                  borderRadius: "var(--w11-radius-sm)",
                   padding: "3px 8px",
-                  fontSize: "11px",
                   overflowX: "auto",
                 }}
               >
-                {path.map((seg, idx) => (
-                  <React.Fragment key={`${seg.id ?? "root"}-${idx}`}>
-                    {idx > 0 && (
-                      <ChevronRight size={11} color="var(--w11-text-secondary)" />
-                    )}
-                    <span
-                      onClick={() => navigateToBreadcrumb(idx)}
-                      style={{
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        color:
-                          idx === path.length - 1
-                            ? "var(--w11-text-primary)"
-                            : "var(--w11-accent)",
-                        fontWeight: idx === path.length - 1 ? 600 : 400,
-                      }}
-                    >
-                      {seg.name}
-                    </span>
-                  </React.Fragment>
-                ))}
-              </div>
+                {path.map((seg, idx) => {
+                  const isCurrent = idx === path.length - 1;
+                  return (
+                    <React.Fragment key={`${seg.id ?? "root"}-${idx}`}>
+                      {idx > 0 && (
+                        <ChevronRight size={11} className="breadcrumb-separator" />
+                      )}
+                      <span
+                        onClick={() => navigateToBreadcrumb(idx)}
+                        className={`breadcrumb-item${isCurrent ? " current" : ""}`}
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        {seg.name}
+                      </span>
+                    </React.Fragment>
+                  );
+                })}
+              </nav>
 
-              {/* Search */}
-              <div className="relative flex-1 min-w-[140px] order-2">
-                <Search
-                  className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground"
-                  style={{ color: "var(--w11-text-secondary)" }}
-                />
+              {/* Search — Fluent searchbox (icon + accent underline focus) */}
+              <div className="win11-searchbox relative flex-1 min-w-[140px] order-2">
                 <Input
                   placeholder="Search files…"
-                  className="pl-7 h-7 text-xs"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                 />
@@ -724,10 +802,10 @@ export function FilePicker({
                       className={typeFilter === f.value ? "accent" : "subtle"}
                       onClick={() => setTypeFilter(f.value)}
                       style={{
-                        fontSize: "10px",
-                        padding: "2px 8px",
-                        borderRadius: "9999px",
-                        lineHeight: 1.5,
+                        fontSize: "12px",
+                        padding: "3px 12px",
+                        borderRadius: "var(--w11-radius-full)",
+                        lineHeight: 1.4,
                       }}
                     >
                       {f.label}
@@ -742,11 +820,11 @@ export function FilePicker({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadMutation.isPending}
                 style={{
-                  fontSize: "11px",
-                  padding: "3px 10px",
+                  fontSize: "12px",
+                  padding: "4px 12px",
                   display: "flex",
                   alignItems: "center",
-                  gap: "5px",
+                  gap: "6px",
                   order: 4,
                 }}
               >
@@ -761,13 +839,13 @@ export function FilePicker({
 
             {/* Thin upload progress strip */}
             {uploadMutation.isPending && (
-              <div style={{ height: "3px", background: "var(--w11-control-hover)" }}>
+              <div style={{ height: "3px", background: "var(--w11-border-default)" }}>
                 <div
                   style={{
                     width: `${overallUploadProgress}%`,
                     height: "100%",
-                    background: "linear-gradient(90deg, #0284c7, #38bdf8)",
-                    transition: "width 0.2s ease",
+                    background: "var(--w11-accent)",
+                    transition: "width var(--w11-transition-normal)",
                   }}
                 />
               </div>
@@ -784,30 +862,45 @@ export function FilePicker({
                 maxHeight: "380px",
                 overflowY: "auto",
                 padding: "12px",
-                outline: dragOver ? "2px dashed var(--w11-accent)" : "none",
+                outline:
+                  dragOver || vaultDragOver
+                    ? "2px dashed var(--w11-accent)"
+                    : "none",
                 outlineOffset: -4,
-                background: dragOver ? "var(--w11-accent-light)" : undefined,
+                background:
+                  dragOver || vaultDragOver
+                    ? "var(--w11-accent-light)"
+                    : undefined,
                 transition: "background 0.15s ease",
               }}
             >
-              {dragOver && (
+              {(dragOver || vaultDragOver) && (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "8px",
-                    marginBottom: "10px",
-                    borderRadius: "8px",
-                    border: "1px dashed var(--w11-accent)",
-                    color: "var(--w11-accent)",
-                    fontSize: "11px",
-                    fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                padding: "8px",
+                marginBottom: "10px",
+                borderRadius: "var(--w11-radius-lg)",
+                border: "1px dashed var(--w11-accent)",
+                color: "var(--w11-accent)",
+                fontSize: "12px",
+                fontWeight: 600,
                   }}
                 >
-                  <Upload size={14} /> Drop files here to upload to{" "}
-                  {activeFolderName}
+                  {dragOver ? (
+                    <>
+                      <Upload size={14} /> Drop files here to upload to{" "}
+                      {activeFolderName}
+                    </>
+                  ) : (
+                    <>
+                      <FolderOpen size={14} /> Drop a vault file here to select
+                      it
+                    </>
+                  )}
                 </div>
               )}
 
@@ -829,9 +922,10 @@ export function FilePicker({
                 <div style={{ marginBottom: "12px" }}>
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 700,
                       textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                       color: "var(--w11-text-secondary)",
                       marginBottom: "6px",
                     }}
@@ -852,14 +946,14 @@ export function FilePicker({
                         onDoubleClick={() => navigateToFolder(folder.id, folder.name)}
                         title={folder.name}
                         style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          padding: "10px 8px",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          border: "1px solid transparent",
-                          transition: "all 0.15s ease",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        padding: "10px 8px",
+                        borderRadius: "var(--w11-radius-lg)",
+                        cursor: "pointer",
+                        border: "1px solid transparent",
+                        transition: "all var(--w11-transition-fast)",
                         }}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.background = "var(--w11-control-hover)")
@@ -902,9 +996,10 @@ export function FilePicker({
                   {folders.length > 0 && typeFilter === "all" && !searchQuery && (
                     <div
                       style={{
-                        fontSize: "10px",
+                        fontSize: "11px",
                         fontWeight: 700,
                         textTransform: "uppercase",
+                        letterSpacing: "0.05em",
                         color: "var(--w11-text-secondary)",
                         margin: "0 0 6px",
                       }}
@@ -933,11 +1028,11 @@ export function FilePicker({
                         className="accent"
                         onClick={() => fileInputRef.current?.click()}
                         style={{
-                          fontSize: "11px",
-                          padding: "3px 12px",
+                          fontSize: "12px",
+                          padding: "4px 12px",
                           display: "flex",
                           alignItems: "center",
-                          gap: "5px",
+                          gap: "6px",
                         }}
                       >
                         <Upload size={12} /> Upload to this folder
@@ -980,7 +1075,7 @@ export function FilePicker({
               >
                 <div
                   style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: 700,
                     color: "var(--w11-text-secondary)",
                     textTransform: "uppercase",
@@ -998,13 +1093,13 @@ export function FilePicker({
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        fontSize: "11px",
+                        fontSize: "12px",
                       }}
                     >
                       {q.status === "uploading" ? (
                         <Loader2 size={12} className="animate-spin" color="var(--w11-accent)" />
                       ) : q.status === "done" ? (
-                        <CheckCircle2 size={12} color="#0f7b0f" />
+                        <CheckCircle2 size={12} color="#107c10" />
                       ) : (
                         <XCircle size={12} color="#c42b1c" />
                       )}
@@ -1024,8 +1119,8 @@ export function FilePicker({
                         style={{
                           width: "100px",
                           height: "4px",
-                          borderRadius: "2px",
-                          background: "var(--w11-control-hover)",
+                          borderRadius: "var(--w11-radius-full)",
+                          background: "var(--w11-border-default)",
                           overflow: "hidden",
                           flexShrink: 0,
                         }}
@@ -1034,11 +1129,8 @@ export function FilePicker({
                           style={{
                             width: `${q.status === "uploading" ? q.progress : 100}%`,
                             height: "100%",
-                            background:
-                              q.status === "error"
-                                ? "#c42b1c"
-                                : "linear-gradient(90deg, #0284c7, #38bdf8)",
-                            transition: "width 0.2s ease",
+                            background: q.status === "error" ? "#c42b1c" : "var(--w11-accent)",
+                            transition: "width var(--w11-transition-normal)",
                           }}
                         />
                       </div>
@@ -1064,11 +1156,8 @@ export function FilePicker({
           </div>
         </div>
 
-        {/* Selection footer strip */}
-        <div
-          className="border-t px-4 py-2.5 flex items-center gap-3"
-          style={{ borderColor: "var(--w11-border-subtle)" }}
-        >
+        {/* Selection footer strip — dialog-footer chrome (control-bg bar) */}
+        <div className="dialog-footer !justify-between !py-2.5 !px-4">
           <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto">
             {selectedFiles.length === 0 ? (
               <span
@@ -1089,10 +1178,10 @@ export function FilePicker({
                     alignItems: "center",
                     gap: "5px",
                     padding: "3px 8px",
-                    borderRadius: "6px",
+                    borderRadius: "var(--w11-radius-full)",
                     background: "var(--w11-accent-light)",
                     border: "1px solid var(--w11-accent)",
-                    fontSize: "11px",
+                    fontSize: "12px",
                     color: "var(--w11-text-primary)",
                     flexShrink: 0,
                     maxWidth: "180px",
@@ -1192,9 +1281,8 @@ function SubFolderList({
           style={{
             justifyContent: "flex-start",
             gap: "6px",
-            fontSize: "11px",
+            fontSize: "12px",
             padding: "4px 8px",
-            borderRadius: "6px",
             minWidth: 0,
           }}
           title={sub.name}
