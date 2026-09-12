@@ -3,6 +3,11 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { Loader2, AlertCircle } from "lucide-react";
+import {
+  formatAOSRouteTitle,
+  parseAOSRouteWindowId,
+  routeToAOSAppPath,
+} from "@/lib/aos-navigation";
 
 /**
  * Standard AOS Window Loading Spinner
@@ -44,84 +49,84 @@ function AOSModuleFallback({ slug }: { slug?: string }) {
  */
 export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   // ── Core Academics ────────────────────────────────────────────────────────
-  students: dynamic(() => import("@/app/dashboard/students/page"), { loading: AOSModuleLoading }),
-  teachers: dynamic(() => import("@/app/dashboard/teachers/page"), { loading: AOSModuleLoading }),
-  academics: dynamic(() => import("@/app/dashboard/academics/page"), { loading: AOSModuleLoading }),
-  timetable: dynamic(() => import("@/app/dashboard/timetable/page"), { loading: AOSModuleLoading }),
-  attendance: dynamic(() => import("@/app/dashboard/attendance/page"), { loading: AOSModuleLoading }),
-  admission: dynamic(() => import("@/app/dashboard/admission/page"), { loading: AOSModuleLoading }),
-  alumni: dynamic(() => import("@/app/dashboard/alumni/page"), { loading: AOSModuleLoading }),
+  students: dynamic(() => import("@/app/aos/apps/students/page"), { loading: AOSModuleLoading }),
+  teachers: dynamic(() => import("@/app/aos/apps/teachers/page"), { loading: AOSModuleLoading }),
+  academics: dynamic(() => import("@/app/aos/apps/academics/page"), { loading: AOSModuleLoading }),
+  timetable: dynamic(() => import("@/app/aos/apps/timetable/page"), { loading: AOSModuleLoading }),
+  attendance: dynamic(() => import("@/app/aos/apps/attendance/page"), { loading: AOSModuleLoading }),
+  admission: dynamic(() => import("@/app/aos/apps/admission/page"), { loading: AOSModuleLoading }),
+  alumni: dynamic(() => import("@/app/aos/apps/alumni/page"), { loading: AOSModuleLoading }),
 
   // ── Learning & Examinations ───────────────────────────────────────────────
-  lms: dynamic(() => import("@/app/dashboard/lms/page"), { loading: AOSModuleLoading }),
-  elibrary: dynamic(() => import("@/app/dashboard/elibrary/page"), { loading: AOSModuleLoading }),
-  library: dynamic(() => import("@/app/dashboard/library/page"), { loading: AOSModuleLoading }),
-  assignments: dynamic(() => import("@/app/dashboard/assignments/page"), { loading: AOSModuleLoading }),
-  exams: dynamic(() => import("@/app/dashboard/exams/page"), { loading: AOSModuleLoading }),
-  portfolio: dynamic(() => import("@/app/dashboard/portfolio/page"), { loading: AOSModuleLoading }),
-  "teaching-content": dynamic(() => import("@/app/dashboard/teaching-content/page"), { loading: AOSModuleLoading }),
+  lms: dynamic(() => import("@/app/aos/apps/lms/page"), { loading: AOSModuleLoading }),
+  elibrary: dynamic(() => import("@/app/aos/apps/elibrary/page"), { loading: AOSModuleLoading }),
+  library: dynamic(() => import("@/app/aos/apps/library/page"), { loading: AOSModuleLoading }),
+  assignments: dynamic(() => import("@/app/aos/apps/assignments/page"), { loading: AOSModuleLoading }),
+  exams: dynamic(() => import("@/app/aos/apps/exams/page"), { loading: AOSModuleLoading }),
+  portfolio: dynamic(() => import("@/app/aos/apps/portfolio/page"), { loading: AOSModuleLoading }),
+  "teaching-content": dynamic(() => import("@/app/aos/apps/teaching-content/page"), { loading: AOSModuleLoading }),
 
   // ── Finance & HR ──────────────────────────────────────────────────────────
-  fees: dynamic(() => import("@/app/dashboard/fees/page"), { loading: AOSModuleLoading }),
-  hr: dynamic(() => import("@/app/dashboard/hr/page"), { loading: AOSModuleLoading }),
+  fees: dynamic(() => import("@/app/aos/apps/fees/page"), { loading: AOSModuleLoading }),
+  hr: dynamic(() => import("@/app/aos/apps/hr/page"), { loading: AOSModuleLoading }),
 
   // ── Campus Operations & Logistics ─────────────────────────────────────────
-  transport: dynamic(() => import("@/app/dashboard/transport/page"), { loading: AOSModuleLoading }),
-  biometric: dynamic(() => import("@/app/dashboard/biometric/page"), { loading: AOSModuleLoading }),
-  inventory: dynamic(() => import("@/app/dashboard/inventory/page"), { loading: AOSModuleLoading }),
-  hostel: dynamic(() => import("@/app/dashboard/hostel/page"), { loading: AOSModuleLoading }),
-  visitors: dynamic(() => import("@/app/dashboard/visitors/page"), { loading: AOSModuleLoading }),
-  dismissal: dynamic(() => import("@/app/dashboard/dismissal/page"), { loading: AOSModuleLoading }),
-  conferences: dynamic(() => import("@/app/dashboard/conferences/page"), { loading: AOSModuleLoading }),
+  transport: dynamic(() => import("@/app/aos/apps/transport/page"), { loading: AOSModuleLoading }),
+  biometric: dynamic(() => import("@/app/aos/apps/biometric/page"), { loading: AOSModuleLoading }),
+  inventory: dynamic(() => import("@/app/aos/apps/inventory/page"), { loading: AOSModuleLoading }),
+  hostel: dynamic(() => import("@/app/aos/apps/hostel/page"), { loading: AOSModuleLoading }),
+  visitors: dynamic(() => import("@/app/aos/apps/visitors/page"), { loading: AOSModuleLoading }),
+  dismissal: dynamic(() => import("@/app/aos/apps/dismissal/page"), { loading: AOSModuleLoading }),
+  conferences: dynamic(() => import("@/app/aos/apps/conferences/page"), { loading: AOSModuleLoading }),
 
   // ── AI & Automation ───────────────────────────────────────────────────────
-  "ai-teacher": dynamic(() => import("@/app/dashboard/ai-teacher/page"), { loading: AOSModuleLoading }),
-  "ai-tools": dynamic(() => import("@/app/dashboard/ai-tools/page"), { loading: AOSModuleLoading }),
-  "ai-workbench": dynamic(() => import("@/app/dashboard/ai-workbench/page"), { loading: AOSModuleLoading }),
+  "ai-teacher": dynamic(() => import("@/app/aos/apps/ai-teacher/page"), { loading: AOSModuleLoading }),
+  "ai-tools": dynamic(() => import("@/app/aos/apps/ai-tools/page"), { loading: AOSModuleLoading }),
+  "ai-workbench": dynamic(() => import("@/app/aos/apps/ai-workbench/page"), { loading: AOSModuleLoading }),
 
   // ── Creative & Web ────────────────────────────────────────────────────────
-  designer: dynamic(() => import("@/app/dashboard/designer/page"), { loading: AOSModuleLoading }),
-  "website-builder": dynamic(() => import("@/app/dashboard/website-builder/page"), { loading: AOSModuleLoading }),
-  "white-label": dynamic(() => import("@/app/dashboard/white-label/page"), { loading: AOSModuleLoading }),
-  certificates: dynamic(() => import("@/app/dashboard/certificates/page"), { loading: AOSModuleLoading }),
+  designer: dynamic(() => import("@/app/aos/apps/designer/page"), { loading: AOSModuleLoading }),
+  "website-builder": dynamic(() => import("@/app/aos/apps/website-builder/page"), { loading: AOSModuleLoading }),
+  "white-label": dynamic(() => import("@/app/aos/apps/white-label/page"), { loading: AOSModuleLoading }),
+  certificates: dynamic(() => import("@/app/aos/apps/certificates/page"), { loading: AOSModuleLoading }),
 
   // ── Communication ─────────────────────────────────────────────────────────
-  communications: dynamic(() => import("@/app/dashboard/communications/page"), { loading: AOSModuleLoading }),
-  notices: dynamic(() => import("@/app/dashboard/notices/page"), { loading: AOSModuleLoading }),
-  notifications: dynamic(() => import("@/app/dashboard/notifications/page"), { loading: AOSModuleLoading }),
-  sms: dynamic(() => import("@/app/dashboard/sms/page"), { loading: AOSModuleLoading }),
+  communications: dynamic(() => import("@/app/aos/apps/communications/page"), { loading: AOSModuleLoading }),
+  notices: dynamic(() => import("@/app/aos/apps/notices/page"), { loading: AOSModuleLoading }),
+  notifications: dynamic(() => import("@/app/aos/apps/notifications/page"), { loading: AOSModuleLoading }),
+  sms: dynamic(() => import("@/app/aos/apps/sms/page"), { loading: AOSModuleLoading }),
 
   // ── Safety & Health ───────────────────────────────────────────────────────
-  emergency: dynamic(() => import("@/app/dashboard/emergency/page"), { loading: AOSModuleLoading }),
-  disaster: dynamic(() => import("@/app/dashboard/disaster/page"), { loading: AOSModuleLoading }),
-  "incident-management": dynamic(() => import("@/app/dashboard/incident-management/page"), { loading: AOSModuleLoading }),
-  incidents: dynamic(() => import("@/app/dashboard/incidents/page"), { loading: AOSModuleLoading }),
-  compliance: dynamic(() => import("@/app/dashboard/compliance/page"), { loading: AOSModuleLoading }),
-  wellbeing: dynamic(() => import("@/app/dashboard/wellbeing/page"), { loading: AOSModuleLoading }),
-  "health-records": dynamic(() => import("@/app/dashboard/health-records/page"), { loading: AOSModuleLoading }),
+  emergency: dynamic(() => import("@/app/aos/apps/emergency/page"), { loading: AOSModuleLoading }),
+  disaster: dynamic(() => import("@/app/aos/apps/disaster/page"), { loading: AOSModuleLoading }),
+  "incident-management": dynamic(() => import("@/app/aos/apps/incident-management/page"), { loading: AOSModuleLoading }),
+  incidents: dynamic(() => import("@/app/aos/apps/incidents/page"), { loading: AOSModuleLoading }),
+  compliance: dynamic(() => import("@/app/aos/apps/compliance/page"), { loading: AOSModuleLoading }),
+  wellbeing: dynamic(() => import("@/app/aos/apps/wellbeing/page"), { loading: AOSModuleLoading }),
+  "health-records": dynamic(() => import("@/app/aos/apps/health-records/page"), { loading: AOSModuleLoading }),
 
   // ── Platform Administration & System ──────────────────────────────────────
-  marketplace: dynamic(() => import("@/app/dashboard/marketplace/page"), { loading: AOSModuleLoading }),
-  plugins: dynamic(() => import("@/app/dashboard/plugins/page"), { loading: AOSModuleLoading }),
-  users: dynamic(() => import("@/app/dashboard/users/page"), { loading: AOSModuleLoading }),
-  "multi-branch": dynamic(() => import("@/app/dashboard/multi-branch/page"), { loading: AOSModuleLoading }),
-  settings: dynamic(() => import("@/app/dashboard/settings/page"), { loading: AOSModuleLoading }),
-  "iemis-import": dynamic(() => import("@/app/dashboard/iemis-import/page"), { loading: AOSModuleLoading }),
-  "bulk-uploads": dynamic(() => import("@/app/dashboard/bulk-uploads/page"), { loading: AOSModuleLoading }),
+  marketplace: dynamic(() => import("@/app/aos/apps/marketplace/page"), { loading: AOSModuleLoading }),
+  plugins: dynamic(() => import("@/app/aos/apps/plugins/page"), { loading: AOSModuleLoading }),
+  users: dynamic(() => import("@/app/aos/apps/users/page"), { loading: AOSModuleLoading }),
+  "multi-branch": dynamic(() => import("@/app/aos/apps/multi-branch/page"), { loading: AOSModuleLoading }),
+  settings: dynamic(() => import("@/app/aos/apps/settings/page"), { loading: AOSModuleLoading }),
+  "iemis-import": dynamic(() => import("@/app/aos/apps/iemis-import/page"), { loading: AOSModuleLoading }),
+  "bulk-uploads": dynamic(() => import("@/app/aos/apps/bulk-uploads/page"), { loading: AOSModuleLoading }),
 
   // ── Analytics & Engagement ────────────────────────────────────────────────
-  reports: dynamic(() => import("@/app/dashboard/reports/page"), { loading: AOSModuleLoading }),
-  analytics: dynamic(() => import("@/app/dashboard/analytics/page"), { loading: AOSModuleLoading }),
-  benchmarking: dynamic(() => import("@/app/dashboard/benchmarking/page"), { loading: AOSModuleLoading }),
-  gamification: dynamic(() => import("@/app/dashboard/gamification/page"), { loading: AOSModuleLoading }),
-  "content-review": dynamic(() => import("@/app/dashboard/content-review/page"), { loading: AOSModuleLoading }),
+  reports: dynamic(() => import("@/app/aos/apps/reports/page"), { loading: AOSModuleLoading }),
+  analytics: dynamic(() => import("@/app/aos/apps/analytics/page"), { loading: AOSModuleLoading }),
+  benchmarking: dynamic(() => import("@/app/aos/apps/benchmarking/page"), { loading: AOSModuleLoading }),
+  gamification: dynamic(() => import("@/app/aos/apps/gamification/page"), { loading: AOSModuleLoading }),
+  "content-review": dynamic(() => import("@/app/aos/apps/content-review/page"), { loading: AOSModuleLoading }),
 
   // ── General Utilities & User Hubs ─────────────────────────────────────────
-  faqs: dynamic(() => import("@/app/dashboard/faqs/page"), { loading: AOSModuleLoading }),
-  files: dynamic(() => import("@/app/dashboard/files/page"), { loading: AOSModuleLoading }),
-  profile: dynamic(() => import("@/app/dashboard/profile/page"), { loading: AOSModuleLoading }),
-  staff: dynamic(() => import("@/app/dashboard/staff/page"), { loading: AOSModuleLoading }),
-  parents: dynamic(() => import("@/app/dashboard/parents/page"), { loading: AOSModuleLoading }),
+  faqs: dynamic(() => import("@/app/aos/apps/faqs/page"), { loading: AOSModuleLoading }),
+  files: dynamic(() => import("@/app/aos/apps/files/page"), { loading: AOSModuleLoading }),
+  profile: dynamic(() => import("@/app/aos/apps/profile/page"), { loading: AOSModuleLoading }),
+  staff: dynamic(() => import("@/app/aos/apps/staff/page"), { loading: AOSModuleLoading }),
+  parents: dynamic(() => import("@/app/aos/apps/parents/page"), { loading: AOSModuleLoading }),
 
   // ── AOS Native System Applications ────────────────────────────────────────
   appstore: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
@@ -138,6 +143,9 @@ const MODULE_ALIASES: Record<string, string> = {
   gradebook: "exams",
   exam: "exams",
   timetable_management: "timetable",
+  "timetable-management": "timetable",
+  file_management: "files",
+  "file-management": "files",
   filemanager: "files",
   campus: "transport",
   notebook: "assignments",
@@ -150,8 +158,10 @@ const MODULE_ALIASES: Record<string, string> = {
   hr_payroll: "hr",
   visitor_management: "visitors",
   iemis: "iemis-import",
+  iemis_importer: "iemis-import",
   health: "health-records",
   "health-record": "health-records",
+  health_records: "health-records",
   incident_management: "incident-management",
   website_builder: "website-builder",
   white_label: "white-label",
@@ -168,6 +178,22 @@ const MODULE_ALIASES: Record<string, string> = {
   personalization: "aos-settings",
 };
 
+function normalizeModuleSlug(rawSlug: string): string {
+  const cleaned = String(rawSlug || "")
+    .trim()
+    .toLowerCase()
+    .split("?")[0]
+    .split("#")[0]
+    .replace(/^\/+|\/+$/g, "");
+
+  if (!cleaned) return "";
+
+  const dashboardMatch = cleaned.match(/(?:^|\/)dashboard\/([^/]+)/);
+  const segment = dashboardMatch?.[1] || cleaned;
+
+  return segment.replace(/\s+/g, "-");
+}
+
 function createFallbackComponent(slug: string): React.ComponentType<any> {
   function FallbackWrapper(props: any) {
     const effectiveSlug = props?.window?.id || props?.pluginId || slug;
@@ -175,6 +201,33 @@ function createFallbackComponent(slug: string): React.ComponentType<any> {
   }
   FallbackWrapper.displayName = `AOSModuleFallback_${slug || "unknown"}`;
   return FallbackWrapper;
+}
+
+function AOSRouteFrame(props: any) {
+  const rawRoute =
+    props?.window?.route ||
+    parseAOSRouteWindowId(props?.window?.id || "") ||
+    props?.route;
+
+  const src = rawRoute ? routeToAOSAppPath(rawRoute) : null;
+  if (!src) {
+    return <AOSModuleFallback slug={props?.window?.id || "route"} />;
+  }
+
+  const title = formatAOSRouteTitle(rawRoute);
+
+  return (
+    <iframe
+      src={src}
+      title={title}
+      style={{
+        width: "100%",
+        height: "100%",
+        border: "none",
+        background: "var(--background)",
+      }}
+    />
+  );
 }
 
 /**
@@ -185,29 +238,50 @@ export function resolveModuleComponent(slug: string): React.ComponentType<any> {
     return createFallbackComponent("unknown");
   }
 
-  // 1. Direct registry hit
-  if (AOS_MODULE_COMPONENTS[slug]) {
-    return AOS_MODULE_COMPONENTS[slug];
+  if (slug.startsWith("route:")) {
+    return AOSRouteFrame;
   }
 
-  // 2. Known alias hit
-  const aliased = MODULE_ALIASES[slug] || MODULE_ALIASES[slug.toLowerCase()];
-  if (aliased && AOS_MODULE_COMPONENTS[aliased]) {
-    return AOS_MODULE_COMPONENTS[aliased];
+  const normalized = normalizeModuleSlug(slug);
+  const candidates = Array.from(
+    new Set([
+      slug,
+      slug.toLowerCase(),
+      normalized,
+      normalized.replace(/_/g, "-"),
+      normalized.replace(/-/g, "_"),
+    ])
+  ).filter(Boolean);
+
+  // 1. Direct registry hits across normalized variants
+  for (const candidate of candidates) {
+    if (AOS_MODULE_COMPONENTS[candidate]) {
+      return AOS_MODULE_COMPONENTS[candidate];
+    }
   }
 
-  // 3. Dashed normalization (e.g. "bulk_uploads" -> "bulk-uploads")
-  const dashed = slug.toLowerCase().replace(/_/g, "-");
-  if (AOS_MODULE_COMPONENTS[dashed]) {
-    return AOS_MODULE_COMPONENTS[dashed];
+  // 2. Known alias hits across normalized variants
+  for (const candidate of candidates) {
+    const aliased = MODULE_ALIASES[candidate];
+    if (aliased && AOS_MODULE_COMPONENTS[aliased]) {
+      return AOS_MODULE_COMPONENTS[aliased];
+    }
+  }
+
+  // 3. Final dashed normalization pass (e.g. "bulk_uploads" -> "bulk-uploads")
+  for (const candidate of candidates) {
+    const dashed = candidate.replace(/_/g, "-");
+    if (AOS_MODULE_COMPONENTS[dashed]) {
+      return AOS_MODULE_COMPONENTS[dashed];
+    }
   }
 
   // 4. Plugin runner pattern (e.g. "plugin-physics-ai", "plugin-attendance")
-  if (slug.startsWith("plugin-")) {
+  if (normalized.startsWith("plugin-") || slug.startsWith("plugin-")) {
     return AOS_MODULE_COMPONENTS["plugin-runner"];
   }
 
   // 5. Fallback safe placeholder
-  return createFallbackComponent(slug);
+  return createFallbackComponent(normalized || slug);
 }
 

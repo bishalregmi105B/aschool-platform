@@ -1,0 +1,888 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { PluginGate, usePluginEnabled } from "@/lib/plugins";
+import { toast } from "sonner";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  BarChart3,
+  Trophy,
+  TrendingUp,
+  AlertTriangle,
+  FileText,
+  X,
+  Eye,
+  Download,
+  TableIcon,
+  ChevronRight,
+  GraduationCap,
+} from "lucide-react";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+interface SubjectResult {
+  subject_id: string;
+  subject_name: string;
+  theory_marks: number;
+  practical_marks: number;
+  obtained_marks: number;
+  full_marks: number;
+  pass_marks: number;
+  grade: string;
+  gpa: number;
+  pass: boolean;
+}
+
+interface StudentResult {
+  student_id: string;
+  student_name: string;
+  roll_number: number;
+  class_name: string;
+  total_marks: number;
+  total_obtained: number;
+  percentage: number;
+  grade: string;
+  gpa: number;
+  rank: number;
+  status: string;
+  subject_results?: SubjectResult[];
+}
+
+interface GradeSheetSubject {
+  id: string;
+  name: string;
+  full_marks: number;
+}
+
+interface GradeSheetRow {
+  student_id: string;
+  student_name: string;
+  roll_number: number;
+  subject_marks: Array<{
+    subject_id: string;
+    obtained: number;
+    full_marks: number;
+    grade: string;
+    pass: boolean;
+    absent: boolean;
+  }>;
+  total_obtained: number;
+  percentage: number;
+  status: string;
+  rank: number;
+}
+
+interface GradeSheet {
+  exam_name: string;
+  class_name: string;
+  subjects: GradeSheetSubject[];
+  rows: GradeSheetRow[];
+  total_full_marks: number;
+}
+
+interface StudentMarksheet {
+  exam_name: string;
+  student_name: string;
+  roll_number: number;
+  class_name: string;
+  section_name: string;
+  school_name: string;
+  subjects: SubjectResult[];
+  total_obtained: number;
+  total_full: number;
+  percentage: number;
+  failed_subjects: number;
+  status: string;
+  ai_remarks?: string;
+  rank_in_class?: number;
+  overall_grade?: string;
+  overall_gpa?: number;
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+export default function ResultsPage() {
+  return (
+    <PluginGate slug="exams">
+      <ResultsContent />
+    </PluginGate>
+  );
+}
+
+type ActiveTab = "results" | "marksLedger";
+
+function ResultsContent() {
+  const [examId, setExamId] = useState("");
+  const [classId, setClassId] = useState("");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("results");
+  const [selectedStudent, setSelectedStudent] =
+    useState<StudentMarksheet | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [loadingMarksheet, setLoadingMarksheet] = useState<string | null>(null);
+  const [loadingStudentHtml, setLoadingStudentHtml] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+
+  const hasDesigner = usePluginEnabled("design_studio");
+
+  const { data: exams } = useQuery({
+    queryKey: ["exams"],
+    queryFn: async () => {
+      const res = await api.get("/exams");
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+  });
+
+  const { data: classes } = useQuery({
+    queryKey: ["classes"],
+    queryFn: async () => {
+      const res = await api.get("/academics/classes");
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+  });
+
+  // Derived: exams filtered to only those belonging to the selected class
+  const filteredExams = classId
+    ? (exams || []).filter(
+        (e: { id: string; name: string; class_id: string | null }) =>
+          e.class_id === classId,
+      )
+    : (exams || []);
+
+  // When the user picks a class, clear exam selection if it no longer matches
+  const handleClassChange = (newClassId: string) => {
+    setClassId(newClassId);
+    const currentExam = (exams || []).find(
+      (e: { id: string; class_id: string | null }) => e.id === examId,
+    );
+    if (currentExam && currentExam.class_id !== newClassId) {
+      setExamId("");
+    }
+  };
+
+  // When the user picks an exam, auto-populate class if exam has a class_id
+  const handleExamChange = (newExamId: string) => {
+    setExamId(newExamId);
+    const chosen = (exams || []).find(
+      (e: { id: string; class_id: string | null }) => e.id === newExamId,
+    );
+    if (chosen?.class_id && !classId) {
+      setClassId(chosen.class_id);
+    }
+  };
+
+  const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
+    queryKey: ["results", examId, classId],
+    queryFn: async () => {
+      const res = await api.get(`/exams/${examId}/results?class_id=${classId}`);
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+    enabled: !!examId && !!classId,
+  });
+
+  const { data: gradeSheet, isLoading: loadingGradeSheet, isError: gradeSheetError, refetch: refetchGradeSheet } = useQuery({
+    queryKey: ["grade-sheet", examId, classId],
+    queryFn: async () => {
+      const res = await api.get(
+        `/exams/${examId}/grade-sheet?class_id=${classId}`,
+      );
+      return res.data?.data as GradeSheet | null;
+    },
+    enabled: !!examId && !!classId && activeTab === "marksLedger",
+  });
+
+  // ── Preview & PDF helpers ─────────────────────────────────────────────────
+  const previewTemplate = async (templateId: "marksheet" | "grade_sheet") => {
+    if (!examId || !classId) return;
+    setPreviewingTemplate(templateId);
+    try {
+      const res = await api.post(`/exams/${examId}/designer-marksheet`, {
+        class_id: classId,
+        template_id: templateId,
+      });
+      const marksheets: any[] = res.data?.data?.marksheets || [];
+      if (!marksheets.length) {
+        toast.error("No data — enter marks first");
+        return;
+      }
+      const htmlPages = marksheets.map((m: any) => m.html || "").filter(Boolean);
+      if (!htmlPages.length) {
+        toast.error("No rendered content");
+        return;
+      }
+      const title = templateId === "grade_sheet" ? "Grade Sheets" : "Marksheets";
+      const combined = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${title}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; background: #fff; }
+  .aschool-page { page-break-after: always; }
+  .aschool-page:last-child { page-break-after: avoid; }
+</style>
+</head><body>
+${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
+</body></html>`;
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.open();
+        w.document.write(combined);
+        w.document.close();
+        w.focus();
+      } else {
+        toast.error("Popup blocked — allow popups for this site");
+      }
+    } catch {
+      toast.error("Failed to generate preview");
+    } finally {
+      setPreviewingTemplate(null);
+    }
+  };
+
+  const downloadPdf = async (templateId: "marksheet" | "grade_sheet") => {
+    if (!examId || !classId) return;
+    setDownloadingPdf(templateId);
+    try {
+      const res = await api.get(
+        `/exams/${examId}/bulk-marksheet-pdf?class_id=${classId}&template_id=${templateId}`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${templateId === "grade_sheet" ? "grade_sheets" : "marksheets"}_${examId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF downloaded");
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
+
+  const openMarksheet = async (studentId: string) => {
+    setLoadingMarksheet(studentId);
+    try {
+      const res = await api.get(`/exams/${examId}/marksheet/${studentId}`);
+      if (res.data?.data) {
+        setSelectedStudentId(studentId);
+        setSelectedStudent(res.data.data as StudentMarksheet);
+      }
+    } finally {
+      setLoadingMarksheet(null);
+    }
+  };
+
+  const RESULT_COLUMNS: Column<StudentResult>[] = [
+    {
+      key: "rank",
+      label: "Rank",
+      sortable: true,
+      value: (r) => r.rank,
+      render: (r) =>
+        r.rank <= 3 ? (
+          <Badge variant={r.rank === 1 ? "default" : "secondary"}>#{r.rank}</Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">#{r.rank}</span>
+        ),
+    },
+    { key: "roll_number", label: "Roll", sortable: true, value: (r) => r.roll_number },
+    { key: "student_name", label: "Student", sortable: true, value: (r) => r.student_name, render: (r) => <span className="font-medium">{r.student_name}</span> },
+    { key: "obtained", label: "Obtained / Total", align: "right", value: (r) => r.total_obtained, render: (r) => <>{r.total_obtained} / {r.total_marks}</> },
+    { key: "percentage", label: "Percentage", align: "right", sortable: true, value: (r) => r.percentage ?? 0, render: (r) => <>{r.percentage?.toFixed(1)}%</> },
+    { key: "grade", label: "Grade", sortable: true, value: (r) => r.grade, render: (r) => <Badge variant="outline">{r.grade}</Badge> },
+    { key: "gpa", label: "GPA", align: "right", sortable: true, value: (r) => r.gpa ?? 0, render: (r) => r.gpa?.toFixed(1) },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      value: (r) => r.status,
+      render: (r) => (
+        <Badge className={r.status === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+          {r.status?.toUpperCase()}
+        </Badge>
+      ),
+    },
+  ];
+
+  const stats =
+    results && results.length > 0
+      ? {
+          total: results.length,
+          passed: results.filter((r: StudentResult) => r.status === "pass")
+            .length,
+          failed: results.filter((r: StudentResult) => r.status === "fail")
+            .length,
+          avgPercentage: (
+            results.reduce(
+              (sum: number, r: StudentResult) => sum + (r.percentage || 0),
+              0,
+            ) / results.length
+          ).toFixed(1),
+        }
+      : null;
+
+  const isReady = !!examId && !!classId;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Exam Results</h1>
+          <p className="text-muted-foreground">
+            Class-wise results, grade sheets and individual marksheets
+          </p>
+        </div>
+        {isReady && hasDesigner && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Marksheet group */}
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+              <span className="px-2 text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">
+                Marksheet
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={previewingTemplate === "marksheet"}
+                onClick={() => previewTemplate("marksheet")}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {previewingTemplate === "marksheet" ? "Loading…" : "Preview"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={downloadingPdf === "marksheet"}
+                onClick={() => downloadPdf("marksheet")}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingPdf === "marksheet" ? "Generating…" : "PDF"}
+              </Button>
+            </div>
+
+            {/* Grade Sheet group */}
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+              <span className="px-2 text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
+                Grade Sheet
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={previewingTemplate === "grade_sheet"}
+                onClick={() => previewTemplate("grade_sheet")}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {previewingTemplate === "grade_sheet" ? "Loading…" : "Preview"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                disabled={downloadingPdf === "grade_sheet"}
+                onClick={() => downloadPdf("grade_sheet")}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingPdf === "grade_sheet" ? "Generating…" : "PDF"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label>Select Class</Label>
+            <Select value={classId} onValueChange={handleClassChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose class" />
+              </SelectTrigger>
+              <SelectContent>
+                {(classes || []).map((c: { id: string; name: string }) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Select Exam</Label>
+            <Select value={examId} onValueChange={handleExamChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose exam" />
+              </SelectTrigger>
+              <SelectContent>
+                {filteredExams.map((e: { id: string; name: string }) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              label: "Total Students",
+              value: stats.total,
+              icon: BarChart3,
+              color: "text-blue-500",
+            },
+            {
+              label: "Passed",
+              value: stats.passed,
+              icon: Trophy,
+              color: "text-green-500",
+            },
+            {
+              label: "Failed",
+              value: stats.failed,
+              icon: AlertTriangle,
+              color: "text-red-500",
+            },
+            {
+              label: "Class Average",
+              value: `${stats.avgPercentage}%`,
+              icon: TrendingUp,
+              color: "text-purple-500",
+            },
+          ].map((s) => (
+            <Card key={s.label}>
+              <CardContent className="pt-5 flex items-center gap-3">
+                <s.icon className={`h-8 w-8 ${s.color}`} />
+                <div>
+                  <p className="text-2xl font-bold">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Tabs */}
+      {isReady && (
+        <>
+          <div className="border-b">
+            <nav className="-mb-px flex gap-0">
+              {(
+                [
+                  { id: "results", label: "Student Results", icon: FileText },
+                  { id: "marksLedger", label: "Marks Ledger", icon: TableIcon },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+                  }`}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Results Table */}
+          {activeTab === "results" && (
+            <Card>
+              <CardContent className="p-0">
+                {resultsError ? (
+                  <div className="flex flex-col items-center py-12 space-y-3">
+                    <p className="text-sm text-destructive">Failed to load results. Please try again.</p>
+                    <Button variant="outline" size="sm" onClick={() => refetchResults()}>Retry</Button>
+                  </div>
+                ) : loadingResults ? (
+                  <div className="flex justify-center py-16">
+                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (results || []).length === 0 ? (
+                  <p className="text-center py-12 text-muted-foreground">
+                    No results found. Enter marks first.
+                  </p>
+                ) : (
+                  <DataTable
+                    columns={RESULT_COLUMNS}
+                    rows={results}
+                    rowKey={(r: StudentResult) => r.student_id}
+                    onRowClick={(r) => openMarksheet(r.student_id)}
+                    searchable
+                    searchPlaceholder="Search students…"
+                    exportFileName="exam-results"
+                    empty={{ icon: GraduationCap, title: "No results found", body: "Enter marks first — results appear here with NEB grades." }}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Marks Ledger */}
+          {activeTab === "marksLedger" && (
+            <div className="space-y-3">
+              <Card>
+                <CardContent className="p-0 overflow-auto">
+                  {gradeSheetError ? (
+                    <div className="flex flex-col items-center py-12 space-y-3">
+                      <p className="text-sm text-destructive">Failed to load the grade sheet. Please try again.</p>
+                      <Button variant="outline" size="sm" onClick={() => refetchGradeSheet()}>Retry</Button>
+                    </div>
+                  ) : loadingGradeSheet ? (
+                    <div className="flex justify-center py-16">
+                      <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : !gradeSheet ? (
+                    <p className="text-center py-12 text-muted-foreground">
+                      No grade sheet data available.
+                    </p>
+                  ) : (
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-muted/60">
+                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-0 bg-muted/60 min-w-[50px]">
+                            Rank
+                          </th>
+                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-12 bg-muted/60 min-w-[50px]">
+                            Roll
+                          </th>
+                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-24 bg-muted/60 min-w-[160px]">
+                            Student
+                          </th>
+                          {gradeSheet.subjects.map((s) => (
+                            <th
+                              key={s.id}
+                              className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[80px]"
+                              title={s.name}
+                            >
+                              <div className="truncate max-w-[80px]">
+                                {s.name.length > 6
+                                  ? s.name.slice(0, 6) + "…"
+                                  : s.name}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground font-normal">
+                                /{s.full_marks}
+                              </div>
+                            </th>
+                          ))}
+                          <th className="text-center px-3 py-2.5 font-medium border-b border-r min-w-[80px]">
+                            Total
+                          </th>
+                          <th className="text-center px-3 py-2.5 font-medium border-b min-w-[70px]">
+                            %
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {gradeSheet.rows.map((row) => (
+                          <tr
+                            key={row.student_id}
+                            className={`hover:bg-muted/30 transition-colors ${
+                              row.status === "fail" ? "bg-red-50" : ""
+                            }`}
+                          >
+                            <td className="px-3 py-2 border-r sticky left-0 bg-inherit font-medium text-center">
+                              #{row.rank}
+                            </td>
+                            <td className="px-3 py-2 border-r sticky left-12 bg-inherit text-center">
+                              {row.roll_number}
+                            </td>
+                            <td className="px-3 py-2 border-r sticky left-24 bg-inherit font-medium">
+                              {row.student_name}
+                            </td>
+                            {row.subject_marks.map((sm, idx) => (
+                              <td
+                                key={idx}
+                                className={`px-2 py-2 border-r text-center ${
+                                  sm.absent
+                                    ? "text-muted-foreground"
+                                    : !sm.pass
+                                      ? "text-red-600 font-medium"
+                                      : ""
+                                }`}
+                              >
+                                {sm.absent ? (
+                                  "—"
+                                ) : (
+                                  <div>
+                                    <div>{sm.obtained}</div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      {sm.grade}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            ))}
+                            <td className="px-3 py-2 border-r text-center font-medium">
+                              {row.total_obtained}/{gradeSheet.total_full_marks}
+                            </td>
+                            <td
+                              className={`px-3 py-2 text-center font-medium ${
+                                row.status === "fail"
+                                  ? "text-red-600"
+                                  : "text-green-700"
+                              }`}
+                            >
+                              {row.percentage}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Student Marksheet Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-bold">
+                  {selectedStudent.student_name}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Roll #{selectedStudent.roll_number} •{" "}
+                  {selectedStudent.class_name} {selectedStudent.section_name} •{" "}
+                  {selectedStudent.exam_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedStudent(null)}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-primary">
+                    {selectedStudent.percentage}%
+                  </p>
+                  <p className="text-xs text-muted-foreground">Percentage</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold">
+                    {selectedStudent.overall_grade || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Grade</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold">
+                    #{selectedStudent.rank_in_class || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Rank</p>
+                </div>
+              </div>
+
+              {/* Subject marks table */}
+              <div className="border rounded-xl overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr>
+                      <th className="text-left px-3 py-2.5 font-medium">
+                        Subject
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        Theory
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        Practical
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        Obtained
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        Full
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        Grade
+                      </th>
+                      <th className="text-center px-3 py-2.5 font-medium">
+                        GPA
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {selectedStudent.subjects.map((s) => (
+                      <tr
+                        key={s.subject_id}
+                        className={`${!s.pass ? "bg-red-50" : ""}`}
+                      >
+                        <td className="px-3 py-2 font-medium">
+                          {s.subject_name}
+                          {!s.pass && (
+                            <span className="ml-1 text-red-500 text-xs">
+                              FAIL
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {s.theory_marks || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {s.practical_marks || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-center font-medium">
+                          {s.obtained_marks}
+                        </td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {s.full_marks}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <Badge variant="outline" className="text-xs">
+                            {s.grade}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {s.gpa?.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/30 border-t font-medium">
+                    <tr>
+                      <td className="px-3 py-2" colSpan={3}>
+                        Total
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {selectedStudent.total_obtained}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {selectedStudent.total_full}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {selectedStudent.overall_grade}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {selectedStudent.overall_gpa?.toFixed(1)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* AI Remarks */}
+              {selectedStudent.ai_remarks && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3">
+                  <p className="text-xs font-semibold text-primary mb-1">
+                    AI Remarks
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedStudent.ai_remarks}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div className="border-t px-6 py-3 flex justify-between items-center">
+              <span
+                className={`text-sm font-semibold ${
+                  selectedStudent.status === "pass"
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {selectedStudent.status === "pass" ? "✓ PASSED" : "✗ FAILED"}
+                {selectedStudent.failed_subjects > 0 &&
+                  ` (${selectedStudent.failed_subjects} subject${selectedStudent.failed_subjects > 1 ? "s" : ""} failed)`}
+              </span>
+              <div className="flex gap-2">
+                {hasDesigner && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={loadingStudentHtml}
+                    onClick={async () => {
+                      if (!selectedStudent || !examId) return;
+                      setLoadingStudentHtml(true);
+                      try {
+                        const sid = selectedStudentId;
+                        if (!sid) { toast.error("Student ID not found"); return; }
+                        const res = await api.get(
+                          `/exams/${examId}/marksheet/${sid}/html?template_id=marksheet`,
+                        );
+                        const html = res.data?.data?.html || "";
+                        if (!html) { toast.error("No HTML generated"); return; }
+                        const w = window.open("", "_blank");
+                        if (w) {
+                          w.document.open();
+                          w.document.write(
+                            `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Marksheet</title>` +
+                            `<style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${html}</body></html>`,
+                          );
+                          w.document.close();
+                          w.focus();
+                        } else {
+                          toast.error("Popup blocked — allow popups for this site");
+                        }
+                      } catch {
+                        toast.error("Failed to generate marksheet");
+                      } finally {
+                        setLoadingStudentHtml(false);
+                      }
+                    }}
+                    className="gap-1.5"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    {loadingStudentHtml ? "Generating..." : "Preview Marksheet"}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedStudent(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

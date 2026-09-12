@@ -11,8 +11,6 @@ import {
   ChevronDown,
   LayoutGrid,
   Layers,
-  Smartphone,
-  Monitor,
 } from "lucide-react";
 import { SchoolRole } from "@/components/aos/types";
 import { useServerTime } from "@/lib/use-server-time";
@@ -30,8 +28,6 @@ interface TopMenuBarProps {
   unreadCount?: number;
   onToggleAppDrawer?: () => void;
   onToggleAppSwitcher?: () => void;
-  systemMode?: "desktop" | "mobile";
-  onToggleSystemMode?: () => void;
   topBarHeight?: "compact" | "standard" | "large";
 }
 
@@ -56,8 +52,6 @@ export default function TopMenuBar({
   unreadCount = 0,
   onToggleAppDrawer,
   onToggleAppSwitcher,
-  systemMode = "desktop",
-  onToggleSystemMode,
   topBarHeight = "standard",
 }: TopMenuBarProps) {
   const [showAppleMenu, setShowAppleMenu] = useState(false);
@@ -182,18 +176,6 @@ export default function TopMenuBar({
               System & Desktop Settings...
             </div>
 
-            <div
-              onClick={() => {
-                setShowAppleMenu(false);
-                if (onToggleSystemMode) onToggleSystemMode();
-              }}
-              style={{ padding: "6px 10px", borderRadius: "4px", cursor: "pointer", color: "#38bdf8" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--w11-control-hover)")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              Switch to General Web Portal
-            </div>
-
             <div style={{ height: "1px", background: "var(--w11-border-subtle)", margin: "4px 0" }} />
 
             <div
@@ -275,23 +257,8 @@ export default function TopMenuBar({
         <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onOpenApp("timetable"); }}>Schedule</span>
       </div>
 
-      {/* Right Area: Status Pills, Mode Switcher & Tray Controls */}
+      {/* Right Area: Status Pills & Tray Controls */}
       <div className="menubar-right">
-        {/* Two-Mode Switcher Toggle Pill */}
-        {onToggleSystemMode && (
-          <div
-            className="aos-mode-switcher-pill"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSystemMode();
-            }}
-            title="Switch to General Web Portal"
-          >
-            <LayoutGrid size={12} />
-            <span>General View</span>
-          </div>
-        )}
-
         {/* User Role Badge */}
         <div
           className="menubar-pill role-badge"

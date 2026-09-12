@@ -1,0 +1,39 @@
+/*
+ * AOS window-host integration fixes.
+ * Scoped to .win11 so the regular dashboard/general portal remains unchanged.
+ */
+
+.win11 .aos-window-content {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  isolation: isolate;
+}
+
+.win11 .aos-window-content > * {
+  min-height: 100%;
+}
+
+.win11 .aos-window-content .aos-app-page {
+  min-height: 100%;
+  height: 100%;
+}
+
+.win11 .aos-window-content .h-screen {
+  height: 100% !important;
+}
+
+.win11 .aos-window-content .min-h-screen {
+  min-height: 100% !important;
+}
+
+.win11 .aos-window-content .max-h-screen {
+  max-height: 100% !important;
+}
+
+/* Contain page-level fixed shells within the AOS window viewport. */
+.win11 .aos-window-content > .fixed {
+  position: absolute !important;
+}

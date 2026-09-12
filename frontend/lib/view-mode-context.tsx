@@ -1,23 +1,17 @@
 "use client";
 
 /**
- * ViewModeContext — governs whether the user sees the General Web Portal or
- * the AOS Desktop Operating System shell.
+ * ViewModeContext — AOS-only runtime selector.
  *
- * Persistence: localStorage key "aschool_view_mode" (UI preference only,
- * not security-sensitive — localStorage is correct here; HttpOnly cookies
- * are reserved for auth tokens).
- *
- * Mobile adaptation:
- *  - General view → responsive SaaS web portal (unchanged)
- *  - AOS view → iOS Mobile Experience (Springboard + Control Center)
+ * Architecture decision:
+ *  - General web portal mode is retired.
+ *  - Desktop renders AOS Desktop shell.
+ *  - Mobile renders AOS Mobile experience.
  */
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
-export type ViewMode = "general" | "aos";
-
-const STORAGE_KEY = "aschool_view_mode";
+export type ViewMode = "aos";
 
 interface ViewModeContextType {
   mode: ViewMode;
@@ -34,20 +28,8 @@ interface ViewModeContextType {
 const ViewModeContext = createContext<ViewModeContextType | undefined>(undefined);
 
 export function ViewModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ViewMode>("general");
+  const mode: ViewMode = "aos";
   const [isMobile, setIsMobile] = useState(false);
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as ViewMode | null;
-      if (stored === "aos" || stored === "general") {
-        setModeState(stored);
-      }
-    } catch {
-      // localStorage unavailable (e.g. private mode restrictions) — stay general
-    }
-  }, []);
 
   // Responsive breakpoint tracking
   useEffect(() => {
@@ -58,18 +40,13 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  const setMode = useCallback((next: ViewMode) => {
-    setModeState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Ignore write failures
-    }
+  const setMode = useCallback((_next: ViewMode) => {
+    // AOS-only mode: setter kept for backward compatibility with existing callers.
   }, []);
 
   const toggleMode = useCallback(() => {
-    setMode(mode === "general" ? "aos" : "general");
-  }, [mode, setMode]);
+    // AOS-only mode: toggle intentionally disabled.
+  }, []);
 
   return (
     <ViewModeContext.Provider
@@ -78,8 +55,8 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
         setMode,
         toggleMode,
         isMobile,
-        isAOSDesktop: mode === "aos" && !isMobile,
-        isAOSMobile: mode === "aos" && isMobile,
+        isAOSDesktop: !isMobile,
+        isAOSMobile: isMobile,
       }}
     >
       {children}

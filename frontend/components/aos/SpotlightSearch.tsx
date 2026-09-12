@@ -1,20 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
   X,
   ArrowRight,
   BookOpen,
-  GraduationCap,
   FileText,
-  Terminal,
   ShieldCheck,
   Zap,
   Sparkles,
-  Layers,
-  Settings,
   User,
 } from "lucide-react";
 import {
@@ -33,6 +29,7 @@ import {
 import { SchoolRole } from "@/components/aos/types";
 import { api } from "@/lib/api";
 import { useInstalledPlugins } from "@/lib/plugins";
+import { extractAOSModuleSlug, normalizeAOSRoute } from "@/lib/aos-navigation";
 
 export interface SpotlightItem {
   id: string;
@@ -56,6 +53,7 @@ interface SpotlightSearchProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenApp?: (appId: string) => void;
+  onOpenRoute?: (route: string) => void;
   currentRole?: SchoolRole;
   accentColor?: string;
 }
@@ -64,6 +62,7 @@ export default function SpotlightSearch({
   isOpen,
   onClose,
   onOpenApp,
+  onOpenRoute,
   currentRole = "student",
   accentColor = "#0078d4",
 }: SpotlightSearchProps) {
@@ -75,7 +74,7 @@ export default function SpotlightSearch({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { sidebarItems, installedPlugins } = useInstalledPlugins();
+  const { sidebarItems } = useInstalledPlugins();
 
   // 300ms Debounce
   useEffect(() => {
@@ -141,6 +140,28 @@ export default function SpotlightSearch({
     };
   }, [debouncedQuery]);
 
+  const openDestination = useCallback(
+    (moduleId: string, route?: string) => {
+      if (route) {
+        const normalized = normalizeAOSRoute(route);
+        if (normalized && onOpenRoute) {
+          onOpenRoute(normalized);
+          return;
+        }
+      }
+
+      if (onOpenApp) {
+        onOpenApp(moduleId);
+        return;
+      }
+
+      if (route) {
+        router.push(route);
+      }
+    },
+    [onOpenApp, onOpenRoute, router]
+  );
+
   // Core base apps catalog
   const baseApps: SpotlightItem[] = useMemo(() => [
     {
@@ -149,10 +170,7 @@ export default function SpotlightSearch({
       subtitle: "Interactive lecture streaming & whiteboard",
       category: "Apps & Plugins",
       icon: <AOSClassroomIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("classroom");
-        else router.push("/dashboard/classroom");
-      },
+      action: () => openDestination("classroom", "/dashboard/classroom"),
       badge: "CORE",
     },
     {
@@ -161,10 +179,7 @@ export default function SpotlightSearch({
       subtitle: "Course materials, textbook PDFs, lab submissions",
       category: "Apps & Plugins",
       icon: <AOSFileManagerIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("filemanager");
-        else router.push("/dashboard/files");
-      },
+      action: () => openDestination("filemanager", "/dashboard/files"),
       badge: "VAULT",
     },
     {
@@ -173,10 +188,7 @@ export default function SpotlightSearch({
       subtitle: "Continuous assessment & transcript tracking",
       category: "Apps & Plugins",
       icon: <AOSGradebookIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("gradebook");
-        else router.push("/dashboard/academics/grades");
-      },
+      action: () => openDestination("gradebook", "/dashboard/academics/grades"),
     },
     {
       id: "app-timetable",
@@ -184,10 +196,7 @@ export default function SpotlightSearch({
       subtitle: "Live bell schedule, class periods & rooms",
       category: "Apps & Plugins",
       icon: <AOSTimetableIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("timetable");
-        else router.push("/dashboard/timetable");
-      },
+      action: () => openDestination("timetable", "/dashboard/timetable"),
     },
     {
       id: "app-library",
@@ -195,10 +204,7 @@ export default function SpotlightSearch({
       subtitle: "Academic publications, journals & textbooks",
       category: "Apps & Plugins",
       icon: <AOSLibraryIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("library");
-        else router.push("/dashboard/library");
-      },
+      action: () => openDestination("library", "/dashboard/library"),
     },
     {
       id: "app-exam",
@@ -206,10 +212,7 @@ export default function SpotlightSearch({
       subtitle: "Timed quizzes, midterms & examination hall",
       category: "Apps & Plugins",
       icon: <AOSExamIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("exam");
-        else router.push("/dashboard/exams");
-      },
+      action: () => openDestination("exam", "/dashboard/exams"),
       badge: "EXAM",
     },
     {
@@ -218,10 +221,7 @@ export default function SpotlightSearch({
       subtitle: "Compiler shell, coding workbench & tools",
       category: "Apps & Plugins",
       icon: <AOSTerminalIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("terminal");
-        else router.push("/dashboard/terminal");
-      },
+      action: () => openDestination("terminal", "/dashboard/terminal"),
     },
     {
       id: "app-settings",
@@ -229,10 +229,7 @@ export default function SpotlightSearch({
       subtitle: "Personalization, wallpapers, dock pinning, accessibility",
       category: "Apps & Plugins",
       icon: <AOSSettingsIcon size={26} />,
-      action: () => {
-        if (onOpenApp) onOpenApp("settings");
-        else router.push("/dashboard/settings");
-      },
+      action: () => openDestination("settings", "/dashboard/settings"),
     },
     ...(currentRole === "admin"
       ? [
@@ -242,10 +239,7 @@ export default function SpotlightSearch({
             subtitle: "Campus security, faculty management & broadcasts",
             category: "Apps & Plugins" as const,
             icon: <AOSAdminIcon size={26} />,
-            action: () => {
-              if (onOpenApp) onOpenApp("admin");
-              else router.push("/dashboard/admin");
-            },
+            action: () => openDestination("admin", "/dashboard/admin"),
             badge: "ADMIN",
           },
         ]
@@ -258,24 +252,19 @@ export default function SpotlightSearch({
             subtitle: "Invoices, payment receipts & student accounts",
             category: "Apps & Plugins" as const,
             icon: <AOSFinanceIcon size={26} />,
-            action: () => {
-              if (onOpenApp) onOpenApp("finance");
-              else router.push("/dashboard/finance");
-            },
+            action: () => openDestination("finance", "/dashboard/finance"),
             badge: "FINANCE",
           },
         ]
       : []),
-  ], [currentRole, onOpenApp, router]);
+  ], [currentRole, openDestination]);
 
   // Plugin-derived items from useInstalledPlugins()
   const pluginItems: SpotlightItem[] = useMemo(() => {
-    return (sidebarItems || []).map((item) => ({
-      id: `plugin-${item.slug}`,
-      title: item.label,
-      subtitle: item.section ? `${item.section} Module` : "Installed ASchool Plugin",
-      category: "Apps & Plugins" as const,
-      icon: (
+    const allItems: SpotlightItem[] = [];
+
+    for (const item of sidebarItems || []) {
+      const pluginIcon = (
         <div
           style={{
             width: "26px",
@@ -290,14 +279,33 @@ export default function SpotlightSearch({
         >
           <Sparkles size={15} />
         </div>
-      ),
-      action: () => {
-        if (item.route) router.push(item.route);
-        else if (onOpenApp) onOpenApp(item.slug);
-      },
-      badge: "PLUGIN",
-    }));
-  }, [sidebarItems, onOpenApp, router]);
+      );
+
+      allItems.push({
+        id: `plugin-${item.slug}`,
+        title: item.label,
+        subtitle: item.section ? `${item.section} Module` : "Installed ASchool Plugin",
+        category: "Apps & Plugins" as const,
+        icon: pluginIcon,
+        action: () => openDestination(item.slug, item.route),
+        badge: "PLUGIN",
+      });
+
+      for (const sub of item.subitems || []) {
+        allItems.push({
+          id: `plugin-sub-${item.slug}-${sub.route}`,
+          title: `${item.label} / ${sub.label}`,
+          subtitle: "Module subpage",
+          category: "Apps & Plugins" as const,
+          icon: pluginIcon,
+          action: () => openDestination(item.slug, sub.route),
+          badge: "SUB",
+        });
+      }
+    }
+
+    return allItems;
+  }, [sidebarItems, openDestination]);
 
   // Quick Action Utilities
   const quickActions: SpotlightItem[] = useMemo(() => [
@@ -307,10 +315,7 @@ export default function SpotlightSearch({
       subtitle: "Secure examination environment and proctor lockdown",
       category: "Quick Actions",
       icon: <ShieldCheck size={22} color="#ef4444" />,
-      action: () => {
-        if (onOpenApp) onOpenApp("exam");
-        else router.push("/dashboard/exams");
-      },
+      action: () => openDestination("exam", "/dashboard/exams"),
     },
     {
       id: "act-campus-bus",
@@ -318,12 +323,9 @@ export default function SpotlightSearch({
       subtitle: "Live shuttle route tracking and arrival times",
       category: "Quick Actions",
       icon: <Zap size={22} color="#fbbf24" />,
-      action: () => {
-        if (onOpenApp) onOpenApp("campus");
-        else router.push("/dashboard/campus");
-      },
+      action: () => openDestination("campus", "/dashboard/campus"),
     },
-  ], [onOpenApp, router]);
+  ], [openDestination]);
 
   // Convert real API search results
   const mappedApiItems: SpotlightItem[] = useMemo(() => {
@@ -340,11 +342,19 @@ export default function SpotlightSearch({
         <FileText size={22} color="#fbbf24" />
       ),
       action: () => {
-        if (r.url) router.push(r.url);
+        if (!r.url) return;
+
+        const internal = normalizeAOSRoute(r.url);
+        if (internal) {
+          openDestination(extractAOSModuleSlug(internal) || "dashboard", internal);
+          return;
+        }
+
+        router.push(r.url);
       },
       badge: r.type?.toUpperCase() || "RESULT",
     }));
-  }, [apiResults, router]);
+  }, [apiResults, openDestination, router]);
 
   // Combine and filter results
   const filteredItems = useMemo(() => {

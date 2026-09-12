@@ -1,26 +1,33 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Wifi,
   Battery,
-  ChevronLeft,
   Bell,
-  Sliders,
   Sparkles,
-  LayoutGrid,
   ArrowLeft,
   X,
-  ExternalLink,
 } from "lucide-react";
 import { useInstalledPlugins } from "@/lib/plugins";
-import { getAOSAppForModule, type AOSApp } from "@/lib/aos-app-adapter";
+import {
+  getAOSAppForModule,
+  normalizeAOSModuleId,
+  type AOSApp,
+} from "@/lib/aos-app-adapter";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
 import IOSControlCenter from "./IOSControlCenter";
 import IOSNotificationCenter from "./IOSNotificationCenter";
 import { useAuth } from "@/lib/auth-context";
 import { useServerTime } from "@/lib/use-server-time";
-import { useViewMode } from "@/lib/view-mode-context";
+import {
+  buildAOSRouteWindowId,
+  extractAOSModuleSlug,
+  formatAOSRouteTitle,
+  isAOSRootModuleRoute,
+  normalizeAOSRoute,
+} from "@/lib/aos-navigation";
 
 interface MobileExperienceProps {
   currentRole?: string;
@@ -61,16 +68,21 @@ export default function MobileExperience({
 
   const { sidebarItems, pluginBottomNav } = useInstalledPlugins();
   const { user } = useAuth();
-  const { toggleMode } = useViewMode();
   const serverTime = useServerTime();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const handleSelectApp = (id: string | null) => {
-    if (onSelectApp) {
-      onSelectApp(id);
-    } else {
-      setInternalActiveApp(id);
-    }
-  };
+  const handleSelectApp = useCallback(
+    (id: string | null) => {
+      if (onSelectApp) {
+        onSelectApp(id);
+      } else {
+        setInternalActiveApp(id);
+      }
+    },
+    [onSelectApp]
+  );
 
   useEffect(() => {
     const updateTime = () => {
@@ -117,11 +129,12 @@ export default function MobileExperience({
     const apps = sidebarItems.map(getAOSAppForModule);
     // Add bottom nav items if not present
     for (const b of pluginBottomNav) {
-      if (!apps.some((a) => a.id === b.slug)) {
+      const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
+      if (!apps.some((a) => a.id === moduleId)) {
         apps.push({
-          id: b.slug,
+          id: moduleId,
           name: b.label,
-          route: b.route,
+          route: b.route || `/dashboard/${moduleId}`,
           category: "System",
           defaultWidth: 800,
           defaultHeight: 600,
@@ -152,6 +165,54 @@ export default function MobileExperience({
     return found;
   }, [allApps]);
 
+  const routeTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+
+    const addRoute = (route: string | undefined, title: string) => {
+      if (!route) return;
+      const normalized = normalizeAOSRoute(route);
+      if (!normalized) return;
+      map.set(normalized.split("?")[0], title);
+    };
+
+    for (const item of sidebarItems) {
+      addRoute(item.route, item.label);
+      for (const sub of item.subitems || []) {
+        addRoute(sub.route, sub.label);
+      }
+    }
+
+    for (const item of pluginBottomNav) {
+      addRoute(item.route, item.label);
+      for (const sub of item.subitems || []) {
+        addRoute(sub.route, sub.label);
+      }
+    }
+
+    return map;
+  }, [sidebarItems, pluginBottomNav]);
+
+  const openRouteInMobile = useCallback(
+    (rawRoute: string): boolean => {
+      const normalizedRoute = normalizeAOSRoute(rawRoute);
+      if (!normalizedRoute) return false;
+
+      const moduleSlug = extractAOSModuleSlug(normalizedRoute);
+      const moduleId = normalizeAOSModuleId(moduleSlug || "", normalizedRoute);
+      if (!moduleId) return false;
+
+      if (isAOSRootModuleRoute(normalizedRoute)) {
+        handleSelectApp(moduleId);
+        return true;
+      }
+
+      const routeWindowId = buildAOSRouteWindowId(normalizedRoute);
+      handleSelectApp(routeWindowId || moduleId);
+      return true;
+    },
+    [handleSelectApp]
+  );
+
   const activeAppComponent = useMemo(() => {
     if (!activeApp) return null;
     return resolveModuleComponent(activeApp);
@@ -159,11 +220,64 @@ export default function MobileExperience({
 
   const activeAppMeta = useMemo(() => {
     if (!activeApp) return null;
+
+    if (activeApp.startsWith("route:")) {
+      const normalizedRoute = normalizeAOSRoute(activeApp.replace(/^route:/, ""));
+      const routePath = normalizedRoute?.split("?")[0] || "";
+      const routeTitle = routeTitleMap.get(routePath);
+
+      return {
+        id: activeApp,
+        name: routeTitle || formatAOSRouteTitle(normalizedRoute || activeApp),
+      };
+    }
+
     return allApps.find((a) => a.id === activeApp) || {
       id: activeApp,
       name: activeApp.charAt(0).toUpperCase() + activeApp.slice(1),
     };
-  }, [activeApp, allApps]);
+  }, [activeApp, allApps, routeTitleMap]);
+
+  useEffect(() => {
+    if (!pathname) return;
+
+    const query = searchParams?.toString();
+    const currentRoute = query ? `${pathname}?${query}` : pathname;
+    const normalized = normalizeAOSRoute(currentRoute);
+    if (!normalized) return;
+
+    const routePath = normalized.split("?")[0];
+    if (routePath === "/dashboard") {
+      if (query) {
+        router.replace("/dashboard");
+      }
+      return;
+    }
+
+    const handled = openRouteInMobile(normalized);
+    if (handled) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, searchParams, openRouteInMobile, router]);
+
+  const handleActiveAppLinkClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const href = anchor.getAttribute("href") || anchor.href;
+      const normalized = normalizeAOSRoute(href || "");
+      if (!normalized) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      openRouteInMobile(normalized);
+    },
+    [openRouteInMobile]
+  );
 
   return (
     <div
@@ -266,7 +380,7 @@ export default function MobileExperience({
         </div>
       </div>
 
-      {/* Springboard Header: Greeting & Quick Toggle to General View */}
+      {/* Springboard Header: Greeting & Quick Actions */}
       <div
         style={{
           position: "relative",
@@ -288,30 +402,6 @@ export default function MobileExperience({
         </div>
 
         <div style={{ display: "flex", gap: "8px" }}>
-          {/* Switch to General Web View */}
-          <button
-            onClick={toggleMode}
-            style={{
-              all: "unset",
-              padding: "6px 12px",
-              borderRadius: "14px",
-              background: "rgba(255, 255, 255, 0.18)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              fontSize: "11px",
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-            }}
-            title="Switch to General SaaS Portal"
-          >
-            <LayoutGrid size={13} />
-            <span>General</span>
-          </button>
-
           {/* Open Notifications */}
           <button
             onClick={() => setIsNotificationCenterOpen(true)}
@@ -509,7 +599,10 @@ export default function MobileExperience({
           </div>
 
           {/* Module Body Frame */}
-          <div className="aos-window-content flex-1 h-full overflow-auto">
+          <div
+            className="aos-window-content flex-1 h-full overflow-auto"
+            onClickCapture={handleActiveAppLinkClick}
+          >
             {activeAppComponent ? (
               React.createElement(activeAppComponent, {})
             ) : (
