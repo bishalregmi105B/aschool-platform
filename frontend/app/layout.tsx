@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Mukta } from "next/font/google";
 import "./globals.css";
-import "@/src/styles/aos-theme.css";
+import "11.css/dist/11.scoped.css";
 import "@/src/styles/aos-integration-overrides.css";
 import { Providers } from "@/components/providers";
 

@@ -1,0 +1,36 @@
+/**
+ * 11.css - Fluent Scrollbars
+ * Windows 11 Overlay Thin Scrollbars
+ */
+
+/* WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  transition: all var(--w11-transition-normal);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--w11-text-tertiary);
+  opacity: 0.5;
+  border-radius: var(--w11-radius-full);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background var(--w11-transition-fast), width var(--w11-transition-fast);
+
+  &:hover {
+    background: var(--w11-text-secondary);
+    width: 10px;
+  }
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--w11-text-tertiary) transparent;
+}

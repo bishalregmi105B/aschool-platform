@@ -1,0 +1,103 @@
+/**
+ * 11.css - Fluent InfoBar Alerts
+ * Windows 11 Notification Banners & In-App Alerts
+ */
+
+.win11-infobar,
+.infobar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--w11-radius-sm);
+  border: 1px solid var(--w11-border-default);
+  background: var(--w11-surface-solid);
+  box-shadow: var(--w11-elevation-card);
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+  animation: w11-flyout-in var(--w11-duration-fast) var(--w11-ease-spring);
+
+  .infobar-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .infobar-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .infobar-title {
+      font-weight: 600;
+      color: var(--w11-text-primary);
+    }
+
+    .infobar-message {
+      color: var(--w11-text-secondary);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+  }
+
+  .infobar-action {
+    flex-shrink: 0;
+  }
+
+  .infobar-close {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: var(--w11-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--w11-text-secondary);
+    box-shadow: none;
+
+    &:hover {
+      background: var(--w11-control-hover);
+      color: var(--w11-text-primary);
+    }
+  }
+
+  /* Status Variants */
+  &.info,
+  &[data-severity="info"] {
+    border-left: 4px solid #0078d4;
+    .infobar-icon { color: #0078d4; }
+  }
+
+  &.success,
+  &[data-severity="success"] {
+    border-left: 4px solid #107c10;
+    .infobar-icon { color: #107c10; }
+  }
+
+  &.warning,
+  &[data-severity="warning"] {
+    border-left: 4px solid #d83b01;
+    .infobar-icon { color: #d83b01; }
+  }
+
+  &.error,
+  &[data-severity="error"] {
+    border-left: 4px solid #c42b1c;
+    .infobar-icon { color: #c42b1c; }
+  }
+}

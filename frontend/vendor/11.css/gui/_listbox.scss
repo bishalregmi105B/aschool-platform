@@ -1,0 +1,38 @@
+/**
+ * 11.css - Fluent Listbox
+ * Windows 11 List Box Container
+ */
+
+ul.win11-listbox,
+ul[role="listbox"] {
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+  background: var(--w11-control-bg);
+  border: 1px solid var(--w11-border-default);
+  border-radius: var(--w11-radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  user-select: none;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+
+  li, [role="option"] {
+    padding: 6px 10px;
+    border-radius: var(--w11-radius-sm);
+    color: var(--w11-text-primary);
+    cursor: pointer;
+    transition: background var(--w11-transition-fast);
+
+    &:hover {
+      background: var(--w11-control-hover);
+    }
+
+    &[aria-selected="true"],
+    &.selected {
+      background: var(--w11-control-active);
+      color: var(--w11-text-primary);
+      font-weight: 500;
+    }
+  }
+}

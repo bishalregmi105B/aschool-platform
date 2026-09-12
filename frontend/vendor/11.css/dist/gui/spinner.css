@@ -1,0 +1,2 @@
+.progress-ring,.win11-spinner{animation:w11-spin .9s linear infinite;border:3px solid rgba(0,0,0,.12);border-radius:50%;border-top-color:#0067c0;box-sizing:border-box;display:inline-block;height:28px;width:28px}.progress-ring.sm,.win11-spinner.sm{border-width:2px;height:16px;width:16px}.progress-ring.lg,.win11-spinner.lg{border-width:4px;height:48px;width:48px}@keyframes w11-spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}
+/*# sourceMappingURL=spinner.css.map */

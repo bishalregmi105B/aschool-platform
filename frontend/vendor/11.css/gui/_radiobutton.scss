@@ -1,0 +1,62 @@
+/**
+ * 11.css - Fluent Radio Buttons
+ * Windows 11 Radio Control
+ */
+
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--w11-control-bg);
+  border: 1px solid var(--w11-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  vertical-align: middle;
+  margin: 0 8px 0 0;
+  outline: none;
+  transition: all var(--w11-transition-fast);
+  position: relative;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-accent);
+  }
+
+  &:checked {
+    border-color: var(--w11-accent);
+    background: var(--w11-control-bg);
+
+    &::after {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--w11-accent);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--w11-accent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+label:has(input[type="radio"]) {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: var(--w11-text-primary);
+}

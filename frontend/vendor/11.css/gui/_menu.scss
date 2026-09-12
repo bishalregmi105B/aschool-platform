@@ -1,0 +1,101 @@
+/**
+ * 11.css - Fluent Menus & Flyouts
+ * Windows 11 Context Menus & Command Menus
+ */
+
+menu,
+[role="menu"],
+.win11-menu,
+.context-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+  background: var(--w11-acrylic-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--w11-border-subtle);
+  border-radius: var(--w11-radius-lg);
+  box-shadow: var(--w11-elevation-flyout);
+  user-select: none;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  z-index: 10000;
+
+  hr,
+  .menu-divider {
+    border: none;
+    border-top: 1px solid var(--w11-border-subtle);
+    margin: 4px -4px;
+  }
+}
+
+menuitem,
+[role="menuitem"],
+.win11-menu-item,
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: var(--w11-radius-sm);
+  color: var(--w11-text-primary);
+  cursor: pointer;
+  transition: background var(--w11-transition-fast);
+  text-decoration: none;
+
+  .item-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .item-shortcut {
+    font-size: 11px;
+    color: var(--w11-text-tertiary);
+    margin-left: auto;
+  }
+
+  &:hover {
+    background: var(--w11-control-hover);
+  }
+
+  &:active {
+    background: var(--w11-control-active);
+  }
+
+  &[aria-disabled="true"],
+  &.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+/* Classic Menu Bar (Windows 11 modern compact bar) */
+.win11-menubar,
+ul[role="menubar"] {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  padding: 2px 6px;
+  margin: 0;
+  background: transparent;
+  font-size: 12px;
+  user-select: none;
+
+  li, [role="menuitem"] {
+    padding: 4px 8px;
+    border-radius: var(--w11-radius-sm);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--w11-control-hover);
+    }
+  }
+}

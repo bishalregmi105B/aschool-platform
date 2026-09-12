@@ -1,0 +1,75 @@
+/**
+ * 11.css - Fluent Treeview / Navigation Pane
+ * Windows 11 File Explorer Sidebar
+ */
+
+ul.tree-view,
+.win11-treeview {
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+  background: transparent;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  user-select: none;
+
+  li {
+    position: relative;
+    padding: 0;
+    margin: 1px 0;
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: var(--w11-radius-sm);
+      cursor: pointer;
+      color: var(--w11-text-primary);
+      transition: background var(--w11-transition-fast);
+      position: relative;
+
+      &:hover {
+        background: var(--w11-control-hover);
+      }
+
+      &.selected,
+      &[aria-selected="true"] {
+        background: var(--w11-control-hover);
+        font-weight: 500;
+
+        /* Windows 11 left accent indicator pill */
+        &::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 3px;
+          height: 16px;
+          background: var(--w11-accent);
+          border-radius: var(--w11-radius-full);
+        }
+      }
+
+      .chevron {
+        width: 12px;
+        height: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform var(--w11-transition-fast);
+
+        &.expanded {
+          transform: rotate(90deg);
+        }
+      }
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 16px;
+      margin: 0;
+    }
+  }
+}

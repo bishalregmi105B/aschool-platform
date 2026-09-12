@@ -1,0 +1,91 @@
+/**
+ * 11.css - Fluent Tab Navigation
+ * Windows 11 Tabs (File Explorer, Notepad, Terminal)
+ */
+
+[role="tablist"],
+.win11-tablist,
+.tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--w11-border-subtle);
+  background: transparent;
+  overflow-x: auto;
+  user-select: none;
+}
+
+[role="tab"],
+.win11-tab,
+.tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  color: var(--w11-text-secondary);
+  border-radius: var(--w11-radius-sm) var(--w11-radius-sm) 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--w11-transition-fast);
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    color: var(--w11-text-primary);
+  }
+
+  &[aria-selected="true"],
+  &.active {
+    background: var(--w11-surface-solid);
+    color: var(--w11-text-primary);
+    border-color: var(--w11-border-subtle);
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+
+    /* Bottom accent indicator */
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--w11-accent);
+      border-radius: var(--w11-radius-full);
+    }
+  }
+
+  .tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--w11-radius-sm);
+    margin-left: 4px;
+    opacity: 0.6;
+    transition: all var(--w11-transition-fast);
+
+    &:hover {
+      background: var(--w11-control-hover);
+      opacity: 1;
+    }
+  }
+}
+
+[role="tabpanel"],
+.win11-tabpanel,
+.tab-content {
+  padding: 16px;
+  background: var(--w11-surface-solid);
+  border-radius: 0 0 var(--w11-radius-md) var(--w11-radius-md);
+
+  &:not([hidden]) {
+    display: block;
+  }
+}

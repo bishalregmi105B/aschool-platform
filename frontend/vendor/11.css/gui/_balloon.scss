@@ -1,0 +1,52 @@
+/**
+ * 11.css - Fluent Tooltips & InfoBadges
+ * Windows 11 Tooltips
+ */
+
+[data-tooltip],
+.win11-tooltip {
+  position: relative;
+
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.95);
+    background: var(--w11-surface-solid);
+    color: var(--w11-text-primary);
+    font-family: var(--w11-font-family);
+    font-size: 12px;
+    line-height: 16px;
+    padding: 4px 8px;
+    border-radius: var(--w11-radius-sm);
+    border: 1px solid var(--w11-border-subtle);
+    box-shadow: var(--w11-elevation-flyout);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--w11-transition-fast), transform var(--w11-transition-fast);
+    z-index: 10000;
+  }
+
+  &:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* InfoBadge */
+.info-badge,
+.win11-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--w11-radius-full);
+  background: var(--w11-accent);
+  color: var(--w11-accent-text);
+  font-size: 11px;
+  font-weight: 600;
+}
