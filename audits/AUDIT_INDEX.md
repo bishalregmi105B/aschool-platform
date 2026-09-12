@@ -216,3 +216,47 @@ Synthesis: `docs/COMPETITOR_CROSS_AUDIT_PLAN_2026-09-11.md` — 30 deduplicated 
 prioritized P0/P1/P2, mapped onto existing waves (S13+), with explicit rejections and 4 founder
 decisions (transport trip-model re-scope, accounting plugin candidate, LMS trio priority, zip
 sideload). No code changes.
+
+## 2026-09-12 — Competitor deep RE-audit v2 (implementation-level) + Master Execution Plan (planning only)
+
+Seven parallel one-agent-per-product line-level re-audits (routes → controllers → migrations →
+views/screens → 5 end-to-end feature traces each → field-to-field comparison vs ASchool →
+adopt/adapt/reject). Each report in `docs/competitor-audits/*.md` gained a top section
+`## Deep re-audit (v2) — implementation-level (2026-09-12)` (originals intact below):
+
+- `infixedu-v9.4.0.md` (587 L) — fees v2 exact math (invoice→chield→transaction approve path,
+  carry-forward signed balances, wallet, due-block cache), exam engine (components, dual
+  GPA/percent axes, custom-result weighting), student multi-year records + promote snapshot,
+  attendance P/L/A/F/H + subject-wise + absent-SMS cron; V2-01..V2-14 (wallet division bug,
+  default password, stale due cache, any-intersection MCQ scoring).
+- `eschool-v3.3.6.md` (479 L) — online-exam state machine exhaustive (2-state attempt created
+  pre-questions, answer key shipped to device, away>5 s auto-submit, client-only timer,
+  read-time scoring), fees/payment state machine, live classes confirmed fake, ops-flag wiring;
+  found OUR opposite bug: `submit_online_exam` lacks duplicate-attempt check → A-05 P0.
+- `mighty-school-pro-v1.6.md` (586 L) — GL is mostly single-entry w/ inverted journal columns +
+  two competing balance models; 7-point A-23 accounting mini-design (two-sided vouchers, no
+  stored balances, FY-start equity, one report SQL shape); fees 5-dim pricing + FIFO allocation;
+  V2-01..V2-14 incl. `call_user_func` success_hook RCE in all 13 gateways.
+- `eduex-lms-v2.0.md` (543 L) — locking is read-only theater (submit unchecked), certificates
+  derivable + PII leak, 7 unscoped payment verify endpoints, discussions w/ zero fan-out;
+  §V2.8 concrete adoption design for A-12/A-13/A-14 in ASchool conventions.
+- `instikit-school-v5.5.0.md` (507 L) — 16-table fee engine (waterfall installments, secondary
+  concession, dual verification), day closure till-lock, approval engine level machine, website
+  blocks (v1 correction: exports are Excel dumps); adoption designs for A-09/A-22/A-24/A-25/A-15;
+  V2-01..13 (unauthenticated integration surface, display-only seat caps, no lockForUpdate).
+- `schoolbustrack-v2.3.md` (521 L) — trip lifecycle crons + ride_status 0/1/2/3, geofence engine
+  w/ 5 radii + per-passenger triggers, coins double-spend; §V2.7 six-table transport schema
+  design (TIMESTAMPTZ, per-instance rooms, dual ingest) + §V2.9 driver MVP for A-10/A-11.
+- `infixedu-addon-modules.md` (479 L) — all 4 modules line-level: RazorPay 100x money-math bug +
+  secret leak; Zoom dead join guards + seeded vendor keys; Jitsi cross-tenant leak; ParentReg
+  login-gated as shipped. **V2-24 (our tree, P0): `VideoService` broken vs `LiveClass` (kwargs
+  mismatch, invalid status, zero route callers)** → folded into A-16.
+
+New plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` — per-project work-item tables (A-01..A-30
+refined ↻ + new A-31..A-37, A-38/A-39/A-41/A-42), ONE sequenced sprint list (S-A1..S-A5 P0
+adoption sprints → S13..S20 AI waves → S21+), extended do-not-adopt list, 10 founder decisions
+(none blocking). Execution priority per founder: P0 adoptions (A-01..A-11) first, then S13.
+
+No product code changed in this wave (docs only; the S12 red-team log append in
+`backend/audits/ai_redteam/known_failure_modes.md` rides along).
+
