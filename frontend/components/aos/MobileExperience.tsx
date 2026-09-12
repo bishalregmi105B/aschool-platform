@@ -128,7 +128,7 @@ export default function MobileExperience({
 
   // Convert all dynamic sidebar and bottom items into AOSApps
   const allApps: AOSApp[] = useMemo(() => {
-    const apps = sidebarItems.map(getAOSAppForModule);
+    const apps = sidebarItems.map((item) => getAOSAppForModule(item));
     // Add bottom nav items if not present
     for (const b of pluginBottomNav) {
       const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;

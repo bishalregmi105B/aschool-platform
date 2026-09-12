@@ -35,11 +35,13 @@ class UserAOSSettings(BaseModel):
     taskbar_align = Column(String(10), nullable=False, default="center")
     system_mode = Column(String(10), nullable=False, default="")
 
-    # Launcher organization: pinned dock apps, desktop folder layout, and
-    # the home widget board. Free-form JSON owned by the frontend.
+    # Launcher organization: pinned dock apps, desktop folder layout, the
+    # home widget board, and visible topbar items. Free-form JSON owned by
+    # the frontend.
     pinned_apps = Column(JSONB, nullable=False, default=list)
     desktop_folders = Column(JSONB, nullable=False, default=list)
     home_widgets = Column(JSONB, nullable=False, default=list)
+    topbar_items = Column(JSONB, nullable=False, default=list)
 
     def to_dict(self):
         return {
@@ -57,4 +59,5 @@ class UserAOSSettings(BaseModel):
             "pinned_apps": self.pinned_apps or [],
             "desktop_folders": self.desktop_folders or [],
             "home_widgets": self.home_widgets or [],
+            "topbar_items": self.topbar_items or [],
         }

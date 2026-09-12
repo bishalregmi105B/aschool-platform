@@ -17,10 +17,10 @@ import {
   AOSFinanceIcon,
   AOSSettingsIcon,
 } from "@/components/aos/AOSIcons";
-import { Trash2, LayoutGrid, Layers, Sparkles, Box } from "lucide-react";
+import { Trash2, LayoutGrid, Layers, Sparkles } from "lucide-react";
 import { WindowInstance, SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins, PluginSidebarItem } from "@/lib/plugins";
-import { normalizeAOSModuleId } from "@/lib/aos-app-adapter";
+import { getAOSAppForModule, normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 
 interface DynamicDockApp {
   id: string;
@@ -171,26 +171,11 @@ export default function Dock({
     if (seenSidebarApps.has(moduleId)) return;
     seenSidebarApps.add(moduleId);
 
+    const app = getAOSAppForModule(sb, iconPx);
     const entry = {
       id: moduleId,
-      title: sb.label,
-      icon: (
-        <div
-          style={{
-            width: `${iconPx}px`,
-            height: `${iconPx}px`,
-            borderRadius: "12px",
-            background: "linear-gradient(135deg, #10b981, #059669)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            boxShadow: "0 4px 10px rgba(16, 185, 129, 0.4)",
-          }}
-        >
-          <Box size={Math.round(iconPx * 0.52)} />
-        </div>
-      ),
+      title: app.name,
+      icon: app.icon,
     };
 
     if (!appCatalog[moduleId]) appCatalog[moduleId] = entry;

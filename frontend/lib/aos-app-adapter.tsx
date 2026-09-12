@@ -130,7 +130,7 @@ const SLUG_TO_DEDICATED_AOS_ICON: Record<string, React.ComponentType<{ size?: nu
   hr: AOSIcons.AOSFinanceIcon,
 };
 
-export function getAOSAppForModule(item: PluginSidebarItem): AOSApp {
+export function getAOSAppForModule(item: PluginSidebarItem, iconSize = 48): AOSApp {
   const moduleId = normalizeAOSModuleId(item.slug, item.route);
   const isHeavy = HEAVY_MODULE_SLUGS.has(moduleId);
   const { width: defaultWidth, height: defaultHeight } = getDefaultWindowSize(moduleId);
@@ -151,16 +151,18 @@ export function getAOSAppForModule(item: PluginSidebarItem): AOSApp {
     "linear-gradient(135deg, #0078D4 0%, #005A9E 100%)";
 
   const iconElement = DedicatedIcon ? (
-    <DedicatedIcon size={48} />
+    <DedicatedIcon size={iconSize} />
   ) : (
     <div
-      className="w-12 h-12 rounded-[14px] flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+      className="rounded-[14px] flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 active:scale-95"
       style={{
+        width: `${iconSize}px`,
+        height: `${iconSize}px`,
         background: gradient,
         boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
       }}
     >
-      {LucideComp ? <LucideComp className="w-6 h-6" /> : null}
+      {LucideComp ? <LucideComp size={Math.round(iconSize * 0.5)} /> : null}
     </div>
   );
 
