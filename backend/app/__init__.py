@@ -385,6 +385,16 @@ def create_app(config_name: str | None = None) -> Flask:
                 "task": "accrue_fee_fines_daily",
                 "schedule": crontab(hour=18, minute=50),
             },
+            # ── S-A4 transport: publish today's instances (every 5 min) +
+            # force-end stale runs (hourly) ─────────────────────────────
+            "publish-transport-instances": {
+                "task": "publish_transport_instances",
+                "schedule": 300.0,
+            },
+            "force-end-stale-transport": {
+                "task": "force_end_stale_transport",
+                "schedule": crontab(minute=40),
+            },
         },
     )
 

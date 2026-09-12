@@ -39,8 +39,14 @@ ui:
       route: /dashboard/transport/buses
     - label: Stops
       route: /dashboard/transport/stops
+    - label: Trips
+      route: /dashboard/transport/trips
+    - label: Monitor
+      route: /dashboard/transport/monitor
     - label: GPS Logs
       route: /dashboard/transport/logs
+    - label: Reports
+      route: /dashboard/transport/reports
 mobile:
   admin:
     feature_folder: transport

@@ -12,3 +12,4 @@ export 'lessons_provider.dart';
 export 'notices_provider.dart';
 export 'chat_provider.dart';
 export 'notification_provider.dart';
+export 'transport_provider.dart';

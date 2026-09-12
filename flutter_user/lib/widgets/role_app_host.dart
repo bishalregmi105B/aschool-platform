@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../features/transport/driver_runs_screen.dart';
 import '../screens/mode_selection_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/school_lookup_screen.dart';
@@ -28,7 +29,7 @@ class ASchoolUnifiedUserApp extends ConsumerWidget {
         case UserRoleTarget.parent:
           return const parent_app.ASchoolParentApp();
         case UserRoleTarget.teacher:
-          return const teacher_app.ASchoolTeacherApp();
+          return const StaffAppWithTransport();
         case UserRoleTarget.unsupported:
           return UnsupportedRoleApp(role: authState.user!.role);
       }
@@ -39,6 +40,48 @@ class ASchoolUnifiedUserApp extends ConsumerWidget {
     }
 
     return const _UserLoginApp();
+  }
+}
+
+/// S-A4: staff (drivers log in with teacher/staff accounts) get a Transport
+/// entry layered over their usual teacher app. Visibility is plugin-gated
+/// (gps_tracking); the runs screen itself is data — the backend only lists
+/// instances the caller is assigned to drive (or all runs for admin tokens).
+class StaffAppWithTransport extends ConsumerWidget {
+  const StaffAppWithTransport({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const app = teacher_app.ASchoolTeacherApp();
+
+    return PluginGate(
+      pluginSlug: 'gps_tracking',
+      fallback: app,
+      child: Stack(
+        children: [
+          app,
+          Positioned(
+            right: 16,
+            bottom: 104,
+            child: FloatingActionButton.extended(
+              heroTag: 'transportDriverEntry',
+              backgroundColor: ASchoolTheme.success,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.directions_bus_rounded),
+              label: const Text(
+                'Transport',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              onPressed: () {
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(builder: (_) => const DriverRunsScreen()),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

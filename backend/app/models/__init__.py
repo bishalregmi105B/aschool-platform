@@ -43,7 +43,18 @@ from app.models.chat import ChatThread, ChatMessage  # noqa: F401
 from app.models.slider import SchoolSlider  # noqa: F401
 from app.models.diary import DiaryCategory, DiaryEntry  # noqa: F401
 from app.models.assignment import Assignment, AssignmentSubmission  # noqa: F401
-from app.models.transport import Route, Bus, BusStop, GPSLog  # noqa: F401
+from app.models.transport import (  # noqa: F401
+    Route,
+    Bus,
+    BusStop,
+    GPSLog,
+    TransportTrip,
+    TransportTripInstance,
+    TransportTripInstanceStop,
+    TransportTripReservation,
+    TransportNotificationPref,
+    TransportAlertLog,
+)
 from app.models.library import (  # noqa: F401
     Book,
     BookCopy,

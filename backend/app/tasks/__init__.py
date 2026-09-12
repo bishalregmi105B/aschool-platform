@@ -43,5 +43,6 @@ from app.tasks import (  # noqa: E402, F401
     trial_expiry,
     ai_teacher,
     fees_depth,
+    transport_trips,
 )
 

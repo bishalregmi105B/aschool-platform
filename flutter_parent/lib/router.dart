@@ -13,6 +13,8 @@ import 'features/fees/invoices_screen.dart';
 import 'features/fees/payment_verification_screen.dart';
 import 'features/results/results_screen.dart';
 import 'features/bus_tracker/bus_tracking_screen.dart';
+import 'features/bus_tracker/trip_timeline_screen.dart';
+import 'features/bus_tracker/transport_notification_settings_screen.dart';
 import 'features/chat/parent_chat_screen.dart';
 import 'features/notices/parent_notices_screen.dart';
 import 'features/wellbeing/child_wellbeing_screen.dart';
@@ -65,6 +67,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (_, __) => const NotificationCenterScreen(),
+      ),
+      // S-A4 transport depth — full-screen trip + alert flows, plugin-gated
+      // per screen (gps_tracking, with the bus_tracking alias handled by
+      // PluginState's legacy slug expansion).
+      GoRoute(
+        path: '/transport/trips/:instanceId',
+        builder: (_, state) => TripTimelineScreen(
+          instanceId: state.pathParameters['instanceId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/transport/notification-settings',
+        builder: (_, __) => const TransportNotificationSettingsScreen(),
       ),
       // Fees depth (S-A1) — full-screen fee flows, plugin-gated per screen.
       GoRoute(
