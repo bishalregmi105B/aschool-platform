@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { Minus, Square, Copy, X, ChevronLeft } from "lucide-react";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
 import { resolveRouteComponent } from "./AOSRouteTable";
-import AOSAppFrame, { shouldUseAOSAppFrame } from "./AOSAppFrame";
 import { AOSWindowRouteProvider } from "@/lib/aos-window-route";
 import { SchoolRole } from "./RoleSwitcherModal";
 import type { EducationalPlugin } from "./apps/AppStoreApp";
@@ -148,7 +147,11 @@ export default function WindowManager({
   // Titlebar drag start
   const handleTitlebarPointerDown = (e: React.PointerEvent, win: WindowInstance) => {
     const target = e.target as HTMLElement;
-    if (target.closest(".win11-titlebar-controls") || target.tagName === "BUTTON") {
+    // Buttons in the titlebar (Back, minimize/maximize/close) render SVG
+    // children — pointerdown lands on the <svg>, not the <button>, so match
+    // any ancestor button via closest() instead of tagName. The snap-layout
+    // hover wrapper sits inside .win11-titlebar-controls, which is covered.
+    if (target.closest(".win11-titlebar-controls") || target.closest("button")) {
       return;
     }
 
@@ -326,9 +329,6 @@ export default function WindowManager({
         const isActive = activeWindowId === win.id;
         const isInteracting = draggingWindowId === win.id || resizingWindowId === win.id;
         const canGoBack = (win.routeHistory?.length ?? 0) > 0;
-        // The universal app frame wraps every plugin-module window except the
-        // apps that ship their own sidebar navigation.
-        const useAppFrame = shouldUseAOSAppFrame(win.moduleId);
 
         const windowStyle: React.CSSProperties = {
           position: "absolute",
@@ -611,43 +611,6 @@ export default function WindowManager({
               }}
             >
               <AOSWindowRouteProvider route={win.route || `/dashboard/${win.moduleId || win.id}`}>
-              {useAppFrame ? (
-                <AOSAppFrame window={win}>
-                  <ResolvedComponent
-                    window={win}
-                    pluginId={win.id}
-                    currentRole={currentRole}
-                    accentColor={accentColor}
-                    themeMode={themeMode}
-                    onToggleTheme={onToggleTheme}
-                    wallpaper={wallpaper}
-                    onChangeWallpaper={onChangeWallpaper}
-                    dockStyle={dockStyle}
-                    onChangeDockStyle={onChangeDockStyle}
-                    dockSize={dockSize}
-                    onChangeDockSize={onChangeDockSize}
-                    showTopBar={showTopBar}
-                    onToggleTopBar={onToggleTopBar}
-                    topBarHeight={topBarHeight}
-                    onChangeTopBarHeight={onChangeTopBarHeight}
-                    blurIntensity={blurIntensity}
-                    onChangeBlurIntensity={onChangeBlurIntensity}
-                    taskbarAlign={taskbarAlign}
-                    onToggleTaskbarAlign={onToggleTaskbarAlign}
-                    brightness={brightness}
-                    onChangeBrightness={onChangeBrightness}
-                    onOpenRoleSwitcher={onOpenRoleSwitcher}
-                    pinnedAppIds={pinnedAppIds}
-                    onTogglePinApp={onTogglePinApp}
-                    plugins={plugins}
-                    onToggleInstallPlugin={onToggleInstallPlugin}
-                    onToggleActivePlugin={onToggleActivePlugin}
-                    onPurchasePlugin={onPurchasePlugin}
-                    onUpdatePluginRoles={onUpdatePluginRoles}
-                    onLaunchPluginDemo={onLaunchPluginDemo}
-                  />
-                </AOSAppFrame>
-              ) : (
                 <ResolvedComponent
                   window={win}
                   pluginId={win.id}
@@ -681,7 +644,6 @@ export default function WindowManager({
                   onUpdatePluginRoles={onUpdatePluginRoles}
                   onLaunchPluginDemo={onLaunchPluginDemo}
                 />
-              )}
               </AOSWindowRouteProvider>
             </div>
           </div>

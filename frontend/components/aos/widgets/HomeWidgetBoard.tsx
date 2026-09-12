@@ -2,33 +2,44 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Pencil, Plus, RotateCcw, Check, X } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
 import { useAOSUserSettings } from "@/lib/aos-settings";
 import { DataPanel, AOSEmptyState } from "@/components/aos/kit/page-kit";
-import type { AOSWidgetDefinition } from "./registry";
 import {
-  getWidgetsForRole,
+  parseDesktopLayout,
+  type AOSDesktopLayout,
+} from "@/lib/aos-launcher";
+import type { AOSWidgetDefinition, AOSWidgetSize } from "./registry";
+import {
+  useWidgetAvailability,
+  defaultWidgetSize,
+  nextWidgetSize,
   getWidgetDefinition,
   normalizeHomeWidgets,
 } from "./registry";
 
-/** Tailwind span classes per defaultSpan, keyed to the board's 3-col grid. */
-const SPAN_CLASSES: Record<number, string> = {
-  1: "",
-  2: "md:col-span-2",
-  3: "md:col-span-2 lg:col-span-3",
+/** Tailwind span classes per widget size, keyed to the board's 3-col grid. */
+const SIZE_SPAN_CLASSES: Record<AOSWidgetSize, string> = {
+  s: "",
+  m: "md:col-span-2",
+  l: "md:col-span-2 lg:col-span-3",
 };
+
+const SIZE_LABELS: Record<AOSWidgetSize, string> = { s: "S", m: "M", l: "L" };
 
 function EditChromeButton({
   label,
   onClick,
   disabled,
   children,
+  className,
+  style,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <button
@@ -37,10 +48,48 @@ function EditChromeButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-[var(--w11-radius-sm)] border border-[color:var(--w11-border-default)] transition-colors hover:bg-[color:var(--w11-control-hover)] disabled:opacity-40 disabled:pointer-events-none"
-      style={{ color: "var(--w11-text-secondary)" }}
+      className={className ? `commandbar-button ${className}` : "commandbar-button"}
+      style={{
+        minHeight: 24,
+        minWidth: 24,
+        padding: "2px 6px",
+        ...style,
+      }}
     >
       {children}
+    </button>
+  );
+}
+
+/**
+ * Size cycle pill — accent-filled so the current S/M/L size reads at a glance;
+ * clicking cycles to the next size (shared with the desktop column).
+ */
+function SizePillButton({
+  size,
+  onClick,
+}: {
+  size: AOSWidgetSize;
+  onClick: () => void;
+}) {
+  const next = nextWidgetSize(size);
+  return (
+    <button
+      type="button"
+      className="accent"
+      title={`Cycle size (currently ${SIZE_LABELS[size]} → ${SIZE_LABELS[next]})`}
+      aria-label={`Cycle widget size, currently ${SIZE_LABELS[size]}`}
+      onClick={onClick}
+      style={{
+        fontSize: "11px",
+        fontWeight: 700,
+        lineHeight: 1.4,
+        padding: "2px 10px",
+        minHeight: 24,
+        borderRadius: "var(--w11-radius-full)",
+      }}
+    >
+      {SIZE_LABELS[size]}
     </button>
   );
 }
@@ -50,8 +99,10 @@ function EditChromeButton({
  *
  * The board order/selection lives in the per-user AOS settings
  * (home_widgets, persisted via useAOSUserSettings → PUT /auth/aos-settings;
- * empty list = role defaults). Every edit (add/remove/reorder/reset) writes
- * the full list immediately — the hook debounces the network PUT.
+ * empty list = role defaults). Widget availability matches the desktop
+ * column exactly: system widgets for every role, plugin widgets only while
+ * their plugin is installed. Sizes (S/M/L → 1/2/3 grid columns) are shared
+ * with the desktop widget column via desktop_layout.widgetLayout.
  *
  * Route opening: widgets render plain anchors, which the AOS WindowManager
  * intercepts (handleInternalAnchorNavigation) and converts into windows, so
@@ -63,17 +114,20 @@ export default function HomeWidgetBoard({
 }: {
   onOpenRoute?: (route: string) => void;
 }) {
-  const { user } = useAuth();
-  const role = user?.role;
   const { settings, updateSettings } = useAOSUserSettings();
+  const { role, installedSlugs, availableWidgets } = useWidgetAvailability();
   const [isEditing, setIsEditing] = useState(false);
 
   const board = useMemo(
-    () => normalizeHomeWidgets(settings.home_widgets, role),
-    [settings.home_widgets, role]
+    () => normalizeHomeWidgets(settings.home_widgets, role, installedSlugs),
+    [settings.home_widgets, role, installedSlugs]
   );
 
-  const availableWidgets = useMemo(() => getWidgetsForRole(role), [role]);
+  const desktopLayout: AOSDesktopLayout = useMemo(
+    () => parseDesktopLayout(settings.desktop_layout),
+    [settings.desktop_layout]
+  );
+
   const addableWidgets = useMemo(
     () => availableWidgets.filter((widget) => !board.includes(widget.key)),
     [availableWidgets, board]
@@ -97,6 +151,30 @@ export default function HomeWidgetBoard({
   const addWidget = (key: string) => persistBoard([...board, key]);
 
   const resetBoard = () => persistBoard([]);
+
+  /** Cycle a widget's size (S → M → L → S), shared with the desktop column. */
+  const cycleWidgetSize = (key: string) => {
+    const definition = getWidgetDefinition(key);
+    const current: AOSWidgetSize =
+      desktopLayout.widgetLayout[key]?.size ??
+      (definition ? defaultWidgetSize(definition) : "s");
+    const next = nextWidgetSize(current);
+    const order =
+      desktopLayout.widgetLayout[key]?.order ??
+      board.reduce(
+        (max, k, i) => Math.max(max, desktopLayout.widgetLayout[k]?.order ?? i),
+        0
+      ) + 1;
+    updateSettings({
+      desktop_layout: {
+        ...settings.desktop_layout,
+        widgetLayout: {
+          ...desktopLayout.widgetLayout,
+          [key]: { size: next, order },
+        },
+      },
+    });
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -148,10 +226,12 @@ export default function HomeWidgetBoard({
         {board.map((key, index) => {
           const definition = getWidgetDefinition(key);
           if (!definition) return null;
+          const size: AOSWidgetSize =
+            desktopLayout.widgetLayout[key]?.size ?? defaultWidgetSize(definition);
           return (
             <div
               key={key}
-              className={`flex flex-col gap-1.5 ${SPAN_CLASSES[definition.defaultSpan] ?? ""}`}
+              className={`flex flex-col gap-1.5 ${SIZE_SPAN_CLASSES[size]}`}
             >
               {isEditing && (
                 <div
@@ -166,6 +246,10 @@ export default function HomeWidgetBoard({
                     {definition.title}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
+                    <SizePillButton
+                      size={size}
+                      onClick={() => cycleWidgetSize(key)}
+                    />
                     <EditChromeButton
                       label="Move up"
                       onClick={() => moveWidget(key, -1)}

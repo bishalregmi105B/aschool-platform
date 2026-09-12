@@ -19,6 +19,7 @@ import { useServerTime } from "@/lib/use-server-time";
 import { useAuth } from "@/lib/auth-context";
 import { LanguageToggle } from "@/components/aos/LanguageToggle";
 import { useAOSNavigate } from "@/lib/aos-window-route";
+import { useI18n } from "@/lib/i18n";
 import { normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 import { DEFAULT_TOPBAR_ITEMS } from "@/lib/aos-settings";
 
@@ -26,9 +27,11 @@ import { DEFAULT_TOPBAR_ITEMS } from "@/lib/aos-settings";
 export interface TopMenuBarNavItem {
   slug: string;
   label: string;
+  /** Nepali manifest label — rendered when the i18n language is "ne". */
+  label_nepali?: string | null;
   section?: string | null;
   route?: string | null;
-  subitems?: Array<{ label: string; route: string }>;
+  subitems?: Array<{ label: string; label_nepali?: string | null; route: string }>;
 }
 
 /** Open-window info the menu bar needs (structural subset of WindowInstance). */
@@ -355,6 +358,13 @@ export default function TopMenuBar({
   // touching the browser URL (provided by the shell's AOSNavigateProvider).
   const aosNavigate = useAOSNavigate();
 
+  // Bilingual manifest labels — Nepali renders when the language toggle is "ne".
+  const { lang } = useI18n();
+  const pickLabel = useCallback(
+    (en: string, ne?: string | null) => (lang === "ne" && ne ? ne : en),
+    [lang]
+  );
+
   // Responsive: below 1100px the section menus collapse into a single
   // "Sections" menu and the mode-switcher pill hides.
   const [viewportWidth, setViewportWidth] = useState(1280);
@@ -412,20 +422,21 @@ export default function TopMenuBar({
   );
 
   // Dynamic section menus from plugin manifests — group modules by their
-  // manifest section (desktop view only).
+  // manifest section (desktop view only). Manifest Nepali labels render
+  // when the i18n language is "ne".
   const sectionMenus = useMemo(() => {
     const groups = new Map<string, { id: string; name: string }[]>();
     for (const item of sidebarItems || []) {
       const section = item.section;
       if (!section || section === "bottom_nav") continue;
       const list = groups.get(section) || [];
-      list.push({ id: item.slug, name: item.label });
+      list.push({ id: item.slug, name: pickLabel(item.label, item.label_nepali) });
       groups.set(section, list);
     }
     return [...groups.entries()]
       .map(([name, apps]) => ({ name, apps }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sidebarItems]);
+  }, [sidebarItems, pickLabel]);
 
   // The focused window and its manifest entry — these drive the macOS-style
   // focused-app menus (Navigate / Window / Help).
@@ -457,15 +468,19 @@ export default function TopMenuBar({
     return item ? { item, moduleId: targetId || item.slug } : null;
   }, [activeWindow, sidebarItems]);
 
-  const appName = activeModule?.item.label || activeWindow?.title || "AOS";
+  const appName =
+    pickLabel(activeModule?.item.label || "", activeModule?.item.label_nepali) ||
+    activeWindow?.title ||
+    "AOS";
 
   // Navigate menu entries: the module hub itself plus the manifest's
-  // sub-pages (deduped by route path).
+  // sub-pages (deduped by route path). Nepali subitem labels render when
+  // the i18n language is "ne".
   const navigateMenuEntries = useMemo(() => {
     if (!activeModule) return [];
     const hubRoute = activeModule.item.route || `/dashboard/${activeModule.moduleId}`;
     const entries: Array<{ label: string; route: string }> = [
-      { label: `${activeModule.item.label} Home`, route: hubRoute },
+      { label: `${appName} Home`, route: hubRoute },
     ];
     const seen = new Set([hubRoute.split("?")[0]]);
     for (const sub of activeModule.item.subitems || []) {
@@ -473,10 +488,10 @@ export default function TopMenuBar({
       const path = sub.route.split("?")[0];
       if (seen.has(path)) continue;
       seen.add(path);
-      entries.push({ label: sub.label, route: sub.route });
+      entries.push({ label: pickLabel(sub.label, sub.label_nepali), route: sub.route });
     }
     return entries;
-  }, [activeModule]);
+  }, [activeModule, appName, pickLabel]);
 
   const openWindows = useMemo(
     () => (windows || []).filter((w) => w.isOpen !== false),

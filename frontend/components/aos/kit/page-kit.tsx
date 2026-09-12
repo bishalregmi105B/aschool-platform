@@ -123,7 +123,12 @@ export function KpiCard({
 }) {
   const valueColor = color || "var(--w11-accent)";
   return (
-    <div className={cn("win11-card", className)} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+    <div
+      className={cn("win11-card", className)}
+      // margin: 0 — KPI cards live in grids (StatGrid) whose gap owns the
+      // spacing; the 11.css card bottom margin would double it to 24px.
+      style={{ display: "flex", flexDirection: "column", gap: "4px", margin: 0 }}
+    >
       <span
         className="text-[11px] font-semibold uppercase"
         style={{ color: "var(--w11-text-secondary)" }}

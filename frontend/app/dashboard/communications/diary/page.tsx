@@ -252,8 +252,8 @@ function DiaryContent() {
                   {attachmentFiles.map((file) => (
                     <span
                       key={file.id}
-                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
-                      style={{ borderColor: "var(--w11-border-default)", background: "var(--w11-control-bg)" }}
+                      title={file.original_name}
+                      className="win11-chip accent"
                     >
                       <span className="max-w-[160px] truncate">{file.original_name}</span>
                       <button
