@@ -283,6 +283,8 @@ export default function MobileExperience({
 
   return (
     <div
+      className={`ios-mobile-screen win11 aos-gpu-accel ${themeMode === "dark" ? "dark" : ""}`}
+      data-theme={themeMode}
       style={{
         position: "fixed",
         inset: 0,
@@ -576,8 +578,8 @@ export default function MobileExperience({
             position: "fixed",
             inset: 0,
             zIndex: 10030,
-            background: "var(--background, #ffffff)",
-            color: "var(--foreground, #000000)",
+            background: "var(--w11-window-bg, #ffffff)",
+            color: "var(--w11-text-primary, #000000)",
             display: "flex",
             flexDirection: "column",
             animation: "iosModalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -591,8 +593,8 @@ export default function MobileExperience({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              borderBottom: "1px solid rgba(0,0,0,0.08)",
-              background: "var(--background, #ffffff)",
+              borderBottom: "1px solid var(--w11-border-subtle, rgba(0,0,0,0.08))",
+              background: "var(--w11-window-bg, #ffffff)",
               flexShrink: 0,
             }}
           >
@@ -643,7 +645,10 @@ export default function MobileExperience({
             {activeAppComponent ? (
               React.createElement(activeAppComponent, {})
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">
+              <div
+                className="p-8 text-center text-sm"
+                style={{ color: "var(--w11-text-secondary)" }}
+              >
                 Loading module {activeApp}...
               </div>
             )}
