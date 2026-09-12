@@ -4,6 +4,10 @@ Pipeline: ESP32 device -> Firebase RTDB -> poll_firebase_gps (beat, 15 s)
           -> process_gps_data (persist + Socket.IO broadcast)
           -> check_geofence_alerts (route-deviation alerts).
 """
+
+import logging
+
+logger = logging.getLogger(__name__)
 from extensions import celery
 
 _GPS_EMITTER = None
@@ -102,6 +106,31 @@ def process_gps_data(
         },
         room=f"school-{bus.school_id}",
     )
+
+    # S-A4 (A-10): dual ingest — the ESP32 fix feeds the SAME trip geofence
+    # engine a driver-phone fix would, so hardware is optional, not
+    # exclusive. Only the bus's RUNNING instance for today is relevant.
+    try:
+        from app.models.transport import TransportTripInstance
+
+        instance = (
+            TransportTripInstance.query.filter(
+                TransportTripInstance.school_id == bus.school_id,
+                TransportTripInstance.bus_id == bus.id,
+                TransportTripInstance.status == "running",
+                TransportTripInstance.is_deleted.is_(False),
+            )
+            .order_by(TransportTripInstance.date.desc())
+            .first()
+        )
+        if instance is not None:
+            from app.services import transport_service
+
+            transport_service.ingest_position(
+                str(bus.school_id), instance, float(lat), float(lng), speed
+            )
+    except Exception:  # noqa: BLE001 — trip tracking must not break telemetry
+        logger.exception("trip geofence ingest failed for bus %s", bus.id)
 
     return {
         "status": "ok",

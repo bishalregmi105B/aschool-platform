@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 import '../../providers/parent_providers.dart';
+import 'todays_trips_section.dart';
 
 class BusTrackingScreen extends ConsumerStatefulWidget {
   const BusTrackingScreen({super.key});
@@ -132,6 +133,8 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
       child: Column(
         children: [
           const SizedBox(height: 14),
+          // S-A4: today's per-direction trip cards above the live map.
+          const TodaysTripsSection(),
           Expanded(
             flex: 6,
             child: Padding(

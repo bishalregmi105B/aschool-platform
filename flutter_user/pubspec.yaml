@@ -23,6 +23,9 @@ dependencies:
   shared_preferences: ^2.5.3
   onesignal_flutter: ^5.2.6
   dio: ^5.4.3
+  # S-A4 driver MVP — GPS streaming + screen wake lock while a run is active
+  geolocator: any
+  wakelock_plus: ^1.3.0
 
 
 dev_dependencies:

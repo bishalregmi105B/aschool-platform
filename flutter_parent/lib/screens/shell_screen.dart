@@ -201,6 +201,12 @@ class ParentShellScreen extends ConsumerWidget {
           moduleKey: 'bus_tracker',
           customVisible: _busTrackingVisible),
       _ParentDrawerItem(
+          icon: Icons.notifications_active_rounded,
+          title: 'Transport Alerts',
+          path: '/transport/notification-settings',
+          moduleKey: 'bus_tracker',
+          customVisible: _busTrackingVisible),
+      _ParentDrawerItem(
           icon: Icons.favorite_rounded,
           title: 'Wellbeing',
           path: '/wellbeing',

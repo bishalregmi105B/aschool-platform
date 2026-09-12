@@ -287,6 +287,29 @@ existing fees suites 9/9; plugin widgets + contract + S0 suites 36/36; drift gat
 `flutter analyze` 0 errors (shared/parent/student/teacher). Full-suite run per founder instruction:
 NOT run for this sprint (targeted suites only).
 
+## 2026-09-12 — S-A4: Transport trip lifecycle (branch `feat/sa4-transport`)
+
+Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A4 (A-10 trip model + A-11 notifications/
+driver flow + A-42 reports) — the SchoolBusTrack 4-layer model rebuilt for multi-tenant PG.
+
+| ID | What landed | Files |
+|---|---|---|
+| A-10 | **Trip lifecycle schema**: `transport_trips` (recurring definition w/ weekday calendar + BS effective date) → `transport_trip_instances` (unique per date, driver/bus snapshots, last GPS fix, status scheduled→running→completed/cancelled) → `transport_trip_instance_stops` (per-stop planned/actual TIMESTAMPTZ) → `transport_trip_reservations` (ride_status 0 waiting/1 onboard/2 missed/3 dropped + boarded/dropped ts) | `backend/app/models/transport.py`, `migrations/versions/s_a4_transport_trips.py` |
+| A-10 | **Geofence engine + service**: haversine + configurable radii (School.settings `transport`), strict in-order stop visits, arrival auto-mark ONLY when nobody is waiting (anti-false-arrival), per-passenger trigger matrix honoring per-student prefs + 30-min dedupe (query-based — PG forbids now() in index predicates), board/missed/drop-off state machine, end-refused-while-onboard guard, stale-run force-end | `backend/app/services/transport_service.py` (new) |
+| A-10 | **Dual ingest**: driver-phone `POST /transport/instances/<id>/position` (3 s server throttle, GPSLog parity) AND the ESP32 path (`process_gps_data` now feeds running instances through the same engine) — hardware optional, not exclusive | `api/v1/transport.py`, `tasks/gps_processing.py` |
+| A-10 | **API**: trips CRUD (weekday/BS validation), instance monitor w/ driver self-scoping, start/end (409 `{onboard}`), pickup `{missed?}`, bulk drop-off, instance detail (stops+passengers; parents only read their children's runs) | `api/v1/transport.py` |
+| A-11 | **Notification prefs**: `transport_notification_prefs` (7 event toggles + per-student radii), parent-scoped GET/PUT; alerts → guardian in-app + `transport.*` events | `models/transport.py`, `services/transport_service.py`, `api/v1/transport.py` |
+| A-10/A-11 | **Beat tasks**: publish today's instances (every 5 min, idempotent) + force-end stale running (hourly); registered in beat schedule | `tasks/transport_trips.py` (new), `app/__init__.py`, `tasks/__init__.py` |
+| A-42 | **Reports**: missed-pickup register + trip history (stops visited/on-time, boarded/missed counts) | `api/v1/transport.py` |
+| Web | Trips manager (create/edit/retire), run monitor (timeline + passenger actions + 409-onboard surface), reports tabs w/ CSV | `frontend/app/dashboard/transport/{trips,monitor,reports}/page.tsx`, gps_tracking manifest nav |
+| Mobile | Parent: today's-trips cards + stop timeline (actual vs planned) + per-student notification settings (7 toggles + radius); Driver MVP in flutter_user (Start, GPS stream w/ 3 s throttle + wakelock, Board/Missed/Drop-off, End w/ 409 dialog) | `aschool_shared/lib/{models/transport,repositories/transport_repository,providers/transport_provider}.dart`, `flutter_parent/lib/features/bus_tracker/*` (3 new screens), `flutter_user/lib/features/transport/*` (2 new screens) |
+
+**Verification:** `tests/test_sa4_transport.py` 8/8 (CRUD validation, publication idempotency +
+reservations from stop assignment, geofence arrival/pickup/dedupe/drop-off flow, missed-pickup,
+end-refused-while-onboard, prefs scoping, reports, ESP32 dual ingest); cross-sprint S-A1+S-A3
+20/20; drift gate PASS (0 blocking / 494); plugin_doctor 49/0/0; `tsc --noEmit` clean;
+`flutter analyze` 0 errors (shared/parent/user).
+
 ## 2026-09-12 — S-A3: Platform services (branch `feat/sa3-platform-services`)
 
 Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A3 (A-02 notification matrix + P-F events
