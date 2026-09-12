@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { GraduationCap, LayoutDashboard, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { displayBS } from "@/lib/nepali_date";
@@ -67,7 +67,7 @@ export default function WidgetsPanel({
   accentColor = "#0078d4",
   onOpenRoute,
 }: WidgetsPanelProps) {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const { user } = useAuth();
   const role = user?.role;
 
@@ -80,7 +80,7 @@ export default function WidgetsPanel({
         return;
       }
       onClose();
-      router.push(route);
+      router(route);
     },
     [onOpenRoute, onClose, router]
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import {
   Bell,
   X,
@@ -47,7 +47,7 @@ export default function NotificationCenter({
   onClearAll: propOnClearAll,
   onDismiss: propOnDismiss,
 }: NotificationCenterProps) {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const [liveNotifications, setLiveNotifications] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -117,7 +117,7 @@ export default function NotificationCenter({
       if (internalRoute && onOpenRoute) {
         onOpenRoute(internalRoute);
       } else {
-        router.push(item.action_url);
+        router(item.action_url);
       }
       onClose();
     } else if (onOpenApp) {

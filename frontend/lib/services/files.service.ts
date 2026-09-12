@@ -99,6 +99,18 @@ export async function deleteFolder(id: string): Promise<void> {
   await api.delete(`/files/folders/${id}`);
 }
 
+/**
+ * Rename a folder (PATCH /files/folders/<id>).
+ * NOTE: requires a backend route accepting PATCH on /files/folders/<id>;
+ * older backends only expose DELETE and will return 405 for this call.
+ */
+export async function renameFolder(id: string, name: string): Promise<FileFolder> {
+  const res = await api.patch<ApiResponse<FileFolder>>(`/files/folders/${id}`, {
+    name,
+  });
+  return res.data.data;
+}
+
 // ── File Service Functions ─────────────────────────────────────────────────
 
 export async function listFiles(
@@ -186,6 +198,14 @@ export async function updateFile(
     payload,
   );
   return res.data.data;
+}
+
+/** Rename a file (PATCH /files/<id> with a new original_name). */
+export async function renameFile(
+  id: string,
+  originalName: string,
+): Promise<ManagedFile> {
+  return updateFile(id, { original_name: originalName });
 }
 
 export async function deleteFile(id: string): Promise<void> {

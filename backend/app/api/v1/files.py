@@ -125,6 +125,27 @@ def create_folder():
     return created_response(folder.to_dict())
 
 
+@files_bp.route("/folders/<uuid:folder_id>", methods=["PATCH"])
+@jwt_required()
+@school_required
+@plugin_required("file_management")
+@role_required("school_admin", "teacher")
+def rename_folder(folder_id):
+    """Rename a folder."""
+    folder = FileFolder.query.filter_by(id=folder_id, school_id=g.school_id, is_deleted=False).first()
+    if not folder:
+        return error_response("Folder not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name or len(name) > 120:
+        return error_response("Folder name must be 1-120 characters", 400)
+
+    folder.name = name
+    db.session.commit()
+    return success_response(folder.to_dict())
+
+
 @files_bp.route("/folders/<uuid:folder_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
