@@ -252,3 +252,163 @@
   height: 38px;
   min-width: 46px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM DESIGN STUDIO (CANVA + MS WORD 365) POLISH
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Sleek Custom Scrollbars (eliminates ugly 16px OS scrollbars) ────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+
+/* ── Canva-style Surface Cards ───────────────────────────────────────────── */
+.canva-card {
+  background: var(--w11-control-bg, rgba(255, 255, 255, 0.8));
+  border: 1px solid var(--w11-border-default, rgba(226, 232, 240, 0.8));
+  border-radius: 14px;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dark .canva-card {
+  background: rgba(30, 41, 59, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.canva-card:hover {
+  border-color: var(--primary, #0078d4);
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Canva-style Sidebar Button ──────────────────────────────────────────── */
+.canva-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 60px;
+  height: 56px;
+  border-radius: 14px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--muted-foreground);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  user-select: none;
+}
+.canva-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--foreground);
+  transform: translateY(-1px);
+}
+.dark .canva-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.canva-icon-btn.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 3px 12px -2px rgba(0, 0, 0, 0.18);
+}
+
+/* ── MS Word 365 Ribbon Styling ─────────────────────────────────────────── */
+.word-ribbon-tab {
+  position: relative;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.word-ribbon-tab:hover {
+  background: rgba(241, 245, 249, 0.9);
+  color: #0f172a;
+}
+.word-ribbon-tab.active {
+  background: #ffffff;
+  color: #0078d4;
+  font-weight: 600;
+}
+.word-ribbon-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 2.5px;
+  background: #0078d4;
+  border-radius: 2px 2px 0 0;
+}
+.dark .word-ribbon-tab {
+  color: #94a3b8;
+}
+.dark .word-ribbon-tab:hover {
+  background: rgba(30, 41, 59, 0.6);
+  color: #f8fafc;
+}
+.dark .word-ribbon-tab.active {
+  background: #1e293b;
+  color: #38bdf8;
+}
+.dark .word-ribbon-tab.active::after {
+  background: #38bdf8;
+}
+
+/* ── Word Quick Styles Gallery Tile ─────────────────────────────────────── */
+.word-style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  min-width: 64px;
+  height: 48px;
+  border-radius: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #ffffff;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.dark .word-style-tile {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.word-style-tile:hover {
+  border-color: #0078d4;
+  background: #f0f7ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.12);
+}
+.dark .word-style-tile:hover {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+.word-style-tile.active {
+  border-color: #0078d4;
+  background: #e6f2ff;
+  box-shadow: 0 0 0 1px #0078d4;
+}
+.dark .word-style-tile.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+

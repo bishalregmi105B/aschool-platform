@@ -764,46 +764,67 @@ function WriterContent() {
     >
       <style>{TOKEN_CSS}</style>
 
-      {/* Title bar */}
+      {/* Title bar — MS Word 365 Style */}
       <div
-        className={`flex items-center gap-2 px-3 h-12 shrink-0 ${focusMode ? "hidden" : ""}`}
-        style={{
-          background: "var(--w11-surface-solid)",
-          borderBottom: "1px solid var(--w11-border-default)",
-        }}
+        className={`flex items-center gap-2.5 px-3.5 h-12 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 ${focusMode ? "hidden" : ""}`}
       >
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router("/dashboard/designer")}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => router("/dashboard/designer")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <Input value={docName} onChange={(e) => { setDocName(e.target.value); setDirty(true); }} className="w-52 h-7 text-sm font-medium" />
-        <span className="text-[10px] hidden md:inline" style={{ color: "var(--w11-text-tertiary)" }}>writer2 · word-mode</span>
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-[#0078d4] shrink-0" />
+          <Input
+            value={docName}
+            onChange={(e) => { setDocName(e.target.value); setDirty(true); }}
+            className="w-56 h-8 text-sm font-semibold border-transparent hover:border-border focus:border-[#0078d4] bg-transparent hover:bg-muted/40 transition-colors rounded-lg px-2"
+          />
+        </div>
+        <span className="text-[11px] hidden md:flex items-center gap-1.5 text-muted-foreground font-medium">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Word Document
+        </span>
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}>
-            <BookOpen className="h-3.5 w-3.5" /> Research &amp; AI
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium" onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}>
+            <BookOpen className="h-3.5 w-3.5 text-violet-500" /> Research &amp; AI
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowTokenBar(!showTokenBar)}>
-            <Braces className="h-3.5 w-3.5" /> Tokens
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium" onClick={() => setShowTokenBar(!showTokenBar)}>
+            <Braces className="h-3.5 w-3.5 text-blue-500" /> Tokens
           </Button>
-          <Button size="sm" className="h-7 text-xs gap-1" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+          <Button
+            size="sm"
+            className="h-8 text-xs gap-1.5 rounded-lg bg-[#0078d4] hover:bg-[#106ebe] text-white font-medium shadow-xs"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+          >
             {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
-                <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1 rounded-lg border-slate-300 dark:border-slate-700 font-medium hover:border-[#0078d4]">
+                <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={doExportDocx} disabled={exporting}>
-                {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                Word Document (.docx)
+            <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-border">
+              <DropdownMenuItem onClick={doExportDocx} disabled={exporting} className="gap-2 cursor-pointer">
+                {exporting ? <Loader2 className="h-4 w-4 animate-spin text-[#0078d4]" /> : <FileText className="h-4 w-4 text-[#0078d4]" />}
+                <div className="flex flex-col">
+                  <span className="font-semibold text-xs">Word Document (.docx)</span>
+                  <span className="text-[10px] text-muted-foreground">Editable in Microsoft Word</span>
+                </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => pdfMutation.mutate()}>
-                <FileOutput className="h-4 w-4 mr-2" /> PDF — Print-ready (server)
+              <DropdownMenuItem onClick={() => pdfMutation.mutate()} className="gap-2 cursor-pointer">
+                <FileOutput className="h-4 w-4 text-red-500" />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-xs">PDF — Print Ready</span>
+                  <span className="text-[10px] text-muted-foreground">Server-rendered with fonts</span>
+                </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.print()}>
-                <Download className="h-4 w-4 mr-2" /> Print / Save as PDF (browser)
+              <DropdownMenuItem onClick={() => window.print()} className="gap-2 cursor-pointer">
+                <Download className="h-4 w-4 text-amber-500" />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-xs">Browser Print / PDF</span>
+                  <span className="text-[10px] text-muted-foreground">Quick browser print</span>
+                </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {
@@ -813,8 +834,8 @@ function WriterContent() {
                 a.href = URL.createObjectURL(blob);
                 a.download = `${slugifyName(docName)}.html`;
                 a.click();
-              }}>
-                Download HTML
+              }} className="text-xs">
+                Export raw HTML
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

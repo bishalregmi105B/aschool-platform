@@ -72,74 +72,72 @@ export default function PropertiesPanel({ canvas }: Props) {
   const isImage = obj.type === "image";
 
   return (
-    <div className="p-3 space-y-4 text-sm overflow-y-auto h-full">
+    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar">
 
       {/* Position & Size */}
-      <div>
-        <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">Position & Size</p>
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
+        <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Transform &amp; Dimensions</p>
         <div className="grid grid-cols-2 gap-2">
           {[
             ["X", "left"],
             ["Y", "top"],
           ].map(([label, prop]) => (
-            <div key={prop}>
-              <Label className="text-xs">{label}</Label>
-              <Input type="number" className="h-7 text-xs" value={Math.round(obj[prop] ?? 0)}
+            <div key={prop} className="relative flex items-center">
+              <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">{label}</span>
+              <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={Math.round(obj[prop] ?? 0)}
                 onChange={(e) => set({ [prop]: Number(e.target.value) })} />
             </div>
           ))}
-          <div>
-            <Label className="text-xs">W</Label>
-            <Input type="number" className="h-7 text-xs"
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">W</span>
+            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl"
               value={Math.round(obj.getScaledWidth?.() ?? obj.width ?? 0)}
               onChange={(e) => set({ scaleX: Number(e.target.value) / (obj.width || 1) })} />
           </div>
-          <div>
-            <Label className="text-xs">H</Label>
-            <Input type="number" className="h-7 text-xs"
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">H</span>
+            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl"
               value={Math.round(obj.getScaledHeight?.() ?? obj.height ?? 0)}
               onChange={(e) => set({ scaleY: Number(e.target.value) / (obj.height || 1) })} />
           </div>
         </div>
-      </div>
 
-      {/* Rotation */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rotation</Label>
-          <span className="text-xs">{Math.round(obj.angle ?? 0)}°</span>
+        {/* Rotation & Opacity */}
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-[10px] font-medium text-muted-foreground">Rotation</Label>
+              <span className="text-[10px] font-mono text-foreground font-semibold">{Math.round(obj.angle ?? 0)}°</span>
+            </div>
+            <Slider min={0} max={360} step={1} value={[obj.angle ?? 0]}
+              onValueChange={([v]) => set({ angle: v })} />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-[10px] font-medium text-muted-foreground">Opacity</Label>
+              <span className="text-[10px] font-mono text-foreground font-semibold">{Math.round((obj.opacity ?? 1) * 100)}%</span>
+            </div>
+            <Slider min={0} max={100} step={1} value={[Math.round((obj.opacity ?? 1) * 100)]}
+              onValueChange={([v]) => set({ opacity: v / 100 })} />
+          </div>
         </div>
-        <Slider min={0} max={360} step={1} value={[obj.angle ?? 0]}
-          onValueChange={([v]) => set({ angle: v })} />
       </div>
-
-      {/* Opacity */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Opacity</Label>
-          <span className="text-xs">{Math.round((obj.opacity ?? 1) * 100)}%</span>
-        </div>
-        <Slider min={0} max={100} step={1} value={[Math.round((obj.opacity ?? 1) * 100)]}
-          onValueChange={([v]) => set({ opacity: v / 100 })} />
-      </div>
-
-      <Separator />
 
       {/* ── Text properties ──────────────────────────────── */}
       {isText && (
-        <div className="space-y-3">
-          <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Text</p>
+        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
+          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Text &amp; Typography</p>
 
           {/* Font family */}
           <div>
-            <Label className="text-xs">Font Family</Label>
+            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Font Family</Label>
             <Select value={obj.fontFamily ?? "Arial"} onValueChange={(v) => {
               if (GOOGLE_FONTS.includes(v)) loadGoogleFont(v);
               set({ fontFamily: v });
             }}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs bg-background/80 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent className="max-h-64">
-                <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold">System</div>
+                <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold">System Fonts</div>
                 {SYSTEM_FONTS.map(f => (
                   <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>
                 ))}
@@ -154,42 +152,50 @@ export default function PropertiesPanel({ canvas }: Props) {
           </div>
 
           {/* Size + color */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <Label className="text-xs">Size</Label>
-              <Input type="number" className="h-7 text-xs" value={obj.fontSize ?? 20}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Font Size</Label>
+              <Input type="number" className="h-8 text-xs bg-background/80 rounded-xl" value={obj.fontSize ?? 20}
                 onChange={(e) => set({ fontSize: Number(e.target.value) })} />
             </div>
             <div>
-              <Label className="text-xs">Color</Label>
-              <input type="color" className="h-7 w-12 rounded border cursor-pointer block"
-                value={obj.fill ?? "#000000"}
-                onChange={(e) => set({ fill: e.target.value })} />
+              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Color</Label>
+              <div className="flex items-center gap-2 p-1 rounded-xl border border-border/70 bg-background/80">
+                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+                  value={typeof obj.fill === "string" && obj.fill.startsWith("#") ? obj.fill : "#000000"}
+                  onChange={(e) => set({ fill: e.target.value })} />
+                <span className="text-[10px] font-mono text-muted-foreground uppercase truncate">{typeof obj.fill === "string" ? obj.fill : "#000"}</span>
+              </div>
             </div>
           </div>
 
           {/* Bold / Italic / Underline / Strike */}
-          <div className="flex flex-wrap gap-1">
-            {([
-              ["B", "fontWeight",  "bold",   "normal"],
-              ["I", "fontStyle",   "italic", "normal"],
-              ["U", "underline",   true,     false   ],
-              ["S", "linethrough", true,     false   ],
-            ] as const).map(([lbl, prop, on, off]) => (
-              <button key={lbl as string}
-                className={`w-7 h-7 text-xs rounded border font-semibold transition-colors ${
-                  obj[prop as string] === on ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"
-                }`}
-                onClick={() => set({ [prop as string]: obj[prop as string] === on ? off : on })}
-              >{lbl as string}</button>
-            ))}
+          <div>
+            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Formatting</Label>
+            <div className="flex gap-1">
+              {([
+                ["B", "fontWeight",  "bold",   "normal"],
+                ["I", "fontStyle",   "italic", "normal"],
+                ["U", "underline",   true,     false   ],
+                ["S", "linethrough", true,     false   ],
+              ] as const).map(([lbl, prop, on, off]) => (
+                <button key={lbl as string}
+                  className={`flex-1 h-8 text-xs rounded-xl border font-bold transition-all ${
+                    obj[prop as string] === on
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
+                  }`}
+                  onClick={() => set({ [prop as string]: obj[prop as string] === on ? off : on })}
+                >{lbl as string}</button>
+              ))}
+            </div>
           </div>
 
           {/* Line height */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs">Line Height</Label>
-              <span className="text-xs">{(obj.lineHeight ?? 1.4).toFixed(1)}</span>
+              <Label className="text-[10px] font-medium text-muted-foreground">Line Height</Label>
+              <span className="text-[10px] font-mono font-semibold">{(obj.lineHeight ?? 1.4).toFixed(1)}</span>
             </div>
             <Slider min={8} max={30} step={1} value={[Math.round((obj.lineHeight ?? 1.4) * 10)]}
               onValueChange={([v]) => set({ lineHeight: v / 10 })} />
@@ -198,8 +204,8 @@ export default function PropertiesPanel({ canvas }: Props) {
           {/* Char spacing */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs">Letter Spacing</Label>
-              <span className="text-xs">{obj.charSpacing ?? 0}</span>
+              <Label className="text-[10px] font-medium text-muted-foreground">Letter Spacing</Label>
+              <span className="text-[10px] font-mono font-semibold">{obj.charSpacing ?? 0}</span>
             </div>
             <Slider min={-100} max={400} step={10} value={[obj.charSpacing ?? 0]}
               onValueChange={([v]) => set({ charSpacing: v })} />
@@ -207,15 +213,17 @@ export default function PropertiesPanel({ canvas }: Props) {
 
           {/* Alignment */}
           <div>
-            <Label className="text-xs">Alignment</Label>
-            <div className="flex gap-1 mt-1">
+            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Alignment</Label>
+            <div className="flex gap-1">
               {["left", "center", "right", "justify"].map(a => (
                 <button key={a}
-                  className={`flex-1 py-0.5 text-[10px] rounded border capitalize ${
-                    obj.textAlign === a ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  className={`flex-1 py-1 text-[11px] rounded-xl border capitalize font-medium transition-all ${
+                    obj.textAlign === a
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
                   }`}
                   onClick={() => set({ textAlign: a })}
-                >{a[0].toUpperCase()}</button>
+                >{a[0].toUpperCase() + a.slice(1)}</button>
               ))}
             </div>
           </div>
@@ -224,26 +232,32 @@ export default function PropertiesPanel({ canvas }: Props) {
 
       {/* ── Shape properties ─────────────────────────────── */}
       {isShape && (
-        <div className="space-y-3">
-          <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Shape</p>
+        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
+          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Shape &amp; Style</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Fill</Label>
-              <input type="color" className="h-7 w-full rounded border cursor-pointer block"
-                value={typeof obj.fill === "string" && obj.fill.startsWith("#") ? obj.fill : "#3b82f6"}
-                onChange={(e) => set({ fill: e.target.value })} />
+              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Fill</Label>
+              <div className="flex items-center gap-2 p-1.5 rounded-xl border border-border/70 bg-background/80">
+                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+                  value={typeof obj.fill === "string" && obj.fill.startsWith("#") ? obj.fill : "#3b82f6"}
+                  onChange={(e) => set({ fill: e.target.value })} />
+                <span className="text-[10px] font-mono uppercase text-muted-foreground truncate">{typeof obj.fill === "string" ? obj.fill : "Color"}</span>
+              </div>
             </div>
             <div>
-              <Label className="text-xs">Stroke</Label>
-              <input type="color" className="h-7 w-full rounded border cursor-pointer block"
-                value={obj.stroke ?? "#000000"}
-                onChange={(e) => set({ stroke: e.target.value })} />
+              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Stroke</Label>
+              <div className="flex items-center gap-2 p-1.5 rounded-xl border border-border/70 bg-background/80">
+                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+                  value={obj.stroke ?? "#000000"}
+                  onChange={(e) => set({ stroke: e.target.value })} />
+                <span className="text-[10px] font-mono uppercase text-muted-foreground truncate">{obj.stroke || "None"}</span>
+              </div>
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs">Stroke Width</Label>
-              <span className="text-xs">{obj.strokeWidth ?? 0}px</span>
+              <Label className="text-[10px] font-medium text-muted-foreground">Stroke Width</Label>
+              <span className="text-[10px] font-mono font-semibold">{obj.strokeWidth ?? 0}px</span>
             </div>
             <Slider min={0} max={20} step={1} value={[obj.strokeWidth ?? 0]}
               onValueChange={([v]) => set({ strokeWidth: v })} />
@@ -251,21 +265,21 @@ export default function PropertiesPanel({ canvas }: Props) {
           {obj.type === "rect" && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-xs">Corner Radius</Label>
-                <span className="text-xs">{obj.rx ?? 0}px</span>
+                <Label className="text-[10px] font-medium text-muted-foreground">Corner Radius</Label>
+                <span className="text-[10px] font-mono font-semibold">{obj.rx ?? 0}px</span>
               </div>
               <Slider min={0} max={60} step={1} value={[obj.rx ?? 0]}
                 onValueChange={([v]) => set({ rx: v, ry: v })} />
             </div>
           )}
           {/* Shadow */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Shadow</Label>
+          <div className="flex items-center justify-between pt-2 border-t border-border/40">
+            <Label className="text-xs font-medium">Drop Shadow</Label>
             <Switch checked={!!obj.shadow}
               onCheckedChange={(v) => {
                 if (v) {
                   import("fabric").then(({ Shadow }) => {
-                    obj.set({ shadow: new Shadow({ color: "rgba(0,0,0,0.3)", blur: 10, offsetX: 4, offsetY: 4 }) });
+                    obj.set({ shadow: new Shadow({ color: "rgba(0,0,0,0.25)", blur: 12, offsetX: 4, offsetY: 4 }) });
                     obj.canvas?.renderAll(); refresh();
                   });
                 } else { set({ shadow: null }); }
@@ -276,17 +290,17 @@ export default function PropertiesPanel({ canvas }: Props) {
 
       {/* ── Image properties ─────────────────────────────── */}
       {isImage && (
-        <div className="space-y-3">
-          <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Image</p>
+        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
+          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Image Filters &amp; Effects</p>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Lock Aspect Ratio</Label>
+            <Label className="text-xs font-medium">Lock Aspect Ratio</Label>
             <Switch checked={!!obj.lockUniScaling}
               onCheckedChange={(v) => set({ lockUniScaling: v })} />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs">Brightness</Label>
-              <span className="text-xs">{obj._fbBrightness ?? 0}</span>
+              <Label className="text-[10px] font-medium text-muted-foreground">Brightness</Label>
+              <span className="text-[10px] font-mono font-semibold">{obj._fbBrightness ?? 0}</span>
             </div>
             <Slider min={-100} max={100} step={5}
               value={[obj._fbBrightness ?? 0]}
@@ -306,9 +320,9 @@ export default function PropertiesPanel({ canvas }: Props) {
         </div>
       )}
 
-      <Separator />
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">Lock Position</Label>
+      {/* Lock Position */}
+      <div className="p-3 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm flex items-center justify-between shadow-xs">
+        <Label className="text-xs font-medium">Lock Position (Freeze)</Label>
         <Switch
           checked={!!obj.lockMovementX}
           onCheckedChange={(v) => set({ lockMovementX: v, lockMovementY: v })}
@@ -562,61 +576,73 @@ function PageSettingsPanel({ canvas, page }: { canvas: any; page: any }) {
   };
 
   return (
-    <div className="p-3 space-y-4 text-sm overflow-y-auto h-full">
-      <div className="text-center p-3 bg-muted/50 rounded-md">
-        <p className="font-medium text-sm">Page Settings</p>
-        <p className="text-xs text-muted-foreground">No element selected</p>
+    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar">
+      <div className="text-center p-3.5 bg-muted/20 border border-border/60 rounded-2xl">
+        <p className="font-semibold text-xs text-foreground">Canvas Setup</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Configure page dimensions and canvas background</p>
       </div>
 
       {/* Page Size */}
-      <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Page Size</Label>
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
+        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Document Format</Label>
         <Select value={sizeName} onValueChange={(v) => canvas.changePageSize(v)}>
-          <SelectTrigger className="h-7 text-xs mt-1"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 text-xs bg-background/80 rounded-xl"><SelectValue /></SelectTrigger>
           <SelectContent>
             {Object.keys(PAGE_SIZES).map(s => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="flex gap-1 mt-2">
-          <Input type="number" className="h-7 text-xs" value={page?.width ?? 794}
-            placeholder="W"
-            onChange={(e) => canvas.updatePageSettings({ width: Number(e.target.value) })} />
-          <span className="text-muted-foreground self-center text-xs">×</span>
-          <Input type="number" className="h-7 text-xs" value={page?.height ?? 1123}
-            placeholder="H"
-            onChange={(e) => canvas.updatePageSettings({ height: Number(e.target.value) })} />
-          <span className="text-muted-foreground self-center text-xs">px</span>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">W</span>
+            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={page?.width ?? 794}
+              placeholder="W"
+              onChange={(e) => canvas.updatePageSettings({ width: Number(e.target.value) })} />
+          </div>
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">H</span>
+            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={page?.height ?? 1123}
+              placeholder="H"
+              onChange={(e) => canvas.updatePageSettings({ height: Number(e.target.value) })} />
+          </div>
         </div>
       </div>
 
       {/* Orientation */}
-      <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Orientation</Label>
-        <div className="flex gap-2 mt-1">
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
+        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Orientation</Label>
+        <div className="flex gap-2">
           {(["portrait", "landscape"] as const).map(o => (
             <button key={o}
-              className={`flex-1 py-1.5 text-xs rounded border capitalize transition-colors ${
-                page?.orientation === o ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+              className={`flex-1 py-1.5 text-xs rounded-xl border capitalize font-medium transition-all ${
+                page?.orientation === o
+                  ? "bg-primary text-primary-foreground border-primary shadow-xs font-semibold"
+                  : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
               }`}
               onClick={() => canvas.updatePageSettings({ orientation: o })}
-            >{o === "portrait" ? "🖺 Portrait" : "🖻 Landscape"}</button>
+            >
+              {o === "portrait" ? "Portrait" : "Landscape"}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Background */}
-      <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Background</Label>
-        <div className="flex items-center gap-2 mt-1">
-          <input type="color" className="h-8 w-12 rounded border cursor-pointer"
-            value={page?.background ?? "#ffffff"}
-            onChange={(e) => canvas.updatePageSettings({ background: e.target.value })} />
-          <div className="flex gap-1">
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
+        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Page Background</Label>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 p-1 rounded-xl border border-border/70 bg-background/80">
+            <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+              value={page?.background ?? "#ffffff"}
+              onChange={(e) => canvas.updatePageSettings({ background: e.target.value })} />
+            <span className="text-[10px] font-mono text-muted-foreground uppercase">{page?.background ?? "#fff"}</span>
+          </div>
+          <div className="flex gap-1 ml-auto">
             {["#ffffff", "#f8fafc", "#1e293b", "#dbeafe", "#fef3c7"].map(c => (
-              <button key={c} className="w-6 h-6 rounded border transition-transform hover:scale-110"
+              <button key={c} className="w-6 h-6 rounded-full border border-border/70 transition-transform hover:scale-110 shadow-xs"
                 style={{ backgroundColor: c }}
+                title={c}
                 onClick={() => canvas.updatePageSettings({ background: c })} />
             ))}
           </div>

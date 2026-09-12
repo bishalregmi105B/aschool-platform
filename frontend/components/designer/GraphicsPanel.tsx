@@ -73,8 +73,7 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  /** color baked into the svg string so canvas.addSVG inserts it pre-colored
-   *  (fabric keeps `currentColor` literal, so fill AND stroke must be baked) */
+  /** color baked into the svg string so canvas.addSVG inserts it pre-colored */
   const insert = (svg: string) => onAddIcon(svg.replace(/currentColor/g, accent), accent);
 
   /** items for the active category, or search hits across all categories */
@@ -88,133 +87,143 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
   }, [query, activeCat]);
 
   return (
-    <div className="space-y-3 flex flex-col min-h-0">
-      {/* QR */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-          <QrCode className="h-3 w-3" /> QR Code
-        </p>
+    <div className="space-y-4">
+      {/* QR Code Card */}
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+            <QrCode className="h-3.5 w-3.5 text-primary" /> QR Code Generator
+          </p>
+        </div>
         <div className="flex gap-1.5">
           <Input
-            placeholder="URL or text…"
+            placeholder="URL, student symbol no or text…"
             value={qrValue}
             onChange={(e) => setQrValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && qrValue.trim()) { onAddQr(qrValue.trim()); setQrValue(""); }}}
-            className="h-8 text-xs"
+            className="h-8 text-xs bg-background/80 rounded-xl"
           />
-          <Button size="sm" className="h-8 px-2 text-xs shrink-0"
+          <Button size="sm" className="h-8 px-3 text-xs rounded-xl shadow-xs shrink-0"
             onClick={() => { if (qrValue.trim()) { onAddQr(qrValue.trim()); setQrValue(""); }}}>
             Insert
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          The QR re-generates automatically for each student during bulk fill.
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          QR codes automatically bind to individual student tokens during bulk generation.
         </p>
       </div>
 
-      <Separator />
-
-      {/* Watermark */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-          <Stamp className="h-3 w-3" /> Watermark Stamp
+      {/* Watermark Card */}
+      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
+        <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+          <Stamp className="h-3.5 w-3.5 text-amber-500" /> Watermark Stamp
         </p>
         <div className="flex gap-1.5">
-          <Input value={wmText} onChange={(e) => setWmText(e.target.value)} className="h-8 text-xs" />
-          <Button size="sm" variant="outline" className="h-8 px-2 text-xs shrink-0"
+          <Input
+            value={wmText}
+            onChange={(e) => setWmText(e.target.value)}
+            className="h-8 text-xs bg-background/80 rounded-xl"
+            placeholder="Stamp text…"
+          />
+          <Button size="sm" variant="outline" className="h-8 px-3 text-xs rounded-xl shrink-0"
             onClick={() => wmText.trim() && onAddWatermark(wmText.trim())}>
-            Stamp
+            Apply
           </Button>
         </div>
-        <div className="flex gap-1 mt-2">
-          {["DRAFT", "COPY", "CONFIDENTIAL", "VERIFIED"].map((t) => (
-            <button key={t} onClick={() => onAddWatermark(t)}
-              className="text-[9px] px-1.5 py-1 border rounded hover:bg-muted transition-colors">{t}</button>
+        <div className="flex flex-wrap gap-1.5">
+          {["DRAFT", "COPY", "CONFIDENTIAL", "VERIFIED", "ORIGINAL"].map((t) => (
+            <button
+              key={t}
+              onClick={() => onAddWatermark(t)}
+              className="text-[10px] font-medium px-2.5 py-1 rounded-full border border-border/80 bg-background/60 hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all duration-150"
+            >
+              {t}
+            </button>
           ))}
         </div>
       </div>
 
-      <Separator />
-
       {/* ── Elements browser (Canva-style) ─────────────────────── */}
-      <div className="min-h-0">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-          <Shapes className="h-3 w-3" /> Elements
-          <span className="font-normal normal-case tracking-normal">({ELEMENT_TOTAL})</span>
-        </p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+            <Shapes className="h-3.5 w-3.5 text-primary" /> Graphics & Elements
+            <span className="text-[10px] font-normal text-muted-foreground">({ELEMENT_TOTAL})</span>
+          </p>
+        </div>
 
-        {/* search */}
-        <div className="relative mb-2">
+        {/* Search */}
+        <div className="relative">
           <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             ref={searchRef}
-            placeholder={`Search ${ELEMENT_TOTAL} elements…`}
+            placeholder={`Search ${ELEMENT_TOTAL} vector elements…`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-8 text-xs pl-8"
+            className="h-8 text-xs pl-8 bg-background/80 rounded-xl"
           />
         </div>
 
-        {/* accent color row */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] text-muted-foreground shrink-0">Color</span>
+        {/* Accent Color Picker Row */}
+        <div className="flex items-center justify-between py-1">
+          <span className="text-[10px] font-medium text-muted-foreground">Color</span>
           <ColorRow color={accent} onChange={setAccent} />
         </div>
 
-        <div className="flex gap-2 min-h-0">
-          {/* left category rail */}
-          <div className="flex flex-col gap-1 shrink-0 overflow-y-auto pr-0.5 max-h-[340px]">
-            {ELEMENT_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                title={cat.label}
-                onClick={() => { setActiveCat(cat.id); setQuery(""); }}
-                className={`w-9 h-9 rounded-lg text-base flex items-center justify-center transition-colors ${
-                  activeCat === cat.id && !query.trim()
-                    ? "bg-primary/15 ring-1 ring-primary/40"
-                    : "hover:bg-muted"
-                }`}
-              >
-                {cat.icon}
-              </button>
-            ))}
-          </div>
-
-          {/* items grid */}
-          <div className="flex-1 min-w-0 overflow-y-auto max-h-[340px] pr-0.5">
-            {listing.groups.map((group) => (
-              <div key={group.id} className="mb-2">
-                {query.trim() && (
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-1">
-                    {group.label} · {group.items.length} found
-                  </p>
-                )}
-                {group.items.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground py-3">
-                    No elements match “{query.trim()}”. Try shapes, star, arrow, bubble…
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        title={item.label}
-                        onClick={() => insert(item.svg)}
-                        className="aspect-square flex items-center justify-center border rounded-lg p-1.5
-                          text-muted-foreground hover:text-foreground hover:bg-primary/5 hover:border-primary
-                          transition-all [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-9 [&>svg]:max-w-9"
-                        dangerouslySetInnerHTML={{ __html: item.svg }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        {/* Horizontal Category Pill Strip */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
+          {ELEMENT_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => { setActiveCat(cat.id); setQuery(""); }}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 shrink-0 ${
+                activeCat === cat.id && !query.trim()
+                  ? "bg-primary text-primary-foreground font-medium shadow-xs"
+                  : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>{cat.icon}</span>
+              <span>{cat.label}</span>
+            </button>
+          ))}
         </div>
 
-        <p className="text-[10px] text-muted-foreground mt-1.5">
-          Click an element to insert it with the selected color. Recolor later from the Properties panel.
+        {/* Elements Grid (Clean, single scroll with parent) */}
+        <div>
+          {listing.groups.map((group) => (
+            <div key={group.id} className="space-y-2">
+              {query.trim() && (
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {group.label} · {group.items.length} found
+                </p>
+              )}
+              {group.items.length === 0 ? (
+                <div className="text-center py-6 px-3 bg-muted/20 rounded-2xl border border-dashed border-border/60">
+                  <p className="text-xs text-muted-foreground font-medium">No elements found</p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">Try shapes, star, arrow, heart, badge…</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      title={item.label}
+                      onClick={() => insert(item.svg)}
+                      className="aspect-square flex items-center justify-center border border-border/70 rounded-xl p-2
+                        bg-card/60 hover:bg-primary/10 hover:border-primary hover:shadow-md hover:scale-[1.06]
+                        transition-all duration-150 text-muted-foreground hover:text-foreground
+                        [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-8 [&>svg]:max-w-8"
+                      dangerouslySetInnerHTML={{ __html: item.svg }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[10px] text-muted-foreground/80 text-center pt-1">
+          Click any element to add. Re-color anytime from the Properties panel.
         </p>
       </div>
     </div>
