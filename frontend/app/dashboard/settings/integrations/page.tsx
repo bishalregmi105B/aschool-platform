@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plug, Upload, QrCode, X } from "lucide-react";
+import { Plug, QrCode, X, FolderOpen } from "lucide-react";
 import Image from "next/image";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
 import {
   AOSPage,
   AOSPageHeader,
@@ -22,7 +24,6 @@ import {
   EMPTY_PAYMENT_METHODS_RESPONSE,
   fetchPaymentMethods,
   updatePaymentMethods,
-  uploadQrImage,
   type PaymentMethodConfig,
   type PaymentMethodKey,
 } from "@/lib/services/payment-methods.service";
@@ -41,7 +42,8 @@ const integrations = [
 export default function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [methods, setMethods] = useState<PaymentMethodConfig[]>([]);
-  const [uploadingQr, setUploadingQr] = useState<PaymentMethodKey | null>(null);
+  const [showQrPicker, setShowQrPicker] = useState(false);
+  const [qrPickerMethod, setQrPickerMethod] = useState<PaymentMethodKey | null>(null);
 
   const { data: paymentConfig, isLoading } = useQuery({
     queryKey: ["settings-payment-methods"],
@@ -94,22 +96,16 @@ export default function IntegrationsPage() {
     );
   };
 
-  const handleQrUpload = async (
-    key: PaymentMethodKey,
-    file: File,
-  ) => {
-    setUploadingQr(key);
-    try {
-      const result = await uploadQrImage(file, key);
-      updateMethod(key, { qr_image_url: result.url });
-      queryClient.invalidateQueries({ queryKey: ["settings-payment-methods"] });
-      queryClient.invalidateQueries({ queryKey: ["fee-payment-methods"] });
-      toast.success("QR image uploaded successfully");
-    } catch {
-      toast.error("Failed to upload QR image");
-    } finally {
-      setUploadingQr(null);
-    }
+  const handleQrSelect = (files: ManagedFile[]) => {
+    const selected = files[0];
+    if (!selected || !qrPickerMethod) return;
+    updateMethod(qrPickerMethod, { qr_image_url: selected.url });
+    toast.success("QR image selected from the file manager");
+  };
+
+  const openQrPicker = (key: PaymentMethodKey) => {
+    setQrPickerMethod(key);
+    setShowQrPicker(true);
   };
 
   if (isLoading) return <AOSModuleLoadingState label="Loading integrations…" />;
@@ -282,29 +278,14 @@ export default function IntegrationsPage() {
                                   />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <label className="cursor-pointer">
-                                    <input
-                                      type="file"
-                                      accept="image/png,image/jpeg,image/webp"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) handleQrUpload(method.key, f);
-                                        e.target.value = "";
-                                      }}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={uploadingQr === method.key}
-                                      asChild
-                                    >
-                                      <span>
-                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                        {uploadingQr === method.key ? "Uploading..." : "Replace"}
-                                      </span>
-                                    </Button>
-                                  </label>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openQrPicker(method.key)}
+                                  >
+                                    <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                                    Replace from Vault
+                                  </Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -315,29 +296,16 @@ export default function IntegrationsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <label className="cursor-pointer">
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const f = e.target.files?.[0];
-                                    if (f) handleQrUpload(method.key, f);
-                                    e.target.value = "";
-                                  }}
-                                />
-                                <div
-                                  className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-5 transition-colors"
-                                  style={{ borderColor: "var(--w11-border-default)" }}
-                                >
-                                  <QrCode className="h-8 w-8" style={{ color: "var(--w11-text-tertiary)" }} />
-                                  <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-                                    {uploadingQr === method.key
-                                      ? "Uploading..."
-                                      : "Click to upload QR image (PNG / JPG / WEBP)"}
-                                  </span>
-                                </div>
-                              </label>
+                              <div
+                                className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-5 transition-colors cursor-pointer"
+                                style={{ borderColor: "var(--w11-border-default)" }}
+                                onClick={() => openQrPicker(method.key)}
+                              >
+                                <QrCode className="h-8 w-8" style={{ color: "var(--w11-text-tertiary)" }} />
+                                <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                                  Choose a QR image from the file manager (PNG / JPG / WEBP)
+                                </span>
+                              </div>
                             )}
                             {/* Fallback URL input */}
                             <Input
@@ -426,6 +394,14 @@ export default function IntegrationsPage() {
           ))}
         </div>
       </AOSPageBody>
+
+      <FilePicker
+        open={showQrPicker}
+        onOpenChange={setShowQrPicker}
+        onSelect={handleQrSelect}
+        fileType="image"
+        title="Select QR Code Image"
+      />
     </AOSPage>
   );
 }

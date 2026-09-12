@@ -18,6 +18,7 @@ import { useExport } from "@/lib/hooks/useExport";
 import { useDesignerStore, type DesignerPanel } from "@/lib/designer/store";
 import { attachShortcuts } from "@/lib/designer/shortcuts";
 import { absolutizeImageUrl } from "@/lib/designer/canvasImages";
+import { fetchManagedFileAsFile, type ManagedFile } from "@/lib/services/files.service";
 
 import { Button }   from "@/components/ui/button";
 import { FilePicker } from "@/components/files/FilePicker";
@@ -36,6 +37,8 @@ import {
   ArrowLeft, Save, Download, Undo2, Redo2, ZoomIn, ZoomOut, Maximize,
   Sparkles, ChevronDown, Plus, FileJson, X, Copy, Trash2, FileOutput,
   LayoutTemplate, Upload, Search, Grid3x3, Magnet, Layers, MoreVertical,
+  Compass, Type, Paintbrush, Database, Shapes, Image as LucideImage,
+  FileDown, FileImage, Code2, PanelTop,
 } from "lucide-react";
 
 import PropertiesPanel from "./PropertiesPanel";
@@ -58,16 +61,17 @@ const BG_PRESETS = [
   "#dbeafe","#fee2e2","#fdf4ff","#f0fdf4","#1e293b","#0f172a","#18181b","#7c2d12",
 ];
 
-const SIDEBAR_ICONS: Array<{ id: DesignerPanel; icon: string; label: string }> = [
-  { id:"explore",    icon:"🔎", label:"Explore"    },
-  { id:"templates",  icon:"📄", label:"Templates"  },
-  { id:"shapes",     icon:"⬜", label:"Shapes"     },
-  { id:"text",       icon:"T",  label:"Text"       },
-  { id:"media",      icon:"🖼", label:"Media"      },
-  { id:"graphics",   icon:"✨", label:"Graphics"   },
-  { id:"background", icon:"🎨", label:"Background" },
-  { id:"data",       icon:"📋", label:"Data Fill"  },
-  { id:"layers",     icon:"🧱", label:"Layers"     },
+type SidebarIconDef = { id: DesignerPanel; Icon: React.ComponentType<{ className?: string }>; label: string };
+const SIDEBAR_ICONS: SidebarIconDef[] = [
+  { id: "explore",    Icon: Compass,        label: "Explore"   },
+  { id: "templates",  Icon: LayoutTemplate, label: "Templates" },
+  { id: "shapes",     Icon: Shapes,         label: "Shapes"    },
+  { id: "text",       Icon: Type,           label: "Text"      },
+  { id: "media",      Icon: LucideImage,    label: "Media"     },
+  { id: "graphics",   Icon: Sparkles,       label: "Graphics"  },
+  { id: "background", Icon: Paintbrush,     label: "BG"        },
+  { id: "data",       Icon: Database,       label: "Data"      },
+  { id: "layers",     Icon: Layers,         label: "Layers"    },
 ];
 
 interface ContextMenuState { x: number; y: number }
@@ -140,10 +144,10 @@ export default function CanvasEditor() {
   const [tplSearch, setTplSearch]     = useState("");
   const [ctxMenu, setCtxMenu]         = useState<ContextMenuState | null>(null);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showDesignPicker, setShowDesignPicker] = useState(false);
 
   const templateLoadedRef = useRef(false);
   const docLoadedRef      = useRef(false);
-  const importFileRef     = useRef<HTMLInputElement>(null);
   const initialFitRef     = useRef(false);
 
   // ── AI agent action execution (designer mode) ────────────────────────
@@ -395,11 +399,23 @@ export default function CanvasEditor() {
     }
   }, [docName, canvas, exportPDF, exportPNG, exportPagesZip, dpiScale, exportJpeg]);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => { try { canvas.loadJSON(JSON.parse(ev.target?.result as string)); setDocName(file.name.replace(/\.(aschool-design|json)$/, "")); toast.success("Design loaded"); } catch { toast.error("Invalid file"); } };
-    reader.readAsText(file); e.target.value = "";
+  /** Design import via the vault: fetch the picked file's text, then load it. */
+  const handleDesignSelect = async (files: ManagedFile[]) => {
+    const mf = files[0];
+    if (!mf) return;
+    try {
+      const fileObj = await fetchManagedFileAsFile(mf);
+      const text = await fileObj.text();
+      try {
+        canvas.loadJSON(JSON.parse(text));
+        setDocName(fileObj.name.replace(/\.(aschool-design|json)$/, ""));
+        toast.success("Design loaded");
+      } catch {
+        toast.error("Invalid file");
+      }
+    } catch {
+      toast.error("Failed to load file from the file manager");
+    }
   };
 
   const handleShape = (id: string) => {
@@ -703,7 +719,6 @@ export default function CanvasEditor() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-muted/20">
-        <input ref={importFileRef} type="file" accept=".json,.aschool-design" className="hidden" onChange={handleImport} />
         <FilePicker
           open={showImagePicker}
           onOpenChange={setShowImagePicker}
@@ -717,6 +732,12 @@ export default function CanvasEditor() {
               canvas.addImage(absolutizeImageUrl(selected.url));
             }
           }}
+        />
+        <FilePicker
+          open={showDesignPicker}
+          onOpenChange={setShowDesignPicker}
+          onSelect={handleDesignSelect}
+          title="Select Design File"
         />
 
         {/* CONTEXT MENU */}
@@ -799,37 +820,70 @@ export default function CanvasEditor() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-64">
-                <div className="px-2 py-1.5 flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">Quality</span>
-                  <Select value={String(dpiScale)} onValueChange={(v) => setDpiScale(Number(v))}>
-                    <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[2, 3.125, 4, 5].map((s) => {
-                        const label = s >= 5 ? "ultra 480 DPI" : s >= 4 ? "384 DPI" : s > 3 ? "print 300 DPI" : "screen 192 DPI";
-                        return (
-                          <SelectItem key={s} value={String(s)}>
-                            {s}× — {label}{s === 3.125 ? " ★" : ""}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Select value={exportJpeg ? "jpeg" : "png"} onValueChange={(v) => setExportJpeg(v === "jpeg")}>
-                    <SelectTrigger className="h-7 w-24 text-xs" title="Image compression — JPEG keeps PDFs small, PNG is lossless"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="jpeg">JPEG · small</SelectItem>
-                      <SelectItem value="png">PNG · lossless</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <DropdownMenuContent align="end" className="min-w-[280px]">
+                {/* ── Quality selector — visible segmented pill row ── */}
+                <div className="px-3 py-2.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">Export Quality</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{Math.round(dpiScale * 96)} DPI</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {([
+                      { v: 2,     label: "Screen" },
+                      { v: 3.125, label: "Print ★" },
+                      { v: 4,     label: "High"    },
+                      { v: 5,     label: "Ultra"   },
+                    ] as { v: number; label: string }[]).map(({ v, label }) => (
+                      <button key={v}
+                        onClick={() => setDpiScale(v)}
+                        className={`flex-1 text-[10px] py-1.5 rounded-lg border transition-all font-medium leading-none
+                          ${dpiScale === v
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "border-border hover:border-primary/40 hover:bg-muted text-muted-foreground"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1">
+                    {(["jpeg", "png"] as const).map((fmt) => (
+                      <button key={fmt}
+                        onClick={() => setExportJpeg(fmt === "jpeg")}
+                        className={`flex-1 text-[10px] py-1 rounded-lg border transition-all font-medium
+                          ${(exportJpeg ? "jpeg" : "png") === fmt
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "border-border hover:border-primary/40 hover:bg-muted text-muted-foreground"}`}
+                      >
+                        {fmt === "jpeg" ? "JPEG · smaller" : "PNG · lossless"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <DropdownMenuSeparator />
+                {/* ── Export options ── */}
                 <DropdownMenuItem disabled={exporting} onClick={() => serverPdfMutation.mutate()}>
-                  <FileOutput className="h-4 w-4 mr-2" /> PDF — Print-ready (server, vector text)
+                  <FileOutput className="h-4 w-4 mr-2.5 text-red-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">PDF — Print-ready</div>
+                    <div className="text-[10px] text-muted-foreground">Server-rendered · Nepali fonts · vector text</div>
+                  </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("pdf")}>PDF — quick (browser)</DropdownMenuItem>
-                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>PNG — current view</DropdownMenuItem>
-                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("zip")}>PNG ZIP — one file per page</DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("pdf")}>
+                  <FileDown className="h-4 w-4 mr-2.5 text-orange-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">PDF — Quick export</div>
+                    <div className="text-[10px] text-muted-foreground">Browser-rendered · instant</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>
+                  <FileImage className="h-4 w-4 mr-2.5 text-blue-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">PNG / JPEG Image</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {exporting ? "Exporting…" : `${(canvas.toFullJSON() as any)?.pages?.length > 1 ? "ZIP of all pages" : "Current page"} · ${Math.round(dpiScale * 96)} DPI`}
+                    </div>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => {
                   const fc = (window as any).__activeCanvas;
                   if (!fc) { toast.error("Canvas not ready"); return; }
@@ -838,7 +892,13 @@ export default function CanvasEditor() {
                     .then(() => toast.success("PowerPoint exported — one slide per page"))
                     .catch((e: any) => toast.error(e?.message ?? "PPTX export failed"))
                     .finally(() => setExporting(false));
-                }}>PPTX — PowerPoint slides</DropdownMenuItem>
+                }}>
+                  <PanelTop className="h-4 w-4 mr-2.5 text-amber-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">PPTX — PowerPoint</div>
+                    <div className="text-[10px] text-muted-foreground">One slide per page</div>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => {
                   const fc = (window as any).__activeCanvas;
                   if (!fc) { toast.error("Canvas not ready"); return; }
@@ -847,15 +907,27 @@ export default function CanvasEditor() {
                     .then(() => toast.success("SVG exported (vector)"))
                     .catch((e: any) => toast.error(e?.message ?? "SVG export failed"))
                     .finally(() => setExporting(false));
-                }}>SVG — vector (editable)</DropdownMenuItem>
+                }}>
+                  <Code2 className="h-4 w-4 mr-2.5 text-purple-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">SVG — Vector</div>
+                    <div className="text-[10px] text-muted-foreground">Editable in Figma / Inkscape</div>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => saveAsTemplateMutation.mutate()}>Save as school template</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => saveAsTemplateMutation.mutate()}>
+                  <Save className="h-4 w-4 mr-2.5 text-green-500 shrink-0" /> Save as School Template
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); }}>
                   <VersionHistoryButton docId={docId} onRestored={() => window.location.reload()} />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleExport("json")}><FileJson className="h-4 w-4 mr-2" />Save as .aschool-design</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => importFileRef.current?.click()}>Open .aschool-design File</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("json")}>
+                  <FileJson className="h-4 w-4 mr-2.5 shrink-0" /> Save as .aschool-design
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDesignPicker(true)}>
+                  <Upload className="h-4 w-4 mr-2.5 shrink-0" /> Open .aschool-design File
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -864,16 +936,18 @@ export default function CanvasEditor() {
         {/* BODY */}
         <div className="flex flex-1 min-h-0">
           {/* Icon bar */}
-          <div className="flex flex-col items-center gap-1 py-3 w-16 border-r bg-background shrink-0 overflow-y-auto">
+          <div className="flex flex-col items-center gap-0.5 py-2 w-[60px] border-r bg-background shrink-0 overflow-y-auto">
             {SIDEBAR_ICONS.map((item) => (
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => { setActivePanel(item.id); setShowAI(false); }}
-                    className={`flex flex-col items-center justify-center gap-0.5 w-12 h-14 rounded-xl text-[9px] font-medium transition-all shrink-0
-                      ${activePanel === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                    className={`flex flex-col items-center justify-center gap-1 w-12 h-[52px] rounded-xl text-[9px] font-medium transition-all duration-150 shrink-0
+                      ${activePanel === item.id
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"}`}
                   >
-                    <span className="text-lg leading-none">{item.icon}</span>
+                    <item.Icon className="h-[17px] w-[17px]" />
                     <span className="leading-none">{item.label}</span>
                   </button>
                 </TooltipTrigger>
@@ -912,14 +986,35 @@ export default function CanvasEditor() {
                         {filteredTemplates.map((tpl: any) => (
                           <button key={tpl.id}
                             onClick={() => loadTemplate(tpl)}
-                            className="group relative border rounded-lg overflow-hidden hover:border-primary hover:shadow-sm transition-all bg-muted/30"
-                            style={{ paddingTop:"75%" }}
+                            className="group relative rounded-xl overflow-hidden border border-border hover:border-primary hover:shadow-md transition-all duration-150 text-left bg-muted/20"
                           >
-                            <div className="absolute inset-0 flex flex-col items-center justify-center p-1.5">
-                              <span className="text-3xl">{tpl.thumbnail_emoji ?? "📄"}</span>
-                              <span className="text-[9px] text-center text-muted-foreground mt-1 leading-tight">{tpl.name}</span>
+                            {/* Thumbnail image area */}
+                            <div className="relative overflow-hidden" style={{ paddingTop: "130%" }}>
+                              {tpl.thumbnail_url ? (
+                                <img
+                                  src={tpl.thumbnail_url}
+                                  alt={tpl.name}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
+                                  <LayoutTemplate className="h-8 w-8 opacity-25" />
+                                </div>
+                              )}
+                              {/* Hover overlay */}
+                              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-150" />
+                              {/* Editor type badge */}
+                              <div className="absolute top-1 right-1">
+                                <span className="text-[8px] bg-black/50 text-white px-1 py-0.5 rounded font-medium backdrop-blur-sm">
+                                  {tpl.editor_type === "writer" ? "W" : "D"}
+                                </span>
+                              </div>
                             </div>
-                            <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+                            {/* Name */}
+                            <div className="px-1.5 py-1.5">
+                              <span className="text-[9px] font-medium text-foreground/80 leading-tight line-clamp-2 block">{tpl.name}</span>
+                            </div>
                           </button>
                         ))}
                       </div>

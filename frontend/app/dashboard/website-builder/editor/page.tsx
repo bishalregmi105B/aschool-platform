@@ -12,6 +12,7 @@ import { ALL_WIDGETS, CATEGORIES, getWidgetDef, getWidgetsByCategory } from "@/l
 import { EditorSectionRenderer } from "@/components/website/EditorSectionRenderer";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ColorField } from "@/components/ui/color-field";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
 import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
 
@@ -267,13 +268,11 @@ function ControlRenderer({ control, value, onChange }: {
     }
     case "image":
       return (
-        <div className="space-y-1.5">
-          <input type="text" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="https://... image URL" style={{ background: "var(--w11-control-bg)", color: "var(--w11-text-primary)", border: "1px solid var(--w11-control-border)", borderRadius: "var(--w11-radius-md)", padding: "8px 12px" }} className="w-full text-sm" />
-          {(value as string) && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={value as string} alt="Preview" className="h-16 rounded border border-[var(--w11-border-default)] object-cover" />
-          )}
-        </div>
+        <VaultImageField
+          value={(value as string) || null}
+          onChange={(url) => onChange(url ?? "")}
+          label="Image"
+        />
       );
     default:
       return (
