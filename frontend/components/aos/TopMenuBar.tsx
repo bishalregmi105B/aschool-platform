@@ -8,7 +8,6 @@ import {
   Bell,
   ChevronDown,
   LayoutGrid,
-  Layers,
   Smartphone,
   Monitor,
   Maximize,
@@ -80,23 +79,23 @@ interface TopMenuBarProps {
 const EDITABLE_TOPBAR_ITEMS: Array<{ id: string; label: string; description: string }> = [
   {
     id: "sections",
-    label: "Section menus",
-    description: "One menu per module section, shown on the desktop view",
+    label: "Section groups",
+    description: "All module sections, grouped by name inside the Apps menu",
   },
   {
     id: "vault",
     label: "Vault",
-    description: "Quick launch for the AOS File Manager",
+    description: "Dashboard link to the AOS File Manager inside the Apps menu",
   },
   {
     id: "store",
     label: "Store",
-    description: "Quick launch for the AOS App Store",
+    description: "Dashboard link to the AOS App Store inside the Apps menu",
   },
   {
     id: "widgets",
     label: "Widgets",
-    description: "Widgets board toggle in the menu bar",
+    description: "Widgets board toggle shown in the menu bar",
   },
 ];
 
@@ -336,7 +335,7 @@ export default function TopMenuBar({
   onChangeTopbarItems,
 }: TopMenuBarProps) {
   // Exactly one dropdown open at a time: "system" | "app" | "window" |
-  // "help" | "sections" | `section:<name>`.
+  // "help" | "apps" (the desktop Apps dropdown).
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [aboutTarget, setAboutTarget] = useState<{
@@ -501,7 +500,7 @@ export default function TopMenuBar({
 
   // Derive user info
   const effectiveRole = (user?.role || currentRole || "student").toLowerCase();
-  const userName = user?.full_name || (effectiveRole === "admin" ? "Dr. Evelyn Carter" : effectiveRole === "teacher" ? "Dr. Robert Henderson" : effectiveRole === "accountant" ? "Clara Higgins, CPA" : "Bishal Regmi");
+  const userName = user?.full_name || "User";
   const roleLabel = effectiveRole.charAt(0).toUpperCase() + effectiveRole.slice(1);
   const badgeColor = ROLE_COLORS[effectiveRole] || "#0284c7";
 
@@ -719,40 +718,72 @@ export default function TopMenuBar({
           </>
         ) : (
           <>
-            {/* Desktop state — minimal "Finder-like" set plus the
-                user's toggled quick items. */}
+            {/* Desktop (Finder-like) state — exactly three items after the
+                logo: "AOS", one Apps dropdown (pinned quick links + every
+                module section as a grouped list), and Widgets. This keeps
+                the menubar at ≤4 top-level items in any mode. */}
             <span className="menubar-app-title">AOS</span>
 
-            {onToggleAppDrawer && (
-              <div
-                className="menubar-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleAppDrawer();
-                }}
-                style={{ display: "flex", alignItems: "center", gap: "5px" }}
-                title="Open AOS App Drawer & Library"
-              >
-                <LayoutGrid size={13} />
-                <span>Apps</span>
-              </div>
-            )}
+            {/* Apps: one dropdown holding the pinned quick links (Dashboard,
+                Vault, Store) and every module section as grouped headers with
+                their apps beneath. The topbar_items setting controls what
+                appears INSIDE this dropdown. */}
+            <div
+              className={`menubar-item ${openMenu === "apps" ? "is-active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMenu("apps");
+              }}
+              onMouseEnter={() => hoverMenu("apps")}
+              style={{ position: "relative", display: "flex", alignItems: "center", gap: "5px" }}
+              title="All AOS apps and quick links"
+            >
+              <LayoutGrid size={13} />
+              <span>Apps</span>
+              <ChevronDown size={11} />
+              {openMenu === "apps" && (
+                <MenuDropdown top={dropdownTop} minWidth={280}>
+                  {/* Pinned quick links — always-on Dashboard, plus the
+                      user-toggled Vault / Store shortcuts. */}
+                  <MenuRow
+                    label="Dashboard"
+                    onClick={() => runMenuAction(() => onOpenApp("dashboard"))}
+                  />
+                  {showTopbarItem("vault") && (
+                    <MenuRow
+                      label="Vault"
+                      onClick={() => runMenuAction(() => onOpenApp("filemanager"))}
+                    />
+                  )}
+                  {showTopbarItem("store") && (
+                    <MenuRow
+                      label="Store"
+                      onClick={() => runMenuAction(() => onOpenApp("appstore"))}
+                    />
+                  )}
 
-            {onToggleAppSwitcher && (
-              <div
-                className="menubar-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleAppSwitcher();
-                }}
-                style={{ display: "flex", alignItems: "center", gap: "5px" }}
-                title="Open AOS Multitasking App Switcher"
-              >
-                <Layers size={13} />
-                <span>Viewer</span>
-              </div>
-            )}
+                  {/* Every module section as a grouped header with its apps
+                      beneath (user-toggled via topbar_items: sections). */}
+                  {showTopbarItem("sections") &&
+                    sectionMenus.length > 0 &&
+                    sectionMenus.map((section, i) => (
+                      <React.Fragment key={section.name}>
+                        {i > 0 && <MenuSeparator />}
+                        <MenuRow label={section.name} isHeader />
+                        {section.apps.map((app) => (
+                          <MenuRow
+                            key={app.id}
+                            label={app.name}
+                            onClick={() => runMenuAction(() => onOpenApp(app.id))}
+                          />
+                        ))}
+                      </React.Fragment>
+                    ))}
+                </MenuDropdown>
+              )}
+            </div>
 
+            {/* Widgets board toggle (user-toggled via topbar_items). */}
             {showTopbarItem("widgets") && (
               <span
                 className="menubar-item"
@@ -764,97 +795,6 @@ export default function TopMenuBar({
                 Widgets
               </span>
             )}
-
-            {showTopbarItem("vault") && (
-              <span
-                className="menubar-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenApp("filemanager");
-                }}
-              >
-                Vault
-              </span>
-            )}
-
-            {showTopbarItem("store") && (
-              <span
-                className="menubar-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenApp("appstore");
-                }}
-              >
-                Store
-              </span>
-            )}
-
-            {showTopbarItem("sections") &&
-              sectionMenus.length > 0 &&
-              (isNarrow ? (
-                /* Narrow: all sections collapse into one "Sections" menu. */
-                <div
-                  className={`menubar-item ${openMenu === "sections" ? "is-active" : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleMenu("sections");
-                  }}
-                  onMouseEnter={() => hoverMenu("sections")}
-                  style={{ position: "relative", display: "flex", alignItems: "center", gap: "4px" }}
-                  title="All module sections"
-                >
-                  <span>Sections</span>
-                  <ChevronDown size={11} />
-                  {openMenu === "sections" && (
-                    <MenuDropdown top={dropdownTop} minWidth={260}>
-                      {sectionMenus.map((section, i) => (
-                        <React.Fragment key={section.name}>
-                          {i > 0 && <MenuSeparator />}
-                          <MenuRow label={section.name} isHeader />
-                          {section.apps.map((app) => (
-                            <MenuRow
-                              key={app.id}
-                              label={app.name}
-                              onClick={() => runMenuAction(() => onOpenApp(app.id))}
-                            />
-                          ))}
-                        </React.Fragment>
-                      ))}
-                    </MenuDropdown>
-                  )}
-                </div>
-              ) : (
-                /* Wide: one menubar menu per plugin sidebar section. */
-                sectionMenus.map((section) => {
-                  const menuId = `section:${section.name}`;
-                  return (
-                    <div
-                      key={section.name}
-                      className={`menubar-item ${openMenu === menuId ? "is-active" : ""}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleMenu(menuId);
-                      }}
-                      onMouseEnter={() => hoverMenu(menuId)}
-                      style={{ position: "relative", display: "flex", alignItems: "center", gap: "4px" }}
-                      title={`${section.name} modules`}
-                    >
-                      <span>{section.name}</span>
-                      {openMenu === menuId && (
-                        <MenuDropdown top={dropdownTop} minWidth={210}>
-                          {section.apps.map((app) => (
-                            <MenuRow
-                              key={app.id}
-                              label={app.name}
-                              onClick={() => runMenuAction(() => onOpenApp(app.id))}
-                            />
-                          ))}
-                        </MenuDropdown>
-                      )}
-                    </div>
-                  );
-                })
-              ))}
           </>
         )}
       </div>
@@ -992,9 +932,10 @@ export default function TopMenuBar({
           }
         >
           <p style={{ margin: "0 0 12px" }}>
-            Choose which quick items appear on the left side of the menu bar
-            while on the desktop. A focused app always takes over the menu bar
-            with its own menus.
+            Choose what appears inside the Apps menu while on the desktop — the
+            Vault and Store quick links, and the module sections grouped beneath
+            them. The Widgets toggle lives in the menu bar itself, and a focused
+            app always takes over the menu bar with its own menus.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {EDITABLE_TOPBAR_ITEMS.map((entry) => {

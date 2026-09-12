@@ -27,6 +27,8 @@ ui:
     visible_to:
     - school_admin
     - teacher
+  aos:
+    about: "Report and track student incidents — witness statements, action logs, bullying tracking, and disciplinary records."
 mobile:
   admin:
     feature_folder: incidents

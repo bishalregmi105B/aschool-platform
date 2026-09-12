@@ -44,6 +44,8 @@ ui:
       route: /dashboard/website-builder/ai-builder
     - label: Website Settings
       route: /dashboard/settings/website-design
+  aos:
+    about: "Build an advanced school website with a drag-drop editor, open-source themes, custom CSS, AI content generation, and SEO tools."
 mobile:
   admin:
     feature_folder: website_builder

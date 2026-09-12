@@ -6,7 +6,6 @@ import {
   Wifi,
   Battery,
   Bell,
-  Sparkles,
   ArrowLeft,
   X,
   Monitor,
@@ -18,10 +17,22 @@ import {
   type AOSApp,
 } from "@/lib/aos-app-adapter";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
+import AOSAppFrame from "./AOSAppFrame";
+import type { WindowInstance } from "./WindowManager";
 import IOSControlCenter from "./IOSControlCenter";
 import IOSNotificationCenter from "./IOSNotificationCenter";
 import { useAuth } from "@/lib/auth-context";
 import { useServerTime } from "@/lib/use-server-time";
+import { useAOSUserSettings } from "@/lib/aos-settings";
+import {
+  AOSNavigateProvider,
+  AOSWindowRouteProvider,
+} from "@/lib/aos-window-route";
+import {
+  getDefaultFolders,
+  parseDesktopFolders,
+  resolveDesktopLayout,
+} from "@/lib/aos-launcher";
 import {
   AOS_MODE_STORAGE_KEY,
   buildAOSRouteWindowId,
@@ -66,10 +77,12 @@ export default function MobileExperience({
   const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   const [timeStr, setTimeStr] = useState("");
 
   const { sidebarItems, pluginBottomNav } = useInstalledPlugins();
   const { user } = useAuth();
+  const { settings: aosSettings } = useAOSUserSettings();
   const serverTime = useServerTime();
   const router = useRouter();
   const pathname = usePathname();
@@ -126,46 +139,85 @@ export default function MobileExperience({
     }
   };
 
-  // Convert all dynamic sidebar and bottom items into AOSApps
-  const allApps: AOSApp[] = useMemo(() => {
-    const apps = sidebarItems.map((item) => getAOSAppForModule(item));
-    // Add bottom nav items if not present
-    for (const b of pluginBottomNav) {
-      const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
-      if (!apps.some((a) => a.id === moduleId)) {
-        apps.push({
-          id: moduleId,
-          name: b.label,
-          route: b.route || `/dashboard/${moduleId}`,
-          category: "System",
-          defaultWidth: 800,
-          defaultHeight: 600,
-          icon: (
-            <div
-              className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-white shadow-lg"
-              style={{ background: "linear-gradient(135deg, #0078D4, #005A9E)" }}
-            >
-              <Sparkles className="w-7 h-7" />
-            </div>
-          ),
-        });
+  // Convert all dynamic sidebar and bottom items into AOSApps with REAL
+  // manifest icons at the requested tile size: 56px springboard tiles,
+  // 52px dock slots, 21px folder mini-grid previews.
+  const buildApps = useCallback(
+    (iconSize: number): AOSApp[] => {
+      const apps = sidebarItems.map((item) => getAOSAppForModule(item, iconSize));
+      // Bottom-nav modules (Settings, Marketplace, …) reuse their real
+      // manifest icons instead of a generic placeholder tile.
+      for (const b of pluginBottomNav) {
+        const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
+        if (apps.some((a) => a.id === moduleId)) continue;
+        apps.push(
+          getAOSAppForModule(
+            {
+              slug: b.slug,
+              label: b.label,
+              label_nepali: null,
+              icon: b.icon,
+              section: "System",
+              route: b.route,
+              subitems: b.subitems || [],
+            },
+            iconSize
+          )
+        );
       }
-    }
-    return apps;
-  }, [sidebarItems, pluginBottomNav]);
+      return apps;
+    },
+    [sidebarItems, pluginBottomNav]
+  );
 
-  // Bottom dock apps (pick top 4)
+  // Springboard apps (56px icons — the tile size) + folder-open grid.
+  const allApps = useMemo(() => buildApps(56), [buildApps]);
+
+  // Mini icons for the 2x2 previews inside folder tiles.
+  const miniAppsById = useMemo(
+    () => new Map(buildApps(21).map((a) => [a.id, a])),
+    [buildApps]
+  );
+
+  // Springboard folder layout — the SAME organization as the desktop:
+  // persisted desktop_folders (aos_settings) win; section-derived defaults
+  // apply while the user has never customized folders.
+  const persistedFolders = useMemo(
+    () => parseDesktopFolders(aosSettings.desktop_folders),
+    [aosSettings.desktop_folders]
+  );
+  const springboardFolders = useMemo(
+    () =>
+      persistedFolders.length > 0
+        ? persistedFolders
+        : getDefaultFolders(allApps, sidebarItems),
+    [persistedFolders, allApps, sidebarItems]
+  );
+  const springboardLayout = useMemo(
+    () => resolveDesktopLayout(allApps, springboardFolders),
+    [allApps, springboardFolders]
+  );
+  const openFolder = useMemo(
+    () =>
+      openFolderId
+        ? springboardLayout.folders.find((f) => f.id === openFolderId) ?? null
+        : null,
+    [openFolderId, springboardLayout]
+  );
+
+  // Bottom dock apps (pick top 4, dock-sized 52px icons)
   const dockApps = useMemo(() => {
+    const source = buildApps(52);
     const preferred = ["students", "attendance", "timetable", "fees"];
-    const found = allApps.filter((a) => preferred.includes(a.id));
+    const found = source.filter((a) => preferred.includes(a.id));
     if (found.length >= 4) return found.slice(0, 4);
     // Fill up to 4
-    for (const a of allApps) {
+    for (const a of source) {
       if (found.length >= 4) break;
       if (!found.some((x) => x.id === a.id)) found.push(a);
     }
     return found;
-  }, [allApps]);
+  }, [buildApps]);
 
   const routeTitleMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -240,6 +292,59 @@ export default function MobileExperience({
     };
   }, [activeApp, allApps, routeTitleMap]);
 
+  // Resolve the active sheet app into (moduleId, route) for the app frame —
+  // route windows ("route:/dashboard/fees/collect") keep their full route,
+  // plain module ids open at the module hub.
+  const activeAppRouteInfo = useMemo(() => {
+    if (!activeApp) {
+      return { moduleId: undefined as string | undefined, route: undefined as string | undefined };
+    }
+    if (activeApp.startsWith("route:")) {
+      const normalizedRoute = normalizeAOSRoute(activeApp.slice("route:".length));
+      if (normalizedRoute) {
+        const moduleSlug = extractAOSModuleSlug(normalizedRoute);
+        return {
+          moduleId: normalizeAOSModuleId(moduleSlug || "", normalizedRoute) || undefined,
+          route: normalizedRoute,
+        };
+      }
+    }
+    return { moduleId: activeApp, route: undefined };
+  }, [activeApp]);
+
+  // Minimal window descriptor for the universal AOSAppFrame drawer.
+  const frameWindow = useMemo<WindowInstance>(
+    () => ({
+      id: activeApp || "mobile-app",
+      moduleId: activeAppRouteInfo.moduleId,
+      route: activeAppRouteInfo.route,
+      title: activeAppMeta?.name || activeApp || "AOS",
+      icon: null,
+      isOpen: true,
+      isMinimized: false,
+      isMaximized: true,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      zIndex: 0,
+    }),
+    [activeApp, activeAppRouteInfo, activeAppMeta]
+  );
+
+  // In-process navigation for the app frame drawer (and any embedded links).
+  const mobileNavigate = useCallback(
+    (route: string) => {
+      openRouteInMobile(route);
+    },
+    [openRouteInMobile]
+  );
+
+  // Opening any app closes the springboard folder view.
+  useEffect(() => {
+    if (activeApp) setOpenFolderId(null);
+  }, [activeApp]);
+
   useEffect(() => {
     if (!pathname) return;
 
@@ -282,6 +387,7 @@ export default function MobileExperience({
   );
 
   return (
+    <AOSNavigateProvider navigate={mobileNavigate}>
     <div
       className={`ios-mobile-screen win11 aos-gpu-accel ${themeMode === "dark" ? "dark" : ""}`}
       data-theme={themeMode}
@@ -474,7 +580,85 @@ export default function MobileExperience({
           alignContent: "flex-start",
         }}
       >
-        {allApps.map((app) => (
+        {/* iOS-style folder tiles — rounded translucent tile with a 2x2
+            mini-grid of up to 4 member app icons. */}
+        {springboardLayout.folders.map((folder) => (
+          <div
+            key={`folder-${folder.id}`}
+            onClick={() => setOpenFolderId(folder.id)}
+            className="aos-haptic-click"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              cursor: "pointer",
+              transition: "transform 0.15s ease",
+            }}
+          >
+            <div
+              className="ios-app-icon"
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "16px",
+                background: "rgba(255, 255, 255, 0.22)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateRows: "repeat(2, 1fr)",
+                gap: "4px",
+                padding: "5px",
+                boxSizing: "border-box",
+                overflow: "hidden",
+                filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
+                transition: "transform 0.1s ease",
+              }}
+            >
+              {folder.apps.slice(0, 4).map((app) => (
+                <div
+                  key={app.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    minWidth: 0,
+                    minHeight: 0,
+                  }}
+                >
+                  {miniAppsById.get(app.id)?.icon ?? app.icon}
+                </div>
+              ))}
+              {Array.from({
+                length: Math.max(0, 4 - Math.min(folder.apps.length, 4)),
+              }).map((_, i) => (
+                <div key={`pad-${i}`} />
+              ))}
+            </div>
+            <span
+              style={{
+                marginTop: "6px",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#ffffff",
+                textAlign: "center",
+                textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+                lineHeight: 1.2,
+                maxWidth: "68px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {folder.name}
+            </span>
+          </div>
+        ))}
+
+        {/* Loose apps (not in any folder) */}
+        {springboardLayout.looseApps.map((app) => (
           <div
             key={app.id}
             onClick={() => handleSelectApp(app.id)}
@@ -637,21 +821,147 @@ export default function MobileExperience({
             </button>
           </div>
 
-          {/* Module Body Frame */}
+          {/* Module Body Frame — the sheet content gets the SAME manifest
+              subitem navigation as the desktop drawer via AOSAppFrame (on
+              phones the drawer collapses into an overlay opened from the
+              edge; modules without manifest entries render unframed). */}
           <div
             className="aos-window-content flex-1 h-full overflow-auto"
+            style={{ minHeight: 0 }}
             onClickCapture={handleActiveAppLinkClick}
           >
-            {activeAppComponent ? (
-              React.createElement(activeAppComponent, {})
-            ) : (
-              <div
-                className="p-8 text-center text-sm"
-                style={{ color: "var(--w11-text-secondary)" }}
-              >
-                Loading module {activeApp}...
-              </div>
-            )}
+            <AOSWindowRouteProvider
+              route={
+                activeAppRouteInfo.route ||
+                `/dashboard/${activeAppRouteInfo.moduleId || activeApp}`
+              }
+            >
+              <AOSAppFrame window={frameWindow}>
+                {activeAppComponent ? (
+                  React.createElement(activeAppComponent, {})
+                ) : (
+                  <div
+                    className="p-8 text-center text-sm"
+                    style={{ color: "var(--w11-text-secondary)" }}
+                  >
+                    Loading module {activeApp}...
+                  </div>
+                )}
+              </AOSAppFrame>
+            </AOSWindowRouteProvider>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Folder Open View — full-screen blurred overlay with the folder's
+          apps; tap outside (or Close) to dismiss. */}
+      {openFolder && (
+        <div
+          onClick={() => setOpenFolderId(null)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10020,
+            background: "rgba(0, 0, 0, 0.35)",
+            backdropFilter: "blur(28px) saturate(160%)",
+            WebkitBackdropFilter: "blur(28px) saturate(160%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "40px 20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "420px", textAlign: "center" }}
+          >
+            <div
+              style={{
+                fontSize: "22px",
+                fontWeight: 800,
+                color: "#ffffff",
+                marginBottom: "26px",
+                letterSpacing: "-0.3px",
+                textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+              }}
+            >
+              {openFolder.name}
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "24px 10px",
+              }}
+            >
+              {openFolder.apps.map((app) => (
+                <div
+                  key={app.id}
+                  onClick={() => {
+                    setOpenFolderId(null);
+                    handleSelectApp(app.id);
+                  }}
+                  className="aos-haptic-click"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div
+                    className="ios-app-icon"
+                    style={{
+                      width: "56px",
+                      height: "56px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.4))",
+                    }}
+                  >
+                    {app.icon}
+                  </div>
+                  <span
+                    style={{
+                      marginTop: "6px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#ffffff",
+                      textAlign: "center",
+                      textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+                      lineHeight: 1.2,
+                      maxWidth: "72px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {app.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setOpenFolderId(null)}
+              style={{
+                all: "unset",
+                marginTop: "28px",
+                background: "rgba(255, 255, 255, 0.2)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255,255,255,0.25)",
+                padding: "6px 18px",
+                borderRadius: "18px",
+                color: "#ffffff",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Close Folder
+            </button>
           </div>
         </div>
       )}
@@ -682,5 +992,6 @@ export default function MobileExperience({
         accentColor={accentColor}
       />
     </div>
+    </AOSNavigateProvider>
   );
 }

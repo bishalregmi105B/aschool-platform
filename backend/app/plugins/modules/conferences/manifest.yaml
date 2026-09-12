@@ -29,6 +29,8 @@ ui:
     - school_admin
     - teacher
     subitems:
+  aos:
+    about: "Book and run parent-teacher conferences online — time slots, video calls, notes, and follow-up tracking."
 mobile:
   admin:
     feature_folder: conferences

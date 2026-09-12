@@ -31,7 +31,7 @@ export default function PluginRunnerApp({
 
   // Attendance Scanner state
   const [scannedStudents, setScannedStudents] = useState<string[]>([
-    "Bishal Regmi (Grade 11-A) — 10:31 AM",
+    "Aarav Sharma (Grade 11-A) — 10:31 AM",
     "Elena Rostova (Grade 11-A) — 10:32 AM",
   ]);
 

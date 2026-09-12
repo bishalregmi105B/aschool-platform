@@ -47,6 +47,8 @@ ui:
       route: /dashboard/transport/logs
     - label: Reports
       route: /dashboard/transport/reports
+  aos:
+    about: "Track school buses live on a map with parent ETA alerts, route and stop management, trips, and speed alerts."
 mobile:
   admin:
     feature_folder: transport

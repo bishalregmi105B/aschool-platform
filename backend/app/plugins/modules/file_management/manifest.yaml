@@ -60,6 +60,8 @@ ui:
       route: /dashboard/files?type=document
     - label: Videos
       route: /dashboard/files?type=video
+  aos:
+    about: "Central school file storage — upload, organize, and manage the documents, images, and videos used across every module."
 mobile:
   admin:
     feature_folder: files

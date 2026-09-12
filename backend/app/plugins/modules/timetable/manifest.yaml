@@ -33,6 +33,8 @@ ui:
     subitems:
     - label: AI Generate
       route: /dashboard/timetable/generate
+  aos:
+    about: "Build the school timetable — class scheduling, teacher and room allocation, substitutions, and an AI timetable generator."
 mobile:
   admin:
     feature_folder: timetable

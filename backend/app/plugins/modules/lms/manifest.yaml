@@ -34,6 +34,8 @@ ui:
     visible_to:
     - school_admin
     - teacher
+  aos:
+    about: "Deliver classes online — live Jitsi classes, a recorded class library, course builder, and student watch analytics."
 mobile:
   admin:
     feature_folder: lms

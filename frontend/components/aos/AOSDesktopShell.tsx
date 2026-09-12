@@ -442,20 +442,30 @@ export default function AOSDesktopShell() {
         setActiveWindowId(windowId);
 
         if (existing) {
-          return prevWindows.map((w) =>
-            w.id === windowId
-              ? {
-                  ...w,
-                  moduleId,
-                  route: hasRouteOverride ? options.route : w.route,
-                  title: options.title || w.title,
-                  icon: options.icon ?? w.icon,
-                  isOpen: true,
-                  isMinimized: false,
-                  zIndex: nextZ,
-                }
-              : w
-          );
+          return prevWindows.map((w) => {
+            if (w.id !== windowId) return w;
+            const nextRoute = hasRouteOverride ? options.route : w.route;
+            // Route history for the per-window Back button: push the previous
+            // route whenever an existing window's route is replaced.
+            let routeHistory = w.routeHistory;
+            if (hasRouteOverride && nextRoute !== w.route) {
+              const previousRoute = w.route || `/dashboard/${w.moduleId || w.id}`;
+              if (previousRoute !== nextRoute) {
+                routeHistory = [...(w.routeHistory || []), previousRoute].slice(-20);
+              }
+            }
+            return {
+              ...w,
+              moduleId,
+              route: nextRoute,
+              routeHistory,
+              title: options.title || w.title,
+              icon: options.icon ?? w.icon,
+              isOpen: true,
+              isMinimized: false,
+              zIndex: nextZ,
+            };
+          });
         }
 
         const appMeta = appMetaById.get(moduleId) || {
@@ -540,6 +550,28 @@ export default function AOSDesktopShell() {
       return true;
     },
     [routeLaunchIndex, appMetaById, openWindow]
+  );
+
+  // Per-window Back: pop the last entry from the window's route history and
+  // set the route directly (does NOT push history again — back navigation is
+  // not itself a navigation step).
+  const navigateWindowBack = useCallback(
+    (windowId: string, route: string) => {
+      setWindows((prev) =>
+        prev.map((w) => {
+          if (w.id !== windowId) return w;
+          const history = w.routeHistory || [];
+          const popped = history[history.length - 1];
+          if (popped !== route) return w;
+          return {
+            ...w,
+            route,
+            routeHistory: history.slice(0, -1),
+          };
+        })
+      );
+    },
+    []
   );
 
   const closeWindow = useCallback((id: string) => {
@@ -802,6 +834,7 @@ export default function AOSDesktopShell() {
           pinnedAppIds={pinnedAppIds}
           onTogglePinApp={handleTogglePinApp}
           onOpenRoute={openRouteInAOS}
+          onNavigateWindowBack={navigateWindowBack}
         />
       </Desktop>
 

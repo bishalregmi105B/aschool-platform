@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Minus, Square, Copy, X } from "lucide-react";
+import { Minus, Square, Copy, X, ChevronLeft } from "lucide-react";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
 import { resolveRouteComponent } from "./AOSRouteTable";
+import AOSAppFrame, { shouldUseAOSAppFrame } from "./AOSAppFrame";
 import { AOSWindowRouteProvider } from "@/lib/aos-window-route";
 import { SchoolRole } from "./RoleSwitcherModal";
 import type { EducationalPlugin } from "./apps/AppStoreApp";
@@ -23,6 +24,8 @@ export interface WindowInstance {
   width: number;
   height: number;
   zIndex: number;
+  /** In-window route history (most recent last, capped at 20) for the Back button. */
+  routeHistory?: string[];
 }
 
 export interface WindowManagerProps {
@@ -66,6 +69,8 @@ export interface WindowManagerProps {
   pinnedAppIds?: string[];
   onTogglePinApp?: (id: string) => void;
   onOpenRoute?: (route: string) => void;
+  /** Navigate a window one step back through its own route history. */
+  onNavigateWindowBack?: (windowId: string, route: string) => void;
 }
 
 type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -111,6 +116,7 @@ export default function WindowManager({
   pinnedAppIds = [],
   onTogglePinApp = () => {},
   onOpenRoute,
+  onNavigateWindowBack = () => {},
 }: WindowManagerProps) {
   const [draggingWindowId, setDraggingWindowId] = useState<string | null>(null);
   const [resizingWindowId, setResizingWindowId] = useState<string | null>(null);
@@ -319,6 +325,10 @@ export default function WindowManager({
 
         const isActive = activeWindowId === win.id;
         const isInteracting = draggingWindowId === win.id || resizingWindowId === win.id;
+        const canGoBack = (win.routeHistory?.length ?? 0) > 0;
+        // The universal app frame wraps every plugin-module window except the
+        // apps that ship their own sidebar navigation.
+        const useAppFrame = shouldUseAOSAppFrame(win.moduleId);
 
         const windowStyle: React.CSSProperties = {
           position: "absolute",
@@ -431,6 +441,32 @@ export default function WindowManager({
                 >
                   {win.icon}
                 </span>
+                <button
+                  aria-label="Back"
+                  title="Back"
+                  disabled={!canGoBack}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const history = win.routeHistory || [];
+                    if (!history.length) return;
+                    onNavigateWindowBack(win.id, history[history.length - 1]);
+                  }}
+                  className="icon-button"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    minWidth: 24,
+                    flexShrink: 0,
+                    padding: 0,
+                    background: "transparent",
+                    border: "none",
+                    color: canGoBack ? "var(--w11-text-secondary)" : "var(--w11-text-disabled)",
+                    opacity: canGoBack ? 1 : 0.3,
+                    cursor: canGoBack ? "pointer" : "default",
+                  }}
+                >
+                  <ChevronLeft size={15} />
+                </button>
                 <span
                   style={{
                     fontSize: "13px",
@@ -461,18 +497,25 @@ export default function WindowManager({
                   <Minus size={14} />
                 </button>
 
-                <button
-                  aria-label={win.isMaximized ? "Restore" : "Maximize"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleMaximizeWindow(win.id);
-                  }}
+                {/* Single hover container around the maximize button + snap
+                    menu: moving the cursor from the button toward the menu
+                    stays inside one hover zone, so the popover no longer
+                    dismisses mid-travel. */}
+                <div
+                  style={{ position: "relative", display: "flex", alignItems: "center", height: "100%" }}
                   onMouseEnter={() => setSnapHoverWindowId(win.id)}
                   onMouseLeave={() => setSnapHoverWindowId(null)}
-                  title="Maximize / Snap Layouts"
-                  style={{ position: "relative" }}
                 >
-                  {win.isMaximized ? <Copy size={12} /> : <Square size={12} />}
+                  <button
+                    aria-label={win.isMaximized ? "Restore" : "Maximize"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleMaximizeWindow(win.id);
+                    }}
+                    title="Maximize / Snap Layouts"
+                  >
+                    {win.isMaximized ? <Copy size={12} /> : <Square size={12} />}
+                  </button>
 
                   {/* Windows 11 Snap Layouts Popover */}
                   {snapHoverWindowId === win.id && (
@@ -537,7 +580,7 @@ export default function WindowManager({
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
 
                 <button
                   aria-label="Close"
@@ -568,39 +611,77 @@ export default function WindowManager({
               }}
             >
               <AOSWindowRouteProvider route={win.route || `/dashboard/${win.moduleId || win.id}`}>
-              <ResolvedComponent
-                window={win}
-                pluginId={win.id}
-                currentRole={currentRole}
-                accentColor={accentColor}
-                themeMode={themeMode}
-                onToggleTheme={onToggleTheme}
-                wallpaper={wallpaper}
-                onChangeWallpaper={onChangeWallpaper}
-                dockStyle={dockStyle}
-                onChangeDockStyle={onChangeDockStyle}
-                dockSize={dockSize}
-                onChangeDockSize={onChangeDockSize}
-                showTopBar={showTopBar}
-                onToggleTopBar={onToggleTopBar}
-                topBarHeight={topBarHeight}
-                onChangeTopBarHeight={onChangeTopBarHeight}
-                blurIntensity={blurIntensity}
-                onChangeBlurIntensity={onChangeBlurIntensity}
-                taskbarAlign={taskbarAlign}
-                onToggleTaskbarAlign={onToggleTaskbarAlign}
-                brightness={brightness}
-                onChangeBrightness={onChangeBrightness}
-                onOpenRoleSwitcher={onOpenRoleSwitcher}
-                pinnedAppIds={pinnedAppIds}
-                onTogglePinApp={onTogglePinApp}
-                plugins={plugins}
-                onToggleInstallPlugin={onToggleInstallPlugin}
-                onToggleActivePlugin={onToggleActivePlugin}
-                onPurchasePlugin={onPurchasePlugin}
-                onUpdatePluginRoles={onUpdatePluginRoles}
-                onLaunchPluginDemo={onLaunchPluginDemo}
-              />
+              {useAppFrame ? (
+                <AOSAppFrame window={win}>
+                  <ResolvedComponent
+                    window={win}
+                    pluginId={win.id}
+                    currentRole={currentRole}
+                    accentColor={accentColor}
+                    themeMode={themeMode}
+                    onToggleTheme={onToggleTheme}
+                    wallpaper={wallpaper}
+                    onChangeWallpaper={onChangeWallpaper}
+                    dockStyle={dockStyle}
+                    onChangeDockStyle={onChangeDockStyle}
+                    dockSize={dockSize}
+                    onChangeDockSize={onChangeDockSize}
+                    showTopBar={showTopBar}
+                    onToggleTopBar={onToggleTopBar}
+                    topBarHeight={topBarHeight}
+                    onChangeTopBarHeight={onChangeTopBarHeight}
+                    blurIntensity={blurIntensity}
+                    onChangeBlurIntensity={onChangeBlurIntensity}
+                    taskbarAlign={taskbarAlign}
+                    onToggleTaskbarAlign={onToggleTaskbarAlign}
+                    brightness={brightness}
+                    onChangeBrightness={onChangeBrightness}
+                    onOpenRoleSwitcher={onOpenRoleSwitcher}
+                    pinnedAppIds={pinnedAppIds}
+                    onTogglePinApp={onTogglePinApp}
+                    plugins={plugins}
+                    onToggleInstallPlugin={onToggleInstallPlugin}
+                    onToggleActivePlugin={onToggleActivePlugin}
+                    onPurchasePlugin={onPurchasePlugin}
+                    onUpdatePluginRoles={onUpdatePluginRoles}
+                    onLaunchPluginDemo={onLaunchPluginDemo}
+                  />
+                </AOSAppFrame>
+              ) : (
+                <ResolvedComponent
+                  window={win}
+                  pluginId={win.id}
+                  currentRole={currentRole}
+                  accentColor={accentColor}
+                  themeMode={themeMode}
+                  onToggleTheme={onToggleTheme}
+                  wallpaper={wallpaper}
+                  onChangeWallpaper={onChangeWallpaper}
+                  dockStyle={dockStyle}
+                  onChangeDockStyle={onChangeDockStyle}
+                  dockSize={dockSize}
+                  onChangeDockSize={onChangeDockSize}
+                  showTopBar={showTopBar}
+                  onToggleTopBar={onToggleTopBar}
+                  topBarHeight={topBarHeight}
+                  onChangeTopBarHeight={onChangeTopBarHeight}
+                  blurIntensity={blurIntensity}
+                  onChangeBlurIntensity={onChangeBlurIntensity}
+                  taskbarAlign={taskbarAlign}
+                  onToggleTaskbarAlign={onToggleTaskbarAlign}
+                  brightness={brightness}
+                  onChangeBrightness={onChangeBrightness}
+                  onOpenRoleSwitcher={onOpenRoleSwitcher}
+                  pinnedAppIds={pinnedAppIds}
+                  onTogglePinApp={onTogglePinApp}
+                  plugins={plugins}
+                  onToggleInstallPlugin={onToggleInstallPlugin}
+                  onToggleActivePlugin={onToggleActivePlugin}
+                  onPurchasePlugin={onPurchasePlugin}
+                  onUpdatePluginRoles={onUpdatePluginRoles}
+                  onLaunchPluginDemo={onLaunchPluginDemo}
+                />
+              )}
               </AOSWindowRouteProvider>
             </div>
           </div>
