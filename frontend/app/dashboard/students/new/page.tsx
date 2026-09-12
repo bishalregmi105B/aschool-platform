@@ -23,7 +23,7 @@ import {
 } from "@/components/ai/ai-form-assist";
 import { ArrowLeft, UserPlus, Upload, User, GraduationCap, Users } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useI18n } from "@/lib/i18n";
 
 /** Field schema doubles for the AI assistant — the same metadata drives the
@@ -47,7 +47,7 @@ const AI_FIELDS: AiFieldSchema[] = [
 ];
 
 export default function NewStudentPage() {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const { t } = useI18n();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -163,7 +163,7 @@ export default function NewStudentPage() {
         roll ? `Roll No. ${roll}` : null,
       ].filter(Boolean).join(", ");
       toast.success(assigned ? `Student enrolled! ${assigned} auto-assigned.` : "Student enrolled!");
-      router.push("/dashboard/students");
+      router("/dashboard/students");
     },
     onError: () => toast.error("Failed to enroll student"),
   });
@@ -419,7 +419,7 @@ export default function NewStudentPage() {
       <FormActions>
         <Button
           variant="ghost"
-          onClick={() => router.push("/dashboard/students")}
+          onClick={() => router("/dashboard/students")}
         >
           {t("Cancel", "रद्द")}
         </Button>

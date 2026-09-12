@@ -246,3 +246,9 @@
   border-radius: 6px;
   color: var(--w11-toast-text-secondary);
 }
+
+/* Taller AOS titlebar (38px) with matching caption buttons */
+.win11 .win11-titlebar-controls button {
+  height: 38px;
+  min-width: 46px;
+}

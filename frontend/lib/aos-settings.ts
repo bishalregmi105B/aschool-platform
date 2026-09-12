@@ -26,7 +26,21 @@ export interface AOSUserSettings {
   pinned_apps: string[];
   desktop_folders: unknown[];
   home_widgets: string[];
+  /**
+   * Which quick items the AOS menu bar shows on its left side (desktop view).
+   * Known ids: "sections", "vault", "store", "widgets". Absent (undefined)
+   * means the user never customized it — DEFAULT_TOPBAR_ITEMS applies.
+   */
+  topbar_items?: string[];
 }
+
+/** Default left-side menu bar items (used when topbar_items is absent). */
+export const DEFAULT_TOPBAR_ITEMS: readonly string[] = [
+  "sections",
+  "vault",
+  "store",
+  "widgets",
+];
 
 export const AOS_SETTINGS_DEFAULTS: AOSUserSettings = {
   theme_mode: "dark",
@@ -79,6 +93,9 @@ function coerce(raw: RawAOS | null | undefined): AOSUserSettings {
     pinned_apps: Array.isArray(raw.pinned_apps) ? (raw.pinned_apps as string[]) : [],
     desktop_folders: Array.isArray(raw.desktop_folders) ? raw.desktop_folders : [],
     home_widgets: Array.isArray(raw.home_widgets) ? (raw.home_widgets as string[]) : [],
+    topbar_items: Array.isArray(raw.topbar_items)
+      ? (raw.topbar_items as unknown[]).filter((v): v is string => typeof v === "string")
+      : undefined,
   };
 }
 

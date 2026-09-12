@@ -312,7 +312,7 @@ _AOS_STRING_FIELDS = {
     "taskbar_align": {"center", "left"},
     "system_mode": {"", "desktop", "mobile"},
 }
-_AOS_JSON_FIELDS = {"pinned_apps": list, "desktop_folders": list, "home_widgets": list}
+_AOS_JSON_FIELDS = {"pinned_apps": list, "desktop_folders": list, "home_widgets": list, "topbar_items": list}
 
 
 def _get_or_create_aos_settings(user_id):

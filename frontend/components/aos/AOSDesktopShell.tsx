@@ -34,6 +34,7 @@ import {
   normalizeAOSRoute,
 } from "@/lib/aos-navigation";
 import { useAOSUserSettings } from "@/lib/aos-settings";
+import { AOSNavigateProvider } from "@/lib/aos-window-route";
 import {
   getDefaultFolders,
   parseDesktopFolders,
@@ -264,7 +265,7 @@ export default function AOSDesktopShell() {
 
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
-    const apps = sidebarItems.map(getAOSAppForModule);
+    const apps = sidebarItems.map((item) => getAOSAppForModule(item));
     for (const b of pluginBottomNav) {
       const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
       if (!apps.some((a) => a.id === moduleId)) {
@@ -318,6 +319,14 @@ export default function AOSDesktopShell() {
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const zIndexRef = useRef(20);
+  const shellRootRef = useRef<HTMLDivElement>(null);
+
+  // Menu bar navigation source — sidebar items plus bottom-nav modules, so
+  // the focused-app menus can derive Navigate/Window/Help for every module.
+  const menubarNavItems = useMemo(
+    () => [...sidebarItems, ...pluginBottomNav],
+    [sidebarItems, pluginBottomNav]
+  );
 
   const closeAllFlyouts = useCallback(
     (
@@ -640,8 +649,46 @@ export default function AOSDesktopShell() {
     }
   }, [pathname, searchParams, openRouteInAOS, router]);
 
+  // In-process navigation: the single entry point every link in the shell
+  // goes through (window content, widgets, flyouts, menubar). The browser
+  // URL never leaves /dashboard.
+  const navigate = useCallback(
+    (route: string) => {
+      const normalized = normalizeAOSRoute(route);
+      if (!normalized) return;
+      openRouteInAOS(normalized);
+    },
+    [openRouteInAOS]
+  );
+
+  // Global anchor interception — capture phase on the shell root catches
+  // EVERY in-app link (windows, widgets, flyouts, dropdowns) before the
+  // router navigates, so the URL bar never changes.
+  useEffect(() => {
+    const root = shellRootRef.current;
+    if (!root) return;
+    const onClickCapture = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      const href = anchor.getAttribute("href") || "";
+      const normalized = normalizeAOSRoute(href);
+      if (!normalized) return; // external/other-prefix links pass through
+      e.preventDefault();
+      e.stopPropagation();
+      navigate(normalized);
+    };
+    root.addEventListener("click", onClickCapture, true);
+    return () => root.removeEventListener("click", onClickCapture, true);
+  }, [navigate]);
+
   return (
+    <AOSNavigateProvider navigate={navigate}>
     <div
+      ref={shellRootRef}
       className={`aos-desktop win11 ${themeMode}`}
       data-theme={themeMode}
       style={shellStyle}
@@ -653,7 +700,7 @@ export default function AOSDesktopShell() {
           currentRole={currentRole}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
-          sidebarItems={sidebarItems}
+          sidebarItems={menubarNavItems}
           onOpenRoleSwitcher={() => {
             closeAllFlyouts("roleSwitcher");
             setIsRoleSwitcherOpen(true);
@@ -667,16 +714,6 @@ export default function AOSDesktopShell() {
             const next = !isNotificationsOpen;
             closeAllFlyouts("notifications");
             setIsNotificationsOpen(next);
-          }}
-          onToggleSearch={() => {
-            const next = !isStartOpen;
-            closeAllFlyouts("start");
-            setIsStartOpen(next);
-          }}
-          onToggleSpotlight={() => {
-            const next = !isSpotlightOpen;
-            closeAllFlyouts("spotlight");
-            setIsSpotlightOpen(next);
           }}
           onToggleWidgets={() => {
             const next = !isWidgetsOpen;
@@ -698,6 +735,20 @@ export default function AOSDesktopShell() {
           onToggleSystemMode={handleToggleSystemMode}
           unreadCount={unreadCount}
           topBarHeight={topBarHeight}
+          windows={windows}
+          activeWindowId={activeWindowId}
+          onFocusWindow={focusWindow}
+          onMinimizeActive={() => {
+            if (activeWindowId) minimizeWindow(activeWindowId);
+          }}
+          onMaximizeActive={() => {
+            if (activeWindowId) toggleMaximizeWindow(activeWindowId);
+          }}
+          onCloseActive={() => {
+            if (activeWindowId) closeWindow(activeWindowId);
+          }}
+          topbarItems={aosSettings.topbar_items}
+          onChangeTopbarItems={(items) => updateAOSSettings({ topbar_items: items })}
         />
       )}
 
@@ -984,5 +1035,6 @@ export default function AOSDesktopShell() {
         accentColor={accentColor}
       />
     </div>
+    </AOSNavigateProvider>
   );
 }

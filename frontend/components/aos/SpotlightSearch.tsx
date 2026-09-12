@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import {
   Search,
   X,
@@ -66,7 +66,7 @@ export default function SpotlightSearch({
   currentRole = "student",
   accentColor = "#0078d4",
 }: SpotlightSearchProps) {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [apiResults, setApiResults] = useState<ApiSearchResult[]>([]);
@@ -156,7 +156,7 @@ export default function SpotlightSearch({
       }
 
       if (route) {
-        router.push(route);
+        router(route);
       }
     },
     [onOpenApp, onOpenRoute, router]
@@ -350,7 +350,7 @@ export default function SpotlightSearch({
           return;
         }
 
-        router.push(r.url);
+        router(r.url);
       },
       badge: r.type?.toUpperCase() || "RESULT",
     }));

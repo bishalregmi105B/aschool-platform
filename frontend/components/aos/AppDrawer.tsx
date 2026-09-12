@@ -17,10 +17,10 @@ import {
   AOSSettingsIcon,
   AOSLogo,
 } from "@/components/aos/AOSIcons";
-import { Search, X, Grid, Sparkles, Box, Folder, ChevronLeft } from "lucide-react";
+import { Search, X, Grid, Sparkles, Folder, ChevronLeft } from "lucide-react";
 import { SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins } from "@/lib/plugins";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { getAOSAppForModule, SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import type { ResolvedAOSDesktopFolder } from "@/lib/aos-launcher";
 
 interface AppDrawerProps {
@@ -223,23 +223,7 @@ export default function AppDrawer({
       id: s.slug,
       name: s.label,
       category: "academics" as const,
-      icon: (
-        <div
-          style={{
-            width: "52px",
-            height: "52px",
-            borderRadius: "14px",
-            background: "linear-gradient(135deg, #10b981, #059669)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            boxShadow: "0 6px 16px rgba(16, 185, 129, 0.4)",
-          }}
-        >
-          <Box size={28} />
-        </div>
-      ),
+      icon: getAOSAppForModule(s, 52).icon,
       badge: "PLUGIN",
       desc: s.section ? `${s.section} module` : "Installed ASchool Module",
     }));

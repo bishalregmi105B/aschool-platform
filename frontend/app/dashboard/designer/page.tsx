@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -44,7 +44,7 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
 };
 
 export default function DesignerPage() {
-  const router         = useRouter();
+  const router = useAOSRouterNavigate();
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
@@ -133,7 +133,7 @@ export default function DesignerPage() {
             <div
               className="win11-card cursor-pointer transition-all group"
               style={{ border: "2px dashed var(--w11-border-default)" }}
-              onClick={() => router.push("/dashboard/designer/bulk")}
+              onClick={() => router("/dashboard/designer/bulk")}
             >
               <div className="flex items-center gap-4 p-5">
                 <div
@@ -165,7 +165,7 @@ export default function DesignerPage() {
             <div
               className="win11-card cursor-pointer transition-all group"
               style={{ border: "2px dashed var(--w11-border-default)" }}
-              onClick={() => router.push("/dashboard/designer/editor")}
+              onClick={() => router("/dashboard/designer/editor")}
             >
               <div className="flex items-center gap-4 p-5">
                 <div
@@ -196,7 +196,7 @@ export default function DesignerPage() {
             <div
               className="win11-card cursor-pointer transition-all group"
               style={{ border: "2px dashed var(--w11-border-default)" }}
-              onClick={() => router.push("/dashboard/designer/writer")}
+              onClick={() => router("/dashboard/designer/writer")}
             >
               <div className="flex items-center gap-4 p-5">
                 <div
@@ -251,7 +251,7 @@ export default function DesignerPage() {
                     onClick={() => {
                       const state = doc.canvas_state;
                       const isWriter = state?.type === "writer" || state?.type === "writer2";
-                      router.push(isWriter ? `/dashboard/designer/writer?doc=${doc.id}` : `/dashboard/designer/editor?doc=${doc.id}`);
+                      router(isWriter ? `/dashboard/designer/writer?doc=${doc.id}` : `/dashboard/designer/editor?doc=${doc.id}`);
                     }}
                   >
                     <div
@@ -291,7 +291,7 @@ export default function DesignerPage() {
                         }}>
                           <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push(`/dashboard/designer/editor?doc=${doc.id}`)}>
+                        <DropdownMenuItem onClick={() => router(`/dashboard/designer/editor?doc=${doc.id}`)}>
                           <RotateCcw className="h-3.5 w-3.5 mr-2" /> Open in editor
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -372,7 +372,7 @@ export default function DesignerPage() {
 }
 
 function TemplateCard({ template }: { template: any }) {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
 
   const ratio = template.height && template.width
     ? template.height / template.width
@@ -388,7 +388,7 @@ function TemplateCard({ template }: { template: any }) {
     <div
       className="win11-card group cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
       style={{ padding: 0 }}
-      onClick={() => router.push(dest)}
+      onClick={() => router(dest)}
     >
       {/* Thumbnail */}
       <div
