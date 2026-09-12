@@ -2,6 +2,8 @@ import React from "react";
 
 export interface WindowInstance {
   id: string;
+  moduleId?: string;
+  route?: string;
   title: string;
   icon: React.ReactNode;
   isOpen: boolean;

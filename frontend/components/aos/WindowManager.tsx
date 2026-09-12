@@ -5,9 +5,12 @@ import { Minus, Square, Copy, X } from "lucide-react";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
 import { SchoolRole } from "./RoleSwitcherModal";
 import type { EducationalPlugin } from "./apps/AppStoreApp";
+import { normalizeAOSRoute } from "@/lib/aos-navigation";
 
 export interface WindowInstance {
   id: string;
+  moduleId?: string;
+  route?: string;
   title: string;
   icon: React.ReactNode;
   isOpen: boolean;
@@ -60,6 +63,7 @@ export interface WindowManagerProps {
   onLaunchPluginDemo?: (id: string) => void;
   pinnedAppIds?: string[];
   onTogglePinApp?: (id: string) => void;
+  onOpenRoute?: (route: string) => void;
 }
 
 type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -104,6 +108,7 @@ export default function WindowManager({
   onLaunchPluginDemo = () => {},
   pinnedAppIds = [],
   onTogglePinApp = () => {},
+  onOpenRoute,
 }: WindowManagerProps) {
   const [draggingWindowId, setDraggingWindowId] = useState<string | null>(null);
   const [resizingWindowId, setResizingWindowId] = useState<string | null>(null);
@@ -272,6 +277,27 @@ export default function WindowManager({
     setSnapHoverWindowId(null);
   };
 
+  const handleInternalAnchorNavigation = (
+    e: React.MouseEvent<HTMLDivElement>,
+    win: WindowInstance
+  ) => {
+    if (!onOpenRoute) return;
+
+    const target = e.target as HTMLElement | null;
+    const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+    if (!anchor) return;
+    if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    const href = anchor.getAttribute("href") || anchor.href;
+    const normalized = normalizeAOSRoute(href || "");
+    if (!normalized) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenRoute(normalized);
+  };
+
   return (
     <div
       style={{
@@ -312,7 +338,8 @@ export default function WindowManager({
           contain: "layout",
         };
 
-        const ResolvedComponent = resolveModuleComponent(win.id);
+        const resolverKey = win.route ? `route:${win.route}` : win.moduleId || win.id;
+        const ResolvedComponent = resolveModuleComponent(resolverKey);
 
         return (
           <div
@@ -478,6 +505,7 @@ export default function WindowManager({
             {/* Window Content Body with CSS Containment */}
             <div
               className="win11-window-body aos-window-content"
+              onClickCapture={(e) => handleInternalAnchorNavigation(e, win)}
               style={{
                 contain: "layout paint",
                 transform: "translateZ(0)",

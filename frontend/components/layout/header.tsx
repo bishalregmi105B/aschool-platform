@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, LogOut, Search, User, X, Check, CheckCheck, Monitor } from "lucide-react";
+import { Bell, LogOut, Search, User, X, Check, CheckCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useViewMode } from "@/lib/view-mode-context";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +46,6 @@ function useDebounce(value: string, delay: number) {
 
 export function Header() {
   const { user, logout } = useAuth();
-  const { mode, toggleMode } = useViewMode();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -184,18 +182,6 @@ export function Header() {
 
         {/* Language toggle — drives sidebar, labels and forms */}
         <LanguageToggle />
-
-        {/* View mode toggle (OS ⟷ General) */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleMode}
-          className="h-8 px-2.5 gap-1.5 text-xs font-medium border-border/80 hover:bg-muted"
-          title={mode === "aos" ? "Switch to General Web Portal" : "Switch to AOS Desktop OS"}
-        >
-          <Monitor className="h-3.5 w-3.5 text-primary" />
-          <span className="hidden sm:inline">AOS OS</span>
-        </Button>
 
         {/* School greeting */}
         {user && (

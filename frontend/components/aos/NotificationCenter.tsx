@@ -24,11 +24,13 @@ import {
   type InAppNotification,
 } from "@/lib/services/notifications.service";
 import { AOSNotification } from "@/components/aos/types";
+import { normalizeAOSRoute } from "@/lib/aos-navigation";
 
 interface NotificationCenterProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenApp?: (appId: string) => void;
+  onOpenRoute?: (route: string) => void;
   accentColor?: string;
   notifications?: AOSNotification[];
   onClearAll?: () => void;
@@ -39,6 +41,7 @@ export default function NotificationCenter({
   isOpen,
   onClose,
   onOpenApp,
+  onOpenRoute,
   accentColor = "#0078d4",
   notifications: propNotifications,
   onClearAll: propOnClearAll,
@@ -110,7 +113,12 @@ export default function NotificationCenter({
       } catch {}
     }
     if (item.action_url) {
-      router.push(item.action_url);
+      const internalRoute = normalizeAOSRoute(item.action_url);
+      if (internalRoute && onOpenRoute) {
+        onOpenRoute(internalRoute);
+      } else {
+        router.push(item.action_url);
+      }
       onClose();
     } else if (onOpenApp) {
       const appId = item.category === "fee" ? "finance" : item.category === "exam" ? "exam" : "classroom";

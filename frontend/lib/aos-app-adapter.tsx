@@ -39,6 +39,61 @@ export const HEAVY_MODULE_SLUGS = new Set<string>([
   "reports",
 ]);
 
+const AOS_MODULE_ALIASES: Record<string, string> = {
+  file_management: "files",
+  "file-management": "files",
+  filemanager: "files",
+  library_management: "library",
+  hr_payroll: "hr",
+  visitor_management: "visitors",
+  iemis_importer: "iemis-import",
+  iemis: "iemis-import",
+  website_builder: "website-builder",
+  white_label: "white-label",
+  teaching_content: "teaching-content",
+  multi_branch: "multi-branch",
+  content_review: "content-review",
+  bulk_uploads: "bulk-uploads",
+  incident_management: "incident-management",
+  health_records: "health-records",
+  ai_teacher: "ai-teacher",
+  ai_tools: "ai-tools",
+  ai_workbench: "ai-workbench",
+  app_store: "appstore",
+  "app-store": "appstore",
+};
+
+export function getSlugFromRoute(route?: string): string {
+  const cleanedRoute = String(route || "")
+    .split("?")[0]
+    .split("#")[0]
+    .replace(/\/+$/g, "");
+
+  if (!cleanedRoute) return "";
+
+  const segments = cleanedRoute.split("/").filter(Boolean);
+  const dashboardIndex = segments.lastIndexOf("dashboard");
+  if (dashboardIndex >= 0 && segments[dashboardIndex + 1]) {
+    return segments[dashboardIndex + 1].toLowerCase();
+  }
+  return "";
+}
+
+export function normalizeAOSModuleId(slug: string, route?: string): string {
+  const slugLower = String(slug || "").trim().toLowerCase();
+  const routeSlug = getSlugFromRoute(route);
+  const base = routeSlug || slugLower;
+  if (!base) return "";
+
+  const viaAlias =
+    AOS_MODULE_ALIASES[base] ||
+    AOS_MODULE_ALIASES[base.replace(/-/g, "_")] ||
+    AOS_MODULE_ALIASES[base.replace(/_/g, "-")] ||
+    AOS_MODULE_ALIASES[slugLower];
+
+  return viaAlias || base.replace(/_/g, "-");
+}
+
 export function getDefaultWindowSize(slug: string): { width: number; height: number } {
   if (HEAVY_MODULE_SLUGS.has(slug)) {
     return { width: 1100, height: 700 };
@@ -76,13 +131,14 @@ const SLUG_TO_DEDICATED_AOS_ICON: Record<string, React.ComponentType<{ size?: nu
 };
 
 export function getAOSAppForModule(item: PluginSidebarItem): AOSApp {
-  const isHeavy = HEAVY_MODULE_SLUGS.has(item.slug);
-  const { width: defaultWidth, height: defaultHeight } = getDefaultWindowSize(item.slug);
+  const moduleId = normalizeAOSModuleId(item.slug, item.route);
+  const isHeavy = HEAVY_MODULE_SLUGS.has(moduleId);
+  const { width: defaultWidth, height: defaultHeight } = getDefaultWindowSize(moduleId);
 
   const DedicatedIcon =
-    SLUG_TO_DEDICATED_AOS_ICON[item.slug] ||
+    SLUG_TO_DEDICATED_AOS_ICON[moduleId] ||
     (AOSIcons as Record<string, React.ComponentType<{ size?: number }>>)[
-      `AOS${item.slug
+      `AOS${moduleId
         .split("-")
         .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
         .join("")}Icon`
@@ -109,9 +165,9 @@ export function getAOSAppForModule(item: PluginSidebarItem): AOSApp {
   );
 
   return {
-    id: item.slug,
+    id: moduleId || item.slug,
     name: item.label,
-    route: item.route,
+    route: item.route || `/dashboard/${moduleId || item.slug}`,
     category: item.section || "General",
     icon: iconElement,
     defaultWidth,

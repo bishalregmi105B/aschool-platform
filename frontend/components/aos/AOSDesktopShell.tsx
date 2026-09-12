@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Desktop from "@/components/aos/Desktop";
 import TopMenuBar from "@/components/aos/TopMenuBar";
 import Dock from "@/components/aos/Dock";
@@ -8,20 +9,54 @@ import Taskbar from "@/components/aos/Taskbar";
 import WindowManager, { WindowInstance } from "@/components/aos/WindowManager";
 import SpotlightSearch from "@/components/aos/SpotlightSearch";
 import AppDrawer from "@/components/aos/AppDrawer";
+import AppSwitcher from "@/components/aos/AppSwitcher";
+import StartMenu from "@/components/aos/StartMenu";
+import WidgetsPanel from "@/components/aos/WidgetsPanel";
 import RoleSwitcherModal from "@/components/aos/RoleSwitcherModal";
 import NotificationCenter from "@/components/aos/NotificationCenter";
 import QuickSettings from "@/components/aos/QuickSettings";
 import CalendarFlyout from "@/components/aos/CalendarFlyout";
 import { useInstalledPlugins } from "@/lib/plugins";
-import { getAOSAppForModule, type AOSApp } from "@/lib/aos-app-adapter";
+import {
+  getAOSAppForModule,
+  normalizeAOSModuleId,
+  type AOSApp,
+} from "@/lib/aos-app-adapter";
 import { useAuth } from "@/lib/auth-context";
-import { useViewMode } from "@/lib/view-mode-context";
 import { Sparkles } from "lucide-react";
+import {
+  AOS_THEME_STORAGE_KEY,
+  extractAOSModuleSlug,
+  formatAOSRouteTitle,
+  isAOSRootModuleRoute,
+  normalizeAOSRoute,
+} from "@/lib/aos-navigation";
+
+interface RouteLaunchMeta {
+  moduleId: string;
+  title: string;
+  icon: React.ReactNode;
+  defaultWidth: number;
+  defaultHeight: number;
+  isSubroute: boolean;
+}
+
+interface OpenWindowOptions {
+  windowId?: string;
+  moduleId?: string;
+  route?: string;
+  title?: string;
+  icon?: React.ReactNode;
+  defaultWidth?: number;
+  defaultHeight?: number;
+}
 
 export default function AOSDesktopShell() {
   const { user } = useAuth();
   const { sidebarItems, pluginBottomNav } = useInstalledPlugins();
-  const { toggleMode, setMode } = useViewMode();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Desktop appearance customization state
   const [themeMode, setThemeMode] = useState<"light" | "dark">("dark");
@@ -44,6 +79,25 @@ export default function AOSDesktopShell() {
     }
   }, [user?.role]);
 
+  useEffect(() => {
+    try {
+      const storedTheme = localStorage.getItem(AOS_THEME_STORAGE_KEY);
+      if (storedTheme === "light" || storedTheme === "dark") {
+        setThemeMode(storedTheme);
+      }
+    } catch {
+      // Ignore storage access issues
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AOS_THEME_STORAGE_KEY, themeMode);
+    } catch {
+      // Ignore storage write issues
+    }
+  }, [themeMode]);
+
   // Flyout and modal toggles
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isAppDrawerOpen, setIsAppDrawerOpen] = useState(false);
@@ -53,16 +107,18 @@ export default function AOSDesktopShell() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isWidgetsOpen, setIsWidgetsOpen] = useState(false);
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
     const apps = sidebarItems.map(getAOSAppForModule);
     for (const b of pluginBottomNav) {
-      if (!apps.some((a) => a.id === b.slug)) {
+      const moduleId = normalizeAOSModuleId(b.slug, b.route) || b.slug;
+      if (!apps.some((a) => a.id === moduleId)) {
         apps.push({
-          id: b.slug,
+          id: moduleId,
           name: b.label,
-          route: b.route,
+          route: b.route || `/dashboard/${moduleId}`,
           category: "System",
           icon: (
             <div
@@ -81,26 +137,122 @@ export default function AOSDesktopShell() {
   // Window State Management
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
-  const [maxZIndex, setMaxZIndex] = useState(20);
+  const zIndexRef = useRef(20);
+
+  const closeAllFlyouts = useCallback(
+    (
+      except?:
+        | "spotlight"
+        | "appDrawer"
+        | "roleSwitcher"
+        | "notifications"
+        | "quickSettings"
+        | "calendar"
+        | "start"
+        | "widgets"
+        | "switcher"
+    ) => {
+      if (except !== "spotlight") setIsSpotlightOpen(false);
+      if (except !== "appDrawer") setIsAppDrawerOpen(false);
+      if (except !== "roleSwitcher") setIsRoleSwitcherOpen(false);
+      if (except !== "notifications") setIsNotificationsOpen(false);
+      if (except !== "quickSettings") setIsQuickSettingsOpen(false);
+      if (except !== "calendar") setIsCalendarOpen(false);
+      if (except !== "start") setIsStartOpen(false);
+      if (except !== "widgets") setIsWidgetsOpen(false);
+      if (except !== "switcher") setIsSwitcherOpen(false);
+    },
+    []
+  );
+
+  const shellStyle = useMemo(
+    () =>
+      ({
+        "--w11-accent": accentColor,
+        "--w11-acrylic-blur": `${blurIntensity}px`,
+      } as React.CSSProperties),
+    [accentColor, blurIntensity]
+  );
+
+  const appMetaById = useMemo(
+    () => new Map(allApps.map((app) => [app.id, app])),
+    [allApps]
+  );
+
+  const routeLaunchIndex = useMemo(() => {
+    const map = new Map<string, RouteLaunchMeta>();
+
+    const registerRoute = (
+      rawRoute: string | undefined,
+      title: string,
+      moduleId: string,
+      isSubroute: boolean
+    ) => {
+      if (!rawRoute || !moduleId) return;
+      const normalized = normalizeAOSRoute(rawRoute);
+      if (!normalized) return;
+
+      const routePath = normalized.split("?")[0];
+      const appMeta = appMetaById.get(moduleId);
+
+      map.set(routePath, {
+        moduleId,
+        title,
+        icon: appMeta?.icon ?? null,
+        defaultWidth: appMeta?.defaultWidth ?? 960,
+        defaultHeight: appMeta?.defaultHeight ?? 640,
+        isSubroute,
+      });
+    };
+
+    for (const item of sidebarItems) {
+      const moduleId = normalizeAOSModuleId(item.slug, item.route) || item.slug;
+      registerRoute(item.route, item.label, moduleId, false);
+      for (const sub of item.subitems || []) {
+        registerRoute(sub.route, sub.label, moduleId, true);
+      }
+    }
+
+    for (const item of pluginBottomNav) {
+      const moduleId = normalizeAOSModuleId(item.slug, item.route) || item.slug;
+      registerRoute(item.route, item.label, moduleId, false);
+      for (const sub of item.subitems || []) {
+        registerRoute(sub.route, sub.label, moduleId, true);
+      }
+    }
+
+    return map;
+  }, [sidebarItems, pluginBottomNav, appMetaById]);
+
+  const getNextZIndex = useCallback(() => {
+    const next = zIndexRef.current + 1;
+    zIndexRef.current = next;
+    return next;
+  }, []);
 
   // Open window helper
   const openWindow = useCallback(
-    (slug: string) => {
-      // Close spotlight/drawers if open
-      setIsSpotlightOpen(false);
-      setIsAppDrawerOpen(false);
+    (slug: string, options: OpenWindowOptions = {}) => {
+      closeAllFlyouts();
+
+      const windowId = options.windowId || slug;
+      const moduleId = options.moduleId || slug;
+      const hasRouteOverride = Object.prototype.hasOwnProperty.call(options, "route");
 
       setWindows((prevWindows) => {
-        const existing = prevWindows.find((w) => w.id === slug);
-        const nextZ = maxZIndex + 1;
-        setMaxZIndex(nextZ);
-        setActiveWindowId(slug);
+        const existing = prevWindows.find((w) => w.id === windowId);
+        const nextZ = getNextZIndex();
+        setActiveWindowId(windowId);
 
         if (existing) {
           return prevWindows.map((w) =>
-            w.id === slug
+            w.id === windowId
               ? {
                   ...w,
+                  moduleId,
+                  route: hasRouteOverride ? options.route : w.route,
+                  title: options.title || w.title,
+                  icon: options.icon ?? w.icon,
                   isOpen: true,
                   isMinimized: false,
                   zIndex: nextZ,
@@ -109,17 +261,16 @@ export default function AOSDesktopShell() {
           );
         }
 
-        // Find metadata
-        const appMeta = allApps.find((a) => a.id === slug) || {
-          id: slug,
-          name: slug.charAt(0).toUpperCase() + slug.slice(1),
+        const appMeta = appMetaById.get(moduleId) || {
+          id: moduleId,
+          name: moduleId.charAt(0).toUpperCase() + moduleId.slice(1),
           defaultWidth: 960,
           defaultHeight: 640,
           icon: null,
         };
 
-        const width = appMeta.defaultWidth || 960;
-        const height = appMeta.defaultHeight || 640;
+        const width = options.defaultWidth ?? appMeta.defaultWidth ?? 960;
+        const height = options.defaultHeight ?? appMeta.defaultHeight ?? 640;
         const offset = (prevWindows.length % 6) * 28;
 
         const screenW = typeof window !== "undefined" ? window.innerWidth : 1280;
@@ -129,9 +280,11 @@ export default function AOSDesktopShell() {
         const initialY = Math.max(48, Math.round((screenH - height) / 2) + offset);
 
         const newWindow: WindowInstance = {
-          id: slug,
-          title: appMeta.name,
-          icon: appMeta.icon,
+          id: windowId,
+          moduleId,
+          route: options.route,
+          title: options.title || appMeta.name,
+          icon: options.icon ?? appMeta.icon,
           isOpen: true,
           isMinimized: false,
           isMaximized: false,
@@ -145,7 +298,51 @@ export default function AOSDesktopShell() {
         return [...prevWindows, newWindow];
       });
     },
-    [allApps, maxZIndex]
+    [appMetaById, closeAllFlyouts, getNextZIndex]
+  );
+
+  const openRouteInAOS = useCallback(
+    (rawRoute: string): boolean => {
+      const normalizedRoute = normalizeAOSRoute(rawRoute);
+      if (!normalizedRoute) return false;
+
+      const routePath = normalizedRoute.split("?")[0];
+      const routeMeta = routeLaunchIndex.get(routePath);
+      const routeModuleSlug = extractAOSModuleSlug(normalizedRoute);
+      const moduleId =
+        routeMeta?.moduleId ||
+        normalizeAOSModuleId(routeModuleSlug || "", normalizedRoute);
+
+      if (!moduleId) return false;
+
+      const appMeta = appMetaById.get(moduleId);
+
+      if (isAOSRootModuleRoute(normalizedRoute) && !routeMeta?.isSubroute) {
+        openWindow(moduleId, {
+          windowId: moduleId,
+          moduleId,
+          route: undefined,
+          title: appMeta?.name || formatAOSRouteTitle(normalizedRoute),
+          icon: appMeta?.icon ?? routeMeta?.icon ?? null,
+          defaultWidth: appMeta?.defaultWidth,
+          defaultHeight: appMeta?.defaultHeight,
+        });
+        return true;
+      }
+
+      openWindow(moduleId, {
+        windowId: moduleId,
+        moduleId,
+        route: normalizedRoute,
+        title: routeMeta?.title || formatAOSRouteTitle(normalizedRoute),
+        icon: routeMeta?.icon ?? appMeta?.icon ?? null,
+        defaultWidth: routeMeta?.defaultWidth ?? appMeta?.defaultWidth ?? 1040,
+        defaultHeight: routeMeta?.defaultHeight ?? appMeta?.defaultHeight ?? 700,
+      });
+
+      return true;
+    },
+    [routeLaunchIndex, appMetaById, openWindow]
   );
 
   const closeWindow = useCallback((id: string) => {
@@ -171,8 +368,7 @@ export default function AOSDesktopShell() {
 
   const focusWindow = useCallback(
     (id: string) => {
-      const nextZ = maxZIndex + 1;
-      setMaxZIndex(nextZ);
+      const nextZ = getNextZIndex();
       setActiveWindowId(id);
       setWindows((prev) =>
         prev.map((w) =>
@@ -180,7 +376,7 @@ export default function AOSDesktopShell() {
         )
       );
     },
-    [maxZIndex]
+    [getNextZIndex]
   );
 
   const updatePosition = useCallback((id: string, x: number, y: number) => {
@@ -213,6 +409,11 @@ export default function AOSDesktopShell() {
     []
   );
 
+  const closeAllWindows = useCallback(() => {
+    setWindows([]);
+    setActiveWindowId(null);
+  }, []);
+
   // Keyboard shortcut handler for Spotlight (Cmd+Space or Ctrl+Space)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -220,36 +421,89 @@ export default function AOSDesktopShell() {
         e.preventDefault();
         setIsSpotlightOpen((prev) => !prev);
       } else if (e.key === "Escape") {
-        setIsSpotlightOpen(false);
-        setIsAppDrawerOpen(false);
-        setIsRoleSwitcherOpen(false);
-        setIsNotificationsOpen(false);
-        setIsQuickSettingsOpen(false);
-        setIsCalendarOpen(false);
-        setIsStartOpen(false);
+        closeAllFlyouts();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [closeAllFlyouts]);
+
+  // Keep AOS browser URL pinned while still honoring in-app route intents.
+  useEffect(() => {
+    if (!pathname) return;
+
+    const query = searchParams?.toString();
+    const currentRoute = query ? `${pathname}?${query}` : pathname;
+    const normalized = normalizeAOSRoute(currentRoute);
+    if (!normalized) return;
+
+    const routePath = normalized.split("?")[0];
+    if (routePath === "/dashboard") {
+      if (query) {
+        router.replace("/dashboard");
+      }
+      return;
+    }
+
+    const handled = openRouteInAOS(normalized);
+    if (handled) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, searchParams, openRouteInAOS, router]);
 
   return (
-    <div className="aos-desktop">
+    <div
+      className={`aos-desktop win11 ${themeMode}`}
+      data-theme={themeMode}
+      style={shellStyle}
+      onClick={() => closeAllFlyouts()}
+    >
       {/* Top Menu Bar */}
       {showTopBar && (
         <TopMenuBar
           currentRole={currentRole}
-          onOpenRoleSwitcher={() => setIsRoleSwitcherOpen(true)}
-          onToggleControlCenter={() => setIsQuickSettingsOpen((prev) => !prev)}
-          onToggleNotifications={() => setIsNotificationsOpen((prev) => !prev)}
-          onToggleSearch={() => setIsSpotlightOpen(true)}
-          onToggleSpotlight={() => setIsSpotlightOpen((prev) => !prev)}
-          onToggleWidgets={() => setIsWidgetsOpen((prev) => !prev)}
+          onOpenRoleSwitcher={() => {
+            closeAllFlyouts("roleSwitcher");
+            setIsRoleSwitcherOpen(true);
+          }}
+          onToggleControlCenter={() => {
+            const next = !isQuickSettingsOpen;
+            closeAllFlyouts("quickSettings");
+            setIsQuickSettingsOpen(next);
+          }}
+          onToggleNotifications={() => {
+            const next = !isNotificationsOpen;
+            closeAllFlyouts("notifications");
+            setIsNotificationsOpen(next);
+          }}
+          onToggleSearch={() => {
+            const next = !isStartOpen;
+            closeAllFlyouts("start");
+            setIsStartOpen(next);
+          }}
+          onToggleSpotlight={() => {
+            const next = !isSpotlightOpen;
+            closeAllFlyouts("spotlight");
+            setIsSpotlightOpen(next);
+          }}
+          onToggleWidgets={() => {
+            const next = !isWidgetsOpen;
+            closeAllFlyouts("widgets");
+            setIsWidgetsOpen(next);
+          }}
           onOpenApp={openWindow}
-          onToggleAppDrawer={() => setIsAppDrawerOpen((prev) => !prev)}
-          systemMode="desktop"
-          onToggleSystemMode={toggleMode}
+          onToggleAppDrawer={() => {
+            const next = !isAppDrawerOpen;
+            closeAllFlyouts("appDrawer");
+            setIsAppDrawerOpen(next);
+          }}
+          onToggleAppSwitcher={() => {
+            const next = !isSwitcherOpen;
+            closeAllFlyouts("switcher");
+            setIsSwitcherOpen(next);
+          }}
+          unreadCount={0}
           topBarHeight={topBarHeight}
         />
       )}
@@ -297,6 +551,7 @@ export default function AOSDesktopShell() {
           onChangeBrightness={setBrightness}
           currentRole={currentRole}
           onOpenRoleSwitcher={() => setIsRoleSwitcherOpen(true)}
+          onOpenRoute={openRouteInAOS}
         />
       </Desktop>
 
@@ -315,24 +570,53 @@ export default function AOSDesktopShell() {
               minimizeWindow(id);
             }
           }}
-          onToggleStart={() => setIsStartOpen((prev) => !prev)}
           isStartOpen={isStartOpen}
           accentColor={accentColor}
           currentRole={currentRole}
           dockSize={dockSize}
-          onToggleAppDrawer={() => setIsAppDrawerOpen((prev) => !prev)}
+          onToggleStart={() => {
+            const next = !isStartOpen;
+            closeAllFlyouts("start");
+            setIsStartOpen(next);
+          }}
+          onToggleAppDrawer={() => {
+            const next = !isAppDrawerOpen;
+            closeAllFlyouts("appDrawer");
+            setIsAppDrawerOpen(next);
+          }}
+          onToggleAppSwitcher={() => {
+            const next = !isSwitcherOpen;
+            closeAllFlyouts("switcher");
+            setIsSwitcherOpen(next);
+          }}
           sidebarItems={sidebarItems}
         />
       ) : (
         <Taskbar
           isStartOpen={isStartOpen}
-          onToggleStart={() => setIsStartOpen((prev) => !prev)}
+          onToggleStart={() => {
+            const next = !isStartOpen;
+            closeAllFlyouts("start");
+            setIsStartOpen(next);
+          }}
           isQuickSettingsOpen={isQuickSettingsOpen}
-          onToggleQuickSettings={() => setIsQuickSettingsOpen((prev) => !prev)}
+          onToggleQuickSettings={() => {
+            const next = !isQuickSettingsOpen;
+            closeAllFlyouts("quickSettings");
+            setIsQuickSettingsOpen(next);
+          }}
           isCalendarOpen={isCalendarOpen}
-          onToggleCalendar={() => setIsCalendarOpen((prev) => !prev)}
+          onToggleCalendar={() => {
+            const next = !isCalendarOpen;
+            closeAllFlyouts("calendar");
+            setIsCalendarOpen(next);
+          }}
           isWidgetsOpen={isWidgetsOpen}
-          onToggleWidgets={() => setIsWidgetsOpen((prev) => !prev)}
+          onToggleWidgets={() => {
+            const next = !isWidgetsOpen;
+            closeAllFlyouts("widgets");
+            setIsWidgetsOpen(next);
+          }}
           windows={windows}
           activeWindowId={activeWindowId}
           onToggleWindow={(id) => {
@@ -351,7 +635,16 @@ export default function AOSDesktopShell() {
           }}
           accentColor={accentColor}
           taskbarAlign={taskbarAlign}
-          onToggleAppDrawer={() => setIsAppDrawerOpen((prev) => !prev)}
+          onToggleAppDrawer={() => {
+            const next = !isAppDrawerOpen;
+            closeAllFlyouts("appDrawer");
+            setIsAppDrawerOpen(next);
+          }}
+          onToggleAppSwitcher={() => {
+            const next = !isSwitcherOpen;
+            closeAllFlyouts("switcher");
+            setIsSwitcherOpen(next);
+          }}
         />
       )}
 
@@ -360,6 +653,7 @@ export default function AOSDesktopShell() {
         isOpen={isSpotlightOpen}
         onClose={() => setIsSpotlightOpen(false)}
         onOpenApp={openWindow}
+        onOpenRoute={openRouteInAOS}
         currentRole={currentRole}
         accentColor={accentColor}
       />
@@ -386,6 +680,7 @@ export default function AOSDesktopShell() {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         onOpenApp={openWindow}
+        onOpenRoute={openRouteInAOS}
         accentColor={accentColor}
       />
 
@@ -406,6 +701,36 @@ export default function AOSDesktopShell() {
       <CalendarFlyout
         isOpen={isCalendarOpen}
         onClose={() => setIsCalendarOpen(false)}
+        accentColor={accentColor}
+      />
+
+      {/* Start Menu Flyout */}
+      <StartMenu
+        isOpen={isStartOpen}
+        onClose={() => setIsStartOpen(false)}
+        onOpenApp={openWindow}
+        accentColor={accentColor}
+      />
+
+      {/* Widgets Board Flyout */}
+      <WidgetsPanel
+        isOpen={isWidgetsOpen}
+        onClose={() => setIsWidgetsOpen(false)}
+        accentColor={accentColor}
+      />
+
+      {/* Multitasking App Viewer & Switcher */}
+      <AppSwitcher
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
+        windows={windows}
+        activeWindowId={activeWindowId}
+        onFocusWindow={(id) => {
+          focusWindow(id);
+          setIsSwitcherOpen(false);
+        }}
+        onCloseWindow={closeWindow}
+        onCloseAll={closeAllWindows}
         accentColor={accentColor}
       />
     </div>
