@@ -1161,7 +1161,10 @@ export default function FileManagerApp() {
   };
 
   const usage = usageQuery.data;
-  const usagePct = usage && usage.total_bytes > 0 ? 100 : 0;
+  // The vault quota shown in the sidebar (matches the reference's 100 GB vault).
+  const VAULT_QUOTA_BYTES = 100 * 1024 * 1024 * 1024;
+  const usageUsedBytes = usage ? Math.min(usage.total_bytes, VAULT_QUOTA_BYTES) : 0;
+  const usagePct = Math.min(100, (usageUsedBytes / VAULT_QUOTA_BYTES) * 100);
 
   return (
     <div style={{ display: "flex", height: "100%", background: "var(--w11-window-bg)", userSelect: "none", position: "relative" }}>
@@ -1228,7 +1231,7 @@ export default function FileManagerApp() {
         <div style={{ marginTop: "auto", padding: "10px", borderRadius: "8px", background: "var(--w11-control-hover)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "var(--w11-text-primary)", marginBottom: "4px" }}>
             <span>Storage Usage</span>
-            <span>{usage ? `${formatBytes(usage.total_bytes)} used` : "—"}</span>
+            <span>{usage ? `${formatBytes(usage.total_bytes)} / 100 GB` : "—"}</span>
           </div>
           <div style={{ width: "100%", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
             <div style={{ width: `${usagePct}%`, height: "100%", background: "linear-gradient(90deg, #0284c7, #38bdf8)" }} />
@@ -1251,7 +1254,6 @@ export default function FileManagerApp() {
             justifyContent: "space-between",
             gap: "12px",
             background: "var(--w11-surface)",
-            flexWrap: "wrap",
           }}
         >
           {/* Folder Drawer Toggle */}
@@ -1268,7 +1270,6 @@ export default function FileManagerApp() {
           <div
             style={{
               flex: 1,
-              minWidth: "140px",
               display: "flex",
               alignItems: "center",
               gap: "4px",
@@ -1298,8 +1299,22 @@ export default function FileManagerApp() {
             ))}
           </div>
 
+          {/* Type filter pills (compact, after the breadcrumb) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                className={typeFilter === f.value ? "accent" : "subtle"}
+                onClick={() => setTypeFilter(f.value)}
+                style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "9999px", lineHeight: 1.4 }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Search Box */}
-          <div style={{ position: "relative", width: "180px", flexShrink: 0 }}>
+          <div style={{ position: "relative", width: "180px" }}>
             <Search size={14} style={{ position: "absolute", left: "8px", top: "8px", color: "var(--w11-text-secondary)" }} />
             <input
               type="text"
@@ -1320,7 +1335,7 @@ export default function FileManagerApp() {
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             {/* Sorting */}
             <select
               value={sortBy}
@@ -1387,30 +1402,7 @@ export default function FileManagerApp() {
           </div>
         </div>
 
-        {/* Type filter pills */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "8px 16px",
-            borderBottom: "1px solid var(--w11-border-subtle)",
-            background: "var(--w11-surface)",
-          }}
-        >
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              className={typeFilter === f.value ? "accent" : "subtle"}
-              onClick={() => setTypeFilter(f.value)}
-              style={{ fontSize: "11px", padding: "3px 12px", borderRadius: "9999px" }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Upload progress */}
+        {/* Upload progress — thin accent strip directly under the toolbar */}
         {uploadMutation.isPending && (
           <div style={{ height: "3px", background: "var(--w11-control-hover)" }}>
             <div
@@ -1424,23 +1416,21 @@ export default function FileManagerApp() {
           </div>
         )}
 
-        {/* Files Display + Preview Pane */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          {/* Files Display Container (drag-and-drop target) */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            style={{
-              flex: 1,
-              padding: "16px",
-              overflowY: "auto",
-              outline: dragOver ? "2px dashed var(--w11-accent)" : "none",
-              outlineOffset: -4,
-              background: dragOver ? "var(--w11-accent-light)" : undefined,
-              transition: "background 0.15s ease",
-            }}
-          >
+        {/* Files Display Container (drag-and-drop target) */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{
+            flex: 1,
+            padding: "16px",
+            overflowY: "auto",
+            outline: dragOver ? "2px dashed var(--w11-accent)" : "none",
+            outlineOffset: -4,
+            background: dragOver ? "var(--w11-accent-light)" : undefined,
+            transition: "background 0.15s ease",
+          }}
+        >
             {dragOver && (
               <div
                 style={{
@@ -1481,29 +1471,15 @@ export default function FileManagerApp() {
                 </button>
               </div>
             ) : displayedItems.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--w11-text-secondary)", gap: "10px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "28px 36px",
-                    borderRadius: "12px",
-                    border: "2px dashed var(--w11-border-default)",
-                  }}
-                >
-                  <Upload size={36} strokeWidth={1.25} color="var(--w11-text-tertiary)" />
-                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--w11-text-primary)" }}>
-                    {searchQuery || typeFilter !== "all"
-                      ? "No matching files"
-                      : "This folder is empty"}
-                  </div>
-                  <div style={{ fontSize: "11px" }}>
-                    {searchQuery || typeFilter !== "all"
-                      ? `No results${searchQuery ? ` for "${searchQuery}"` : ""} — try a different filter.`
-                      : "Drop files here to upload, or use the Upload button."}
-                  </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--w11-text-secondary)", gap: "8px" }}>
+                <Folder size={48} strokeWidth={1} color="var(--w11-text-tertiary)" />
+                <div style={{ fontSize: "13px" }}>
+                  {searchQuery || typeFilter !== "all" ? "No matching files" : "This folder is empty"}
+                </div>
+                <div style={{ fontSize: "11px" }}>
+                  {searchQuery || typeFilter !== "all"
+                    ? `No results${searchQuery ? ` for "${searchQuery}"` : ""} — try a different filter.`
+                    : "Drop files here to upload, or use the Upload button."}
                 </div>
               </div>
             ) : viewMode === "grid" ? (
@@ -1580,112 +1556,6 @@ export default function FileManagerApp() {
             )}
           </div>
 
-          {/* Right Preview Pane (double-click a file to open) */}
-          {previewFile && (
-            <aside
-              style={{
-                width: "360px",
-                flexShrink: 0,
-                borderLeft: "1px solid var(--w11-border-subtle)",
-                background: "var(--w11-surface)",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  padding: "10px 14px",
-                  borderBottom: "1px solid var(--w11-border-subtle)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                {renderFileIcon(fileIconKind(previewFile), 18)}
-                <span
-                  title={previewFile.original_name}
-                  style={{
-                    flex: 1,
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "var(--w11-text-primary)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {previewFile.original_name}
-                </span>
-                <button
-                  className="subtle"
-                  onClick={() => setPreviewFile(null)}
-                  style={{ padding: "2px 6px" }}
-                  title="Close preview"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: "auto",
-                  padding: "14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "14px",
-                }}
-              >
-                <FilePreviewBody file={previewFile} />
-
-                {/* Metadata */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <PreviewDetailRow label="Size" value={formatBytes(previewFile.size_bytes)} />
-                  <PreviewDetailRow label="Type" value={previewFile.file_type} />
-                  <PreviewDetailRow label="Uploaded" value={formatDate(previewFile.created_at)} />
-                  {previewFile.mime_type && (
-                    <PreviewDetailRow label="MIME" value={previewFile.mime_type} />
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "auto", paddingTop: "4px" }}>
-                  <button
-                    className="accent"
-                    onClick={() => handleDownload(displayFromFile(previewFile))}
-                    style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    <Download size={13} /> Download
-                  </button>
-                  <button
-                    className="subtle"
-                    onClick={() => handleShare(displayFromFile(previewFile))}
-                    style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    <Share2 size={13} /> Share
-                  </button>
-                  <button
-                    className="subtle"
-                    onClick={() => openRename(displayFromFile(previewFile))}
-                    style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    <Pencil size={13} /> Rename
-                  </button>
-                  <button
-                    className="subtle"
-                    onClick={() => handleDelete(displayFromFile(previewFile))}
-                    disabled={deleteMutation.isPending}
-                    style={{ padding: "4px 10px", fontSize: "11px", color: "#c42b1c", display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    {deleteMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete
-                  </button>
-                </div>
-              </div>
-            </aside>
-          )}
-        </div>
-
         {/* Upload queue (per-file progress) */}
         {uploadQueue.length > 0 && (
           <div
@@ -1753,13 +1623,17 @@ export default function FileManagerApp() {
               justifyContent: "space-between",
               fontSize: "12px",
               gap: "10px",
-              flexWrap: "wrap",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
               {renderFileIcon(selectedItem.iconType, 20)}
               <div style={{ minWidth: 0 }}>
-                <span style={{ fontWeight: 600, color: "var(--w11-text-primary)" }}>{selectedItem.name}</span>
+                <span
+                  title={selectedItem.name}
+                  style={{ fontWeight: 600, color: "var(--w11-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", display: "inline-block", verticalAlign: "bottom" }}
+                >
+                  {selectedItem.name}
+                </span>
                 <span style={{ color: "var(--w11-text-secondary)", marginLeft: "8px", fontSize: "11px" }}>
                   {selectedItem.kind === "folder"
                     ? `${selectedItem.fileCount ?? 0} item${selectedItem.fileCount === 1 ? "" : "s"}`
@@ -1816,6 +1690,112 @@ export default function FileManagerApp() {
           </div>
         )}
       </div>
+
+      {/* Right Preview Pane (double-click a file to open) — full-height column
+          next to the sidebar + content, so all three share the flex row. */}
+      {previewFile && (
+        <aside
+          style={{
+            width: "360px",
+            flexShrink: 0,
+            borderLeft: "1px solid var(--w11-border-subtle)",
+            background: "var(--w11-surface)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "10px 14px",
+              borderBottom: "1px solid var(--w11-border-subtle)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            {renderFileIcon(fileIconKind(previewFile), 18)}
+            <span
+              title={previewFile.original_name}
+              style={{
+                flex: 1,
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--w11-text-primary)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {previewFile.original_name}
+            </span>
+            <button
+              className="subtle"
+              onClick={() => setPreviewFile(null)}
+              style={{ padding: "2px 6px" }}
+              title="Close preview"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <FilePreviewBody file={previewFile} />
+
+            {/* Metadata */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <PreviewDetailRow label="Size" value={formatBytes(previewFile.size_bytes)} />
+              <PreviewDetailRow label="Type" value={previewFile.file_type} />
+              <PreviewDetailRow label="Uploaded" value={formatDate(previewFile.created_at)} />
+              {previewFile.mime_type && (
+                <PreviewDetailRow label="MIME" value={previewFile.mime_type} />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "auto", paddingTop: "4px" }}>
+              <button
+                className="accent"
+                onClick={() => handleDownload(displayFromFile(previewFile))}
+                style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <Download size={13} /> Download
+              </button>
+              <button
+                className="subtle"
+                onClick={() => handleShare(displayFromFile(previewFile))}
+                style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <Share2 size={13} /> Share
+              </button>
+              <button
+                className="subtle"
+                onClick={() => openRename(displayFromFile(previewFile))}
+                style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <Pencil size={13} /> Rename
+              </button>
+              <button
+                className="subtle"
+                onClick={() => handleDelete(displayFromFile(previewFile))}
+                disabled={deleteMutation.isPending}
+                style={{ padding: "4px 10px", fontSize: "11px", color: "#c42b1c", display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                {deleteMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
 
       {/* New Folder Dialog (win11-dialog pattern) */}
       {showNewFolderDialog && (

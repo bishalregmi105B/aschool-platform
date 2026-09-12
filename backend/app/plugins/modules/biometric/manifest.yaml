@@ -27,6 +27,8 @@ ui:
       route: /biometric/devices
     - label: Sync Logs
       route: /biometric/logs
+  aos:
+    about: "Sync ZKTeco fingerprint devices to pull attendance straight into ASchool, with device management and sync logs."
 mobile:
   admin:
     feature_folder: biometric

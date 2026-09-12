@@ -22,6 +22,8 @@ ui:
     visible_to:
     - school_admin
     - teacher
+  aos:
+    about: "Build each student's digital achievement portfolio with badges and PDF export."
 mobile:
   teacher:
     feature_folder: portfolio

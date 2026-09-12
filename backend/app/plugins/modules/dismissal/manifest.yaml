@@ -25,6 +25,8 @@ ui:
     icon: CalendarOff
     visible_to:
     - school_admin
+  aos:
+    about: "Manage after-school pickup safely — QR verification, authorized pickup contacts, a dismissal queue, and parent notifications."
 mobile:
   admin:
     feature_folder: dismissal

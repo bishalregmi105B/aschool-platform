@@ -43,6 +43,8 @@ ui:
       route: /dashboard/communications/whatsapp/templates
     - label: Analytics
       route: /dashboard/communications/whatsapp/analytics
+  aos:
+    about: "Chat with parents on WhatsApp — two-way answers about attendance, fees, results, and buses, with AI chat in Nepali or English."
 mobile:
   admin:
     feature_folder: whatsapp

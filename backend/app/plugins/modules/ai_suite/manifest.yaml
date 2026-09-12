@@ -31,6 +31,8 @@ ui:
       route: /dashboard/benchmarking
     - label: Reports
       route: /dashboard/reports
+  aos:
+    about: "One bundle for every AI feature — auto-grading, AI workbench tools, adaptive learning, school intelligence insights, analytics, and benchmarking."
 mobile:
   teacher:
     feature_folder: ai_suite

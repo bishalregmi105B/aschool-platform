@@ -37,6 +37,8 @@ ui:
       route: /dashboard/wellbeing/counselor
     - label: Surveys
       route: /dashboard/wellbeing/surveys
+  aos:
+    about: "Watch over student wellbeing — daily mood check-ins, surveys, counselor sessions, and early-intervention alerts."
 mobile:
   admin:
     feature_folder: wellbeing

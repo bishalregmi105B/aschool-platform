@@ -30,6 +30,8 @@ ui:
     - school_admin
     - teacher
     subitems:
+  aos:
+    about: "Create and distribute assignments, collect submissions with file uploads, and grade them with AI-assisted feedback."
 mobile:
   teacher:
     feature_folder: assignments

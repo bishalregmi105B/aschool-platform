@@ -18,9 +18,13 @@ import {
   ChevronRight,
   Plus,
   AppWindow,
+  LayoutGrid,
 } from "lucide-react";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { getAOSAppForModule, SECTION_GRADIENTS, type AOSApp } from "@/lib/aos-app-adapter";
+import { useAOSNavigate } from "@/lib/aos-window-route";
+import { useAOSUserSettings } from "@/lib/aos-settings";
+import { getWidgetDefinition, normalizeHomeWidgets } from "@/components/aos/widgets/registry";
 import {
   createFolderId,
   generateUniqueFolderName,
@@ -230,6 +234,63 @@ function DesktopIconTile({
   );
 }
 
+/** localStorage key persisting desktop-widget column visibility. */
+const WIDGETS_VISIBLE_KEY = "aos-desktop-widgets-visible";
+/** Wide-screen breakpoint: widgets default ON at/above this width. */
+const WIDGETS_DEFAULT_MIN_WIDTH = 1200;
+
+/**
+ * macOS-style desktop widget column — the user's home_widgets board
+ * (same list as the dashboard board → single config) rendered compact
+ * along the right edge of the desktop. Widgets come from the registry so
+ * role gating matches the board exactly; each fetches its own data.
+ */
+function DesktopWidgetColumn({
+  role,
+  top,
+}: {
+  role: string;
+  /** CSS top offset (below the menubar + toggle button). */
+  top: string;
+}) {
+  const navigate = useAOSNavigate();
+  const { settings } = useAOSUserSettings();
+
+  const board = useMemo(
+    () => normalizeHomeWidgets(settings.home_widgets, role),
+    [settings.home_widgets, role]
+  );
+
+  return (
+    <div
+      aria-label="Desktop widgets"
+      style={{
+        position: "absolute",
+        top,
+        right: "16px",
+        bottom: "80px",
+        width: "300px",
+        maxWidth: "calc(100vw - 130px)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        overflowY: "auto",
+        pointerEvents: "auto",
+        zIndex: 5,
+        paddingBottom: "4px",
+      }}
+    >
+      {board.map((key) => {
+        const definition = getWidgetDefinition(key);
+        if (!definition) return null;
+        const Widget = definition.Component;
+        // In-process navigation: opens the route as an AOS window.
+        return <Widget key={key} compact onOpenRoute={navigate ?? undefined} />;
+      })}
+    </div>
+  );
+}
+
 export default function Desktop({
   onOpenApp,
   wallpaper,
@@ -259,6 +320,11 @@ export default function Desktop({
     currentY: number;
     active: boolean;
   } | null>(null);
+
+  // Desktop widget column visibility. Starts undetermined (null) so the
+  // first paint matches SSR; the persisted/local default resolves in an
+  // effect (no hydration mismatch).
+  const [widgetsVisible, setWidgetsVisible] = useState<boolean | null>(null);
 
   const desktopRef = useRef<HTMLDivElement>(null);
 
@@ -336,6 +402,29 @@ export default function Desktop({
     if (!dialog || dialog.type === "newFolder") return null;
     return (resolvedFolders ?? []).find((f) => f.id === dialog.folderId) ?? null;
   }, [dialog, resolvedFolders]);
+
+  // Resolve widget-column visibility: stored preference wins; otherwise
+  // default to visible on wide screens, hidden below 1200px.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(WIDGETS_VISIBLE_KEY);
+    if (stored === "true" || stored === "false") {
+      setWidgetsVisible(stored === "true");
+    } else {
+      setWidgetsVisible(window.innerWidth >= WIDGETS_DEFAULT_MIN_WIDTH);
+    }
+  }, []);
+
+  const toggleWidgetColumn = () => {
+    setWidgetsVisible((prev) => {
+      const next = !(prev ?? false);
+      try {
+        window.localStorage.setItem(WIDGETS_VISIBLE_KEY, String(next));
+      } catch {
+        // Private-mode / storage disabled — toggle still works for the session.
+      }
+      return next;
+    });
+  };
 
   // Close the folder popup / dialogs on Escape (matches shell flyout behavior).
   useEffect(() => {
@@ -1120,6 +1209,45 @@ export default function Desktop({
           );
         })}
       </div>
+
+      {/* macOS-style widget column — compact home widgets stacked along the
+          right edge (below windows, above the wallpaper). */}
+      {widgetsVisible && (
+        <DesktopWidgetColumn
+          role={currentRole}
+          top={showTopBar ? "94px" : "60px"}
+        />
+      )}
+
+      {/* Widget column toggle — small round acrylic button, below the menubar */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleWidgetColumn();
+        }}
+        title={widgetsVisible ? "Hide desktop widgets" : "Show desktop widgets"}
+        aria-label={widgetsVisible ? "Hide desktop widgets" : "Show desktop widgets"}
+        aria-pressed={widgetsVisible ?? false}
+        style={{
+          position: "absolute",
+          top: showTopBar ? "50px" : "16px",
+          right: "16px",
+          width: "32px",
+          height: "32px",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          zIndex: 6,
+          ...acrylicSurfaceStyle,
+          boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
+          color: widgetsVisible ? "var(--w11-accent, #0078d4)" : "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+        }}
+      >
+        <LayoutGrid size={15} />
+      </button>
 
       {/* Windows Manager Layer */}
       {children}

@@ -28,6 +28,8 @@ ui:
     icon: ShieldCheck
     visible_to:
     - school_admin
+  aos:
+    about: "Trigger and manage school emergencies — alerts, evacuation plans, headcount tracking, safe-status confirmation, and drills."
 mobile:
   admin:
     feature_folder: emergency

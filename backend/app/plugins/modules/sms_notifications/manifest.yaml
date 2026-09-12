@@ -45,6 +45,8 @@ ui:
       route: /dashboard/communications/sliders
     - label: Message Templates
       route: /dashboard/communications/templates
+  aos:
+    about: "Reach parents by SMS — bulk sends via Sparrow SMS, attendance alerts, fee reminders, and custom templates."
 mobile:
   admin:
     feature_folder: sms
