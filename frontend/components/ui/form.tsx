@@ -48,18 +48,18 @@ export function FormField({
   const { t } = useI18n();
   return (
     <div className={cn("space-y-1.5 min-w-0", className)}>
-      <Label htmlFor={htmlFor} className="text-[12px]">
+      <Label htmlFor={htmlFor}>
         {ne ? t(label, ne) : label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
+        {required && <span className="ml-0.5 text-red-600">*</span>}
       </Label>
       {children}
       {error ? (
-        <p className="flex items-center gap-1 text-[11px] text-destructive">
+        <p className="flex items-center gap-1 !text-[11px] text-red-600">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[11px] text-muted-foreground leading-snug">
+        <p className="text-tertiary !text-[11px] !leading-snug">
           {neHint ? t(hint, neHint) : hint}
         </p>
       ) : null}
@@ -92,13 +92,13 @@ export function FormSection({
   return (
     <section
       className={cn(
-        "rounded-lg border bg-card overflow-hidden",
+        "overflow-hidden rounded-[var(--w11-radius-lg)] border-[var(--w11-border-default)] bg-[var(--w11-card-bg)] shadow-[var(--w11-elevation-card)]",
         className
       )}
     >
-      <header className="flex items-center gap-3 px-4 sm:px-5 py-3 border-b bg-muted/40">
+      <header className="flex items-center gap-3 border-b border-[var(--w11-border-subtle)] bg-[var(--w11-control-hover)] px-4 py-3 sm:px-5">
         {Icon && (
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--w11-radius-sm)] bg-[var(--w11-accent-light)] text-[var(--w11-accent)]">
             <Icon className="h-3.5 w-3.5" />
           </span>
         )}
@@ -107,7 +107,7 @@ export function FormSection({
             {ne ? t(title, ne) : title}
           </h3>
           {description && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+            <p className="text-tertiary mt-0.5 !text-[11px] !leading-snug">
               {neDescription ? t(description, neDescription) : description}
             </p>
           )}
@@ -161,7 +161,7 @@ export function FormActions({
   return (
     <div
       className={cn(
-        "sticky bottom-0 z-10 -mx-1 mt-6 flex items-center justify-end gap-2 rounded-lg border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+        "sticky bottom-0 z-10 -mx-1 mt-6 flex items-center justify-end gap-2 rounded-[var(--w11-radius-lg)] border-[var(--w11-border-default)] bg-[var(--w11-surface-flyout)] px-4 py-3 backdrop-blur",
         className
       )}
     >

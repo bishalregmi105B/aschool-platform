@@ -20,18 +20,24 @@ export type StatusTone =
   | "muted"
   | "primary";
 
+/**
+ * Tone → 11.css chip modifier (+ mirrored arbitrary-value fallbacks for
+ * surfaces outside the `.win11` scope). The scoped `win11-chip` class paints
+ * the pill; the semantic text color also feeds the leading dot via
+ * `bg-current`, so dot and label always agree.
+ */
 const TONE_CLASSES: Record<StatusTone, string> = {
   success:
-    "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20",
+    "success border-[#107c10] bg-[rgba(16,124,16,0.12)] text-[#107c10]",
   danger:
-    "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20",
+    "error border-[#c42b1c] bg-[rgba(196,43,28,0.12)] text-[#c42b1c]",
   warning:
-    "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20",
-  info: "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-400/20",
+    "warning border-[#d83b01] bg-[rgba(216,59,1,0.12)] text-[#d83b01]",
+  info: "accent border-[var(--w11-accent,#0067c0)] bg-[var(--w11-accent-light,rgba(0,103,192,0.12))] text-[var(--w11-accent,#0067c0)]",
   muted:
-    "bg-muted text-muted-foreground ring-border dark:bg-muted dark:text-muted-foreground",
+    "subtle border-[var(--w11-border-default,rgba(0,0,0,0.12))] bg-[var(--w11-control-hover,rgba(0,0,0,0.05))] text-[var(--w11-text-secondary,#5d5d5d)]",
   primary:
-    "bg-primary/10 text-primary ring-primary/20 dark:bg-primary/15 dark:text-primary",
+    "accent border-[var(--w11-accent,#0067c0)] bg-[var(--w11-accent-light,rgba(0,103,192,0.12))] text-[var(--w11-accent,#0067c0)]",
 };
 
 /**
@@ -169,7 +175,7 @@ function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full font-medium ring-1 ring-inset",
+        "win11-chip inline-flex items-center gap-1 rounded-full border font-medium",
         size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
         TONE_CLASSES[resolvedTone],
         className
@@ -179,15 +185,7 @@ function StatusPill({
       {dot && (
         <span
           aria-hidden="true"
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            resolvedTone === "success" && "bg-emerald-500",
-            resolvedTone === "danger" && "bg-red-500",
-            resolvedTone === "warning" && "bg-amber-500",
-            resolvedTone === "info" && "bg-sky-500",
-            resolvedTone === "primary" && "bg-primary",
-            resolvedTone === "muted" && "bg-muted-foreground/50"
-          )}
+          className="h-1.5 w-1.5 rounded-full bg-current"
         />
       )}
       {resolvedLabel}

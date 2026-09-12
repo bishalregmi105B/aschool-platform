@@ -64,18 +64,18 @@ function EmptyState({
       {Icon && (
         <div
           className={cn(
-            "flex items-center justify-center rounded-full bg-muted text-muted-foreground",
+            "flex items-center justify-center rounded-full bg-[var(--w11-control-hover,rgba(0,0,0,0.05))] text-[var(--w11-text-secondary,#5d5d5d)]",
             size === "md" ? "mb-1 h-12 w-12" : "h-10 w-10"
           )}
         >
           <Icon className={size === "md" ? "h-6 w-6" : "h-5 w-5"} />
         </div>
       )}
-      <p className={cn("font-semibold", size === "md" ? "text-sm" : "text-[13px]")}>
+      <p className={cn("font-semibold text-[var(--w11-text-primary,#1b1b1b)]", size === "md" ? "text-sm" : "text-[13px]")}>
         {title}
       </p>
       {body && (
-        <p className="max-w-xs text-[12px] leading-relaxed text-muted-foreground">
+        <p className="max-w-xs text-[12px] leading-relaxed text-[var(--w11-text-secondary,#5d5d5d)]">
           {body}
         </p>
       )}
@@ -118,7 +118,7 @@ function ErrorState({
     >
       <div
         className={cn(
-          "flex items-center justify-center rounded-full bg-destructive/10 text-destructive",
+          "flex items-center justify-center rounded-full bg-[rgba(196,43,28,0.1)] text-[#c42b1c]",
           size === "md" ? "mb-1 h-12 w-12" : "h-10 w-10"
         )}
       >
@@ -137,11 +137,11 @@ function ErrorState({
           <path d="M12 17h.01" />
         </svg>
       </div>
-      <p className={cn("font-semibold", size === "md" ? "text-sm" : "text-[13px]")}>
+      <p className={cn("font-semibold text-[var(--w11-text-primary,#1b1b1b)]", size === "md" ? "text-sm" : "text-[13px]")}>
         {title}
       </p>
       {body && (
-        <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">
+        <p className="max-w-sm text-[12px] leading-relaxed text-[var(--w11-text-secondary,#5d5d5d)]">
           {body}
         </p>
       )}
@@ -179,11 +179,11 @@ function LockedState({
   return (
     <div
       className={cn(
-        "flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center",
+        "flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-[var(--w11-radius-xl)] border-2 border-dashed border-[var(--w11-border-default,rgba(0,0,0,0.12))] px-6 py-10 text-center",
         className
       )}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--w11-accent-light,rgba(0,103,192,0.12))] text-[var(--w11-accent,#0067c0)]">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -199,8 +199,8 @@ function LockedState({
         </svg>
       </div>
       <div className="space-y-1">
-        <p className="text-sm font-semibold">{feature} — not installed</p>
-        <p className="mx-auto max-w-xs text-[12px] leading-relaxed text-muted-foreground">
+        <p className="text-sm font-semibold text-[var(--w11-text-primary,#1b1b1b)]">{feature} — not installed</p>
+        <p className="mx-auto max-w-xs text-[12px] leading-relaxed text-[var(--w11-text-secondary,#5d5d5d)]">
           {body ??
             `Enable the ${feature} plugin to use this page. Free plugins activate instantly; paid ones start a trial.`}
         </p>

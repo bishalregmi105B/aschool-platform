@@ -226,27 +226,32 @@ export function DataTable<T>({
   };
 
   const colSpan = visibleColumns.length + (selectable ? 1 : 0);
+  const isSelectedRow = (key: string) =>
+    activeRowKey === key || selected.has(key);
 
   return (
     <div className={cn("space-y-2", className)}>
       {(searchable || toolbar || exportFileName || columns.length > 4) && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="win11-commandbar flex flex-wrap items-center">
           {searchable && (
-            <Input
-              value={searchValue ?? ""}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="h-8 w-full max-w-[240px]"
-              aria-label="Search table"
-            />
+            <div className="win11-searchbox w-full max-w-[240px]">
+              <Input
+                value={searchValue ?? ""}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-8 border-transparent bg-transparent px-3 text-[12px] focus-visible:ring-0 focus-visible:ring-offset-0"
+                aria-label="Search table"
+              />
+            </div>
           )}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1">
             {toolbar}
             {columns.length > 4 && (
               <div className="relative">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="commandbar-button h-8 border-0 bg-transparent px-2.5 text-[12px] font-normal shadow-none hover:bg-transparent"
                   onClick={() => setColumnMenuOpen((v) => !v)}
                   aria-expanded={columnMenuOpen}
                 >
@@ -258,11 +263,11 @@ export function DataTable<T>({
                       className="fixed inset-0 z-40"
                       onClick={() => setColumnMenuOpen(false)}
                     />
-                    <div className="absolute right-0 z-50 mt-1 w-52 rounded-md border bg-popover p-1.5 shadow-md">
+                    <div className="absolute right-0 z-50 mt-1 w-52 rounded-[var(--w11-radius-lg)] border border-[var(--w11-acrylic-border)] bg-[var(--w11-surface-flyout)] p-1.5 shadow-[var(--w11-elevation-flyout)] backdrop-blur-[24px] backdrop-saturate-[1.8]">
                       {columns.map((c) => (
                         <label
                           key={c.key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[12px] hover:bg-muted"
+                          className="flex cursor-pointer items-center gap-2 rounded-[var(--w11-radius-sm)] px-2 py-1.5 text-[12px] text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)]"
                         >
                           <Checkbox
                             checked={!hiddenKeys.has(c.key)}
@@ -287,6 +292,7 @@ export function DataTable<T>({
               <Button
                 variant="outline"
                 size="sm"
+                className="commandbar-button h-8 border-0 bg-transparent px-2.5 text-[12px] font-normal shadow-none hover:bg-transparent"
                 onClick={handleExport}
                 disabled={displayRows.length === 0}
               >
@@ -298,8 +304,8 @@ export function DataTable<T>({
       )}
 
       {selectable && selectedRows.length > 0 && (
-        <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
-          <span className="text-[12px] font-medium">
+        <div className="flex items-center gap-2 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-default)] bg-[var(--w11-surface-solid)] px-3 py-2">
+          <span className="win11-chip accent">
             {selectedRows.length} selected
           </span>
           <div className="ml-auto flex items-center gap-2">
@@ -324,29 +330,29 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background">
-            <TableRow>
-              {selectable && (
-                <TableHead className="w-9">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all rows"
-                  />
-                </TableHead>
-              )}
-              {visibleColumns.map((c) => {
-                const isSorted = activeSort?.key === c.key;
-                return (
+      <Table className={dense ? "compact" : undefined}>
+        <TableHeader>
+          <TableRow>
+            {selectable && (
+              <TableHead className="w-9">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all rows"
+                />
+              </TableHead>
+            )}
+            {visibleColumns.map((c) => {
+              const isSorted = activeSort?.key === c.key;
+              return (
                   <TableHead
                     key={c.key}
-                    style={c.width ? { width: c.width } : undefined}
+                    style={{
+                      width: c.width,
+                      textAlign: c.align ?? "left",
+                    }}
                     className={cn(
-                      c.align === "right" && "text-right",
-                      c.align === "center" && "text-center",
-                      c.sortable && "cursor-pointer select-none hover:text-foreground",
+                      c.sortable && "sortable",
                       c.className
                     )}
                     onClick={() => toggleSort(c)}
@@ -364,7 +370,7 @@ export function DataTable<T>({
                         <span
                           aria-hidden="true"
                           className={cn(
-                            "text-[9px] leading-none",
+                            "sort-icon leading-none",
                             isSorted ? "opacity-100" : "opacity-30"
                           )}
                         >
@@ -375,8 +381,8 @@ export function DataTable<T>({
                   </TableHead>
                 );
               })}
-            </TableRow>
-          </TableHeader>
+          </TableRow>
+        </TableHeader>
           <TableBody>
             {loading && (
               <TableRow>
@@ -415,16 +421,10 @@ export function DataTable<T>({
                 return (
                   <TableRow
                     key={key}
-                    data-state={
-                      activeRowKey === key
-                        ? "selected"
-                        : selected.has(key)
-                          ? "selected"
-                          : undefined
-                    }
+                    data-state={isSelectedRow(key) ? "selected" : undefined}
                     className={cn(
-                      onRowClick && "cursor-pointer",
-                      dense && "[&>td]:py-1.5"
+                      isSelectedRow(key) && "selected",
+                      onRowClick && "cursor-pointer"
                     )}
                     onClick={
                       onRowClick
@@ -465,11 +465,8 @@ export function DataTable<T>({
                     {visibleColumns.map((c) => (
                       <TableCell
                         key={c.key}
-                        className={cn(
-                          c.align === "right" && "text-right",
-                          c.align === "center" && "text-center",
-                          c.className
-                        )}
+                        style={{ textAlign: c.align ?? "left" }}
+                        className={cn(c.className)}
                       >
                         {c.render
                           ? c.render(row, index)
@@ -481,7 +478,6 @@ export function DataTable<T>({
               })}
           </TableBody>
         </Table>
-      </div>
 
       {pagination && onPageChange && (
         <Pagination

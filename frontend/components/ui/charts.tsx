@@ -34,7 +34,9 @@ export const CHART_COLORS = [
   "#5b7fb9", // slate blue
 ];
 
-const axisStyle = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
+const axisStyle = { fontSize: 10, fill: "var(--w11-text-secondary)" };
+const gridStroke = "var(--w11-border-subtle)";
+const cursorFill = "var(--w11-control-hover)";
 
 function ChartTooltip({ active, payload, label }: {
   active?: boolean;
@@ -44,12 +46,19 @@ function ChartTooltip({ active, payload, label }: {
   const { t } = useI18n();
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md border bg-popover px-2.5 py-1.5 shadow-md">
+    <div
+      className="rounded-[var(--w11-radius-md)] border border-[var(--w11-acrylic-border)] px-2.5 py-1.5"
+      style={{
+        background: "var(--w11-surface-flyout)",
+        boxShadow: "var(--w11-elevation-flyout)",
+        backdropFilter: "blur(24px) saturate(180%)",
+      }}
+    >
       {label !== undefined && (
-        <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{label}</p>
+        <p className="mb-0.5 text-[10px] font-medium text-[var(--w11-text-secondary)]">{label}</p>
       )}
       {payload.map((entry, i) => (
-        <p key={i} className="flex items-center gap-1.5 text-[11px] font-medium">
+        <p key={i} className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--w11-text-primary)]">
           <span className="h-2 w-2 rounded-sm" style={{ background: entry.color }} />
           {entry.name}: <span className="tabular-nums">{entry.value}</span>
         </p>
@@ -76,10 +85,10 @@ export function ThemedBarChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
         <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
         <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
-        <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: cursorFill, opacity: 0.5 }} />
         {bars.length > 1 && (
           <Legend
             formatter={(value) => {
@@ -119,7 +128,7 @@ export function ThemedLineChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
         <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
         <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
         <Tooltip content={<ChartTooltip />} />

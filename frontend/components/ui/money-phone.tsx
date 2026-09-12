@@ -63,7 +63,7 @@ export function MoneyInput({
 
   return (
     <div className={cn("relative", className)}>
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-medium text-muted-foreground">
+      <span className="text-tertiary pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-medium">
         {t("Rs.", "रू")}
       </span>
       <Input
@@ -118,7 +118,7 @@ export function PhoneInput({
 
   return (
     <div className={cn("relative", className)}>
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-medium text-muted-foreground">
+      <span className="text-tertiary pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-medium">
         +977
       </span>
       <Input

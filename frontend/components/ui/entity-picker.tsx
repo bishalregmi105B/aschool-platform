@@ -24,6 +24,7 @@ import { Search, Loader2, X, ChevronDown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Win11Scope } from "@/lib/win11-scope";
 import type { AdvancedOption } from "@/components/ui/advanced-select";
 
 export interface EntityQuery {
@@ -100,11 +101,11 @@ export function EntityPicker({
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-[13px] transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            "flex min-h-9 w-full items-center justify-between gap-2 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-default)] bg-[var(--w11-control-bg)] px-3 text-[13px] text-[var(--w11-text-primary)] transition-colors hover:bg-[var(--w11-control-hover)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--w11-accent)] disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
         >
-          <span className={cn("min-w-0 truncate", !value && "text-muted-foreground")}>
+          <span className={cn("min-w-0 truncate", !value && "text-[var(--w11-text-secondary)]")}>
             {selectedOpt
               ? selectedOpt.ne ? t(selectedOpt.label, selectedOpt.ne) : selectedOpt.label
               : value
@@ -115,29 +116,30 @@ export function EntityPicker({
           </span>
           {value ? (
             <X
-              className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
+              className="h-3.5 w-3.5 shrink-0 text-[var(--w11-text-tertiary)] hover:text-[var(--w11-text-primary)]"
               onClick={(e) => { e.stopPropagation(); onChange?.(""); }}
             />
           ) : (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden />
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--w11-text-tertiary)]" aria-hidden />
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <div className="flex items-center gap-2 border-b px-2.5 py-2">
-          <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <PopoverContent className="w-[--radix-popover-trigger-width] rounded-[var(--w11-radius-lg)] border-[var(--w11-acrylic-border)] bg-[var(--w11-surface-flyout)] p-0 shadow-[var(--w11-elevation-flyout)] backdrop-blur-[24px] backdrop-saturate-[1.8]" align="start">
+        <Win11Scope>
+        <div className="flex items-center gap-2 border-b border-[var(--w11-border-subtle)] px-2.5 py-2">
+          <Search className="h-3.5 w-3.5 text-[var(--w11-text-tertiary)] shrink-0" />
           <input
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("Type to search…", "टाइप गरी खोज्नुहोस्…")}
-            className="w-full bg-transparent text-[12px] outline-none placeholder:text-muted-foreground"
+            className="w-full bg-transparent text-[12px] text-[var(--w11-text-primary)] outline-none placeholder:text-[var(--w11-text-tertiary)]"
           />
-          {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--w11-text-secondary)]" />}
         </div>
         <div className="max-h-64 overflow-y-auto py-1">
           {options.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[12px] text-muted-foreground">
+            <p className="px-3 py-6 text-center text-[12px] text-[var(--w11-text-secondary)]">
               {isLoading ? t("Loading…", "लोड हुँदै…") : t("Nothing matches that search", "कुनै नतिजा छैन")}
             </p>
           ) : (
@@ -151,15 +153,15 @@ export function EntityPicker({
                   setSearch("");
                 }}
                 className={cn(
-                  "flex w-full flex-col px-3 py-1.5 text-left hover:bg-accent",
-                  opt.value === value && "bg-primary/5"
+                  "flex min-h-8 w-full flex-col px-3 text-left text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)]",
+                  opt.value === value && "bg-[var(--w11-accent-light)]"
                 )}
               >
                 <span className="text-[13px] font-medium">
                   {opt.ne ? t(opt.label, opt.ne) : opt.label}
                 </span>
                 {(opt as AdvancedOption & { hint?: string }).hint && (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[11px] text-[var(--w11-text-secondary)]">
                     {(opt as AdvancedOption & { hint?: string }).hint}
                   </span>
                 )}
@@ -167,6 +169,7 @@ export function EntityPicker({
             ))
           )}
         </div>
+        </Win11Scope>
       </PopoverContent>
     </Popover>
   );

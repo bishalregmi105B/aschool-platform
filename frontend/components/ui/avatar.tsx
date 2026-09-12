@@ -13,6 +13,12 @@ const sizeMap = {
   lg: "h-14 w-14 text-lg",
 };
 
+/**
+ * Persona-style avatar: circular, image covers the frame, initials fallback
+ * sits on `--w11-accent-light` with accent text (the softer sibling of the
+ * solid 11.css `persona-avatar`). Falls back to literal tints outside the
+ * `.win11` scope.
+ */
 export function Avatar({ src, name, size = "md", className }: AvatarProps) {
   if (src) {
     return (
@@ -27,7 +33,7 @@ export function Avatar({ src, name, size = "md", className }: AvatarProps) {
   return (
     <div
       className={cn(
-        "rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--w11-accent-light,rgba(0,103,192,0.12))] font-semibold text-[var(--w11-accent,#0067c0)]",
         sizeMap[size],
         className
       )}

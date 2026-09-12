@@ -13,18 +13,11 @@
  * params stay plain.
  */
 import * as React from "react";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Loader2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Win11Scope } from "@/lib/win11-scope";
 
 export interface AdvancedOption {
   value: string;
@@ -129,9 +122,15 @@ export function AdvancedSelect(props: AdvancedSelectProps) {
         }}
         disabled={disabled}
       >
-        <SelectTrigger id={id} className={cn("h-9 text-[13px]", triggerClassName)}>
+        <SelectTrigger
+          id={id}
+          className={cn(
+            "h-9 rounded-[var(--w11-radius-md)] border-[var(--w11-border-default)] bg-[var(--w11-control-bg)] text-[13px] text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)] focus:ring-1 focus:ring-[var(--w11-accent)]",
+            triggerClassName
+          )}
+        >
           {loading ? (
-            <span className="flex items-center gap-2 text-muted-foreground">
+            <span className="flex items-center gap-2 text-[var(--w11-text-secondary)]">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("Loading…", "लोड हुँदै…")}
             </span>
@@ -139,10 +138,11 @@ export function AdvancedSelect(props: AdvancedSelectProps) {
             <SelectValue placeholder={nePlaceholder ? t(placeholder ?? "Select", nePlaceholder) : placeholder ?? t("Select", "छान्नुहोस्")} />
           )}
         </SelectTrigger>
-        <SelectContent className="max-h-72">
+        <SelectContent className="max-h-72 rounded-[var(--w11-radius-lg)] border-[var(--w11-acrylic-border)] bg-[var(--w11-surface-flyout)] shadow-[var(--w11-elevation-flyout)] backdrop-blur-[24px] backdrop-saturate-[1.8]">
+          <Win11Scope>
           {searchable && (
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-popover px-2.5 py-2">
-              <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--w11-border-subtle)] bg-[var(--w11-surface-flyout)] px-2.5 py-2">
+              <Search className="h-3.5 w-3.5 text-[var(--w11-text-tertiary)] shrink-0" />
               <input
                 // Search inside the dropdown; Radix handles typeahead natively
                 // but an explicit box beats it for 50+ teachers/classes.
@@ -150,7 +150,7 @@ export function AdvancedSelect(props: AdvancedSelectProps) {
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder={t("Filter…", "खोज्नुहोस्…")}
-                className="w-full bg-transparent text-[12px] outline-none placeholder:text-muted-foreground"
+                className="w-full bg-transparent text-[12px] text-[var(--w11-text-primary)] outline-none placeholder:text-[var(--w11-text-tertiary)]"
                 onKeyDown={(e) => e.stopPropagation()}
               />
             </div>
@@ -159,25 +159,25 @@ export function AdvancedSelect(props: AdvancedSelectProps) {
             <button
               type="button"
               onClick={() => onChange?.("")}
-              className="flex w-full items-center gap-2 border-b px-3 py-2 text-[12px] text-muted-foreground hover:bg-accent"
+              className="flex w-full items-center gap-2 border-b border-[var(--w11-border-subtle)] px-3 py-2 text-[12px] text-[var(--w11-text-secondary)] hover:bg-[var(--w11-control-hover)]"
             >
               <X className="h-3 w-3" /> {t("Clear selection", "छान्नु रद्द")}
             </button>
           )}
           {groups.size === 0 ? (
-            <div className="px-3 py-6 text-center text-[12px] text-muted-foreground">
+            <div className="px-3 py-6 text-center text-[12px] text-[var(--w11-text-secondary)]">
               {t("No options", "विकल्प छैन")}
             </div>
           ) : (
             Array.from(groups.entries()).map(([group, opts]) => (
               <SelectGroup key={group || "__all"}>
-                {group && <SelectLabel>{group}</SelectLabel>}
+                {group && <SelectLabel className="text-[11px] font-semibold text-[var(--w11-text-secondary)]">{group}</SelectLabel>}
                 {opts.map((opt) => (
                   <SelectItem
                     key={opt.value}
                     value={opt.value}
                     disabled={opt.disabled}
-                    className="text-[13px]"
+                    className="rounded-[var(--w11-radius-sm)] px-3 py-1.5 text-[13px] text-[var(--w11-text-primary)] focus:bg-[var(--w11-control-hover)] focus:text-[var(--w11-text-primary)] data-[highlighted]:bg-[var(--w11-accent-light)] data-[highlighted]:text-[var(--w11-accent)] data-[state=checked]:bg-[var(--w11-accent-light)] data-[state=checked]:text-[var(--w11-accent)]"
                   >
                     {opt.ne ? t(opt.label, opt.ne) : opt.label}
                   </SelectItem>
@@ -185,6 +185,7 @@ export function AdvancedSelect(props: AdvancedSelectProps) {
               </SelectGroup>
             ))
           )}
+          </Win11Scope>
         </SelectContent>
       </Select>
     </div>
