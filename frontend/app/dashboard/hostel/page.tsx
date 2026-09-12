@@ -5,16 +5,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PageLoader } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+  AOSEmptyState,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Building2, BedDouble, Users, Plus, UserX } from "lucide-react";
 
 // Backend GET /hostel/summary returns an array of per-hostel stats:
@@ -64,7 +72,7 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
     render: (a) => (
       <div>
         <p className="font-medium">{a.student_name}</p>
-        {a.student_roll != null && <p className="text-xs text-muted-foreground">Roll: {a.student_roll}</p>}
+        {a.student_roll != null && <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Roll: {a.student_roll}</p>}
       </div>
     ),
   },
@@ -76,7 +84,7 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
     render: (a) => (
       <div>
         <p>{a.hostel_name || "—"}</p>
-        <p className="text-xs text-muted-foreground">Room {a.room_number || "—"}</p>
+        <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Room {a.room_number || "—"}</p>
       </div>
     ),
   },
@@ -86,12 +94,12 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
     sortable: true,
     value: (a) => a.check_in_date ?? "",
     render: (a) => (
-      <span className="text-muted-foreground">
+      <span style={{ color: "var(--w11-text-secondary)" }}>
         {a.check_in_date ? new Date(a.check_in_date).toLocaleDateString("ne-NP") : "—"}
       </span>
     ),
   },
-  { key: "monthly_fee", label: "Fee", align: "right", sortable: true, value: (a) => a.monthly_fee ?? 0, render: (a) => <span className="text-green-700 font-medium">{fmt(a.monthly_fee)}</span> },
+  { key: "monthly_fee", label: "Fee", align: "right", sortable: true, value: (a) => a.monthly_fee ?? 0, render: (a) => <span className="font-medium" style={{ color: "#107c10" }}>{fmt(a.monthly_fee)}</span> },
   {
     key: "status",
     label: "Status",
@@ -99,9 +107,9 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
     value: (a) => a.status ?? "",
     render: (a) =>
       a.status === "checked_out" || a.check_out_date ? (
-        <Badge variant="outline" className="text-xs">Checked Out</Badge>
+        <span className="win11-chip subtle text-xs">Checked Out</span>
       ) : (
-        <Badge variant="success" className="text-xs">Active</Badge>
+        <StatusChip status="active" label="Active" className="text-xs" />
       ),
   },
   {
@@ -113,7 +121,8 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
         <Button
           size="sm"
           variant="outline"
-          className="text-destructive border-destructive/30 h-7 text-xs"
+          className="h-7 text-xs"
+          style={{ color: "#c42b1c", borderColor: "rgba(196,43,28,0.3)" }}
           onClick={(e) => {
             e.stopPropagation();
             if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id);
@@ -158,118 +167,132 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
   });
 
   const hostels = summary?.hostels ?? [];
-  if (sl && tab === "overview") return <PageLoader />;
+  if (sl && tab === "overview") return <AOSModuleLoadingState label="Loading hostels…" />;
   if (se) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load hostel data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => srefetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Hostel Management" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load hostel data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => srefetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Building2 className="h-6 w-6" />Hostel Management</h1>
-          <p className="text-sm text-muted-foreground">Manage hostels, rooms and student allocations</p>
-        </div>
-        <Button onClick={() => setShowAddHostel(true)}><Plus className="mr-2 h-4 w-4" />Add Hostel</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Building2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Hostel Management"
+        subtitle={summary ? `${summary.total_hostels} hostels · ${summary.total_occupied}/${summary.total_capacity} beds occupied (${summary.occupancy_rate?.toFixed(0)}%)` : "Manage hostels, rooms and student allocations"}
+        actions={
+          <Button onClick={() => setShowAddHostel(true)}><Plus className="mr-2 h-4 w-4" />Add Hostel</Button>
+        }
+      />
+      <AOSPageBody>
+        {summary && (
+          <StatGrid>
+            <KpiCard label="Hostels" value={summary.total_hostels} icon={<Building2 className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />} />
+            <KpiCard label="Total Capacity" value={summary.total_capacity} color="#107c10" icon={<BedDouble className="h-4 w-4" style={{ color: "#107c10" }} />} />
+            <KpiCard label="Occupied" value={summary.total_occupied} color="#d83b01" icon={<Users className="h-4 w-4" style={{ color: "#d83b01" }} />} />
+            <KpiCard label="Available" value={summary.total_available} footnote={`${summary.occupancy_rate?.toFixed(0)}% occupancy`} icon={<BedDouble className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />} />
+          </StatGrid>
+        )}
 
-      {summary && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Hostels", value: summary.total_hostels, icon: <Building2 className="h-5 w-5 text-blue-600" />, bg: "bg-blue-50" },
-            { label: "Total Capacity", value: summary.total_capacity, icon: <BedDouble className="h-5 w-5 text-green-600" />, bg: "bg-green-50" },
-            { label: "Occupied", value: summary.total_occupied, icon: <Users className="h-5 w-5 text-orange-600" />, bg: "bg-orange-50" },
-            { label: "Available", value: summary.total_available, icon: <BedDouble className="h-5 w-5 text-purple-600" />, bg: "bg-purple-50", sub: `${summary.occupancy_rate?.toFixed(0)}% occupancy` },
-          ].map((s) => (
-            <Card key={s.label}><CardContent className="pt-4 flex items-center gap-4">
-              <div className={`rounded-lg p-2.5 ${s.bg}`}>{s.icon}</div>
-              <div><p className="text-2xl font-bold">{s.value}</p><p className="text-sm text-muted-foreground">{s.label}</p>{s.sub && <p className="text-xs text-muted-foreground">{s.sub}</p>}</div>
-            </CardContent></Card>
-          ))}
-        </div>
-      )}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList><TabsTrigger value="overview">Hostels</TabsTrigger><TabsTrigger value="rooms">Rooms</TabsTrigger><TabsTrigger value="allocations">Allocations</TabsTrigger></TabsList>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList><TabsTrigger value="overview">Hostels</TabsTrigger><TabsTrigger value="rooms">Rooms</TabsTrigger><TabsTrigger value="allocations">Allocations</TabsTrigger></TabsList>
-
-        <TabsContent value="overview" className="mt-4">
-          {hostels.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center"><Building2 className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No hostels yet</p><p className="text-sm text-muted-foreground">Add your first hostel to start managing accommodation</p></div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {hostels.map((h) => (
-                <Card key={h.hostel_id}><CardContent className="pt-4 space-y-3">
-                  <div className="flex justify-between gap-2">
-                    <div><p className="font-semibold">{h.hostel_name}</p><p className="text-xs text-muted-foreground capitalize">{h.type}</p></div>
-                    <Badge variant="outline" className="capitalize">{h.type}</Badge>
+          <TabsContent value="overview" className="mt-4">
+            {hostels.length === 0 ? (
+              <DataPanel>
+                <AOSEmptyState icon={<Building2 className="h-10 w-10" />} title="No hostels yet" description="Add your first hostel to start managing accommodation" />
+              </DataPanel>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {hostels.map((h) => (
+                  <div key={h.hostel_id} className="win11-card space-y-3">
+                    <div className="flex justify-between gap-2">
+                      <div><p className="font-semibold" style={{ color: "var(--w11-text-primary)" }}>{h.hostel_name}</p><p className="text-xs capitalize" style={{ color: "var(--w11-text-secondary)" }}>{h.type}</p></div>
+                      <span className="win11-chip subtle capitalize">{h.type}</span>
+                    </div>
+                    <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}><span className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{h.occupied}</span>/{h.total_capacity} occupied · <span className="font-medium" style={{ color: "#107c10" }}>{h.available}</span> free · {h.total_rooms} rooms</p>
+                    <Button size="sm" variant="outline" className="w-full" onClick={() => { setSelHostel(h.hostel_id); setTab("rooms"); }}>View Rooms</Button>
                   </div>
-                  <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">{h.occupied}</span>/{h.total_capacity} occupied · <span className="text-green-600 font-medium">{h.available}</span> free · {h.total_rooms} rooms</p>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => { setSelHostel(h.hostel_id); setTab("rooms"); }}>View Rooms</Button>
-                </CardContent></Card>
-              ))}
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="rooms" className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <AdvancedSelect className="w-44" value={selHostel} onChange={(v) => setSelHostel(v)} clearable placeholder="All Hostels"
+                options={hostels.map((h) => ({ value: h.hostel_id, label: h.hostel_name }))} />
+              <Button size="sm" onClick={() => setShowAddRoom(true)}><Plus className="mr-1.5 h-3.5 w-3.5" />Add Room</Button>
             </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="rooms" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <AdvancedSelect className="w-44" value={selHostel} onChange={(v) => setSelHostel(v)} clearable placeholder="All Hostels"
-              options={hostels.map((h) => ({ value: h.hostel_id, label: h.hostel_name }))} />
-            <Button size="sm" onClick={() => setShowAddRoom(true)}><Plus className="mr-1.5 h-3.5 w-3.5" />Add Room</Button>
-          </div>
-          {rl ? <PageLoader /> : re ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <p className="text-sm text-destructive">Failed to load rooms.</p>
-              <Button size="sm" variant="outline" onClick={() => rrefetch()}>Retry</Button>
-            </div>
-          ) : !rooms?.length ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center"><BedDouble className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No rooms</p><p className="text-sm text-muted-foreground">Add rooms to this hostel</p></div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {rooms.map((r) => (
-                <Card key={r.id} className={r.is_full ? "border-red-200" : ""}><CardContent className="pt-4">
-                  <div className="flex items-center justify-between mb-2"><p className="font-semibold">Room {r.room_number}</p><Badge variant={r.is_full ? "destructive" : "success"} className="text-xs">{r.is_full ? "Full" : "Available"}</Badge></div>
-                  <p className="text-sm text-muted-foreground">{r.occupied_count}/{r.capacity} beds</p>
-                  {r.room_type && <p className="text-xs text-muted-foreground capitalize mt-1">{r.room_type}</p>}
-                  {r.monthly_fee != null && <p className="text-xs font-medium text-green-700 mt-1">{fmt(r.monthly_fee)}/mo</p>}
-                </CardContent></Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+            {rl ? <AOSModuleLoadingState label="Loading rooms…" /> : re ? (
+              <DataPanel className="max-w-2xl mx-auto">
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load rooms.</p>
+                  <Button size="sm" variant="outline" onClick={() => rrefetch()}>Retry</Button>
+                </div>
+              </DataPanel>
+            ) : !rooms?.length ? (
+              <DataPanel>
+                <AOSEmptyState icon={<BedDouble className="h-10 w-10" />} title="No rooms" description="Add rooms to this hostel" />
+              </DataPanel>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {rooms.map((r) => (
+                  <div key={r.id} className="win11-card" style={r.is_full ? { borderColor: "#c42b1c" } : undefined}>
+                    <div className="flex items-center justify-between mb-2"><p className="font-semibold" style={{ color: "var(--w11-text-primary)" }}>Room {r.room_number}</p><span className={`win11-chip text-xs ${r.is_full ? "error" : "success"}`}>{r.is_full ? "Full" : "Available"}</span></div>
+                    <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{r.occupied_count}/{r.capacity} beds</p>
+                    {r.room_type && <p className="text-xs capitalize mt-1" style={{ color: "var(--w11-text-secondary)" }}>{r.room_type}</p>}
+                    {r.monthly_fee != null && <p className="text-xs font-medium mt-1" style={{ color: "#107c10" }}>{fmt(r.monthly_fee)}/mo</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
 
 
-        <TabsContent value="allocations" className="mt-4">
-          {al ? <PageLoader /> : ae ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <p className="text-sm text-destructive">Failed to load allocations.</p>
-              <Button size="sm" variant="outline" onClick={() => arefetch()}>Retry</Button>
-            </div>
-          ) : !allocs?.length ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center"><Users className="h-10 w-10 text-muted-foreground/40" /><p className="font-semibold">No allocations</p><p className="text-sm text-muted-foreground">Students have not been allocated to hostel rooms yet</p></div>
-          ) : (
-            <DataTable
-              columns={ALLOCATION_COLUMNS}
-              rows={allocs}
-              rowKey={(a: any) => a.id}
-              searchable
-              searchPlaceholder="Search students…"
-              exportFileName="hostel-allocations"
-              dense
-            />
-          )}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="allocations" className="mt-4">
+            {al ? <AOSModuleLoadingState label="Loading allocations…" /> : ae ? (
+              <DataPanel className="max-w-2xl mx-auto">
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load allocations.</p>
+                  <Button size="sm" variant="outline" onClick={() => arefetch()}>Retry</Button>
+                </div>
+              </DataPanel>
+            ) : !allocs?.length ? (
+              <DataPanel>
+                <AOSEmptyState icon={<Users className="h-10 w-10" />} title="No allocations" description="Students have not been allocated to hostel rooms yet" />
+              </DataPanel>
+            ) : (
+              <DataPanel bodyClassName="p-0">
+                <DataTable
+                  columns={ALLOCATION_COLUMNS}
+                  rows={allocs}
+                  rowKey={(a: any) => a.id}
+                  searchable
+                  searchPlaceholder="Search students…"
+                  exportFileName="hostel-allocations"
+                  dense
+                />
+              </DataPanel>
+            )}
+          </TabsContent>
+        </Tabs>
 
-      <AddHostelDialog open={showAddHostel} onClose={() => setShowAddHostel(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ["hostel-summary"] }); setShowAddHostel(false); }} />
-      <AddRoomDialog open={showAddRoom} hostels={hostels} defaultHostelId={selHostel} onClose={() => setShowAddRoom(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ["hostel-rooms"] }); setShowAddRoom(false); }} />
-    </div>
+        <AddHostelDialog open={showAddHostel} onClose={() => setShowAddHostel(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ["hostel-summary"] }); setShowAddHostel(false); }} />
+        <AddRoomDialog open={showAddRoom} hostels={hostels} defaultHostelId={selHostel} onClose={() => setShowAddRoom(false)} onSaved={() => { qc.invalidateQueries({ queryKey: ["hostel-rooms"] }); setShowAddRoom(false); }} />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

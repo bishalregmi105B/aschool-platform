@@ -3,13 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { PageLoader } from "@/components/ui/spinner";
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, StatusChip,
+  AOSModuleLoadingState, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { Calendar } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -42,7 +41,7 @@ interface ExamSubject {
 
 const SCHEDULE_COLUMNS: Column<ExamSubject>[] = [
   { key: "name", label: "Subject", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
-  { key: "code", label: "Code", sortable: true, value: (s) => s.code ?? "", render: (s) => <span className="text-muted-foreground">{s.code || "—"}</span> },
+  { key: "code", label: "Code", sortable: true, value: (s) => s.code ?? "", render: (s) => <span className="text-[color:var(--w11-text-secondary)]">{s.code || "—"}</span> },
   { key: "full", label: "Full Marks", align: "right", sortable: true, value: (s) => s.total_full_marks ?? s.full_marks, render: (s) => <>{s.total_full_marks ?? s.full_marks}</> },
   { key: "pass", label: "Pass Marks", align: "right", sortable: true, value: (s) => s.total_pass_marks ?? s.pass_marks, render: (s) => <>{s.total_pass_marks ?? s.pass_marks}</> },
   {
@@ -55,10 +54,17 @@ const SCHEDULE_COLUMNS: Column<ExamSubject>[] = [
           {s.practical_full_marks ? `${s.practical_full_marks} marks` : "Yes"}
         </Badge>
       ) : (
-        <span className="text-muted-foreground text-sm">—</span>
+        <span className="text-[color:var(--w11-text-secondary)] text-sm">—</span>
       ),
   },
 ];
+
+/** Exam status → StatusChip tone key (ongoing rides the warning key). */
+const STATUS_TONE: Record<string, string> = {
+  ongoing: "pending",
+  completed: "completed",
+  result_published: "published",
+};
 
 export default function ExamSchedulePage() {
   return (
@@ -77,40 +83,51 @@ function ExamScheduleContent() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading schedule…" /></AOSPage>;
 
   if (isError)
     return (
-      <div className="p-6 border border-destructive/30 bg-destructive/5 rounded-lg text-sm text-destructive text-center">
-        Failed to load the exam schedule. Please refresh the page to try again.
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Exam Schedule" subtitle="View exam timetables and schedules" />
+        <AOSPageBody>
+          <div className="win11-card p-6 rounded-lg text-sm text-[#c42b1c] text-center">
+            Failed to load the exam schedule. Please refresh the page to try again.
+          </div>
+        </AOSPageBody>
+      </AOSPage>
     );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Exam Schedule</h1>
-          <p className="text-muted-foreground">View exam timetables and schedules</p>
-        </div>
-        <a href="/dashboard/exams" className="text-sm font-medium text-primary hover:underline">
-          Create / manage exams →
-        </a>
-      </div>
-
-      {(exams || []).length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <p className="text-muted-foreground">No exams scheduled yet.</p>
-          <a href="/dashboard/exams" className="text-sm font-medium text-primary hover:underline">
-            Create your first exam on the Exams overview →
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Exam Schedule"
+        subtitle={`${(exams || []).length} exams · View exam timetables and schedules`}
+        actions={
+          <a href="/dashboard/exams" className="text-sm font-medium text-[color:var(--w11-accent)] hover:underline whitespace-nowrap">
+            Create / manage exams →
           </a>
-        </div>
-      ) : (
-        (exams || []).map((exam: Exam) => (
-          <ExamCard key={exam.id} exam={exam} />
-        ))
-      )}
-    </div>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {(exams || []).length === 0 ? (
+          <AOSEmptyState
+            icon={<Calendar className="h-8 w-8" style={{ color: "var(--w11-accent)" }} />}
+            title="No exams scheduled yet."
+            description="Create your first exam on the Exams overview."
+            action={
+              <a href="/dashboard/exams" className="text-sm font-medium text-[color:var(--w11-accent)] hover:underline">
+                Create your first exam on the Exams overview →
+              </a>
+            }
+          />
+        ) : (
+          (exams || []).map((exam: Exam) => (
+            <ExamCard key={exam.id} exam={exam} />
+          ))
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -134,52 +151,43 @@ function ExamCard({ exam }: { exam: Exam }) {
     : "—";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            {exam.name}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            {exam.class_name && (
-              <Badge variant="outline" className="capitalize">
-                {exam.class_name}
-              </Badge>
-            )}
-            <Badge
-              variant={
-                exam.status === "ongoing"
-                  ? "warning"
-                  : exam.status === "completed" || exam.status === "result_published"
-                  ? "success"
-                  : "secondary"
-              }
-              className="capitalize"
-            >
-              {exam.status?.replace("_", " ")}
+    <DataPanel
+      title={
+        <span className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" /> {exam.name}
+        </span>
+      }
+      actions={
+        <>
+          {exam.class_name && (
+            <Badge variant="outline" className="capitalize">
+              {exam.class_name}
             </Badge>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{dateLabel}</p>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading subjects…</p>
-        ) : !subjects || subjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No subjects assigned for this exam.</p>
-        ) : (
-          <DataTable<ExamSubject>
-            columns={SCHEDULE_COLUMNS}
-            rows={subjects}
-            rowKey={(s) => s.id}
-            searchable
-            searchPlaceholder="Search subjects…"
-            exportFileName={`exam-schedule-${exam.name}`}
-            empty={{ icon: Calendar, title: "No subjects assigned", body: "Add subjects to this exam to build the schedule." }}
+          )}
+          <StatusChip
+            status={STATUS_TONE[exam.status] || exam.status}
+            label={exam.status?.replace("_", " ")}
+            className="capitalize"
           />
-        )}
-      </CardContent>
-    </Card>
+        </>
+      }
+    >
+      <p className="text-sm text-[color:var(--w11-text-secondary)] mb-3">{dateLabel}</p>
+      {isLoading ? (
+        <p className="text-sm text-[color:var(--w11-text-secondary)]">Loading subjects…</p>
+      ) : !subjects || subjects.length === 0 ? (
+        <p className="text-sm text-[color:var(--w11-text-secondary)]">No subjects assigned for this exam.</p>
+      ) : (
+        <DataTable<ExamSubject>
+          columns={SCHEDULE_COLUMNS}
+          rows={subjects}
+          rowKey={(s) => s.id}
+          searchable
+          searchPlaceholder="Search subjects…"
+          exportFileName={`exam-schedule-${exam.name}`}
+          empty={{ icon: Calendar, title: "No subjects assigned", body: "Add subjects to this exam to build the schedule." }}
+        />
+      )}
+    </DataPanel>
   );
 }

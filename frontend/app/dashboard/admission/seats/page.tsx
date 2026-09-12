@@ -10,8 +10,14 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Armchair } from "lucide-react";
 import { PluginGate } from "@/lib/plugins";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface SeatRow {
   id?: string;
@@ -71,75 +77,77 @@ function SeatsInner() {
 
   if (classes.isLoading || seats.isLoading) {
     return (
-      <div className="p-6 flex justify-center">
-        <Loader2 className="animate-spin text-[#0e3b2e]" />
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="animate-spin text-[color:var(--w11-text-secondary)]" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-xl font-semibold text-[#0e3b2e]">
-        Enrollment Seat Caps
-      </h1>
-      <p className="text-sm text-[#0d1f14]/60">
-        Applications beyond the cap are rejected at conversion time — the
-        office cannot over-admit a class.
-      </p>
-      <div className="rounded-xl border border-[#0e3b2e]/10 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-[#0e3b2e] text-[#c5f4dd]">
-            <tr>
-              <th className="text-left px-4 py-2">Class</th>
-              <th className="text-center px-4 py-2">Booked</th>
-              <th className="text-center px-4 py-2">Cap</th>
-              <th className="text-center px-4 py-2">Remaining</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(classes.data ?? []).map((k) => {
-              const seat = seatByClass.get(k.id);
-              const editKey = k.id;
-              const value = edits[editKey] ?? seat?.max_seat ?? 0;
-              const booked = seat?.booked ?? 0;
-              const remaining =
-                value > 0 ? Math.max(value - booked, 0) : (seat?.remaining ?? "∞");
-              return (
-                <tr key={k.id} className="border-t border-[#0e3b2e]/10">
-                  <td className="px-4 py-2">{k.name}</td>
-                  <td className="text-center">{booked}</td>
-                  <td className="text-center">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={500}
-                      value={value || ""}
-                      onChange={(e) =>
-                        setEdits({ ...edits, [editKey]: Number(e.target.value) })
-                      }
-                      className="w-20 mx-auto"
-                      placeholder="∞"
-                    />
-                  </td>
-                  <td className="text-center">{remaining}</td>
-                  <td className="px-4 py-2 text-right">
-                    <Button
-                      size="sm"
-                      disabled={save.isPending || !value || value < 1}
-                      onClick={() =>
-                        save.mutate({ class_id: k.id, max_seat: value })
-                      }
-                    >
-                      Save
-                    </Button>
-                  </td>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Armchair className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Enrollment Seat Caps"
+        subtitle="Applications beyond the cap are rejected at conversion time — the office cannot over-admit a class."
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Class</th>
+                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Booked</th>
+                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Cap</th>
+                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Remaining</th>
+                  <th className="bg-[var(--w11-surface-solid)] border-b border-[var(--w11-border-default)]" />
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              </thead>
+              <tbody>
+                {(classes.data ?? []).map((k) => {
+                  const seat = seatByClass.get(k.id);
+                  const editKey = k.id;
+                  const value = edits[editKey] ?? seat?.max_seat ?? 0;
+                  const booked = seat?.booked ?? 0;
+                  const remaining =
+                    value > 0 ? Math.max(value - booked, 0) : (seat?.remaining ?? "∞");
+                  return (
+                    <tr key={k.id} className="border-b border-[var(--w11-border-subtle)]">
+                      <td className="px-4 py-2">{k.name}</td>
+                      <td className="text-center">{booked}</td>
+                      <td className="text-center">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={value || ""}
+                          onChange={(e) =>
+                            setEdits({ ...edits, [editKey]: Number(e.target.value) })
+                          }
+                          className="w-20 mx-auto"
+                          placeholder="∞"
+                        />
+                      </td>
+                      <td className="text-center">{remaining}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Button
+                          size="sm"
+                          disabled={save.isPending || !value || value < 1}
+                          onClick={() =>
+                            save.mutate({ class_id: k.id, max_seat: value })
+                          }
+                        >
+                          Save
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

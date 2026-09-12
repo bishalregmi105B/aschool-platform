@@ -2,10 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type ParentNotice = {
   id: string;
@@ -26,7 +26,7 @@ export default function ParentNoticesPage() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading…" />;
   if (isError)
     return <ErrorState title="Couldn't load notices" onRetry={() => refetch()} />;
 
@@ -44,7 +44,7 @@ export default function ParentNoticesPage() {
             <div className="space-y-3">
               {notices.map((n) => (
                 <div key={n.id} className="flex items-start gap-3 border-b py-2 last:border-0">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
+                  <div className="w-2 h-2 mt-2" style={{ background: "var(--w11-accent)", borderRadius: "var(--w11-radius-full)" }} />
                   <div>
                     <p className="text-sm font-medium">{n.title}</p>
                     <p className="text-xs text-muted-foreground">

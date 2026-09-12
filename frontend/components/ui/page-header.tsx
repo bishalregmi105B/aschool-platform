@@ -94,18 +94,20 @@ function PageHeader({
     <header className={cn("space-y-2", className)}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb">
-          <ol className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+          <ol className="win11-breadcrumb flex flex-wrap items-center text-[11px]">
             {breadcrumbs.map((crumb, i) => (
-              <li key={`${crumb.label}-${i}`} className="flex items-center gap-1">
+              <li key={`${crumb.label}-${i}`} className="flex items-center">
                 {crumb.href ? (
-                  <Link href={crumb.href} className="hover:text-foreground hover:underline">
+                  <Link href={crumb.href} className="breadcrumb-item">
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span aria-current="page">{crumb.label}</span>
+                  <span className="breadcrumb-item current" aria-current="page">
+                    {crumb.label}
+                  </span>
                 )}
                 {i < breadcrumbs.length - 1 && (
-                  <span aria-hidden="true" className="opacity-50">
+                  <span aria-hidden="true" className="breadcrumb-separator">
                     /
                   </span>
                 )}
@@ -117,14 +119,14 @@ function PageHeader({
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold leading-tight">{title}</h1>
+          <h1 className="text-title truncate leading-tight text-[var(--w11-text-primary)]">{title}</h1>
           {titleNepali && (
-            <p className="font-nepali text-[12px] text-muted-foreground">
+            <p className="font-nepali text-[12px] text-[var(--w11-text-secondary)]">
               {titleNepali}
             </p>
           )}
           {description && (
-            <p className="mt-0.5 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 max-w-2xl text-[12px] leading-relaxed text-[var(--w11-text-secondary)]">
               {description}
             </p>
           )}
@@ -156,7 +158,7 @@ function PageHeader({
                     className="fixed inset-0 z-40"
                     onClick={() => setOverflowOpen(false)}
                   />
-                  <div className="absolute right-0 z-50 mt-1 w-48 rounded-md border bg-popover p-1 shadow-md">
+                  <div className="absolute right-0 z-50 mt-1 w-48 rounded-[var(--w11-radius-lg)] border border-[var(--w11-acrylic-border)] bg-[var(--w11-surface-flyout)] p-1 shadow-[var(--w11-elevation-flyout)] backdrop-blur-[24px] backdrop-saturate-[1.8]">
                     {overflowActions.map((action) => {
                       const Icon = action.icon;
                       const inner = (
@@ -169,7 +171,7 @@ function PageHeader({
                         <Link
                           key={action.label}
                           href={action.href}
-                          className="flex items-center gap-2 rounded px-2 py-1.5 text-[12px] hover:bg-muted"
+                          className="flex items-center gap-2 rounded-[var(--w11-radius-sm)] px-2 py-1.5 text-[12px] text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)]"
                           onClick={() => setOverflowOpen(false)}
                         >
                           {inner}
@@ -180,8 +182,8 @@ function PageHeader({
                           type="button"
                           disabled={action.disabled}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-muted disabled:opacity-50",
-                            action.tone === "destructive" && "text-destructive"
+                            "flex w-full items-center gap-2 rounded-[var(--w11-radius-sm)] px-2 py-1.5 text-left text-[12px] text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)] disabled:opacity-50",
+                            action.tone === "destructive" && "text-[#c42b1c]"
                           )}
                           onClick={() => {
                             setOverflowOpen(false);

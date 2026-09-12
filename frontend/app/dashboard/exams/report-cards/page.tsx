@@ -4,18 +4,18 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, FilterCommandBar,
+  DataPanel, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { FileText, Download, Printer, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -45,14 +45,14 @@ const REPORT_CARD_COLUMNS: Column<ReportCard>[] = [
       <div>
         <span className="font-medium">{rc.student_name}</span>
         <br />
-        <span className="text-xs text-muted-foreground">Roll: {rc.roll_number}</span>
+        <span className="text-xs text-[color:var(--w11-text-secondary)]">Roll: {rc.roll_number}</span>
       </div>
     ),
   },
   { key: "total_percentage", label: "Percentage", align: "right", sortable: true, value: (rc) => rc.total_percentage ?? 0, render: (rc) => <>{rc.total_percentage?.toFixed(1)}%</> },
   { key: "overall_grade", label: "Grade", sortable: true, value: (rc) => rc.overall_grade, render: (rc) => <Badge variant="outline">{rc.overall_grade}</Badge> },
   { key: "overall_gpa", label: "GPA", align: "right", sortable: true, value: (rc) => rc.overall_gpa ?? 0, render: (rc) => rc.overall_gpa?.toFixed(1) },
-  { key: "ai_remarks", label: "AI Remarks", value: (rc) => rc.ai_remarks ?? "", render: (rc) => <span className="max-w-xs truncate text-sm text-muted-foreground block">{rc.ai_remarks || "—"}</span> },
+  { key: "ai_remarks", label: "AI Remarks", value: (rc) => rc.ai_remarks ?? "", render: (rc) => <span className="max-w-xs truncate text-sm text-[color:var(--w11-text-secondary)] block">{rc.ai_remarks || "—"}</span> },
   {
     key: "actions",
     label: "Actions",
@@ -63,7 +63,7 @@ const REPORT_CARD_COLUMNS: Column<ReportCard>[] = [
           <Printer className="h-4 w-4" />
         </Button>
       ) : (
-        <span className="text-xs text-muted-foreground">Pending</span>
+        <span className="text-xs text-[color:var(--w11-text-secondary)]">Pending</span>
       ),
   },
 ];
@@ -142,25 +142,25 @@ function ReportCardsContent() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Report Cards</h1>
-          <p className="text-muted-foreground">Generate AI-powered report cards with personalized remarks</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => bulkDownloadMutation.mutate()}
-          disabled={!examId || !classId || bulkDownloadMutation.isPending}
-        >
-          <Download className="h-4 w-4 mr-2" /> Download All
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div className="space-y-2">
-            <Label>Select Exam</Label>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Report Cards"
+        subtitle="Generate AI-powered report cards with personalized remarks"
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => bulkDownloadMutation.mutate()}
+            disabled={!examId || !classId || bulkDownloadMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-2" /> Download All
+          </Button>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Select Exam</Label>
             <Select value={examId} onValueChange={setExamId}>
               <SelectTrigger><SelectValue placeholder="Choose exam" /></SelectTrigger>
               <SelectContent>
@@ -170,8 +170,8 @@ function ReportCardsContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Select Class</Label>
+          <div className="space-y-1 w-full md:w-48">
+            <Label className="text-xs">Select Class</Label>
             <Select value={classId} onValueChange={setClassId}>
               <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
               <SelectContent>
@@ -181,40 +181,36 @@ function ReportCardsContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2">
-          {isAdmin ? (
-            <Button
-              onClick={() => generateMutation.mutate()}
-              disabled={!examId || !classId || generateMutation.isPending}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {generateMutation.isPending ? "Generating..." : "Generate with AI"}
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground">Only admins can generate report cards</p>
-          )}
+          <div className="flex gap-2 items-end">
+            {isAdmin ? (
+              <Button
+                onClick={() => generateMutation.mutate()}
+                disabled={!examId || !classId || generateMutation.isPending}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {generateMutation.isPending ? "Generating..." : "Generate with AI"}
+              </Button>
+            ) : (
+              <p className="text-xs pb-2 text-[color:var(--w11-text-secondary)]">Only admins can generate report cards</p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {examId && classId && (
-        <Card>
-          <CardContent className="p-0">
+        {examId && classId && (
+          <DataPanel title={`Report Cards (${(reportCards || []).length})`} bodyClassName="p-0">
             {isError ? (
               <div className="flex flex-col items-center py-12 space-y-3">
-                <p className="text-sm text-destructive">Failed to load report cards. Please try again.</p>
+                <p className="text-sm text-[#c42b1c]">Failed to load report cards. Please try again.</p>
                 <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
               </div>
             ) : isLoading ? (
               <PageLoader />
             ) : (reportCards || []).length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No report cards generated yet.</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Click &quot;Generate with AI&quot; to create report cards with personalized remarks.
-                </p>
-              </div>
+              <AOSEmptyState
+                icon={<FileText className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
+                title="No report cards generated yet."
+                description='Click "Generate with AI" to create report cards with personalized remarks.'
+              />
             ) : (
               <DataTable
                 columns={REPORT_CARD_COLUMNS}
@@ -225,9 +221,9 @@ function ReportCardsContent() {
                 exportFileName="report-cards"
               />
             )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

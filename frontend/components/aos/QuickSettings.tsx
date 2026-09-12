@@ -137,15 +137,12 @@ export default function QuickSettings({
             <Sun size={18} color="var(--w11-text-secondary)" style={{ flexShrink: 0 }} />
             <input
               type="range"
+              className="win11-slider"
               min="20"
               max="100"
               value={brightness}
               onChange={(e) => onChangeBrightness(Number(e.target.value))}
-              style={{
-                width: "100%",
-                accentColor: accentColor,
-                cursor: "pointer",
-              }}
+              style={{ width: "100%", cursor: "pointer" }}
             />
             <span style={{ fontSize: "11px", width: "32px", textAlign: "right", color: "var(--w11-text-secondary)" }}>
               {brightness}%
@@ -163,6 +160,7 @@ export default function QuickSettings({
             </div>
             <input
               type="range"
+              className="win11-slider"
               min="0"
               max="100"
               value={isMuted ? 0 : volume}
@@ -170,11 +168,7 @@ export default function QuickSettings({
                 setVolume(Number(e.target.value));
                 if (isMuted) setIsMuted(false);
               }}
-              style={{
-                width: "100%",
-                accentColor: accentColor,
-                cursor: "pointer",
-              }}
+              style={{ width: "100%", cursor: "pointer" }}
             />
             <span style={{ fontSize: "11px", width: "32px", textAlign: "right", color: "var(--w11-text-secondary)" }}>
               {isMuted ? 0 : volume}%

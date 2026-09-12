@@ -3,10 +3,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Shield, AlertTriangle, Map, Calendar, Bell } from "lucide-react";
 import Link from "next/link";
 import { displayBS } from "@/lib/nepali_date";
@@ -22,13 +28,20 @@ function DisasterContent() {
     retry: 1,
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading disaster overview…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load the disaster overview. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Disaster Management" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load the disaster overview. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -36,106 +49,108 @@ function DisasterContent() {
   const stats = data?.stats ?? {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-red-600" />
-          <div><h1 className="text-2xl font-bold">Disaster Management</h1><p className="text-muted-foreground">Earthquake alerts, evacuation plans, and drill scheduling</p></div>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Shield className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+        title="Disaster Management"
+        subtitle={`Earthquake alerts, evacuation plans, and drill scheduling · readiness ${stats.readiness_score ?? "—"}/100`}
+      />
+      <AOSPageBody>
+        <StatGrid>
+          <div className="win11-card" style={{ borderTop: "2px solid #d83b01" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <Map className="h-6 w-6" style={{ color: "#d83b01" }} />
+              <div>
+                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Evacuation Plans</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.total_plans ?? "—"}</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/plans">Manage Plans</Link></Button>
+          </div>
+          <div className="win11-card" style={{ borderTop: "2px solid var(--w11-accent)" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <Calendar className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
+              <div>
+                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Drills This Year</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.drills_this_year ?? "—"}</p>
+                {stats.last_drill_at && <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>Last: {displayBS(stats.last_drill_at)}</p>}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/drills">Schedule Drills</Link></Button>
+          </div>
+          <div className="win11-card" style={{ borderTop: "2px solid #c42b1c" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <Bell className="h-6 w-6" style={{ color: "#c42b1c" }} />
+              <div>
+                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Active Alerts</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.active_alerts ?? "—"}</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/alerts">View Alerts</Link></Button>
+          </div>
+          <div className="win11-card" style={{ borderTop: "2px solid #107c10" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <Shield className="h-6 w-6" style={{ color: "#107c10" }} />
+              <div>
+                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Readiness Score</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.readiness_score ?? "—"}<span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>/100</span></p>
+              </div>
+            </div>
+            <p className="text-xs mt-3" style={{ color: "var(--w11-text-secondary)" }}>Drill recency, frequency, evacuation plans &amp; alert hygiene</p>
+          </div>
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Map className="h-6 w-6 text-orange-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Evacuation Plans</p>
-                <p className="text-2xl font-bold">{stats.total_plans ?? "—"}</p>
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="mt-4 w-full" asChild><Link href="/dashboard/disaster/plans">Manage Plans</Link></Button>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-6 w-6 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Drills This Year</p>
-                <p className="text-2xl font-bold">{stats.drills_this_year ?? "—"}</p>
-                {stats.last_drill_at && <p className="text-xs text-muted-foreground mt-1">Last: {displayBS(stats.last_drill_at)}</p>}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="mt-4 w-full" asChild><Link href="/dashboard/disaster/drills">Schedule Drills</Link></Button>
-          </CardContent>
-        </Card>
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Bell className="h-6 w-6 text-red-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Active Alerts</p>
-                <p className="text-2xl font-bold">{stats.active_alerts ?? "—"}</p>
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="mt-4 w-full" asChild><Link href="/dashboard/disaster/alerts">View Alerts</Link></Button>
-          </CardContent>
-        </Card>
-        <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Shield className="h-6 w-6 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Readiness Score</p>
-                <p className="text-2xl font-bold">{stats.readiness_score ?? "—"}<span className="text-sm text-muted-foreground">/100</span></p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">Drill recency, frequency, evacuation plans & alert hygiene</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {stats.upcoming_drills > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" />Upcoming Drills</CardTitle></CardHeader>
-          <CardContent>
+        {stats.upcoming_drills > 0 && (
+          <DataPanel
+            className="mb-4"
+            title={
+              <span className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />Upcoming Drills
+              </span>
+            }
+          >
             <div className="space-y-3">
               {(data?.upcoming_drills ?? []).map((d: any) => (
-                <div key={d.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div><div className="font-medium">{d.title}</div><div className="text-sm text-muted-foreground capitalize">{d.drill_type ?? d.type}</div></div>
-                  <Badge variant="secondary">{d.scheduled_date ? displayBS(d.scheduled_date) : "—"}</Badge>
+                <div key={d.id} className="flex items-center justify-between p-3 border border-[var(--w11-border-subtle)] rounded-lg">
+                  <div><div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{d.title}</div><div className="text-sm capitalize" style={{ color: "var(--w11-text-secondary)" }}>{d.drill_type ?? d.type}</div></div>
+                  <span className="win11-chip subtle">{d.scheduled_date ? displayBS(d.scheduled_date) : "—"}</span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-yellow-600" />Recent Seismic Alerts</CardTitle></CardHeader>
-        <CardContent>
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: "#d83b01" }} />Recent Seismic Alerts
+            </span>
+          }
+        >
           {data?.seismic?.unavailable && (
-            <p className="text-sm text-muted-foreground mb-3">Live seismic feed is currently unreachable — showing no events rather than stale data.</p>
+            <p className="text-sm mb-3" style={{ color: "var(--w11-text-secondary)" }}>Live seismic feed is currently unreachable — showing no events rather than stale data.</p>
           )}
           {alerts.length === 0 ? (
-            <p className="text-center text-muted-foreground py-6">No recent seismic alerts. System is monitoring.</p>
+            <p className="text-center py-6" style={{ color: "var(--w11-text-secondary)" }}>No recent seismic alerts. System is monitoring.</p>
           ) : (
             <div className="space-y-3">
               {alerts.map((a: any) => (
-                <div key={a.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                  <AlertTriangle className={`h-5 w-5 ${a.magnitude >= 6 ? "text-red-600" : a.magnitude >= 4 ? "text-orange-600" : "text-yellow-600"}`} />
+                <div key={a.id} className="flex items-center gap-4 p-3 border border-[var(--w11-border-subtle)] rounded-lg">
+                  <AlertTriangle
+                    className="h-5 w-5"
+                    style={{ color: a.magnitude >= 6 ? "#c42b1c" : a.magnitude >= 4 ? "#d83b01" : "#8a6116" }}
+                  />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2"><span className="font-medium">M{a.magnitude}</span><Badge variant={a.magnitude >= 6 ? "destructive" : "secondary"}>{a.location ?? "Unknown"}</Badge></div>
-                    <p className="text-sm text-muted-foreground">{a.time ?? a.created_at ?? "—"}</p>
+                    <div className="flex items-center gap-2"><span className="font-medium" style={{ color: "var(--w11-text-primary)" }}>M{a.magnitude}</span><span className={`win11-chip ${a.magnitude >= 6 ? "error" : "subtle"}`}>{a.location ?? "Unknown"}</span></div>
+                    <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{a.time ?? a.created_at ?? "—"}</p>
                   </div>
-                  <span className="text-sm text-muted-foreground">{a.depth_km ? `${a.depth_km}km depth` : ""}</span>
+                  <span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{a.depth_km ? `${a.depth_km}km depth` : ""}</span>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

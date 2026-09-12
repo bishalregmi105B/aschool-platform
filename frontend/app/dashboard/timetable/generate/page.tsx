@@ -5,13 +5,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Spinner, PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
 import { Wand2, CheckCircle, Calendar, AlertCircle } from "lucide-react";
 
 interface ClassItem {
@@ -116,117 +122,115 @@ function GenerateContent() {
   const previewSlotCount = previewClasses.reduce((n, c) => n + (c.slots?.length ?? 0), 0);
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <Wand2 className="h-6 w-6" /> Timetable Generator
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Auto-generate a clash-free timetable — assigns subjects to periods while keeping
-          each teacher to one class per period.
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Wand2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Timetable Generator"
+        subtitle="Auto-generate a clash-free timetable — assigns subjects to periods while keeping each teacher to one class per period."
+      />
+      <AOSPageBody>
+        <div className="max-w-2xl space-y-4">
+          <DataPanel title="Generation Options">
+            <div className="space-y-4">
+              <div>
+                <Label>Class (optional — scope the preview and save to one class)</Label>
+                <Select value={classId || "all"} onValueChange={(v) => setClassId(v === "all" ? "" : v)}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classes</SelectItem>
+                    {(classes ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Generation Options</CardTitle>
-          <CardDescription>Select scope for timetable generation</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Class (optional — scope the preview and save to one class)</Label>
-            <Select value={classId || "all"} onValueChange={(v) => setClassId(v === "all" ? "" : v)}>
-              <SelectTrigger className="mt-1.5">
-                <SelectValue placeholder="All Classes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {(classes ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="rounded-[var(--w11-radius-lg)] p-4 space-y-2 bg-[var(--w11-control-hover)]">
+                <h4 className="text-sm font-medium">What the generator considers:</h4>
+                <ul className="text-xs text-[color:var(--w11-text-secondary)] space-y-1 list-disc list-inside">
+                  <li>Every subject assigned to each class section</li>
+                  <li>No teacher double-booking across classes</li>
+                  <li>Round-robin subject distribution across periods</li>
+                </ul>
+              </div>
 
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <h4 className="text-sm font-medium">What the generator considers:</h4>
-            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Every subject assigned to each class section</li>
-              <li>No teacher double-booking across classes</li>
-              <li>Round-robin subject distribution across periods</li>
-            </ul>
-          </div>
-
-          <Button
-            className="w-full"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending}
-          >
-            {generateMutation.isPending
-              ? <><Spinner size="sm" className="mr-2" /> Generating...</>
-              : <><Wand2 className="h-4 w-4 mr-2" /> Generate Timetable</>}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Result preview */}
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CheckCircle className="h-5 w-5 text-green-600" /> Generated Preview
-            </CardTitle>
-            <CardDescription>
-              {previewSlotCount} slots for {previewClasses.length} class section(s)
-              {classId ? " (filtered by class)" : ""} — review before saving.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {previewClasses.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No sections matched the selected class.
-              </p>
-            ) : (
-              previewClasses.map((c) => (
-                <div key={`${c.class_id}-${c.section_id}`} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm">
-                  <span className="font-medium">
-                    {c.class_name || c.class_id} {c.section_name ? `- ${c.section_name}` : ""}
-                  </span>
-                  <span className="text-muted-foreground">{c.slots?.length ?? 0} slots</span>
-                </div>
-              ))
-            )}
-            <div className="flex gap-2">
               <Button
-                className="flex-1"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || previewSlotCount === 0}
+                className="w-full"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
               >
-                {saveMutation.isPending
-                  ? <><Spinner size="sm" className="mr-2" /> Saving...</>
-                  : <><Calendar className="h-4 w-4 mr-2" /> Save to Timetable{classId ? " (selected class only)" : ""}</>}
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/dashboard/timetable">View Timetable</a>
+                {generateMutation.isPending
+                  ? <><Spinner size="sm" className="mr-2" /> Generating...</>
+                  : <><Wand2 className="h-4 w-4 mr-2" /> Generate Timetable</>}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
 
-      {/* Info note */}
-      <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/10">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 dark:text-amber-500">
+          {/* Result preview */}
+          {result && (
+            <DataPanel
+              title={
+                <span className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" style={{ color: "#107c10" }} /> Generated Preview
+                </span>
+              }
+            >
+              <div className="space-y-3">
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                  {previewSlotCount} slots for {previewClasses.length} class section(s)
+                  {classId ? " (filtered by class)" : ""} — review before saving.
+                </p>
+                {previewClasses.length === 0 ? (
+                  <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                    No sections matched the selected class.
+                  </p>
+                ) : (
+                  previewClasses.map((c) => (
+                    <div
+                      key={`${c.class_id}-${c.section_id}`}
+                      className="flex items-center justify-between border border-[var(--w11-border-subtle)] rounded-[var(--w11-radius-lg)] px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium">
+                        {c.class_name || c.class_id} {c.section_name ? `- ${c.section_name}` : ""}
+                      </span>
+                      <span className="text-[color:var(--w11-text-secondary)]">{c.slots?.length ?? 0} slots</span>
+                    </div>
+                  ))
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending || previewSlotCount === 0}
+                  >
+                    {saveMutation.isPending
+                      ? <><Spinner size="sm" className="mr-2" /> Saving...</>
+                      : <><Calendar className="h-4 w-4 mr-2" /> Save to Timetable{classId ? " (selected class only)" : ""}</>}
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href="/dashboard/timetable">View Timetable</a>
+                  </Button>
+                </div>
+              </div>
+            </DataPanel>
+          )}
+
+          {/* Info note */}
+          <div
+            className="win11-card flex gap-3 p-4"
+            style={{ borderColor: "rgba(216,59,1,0.3)", background: "rgba(216,59,1,0.06)" }}
+          >
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: "#d83b01" }} />
+            <p className="text-xs" style={{ color: "#d83b01" }}>
               Saving replaces the existing slots for the saved class sections only.
               Classes not included in the save keep their current slots. Review the result in the
               Timetable view before saving.
             </p>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

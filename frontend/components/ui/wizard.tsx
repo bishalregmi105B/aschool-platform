@@ -102,18 +102,19 @@ export function Wizard({
                 disabled={idx > current}
                 onClick={() => idx < current && setCurrent(idx)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium",
-                  isCurrent && "bg-primary text-primary-foreground",
-                  isDone && !isCurrent && "text-primary hover:bg-primary/5",
-                  !isDone && !isCurrent && "text-muted-foreground",
+                  "flex items-center gap-1.5 rounded-[var(--w11-radius-sm)] px-2 py-1 text-xs font-medium",
+                  isCurrent && "text-[var(--w11-accent)]",
+                  isDone && !isCurrent && "text-[var(--w11-accent)] hover:bg-[var(--w11-control-hover)]",
+                  !isDone && !isCurrent && "text-[var(--w11-text-tertiary)]",
                   idx < current && "cursor-pointer"
                 )}
               >
                 <span
                   className={cn(
                     "flex h-5 w-5 items-center justify-center rounded-full border text-[10px]",
-                    isCurrent && "border-primary-foreground/40",
-                    isDone && !isCurrent && "border-primary bg-primary/10"
+                    isCurrent && "border-[var(--w11-accent)] text-[var(--w11-accent)]",
+                    isDone && !isCurrent && "border-[var(--w11-accent)] bg-[var(--w11-accent)] text-[var(--w11-accent-text)]",
+                    !isDone && !isCurrent && "border-[var(--w11-border-default)]"
                   )}
                 >
                   {isDone && !isCurrent ? <Check className="h-3 w-3" /> : idx + 1}
@@ -124,7 +125,7 @@ export function Wizard({
                 <span
                   className={cn(
                     "h-px flex-1",
-                    idx < current ? "bg-primary" : "bg-border"
+                    idx < current ? "bg-[var(--w11-accent)]" : "bg-[var(--w11-border-default)]"
                   )}
                 />
               )}
@@ -135,22 +136,22 @@ export function Wizard({
 
       {/* Step body */}
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">{step.title}</h2>
+        <h2 className="text-subtitle text-[var(--w11-text-primary)]">{step.title}</h2>
         {step.description && (
-          <p className="text-muted-foreground text-sm">{step.description}</p>
+          <p className="text-[12px] text-[var(--w11-text-secondary)]">{step.description}</p>
         )}
       </div>
 
-      <div className="min-h-0">{step.content}</div>
+      <div className="win11-card min-h-0">{step.content}</div>
 
       {error && (
-        <p role="alert" className="text-destructive text-sm">
+        <p role="alert" className="text-sm text-[#c42b1c]">
           {error}
         </p>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between border-t pt-4">
+      <div className="flex items-center justify-between border-t border-[var(--w11-border-default)] pt-4">
         <div>
           {isFirst ? (
             onCancel && (

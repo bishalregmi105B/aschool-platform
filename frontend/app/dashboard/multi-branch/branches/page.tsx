@@ -5,15 +5,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Building2, Plus, Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Building2, Plus } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 export default function BranchesPage() {
   return <PluginGate slug="multi_branch"><BranchesContent /></PluginGate>;
@@ -38,7 +45,7 @@ function BranchesContent() {
     onError: () => toast.error("Failed to create branch"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading branches…" />;
 
   const BRANCH_COLUMNS: Column<any>[] = [
     { key: "code", label: "Code", sortable: true, value: (b) => b.code ?? "", render: (b) => <Badge variant="outline">{b.code}</Badge> },
@@ -51,54 +58,64 @@ function BranchesContent() {
       label: "Status",
       sortable: true,
       value: (b) => (b.is_active ? "active" : "inactive"),
-      render: (b) => <Badge variant={b.is_active ? "default" : "secondary"}>{b.is_active ? "Active" : "Inactive"}</Badge>,
+      render: (b) => (
+        <StatusChip
+          status={b.is_active ? "active" : "inactive"}
+          label={b.is_active ? "Active" : "Inactive"}
+        />
+      ),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Branches</h1><p className="text-muted-foreground">Manage all school chain branches</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" />Add Branch</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Building2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Branches"
+        subtitle="Manage all school chain branches"
+        actions={
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />Add Branch
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel>
+          <DataTable
+            columns={BRANCH_COLUMNS}
+            rows={branches}
+            rowKey={(b: any) => b.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search branches..."
+            exportFileName="branches"
+            empty={{ icon: Building2, title: "No branches found", body: "Add branch campuses to manage them from one console." }}
+          />
+        </DataPanel>
 
-      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search branches..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-
-      <Card><CardContent className="pt-6">
-        <DataTable
-          columns={BRANCH_COLUMNS}
-          rows={branches}
-          rowKey={(b: any) => b.id}
-          searchable
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Search branches..."
-          exportFileName="branches"
-          empty={{ icon: Building2, title: "No branches found", body: "Add branch campuses to manage them from one console." }}
-        />
-      </CardContent></Card>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add New Branch</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Branch Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Kathmandu Branch" /></div>
-              <div className="space-y-2"><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. KTM01" /></div>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add New Branch</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Branch Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Kathmandu Branch" /></div>
+                <div className="space-y-2"><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. KTM01" /></div>
+              </div>
+              <div className="space-y-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Branch address" /></div>
+              <div className="space-y-2"><Label>Principal Name</Label><Input value={form.principal_name} onChange={(e) => setForm({ ...form, principal_name: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              </div>
             </div>
-            <div className="space-y-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Branch address" /></div>
-            <div className="space-y-2"><Label>Principal Name</Label><Input value={form.principal_name} onChange={(e) => setForm({ ...form, principal_name: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-            <Button onClick={() => create.mutate()} disabled={create.isPending || !form.name}>{create.isPending ? <Spinner /> : "Create Branch"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+              <Button onClick={() => create.mutate()} disabled={create.isPending || !form.name}>{create.isPending ? <Spinner /> : "Create Branch"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

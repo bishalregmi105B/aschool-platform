@@ -12,8 +12,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PluginGate } from "@/lib/plugins";
 import { AiResultView } from "@/components/ai/ai-result-view";
 import { api, type ApiResponse } from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles,
@@ -22,15 +20,16 @@ import {
   Coins,
   BookOpenCheck,
   ClipboardList,
-  Ticket,
-  ListChecks,
-  Mail,
-  Layers,
   GraduationCap,
-  Layers3,
-  PenTool,
   FlaskConical,
+  Layers3,
 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface WorkbenchTool {
   tool_key: string;
@@ -67,7 +66,7 @@ interface GenerateResponse {
 const CATEGORY_ICONS: Record<string, typeof Sparkles> = {
   planning: BookOpenCheck,
   assessment: ClipboardList,
-  communication: Mail,
+  communication: Sparkles,
   tutor: GraduationCap,
   admin: FlaskConical,
 };
@@ -109,13 +108,13 @@ function ToolRunner({
         <Button variant="outline" size="sm" onClick={onBack}>
           ← All tools
         </Button>
-        <h1 className="text-xl font-bold">{tool.name}</h1>
-        <Badge variant="outline">{tool.category}</Badge>
+        <h1 className="text-xl font-semibold text-[color:var(--w11-text-primary)]">{tool.name}</h1>
+        <span className="win11-chip">{tool.category}</span>
       </div>
 
       {/* Cost estimate BEFORE generation (AW-12: CostEstimateChip) */}
       {generate.isIdle && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-[color:var(--w11-text-secondary)]">
           <Coins className="h-4 w-4" />
           Estimated cost: &lt;NPR 1 per generation (metered, hard stop — never
           an overage bill)
@@ -124,26 +123,26 @@ function ToolRunner({
 
       {/* AI Nutrition Facts (A-07/AW-04 transparency) */}
       {nutrition.data && (
-        <Card>
-          <CardContent className="p-4 text-sm space-y-1.5">
-            <div className="flex items-center gap-2 font-semibold">
-              <ShieldCheck className="h-4 w-4 text-green-600" />
+        <DataPanel>
+          <div className="p-0 text-sm space-y-1.5">
+            <div className="flex items-center gap-2 font-semibold text-[color:var(--w11-text-primary)]">
+              <ShieldCheck className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
               AI Nutrition Facts
             </div>
             <p>
-              <span className="text-muted-foreground">Model:</span>{" "}
+              <span className="text-[color:var(--w11-text-secondary)]">Model:</span>{" "}
               {nutrition.data.model} ({nutrition.data.provider})
             </p>
             <p>
-              <span className="text-muted-foreground">Accesses:</span>{" "}
+              <span className="text-[color:var(--w11-text-secondary)]">Accesses:</span>{" "}
               {nutrition.data.data_accessed.join(", ") || "only what you type"}
             </p>
             <p>
-              <span className="text-muted-foreground">Never accesses:</span>{" "}
+              <span className="text-[color:var(--w11-text-secondary)]">Never accesses:</span>{" "}
               {nutrition.data.data_not_accessed.join(", ") || "—"}
             </p>
             <p>
-              <span className="text-muted-foreground">Retention:</span>{" "}
+              <span className="text-[color:var(--w11-text-secondary)]">Retention:</span>{" "}
               {nutrition.data.retention_days} days ·{" "}
               {nutrition.data.no_training_guarantee
                 ? "your data is never used to train models"
@@ -153,19 +152,24 @@ function ToolRunner({
                 : ""}
             </p>
             {nutrition.data.limitations && (
-              <p className="text-muted-foreground italic">
+              <p className="text-[color:var(--w11-text-secondary)] italic">
                 {nutrition.data.limitations}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataPanel>
       )}
 
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Describe what you need — topic, grade, subject, any notes…"
-        className="w-full min-h-[120px] rounded-lg border border-border bg-background p-3 text-sm"
+        className="w-full min-h-[120px] rounded-lg p-3 text-sm"
+        style={{
+          background: "var(--w11-control-bg)",
+          border: "1px solid var(--w11-control-border, var(--w11-border-default))",
+          color: "var(--w11-text-primary)",
+        }}
       />
 
       <Button
@@ -184,16 +188,16 @@ function ToolRunner({
       </Button>
 
       {generate.isError && (
-        <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+        <p className="text-sm rounded-md px-3 py-2" style={{ color: "#c42b1c", background: "rgba(196,43,28,.08)" }}>
           {(generate.error as { response?: { data?: { error?: string } } })
             ?.response?.data?.error ?? "Generation failed. Please try again."}
         </p>
       )}
 
       {generate.data && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <DataPanel>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-[color:var(--w11-text-secondary)]">
               <span>
                 {generate.data.model} via {generate.data.provider} · $
                 {generate.data.cost_usd.toFixed(4)}
@@ -203,8 +207,8 @@ function ToolRunner({
               </span>
             </div>
             <AiResultView result={generate.data.result} />
-          </CardContent>
-        </Card>
+          </div>
+        </DataPanel>
       )}
     </div>
   );
@@ -223,7 +227,7 @@ function Catalog({ onOpen }: { onOpen: (t: WorkbenchTool) => void }) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="animate-pulse h-32 bg-muted rounded-xl" />
+          <div key={i} className="animate-pulse h-32 rounded-xl" style={{ background: "var(--w11-control-hover)" }} />
         ))}
       </div>
     );
@@ -239,33 +243,30 @@ function Catalog({ onOpen }: { onOpen: (t: WorkbenchTool) => void }) {
           <button
             key={t.tool_key}
             onClick={() => onOpen(t)}
-            className="text-left rounded-xl border border-border hover:border-primary/50 hover:shadow-md transition-all p-5 space-y-2 bg-card"
+            className="win11-card interactive text-left p-5 space-y-2"
           >
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Icon className="h-5 w-5 text-primary" />
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}
+              >
+                <Icon className="h-5 w-5" />
               </div>
               <div className="flex gap-1.5">
                 {t.status === "ga" && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    GA
-                  </Badge>
+                  <span className="win11-chip success text-[10px]">GA</span>
                 )}
                 {t.min_plan_tier !== "free" && (
-                  <Badge variant="outline" className="text-[10px]">
-                    AI Suite
-                  </Badge>
+                  <span className="win11-chip text-[10px]">AI Suite</span>
                 )}
                 {!t.enabled && (
-                  <Badge variant="destructive" className="text-[10px]">
-                    Off
-                  </Badge>
+                  <span className="win11-chip error text-[10px]">Off</span>
                 )}
               </div>
             </div>
-            <p className="font-semibold">{t.name}</p>
+            <p className="font-semibold text-[color:var(--w11-text-primary)]">{t.name}</p>
             {t.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2">
+              <p className="text-xs text-[color:var(--w11-text-secondary)] line-clamp-2">
                 {t.description}
               </p>
             )}
@@ -273,7 +274,7 @@ function Catalog({ onOpen }: { onOpen: (t: WorkbenchTool) => void }) {
         );
       })}
       {tools.length === 0 && (
-        <p className="text-sm text-muted-foreground col-span-full">
+        <p className="text-sm text-[color:var(--w11-text-secondary)] col-span-full">
           No AI tools available yet.
         </p>
       )}
@@ -285,24 +286,20 @@ function WorkbenchContent() {
   const [active, setActive] = useState<WorkbenchTool | null>(null);
 
   return (
-    <div className="space-y-6">
-      {!active && (
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Layers3 className="h-6 w-6 text-primary" /> AI Workbench
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your AI teaching assistants — every tool shows exactly what data it
-            uses, never trains on your school&apos;s work.
-          </p>
-        </div>
-      )}
-      {active ? (
-        <ToolRunner tool={active} onBack={() => setActive(null)} />
-      ) : (
-        <Catalog onOpen={setActive} />
-      )}
-    </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Layers3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="AI Workbench"
+        subtitle="Your AI teaching assistants — every tool shows exactly what data it uses, never trains on your school's work."
+      />
+      <AOSPageBody>
+        {active ? (
+          <ToolRunner tool={active} onBack={() => setActive(null)} />
+        ) : (
+          <Catalog onOpen={setActive} />
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

@@ -4,10 +4,16 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { BarChart3 } from "lucide-react";
 
 const REPORTS = [
@@ -43,26 +49,28 @@ function ReportsContent() {
       : [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Library Reports</h1>
-        <p className="text-muted-foreground">Circulation, popularity, overdue and collection insights</p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Library Reports"
+        subtitle="Circulation, popularity, overdue and collection insights"
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          {REPORTS.map((r) => (
+            <Button key={r.key} size="sm" variant={report === r.key ? "default" : "outline"}
+              onClick={() => setReport(r.key)}>
+              {r.label}
+            </Button>
+          ))}
+        </FilterCommandBar>
 
-      <div className="flex flex-wrap gap-2">
-        {REPORTS.map((r) => (
-          <Button key={r.key} size="sm" variant={report === r.key ? "default" : "outline"}
-            onClick={() => setReport(r.key)}>
-            {r.label}
-          </Button>
-        ))}
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> {REPORTS.find((r) => r.key === report)?.label}</CardTitle></CardHeader>
-        <CardContent className="p-0">
+        <DataPanel
+          title={REPORTS.find((r) => r.key === report)?.label}
+          bodyClassName="p-0"
+        >
           {isLoading ? (
-            <PageLoader />
+            <div className="py-10"><AOSModuleLoadingState label="Running report…" /></div>
           ) : (
             <DataTable
               columns={columns}
@@ -71,8 +79,8 @@ function ReportsContent() {
               exportFileName={`library-${report}`}
             />
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

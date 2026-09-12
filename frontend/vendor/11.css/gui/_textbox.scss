@@ -1,0 +1,57 @@
+/**
+ * 11.css - Fluent Text Inputs
+ * Windows 11 Textbox & Textarea
+ */
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea {
+  box-sizing: border-box;
+  font-family: var(--w11-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--w11-text-primary);
+  background: var(--w11-control-bg);
+  border: 1px solid var(--w11-border-default);
+  border-bottom: 1px solid var(--w11-border-strong);
+  border-radius: var(--w11-radius-sm);
+  padding: 5px 10px;
+  min-height: 32px;
+  outline: none;
+  transition: border-color var(--w11-transition-fast), background var(--w11-transition-fast), box-shadow var(--w11-transition-fast);
+
+  &::placeholder {
+    color: var(--w11-text-tertiary);
+  }
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-border-strong);
+  }
+
+  &:focus {
+    background: var(--w11-surface-solid);
+    border-color: var(--w11-border-default);
+    border-bottom: 2px solid var(--w11-accent);
+    padding-bottom: 4px;
+  }
+
+  &:disabled,
+  &[readonly] {
+    opacity: 0.5;
+    background: var(--w11-control-bg);
+    cursor: not-allowed;
+    border-color: var(--w11-border-subtle);
+  }
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.5;
+}

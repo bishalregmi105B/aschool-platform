@@ -1,0 +1,199 @@
+/**
+ * 11.css - Fluent Buttons & Toggles
+ * Windows 11 Controls
+ */
+
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--w11-font-family);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--w11-text-primary);
+  min-height: 32px;
+  padding: 5px 16px;
+  border-radius: var(--w11-radius-sm);
+  background: var(--w11-control-bg);
+  border: 1px solid var(--w11-border-default);
+  border-bottom: 1px solid var(--w11-border-strong);
+  box-shadow: var(--w11-elevation-card);
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--w11-transition-fast);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-border-strong);
+  }
+
+  &:active {
+    transform: scale(0.985);
+    background: var(--w11-control-active);
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    border-color: var(--w11-accent);
+    outline: 2px solid var(--w11-accent);
+    outline-offset: 1px;
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--w11-control-bg);
+    border-color: var(--w11-border-subtle);
+    color: var(--w11-text-disabled);
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+/* Accent / Primary Button */
+button.accent,
+button.primary,
+.btn-accent,
+[role="button"].accent {
+  background: var(--w11-accent);
+  color: var(--w11-accent-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    background: var(--w11-accent-hover);
+    filter: brightness(1.04);
+  }
+
+  &:active {
+    background: var(--w11-accent-active);
+    filter: brightness(0.96);
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    background: var(--w11-control-bg);
+    color: var(--w11-text-disabled);
+    border-color: var(--w11-border-subtle);
+  }
+}
+
+/* Subtle / Ghost Button */
+button.subtle,
+.btn-subtle {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: transparent;
+  }
+
+  &:active {
+    background: var(--w11-control-active);
+  }
+}
+
+/* Icon-Only Button */
+button.icon-button,
+.btn-icon {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--w11-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Command Bar Button */
+.commandbar-button {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: var(--w11-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--w11-text-primary);
+
+  &:hover {
+    background: var(--w11-control-hover);
+  }
+
+  &:active {
+    background: var(--w11-control-active);
+    transform: scale(0.98);
+  }
+}
+
+/* Windows 11 Toggle Switch */
+.win11-toggle,
+input[type="checkbox"][role="switch"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 20px;
+  border-radius: var(--w11-radius-full);
+  background: var(--w11-control-hover);
+  border: 1px solid var(--w11-border-strong);
+  position: relative;
+  cursor: pointer;
+  transition: all var(--w11-transition-normal);
+  vertical-align: middle;
+  outline: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--w11-text-primary);
+    transition: transform var(--w11-transition-fast), background var(--w11-transition-fast);
+  }
+
+  &:hover {
+    background: var(--w11-control-active);
+  }
+
+  &:checked {
+    background: var(--w11-accent);
+    border-color: var(--w11-accent);
+
+    &::before {
+      transform: translateX(20px);
+      background: #ffffff;
+    }
+
+    &:hover {
+      background: var(--w11-accent-hover);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--w11-accent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}

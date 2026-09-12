@@ -3,10 +3,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { ShieldAlert, AlertOctagon, TrendingUp, FileText } from "lucide-react";
 import Link from "next/link";
 
@@ -21,13 +28,20 @@ function IncidentMgmtContent() {
     retry: 1,
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading incident management…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load incident management overview. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Full Incident Management" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load incident management overview. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -35,63 +49,56 @@ function IncidentMgmtContent() {
   const recentCases: any[] = data?.recent_cases ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="h-8 w-8 text-orange-600" />
-          <div><h1 className="text-2xl font-bold">Full Incident Management</h1><p className="text-muted-foreground">Behavior management with witnesses, escalation, and parent conferences</p></div>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ShieldAlert className="h-5 w-5" style={{ color: "#d83b01" }} />}
+        title="Full Incident Management"
+        subtitle="Behavior management with witnesses, escalation, and parent conferences"
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {[
+            { label: "Active Cases", value: stats.active ?? "—", href: "/dashboard/incident-management/active", color: "#c42b1c", icon: <AlertOctagon className="h-4 w-4" style={{ color: "#c42b1c" }} /> },
+            { label: "Pending Escalation", value: stats.pending_escalation ?? "—", href: "/dashboard/incident-management/escalations", color: "#d83b01", icon: <TrendingUp className="h-4 w-4" style={{ color: "#d83b01" }} /> },
+            { label: "Resolved (Month)", value: stats.resolved_this_month ?? "—", href: "/dashboard/incident-management/reports", color: "#107c10", icon: <ShieldAlert className="h-4 w-4" style={{ color: "#107c10" }} /> },
+            { label: "Total This Year", value: stats.total_this_year ?? "—", href: "/dashboard/incident-management/reports", color: "var(--w11-accent)", icon: <FileText className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> },
+          ].map((s) => (
+            <Link key={s.label} href={s.href} className="block">
+              <KpiCard label={s.label} value={s.value} color={s.color} icon={s.icon} className="cursor-pointer hover:shadow-md transition-shadow" />
+            </Link>
+          ))}
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Active Cases", value: stats.active ?? "—", icon: AlertOctagon, color: "text-red-600", href: "/dashboard/incident-management/active" },
-          { label: "Pending Escalation", value: stats.pending_escalation ?? "—", icon: TrendingUp, color: "text-orange-600", href: "/dashboard/incident-management/escalations" },
-          { label: "Resolved (Month)", value: stats.resolved_this_month ?? "—", icon: ShieldAlert, color: "text-green-600", href: "/dashboard/incident-management/reports" },
-          { label: "Total This Year", value: stats.total_this_year ?? "—", icon: FileText, color: "text-blue-600", href: "/dashboard/incident-management/reports" },
-        ].map((s) => (
-          <Card key={s.label} className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <Link href={s.href} className="flex items-center gap-4">
-                <s.icon className={`h-8 w-8 ${s.color}`} />
-                <div><p className="text-sm text-muted-foreground">{s.label}</p><p className="text-2xl font-bold">{s.value}</p></div>
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { title: "Active Cases", desc: "Open incidents requiring resolution", icon: AlertOctagon, href: "/dashboard/incident-management/active", color: "border-red-200" },
-          { title: "Escalations", desc: "Cases escalated to principal/management", icon: TrendingUp, href: "/dashboard/incident-management/escalations", color: "border-orange-200" },
-          { title: "Reports", desc: "Analytics and resolved case reports", icon: FileText, href: "/dashboard/incident-management/reports", color: "border-blue-200" },
-        ].map((card) => (
-          <Card key={card.title} className={`${card.color} hover:shadow-md transition-shadow`}>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><card.icon className="h-5 w-5" />{card.title}</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">{card.desc}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { title: "Active Cases", desc: "Open incidents requiring resolution", icon: AlertOctagon, href: "/dashboard/incident-management/active", accent: "#c42b1c" },
+            { title: "Escalations", desc: "Cases escalated to principal/management", icon: TrendingUp, href: "/dashboard/incident-management/escalations", accent: "#d83b01" },
+            { title: "Reports", desc: "Analytics and resolved case reports", icon: FileText, href: "/dashboard/incident-management/reports", accent: "var(--w11-accent)" },
+          ].map((card) => (
+            <div key={card.title} className="win11-card hover:shadow-md transition-shadow" style={{ borderTop: `2px solid ${card.accent}` }}>
+              <div className="flex items-center gap-2 mb-2">
+                <card.icon className="h-5 w-5" style={{ color: card.accent }} />
+                <span className="text-base font-semibold" style={{ color: "var(--w11-text-primary)" }}>{card.title}</span>
+              </div>
+              <p className="text-sm mb-4" style={{ color: "var(--w11-text-secondary)" }}>{card.desc}</p>
               <Button size="sm" variant="outline" asChild className="w-full"><Link href={card.href}>Open</Link></Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
 
-      {recentCases.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Recent Cases</CardTitle></CardHeader>
-          <CardContent>
+        {recentCases.length > 0 && (
+          <DataPanel title="Recent Cases">
             <div className="space-y-3">
               {recentCases.slice(0, 5).map((c: any) => (
-                <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div><div className="font-medium">{c.title}</div><div className="text-sm text-muted-foreground">{c.student_name ?? "—"} · {c.type ?? "incident"}</div></div>
-                  <Badge variant={c.severity === "high" ? "destructive" : "secondary"}>{c.severity ?? "medium"}</Badge>
+                <div key={c.id} className="flex items-center justify-between p-3 border border-[var(--w11-border-subtle)] rounded-lg">
+                  <div><div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{c.title}</div><div className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{c.student_name ?? "—"} · {c.type ?? "incident"}</div></div>
+                  <StatusChip status={c.severity === "high" ? "failed" : "pending"} label={c.severity ?? "medium"} />
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -9,9 +9,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { FileQuestion, Printer, Sparkles, Copy, Check } from "lucide-react";
 
 export default function OnlineExamQuestionsPage() {
@@ -80,23 +82,18 @@ function QuestionsContent() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-purple-600" /> AI Question Generator
-          </h1>
-          <p className="text-muted-foreground">Instantly generate exam papers and questions using AI</p>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle>Exam Parameters</CardTitle>
-            <CardDescription>Configure the paper details</CardDescription>
-          </CardHeader>
-          <CardContent>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Sparkles className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="AI Question Generator"
+        subtitle="Instantly generate exam papers and questions using AI"
+      />
+      <AOSPageBody className="max-w-5xl">
+        <div className="grid md:grid-cols-3 gap-4">
+          <DataPanel title="Exam Parameters" className="md:col-span-1 h-fit">
+            <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-4">
+              Configure the paper details
+            </p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -116,7 +113,7 @@ function QuestionsContent() {
                 <Label>Subject</Label>
                 <Input name="subject" required placeholder="e.g. Science, Mathematics" />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Grade / Class</Label>
@@ -151,52 +148,59 @@ function QuestionsContent() {
                 <Input name="topics" placeholder="e.g. Thermodynamics, Optics" />
               </div>
 
-              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={generateMutation.isPending}>
-                {generateMutation.isPending ? <Spinner size="sm" className="mr-2 text-white" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              <Button type="submit" className="w-full" disabled={generateMutation.isPending}>
+                {generateMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
                 Generate Paper
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </DataPanel>
 
-        <Card className="md:col-span-2 flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
-            <CardTitle className="text-lg">Generated Output</CardTitle>
-            {result && (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopy}>
-                  {copied ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-                  {copied ? "Copied!" : "Copy Text"}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handlePrint} disabled={!result.html}>
-                  <Printer className="h-4 w-4 mr-2" /> Print PDF
-                </Button>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="flex-1 p-0 overflow-hidden relative">
-            {generateMutation.isPending ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-muted-foreground gap-4">
-                <Spinner size="lg" className="text-purple-600" />
-                <p className="animate-pulse">AI is crafting the perfect questions...</p>
-              </div>
-            ) : result ? (
-              <div className="p-6 h-[600px] overflow-y-auto bg-muted/10 font-serif">
-                {result.html ? (
-                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.html) }} />
-                ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm">{result.text || JSON.stringify(result, null, 2)}</pre>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-muted-foreground border-2 border-dashed m-6 rounded-lg bg-muted/30">
-                <FileQuestion className="h-12 w-12 mb-4 opacity-30" />
-                <p>Fill out the parameters and click Generate to see the AI output here.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          <DataPanel
+            title="Generated Output"
+            className="md:col-span-2 flex flex-col"
+            actions={
+              result && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCopy}>
+                    {copied ? <Check className="h-4 w-4 mr-2" style={{ color: "#107c10" }} /> : <Copy className="h-4 w-4 mr-2" />}
+                    {copied ? "Copied!" : "Copy Text"}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handlePrint} disabled={!result.html}>
+                    <Printer className="h-4 w-4 mr-2" /> Print PDF
+                  </Button>
+                </div>
+              )
+            }
+            bodyClassName="p-0"
+          >
+            <div className="relative overflow-hidden">
+              {generateMutation.isPending ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[color:var(--w11-text-secondary)] gap-4">
+                  <Spinner size="lg" />
+                  <p className="animate-pulse">AI is crafting the perfect questions...</p>
+                </div>
+              ) : result ? (
+                <div
+                  className="p-6 h-[600px] overflow-y-auto font-serif"
+                  style={{ background: "var(--w11-control-hover)" }}
+                >
+                  {result.html ? (
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.html) }} />
+                  ) : (
+                    <pre className="whitespace-pre-wrap font-sans text-sm">{result.text || JSON.stringify(result, null, 2)}</pre>
+                  )}
+                </div>
+              ) : (
+                <AOSEmptyState
+                  icon={<FileQuestion className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
+                  title="Nothing generated yet"
+                  description="Fill out the parameters and click Generate to see the AI output here."
+                />
+              )}
+            </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

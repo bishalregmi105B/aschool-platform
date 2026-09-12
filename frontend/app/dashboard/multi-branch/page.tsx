@@ -3,12 +3,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { Building2, Users, TrendingUp, MapPin } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 export default function MultiBranchPage() {
   return <PluginGate slug="multi_branch"><MultiBranchContent /></PluginGate>;
@@ -21,15 +29,22 @@ function MultiBranchContent() {
     queryFn: async () => { const r = await api.get("/schools/chain/overview"); return r.data?.data ?? r.data; },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading multi-branch overview…" />;
     if (isError) {
       return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load multi-branch overview. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
+        <AOSPage>
+          <AOSPageHeader title="Multi-Branch Management" subtitle="Oversee all branches in your school chain" />
+          <AOSPageBody>
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="py-10 text-center space-y-3">
+                <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>
+                  Failed to load multi-branch overview. Please try again.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            </DataPanel>
+          </AOSPageBody>
+        </AOSPage>
       );
     }
 
@@ -37,58 +52,79 @@ function MultiBranchContent() {
   const stats = data?.stats ?? {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Multi-Branch Management</h1>
-          <p className="text-muted-foreground">Oversee all branches in your school chain</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild><Link href="/dashboard/multi-branch/analytics">Chain Analytics</Link></Button>
-          <Button asChild><Link href="/dashboard/multi-branch/branches">Manage Branches</Link></Button>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Building2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Multi-Branch Management"
+        subtitle="Oversee all branches in your school chain"
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild><Link href="/dashboard/multi-branch/analytics">Chain Analytics</Link></Button>
+            <Button asChild><Link href="/dashboard/multi-branch/branches">Manage Branches</Link></Button>
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid min={200}>
+          <KpiCard
+            label="Total Branches"
+            value={stats.total_branches ?? branches.length}
+            icon={<Building2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Total Students"
+            value={stats.total_students ?? "—"}
+            icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Total Staff"
+            value={stats.total_staff ?? "—"}
+            icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Avg Performance"
+            value={stats.avg_performance ? `${stats.avg_performance}%` : "—"}
+            icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Branches", value: stats.total_branches ?? branches.length, icon: Building2, color: "text-blue-600" },
-          { label: "Total Students", value: stats.total_students ?? "—", icon: Users, color: "text-green-600" },
-          { label: "Total Staff", value: stats.total_staff ?? "—", icon: Users, color: "text-orange-600" },
-          { label: "Avg Performance", value: stats.avg_performance ? `${stats.avg_performance}%` : "—", icon: TrendingUp, color: "text-purple-600" },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <s.icon className={`h-8 w-8 ${s.color}`} />
-              <div><p className="text-sm text-muted-foreground">{s.label}</p><p className="text-2xl font-bold">{s.value}</p></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {branches.length === 0 ? (
-          <Card className="col-span-full"><CardContent className="pt-6 text-center text-muted-foreground py-12">No branches found. Add branches to get started.</CardContent></Card>
-        ) : branches.map((b: any) => (
-          <Card key={b.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{b.name}</CardTitle>
-                <Badge variant={b.is_active ? "default" : "secondary"}>{b.is_active ? "Active" : "Inactive"}</Badge>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {branches.length === 0 ? (
+            <DataPanel className="col-span-full">
+              <AOSEmptyState title="No branches found" description="Add branches to get started." />
+            </DataPanel>
+          ) : branches.map((b: any) => (
+            <DataPanel
+              key={b.id}
+              title={b.name}
+              actions={
+                <StatusChip
+                  status={b.is_active ? "active" : "inactive"}
+                  label={b.is_active ? "Active" : "Inactive"}
+                />
+              }
+            >
+              <div className="space-y-2">
+                <div
+                  className="flex items-center gap-2 text-sm"
+                  style={{ color: "var(--w11-text-secondary)" }}
+                >
+                  <MapPin className="h-4 w-4" />{b.address ?? "—"}
+                </div>
+                <div className="flex justify-between text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                  <span>Students: <strong style={{ color: "var(--w11-text-primary)" }}>{b.student_count ?? "—"}</strong></span>
+                  <span>Staff: <strong style={{ color: "var(--w11-text-primary)" }}>{b.staff_count ?? "—"}</strong></span>
+                </div>
+                {b.performance_score != null && (
+                  <div className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                    Performance: <strong style={{ color: "var(--w11-text-primary)" }}>{b.performance_score}%</strong>
+                  </div>
+                )}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{b.address ?? "—"}</div>
-              <div className="flex justify-between text-sm">
-                <span>Students: <strong>{b.student_count ?? "—"}</strong></span>
-                <span>Staff: <strong>{b.staff_count ?? "—"}</strong></span>
-              </div>
-              {b.performance_score != null && (
-                <div className="text-sm">Performance: <strong>{b.performance_score}%</strong></div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+            </DataPanel>
+          ))}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -1,0 +1,729 @@
+/* Windows 11 Fluent 2 Design System - 11.css */
+
+:root,
+[data-theme="light"] {
+  /* Windows 11 Fluent Light Tokens */
+  --w11-accent: #0067c0;
+  --w11-accent-light: #4cc2ff;
+  --w11-accent-hover: #005fb8;
+  --w11-accent-active: #0054a4;
+  --w11-accent-text: #ffffff;
+
+  --w11-bg-desktop: #f3f3f3;
+  --w11-text-primary: #1b1b1b;
+  --w11-text-secondary: #5c5c5c;
+  --w11-text-tertiary: #8a8a8a;
+
+  /* Surfaces & Materials */
+  --w11-shell-bg: rgba(243, 243, 243, 0.85);
+  --w11-surface-flyout: rgba(255, 255, 255, 0.88);
+  --w11-acrylic: rgba(243, 243, 243, 0.78);
+  --w11-acrylic-border: rgba(0, 0, 0, 0.08);
+  --w11-mica: #f3f3f3 radial-gradient(#eff4f9 75%, #f3f3f3 100%) no-repeat fixed;
+
+  /* Windows */
+  --w11-window-bg: #ffffff;
+  --w11-window-titlebar: #f9f9f9;
+  --w11-window-border: rgba(0, 0, 0, 0.12);
+  --w11-window-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --w11-window-shadow-active: 0 24px 60px rgba(0, 0, 0, 0.22), 0 0 1px rgba(0, 0, 0, 0.3);
+
+  /* Controls */
+  --w11-control-bg: rgba(255, 255, 255, 0.7);
+  --w11-control-border: #d2d2d2;
+  --w11-control-hover: rgba(0, 0, 0, 0.05);
+  --w11-control-active: rgba(0, 0, 0, 0.08);
+
+  --w11-font: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --w11-radius-sm: 4px;
+  --w11-radius-md: 6px;
+  --w11-radius-lg: 8px;
+  --w11-radius-xl: 10px;
+  --w11-radius-card: 12px;
+
+  --w11-taskbar-height: 48px;
+  --w11-ease-spring: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --w11-ease-smooth: cubic-bezier(0.85, 0.14, 0.14, 0.85);
+}
+
+[data-theme="dark"],
+.dark {
+  /* Windows 11 Fluent Dark Tokens */
+  --w11-accent: #4cc2ff;
+  --w11-accent-light: #70d2ff;
+  --w11-accent-hover: #44b6f0;
+  --w11-accent-active: #3ca2d7;
+  --w11-accent-text: #000000;
+
+  --w11-bg-desktop: #202020;
+  --w11-text-primary: #ffffff;
+  --w11-text-secondary: #cccccc;
+  --w11-text-tertiary: #888888;
+
+  /* Surfaces & Materials */
+  --w11-shell-bg: rgba(32, 32, 32, 0.82);
+  --w11-surface-flyout: rgba(36, 36, 36, 0.88);
+  --w11-acrylic: rgba(32, 32, 32, 0.78);
+  --w11-acrylic-border: rgba(255, 255, 255, 0.08);
+  --w11-mica: #202020 radial-gradient(#1a1f35 25%, #202020 100%) no-repeat fixed;
+
+  /* Windows */
+  --w11-window-bg: #272727;
+  --w11-window-titlebar: #202020;
+  --w11-window-border: rgba(255, 255, 255, 0.08);
+  --w11-window-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --w11-window-shadow-active: 0 28px 70px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.15);
+
+  /* Controls */
+  --w11-control-bg: rgba(255, 255, 255, 0.06);
+  --w11-control-border: rgba(255, 255, 255, 0.12);
+  --w11-control-hover: rgba(255, 255, 255, 0.09);
+  --w11-control-active: rgba(255, 255, 255, 0.05);
+}
+
+/* ==========================================================================
+   Mica & Acrylic Material Classes
+   ========================================================================== */
+
+.w11-acrylic {
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  background-color: var(--w11-acrylic);
+  border: 1px solid var(--w11-acrylic-border);
+}
+
+.w11-mica {
+  background: var(--w11-mica);
+  color: var(--w11-text-primary);
+}
+
+/* ==========================================================================
+   Windows 11 Window Frame & Titlebar
+   ========================================================================== */
+
+.win11-window {
+  font-family: var(--w11-font);
+  background: var(--w11-window-bg);
+  color: var(--w11-text-primary);
+  border: 1px solid var(--w11-window-border);
+  border-radius: var(--w11-radius-xl);
+  box-shadow: var(--w11-window-shadow);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease, border-radius 0.15s ease;
+
+  &.active {
+    box-shadow: var(--w11-window-shadow-active);
+  }
+
+  &.is-maximized {
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  /* Titlebar */
+  .win11-titlebar {
+    height: 32px;
+    min-height: 32px;
+    background: var(--w11-window-titlebar);
+    border-bottom: 1px solid var(--w11-window-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 12px;
+    user-select: none;
+
+    .win11-titlebar-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--w11-text-primary);
+    }
+
+    .win11-titlebar-controls {
+      display: flex;
+      height: 100%;
+
+      button {
+        all: unset;
+        width: 46px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--w11-text-primary);
+        cursor: pointer;
+        transition: background-color 0.12s ease, color 0.12s ease;
+
+        &:hover {
+          background-color: var(--w11-control-hover);
+        }
+
+        &[aria-label="Close"]:hover {
+          background-color: #c42b1c !important;
+          color: #ffffff !important;
+        }
+
+        &[aria-label="Close"]:active {
+          background-color: #b32719 !important;
+        }
+      }
+    }
+  }
+
+  .win11-window-body {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+}
+
+/* ==========================================================================
+   Snap Layouts Menu
+   ========================================================================== */
+
+.win11-snap-menu {
+  position: absolute;
+  top: 36px;
+  right: 48px;
+  width: 280px;
+  background: var(--w11-surface-flyout);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--w11-acrylic-border);
+  border-radius: var(--w11-radius-lg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  z-index: 10000;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+
+  .snap-layout-card {
+    height: 70px;
+    border: 1px solid var(--w11-control-border);
+    border-radius: var(--w11-radius-sm);
+    background: var(--w11-control-bg);
+    display: flex;
+    overflow: hidden;
+    gap: 3px;
+    padding: 4px;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--w11-accent);
+    }
+
+    .snap-zone {
+      background: rgba(128, 128, 128, 0.2);
+      border-radius: 2px;
+      transition: background-color 0.12s;
+
+      &:hover {
+        background: var(--w11-accent);
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   Desktop Icons
+   ========================================================================== */
+
+.win11-desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: var(--w11-radius-md);
+  border: 1px solid transparent;
+  cursor: default;
+  user-select: none;
+  transition: background var(--w11-transition-fast), border-color var(--w11-transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  &.selected {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .desktop-icon-label {
+    font-size: 12px;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    text-align: center;
+    max-width: 82px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+
+/* ==========================================================================
+   Windows 11 Centered Taskbar
+   ========================================================================== */
+
+.win11-taskbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: var(--w11-taskbar-height);
+  background: var(--w11-shell-bg);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-top: 1px solid var(--w11-acrylic-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9990;
+  user-select: none;
+
+  .taskbar-center {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .taskbar-item {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--w11-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+
+      &:active {
+        transform: scale(0.85);
+      }
+
+      /* Running & Focused Indicators */
+      &::after {
+        content: "";
+        position: absolute;
+        bottom: 2px;
+        left: 50%;
+        transform: translateX(-50%);
+        height: 3px;
+        border-radius: 3px;
+        background-color: var(--w11-text-secondary);
+        width: 6px;
+        opacity: 0;
+        transition: width 0.2s var(--w11-ease-smooth), opacity 0.15s ease, background-color 0.2s;
+      }
+
+      &.is-running::after {
+        opacity: 0.7;
+        width: 6px;
+      }
+
+      &.is-focused::after {
+        opacity: 1;
+        width: 16px;
+        background-color: var(--w11-accent);
+      }
+    }
+  }
+
+  .taskbar-right {
+    position: absolute;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-right: 2px;
+
+    .tray-cluster {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      height: 36px;
+      border-radius: var(--w11-radius-sm);
+      cursor: pointer;
+      transition: background-color 0.15s;
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+    }
+
+    .clock-cluster {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 8px;
+      height: 36px;
+      border-radius: var(--w11-radius-sm);
+      font-size: 11px;
+      line-height: 1.2;
+      color: var(--w11-text-primary);
+      cursor: pointer;
+      transition: background-color 0.15s;
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+    }
+
+    .show-desktop-strip {
+      width: 4px;
+      height: 100%;
+      border-left: 1px solid var(--w11-control-border);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   Windows 11 Start Menu
+   ========================================================================== */
+
+.win11-startmenu {
+  position: fixed;
+  bottom: calc(var(--w11-taskbar-height) + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  width: 620px;
+  max-width: 95vw;
+  height: 680px;
+  max-height: calc(100vh - 80px);
+  background: var(--w11-surface-flyout);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--w11-acrylic-border);
+  border-radius: var(--w11-radius-card);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 9999;
+  user-select: none;
+  opacity: 0;
+  transition: transform 0.25s var(--w11-ease-spring), opacity 0.2s ease;
+
+  &.is-open {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .start-search {
+    margin: 24px 32px 16px 32px;
+    position: relative;
+
+    input {
+      width: 100%;
+      height: 36px;
+      background: var(--w11-control-bg);
+      border: 1px solid var(--w11-control-border);
+      border-bottom: 2px solid transparent;
+      border-radius: var(--w11-radius-md);
+      color: var(--w11-text-primary);
+      padding: 0 16px 0 40px;
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+      transition: all 0.15s ease;
+
+      &:focus {
+        background: var(--w11-window-bg);
+        border-bottom-color: var(--w11-accent);
+      }
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--w11-text-secondary);
+    }
+  }
+
+  .start-pinned {
+    padding: 0 32px;
+    flex: 1;
+    overflow-y: auto;
+
+    .start-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--w11-text-primary);
+      margin-bottom: 12px;
+
+      button {
+        all: unset;
+        font-size: 11px;
+        font-weight: 500;
+        background: var(--w11-control-bg);
+        border: 1px solid var(--w11-control-border);
+        border-radius: var(--w11-radius-sm);
+        padding: 3px 8px;
+        cursor: pointer;
+
+        &:hover {
+          background-color: var(--w11-control-hover);
+        }
+      }
+    }
+
+    .start-grid-6 {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px 8px;
+
+      .start-app-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px 4px;
+        border-radius: var(--w11-radius-md);
+        cursor: pointer;
+        transition: background-color 0.15s;
+
+        &:hover {
+          background-color: var(--w11-control-hover);
+        }
+
+        &:active img,
+        &:active svg {
+          transform: scale(0.85);
+        }
+
+        span {
+          font-size: 11px;
+          color: var(--w11-text-primary);
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 80px;
+        }
+      }
+    }
+  }
+
+  .start-powerbar {
+    height: 60px;
+    background: rgba(0, 0, 0, 0.05);
+    border-top: 1px solid var(--w11-acrylic-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: var(--w11-radius-md);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--w11-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: bold;
+      }
+
+      span {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--w11-text-primary);
+      }
+    }
+
+    .power-btn {
+      all: unset;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--w11-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--w11-text-primary);
+
+      &:hover {
+        background-color: var(--w11-control-hover);
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   Windows 11 Fluent Controls (Buttons, Switches, Sliders)
+   ========================================================================== */
+
+/* Fluent Button */
+.win11-btn {
+  font-family: var(--w11-font);
+  font-size: 12px;
+  background: var(--w11-control-bg);
+  color: var(--w11-text-primary);
+  border: 1px solid var(--w11-control-border);
+  border-radius: var(--w11-radius-sm);
+  padding: 5px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-accent);
+  }
+
+  &:active {
+    background: var(--w11-control-active);
+    transform: scale(0.98);
+  }
+
+  &.accent {
+    background: var(--w11-accent);
+    color: var(--w11-accent-text);
+    border-color: var(--w11-accent);
+
+    &:hover {
+      background: var(--w11-accent-hover);
+    }
+  }
+}
+
+/* Fluent Toggle Switch */
+.win11-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 20px;
+
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+
+    &:checked + .switch-slider {
+      background-color: var(--w11-accent);
+      border-color: var(--w11-accent);
+
+      &::before {
+        transform: translateX(20px);
+        background-color: #ffffff;
+      }
+    }
+  }
+
+  .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: var(--w11-control-bg);
+    border: 1px solid var(--w11-control-border);
+    border-radius: 20px;
+    transition: all 0.2s var(--w11-ease-smooth);
+
+    &::before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--w11-text-secondary);
+      border-radius: 50%;
+      transition: all 0.2s var(--w11-ease-smooth);
+    }
+  }
+}
+
+/* Fluent Range Slider */
+.win11-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--w11-accent);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--w11-accent);
+    border: 4px solid var(--w11-window-bg);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    transition: border-width 0.12s ease;
+    cursor: pointer;
+
+    &:hover {
+      border-width: 2.5px;
+    }
+  }
+}
+
+/* Fluent Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 10px;
+
+  &:hover {
+    background: rgba(128, 128, 128, 0.65);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+}

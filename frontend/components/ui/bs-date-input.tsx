@@ -147,22 +147,22 @@ export function BSDateInput({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-[13px] transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          "flex w-full items-center justify-between px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
         )}
       >
         <span className="flex min-w-0 flex-col items-start leading-tight">
-          <span className={displayStr ? "" : "text-muted-foreground"}>
+          <span className={cn(displayStr ? "" : "text-tertiary")}>
             {displayStr || placeholder || t("Pick date", "मिति छान्नुहोस्")}
           </span>
           {adDisplay && (
-            <span className="text-[10px] text-muted-foreground tabular-nums">{adDisplay} AD</span>
+            <span className="text-tertiary text-[10px] tabular-nums">{adDisplay} AD</span>
           )}
         </span>
         <CalendarDays className="h-3.5 w-3.5 opacity-50 shrink-0" aria-hidden />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-[272px] rounded-lg border bg-popover p-3 shadow-lg">
+        <div className="absolute z-50 mt-1 w-[272px] border border-[var(--w11-border-default)] bg-[var(--w11-surface-flyout)] p-3 shadow-[var(--w11-elevation-flyout)] backdrop-blur-xl">
           <div className="mb-2 flex gap-2">
             <select
               aria-label="Year"
@@ -173,7 +173,7 @@ export function BSDateInput({
                 const md = getDaysInMonth(y, month);
                 if (day !== null && day > md) setDay(md);
               }}
-              className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-[12px]"
+              className="flex-1 px-2 text-[12px]"
             >
               {years.map((y) => (
                 <option key={y} value={y}>{y} BS</option>
@@ -188,7 +188,7 @@ export function BSDateInput({
                 const md = getDaysInMonth(year, m);
                 if (day !== null && day > md) setDay(md);
               }}
-              className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-[12px]"
+              className="flex-1 px-2 text-[12px]"
             >
               {months.map((label, i) => (
                 <option key={i + 1} value={i + 1}>{label}</option>
@@ -197,7 +197,7 @@ export function BSDateInput({
           </div>
           <div className="grid grid-cols-7 gap-0.5">
             {weekDays.map((d) => (
-              <div key={d} className="py-1 text-center text-[10px] font-medium text-muted-foreground">{d}</div>
+              <div key={d} className="text-tertiary py-1 text-center text-[10px] font-medium">{d}</div>
             ))}
             {Array.from({ length: firstWeekday }, (_, i) => (
               <div key={`pad-${i}`} />
@@ -211,11 +211,11 @@ export function BSDateInput({
                   type="button"
                   onClick={() => commit(year, month, d)}
                   className={cn(
-                    "h-7 w-7 justify-self-center rounded text-[12px] tabular-nums transition-colors hover:bg-accent",
+                    "h-7 w-7 justify-self-center rounded-sm text-[12px] tabular-nums",
                     d === day
-                      ? "bg-primary font-semibold text-primary-foreground hover:bg-primary"
-                      : "",
-                    isToday && d !== day ? "ring-1 ring-primary/50 font-semibold" : ""
+                      ? "accent font-semibold"
+                      : "subtle",
+                    isToday && d !== day ? "font-semibold ring-1 ring-[var(--w11-accent)]" : ""
                   )}
                 >
                   {d}
@@ -223,14 +223,14 @@ export function BSDateInput({
               );
             })}
           </div>
-          <div className="mt-2 flex items-center justify-between border-t pt-2">
-            <span className="text-[10px] text-muted-foreground">
+          <div className="mt-2 flex items-center justify-between border-t border-[var(--w11-border-subtle)] pt-2">
+            <span className="text-tertiary text-[10px]">
               {adDisplay ? `${adDisplay} AD` : t("No date chosen", "मिति छानिएको छैन")}
             </span>
             <button
               type="button"
               onClick={pickToday}
-              className="rounded-md border px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-accent"
+              className="!h-6 !min-h-0 px-2 text-[11px] font-medium !text-[var(--w11-accent)]"
             >
               {t("Today", "आज")}
             </button>
@@ -279,7 +279,7 @@ export function BSMonthInput({
         disabled={disabled}
         value={year}
         onChange={(e) => { const y = Number(e.target.value); setYear(y); emit(y, month); }}
-        className="h-9 rounded-md border border-input bg-background px-2 text-[13px]"
+        className="h-9 px-2 text-[13px]"
       >
         {years.map((y) => <option key={y} value={y}>{y} BS</option>)}
       </select>
@@ -287,7 +287,7 @@ export function BSMonthInput({
         disabled={disabled}
         value={month}
         onChange={(e) => { const m = Number(e.target.value); setMonth(m); emit(year, m); }}
-        className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-[13px]"
+        className="h-9 flex-1 px-2 text-[13px]"
       >
         {months.map((label, i) => (
           <option key={i + 1} value={i + 1}>{label}</option>

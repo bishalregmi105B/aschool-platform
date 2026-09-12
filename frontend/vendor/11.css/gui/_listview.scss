@@ -1,0 +1,50 @@
+/**
+ * 11.css - Fluent List View / Data Grid
+ * Windows 11 Details View
+ */
+
+table.win11-listview,
+table.list-view {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  text-align: left;
+  user-select: none;
+
+  thead th {
+    padding: 8px 12px;
+    font-weight: 500;
+    color: var(--w11-text-secondary);
+    border-bottom: 1px solid var(--w11-border-subtle);
+    background: transparent;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--w11-control-hover);
+      color: var(--w11-text-primary);
+    }
+  }
+
+  tbody tr {
+    transition: background var(--w11-transition-fast);
+    cursor: pointer;
+
+    td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--w11-border-subtle);
+    }
+
+    &:hover {
+      background: var(--w11-control-hover);
+    }
+
+    &.selected,
+    &[aria-selected="true"] {
+      background: var(--w11-control-active);
+      color: var(--w11-text-primary);
+      font-weight: 500;
+    }
+  }
+}

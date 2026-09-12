@@ -3,11 +3,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Bell, MessageCircle, Phone, Smartphone } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 interface NotificationConfig {
   push_enabled: boolean;
@@ -69,75 +75,69 @@ export default function NotificationSettingsPage() {
     save.mutate({ types: { ...data.types, [type]: !data.types[type] } });
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading notification settings…" />;
   if (!data) return null;
 
   const channels = [
-    { key: "push_enabled" as const, label: "Push Notifications", icon: Smartphone, color: "text-violet-600" },
-    { key: "sms_enabled" as const, label: "SMS", icon: Phone, color: "text-blue-600" },
-    { key: "whatsapp_enabled" as const, label: "WhatsApp", icon: MessageCircle, color: "text-green-600" },
+    { key: "push_enabled" as const, label: "Push Notifications", icon: Smartphone },
+    { key: "sms_enabled" as const, label: "SMS", icon: Phone },
+    { key: "whatsapp_enabled" as const, label: "WhatsApp", icon: MessageCircle },
   ];
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bell className="h-6 w-6" /> Notification Settings
-        </h1>
-        <p className="text-muted-foreground">
-          Control which channels and event types are active for your school.
-        </p>
-      </div>
-
-      {/* Global channel toggles */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notification Channels</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {channels.map((ch) => (
-            <div key={ch.key} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ch.icon className={`h-5 w-5 ${ch.color}`} />
-                <Label className="text-sm font-medium">{ch.label}</Label>
-              </div>
-              <Switch
-                checked={data[ch.key]}
-                onCheckedChange={() => toggleChannel(ch.key)}
-                disabled={save.isPending}
-              />
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Notification Settings"
+        subtitle="Control which channels and event types are active for your school."
+      />
+      <AOSPageBody>
+        <div className="space-y-4 max-w-3xl">
+          {/* Global channel toggles */}
+          <DataPanel title="Notification Channels">
+            <div className="space-y-4">
+              {channels.map((ch) => (
+                <div key={ch.key} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <ch.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
+                    <Label className="text-sm font-medium">{ch.label}</Label>
+                  </div>
+                  <Switch
+                    checked={data[ch.key]}
+                    onCheckedChange={() => toggleChannel(ch.key)}
+                    disabled={save.isPending}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </DataPanel>
 
-      {/* Per-type toggles */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notification Types</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {Object.entries(TYPE_LABELS).map(([key, meta]) => (
-            <div key={key} className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">{meta.label}</p>
-                <p className="text-xs text-muted-foreground">{meta.description}</p>
-              </div>
-              <Switch
-                checked={data.types[key] ?? true}
-                onCheckedChange={() => toggleType(key)}
-                disabled={save.isPending}
-              />
+          {/* Per-type toggles */}
+          <DataPanel title="Notification Types">
+            <div className="space-y-5">
+              {Object.entries(TYPE_LABELS).map(([key, meta]) => (
+                <div key={key} className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>{meta.label}</p>
+                    <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{meta.description}</p>
+                  </div>
+                  <Switch
+                    checked={data.types[key] ?? true}
+                    onCheckedChange={() => toggleType(key)}
+                    disabled={save.isPending}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </DataPanel>
 
-      {save.isPending && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner className="h-4 w-4" /> Saving…
+          {save.isPending && (
+            <div className="flex items-center gap-2 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+              <Spinner className="h-4 w-4" /> Saving…
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

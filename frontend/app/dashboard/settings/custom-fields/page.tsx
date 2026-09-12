@@ -18,8 +18,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PluginGate } from "@/lib/plugins";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 interface FieldDef {
   id: string;
@@ -75,100 +85,127 @@ function CustomFieldsInner() {
   const rows = defs.data ?? [];
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold text-[#0e3b2e] flex-1">
-          Custom Registration Fields
-        </h1>
-        <Button
-          className="bg-[#0e3b2e] text-[#c5f4dd] hover:bg-[#0e3b2e]/90"
-          onClick={() => setCreating(true)}
-        >
-          <Plus className="w-4 h-4 mr-1" /> Add field
-        </Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        title="Custom Registration Fields"
+        subtitle="Add fields to registration forms and the public admission wizard"
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Add field
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          {FORMS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setForm(f)}
+              className={`win11-chip ${form === f ? "accent" : ""} cursor-pointer`}
+              style={{ textTransform: "capitalize" }}
+            >
+              {f.replace("_", " ")}
+            </button>
+          ))}
+        </FilterCommandBar>
 
-      <div className="flex gap-2">
-        {FORMS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setForm(f)}
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
-              form === f ? "bg-[#0e3b2e] text-[#c5f4dd]" : "bg-[#f7f5f0]"
-            }`}
-          >
-            {f.replace("_", " ")}
-          </button>
-        ))}
-      </div>
-
-      {defs.isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="animate-spin text-[#0e3b2e]" />
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-[#0d1f14]/60 py-16 text-center">
-          No custom fields yet. Added fields appear on the registration forms
-          and the public admission wizard.
-        </p>
-      ) : (
-        <table className="w-full text-sm rounded-xl overflow-hidden border border-[#0e3b2e]/10">
-          <thead className="bg-[#0e3b2e] text-[#c5f4dd]">
-            <tr>
-              <th className="text-left px-4 py-2">Label</th>
-              <th className="text-left px-4 py-2">Type</th>
-              <th className="text-center px-4 py-2">Required</th>
-              <th className="text-center px-4 py-2">Active</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((d) => (
-              <tr key={d.id} className="border-t border-[#0e3b2e]/10">
-                <td className="px-4 py-2">
-                  {d.label}
-                  {d.label_nepali ? (
-                    <span className="text-[#0d1f14]/50"> · {d.label_nepali}</span>
-                  ) : null}
-                  {d.field_type.includes("select") && d.choices?.length ? (
-                    <span className="text-xs text-[#0d1f14]/50">
-                      {" "}
-                      ({d.choices.join(", ")})
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-2">{d.field_type}</td>
-                <td className="text-center">{d.required ? "Yes" : "—"}</td>
-                <td className="text-center">{d.is_active ? "Yes" : "—"}</td>
-                <td className="px-4 py-2 text-right space-x-2">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => remove.mutate(d.id)}
+        {defs.isLoading ? (
+          <AOSModuleLoadingState label="Loading fields…" />
+        ) : rows.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              title="No custom fields yet"
+              description="Added fields appear on the registration forms and the public admission wizard."
+            />
+          </DataPanel>
+        ) : (
+          <DataPanel bodyClassName="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="border-b border-[var(--w11-border-subtle)]"
+                  style={{ background: "var(--w11-control-hover)" }}
+                >
+                  <th
+                    className="text-left px-4 py-2 font-semibold"
+                    style={{ color: "var(--w11-text-secondary)" }}
                   >
-                    <Trash2 className="w-4 h-4 text-rose-600" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+                    Label
+                  </th>
+                  <th
+                    className="text-left px-4 py-2 font-semibold"
+                    style={{ color: "var(--w11-text-secondary)" }}
+                  >
+                    Type
+                  </th>
+                  <th
+                    className="text-center px-4 py-2 font-semibold"
+                    style={{ color: "var(--w11-text-secondary)" }}
+                  >
+                    Required
+                  </th>
+                  <th
+                    className="text-center px-4 py-2 font-semibold"
+                    style={{ color: "var(--w11-text-secondary)" }}
+                  >
+                    Active
+                  </th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => (
+                  <tr key={d.id} className="border-t border-[var(--w11-border-subtle)]">
+                    <td className="px-4 py-2" style={{ color: "var(--w11-text-primary)" }}>
+                      {d.label}
+                      {d.label_nepali ? (
+                        <span style={{ color: "var(--w11-text-tertiary)" }}> · {d.label_nepali}</span>
+                      ) : null}
+                      {d.field_type.includes("select") && d.choices?.length ? (
+                        <span className="text-xs" style={{ color: "var(--w11-text-tertiary)" }}>
+                          {" "}
+                          ({d.choices.join(", ")})
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2" style={{ color: "var(--w11-text-secondary)" }}>{d.field_type}</td>
+                    <td className="text-center" style={{ color: "var(--w11-text-primary)" }}>
+                      {d.required ? <StatusChip status="active" label="Yes" /> : "—"}
+                    </td>
+                    <td className="text-center" style={{ color: "var(--w11-text-primary)" }}>
+                      {d.is_active ? <StatusChip status="active" label="Yes" /> : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => remove.mutate(d.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DataPanel>
+        )}
 
-      {(creating || editing) && (
-        <FieldDialog
-          form={form}
-          existing={editing}
-          onClose={() => {
-            setCreating(false);
-            setEditing(null);
-          }}
-        />
-      )}
-    </div>
+        {(creating || editing) && (
+          <FieldDialog
+            form={form}
+            existing={editing}
+            onClose={() => {
+              setCreating(false);
+              setEditing(null);
+            }}
+          />
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -235,7 +272,7 @@ function FieldDialog({
             onChange={(e) => setLabelNepali(e.target.value)}
           />
           <select
-            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+            className="win11-select w-full"
             value={fieldType}
             onChange={(e) => setFieldType(e.target.value)}
           >
@@ -253,7 +290,7 @@ function FieldDialog({
             />
           )}
           <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2" style={{ color: "var(--w11-text-primary)" }}>
               <input
                 type="checkbox"
                 checked={required}
@@ -261,7 +298,7 @@ function FieldDialog({
               />
               Required
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2" style={{ color: "var(--w11-text-primary)" }}>
               <input
                 type="checkbox"
                 checked={isActive}
@@ -276,7 +313,6 @@ function FieldDialog({
             Cancel
           </Button>
           <Button
-            className="bg-[#0e3b2e] text-[#c5f4dd] hover:bg-[#0e3b2e]/90"
             onClick={() => save.mutate()}
             disabled={save.isPending || !label.trim()}
           >

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -13,11 +12,21 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { CalendarOff, CheckCircle2, XCircle, Clock, Download } from "lucide-react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 interface LeaveRequest {
   id: string;
@@ -39,17 +48,13 @@ const REQUEST_COLUMNS: Column<LeaveRequest>[] = [
     </span>
   ) },
   { key: "days", label: "Days", align: "right", sortable: true, value: (l) => l.days ?? 0, render: (l) => l.days || "—" },
-  { key: "reason", label: "Reason", value: (l) => l.reason ?? "", render: (l) => <span className="text-sm text-muted-foreground max-w-[200px] truncate block">{l.reason || "No reason provided"}</span> },
+  { key: "reason", label: "Reason", value: (l) => l.reason ?? "", render: (l) => <span className="text-sm max-w-[200px] truncate block" style={{ color: "var(--w11-text-secondary)" }}>{l.reason || "No reason provided"}</span> },
   {
     key: "status",
     label: "Status",
     sortable: true,
     value: (l) => l.status,
-    render: (l) => (
-      <Badge variant={l.status === "approved" ? "success" : l.status === "rejected" ? "destructive" : "secondary"}>
-        {l.status}
-      </Badge>
-    ),
+    render: (l) => <StatusChip status={l.status} className="capitalize" />,
   },
 ];
 
@@ -196,148 +201,142 @@ export default function LeaveReportPage() {
     toast.success(`Exported ${filtered.length} row${filtered.length === 1 ? "" : "s"}`);
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading leave report…" />;
 
   if (isError) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load leave requests. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent>
-      </Card>
+      <AOSPage>
+        <AOSPageHeader title="Leave Report & Approvals" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load leave requests. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <CalendarOff className="h-6 w-6" /> Leave Report & Approvals
-        </h1>
-        <p className="text-muted-foreground">Staff time-off summary, export and approvals</p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<CalendarOff className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Leave Report & Approvals"
+        subtitle={`${leaves.length} requests · ${stats.totalDays} leave days · ${stats.byStatus.pending} pending`}
+      />
+      <AOSPageBody>
+        {/* Status summary cards */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Total Requests"
+            value={leaves.length}
+            icon={<CalendarOff className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          <KpiCard
+            label="Pending"
+            value={stats.byStatus.pending}
+            color="#d83b01"
+            icon={<Clock className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+          <KpiCard
+            label="Approved"
+            value={stats.byStatus.approved}
+            color="#107c10"
+            icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Rejected"
+            value={stats.byStatus.rejected}
+            color="#c42b1c"
+            icon={<XCircle className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+          />
+        </StatGrid>
 
-      {/* Status summary cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
-            <CalendarOff className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{leaves.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-500">{stats.byStatus.pending}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.byStatus.approved}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.byStatus.rejected}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Leave-days breakdown by type */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Leave Days by Type</CardTitle>
-        </CardHeader>
-        <CardContent>
+        {/* Leave-days breakdown by type */}
+        <DataPanel
+          title="Leave Days by Type"
+          className="mb-4"
+        >
           {Object.keys(stats.byType).length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">No leave data yet.</p>
+            <p className="text-sm py-2" style={{ color: "var(--w11-text-secondary)" }}>
+              No leave data yet.
+            </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {Object.entries(stats.byType).map(([type, agg]) => (
                 <div
                   key={type}
-                  className="rounded-lg border bg-muted/30 px-4 py-3"
+                  className="rounded-lg border border-[var(--w11-border-subtle)] px-4 py-3"
+                  style={{ background: "var(--w11-control-hover)" }}
                 >
-                  <p className="text-sm font-medium capitalize">{type}</p>
-                  <p className="text-2xl font-bold">{agg.days}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm font-medium capitalize" style={{ color: "var(--w11-text-primary)" }}>{type}</p>
+                  <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{agg.days}</p>
+                  <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                     days across {agg.requests} request{agg.requests === 1 ? "" : "s"}
                   </p>
                 </div>
               ))}
             </div>
           )}
-          <p className="mt-4 text-sm text-muted-foreground">
-            Total leave days across all requests: <span className="font-semibold text-foreground">{stats.totalDays}</span>
+          <p className="mt-4 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+            Total leave days across all requests: <span className="font-semibold" style={{ color: "var(--w11-text-primary)" }}>{stats.totalDays}</span>
           </p>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Per-staff aggregate for a month/year — served by GET /hr/leave-report */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-lg">Leave Days per Staff</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Aggregated leave totals by type for the selected period
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select
-              value={reportMonth}
-              onValueChange={setReportMonth}
-            >
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Whole year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Whole year</SelectItem>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>
-                    {new Date(2000, i, 1).toLocaleString(undefined, { month: "long" })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={String(reportYear)}
-              onValueChange={(val) => setReportYear(Number(val))}
-            >
-              <SelectTrigger className="w-[100px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 5 }, (_, i) => {
-                  const y = new Date().getFullYear() - i;
-                  return (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
+        {/* Per-staff aggregate for a month/year — served by GET /hr/leave-report */}
+        <DataPanel
+          className="mb-4"
+          bodyClassName="p-0"
+          title="Leave Days per Staff"
+          actions={
+            <div className="flex items-center gap-2">
+              <Select
+                value={reportMonth}
+                onValueChange={setReportMonth}
+              >
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Whole year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Whole year</SelectItem>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>
+                      {new Date(2000, i, 1).toLocaleString(undefined, { month: "long" })}
                     </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={exportSummaryCsv} disabled={reportLoading}>
-              <Download className="h-4 w-4 mr-2" /> Export CSV
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(reportYear)}
+                onValueChange={(val) => setReportYear(Number(val))}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const y = new Date().getFullYear() - i;
+                    return (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={exportSummaryCsv} disabled={reportLoading}>
+                <Download className="h-4 w-4 mr-2" /> Export CSV
+              </Button>
+            </div>
+          }
+        >
+          <p className="px-4 pt-3 text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+            Aggregated leave totals by type for the selected period
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
@@ -358,7 +357,7 @@ export default function LeaveReportPage() {
                 </TableRow>
               ) : staffRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={reportTypes.length + 3} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={reportTypes.length + 3} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>
                     No leave records for this period.
                   </TableCell>
                 </TableRow>
@@ -376,12 +375,10 @@ export default function LeaveReportPage() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Filter by Status:</span>
+        <FilterCommandBar>
+          <span className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>Filter by Status:</span>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="All Statuses" />
@@ -394,18 +391,16 @@ export default function LeaveReportPage() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <Button
-          variant="outline"
-          onClick={exportCsv}
-          disabled={filtered.length === 0}
-        >
-          <Download className="h-4 w-4 mr-2" /> Export CSV
-        </Button>
-      </div>
+          <Button
+            variant="outline"
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" /> Export CSV
+          </Button>
+        </FilterCommandBar>
 
-      <Card>
-        <CardContent className="p-0">
+        <DataPanel bodyClassName="p-0">
           <DataTable<LeaveRequest>
             columns={REQUEST_COLUMNS}
             rows={filtered}
@@ -415,8 +410,8 @@ export default function LeaveReportPage() {
             exportFileName="leave-requests"
             empty={{ icon: Download, title: "No leave requests found" }}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

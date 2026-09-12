@@ -3,10 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type BusInfo = {
   bus_id?: string;
@@ -46,7 +46,7 @@ export default function ParentBusPage() {
     },
   });
 
-  if (info.isLoading) return <PageLoader />;
+  if (info.isLoading) return <AOSModuleLoadingState label="Loading…" />;
   if (info.isError)
     return <ErrorState title="Couldn't load bus info" onRetry={() => info.refetch()} />;
 
@@ -64,7 +64,7 @@ export default function ParentBusPage() {
               Your child is not assigned to a bus route yet — contact the school office.
             </p>
           )}
-          {busId && location.isLoading && <PageLoader />}
+          {busId && location.isLoading && <AOSModuleLoadingState label="Loading…" />}
           {busId && location.data?.lat != null && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">

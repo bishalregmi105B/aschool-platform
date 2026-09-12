@@ -8,18 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -36,10 +25,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { DataTable, type Column, type BulkAction } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   Plus,
   Trash2,
@@ -247,22 +244,25 @@ export default function StudentsPage() {
     bulkDeleteMutation.mutate(Array.from(selected));
   }
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading students…" />;
 
   if (listError)
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">
-              Failed to load students. Please try again.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refetchStudents()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Students" subtitle={`${pagination?.total || 0} students enrolled`} />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load students. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetchStudents()}>
+                Retry
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
 
   // ── DataTable wiring ──────────────────────────────────────────────────
@@ -305,9 +305,7 @@ export default function StudentsPage() {
       sortable: true,
       value: (s) => s.status,
       render: (s) => (
-        <Badge variant={s.status === "active" ? "success" : s.status === "graduated" ? "secondary" : "destructive"}>
-          {STATUS_LABELS[s.status] ?? s.status}
-        </Badge>
+        <StatusChip status={s.status} label={STATUS_LABELS[s.status] ?? s.status} />
       ),
     },
     {
@@ -327,7 +325,7 @@ export default function StudentsPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-destructive"
+            className="text-[#c42b1c]"
             onClick={() => {
               void (async () => {
                 const ok = await confirm({
@@ -370,219 +368,225 @@ export default function StudentsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Students</h1>
-          <p className="text-muted-foreground">
-            {pagination?.total || 0} students enrolled
-          </p>
-        </div>
-        <Button onClick={() => router.push("/dashboard/students/new")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Student
-        </Button>
-      </div>
-
-      {/* Students table — one component for selection, sort, pagination,
-          export; row click opens the detail drawer (no full-page hop). */}
-      <DataTable<Student>
-        columns={COLUMNS}
-        rows={students}
-        rowKey={(s) => s.id}
-        loading={false}
-        searchable
-        searchValue={search}
-        onSearchChange={(v) => {
-          setSearch(v);
-          setPage(1);
-        }}
-        searchPlaceholder="Search by name or enrollment number..."
-        selectable
-        bulkActions={BULK_ACTIONS}
-        onRowClick={(s) => setViewStudent(s)}
-        activeRowKey={viewStudent?.id ?? null}
-        pagination={pagination ? {
-          page: pagination.page,
-          pages: pagination.pages,
-          total: pagination.total,
-          per_page: pagination.per_page,
-          has_next: pagination.has_next ?? pagination.page < pagination.pages,
-          has_prev: pagination.has_prev ?? pagination.page > 1,
-        } : undefined}
-        onPageChange={(p) => setPage(p)}
-        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-        exportFileName="students"
-        empty={{
-          icon: Users,
-          title: "No students found",
-          body: hasFilters ? "Try clearing the filters — or enroll your first student." : "Enroll your first student to get started.",
-          action: { label: "Add Student", href: "/dashboard/students/new" },
-        }}
-        toolbar={
-          <div className="flex flex-wrap items-center gap-2">
-            <AdvancedSelect
-              className="w-36"
-              value={filterClassId}
-              onChange={(v) => {
-                setFilterClassId(v || "all");
-                setFilterSectionId("all");
-                setFilterGrade("all");
-                setPage(1);
-              }}
-              clearable
-              placeholder="All Classes"
-              options={classes.map((c) => ({ value: c.id, label: c.name }))}
-            />
-            {filterClassId !== "all" && sections.length > 0 && (
-              <AdvancedSelect
-                className="w-32"
-                value={filterSectionId}
-                onChange={(v) => {
-                  setFilterSectionId(v || "all");
-                  setPage(1);
-                }}
-                clearable
-                placeholder="All Sections"
-                options={sections.map((sec) => ({ value: sec.id, label: sec.name }))}
-              />
-            )}
-            <AdvancedSelect
-              className="w-32"
-              value={filterGender}
-              onChange={(v) => {
-                setFilterGender(v || "all");
-                setPage(1);
-              }}
-              clearable
-              placeholder="All Genders"
-              options={[
-                { value: "male", label: "Male" },
-                { value: "female", label: "Female" },
-                { value: "other", label: "Other" },
-              ]}
-            />
-            <AdvancedSelect
-              className="w-36"
-              value={filterStatus}
-              onChange={(v) => {
-                setFilterStatus(v || "all");
-                setPage(1);
-              }}
-              clearable
-              placeholder="All Statuses"
-              options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
-            />
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/bulk-import")}>
-              <Upload className="h-3.5 w-3.5 mr-1" /> Import
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/profile-images")}>
-              <ImagePlus className="h-3.5 w-3.5 mr-1" /> Photos
-            </Button>
-            <Button onClick={() => router.push("/dashboard/students/new")}>
-              <Plus className="h-4 w-4 mr-1" /> Add Student
-            </Button>
-          </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Students"
+        subtitle={`${pagination?.total || 0} students enrolled`}
+        actions={
+          <Button onClick={() => router.push("/dashboard/students/new")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Student
+          </Button>
         }
       />
-
-      {/* Detail drawer — the quick view without leaving the list */}
-      <Sheet open={!!viewStudent} onOpenChange={(open) => !open && setViewStudent(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <div className="border-b px-4 py-3">
-            <SheetTitle className="text-[15px] font-semibold">Student Details</SheetTitle>
-          </div>
-          {viewStudent && (
-            <div className="space-y-5 px-4 pb-6">
-              <div className="flex items-center gap-4">
-                <Avatar
-                  src={viewStudent.photo_url}
-                  name={`${viewStudent.first_name} ${viewStudent.last_name}`}
-                  size="lg"
+      <AOSPageBody>
+        {/* Students table — one component for selection, sort, pagination,
+            export; row click opens the detail drawer (no full-page hop). */}
+        <DataPanel bodyClassName="p-0">
+          <DataTable<Student>
+            columns={COLUMNS}
+            rows={students}
+            rowKey={(s) => s.id}
+            loading={false}
+            searchable
+            searchValue={search}
+            onSearchChange={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            searchPlaceholder="Search by name or enrollment number..."
+            selectable
+            bulkActions={BULK_ACTIONS}
+            onRowClick={(s) => setViewStudent(s)}
+            activeRowKey={viewStudent?.id ?? null}
+            pagination={pagination ? {
+              page: pagination.page,
+              pages: pagination.pages,
+              total: pagination.total,
+              per_page: pagination.per_page,
+              has_next: pagination.has_next ?? pagination.page < pagination.pages,
+              has_prev: pagination.has_prev ?? pagination.page > 1,
+            } : undefined}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            exportFileName="students"
+            empty={{
+              icon: Users,
+              title: "No students found",
+              body: hasFilters ? "Try clearing the filters — or enroll your first student." : "Enroll your first student to get started.",
+              action: { label: "Add Student", href: "/dashboard/students/new" },
+            }}
+            toolbar={
+              <div className="flex flex-wrap items-center gap-2">
+                <AdvancedSelect
+                  className="w-36"
+                  value={filterClassId}
+                  onChange={(v) => {
+                    setFilterClassId(v || "all");
+                    setFilterSectionId("all");
+                    setFilterGrade("all");
+                    setPage(1);
+                  }}
+                  clearable
+                  placeholder="All Classes"
+                  options={classes.map((c) => ({ value: c.id, label: c.name }))}
                 />
-                <div className="min-w-0">
-                  <p className="text-base font-semibold truncate">
-                    {viewStudent.first_name} {viewStudent.last_name}
-                  </p>
-                  <p className="text-[12px] text-muted-foreground">
-                    {viewStudent.enrollment_number || "No enrollment no."}
-                  </p>
-                  <Badge
-                    variant={viewStudent.status === "active" ? "success" : viewStudent.status === "graduated" ? "secondary" : "destructive"}
-                    className="mt-1"
+                {filterClassId !== "all" && sections.length > 0 && (
+                  <AdvancedSelect
+                    className="w-32"
+                    value={filterSectionId}
+                    onChange={(v) => {
+                      setFilterSectionId(v || "all");
+                      setPage(1);
+                    }}
+                    clearable
+                    placeholder="All Sections"
+                    options={sections.map((sec) => ({ value: sec.id, label: sec.name }))}
+                  />
+                )}
+                <AdvancedSelect
+                  className="w-32"
+                  value={filterGender}
+                  onChange={(v) => {
+                    setFilterGender(v || "all");
+                    setPage(1);
+                  }}
+                  clearable
+                  placeholder="All Genders"
+                  options={[
+                    { value: "male", label: "Male" },
+                    { value: "female", label: "Female" },
+                    { value: "other", label: "Other" },
+                  ]}
+                />
+                <AdvancedSelect
+                  className="w-36"
+                  value={filterStatus}
+                  onChange={(v) => {
+                    setFilterStatus(v || "all");
+                    setPage(1);
+                  }}
+                  clearable
+                  placeholder="All Statuses"
+                  options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
+                />
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/bulk-import")}>
+                  <Upload className="h-3.5 w-3.5 mr-1" /> Import
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/profile-images")}>
+                  <ImagePlus className="h-3.5 w-3.5 mr-1" /> Photos
+                </Button>
+                <Button onClick={() => router.push("/dashboard/students/new")}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Student
+                </Button>
+              </div>
+            }
+          />
+        </DataPanel>
+
+        {/* Detail drawer — the quick view without leaving the list */}
+        <Sheet open={!!viewStudent} onOpenChange={(open) => !open && setViewStudent(null)}>
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+            <div className="border-b border-[color:var(--w11-border-subtle)] px-4 py-3">
+              <SheetTitle className="text-[15px] font-semibold">Student Details</SheetTitle>
+            </div>
+            {viewStudent && (
+              <div className="space-y-5 px-4 pb-6">
+                <div className="flex items-center gap-4">
+                  <Avatar
+                    src={viewStudent.photo_url}
+                    name={`${viewStudent.first_name} ${viewStudent.last_name}`}
+                    size="lg"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold truncate">
+                      {viewStudent.first_name} {viewStudent.last_name}
+                    </p>
+                    <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                      {viewStudent.enrollment_number || "No enrollment no."}
+                    </p>
+                    <StatusChip
+                      status={viewStudent.status}
+                      label={STATUS_LABELS[viewStudent.status] ?? viewStudent.status}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+                  {[
+                    ["Class", viewStudent.class_name ? `Class ${viewStudent.class_name.replace(/^\s*class\s+/i, "")}${viewStudent.section_name ? ` - ${viewStudent.section_name}` : ""}` : "—"],
+                    ["Gender", viewStudent.gender ? viewStudent.gender.charAt(0).toUpperCase() + viewStudent.gender.slice(1) : "—"],
+                    ["Guardian", viewStudent.guardians?.[0]?.full_name || "—"],
+                    ["Guardian Phone", viewStudent.guardians?.[0]?.phone || "—"],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <dt
+                        className="text-[10px] font-medium uppercase tracking-wide"
+                        style={{ color: "var(--w11-text-secondary)" }}
+                      >
+                        {k}
+                      </dt>
+                      <dd className="mt-0.5 font-medium">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="flex gap-2 border-t border-[color:var(--w11-border-subtle)] pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setEditStudent(viewStudent);
+                      setViewStudent(null);
+                    }}
                   >
-                    {STATUS_LABELS[viewStudent.status] ?? viewStudent.status}
-                  </Badge>
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => router.push(`/dashboard/students/${viewStudent.id}`)}
+                  >
+                    Full Profile
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[#c42b1c]"
+                    onClick={() => {
+                      const target = viewStudent;
+                      setViewStudent(null);
+                      void (async () => {
+                        const ok = await confirm({
+                          title: "Delete this student?",
+                          body: "Their login and guardian links are removed. This cannot be undone.",
+                          confirmLabel: "Delete student",
+                          tone: "danger",
+                        });
+                        if (ok) deleteMutation.mutate(target.id);
+                      })();
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
-                {[
-                  ["Class", viewStudent.class_name ? `Class ${viewStudent.class_name.replace(/^\s*class\s+/i, "")}${viewStudent.section_name ? ` - ${viewStudent.section_name}` : ""}` : "—"],
-                  ["Gender", viewStudent.gender ? viewStudent.gender.charAt(0).toUpperCase() + viewStudent.gender.slice(1) : "—"],
-                  ["Guardian", viewStudent.guardians?.[0]?.full_name || "—"],
-                  ["Guardian Phone", viewStudent.guardians?.[0]?.phone || "—"],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{k}</dt>
-                    <dd className="mt-0.5 font-medium">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="flex gap-2 border-t pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    setEditStudent(viewStudent);
-                    setViewStudent(null);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => router.push(`/dashboard/students/${viewStudent.id}`)}
-                >
-                  Full Profile
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => {
-                    const target = viewStudent;
-                    setViewStudent(null);
-                    void (async () => {
-                      const ok = await confirm({
-                        title: "Delete this student?",
-                        body: "Their login and guardian links are removed. This cannot be undone.",
-                        confirmLabel: "Delete student",
-                        tone: "danger",
-                      });
-                      if (ok) deleteMutation.mutate(target.id);
-                    })();
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+            )}
+          </SheetContent>
+        </Sheet>
 
-      <AddStudentDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
-      {editStudent && (
-        <EditStudentDialog
-          student={editStudent}
-          onOpenChange={(open) => {
-            if (!open) setEditStudent(null);
-          }}
-        />
-      )}
-    </div>
+        <AddStudentDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
+        {editStudent && (
+          <EditStudentDialog
+            student={editStudent}
+            onOpenChange={(open) => {
+              if (!open) setEditStudent(null);
+            }}
+          />
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -755,22 +759,22 @@ function AddStudentDialog({
                 type="password"
                 placeholder="Leave empty for auto-generation"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                 Default: {"{class}{section}{roll}.{first}"} (e.g. 7a12.ram)
               </p>
             </div>
           </div>
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 pt-4 border-t border-[color:var(--w11-border-subtle)]">
             <Label htmlFor="dob_bs">Date of Birth (BS)</Label>
             <BSDateInput name="dob_bs" emit="bs" />
           </div>
-          <div className="border-t pt-4">
+          <div className="border-t border-[color:var(--w11-border-subtle)] pt-4">
             <p className="text-sm font-medium mb-3">Guardian Information</p>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="guardian_name">Guardian Name *</Label>
                 <Input id="guardian_name" name="guardian_name" required />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                   Creates the parent login
                 </p>
               </div>

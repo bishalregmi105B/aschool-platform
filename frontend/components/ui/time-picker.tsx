@@ -78,24 +78,23 @@ export function TimePicker({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-[13px] transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-          className
+          "flex w-full items-center justify-between px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
         )}
       >
-        <span className={display ? "tabular-nums" : "text-muted-foreground"}>
+        <span className={cn("tabular-nums", !display && "text-tertiary")}>
           {display || placeholder || t("Pick time", "समय छान्नुहोस्")}
         </span>
         <Clock className="h-3.5 w-3.5 opacity-50 shrink-0" aria-hidden />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 rounded-lg border bg-popover p-3 shadow-lg">
-          <div className="mb-2 rounded-md bg-muted/60 px-3 py-1.5 text-center text-sm font-semibold tabular-nums">
+        <div className="absolute z-50 mt-1 border border-[var(--w11-border-default)] bg-[var(--w11-surface-flyout)] p-3 shadow-[var(--w11-elevation-flyout)] backdrop-blur-xl">
+          <div className="text-tertiary mb-2 rounded-[var(--w11-radius-md)] bg-[var(--w11-control-hover)] px-3 py-1.5 text-center text-sm font-semibold tabular-nums">
             {display || "--:--"}
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <p className="mb-1 text-center text-[10px] font-medium uppercase text-muted-foreground">
+              <p className="text-tertiary mb-1 text-center text-[10px] font-medium uppercase">
                 {t("Hour", "घण्टा")}
               </p>
               <div className="grid max-h-40 grid-cols-4 gap-0.5 overflow-y-auto pr-1">
@@ -105,8 +104,8 @@ export function TimePicker({
                     type="button"
                     onClick={() => { setHour(h); emit(h, minute); }}
                     className={cn(
-                      "h-7 rounded text-[11px] tabular-nums transition-colors hover:bg-accent",
-                      h === hour ? "bg-primary font-semibold text-primary-foreground" : ""
+                      "h-7 rounded-sm text-[11px] tabular-nums",
+                      h === hour ? "accent font-semibold" : "subtle"
                     )}
                   >
                     {String(h).padStart(2, "0")}
@@ -115,7 +114,7 @@ export function TimePicker({
               </div>
             </div>
             <div className="w-[104px]">
-              <p className="mb-1 text-center text-[10px] font-medium uppercase text-muted-foreground">
+              <p className="text-tertiary mb-1 text-center text-[10px] font-medium uppercase">
                 {t("Minute", "मिनेट")}
               </p>
               <div className="grid max-h-40 grid-cols-3 gap-0.5 overflow-y-auto pr-1">
@@ -125,8 +124,8 @@ export function TimePicker({
                     type="button"
                     onClick={() => { setMinute(m); emit(hour, m); }}
                     className={cn(
-                      "h-7 rounded text-[11px] tabular-nums transition-colors hover:bg-accent",
-                      m === minute ? "bg-primary font-semibold text-primary-foreground" : ""
+                      "h-7 rounded-sm text-[11px] tabular-nums",
+                      m === minute ? "accent font-semibold" : "subtle"
                     )}
                   >
                     {String(m).padStart(2, "0")}
@@ -138,7 +137,7 @@ export function TimePicker({
           {display && (
             <button
               type="button"
-              className="mt-2 w-full rounded-md border py-1 text-[11px] text-muted-foreground hover:bg-accent"
+              className="!h-6 !min-h-0 mt-2 w-full py-1 !text-[var(--w11-text-secondary)] subtle !px-0"
               onClick={() => { setHour(null); setMinute(null); onChange?.(""); setOpen(false); }}
             >
               {t("Clear", "मेटाउनुहोस्")}

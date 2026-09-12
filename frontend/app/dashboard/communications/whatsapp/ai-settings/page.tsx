@@ -2,20 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { ArrowLeft, Bot, Save } from "lucide-react";
+import { Bot, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TimePicker } from "@/components/ui/time-picker";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -111,16 +116,21 @@ function WhatsAppAiSettingsContent() {
     onError: () => toast.error("Failed to save AI settings"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading AI settings…" />;
 
   if (isError) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load AI settings. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent>
-      </Card>
+      <AOSPage>
+        <AOSPageHeader title="WhatsApp AI Settings" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load AI settings. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -138,157 +148,160 @@ function WhatsAppAiSettingsContent() {
     }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/communications/whatsapp">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Bot className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="WhatsApp AI Settings"
+        subtitle="Control how the WhatsApp bot talks to parents — persona, auto-replies, and working hours."
+        actions={
+          <Button
+            onClick={() => saveMutation.mutate(settings)}
+            disabled={saveMutation.isPending || !local}
+          >
+            {saveMutation.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Changes
           </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">WhatsApp AI Settings</h1>
-          <p className="text-muted-foreground">
-            Control how the WhatsApp bot talks to parents — persona, auto-replies, and working hours.
-          </p>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2 text-sm">
+                <Bot className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                Bot Behaviour
+              </span>
+            }
+          >
+            <div className="space-y-6">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--w11-border-subtle)] p-4">
+                <div>
+                  <p className="font-medium" style={{ color: "var(--w11-text-primary)" }}>Auto-reply enabled</p>
+                  <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                    When on, the bot answers matching inbound messages automatically.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.auto_reply_enabled}
+                  onCheckedChange={(checked) =>
+                    update((current) => ({ ...current, auto_reply_enabled: checked }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>AI Persona</Label>
+                <Textarea
+                  rows={5}
+                  value={settings.ai_persona}
+                  onChange={(e) =>
+                    update((current) => ({ ...current, ai_persona: e.target.value }))
+                  }
+                  placeholder="You are the friendly front-office assistant of the school. Reply politely in Nepali or English, keep answers short, and never invent fee amounts."
+                />
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  Shown as instructions to the AI when it drafts replies for parents.
+                </p>
+              </div>
+            </div>
+          </DataPanel>
+
+          <DataPanel title={<span className="text-sm">Working Hours</span>}>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--w11-border-subtle)] p-4">
+                <div>
+                  <p className="font-medium" style={{ color: "var(--w11-text-primary)" }}>Limit replies to working hours</p>
+                  <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                    Outside these hours parents get the off-hours message instead.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.working_hours.enabled}
+                  onCheckedChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      working_hours: { ...current.working_hours, enabled: checked },
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start</Label>
+                  <TimePicker
+                    value={settings.working_hours.start}
+                    onChange={(v) =>
+                      update((current) => ({
+                        ...current,
+                        working_hours: { ...current.working_hours, start: v },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End</Label>
+                  <TimePicker
+                    value={settings.working_hours.end}
+                    onChange={(v) =>
+                      update((current) => ({
+                        ...current,
+                        working_hours: { ...current.working_hours, end: v },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Working Days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {WEEK_DAYS.map((day) => {
+                    const active = settings.working_hours.days.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className="rounded-full border px-3 py-1 text-sm transition-colors"
+                        style={
+                          active
+                            ? {
+                                borderColor: "var(--w11-accent)",
+                                background: "var(--w11-accent)",
+                                color: "#fff",
+                              }
+                            : {
+                                borderColor: "var(--w11-border-default)",
+                                color: "var(--w11-text-primary)",
+                              }
+                        }
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Off-Hours Message</Label>
+                <Textarea
+                  rows={3}
+                  value={settings.working_hours.off_hours_message}
+                  onChange={(e) =>
+                    update((current) => ({
+                      ...current,
+                      working_hours: { ...current.working_hours, off_hours_message: e.target.value },
+                    }))
+                  }
+                  placeholder="The school office is closed right now. We will reply during working hours (Sun–Fri, 9am–5pm)."
+                />
+              </div>
+            </div>
+          </DataPanel>
         </div>
-        <Button
-          onClick={() => saveMutation.mutate(settings)}
-          disabled={saveMutation.isPending || !local}
-        >
-          {saveMutation.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Changes
-        </Button>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Bot className="h-4 w-4" />
-              Bot Behaviour
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-medium">Auto-reply enabled</p>
-                <p className="text-sm text-muted-foreground">
-                  When on, the bot answers matching inbound messages automatically.
-                </p>
-              </div>
-              <Switch
-                checked={settings.auto_reply_enabled}
-                onCheckedChange={(checked) =>
-                  update((current) => ({ ...current, auto_reply_enabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>AI Persona</Label>
-              <Textarea
-                rows={5}
-                value={settings.ai_persona}
-                onChange={(e) =>
-                  update((current) => ({ ...current, ai_persona: e.target.value }))
-                }
-                placeholder="You are the friendly front-office assistant of the school. Reply politely in Nepali or English, keep answers short, and never invent fee amounts."
-              />
-              <p className="text-xs text-muted-foreground">
-                Shown as instructions to the AI when it drafts replies for parents.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Working Hours</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-medium">Limit replies to working hours</p>
-                <p className="text-sm text-muted-foreground">
-                  Outside these hours parents get the off-hours message instead.
-                </p>
-              </div>
-              <Switch
-                checked={settings.working_hours.enabled}
-                onCheckedChange={(checked) =>
-                  update((current) => ({
-                    ...current,
-                    working_hours: { ...current.working_hours, enabled: checked },
-                  }))
-                }
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start</Label>
-                <TimePicker
-                  value={settings.working_hours.start}
-                  onChange={(v) =>
-                    update((current) => ({
-                      ...current,
-                      working_hours: { ...current.working_hours, start: v },
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>End</Label>
-                <TimePicker
-                  value={settings.working_hours.end}
-                  onChange={(v) =>
-                    update((current) => ({
-                      ...current,
-                      working_hours: { ...current.working_hours, end: v },
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Working Days</Label>
-              <div className="flex flex-wrap gap-2">
-                {WEEK_DAYS.map((day) => {
-                  const active = settings.working_hours.days.includes(day);
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDay(day)}
-                      className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                        active ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Off-Hours Message</Label>
-              <Textarea
-                rows={3}
-                value={settings.working_hours.off_hours_message}
-                onChange={(e) =>
-                  update((current) => ({
-                    ...current,
-                    working_hours: { ...current.working_hours, off_hours_message: e.target.value },
-                  }))
-                }
-                placeholder="The school office is closed right now. We will reply during working hours (Sun–Fri, 9am–5pm)."
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

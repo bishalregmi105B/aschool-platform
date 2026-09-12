@@ -1,0 +1,37 @@
+/**
+ * 11.css - Fluent Progress Ring
+ * Windows 11 Spinner
+ */
+
+.win11-spinner,
+.progress-ring {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--w11-border-default);
+  border-top-color: var(--w11-accent);
+  animation: w11-spin 0.9s linear infinite;
+  display: inline-block;
+  box-sizing: border-box;
+
+  &.sm {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+  }
+
+  &.lg {
+    width: 48px;
+    height: 48px;
+    border-width: 4px;
+  }
+}
+
+@keyframes w11-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

@@ -4,6 +4,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Win11Scope } from "@/lib/win11-scope";
 import { Button } from "./button";
 
 /**
@@ -13,6 +14,11 @@ import { Button } from "./button";
  * list's scroll position and filters. A drawer keeps the list behind it, and
  * `onPrev`/`onNext` let a user walk a filtered set (checking 30 fee defaulters
  * in a row) without ever returning to the table.
+ *
+ * Surface: Fluent acrylic flyout — `--w11-surface-flyout` over a 30px blur,
+ * 1px acrylic border on the inner (left) edge, window elevation, and a radius
+ * on the inner edge only. The portaled subtree is re-scoped with
+ * `<Win11Scope>` so the vendored 11.css tokens resolve.
  */
 
 const Sheet = DialogPrimitive.Root;
@@ -26,7 +32,7 @@ const SheetOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "win11-modal-backdrop fixed inset-0 z-[99999] bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -51,22 +57,24 @@ const SheetContent = React.forwardRef<
   SheetContentProps
 >(({ className, children, size = "default", ...props }, ref) => (
   <DialogPrimitive.Portal>
-    <SheetOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-        SIZES[size],
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
+    <Win11Scope>
+      <SheetOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed inset-y-0 right-0 z-[100000] flex h-full w-full flex-col rounded-l-[var(--w11-radius-xl)] border-l border-[var(--w11-acrylic-border)] bg-[var(--w11-surface-flyout)] text-[var(--w11-text-primary)] shadow-[var(--w11-elevation-window)] backdrop-blur-[30px] backdrop-saturate-[1.8] transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+          SIZES[size],
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-[var(--w11-radius-sm)] text-[var(--w11-text-secondary)] transition-colors hover:bg-[var(--w11-control-hover)] hover:text-[var(--w11-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--w11-accent)]">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </Win11Scope>
   </DialogPrimitive.Portal>
 ));
 SheetContent.displayName = "SheetContent";
@@ -77,7 +85,10 @@ const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("truncate text-sm font-semibold leading-tight", className)}
+    className={cn(
+      "truncate text-sm font-semibold leading-tight text-[var(--w11-text-primary,#1b1b1b)]",
+      className
+    )}
     {...props}
   />
 ));
@@ -89,7 +100,7 @@ const SheetDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-[11px] text-muted-foreground", className)}
+    className={cn("text-[11px] text-[var(--w11-text-secondary,#5d5d5d)]", className)}
     {...props}
   />
 ));
@@ -152,7 +163,7 @@ function DetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent size={size}>
-        <div className="flex items-start gap-2 border-b px-4 py-3 pr-10">
+        <div className="flex items-start gap-2 border-b border-[var(--w11-border-subtle)] px-4 py-3 pr-10">
           <div className="min-w-0 flex-1">
             <SheetTitle>{title}</SheetTitle>
             {subtitle && <SheetDescription>{subtitle}</SheetDescription>}
@@ -186,7 +197,7 @@ function DetailSheet({
         <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t bg-background px-4 py-3">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--w11-border-subtle)] px-4 py-3">
             {footer}
           </div>
         )}

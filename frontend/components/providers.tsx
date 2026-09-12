@@ -32,7 +32,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <ConfirmProvider>{children}</ConfirmProvider>
           </PluginProvider>
         </I18nProvider>
-        <Toaster position="top-right" richColors />
+        {/* AOS acrylic toast styling lives in aos-integration-overrides.css
+            ([data-sonner-toast]); richColors would override it. */}
+        <Toaster position="top-right" closeButton />
       </AuthProvider>
     </QueryClientProvider>
   );

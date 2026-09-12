@@ -719,7 +719,7 @@ function WriterContent() {
 
   const find = useMemo(() => ({ query: "", caseSensitive: false, index: 0 }), []);
 
-  if (!editor) return <div className="h-screen" />;
+  if (!editor) return <div className="h-screen win11" style={{ background: "var(--w11-window-bg)" }} />;
 
   const { pw, ph } = geom;
   const contentW = Math.max(80, pw - settings.marginLeft - settings.marginRight);
@@ -757,16 +757,25 @@ function WriterContent() {
   const pageCount = Math.max(1, pages);
 
   return (
-    <div className="relative h-screen flex flex-col bg-[#e8ecf1] overflow-hidden">
+    <div
+      className="relative h-screen flex flex-col overflow-hidden win11"
+      style={{ background: "var(--w11-window-bg)" }}
+    >
       <style>{TOKEN_CSS}</style>
 
       {/* Title bar */}
-      <div className={`flex items-center gap-2 px-3 h-12 border-b bg-background shrink-0 ${focusMode ? "hidden" : ""}`}>
+      <div
+        className={`flex items-center gap-2 px-3 h-12 shrink-0 ${focusMode ? "hidden" : ""}`}
+        style={{
+          background: "var(--w11-surface-solid)",
+          borderBottom: "1px solid var(--w11-border-default)",
+        }}
+      >
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/dashboard/designer")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Input value={docName} onChange={(e) => { setDocName(e.target.value); setDirty(true); }} className="w-52 h-7 text-sm font-medium" />
-        <span className="text-[10px] text-slate-400 hidden md:inline">writer2 · word-mode</span>
+        <span className="text-[10px] hidden md:inline" style={{ color: "var(--w11-text-tertiary)" }}>writer2 · word-mode</span>
         <div className="ml-auto flex items-center gap-1.5">
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}>
             <BookOpen className="h-3.5 w-3.5" /> Research &amp; AI
@@ -813,18 +822,30 @@ function WriterContent() {
 
       {/* Token bar */}
       {showTokenBar && !focusMode && (
-        <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 border-b bg-sky-50 shrink-0">
-          <span className="text-xs text-sky-700 font-medium mr-1">Click to insert:</span>
+        <div
+          className="flex items-center flex-wrap gap-1.5 px-3 py-2 shrink-0"
+          style={{
+            background: "var(--w11-accent-light)",
+            borderBottom: "1px solid var(--w11-border-subtle)",
+          }}
+        >
+          <span className="text-xs font-medium mr-1" style={{ color: "var(--w11-accent)" }}>Click to insert:</span>
           {sources.flatMap((src: any) =>
             (src.fields || []).slice(0, 14).map((f: string) => (
-              <button key={`${src.id}.${f}`} onClick={() => insertToken(`{${f}}`)}
-                className="text-[10px] px-1.5 py-0.5 bg-white border border-sky-200 rounded font-mono text-sky-700 hover:bg-sky-100"
-                title={`${src.name} → {${f}}`}>
+              <button
+                key={`${src.id}.${f}`}
+                onClick={() => insertToken(`{${f}}`)}
+                className="win11-chip"
+                style={{ fontFamily: "var(--w11-font-mono)", fontSize: "10px" }}
+                title={`${src.name} → {${f}}`}
+              >
                 {`{${f}}`}
               </button>
             )),
           )}
-          <span className="text-[10px] text-sky-600 ml-2">Tokens auto-fill from Data panels and server renders.</span>
+          <span className="text-[10px] ml-2" style={{ color: "var(--w11-text-secondary)" }}>
+            Tokens auto-fill from Data panels and server renders.
+          </span>
         </div>
       )}
 
@@ -836,7 +857,13 @@ function WriterContent() {
         <button
           type="button"
           onClick={() => setFocusMode(false)}
-          className="absolute right-3 top-2 z-50 text-[10px] bg-slate-800/70 text-white rounded px-2 py-1"
+          className="absolute right-3 top-2 z-50 text-[10px] rounded px-2 py-1"
+          style={{
+            background: "var(--w11-surface-solid)",
+            color: "var(--w11-text-secondary)",
+            border: "1px solid var(--w11-border-default)",
+            borderRadius: "var(--w11-radius-sm)",
+          }}
         >
           Exit focus mode (Esc)
         </button>
@@ -844,7 +871,13 @@ function WriterContent() {
 
       {/* Ruler (scales with zoom, aligned to page) */}
       {!focusMode && settings.ruler && (
-        <div className="shrink-0 border-b border-slate-300 bg-[#eef2f7] overflow-hidden">
+        <div
+          className="shrink-0 overflow-hidden"
+          style={{
+            background: "var(--w11-control-hover)",
+            borderBottom: "1px solid var(--w11-border-default)",
+          }}
+        >
           <div style={{ width: pw * zoomScale, height: 24 * zoomScale, margin: "0 auto", overflow: "hidden" }}>
             <div style={{ transform: `scale(${zoomScale})`, transformOrigin: "top left", width: pw }}>
               <WriterRuler
@@ -885,11 +918,13 @@ function WriterContent() {
               >
                 {settings.headerOn && settings.headerText && (
                   <div
-                    className="absolute text-center text-[9pt] text-slate-500 border-b border-slate-200 pb-1 truncate"
+                    className="absolute text-center text-[9pt] pb-1 truncate"
                     style={{
                       top: Math.max(6, settings.marginTop / 2 - 10),
                       left: settings.marginLeft,
                       right: settings.marginRight,
+                      color: "var(--w11-text-secondary)",
+                      borderBottom: "1px solid var(--w11-border-subtle)",
                     }}
                   >
                     {settings.headerText}
@@ -897,13 +932,15 @@ function WriterContent() {
                 )}
                 {settings.footerOn && (
                   <div
-                    className="absolute text-[8pt] text-slate-500 border-t border-slate-200 pt-1"
+                    className="absolute text-[8pt] pt-1"
                     style={{
                       bottom: Math.max(6, settings.marginBottom / 2 - 12),
                       left: settings.marginLeft,
                       right: settings.marginRight,
                       textAlign: settings.pageNumber === "bottom-left" ? "left"
                         : settings.pageNumber === "bottom-right" ? "right" : "center",
+                      color: "var(--w11-text-secondary)",
+                      borderTop: "1px solid var(--w11-border-subtle)",
                     }}
                   >
                     {settings.footerText}

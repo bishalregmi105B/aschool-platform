@@ -5,11 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +20,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { ArrowLeft, Check, X, Calendar, Plus } from "lucide-react";
-import Link from "next/link";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Check, X, Calendar, Plus } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 interface StaffOption {
@@ -67,26 +73,31 @@ function LeavesContent() {
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/hr"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-          <h1 className="text-2xl font-bold">Leave Management</h1>
-        </div>
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load leave requests. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Leave Management" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load leave requests. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading leave requests…" />;
+
+  const pendingCount = filter === "all"
+    ? leaves.filter((l: any) => l.status === "pending").length
+    : filter === "pending" ? leaves.length : 0;
 
   const LEAVE_COLUMNS: Column<any>[] = [
     { key: "staff_name", label: "Staff", sortable: true, value: (l) => l.staff_name ?? "", render: (l) => <span className="font-medium">{l.staff_name}</span> },
-    { key: "leave_type", label: "Type", sortable: true, value: (l) => l.leave_type ?? l.type ?? "", render: (l) => <Badge variant="outline">{l.leave_type || l.type}</Badge> },
+    { key: "leave_type", label: "Type", sortable: true, value: (l) => l.leave_type ?? l.type ?? "", render: (l) => <span className="win11-chip subtle">{l.leave_type || l.type}</span> },
     { key: "from_date", label: "From", sortable: true, value: (l) => l.from_date ?? "", render: (l) => (l.from_date ? displayBS(l.from_date) : "—") },
     { key: "to_date", label: "To", sortable: true, value: (l) => l.to_date ?? "", render: (l) => (l.to_date ? displayBS(l.to_date) : "—") },
     {
@@ -106,7 +117,7 @@ function LeavesContent() {
       label: "Status",
       sortable: true,
       value: (l) => l.status ?? "",
-      render: (l) => <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge>,
+      render: (l) => <StatusChip status={l.status} className="capitalize" />,
     },
     {
       key: "actions",
@@ -115,30 +126,33 @@ function LeavesContent() {
       render: (l) =>
         l.status === "pending" ? (
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="text-green-600" onClick={(e) => { e.stopPropagation(); approve.mutate({ id: l.id, action: "approved" }); }}><Check className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="text-red-600" onClick={(e) => { e.stopPropagation(); approve.mutate({ id: l.id, action: "rejected" }); }}><X className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); approve.mutate({ id: l.id, action: "approved" }); }}><Check className="h-4 w-4" style={{ color: "#107c10" }} /></Button>
+            <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); approve.mutate({ id: l.id, action: "rejected" }); }}><X className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
           </div>
         ) : null,
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/hr"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <div className="flex-1"><h1 className="text-2xl font-bold">Leave Management</h1><p className="text-muted-foreground">Review and manage staff leave requests</p></div>
-        <Button onClick={() => setShowApply(true)}><Plus className="h-4 w-4 mr-2" /> Apply Leave</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Leave Management"
+        subtitle={`${leaves.length} ${filter === "all" ? "total" : filter} ${leaves.length === 1 ? "request" : "requests"}${pendingCount > 0 && filter !== "pending" ? ` · ${pendingCount} pending` : ""}`}
+        actions={
+          <Button onClick={() => setShowApply(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Apply Leave
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          {["pending", "approved", "rejected", "all"].map((f: any) => (
+            <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)} className="capitalize">{f}</Button>
+          ))}
+        </FilterCommandBar>
 
-
-      <div className="flex gap-2">
-        {["pending", "approved", "rejected", "all"].map((f: any) => (
-          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)} className="capitalize">{f}</Button>
-        ))}
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={LEAVE_COLUMNS}
             rows={leaves}
@@ -148,13 +162,13 @@ function LeavesContent() {
             exportFileName="hr-leaves"
             empty={{ icon: Check, title: "No leave requests" }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {showApply ? (
-        <ApplyLeaveDialog onClose={() => setShowApply(false)} />
-      ) : null}
-    </div>
+        {showApply ? (
+          <ApplyLeaveDialog onClose={() => setShowApply(false)} />
+        ) : null}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

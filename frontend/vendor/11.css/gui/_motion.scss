@@ -1,0 +1,198 @@
+/**
+ * 11.css - Windows 11 Fluent 2 Motion & Animation System
+ * Authentic Spring Physics, Deceleration Curves, and Micro-interactions
+ */
+
+:root {
+  /* Fluent 2 Easing Functions */
+  --w11-ease-spring: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --w11-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --w11-ease-accelerate: cubic-bezier(0.7, 0, 1, 0.5);
+  --w11-ease-standard: cubic-bezier(0.8, 0, 0.2, 1);
+  --w11-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Fluent Motion Durations */
+  --w11-duration-instant: 50ms;
+  --w11-duration-fast: 150ms;
+  --w11-duration-normal: 250ms;
+  --w11-duration-slow: 350ms;
+  --w11-duration-gentle: 500ms;
+}
+
+/* 0. Fade (used by modal backdrop) */
+@keyframes w11-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 1. Window Opening Motion */
+@keyframes w11-window-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 2. Window Minimizing / Closing Motion */
+@keyframes w11-window-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.88) translateY(80px);
+  }
+}
+
+/* 3. Floating Flyout Entrance (Start Menu, Quick Settings, Calendar) */
+@keyframes w11-flyout-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 4. Left Sliding Flyout (Widgets Board) */
+@keyframes w11-flyout-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 5. Notification Toast Entrance */
+@keyframes w11-toast-in {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 6. Context Menu Scale & Fade */
+@keyframes w11-menu-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 7. Taskbar Pill Active Expansion */
+@keyframes w11-pill-expand {
+  0% {
+    width: 6px;
+  }
+  50% {
+    width: 18px;
+  }
+  100% {
+    width: 16px;
+  }
+}
+
+/* 8. Skeleton Shimmer Sweep */
+@keyframes w11-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 9. Badge Pop Bounce */
+@keyframes w11-badge-pop {
+  0% {
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Animation Utility Classes */
+.animate-window-in {
+  animation: w11-window-in var(--w11-duration-normal) var(--w11-ease-spring) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-window-out {
+  animation: w11-window-out var(--w11-duration-fast) var(--w11-ease-accelerate) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-flyout-in {
+  animation: w11-flyout-in var(--w11-duration-normal) var(--w11-ease-spring) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-flyout-left {
+  animation: w11-flyout-left var(--w11-duration-slow) var(--w11-ease-spring) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-toast-in {
+  animation: w11-toast-in var(--w11-duration-normal) var(--w11-ease-spring) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-menu-pop {
+  animation: w11-menu-pop var(--w11-duration-fast) var(--w11-ease-spring) forwards;
+  transform-origin: top left;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--w11-control-bg) 25%, var(--w11-control-hover) 50%, var(--w11-control-bg) 75%);
+  background-size: 200% 100%;
+  animation: w11-shimmer 1.8s infinite linear;
+}
+
+/* Fluent Reveal Cursor Highlight Effect */
+.win11-reveal {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle 80px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.15), transparent);
+    transition: opacity var(--w11-duration-fast);
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+}

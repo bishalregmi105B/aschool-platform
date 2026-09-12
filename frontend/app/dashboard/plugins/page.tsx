@@ -7,12 +7,19 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import { Plug, Settings, Store, Trash2 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 /**
  * Installed Plugins — the WordPress plugins.php-style management surface
@@ -44,8 +51,14 @@ interface MarketplacePlugin {
 
 function PluginIcon({ emoji }: { emoji?: string }) {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-lg">
-      {emoji || <Plug className="h-4 w-4 text-muted-foreground" />}
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-lg"
+      style={{
+        background: "var(--w11-control-hover)",
+        borderRadius: "var(--w11-radius-md)",
+      }}
+    >
+      {emoji || <Plug className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
     </span>
   );
 }
@@ -143,11 +156,12 @@ export default function InstalledPluginsPage() {
         const isActive = state === "active";
         const onTrial = isActive && p.is_trial === true;
         return onTrial ? (
-          <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-none">
-            Trial{typeof p.trial_days_left === "number" ? ` · ${p.trial_days_left}d left` : ""}
-          </Badge>
+          <StatusChip
+            status="pending"
+            label={`Trial${typeof p.trial_days_left === "number" ? ` · ${p.trial_days_left}d left` : ""}`}
+          />
         ) : p.is_free ? (
-          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Free</Badge>
+          <StatusChip status="active" label="Free" />
         ) : (
           <Badge variant="secondary" className="font-semibold">{formatCurrency(p.price_monthly)}/mo</Badge>
         );
@@ -186,7 +200,6 @@ export default function InstalledPluginsPage() {
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
             disabled={busy}
             title="Uninstall (plugin data is preserved)"
             onClick={(e) => {
@@ -200,6 +213,7 @@ export default function InstalledPluginsPage() {
               }
             }}
           >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
             {uninstallMutation.isPending && "…"}
             Uninstall
           </Button>
@@ -208,40 +222,49 @@ export default function InstalledPluginsPage() {
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading plugins…" />;
 
   return (
-    <div className="space-y-6 pb-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Installed Plugins</h1>
-          <p className="text-muted-foreground mt-2">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Plug className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Installed Plugins"
+        subtitle={
+          <>
             {installed.length} plugin{installed.length === 1 ? "" : "s"}{" "}
             installed. Deactivate to disable a plugin without losing its data —
             uninstall removes it but keeps the data too.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/dashboard/marketplace">
-            <Store className="h-4 w-4 mr-2" />
-            Add New (Marketplace)
-          </Link>
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+          </>
+        }
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/dashboard/marketplace">
+              <Store className="h-4 w-4 mr-2" />
+              Add New (Marketplace)
+            </Link>
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           {installed.length === 0 ? (
-            <p className="text-muted-foreground text-center py-12">
-              No plugins installed yet — browse the{" "}
-              <Link
-                href="/dashboard/marketplace"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                marketplace
-              </Link>{" "}
-              to add some.
-            </p>
+            <AOSEmptyState
+              icon={<Store className="h-10 w-10" />}
+              title="No plugins installed yet"
+              description={
+                <>
+                  Browse the{" "}
+                  <Link
+                    href="/dashboard/marketplace"
+                    className="underline-offset-4 hover:underline"
+                    style={{ color: "var(--w11-accent)" }}
+                  >
+                    marketplace
+                  </Link>{" "}
+                  to add some.
+                </>
+              }
+            />
           ) : (
             <DataTable
               columns={PLUGIN_COLUMNS}
@@ -252,8 +275,8 @@ export default function InstalledPluginsPage() {
               exportFileName="installed-plugins"
             />
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

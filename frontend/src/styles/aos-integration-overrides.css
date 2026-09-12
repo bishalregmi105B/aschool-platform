@@ -37,3 +37,212 @@
 .win11 .aos-window-content > .fixed {
   position: absolute !important;
 }
+
+/*
+ * Radix bridges: 11.css styles native form elements (input[type=checkbox],
+ * input[type=checkbox][role=switch], …), but Radix renders <button> with
+ * ARIA roles instead. These rules re-apply the same Fluent visuals to the
+ * Radix-rendered elements. Ported from 11.css gui/_win11.scss & _checkbox.scss.
+ */
+
+/* Fluent toggle switch (Radix Switch root) */
+.win11 button[role="switch"] {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 1px solid var(--w11-control-border);
+  background: var(--w11-control-bg);
+  padding: 0;
+  cursor: pointer;
+  transition: background var(--w11-transition-fast), border-color var(--w11-transition-fast);
+  flex-shrink: 0;
+}
+.win11 button[role="switch"]:hover {
+  background: var(--w11-control-hover);
+}
+.win11 button[role="switch"][data-state="checked"] {
+  background: var(--w11-accent);
+  border-color: var(--w11-accent);
+}
+.win11 button[role="switch"] > * {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--w11-text-primary);
+  transition: transform var(--w11-transition-fast);
+}
+.win11 button[role="switch"][data-state="checked"] > * {
+  background: var(--w11-accent-text);
+  transform: translateX(18px);
+}
+.win11 button[role="switch"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Fluent checkbox (Radix Checkbox root) */
+.win11 button[role="checkbox"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--w11-control-border);
+  border-bottom-width: 2px;
+  background: var(--w11-control-bg);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--w11-transition-fast), border-color var(--w11-transition-fast);
+}
+.win11 button[role="checkbox"]:hover {
+  background: var(--w11-control-hover);
+}
+.win11 button[role="checkbox"][data-state="checked"],
+.win11 button[role="checkbox"][data-state="indeterminate"] {
+  background: var(--w11-accent);
+  border-color: var(--w11-accent);
+  color: var(--w11-accent-text);
+}
+.win11 button[role="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Fluent radio (Radix RadioGroup item) */
+.win11 button[role="radio"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 1px solid var(--w11-control-border);
+  border-bottom-width: 2px;
+  background: var(--w11-control-bg);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.win11 button[role="radio"]:hover {
+  background: var(--w11-control-hover);
+}
+.win11 button[role="radio"][data-state="checked"] {
+  border-color: var(--w11-accent);
+}
+.win11 button[role="radio"] > * {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--w11-accent);
+}
+.win11 button[role="radio"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Radix Select renders a div listbox; 11.css targets ul[role=listbox]. */
+.win11 div[role="listbox"] {
+  border: 1px solid var(--w11-border-default);
+  border-radius: var(--w11-radius-md);
+  background: var(--w11-surface-flyout);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--w11-elevation-flyout);
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+.win11 div[role="listbox"] [role="option"] {
+  padding: 6px 10px;
+  border-radius: var(--w11-radius-sm);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  cursor: pointer;
+}
+.win11 div[role="listbox"] [role="option"]:hover,
+.win11 div[role="listbox"] [role="option"][data-highlighted] {
+  background: var(--w11-control-hover);
+}
+.win11 div[role="listbox"] [role="option"][data-state="checked"] {
+  background: var(--w11-accent-light);
+  color: var(--w11-accent);
+  font-weight: 600;
+}
+
+/* Radix dropdown menu items: 11.css styles menuitem element selectors;
+ * button[role=menuitem] needs the same treatment. */
+.win11 [role="menu"] button[role="menuitem"],
+.win11 [role="menu"] div[role="menuitem"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border-radius: var(--w11-radius-sm);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+.win11 [role="menu"] button[role="menuitem"]:hover,
+.win11 [role="menu"] div[role="menuitem"]:hover,
+.win11 [role="menu"] button[role="menuitem"][data-highlighted],
+.win11 [role="menu"] div[role="menuitem"][data-highlighted] {
+  background: var(--w11-control-hover);
+}
+.win11 [role="menu"] button[role="menuitem"][data-disabled],
+.win11 [role="menu"] div[role="menuitem"][data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/*
+ * AOS toast (sonner). Toasts mount at document.body — outside the .win11
+ * scope — so they carry their own neutral-acrylic token values (works over
+ * both light and dark themes, like macOS notifications). Keyframes
+ * (w11-toast-in) are global from 11.css.
+ */
+[data-sonner-toaster] {
+  --w11-toast-surface: rgba(32, 32, 34, 0.9);
+  --w11-toast-border: rgba(255, 255, 255, 0.12);
+  --w11-toast-text: #ffffff;
+  --w11-toast-text-secondary: rgba(255, 255, 255, 0.7);
+}
+[data-sonner-toast] {
+  background: var(--w11-toast-surface) !important;
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--w11-toast-border) !important;
+  border-radius: 10px !important;
+  color: var(--w11-toast-text) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.38) !important;
+  animation: w11-toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
+    -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+}
+[data-sonner-toast] [data-description] {
+  color: var(--w11-toast-text-secondary) !important;
+  font-size: 12px;
+}
+[data-sonner-toast] [data-icon] {
+  color: #4cc2ff;
+}
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: #6ccb5f;
+}
+[data-sonner-toast][data-type="error"] [data-icon],
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: #ff6b5e;
+}
+[data-sonner-toast] [data-close-button] {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--w11-toast-text-secondary);
+}

@@ -7,15 +7,22 @@ import { toast } from "sonner";
 
 import { api, ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSEmptyState,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 type Slider = {
   id: string;
@@ -120,50 +127,48 @@ function SlidersContent() {
     setDialogOpen(true);
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading sliders…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Image className="h-6 w-6" /> Banners & Sliders
-          </h1>
-          <p className="text-muted-foreground">Manage dashboard carousel banners</p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> New Slider
-        </Button>
-      </div>
-
-      {sliders.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            No sliders configured for this school.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {sliders.map((slider) => (
-            <Card key={slider.id}>
-              <CardContent className="p-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Image className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Banners &amp; Sliders"
+        subtitle={`${sliders.length} carousel ${sliders.length === 1 ? "banner" : "banners"} · ${sliders.filter((s) => s.is_active).length} active`}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" /> New Slider
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        {sliders.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Image className="h-10 w-10" />}
+              title="No sliders configured"
+              description="No sliders configured for this school."
+            />
+          </DataPanel>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {sliders.map((slider) => (
+              <div key={slider.id} className="win11-card p-4">
                 <div className="flex gap-4">
-                  <div className="h-28 w-44 shrink-0 overflow-hidden rounded-md border bg-muted">
+                  <div className="h-28 w-44 shrink-0 overflow-hidden rounded-md border border-[var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
                     <img src={slider.image_url} alt={slider.title} className="h-full w-full object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h2 className="font-semibold truncate">{slider.title}</h2>
+                        <h2 className="font-semibold truncate" style={{ color: "var(--w11-text-primary)" }}>{slider.title}</h2>
                         {slider.subtitle ? (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{slider.subtitle}</p>
+                          <p className="text-sm line-clamp-2" style={{ color: "var(--w11-text-secondary)" }}>{slider.subtitle}</p>
                         ) : null}
                       </div>
-                      <Badge variant={slider.is_active ? "default" : "secondary"}>
-                        {slider.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                      <StatusChip status={slider.is_active ? "active" : "inactive"} />
                     </div>
-                    <div className="mt-3 text-sm text-muted-foreground">
+                    <div className="mt-3 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
                       Order {slider.sort_order || 0}
                       {slider.link_url ? <span className="ml-3 truncate inline-block max-w-[220px] align-bottom">{slider.link_url}</span> : null}
                     </div>
@@ -171,62 +176,62 @@ function SlidersContent() {
                       <Button variant="outline" size="sm" onClick={() => openEdit(slider)}>
                         <Pencil className="h-4 w-4 mr-2" /> Edit
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => remove.mutate(slider.id)}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      <Button variant="ghost" size="sm" onClick={() => remove.mutate(slider.id)}>
+                        <Trash2 className="h-4 w-4 mr-2" style={{ color: "#c42b1c" }} /> Delete
                       </Button>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{form.id ? "Edit Slider" : "New Slider"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Subtitle</Label>
-              <Textarea rows={3} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Image URL</Label>
-              <Input value={form.image_url} onChange={(event) => setForm({ ...form, image_url: event.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Link URL</Label>
-              <Input value={form.link_url} onChange={(event) => setForm({ ...form, link_url: event.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Sort Order</Label>
-                <Input type="number" value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: event.target.value })} />
               </div>
-              <div className="rounded-md border px-3 py-2.5 mt-6">
-                <FormCheckbox
-                  label="Active"
-                  checked={form.is_active}
-                  onCheckedChange={(v) => setForm({ ...form, is_active: v })}
-                />
-              </div>
-            </div>
+            ))}
           </div>
-          <DialogFooter>
-            <Button onClick={() => save.mutate()} disabled={!form.title.trim() || !form.image_url.trim() || save.isPending}>
-              {save.isPending ? <Spinner className="mr-2" /> : null}
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        )}
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{form.id ? "Edit Slider" : "New Slider"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Textarea rows={3} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Image URL</Label>
+                <Input value={form.image_url} onChange={(event) => setForm({ ...form, image_url: event.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Link URL</Label>
+                <Input value={form.link_url} onChange={(event) => setForm({ ...form, link_url: event.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Sort Order</Label>
+                  <Input type="number" value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: event.target.value })} />
+                </div>
+                <div className="rounded-md border border-[var(--w11-control-border)] px-3 py-2.5 mt-6">
+                  <FormCheckbox
+                    label="Active"
+                    checked={form.is_active}
+                    onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => save.mutate()} disabled={!form.title.trim() || !form.image_url.trim() || save.isPending}>
+                {save.isPending ? <Spinner className="mr-2" /> : null}
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

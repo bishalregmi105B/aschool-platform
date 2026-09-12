@@ -5,18 +5,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate, usePluginEnabled } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel, StatusChip,
+} from "@/components/aos/kit/page-kit";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import {
   BarChart3,
   Trophy,
@@ -35,7 +30,6 @@ import {
   Eye,
   Download,
   TableIcon,
-  ChevronRight,
   GraduationCap,
 } from "lucide-react";
 
@@ -302,7 +296,7 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
         r.rank <= 3 ? (
           <Badge variant={r.rank === 1 ? "default" : "secondary"}>#{r.rank}</Badge>
         ) : (
-          <span className="text-muted-foreground text-sm">#{r.rank}</span>
+          <span className="text-[color:var(--w11-text-secondary)] text-sm">#{r.rank}</span>
         ),
     },
     { key: "roll_number", label: "Roll", sortable: true, value: (r) => r.roll_number },
@@ -317,9 +311,7 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
       sortable: true,
       value: (r) => r.status,
       render: (r) => (
-        <Badge className={r.status === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-          {r.status?.toUpperCase()}
-        </Badge>
+        <StatusChip status={r.status} label={r.status?.toUpperCase()} />
       ),
     },
   ];
@@ -344,79 +336,75 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
   const isReady = !!examId && !!classId;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Exam Results</h1>
-          <p className="text-muted-foreground">
-            Class-wise results, grade sheets and individual marksheets
-          </p>
-        </div>
-        {isReady && hasDesigner && (
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Marksheet group */}
-            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
-              <span className="px-2 text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">
-                Marksheet
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                disabled={previewingTemplate === "marksheet"}
-                onClick={() => previewTemplate("marksheet")}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                {previewingTemplate === "marksheet" ? "Loading…" : "Preview"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                disabled={downloadingPdf === "marksheet"}
-                onClick={() => downloadPdf("marksheet")}
-              >
-                <Download className="h-3.5 w-3.5" />
-                {downloadingPdf === "marksheet" ? "Generating…" : "PDF"}
-              </Button>
-            </div>
+    <AOSPage>
+      <AOSPageHeader
+        title="Exam Results"
+        subtitle="Class-wise results, grade sheets and individual marksheets"
+        actions={
+          isReady && hasDesigner ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Marksheet group */}
+              <div className="flex items-center gap-1 rounded-lg border border-[var(--w11-border-subtle)] p-1" style={{ background: "var(--w11-control-hover)" }}>
+                <span className="px-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#107c10" }}>
+                  Marksheet
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={previewingTemplate === "marksheet"}
+                  onClick={() => previewTemplate("marksheet")}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  {previewingTemplate === "marksheet" ? "Loading…" : "Preview"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={downloadingPdf === "marksheet"}
+                  onClick={() => downloadPdf("marksheet")}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {downloadingPdf === "marksheet" ? "Generating…" : "PDF"}
+                </Button>
+              </div>
 
-            {/* Grade Sheet group */}
-            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
-              <span className="px-2 text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
-                Grade Sheet
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                disabled={previewingTemplate === "grade_sheet"}
-                onClick={() => previewTemplate("grade_sheet")}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                {previewingTemplate === "grade_sheet" ? "Loading…" : "Preview"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                disabled={downloadingPdf === "grade_sheet"}
-                onClick={() => downloadPdf("grade_sheet")}
-              >
-                <Download className="h-3.5 w-3.5" />
-                {downloadingPdf === "grade_sheet" ? "Generating…" : "PDF"}
-              </Button>
+              {/* Grade Sheet group */}
+              <div className="flex items-center gap-1 rounded-lg border border-[var(--w11-border-subtle)] p-1" style={{ background: "var(--w11-control-hover)" }}>
+                <span className="px-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-accent)" }}>
+                  Grade Sheet
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={previewingTemplate === "grade_sheet"}
+                  onClick={() => previewTemplate("grade_sheet")}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  {previewingTemplate === "grade_sheet" ? "Loading…" : "Preview"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={downloadingPdf === "grade_sheet"}
+                  onClick={() => downloadPdf("grade_sheet")}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {downloadingPdf === "grade_sheet" ? "Generating…" : "PDF"}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label>Select Class</Label>
+          ) : undefined
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {/* Filters */}
+        <FilterCommandBar>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Select Class</Label>
             <Select value={classId} onValueChange={handleClassChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose class" />
@@ -430,8 +418,8 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Select Exam</Label>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Select Exam</Label>
             <Select value={examId} onValueChange={handleExamChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose exam" />
@@ -445,93 +433,78 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: "Total Students",
-              value: stats.total,
-              icon: BarChart3,
-              color: "text-blue-500",
-            },
-            {
-              label: "Passed",
-              value: stats.passed,
-              icon: Trophy,
-              color: "text-green-500",
-            },
-            {
-              label: "Failed",
-              value: stats.failed,
-              icon: AlertTriangle,
-              color: "text-red-500",
-            },
-            {
-              label: "Class Average",
-              value: `${stats.avgPercentage}%`,
-              icon: TrendingUp,
-              color: "text-purple-500",
-            },
-          ].map((s) => (
-            <Card key={s.label}>
-              <CardContent className="pt-5 flex items-center gap-3">
-                <s.icon className={`h-8 w-8 ${s.color}`} />
-                <div>
-                  <p className="text-2xl font-bold">{s.value}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        {/* Stats */}
+        {stats && (
+          <StatGrid className="mb-0">
+            <KpiCard
+              label="Total Students"
+              value={stats.total}
+              color="var(--w11-text-primary)"
+              icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            />
+            <KpiCard
+              label="Passed"
+              value={stats.passed}
+              color="#107c10"
+              icon={<Trophy className="h-5 w-5" style={{ color: "#107c10" }} />}
+            />
+            <KpiCard
+              label="Failed"
+              value={stats.failed}
+              color="#c42b1c"
+              icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+            />
+            <KpiCard
+              label="Class Average"
+              value={`${stats.avgPercentage}%`}
+              icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            />
+          </StatGrid>
+        )}
 
-      {/* Tabs */}
-      {isReady && (
-        <>
-          <div className="border-b">
-            <nav className="-mb-px flex gap-0">
-              {(
-                [
-                  { id: "results", label: "Student Results", icon: FileText },
-                  { id: "marksLedger", label: "Marks Ledger", icon: TableIcon },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab.id
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+        {/* Tabs */}
+        {isReady && (
+          <>
+            <div className="border-b border-[var(--w11-border-subtle)]">
+              <nav className="-mb-px flex gap-0">
+                {(
+                  [
+                    { id: "results", label: "Student Results", icon: FileText },
+                    { id: "marksLedger", label: "Marks Ledger", icon: TableIcon },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab.id
+                        ? "border-[var(--w11-accent)] text-[color:var(--w11-accent)]"
+                        : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] hover:border-[var(--w11-border-strong)]"
+                    }`}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-          {/* Results Table */}
-          {activeTab === "results" && (
-            <Card>
-              <CardContent className="p-0">
+            {/* Results Table */}
+            {activeTab === "results" && (
+              <DataPanel bodyClassName="p-0">
                 {resultsError ? (
                   <div className="flex flex-col items-center py-12 space-y-3">
-                    <p className="text-sm text-destructive">Failed to load results. Please try again.</p>
+                    <p className="text-sm text-[#c42b1c]">Failed to load results. Please try again.</p>
                     <Button variant="outline" size="sm" onClick={() => refetchResults()}>Retry</Button>
                   </div>
                 ) : loadingResults ? (
                   <div className="flex justify-center py-16">
-                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <div className="win11-spinner" />
                   </div>
                 ) : (results || []).length === 0 ? (
-                  <p className="text-center py-12 text-muted-foreground">
+                  <p className="text-center py-12 text-[color:var(--w11-text-secondary)]">
                     No results found. Enter marks first.
                   </p>
                 ) : (
@@ -546,343 +519,343 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                     empty={{ icon: GraduationCap, title: "No results found", body: "Enter marks first — results appear here with NEB grades." }}
                   />
                 )}
-              </CardContent>
-            </Card>
-          )}
+              </DataPanel>
+            )}
 
-          {/* Marks Ledger */}
-          {activeTab === "marksLedger" && (
-            <div className="space-y-3">
-              <Card>
-                <CardContent className="p-0 overflow-auto">
-                  {gradeSheetError ? (
-                    <div className="flex flex-col items-center py-12 space-y-3">
-                      <p className="text-sm text-destructive">Failed to load the grade sheet. Please try again.</p>
-                      <Button variant="outline" size="sm" onClick={() => refetchGradeSheet()}>Retry</Button>
-                    </div>
-                  ) : loadingGradeSheet ? (
-                    <div className="flex justify-center py-16">
-                      <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : !gradeSheet ? (
-                    <p className="text-center py-12 text-muted-foreground">
-                      No grade sheet data available.
-                    </p>
-                  ) : (
-                    <table className="w-full text-sm border-collapse">
-                      <thead>
-                        <tr className="bg-muted/60">
-                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-0 bg-muted/60 min-w-[50px]">
-                            Rank
-                          </th>
-                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-12 bg-muted/60 min-w-[50px]">
-                            Roll
-                          </th>
-                          <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-24 bg-muted/60 min-w-[160px]">
-                            Student
-                          </th>
-                          {gradeSheet.subjects.map((s) => (
-                            <th
-                              key={s.id}
-                              className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[80px]"
-                              title={s.name}
-                            >
-                              <div className="truncate max-w-[80px]">
-                                {s.name.length > 6
-                                  ? s.name.slice(0, 6) + "…"
-                                  : s.name}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground font-normal">
-                                /{s.full_marks}
-                              </div>
+            {/* Marks Ledger */}
+            {activeTab === "marksLedger" && (
+              <div className="space-y-3">
+                <DataPanel bodyClassName="p-0">
+                  <div className="overflow-auto">
+                    {gradeSheetError ? (
+                      <div className="flex flex-col items-center py-12 space-y-3">
+                        <p className="text-sm text-[#c42b1c]">Failed to load the grade sheet. Please try again.</p>
+                        <Button variant="outline" size="sm" onClick={() => refetchGradeSheet()}>Retry</Button>
+                      </div>
+                    ) : loadingGradeSheet ? (
+                      <div className="flex justify-center py-16">
+                        <div className="win11-spinner" />
+                      </div>
+                    ) : !gradeSheet ? (
+                      <p className="text-center py-12 text-[color:var(--w11-text-secondary)]">
+                        No grade sheet data available.
+                      </p>
+                    ) : (
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr style={{ background: "var(--w11-control-hover)" }}>
+                            <th className="text-left px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] sticky left-0 min-w-[50px]" style={{ background: "var(--w11-control-hover)" }}>
+                              Rank
                             </th>
-                          ))}
-                          <th className="text-center px-3 py-2.5 font-medium border-b border-r min-w-[80px]">
-                            Total
-                          </th>
-                          <th className="text-center px-3 py-2.5 font-medium border-b min-w-[70px]">
-                            %
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {gradeSheet.rows.map((row) => (
-                          <tr
-                            key={row.student_id}
-                            className={`hover:bg-muted/30 transition-colors ${
-                              row.status === "fail" ? "bg-red-50" : ""
-                            }`}
-                          >
-                            <td className="px-3 py-2 border-r sticky left-0 bg-inherit font-medium text-center">
-                              #{row.rank}
-                            </td>
-                            <td className="px-3 py-2 border-r sticky left-12 bg-inherit text-center">
-                              {row.roll_number}
-                            </td>
-                            <td className="px-3 py-2 border-r sticky left-24 bg-inherit font-medium">
-                              {row.student_name}
-                            </td>
-                            {row.subject_marks.map((sm, idx) => (
-                              <td
-                                key={idx}
-                                className={`px-2 py-2 border-r text-center ${
-                                  sm.absent
-                                    ? "text-muted-foreground"
-                                    : !sm.pass
-                                      ? "text-red-600 font-medium"
-                                      : ""
-                                }`}
+                            <th className="text-left px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] sticky left-12 min-w-[50px]" style={{ background: "var(--w11-control-hover)" }}>
+                              Roll
+                            </th>
+                            <th className="text-left px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] sticky left-24 min-w-[160px]" style={{ background: "var(--w11-control-hover)" }}>
+                              Student
+                            </th>
+                            {gradeSheet.subjects.map((s) => (
+                              <th
+                                key={s.id}
+                                className="text-center px-2 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[80px]"
+                                title={s.name}
                               >
-                                {sm.absent ? (
-                                  "—"
-                                ) : (
-                                  <div>
-                                    <div>{sm.obtained}</div>
-                                    <div className="text-[10px] text-muted-foreground">
-                                      {sm.grade}
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
+                                <div className="truncate max-w-[80px]">
+                                  {s.name.length > 6
+                                    ? s.name.slice(0, 6) + "…"
+                                    : s.name}
+                                </div>
+                                <div className="text-[10px] text-[color:var(--w11-text-secondary)] font-normal">
+                                  /{s.full_marks}
+                                </div>
+                              </th>
                             ))}
-                            <td className="px-3 py-2 border-r text-center font-medium">
-                              {row.total_obtained}/{gradeSheet.total_full_marks}
-                            </td>
-                            <td
-                              className={`px-3 py-2 text-center font-medium ${
-                                row.status === "fail"
-                                  ? "text-red-600"
-                                  : "text-green-700"
-                              }`}
-                            >
-                              {row.percentage}%
-                            </td>
+                            <th className="text-center px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[80px]">
+                              Total
+                            </th>
+                            <th className="text-center px-3 py-2.5 font-medium border-b border-[var(--w11-border-subtle)] min-w-[70px]">
+                              %
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Student Marksheet Modal */}
-      {selectedStudent && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <div>
-                <h2 className="text-lg font-bold">
-                  {selectedStudent.student_name}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Roll #{selectedStudent.roll_number} •{" "}
-                  {selectedStudent.class_name} {selectedStudent.section_name} •{" "}
-                  {selectedStudent.exam_name}
-                </p>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--w11-border-subtle)]">
+                          {gradeSheet.rows.map((row) => (
+                            <tr
+                              key={row.student_id}
+                              className="transition-colors hover:bg-[color:var(--w11-control-hover)]"
+                              style={row.status === "fail" ? { background: "rgba(196,43,28,.06)" } : undefined}
+                            >
+                              <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] sticky left-0 bg-inherit font-medium text-center">
+                                #{row.rank}
+                              </td>
+                              <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] sticky left-12 bg-inherit text-center">
+                                {row.roll_number}
+                              </td>
+                              <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] sticky left-24 bg-inherit font-medium">
+                                {row.student_name}
+                              </td>
+                              {row.subject_marks.map((sm, idx) => (
+                                <td
+                                  key={idx}
+                                  className={`px-2 py-2 border-r border-[var(--w11-border-subtle)] text-center ${
+                                    sm.absent
+                                      ? "text-[color:var(--w11-text-secondary)]"
+                                      : !sm.pass
+                                        ? "font-medium"
+                                        : ""
+                                  }`}
+                                  style={!sm.absent && !sm.pass ? { color: "#c42b1c" } : undefined}
+                                >
+                                  {sm.absent ? (
+                                    "—"
+                                  ) : (
+                                    <div>
+                                      <div>{sm.obtained}</div>
+                                      <div className="text-[10px] text-[color:var(--w11-text-secondary)]">
+                                        {sm.grade}
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] text-center font-medium">
+                                {row.total_obtained}/{gradeSheet.total_full_marks}
+                              </td>
+                              <td
+                                className="px-3 py-2 text-center font-medium"
+                                style={{ color: row.status === "fail" ? "#c42b1c" : "#107c10" }}
+                              >
+                                {row.percentage}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </DataPanel>
               </div>
-              <button
-                onClick={() => setSelectedStudent(null)}
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            )}
+          </>
+        )}
 
-            {/* Modal body */}
-            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
-              {/* Summary */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold text-primary">
-                    {selectedStudent.percentage}%
+        {/* Student Marksheet Modal */}
+        {selectedStudent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.5)" }}>
+            <div
+              className="rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-[var(--w11-window-border)]"
+              style={{ background: "var(--w11-surface-solid)" }}
+            >
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--w11-border-subtle)]">
+                <div>
+                  <h2 className="text-lg font-bold">
+                    {selectedStudent.student_name}
+                  </h2>
+                  <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                    Roll #{selectedStudent.roll_number} •{" "}
+                    {selectedStudent.class_name} {selectedStudent.section_name} •{" "}
+                    {selectedStudent.exam_name}
                   </p>
-                  <p className="text-xs text-muted-foreground">Percentage</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold">
-                    {selectedStudent.overall_grade || "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Grade</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-xl font-bold">
-                    #{selectedStudent.rank_in_class || "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Rank</p>
-                </div>
+                <button
+                  onClick={() => setSelectedStudent(null)}
+                  className="p-1.5 rounded-md hover:bg-[color:var(--w11-control-hover)] text-[color:var(--w11-text-secondary)]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {/* Subject marks table */}
-              <div className="border rounded-xl overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left px-3 py-2.5 font-medium">
-                        Subject
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        Theory
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        Practical
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        Obtained
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        Full
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        Grade
-                      </th>
-                      <th className="text-center px-3 py-2.5 font-medium">
-                        GPA
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {selectedStudent.subjects.map((s) => (
-                      <tr
-                        key={s.subject_id}
-                        className={`${!s.pass ? "bg-red-50" : ""}`}
-                      >
-                        <td className="px-3 py-2 font-medium">
-                          {s.subject_name}
-                          {!s.pass && (
-                            <span className="ml-1 text-red-500 text-xs">
-                              FAIL
-                            </span>
-                          )}
+              {/* Modal body */}
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+                {/* Summary */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg p-3 text-center" style={{ background: "var(--w11-control-hover)" }}>
+                    <p className="text-xl font-bold text-[color:var(--w11-accent)]">
+                      {selectedStudent.percentage}%
+                    </p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">Percentage</p>
+                  </div>
+                  <div className="rounded-lg p-3 text-center" style={{ background: "var(--w11-control-hover)" }}>
+                    <p className="text-xl font-bold">
+                      {selectedStudent.overall_grade || "—"}
+                    </p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">Grade</p>
+                  </div>
+                  <div className="rounded-lg p-3 text-center" style={{ background: "var(--w11-control-hover)" }}>
+                    <p className="text-xl font-bold">
+                      #{selectedStudent.rank_in_class || "—"}
+                    </p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">Rank</p>
+                  </div>
+                </div>
+
+                {/* Subject marks table */}
+                <div className="border border-[var(--w11-border-subtle)] rounded-xl overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-[var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
+                      <tr>
+                        <th className="text-left px-3 py-2.5 font-medium">
+                          Subject
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          Theory
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          Practical
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          Obtained
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          Full
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          Grade
+                        </th>
+                        <th className="text-center px-3 py-2.5 font-medium">
+                          GPA
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--w11-border-subtle)]">
+                      {selectedStudent.subjects.map((s) => (
+                        <tr
+                          key={s.subject_id}
+                          style={!s.pass ? { background: "rgba(196,43,28,.06)" } : undefined}
+                        >
+                          <td className="px-3 py-2 font-medium">
+                            {s.subject_name}
+                            {!s.pass && (
+                              <span className="ml-1 text-xs" style={{ color: "#c42b1c" }}>
+                                FAIL
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {s.theory_marks || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {s.practical_marks || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-center font-medium">
+                            {s.obtained_marks}
+                          </td>
+                          <td className="px-3 py-2 text-center text-[color:var(--w11-text-secondary)]">
+                            {s.full_marks}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <Badge variant="outline" className="text-xs">
+                              {s.grade}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {s.gpa?.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t border-[var(--w11-border-subtle)] font-medium" style={{ background: "var(--w11-control-hover)" }}>
+                      <tr>
+                        <td className="px-3 py-2" colSpan={3}>
+                          Total
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {s.theory_marks || "—"}
+                          {selectedStudent.total_obtained}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {s.practical_marks || "—"}
-                        </td>
-                        <td className="px-3 py-2 text-center font-medium">
-                          {s.obtained_marks}
-                        </td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">
-                          {s.full_marks}
+                          {selectedStudent.total_full}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <Badge variant="outline" className="text-xs">
-                            {s.grade}
-                          </Badge>
+                          {selectedStudent.overall_grade}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {s.gpa?.toFixed(1)}
+                          {selectedStudent.overall_gpa?.toFixed(1)}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-muted/30 border-t font-medium">
-                    <tr>
-                      <td className="px-3 py-2" colSpan={3}>
-                        Total
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {selectedStudent.total_obtained}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {selectedStudent.total_full}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {selectedStudent.overall_grade}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {selectedStudent.overall_gpa?.toFixed(1)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* AI Remarks */}
+                {selectedStudent.ai_remarks && (
+                  <div
+                    className="rounded-lg px-4 py-3"
+                    style={{ background: "var(--w11-accent-light)", border: "1px solid var(--w11-accent)" }}
+                  >
+                    <p className="text-xs font-semibold mb-1 text-[color:var(--w11-accent)]">
+                      AI Remarks
+                    </p>
+                    <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                      {selectedStudent.ai_remarks}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* AI Remarks */}
-              {selectedStudent.ai_remarks && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3">
-                  <p className="text-xs font-semibold text-primary mb-1">
-                    AI Remarks
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedStudent.ai_remarks}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Modal footer */}
-            <div className="border-t px-6 py-3 flex justify-between items-center">
-              <span
-                className={`text-sm font-semibold ${
-                  selectedStudent.status === "pass"
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {selectedStudent.status === "pass" ? "✓ PASSED" : "✗ FAILED"}
-                {selectedStudent.failed_subjects > 0 &&
-                  ` (${selectedStudent.failed_subjects} subject${selectedStudent.failed_subjects > 1 ? "s" : ""} failed)`}
-              </span>
-              <div className="flex gap-2">
-                {hasDesigner && (
+              {/* Modal footer */}
+              <div className="border-t border-[var(--w11-border-subtle)] px-6 py-3 flex justify-between items-center">
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: selectedStudent.status === "pass" ? "#107c10" : "#c42b1c" }}
+                >
+                  {selectedStudent.status === "pass" ? "✓ PASSED" : "✗ FAILED"}
+                  {selectedStudent.failed_subjects > 0 &&
+                    ` (${selectedStudent.failed_subjects} subject${selectedStudent.failed_subjects > 1 ? "s" : ""} failed)`}
+                </span>
+                <div className="flex gap-2">
+                  {hasDesigner && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={loadingStudentHtml}
+                      onClick={async () => {
+                        if (!selectedStudent || !examId) return;
+                        setLoadingStudentHtml(true);
+                        try {
+                          const sid = selectedStudentId;
+                          if (!sid) { toast.error("Student ID not found"); return; }
+                          const res = await api.get(
+                            `/exams/${examId}/marksheet/${sid}/html?template_id=marksheet`,
+                          );
+                          const html = res.data?.data?.html || "";
+                          if (!html) { toast.error("No HTML generated"); return; }
+                          const w = window.open("", "_blank");
+                          if (w) {
+                            w.document.open();
+                            w.document.write(
+                              `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Marksheet</title>` +
+                              `<style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${html}</body></html>`,
+                            );
+                            w.document.close();
+                            w.focus();
+                          } else {
+                            toast.error("Popup blocked — allow popups for this site");
+                          }
+                        } catch {
+                          toast.error("Failed to generate marksheet");
+                        } finally {
+                          setLoadingStudentHtml(false);
+                        }
+                      }}
+                      className="gap-1.5"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {loadingStudentHtml ? "Generating..." : "Preview Marksheet"}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={loadingStudentHtml}
-                    onClick={async () => {
-                      if (!selectedStudent || !examId) return;
-                      setLoadingStudentHtml(true);
-                      try {
-                        const sid = selectedStudentId;
-                        if (!sid) { toast.error("Student ID not found"); return; }
-                        const res = await api.get(
-                          `/exams/${examId}/marksheet/${sid}/html?template_id=marksheet`,
-                        );
-                        const html = res.data?.data?.html || "";
-                        if (!html) { toast.error("No HTML generated"); return; }
-                        const w = window.open("", "_blank");
-                        if (w) {
-                          w.document.open();
-                          w.document.write(
-                            `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Marksheet</title>` +
-                            `<style>@page{size:A4;margin:0}body{margin:0}</style></head><body>${html}</body></html>`,
-                          );
-                          w.document.close();
-                          w.focus();
-                        } else {
-                          toast.error("Popup blocked — allow popups for this site");
-                        }
-                      } catch {
-                        toast.error("Failed to generate marksheet");
-                      } finally {
-                        setLoadingStudentHtml(false);
-                      }
-                    }}
-                    className="gap-1.5"
+                    onClick={() => setSelectedStudent(null)}
                   >
-                    <Eye className="h-3.5 w-3.5" />
-                    {loadingStudentHtml ? "Generating..." : "Preview Marksheet"}
+                    Close
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setSelectedStudent(null)}
-                >
-                  Close
-                </Button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

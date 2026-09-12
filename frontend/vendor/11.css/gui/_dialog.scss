@@ -1,0 +1,109 @@
+/**
+ * 11.css - Fluent Dialogs, Breadcrumbs & CommandBar
+ * Windows 11 Modal Architecture & App Navigation
+ */
+
+/* Modal Backdrop */
+.win11-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: w11-fade-in var(--w11-duration-fast) var(--w11-ease-spring);
+}
+
+/* Content Dialog */
+.win11-dialog {
+  box-sizing: border-box;
+  width: 90%;
+  max-width: 440px;
+  background: var(--w11-surface-solid);
+  border: 1px solid var(--w11-window-border);
+  border-radius: var(--w11-radius-lg);
+  box-shadow: var(--w11-elevation-active);
+  overflow: hidden;
+  animation: w11-window-in var(--w11-duration-normal) var(--w11-ease-spring);
+
+  .dialog-header {
+    padding: 20px 24px 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--w11-text-primary);
+  }
+
+  .dialog-body {
+    padding: 0 24px 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--w11-text-secondary);
+  }
+
+  .dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px;
+    background: var(--w11-control-bg);
+    border-top: 1px solid var(--w11-border-subtle);
+  }
+}
+
+/* Breadcrumb Navigation */
+.win11-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--w11-text-secondary);
+  user-select: none;
+
+  .breadcrumb-item {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--w11-radius-sm);
+    transition: background var(--w11-transition-fast), color var(--w11-transition-fast);
+
+    &:hover {
+      background: var(--w11-control-hover);
+      color: var(--w11-text-primary);
+    }
+
+    &.current {
+      font-weight: 600;
+      color: var(--w11-text-primary);
+      cursor: default;
+      &:hover { background: transparent; }
+    }
+  }
+
+  .breadcrumb-separator {
+    color: var(--w11-text-tertiary);
+    font-size: 10px;
+  }
+}
+
+/* CommandBar Toolbar */
+.win11-commandbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border-bottom: 1px solid var(--w11-border-subtle);
+
+  .command-separator {
+    width: 1px;
+    height: 18px;
+    background: var(--w11-border-default);
+    margin: 0 6px;
+  }
+}

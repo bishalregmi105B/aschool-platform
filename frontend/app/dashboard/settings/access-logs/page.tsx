@@ -4,12 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Activity,
   Fingerprint,
@@ -21,6 +19,13 @@ import {
   Search,
   X,
 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 /**
  * Access Logs (A-37) — authentication activity per school: logins, failed
@@ -209,25 +214,17 @@ function AccessLogsContent() {
     []
   );
 
-  if (isLoading && !data) return <PageLoader />;
+  if (isLoading && !data) return <AOSModuleLoadingState label="Loading access logs…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ScrollText className="h-6 w-6" />
-            Access Logs
-          </h1>
-          <p className="text-muted-foreground">
-            Sign-in activity across the school — logins, failures, lockouts and
-            password changes
-          </p>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Access Logs"
+        subtitle="Sign-in activity across the school — logins, failures, lockouts and password changes"
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-4">
           <DataTable<AccessLog>
             columns={columns}
             rows={logs}
@@ -258,11 +255,7 @@ function AccessLogsContent() {
                         setEvent(e.value);
                         setPage(1);
                       }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        event === e.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                      }`}
+                      className={`win11-chip ${event === e.value ? "accent" : ""}`}
                     >
                       {e.label}
                     </button>
@@ -298,9 +291,9 @@ function AccessLogsContent() {
             exportFileName="access-logs"
             dense
           />
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

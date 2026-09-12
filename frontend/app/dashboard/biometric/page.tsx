@@ -3,10 +3,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSEmptyState,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Fingerprint, Monitor, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
 
@@ -21,15 +28,20 @@ function BiometricContent() {
     queryFn: async () => { const r = await api.get("/attendance/biometric/overview"); return r.data?.data ?? r.data; },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading biometric overview…" />;
     if (isError) {
       return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load biometric overview. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
+        <AOSPage>
+          <AOSPageHeader title="Biometric Integration" />
+          <AOSPageBody>
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="py-10 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load biometric overview. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            </DataPanel>
+          </AOSPageBody>
+        </AOSPage>
       );
     }
 
@@ -37,51 +49,57 @@ function BiometricContent() {
   const stats = data?.stats ?? {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Biometric Integration</h1><p className="text-muted-foreground">ZKTeco fingerprint attendance management</p></div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild><Link href="/dashboard/biometric/logs">Sync Logs</Link></Button>
-          <Button asChild><Link href="/dashboard/biometric/devices">Manage Devices</Link></Button>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Fingerprint className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Biometric Integration"
+        subtitle={`ZKTeco fingerprint attendance · ${stats.online ?? devices.filter((d: any) => d.status === "online").length}/${stats.total_devices ?? devices.length} devices online`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild><Link href="/dashboard/biometric/logs">Sync Logs</Link></Button>
+            <Button asChild><Link href="/dashboard/biometric/devices">Manage Devices</Link></Button>
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {[
+            { label: "Total Devices", value: stats.total_devices ?? devices.length, icon: <Monitor className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />, color: "var(--w11-accent)" },
+            { label: "Online", value: stats.online ?? devices.filter((d: any) => d.status === "online").length, icon: <Wifi className="h-4 w-4" style={{ color: "#107c10" }} />, color: "#107c10" },
+            { label: "Offline", value: stats.offline ?? devices.filter((d: any) => d.status !== "online").length, icon: <WifiOff className="h-4 w-4" style={{ color: "#c42b1c" }} />, color: "#c42b1c" },
+            { label: "Today Syncs", value: stats.today_syncs ?? "—", icon: <RefreshCw className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+          ].map((s) => (
+            <KpiCard key={s.label} label={s.label} value={s.value} icon={s.icon} color={s.color} />
+          ))}
+        </StatGrid>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {devices.length === 0 ? (
+            <DataPanel className="col-span-full">
+              <AOSEmptyState
+                icon={<Fingerprint className="h-12 w-12" />}
+                title="No biometric devices configured"
+                action={<Button className="mt-2" asChild><Link href="/dashboard/biometric/devices">Add Device</Link></Button>}
+              />
+            </DataPanel>
+          ) : devices.map((d: any) => (
+            <div key={d.id} className="win11-card">
+              <div className="flex flex-row items-center justify-between mb-2">
+                <span className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--w11-text-primary)" }}>
+                  <Fingerprint className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />{d.name}
+                </span>
+                <span className={`win11-chip ${d.status === "online" ? "success" : "error"}`}>{d.status ?? "unknown"}</span>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span style={{ color: "var(--w11-text-secondary)" }}>IP Address</span><span className="font-mono">{d.ip_address ?? "—"}</span></div>
+                <div className="flex justify-between"><span style={{ color: "var(--w11-text-secondary)" }}>Location</span><span>{d.location ?? "—"}</span></div>
+                <div className="flex justify-between"><span style={{ color: "var(--w11-text-secondary)" }}>Last Sync</span><span>{d.last_sync ?? "Never"}</span></div>
+                <div className="flex justify-between"><span style={{ color: "var(--w11-text-secondary)" }}>Users Enrolled</span><span>{d.enrolled_count ?? "—"}</span></div>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Devices", value: stats.total_devices ?? devices.length, icon: Monitor },
-          { label: "Online", value: stats.online ?? devices.filter((d: any) => d.status === "online").length, icon: Wifi, color: "text-green-600" },
-          { label: "Offline", value: stats.offline ?? devices.filter((d: any) => d.status !== "online").length, icon: WifiOff, color: "text-red-600" },
-          { label: "Today Syncs", value: stats.today_syncs ?? "—", icon: RefreshCw },
-        ].map((s) => (
-          <Card key={s.label}><CardContent className="pt-6 flex items-center gap-4">
-            <s.icon className={`h-8 w-8 ${s.color ?? "text-primary"}`} />
-            <div><p className="text-sm text-muted-foreground">{s.label}</p><p className="text-2xl font-bold">{s.value}</p></div>
-          </CardContent></Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {devices.length === 0 ? (
-          <Card className="col-span-full"><CardContent className="pt-6 text-center text-muted-foreground py-12">
-            <Fingerprint className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>No biometric devices configured.</p>
-            <Button className="mt-4" asChild><Link href="/dashboard/biometric/devices">Add Device</Link></Button>
-          </CardContent></Card>
-        ) : devices.map((d: any) => (
-          <Card key={d.id}>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2"><Fingerprint className="h-4 w-4" />{d.name}</CardTitle>
-              <Badge variant={d.status === "online" ? "default" : "destructive"}>{d.status ?? "unknown"}</Badge>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">IP Address</span><span className="font-mono">{d.ip_address ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{d.location ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Last Sync</span><span>{d.last_sync ?? "Never"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Users Enrolled</span><span>{d.enrolled_count ?? "—"}</span></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -1,0 +1,45 @@
+{
+  "name": "11.css",
+  "version": "1.0.0",
+  "description": "A design system for building faithful recreations of the Windows 11 Fluent UI. Vendored from Win7Css; scoped build emits `.win11`-prefixed selectors with compound theme markers.",
+  "main": "dist/11.css",
+  "style": "dist/11.css",
+  "exports": {
+    ".": "./dist/11.css",
+    "./dist/11.css": "./dist/11.css",
+    "./dist/11.scoped.css": "./dist/11.scoped.css",
+    "./*": "./*"
+  },
+  "files": [
+    "dist/gui",
+    "dist/11*",
+    "dist/win11*"
+  ],
+  "scripts": {
+    "build": "node build.js"
+  },
+  "keywords": [
+    "css",
+    "scss",
+    "windows",
+    "windows11",
+    "fluent",
+    "fluent-design",
+    "gui",
+    "ui-design",
+    "aos"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "autoprefixer": "^10.4.8",
+    "cssnano": "^5.1.7",
+    "mkdirp": "^1.0.4",
+    "postcss": "^8.3.5",
+    "postcss-base64": "^0.7.1",
+    "postcss-calc": "^7.0.2",
+    "postcss-css-variables": "^0.19.0",
+    "postcss-import": "^12.0.1",
+    "postcss-nested": "^4.2.1",
+    "postcss-prefix-selector": "^1.15.0"
+  }
+}

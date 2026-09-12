@@ -4,11 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, ClipboardList, FileBarChart, GraduationCap } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  DataPanel, StatusChip, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -54,12 +56,13 @@ interface StudentResult {
   status?: string;
 }
 
+/** Exam status → StatusChip tone key. */
 const STATUS_TONE: Record<string, string> = {
-  scheduled: "secondary",
-  ongoing: "default",
-  completed: "outline",
-  published: "default",
-  cancelled: "destructive",
+  scheduled: "scheduled",
+  ongoing: "pending",
+  completed: "completed",
+  published: "published",
+  cancelled: "cancelled",
 };
 
 export default function ExamDetailPage() {
@@ -93,7 +96,7 @@ export default function ExamDetailPage() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading exam…" /></AOSPage>;
   if (error || !exam) {
     return (
       <ErrorState
@@ -116,97 +119,75 @@ export default function ExamDetailPage() {
       }
     : null;
 
+  const windowLabel = `${displayBS(exam.start_date_bs || exam.start_date) || "—"} → ${displayBS(exam.end_date_bs || exam.end_date) || "—"}`;
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <AOSPage>
+      <AOSPageHeader
+        icon={
           <Link href="/dashboard/exams">
             <Button variant="ghost" size="icon" aria-label="Back to exams">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-lg font-semibold">{exam.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {[exam.exam_type, exam.class_name].filter(Boolean).join(" · ") || "Exam"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {exam.status && (
-            <Badge variant={(STATUS_TONE[exam.status] as "default") ?? "secondary"}>
-              {exam.status}
-            </Badge>
-          )}
-          <Link href={`/dashboard/exams/marks?exam_id=${examId}`}>
-            <Button size="sm">
-              <ClipboardList className="mr-1 h-4 w-4" /> Enter marks
-            </Button>
-          </Link>
-          <Link href={`/dashboard/exams/results?exam_id=${examId}`}>
-            <Button size="sm" variant="outline">
-              <FileBarChart className="mr-1 h-4 w-4" /> Results
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Window</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm font-medium">
-              {displayBS(exam.start_date_bs || exam.start_date) || "—"}
-              {" → "}
-              {displayBS(exam.end_date_bs || exam.end_date) || "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Marks</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm font-medium">
-              Full {exam.total_marks ?? totalFull ?? "—"} · Pass {exam.pass_marks ?? "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Subjects</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm font-medium">{subjects?.length ?? 0} mapped</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Results</CardTitle>
-            <FileBarChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {summary ? (
-              <p className="text-sm font-medium">
-                {summary.appeared} students · avg {summary.average}% · high {summary.highest}%
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No marks entered yet</p>
+        }
+        title={exam.name}
+        subtitle={
+          [exam.exam_type, exam.class_name, windowLabel].filter(Boolean).join(" · ") || "Exam"
+        }
+        actions={
+          <>
+            {exam.status && (
+              <StatusChip status={STATUS_TONE[exam.status] ?? exam.status} label={exam.status} />
             )}
-          </CardContent>
-        </Card>
-      </div>
+            <Link href={`/dashboard/exams/marks?exam_id=${examId}`}>
+              <Button size="sm">
+                <ClipboardList className="mr-1 h-4 w-4" /> Enter marks
+              </Button>
+            </Link>
+            <Link href={`/dashboard/exams/results?exam_id=${examId}`}>
+              <Button size="sm" variant="outline">
+                <FileBarChart className="mr-1 h-4 w-4" /> Results
+              </Button>
+            </Link>
+          </>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <StatGrid className="mb-0">
+          <KpiCard
+            label="Subjects"
+            value={subjects?.length ?? 0}
+            icon={<ClipboardList className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            footnote="mapped to this exam"
+          />
+          <KpiCard
+            label="Full Marks"
+            value={exam.total_marks ?? totalFull ?? "—"}
+            icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            footnote={`Pass marks ${exam.pass_marks ?? "—"}`}
+          />
+          <KpiCard
+            label="Appeared"
+            value={summary?.appeared ?? "—"}
+            icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            footnote={summary ? `highest ${summary.highest}%` : "No marks entered yet"}
+          />
+          <KpiCard
+            label="Passed"
+            value={summary?.passed ?? "—"}
+            color="#107c10"
+            footnote={summary ? `${summary.appeared} students appeared` : "No marks entered yet"}
+          />
+          <KpiCard
+            label="Average"
+            value={summary ? `${summary.average}%` : "—"}
+            color={summary && summary.average >= (exam.pass_marks ?? 0) ? "#107c10" : "#d83b01"}
+            footnote={summary ? `across ${summary.appeared} students` : "No marks entered yet"}
+          />
+        </StatGrid>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Exam subjects</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <DataPanel title="Exam subjects">
           {subjects && subjects.length > 0 ? (
             <Table>
               <TableHeader>
@@ -222,7 +203,7 @@ export default function ExamDetailPage() {
                 {subjects.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.code || "—"}</TableCell>
+                    <TableCell className="text-[color:var(--w11-text-secondary)]">{s.code || "—"}</TableCell>
                     <TableCell className="text-right">{s.total_full_marks ?? s.full_marks}</TableCell>
                     <TableCell className="text-right">{s.total_pass_marks ?? s.pass_marks}</TableCell>
                     <TableCell>
@@ -231,7 +212,7 @@ export default function ExamDetailPage() {
                           {s.practical_full_marks ? `${s.practical_full_marks} marks` : "Yes"}
                         </Badge>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-sm text-[color:var(--w11-text-secondary)]">—</span>
                       )}
                     </TableCell>
                   </TableRow>
@@ -245,15 +226,10 @@ export default function ExamDetailPage() {
               body="Map subjects to this exam from the exam editor."
             />
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {results && results.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top performers</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {results && results.length > 0 && (
+          <DataPanel title="Top performers">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -272,17 +248,15 @@ export default function ExamDetailPage() {
                     <TableCell className="text-right">{r.percentage}%</TableCell>
                     <TableCell>{r.grade || "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={r.status === "pass" ? "default" : "destructive"}>
-                        {r.status || "—"}
-                      </Badge>
+                      <StatusChip status={r.status || "—"} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -13,9 +13,9 @@ export default function MarkAttendanceRedirect() {
   }, [router]);
 
   return (
-    <div className="flex items-center justify-center py-16 text-muted-foreground">
+    <div className="flex items-center justify-center h-full text-[color:var(--w11-text-secondary)]">
       <div className="text-center">
-        <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <div className="win11-spinner mx-auto mb-3" />
         <p className="text-sm">Redirecting to Attendance...</p>
       </div>
     </div>

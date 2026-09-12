@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import Desktop from "@/components/aos/Desktop";
 import TopMenuBar from "@/components/aos/TopMenuBar";
 import Dock from "@/components/aos/Dock";
@@ -23,9 +24,11 @@ import {
   type AOSApp,
 } from "@/lib/aos-app-adapter";
 import { useAuth } from "@/lib/auth-context";
+import { fetchUnreadCount } from "@/lib/services/notifications.service";
 import { Sparkles } from "lucide-react";
 import {
   AOS_THEME_STORAGE_KEY,
+  AOS_MODE_STORAGE_KEY,
   extractAOSModuleSlug,
   formatAOSRouteTitle,
   isAOSRootModuleRoute,
@@ -98,6 +101,22 @@ export default function AOSDesktopShell() {
     }
   }, [themeMode]);
 
+  // Manual desktop/iOS mode override — persists across reloads; absence of a
+  // stored value keeps the viewport-based decision in dashboard-layout.
+  const handleToggleSystemMode = useCallback(() => {
+    try {
+      const current = localStorage.getItem(AOS_MODE_STORAGE_KEY);
+      const isMobileNow =
+        current === "mobile" ||
+        (current !== "desktop" && window.matchMedia("(max-width: 767px)").matches);
+      const next = isMobileNow ? "desktop" : "mobile";
+      localStorage.setItem(AOS_MODE_STORAGE_KEY, next);
+      window.location.reload();
+    } catch {
+      // Ignore storage access issues
+    }
+  }, []);
+
   // Flyout and modal toggles
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isAppDrawerOpen, setIsAppDrawerOpen] = useState(false);
@@ -108,6 +127,20 @@ export default function AOSDesktopShell() {
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isWidgetsOpen, setIsWidgetsOpen] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+
+  // Live unread badge for the menubar bell (refetches when the flyout opens
+  // so read/dismiss actions in NotificationCenter immediately update it).
+  const { data: unreadCount = 0, refetch: refetchUnread } = useQuery({
+    queryKey: ["aos-unread-notifications"],
+    queryFn: fetchUnreadCount,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!isNotificationsOpen) return;
+    refetchUnread();
+  }, [isNotificationsOpen, refetchUnread]);
 
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
@@ -235,8 +268,16 @@ export default function AOSDesktopShell() {
     (slug: string, options: OpenWindowOptions = {}) => {
       closeAllFlyouts();
 
-      const windowId = options.windowId || slug;
-      const moduleId = options.moduleId || slug;
+      // "settings" from shell chrome (QuickSettings gear, context menu,
+      // TopMenuBar system menu, iOS control center) means the OS
+      // personalization app — the school settings module keeps its own id.
+      const effectiveSlug =
+        !options.moduleId && !Object.prototype.hasOwnProperty.call(options, "route") && slug === "settings"
+          ? "aos-settings"
+          : slug;
+
+      const windowId = options.windowId || effectiveSlug;
+      const moduleId = options.moduleId || effectiveSlug;
       const hasRouteOverride = Object.prototype.hasOwnProperty.call(options, "route");
 
       setWindows((prevWindows) => {
@@ -503,7 +544,9 @@ export default function AOSDesktopShell() {
             closeAllFlyouts("switcher");
             setIsSwitcherOpen(next);
           }}
-          unreadCount={0}
+          systemMode="desktop"
+          onToggleSystemMode={handleToggleSystemMode}
+          unreadCount={unreadCount}
           topBarHeight={topBarHeight}
         />
       )}

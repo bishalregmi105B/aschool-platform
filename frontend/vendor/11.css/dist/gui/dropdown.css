@@ -1,0 +1,2 @@
+.dropdown,.win11-dropdown{display:inline-block;position:relative}.dropdown .dropdown-menu,.win11-dropdown .dropdown-menu{display:none;left:0;position:absolute;top:calc(100% + 4px);z-index:1000}.dropdown.is-open .dropdown-menu,.dropdown:focus-within .dropdown-menu,.win11-dropdown.is-open .dropdown-menu,.win11-dropdown:focus-within .dropdown-menu{display:flex}
+/*# sourceMappingURL=dropdown.css.map */

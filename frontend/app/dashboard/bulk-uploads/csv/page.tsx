@@ -5,12 +5,18 @@ import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, FileText, Download, AlertCircle, CheckCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { FilePicker } from "@/components/files/FilePicker";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
 import type { ManagedFile } from "@/lib/services/files.service";
 
 interface ImportResult {
@@ -120,138 +126,147 @@ export default function CsvUploadPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6" /> Generic CSV Upload
-          </h1>
-          <p className="text-muted-foreground">Upload standard CSV templates to import data in bulk.</p>
-        </div>
-        <Button variant="outline" onClick={downloadTemplate}>
-          <Download className="h-4 w-4 mr-2" /> Download Template
-        </Button>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload File</CardTitle>
-            <CardDescription>Select a CSV file matching our provided templates</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Import Type</Label>
-              <Select value={format} onValueChange={setFormat}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select data type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {FORMATS.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>CSV File (.csv)</Label>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowFilePicker(true)}
-                  className="w-full cursor-pointer flex flex-col items-center"
-                >
-                  <UploadCloud className="h-10 w-10 text-muted-foreground mb-2" />
-                  <span className="text-sm font-medium">Choose from File Manager</span>
-                  <span className="text-xs text-muted-foreground mt-1">
-                    {file ? file.name : "No file selected"}
-                  </span>
-                </button>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Generic CSV Upload"
+        subtitle="Upload standard CSV templates to import data in bulk."
+        actions={
+          <Button variant="outline" onClick={downloadTemplate}>
+            <Download className="h-4 w-4 mr-2" /> Download Template
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <div className="max-w-4xl grid md:grid-cols-2 gap-4">
+          <FormSection title="Upload File">
+            <p className="text-xs mb-4" style={{ color: "var(--w11-text-secondary)" }}>
+              Select a CSV file matching our provided templates
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Import Type</Label>
+                <Select value={format} onValueChange={setFormat}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select data type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMATS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>CSV File (.csv)</Label>
+                <div
+                  className="border-2 border-dashed border-[var(--w11-border-default)] rounded-lg p-8 text-center"
+                  style={{ background: "var(--w11-control-hover)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowFilePicker(true)}
+                    className="w-full cursor-pointer flex flex-col items-center"
+                  >
+                    <UploadCloud className="h-10 w-10 mb-2" style={{ color: "var(--w11-text-secondary)" }} />
+                    <span className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>Choose from File Manager</span>
+                    <span className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
+                      {file ? file.name : "No file selected"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleUpload}
+                disabled={importMutation.isPending || !file || !format}
+              >
+                {importMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <UploadCloud className="h-4 w-4 mr-2" />}
+                {importMutation.isPending ? "Importing..." : "Start Import"}
+              </Button>
             </div>
+          </FormSection>
 
-            <Button
-              className="w-full"
-              onClick={handleUpload}
-              disabled={importMutation.isPending || !file || !format}
-            >
-              {importMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <UploadCloud className="h-4 w-4 mr-2" />}
-              {importMutation.isPending ? "Importing..." : "Start Import"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {result ? (
-          <div className="space-y-6">
-            <Card className={result.error_rows > 0 ? "border-amber-200" : "border-green-200"}>
-              <CardHeader className="pb-2">
-                <CardTitle className={`text-lg flex items-center gap-2 ${result.error_rows > 0 ? "text-amber-700" : "text-green-700"}`}>
-                  {result.error_rows > 0 ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />} Import Summary
-                </CardTitle>
-                <CardDescription className="capitalize">{result.format_code?.replace(/_/g, " ")} — {result.filename}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center mt-2">
-                  <div className="bg-background rounded-lg p-3 border">
-                    <div className="text-2xl font-bold">{result.total_rows}</div>
-                    <div className="text-xs text-muted-foreground">Total Processed</div>
+          {result ? (
+            <div className="space-y-4">
+              <DataPanel
+                title={
+                  <span
+                    className="text-lg flex items-center gap-2"
+                    style={{ color: result.error_rows > 0 ? "#8a6116" : "#107c10" }}
+                  >
+                    {result.error_rows > 0 ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />} Import Summary
+                  </span>
+                }
+              >
+                <p className="text-xs mb-3 capitalize" style={{ color: "var(--w11-text-secondary)" }}>
+                  {result.format_code?.replace(/_/g, " ")} — {result.filename}
+                </p>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="rounded-lg p-3 border border-[var(--w11-border-subtle)]">
+                    <div className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{result.total_rows}</div>
+                    <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Total Processed</div>
                   </div>
-                  <div className="bg-background rounded-lg p-3 border border-green-200">
-                    <div className="text-2xl font-bold text-green-600">{result.imported_rows}</div>
-                    <div className="text-xs text-muted-foreground">Successful</div>
+                  <div className="rounded-lg p-3 border" style={{ borderColor: "rgba(16,124,16,0.35)" }}>
+                    <div className="text-2xl font-bold" style={{ color: "#107c10" }}>{result.imported_rows}</div>
+                    <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Successful</div>
                   </div>
-                  <div className="bg-background rounded-lg p-3 border border-red-200">
-                    <div className="text-2xl font-bold text-red-600">{result.error_rows}</div>
-                    <div className="text-xs text-muted-foreground">Failed</div>
+                  <div className="rounded-lg p-3 border" style={{ borderColor: "rgba(196,43,28,0.35)" }}>
+                    <div className="text-2xl font-bold" style={{ color: "#c42b1c" }}>{result.error_rows}</div>
+                    <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Failed</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </DataPanel>
 
-            {result.errors && result.errors.length > 0 && (
-              <Card className="border-red-200 bg-red-50/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2 text-red-700">
-                    <AlertCircle className="h-4 w-4" /> Import Warnings ({result.errors.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="list-disc pl-4 text-sm max-h-40 overflow-y-auto text-red-700">
+              {result.errors && result.errors.length > 0 && (
+                <DataPanel
+                  title={
+                    <span className="text-sm flex items-center gap-2" style={{ color: "#c42b1c" }}>
+                      <AlertCircle className="h-4 w-4" /> Import Warnings ({result.errors.length})
+                    </span>
+                  }
+                >
+                  <ul className="list-disc pl-4 text-sm max-h-40 overflow-y-auto" style={{ color: "#c42b1c" }}>
                     {result.errors.map((err, i) => {
                       const msg = typeof err === "string" ? err : (err as { error?: string }).error || JSON.stringify(err);
                       return <li key={i}>{msg}</li>;
                     })}
                   </ul>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : (
-          <Card className="bg-muted/50 border-dashed">
-            <CardHeader>
-              <CardTitle className="text-lg">Instructions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <p>1. Download the sample CSV template using the button above.</p>
-              <p>2. Fill in the data without modifying the header row column names.</p>
-              <p>3. Save the file as a <strong>Comma Separated Values (.csv)</strong> format.</p>
-              <p>4. Select the correct import type and upload the file.</p>
-              <div className="p-3 bg-amber-500/10 text-amber-600 rounded mt-4 border border-amber-500/20">
-                <strong>Note:</strong> Maximum file size is 20MB. Rows import immediately and appear in the history tab.
+                </DataPanel>
+              )}
+            </div>
+          ) : (
+            <DataPanel title={<span className="text-lg">Instructions</span>}>
+              <div className="space-y-4 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                <p>1. Download the sample CSV template using the button above.</p>
+                <p>2. Fill in the data without modifying the header row column names.</p>
+                <p>3. Save the file as a <strong>Comma Separated Values (.csv)</strong> format.</p>
+                <p>4. Select the correct import type and upload the file.</p>
+                <div
+                  className="p-3 rounded mt-4 border"
+                  style={{
+                    color: "#8a6116",
+                    background: "rgba(255,185,0,0.10)",
+                    borderColor: "rgba(255,185,0,0.25)",
+                  }}
+                >
+                  <strong>Note:</strong> Maximum file size is 20MB. Rows import immediately and appear in the history tab.
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </DataPanel>
+          )}
+        </div>
 
-      <FilePicker
-        open={showFilePicker}
-        onOpenChange={setShowFilePicker}
-        onSelect={handleManagedFileSelect}
-        fileType="spreadsheet"
-        title="Select CSV File"
-      />
-    </div>
+        <FilePicker
+          open={showFilePicker}
+          onOpenChange={setShowFilePicker}
+          onSelect={handleManagedFileSelect}
+          fileType="spreadsheet"
+          title="Select CSV File"
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
