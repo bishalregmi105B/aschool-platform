@@ -239,7 +239,10 @@ export function resolveModuleComponent(slug: string): React.ComponentType<any> {
   }
 
   if (slug.startsWith("route:")) {
-    return AOSRouteFrame;
+    // Delegate to route-aware resolution: inline component when registered,
+    // iframe only as a last resort.
+    const route = parseAOSRouteWindowId(slug) || slug.slice("route:".length);
+    return resolveRouteWindowComponent(route);
   }
 
   const normalized = normalizeModuleSlug(slug);
@@ -283,5 +286,28 @@ export function resolveModuleComponent(slug: string): React.ComponentType<any> {
 
   // 5. Fallback safe placeholder
   return createFallbackComponent(normalized || slug);
+}
+
+/**
+ * Route windows prefer inline rendering: resolve the route's module segment
+ * against the registry so most subroutes open as real components. Only
+ * genuinely unregistered routes fall back to the aos_embed iframe — iframes
+ * are the last resort because proxy/redirect edge cases can make them fail
+ * to load ("refused connection" class of bug documented in files.py).
+ */
+export function resolveRouteWindowComponent(route: string): React.ComponentType<any> {
+  const path = route.split("?")[0].replace(/\/+$/, "");
+  const segments = path.split("/").filter(Boolean); // ["dashboard", "fees", "collect"]
+  const moduleSegment = segments[1]; // segment after /dashboard
+  if (!moduleSegment) {
+    return AOSRouteFrame;
+  }
+  const resolved = resolveModuleComponent(moduleSegment);
+  // resolveModuleComponent returns a fallback for unknown slugs — detect by
+  // displayName convention used in createFallbackComponent.
+  if (resolved && typeof resolved === "function" && !String(resolved.displayName || "").startsWith("AOSModuleFallback")) {
+    return resolved;
+  }
+  return AOSRouteFrame;
 }
 

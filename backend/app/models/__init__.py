@@ -3,6 +3,7 @@ from app.models.base import BaseModel, SchoolModel  # noqa: F401
 from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptCounter  # noqa: F401
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.user_aos_settings import UserAOSSettings  # noqa: F401
 from app.models.user_access_log import UserAccessLog  # noqa: F401
 from app.models.student_enrollment import StudentEnrollment, PromotionRecord  # noqa: F401
 from app.models.custom_field import CustomFieldDef  # noqa: F401
