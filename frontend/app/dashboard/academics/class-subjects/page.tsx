@@ -12,17 +12,17 @@ import {
 } from "@/lib/services/dashboard/academics.service";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 import { Plus, Link2 } from "lucide-react";
 
 export default function ClassSubjectsPage() {
@@ -138,22 +138,14 @@ export default function ClassSubjectsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Link2 className="h-6 w-6" /> Class Subjects
-        </h1>
-        <p className="text-muted-foreground">
-          Assign subjects to classes and manage the mapping
-        </p>
-      </div>
-
-      {/* Class selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Select Class</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Link2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Class Subjects"
+        subtitle="Assign subjects to classes and manage the mapping"
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
           <AdvancedSelect
             className="max-w-xs"
             value={selectedClass}
@@ -162,17 +154,10 @@ export default function ClassSubjectsPage() {
             placeholder="Choose a class..."
             options={(classes || []).map((cls: any) => ({ value: cls.id, label: cls.name }))}
           />
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {/* Assigned subjects */}
-      {selectedClass && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Assigned Subjects</CardTitle>
-            {/* Quick assign buttons for unassigned subjects */}
-          </CardHeader>
-          <CardContent>
+        {selectedClass && (
+          <DataPanel title="Assigned Subjects">
             {csLoading ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : (
@@ -192,7 +177,7 @@ export default function ClassSubjectsPage() {
 
                 {/* Available subjects to assign */}
                 {subjects && subjects.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="mt-4 pt-4 border-t border-[var(--w11-border-subtle)]">
                     <p className="text-sm font-medium mb-2">Quick Assign:</p>
                     <div className="flex flex-wrap gap-2">
                       {subjects
@@ -213,9 +198,9 @@ export default function ClassSubjectsPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

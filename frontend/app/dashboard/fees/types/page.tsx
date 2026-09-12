@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +17,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { Plus, Pencil, Trash2, Tag, Info } from "lucide-react";
 
 interface FeeType {
@@ -115,12 +117,12 @@ function FeeTypesContent() {
       value: (ft) => ft.name,
       render: (ft) => (
         <div className="flex items-center gap-2">
-          <Tag className="h-3.5 w-3.5 text-primary" />
+          <Tag className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} />
           <span className="font-medium">{ft.name}</span>
         </div>
       ),
     },
-    { key: "description", label: "Description", value: (ft) => ft.description ?? "", render: (ft) => <span className="text-muted-foreground text-sm">{ft.description || "—"}</span> },
+    { key: "description", label: "Description", value: (ft) => ft.description ?? "", render: (ft) => <span className="text-[color:var(--w11-text-secondary)] text-sm">{ft.description || "—"}</span> },
     {
       key: "actions",
       label: "Actions",
@@ -139,7 +141,7 @@ function FeeTypesContent() {
             }}
             disabled={deleteMutation.isPending}
           >
-            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
@@ -147,76 +149,68 @@ function FeeTypesContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Fee Types</h1>
-          <p className="text-muted-foreground">
-            Manage fee categories — used when defining fee structures and
-            collecting payments
-          </p>
-        </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Fee Type
-        </Button>
-      </div>
-
-      {/* System Fee Types (read-only) */}
-      {systemTypes.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Info className="h-4 w-4 text-blue-500" />
-              Default Fee Types
-              <Badge variant="secondary" className="ml-1">
-                System
-              </Badge>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Tag className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Fee Types"
+        subtitle="Manage fee categories — used when defining fee structures and collecting payments"
+        actions={
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Fee Type
+          </Button>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {/* System Fee Types (read-only) */}
+        {systemTypes.length > 0 && (
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2">
+                <Info className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                Default Fee Types
+                <Badge variant="secondary" className="ml-1">
+                  System
+                </Badge>
+              </span>
+            }
+            bodyClassName="p-0"
+          >
+            <p className="text-sm text-[color:var(--w11-text-secondary)] px-4 pt-3">
               These are standard fee types included with ASchool. You can
               add custom types below.
             </p>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="flex flex-wrap gap-2 px-6 pb-4">
+            <div className="flex flex-wrap gap-2 px-4 pt-3 pb-4">
               {systemTypes.map((t, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-1.5 bg-muted/50 border rounded-lg px-3 py-1.5"
+                  className="flex items-center gap-1.5 border border-[var(--w11-border-default)] rounded-lg px-3 py-1.5"
+                  style={{ background: "var(--w11-control-hover)" }}
                 >
-                  <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Tag className="h-3.5 w-3.5 text-[color:var(--w11-text-secondary)]" />
                   <span className="text-sm font-medium">{t.name}</span>
                   {t.description && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-[color:var(--w11-text-secondary)]">
                       — {t.description}
                     </span>
                   )}
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {/* Custom Fee Types */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Custom Fee Types</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+        {/* Custom Fee Types */}
+        <DataPanel title="Custom Fee Types" bodyClassName="p-0">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="win11-spinner" />
             </div>
           ) : customTypes.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Tag className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p className="font-medium">No custom fee types yet</p>
-              <p className="text-sm mt-1">
-                Add custom types for school-specific fee categories
-              </p>
-            </div>
+            <AOSEmptyState
+              icon={<Tag className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
+              title="No custom fee types yet"
+              description="Add custom types for school-specific fee categories"
+            />
           ) : (
             <DataTable<FeeType>
               columns={FEE_TYPE_COLUMNS}
@@ -228,66 +222,66 @@ function FeeTypesContent() {
               empty={{ icon: Tag, title: "No custom fee types yet", body: "Add custom types for school-specific fee categories." }}
             />
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Create / Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing?.id ? "Edit Fee Type" : "Create Fee Type"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.name}
-                onChange={(e) =>
-                  setForm((d) => ({ ...d, name: e.target.value }))
-                }
-                placeholder="e.g. Computer Lab Fee"
-              />
+        {/* Create / Edit Dialog */}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editing?.id ? "Edit Fee Type" : "Create Fee Type"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>
+                  Name <span style={{ color: "#c42b1c" }}>*</span>
+                </Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((d) => ({ ...d, name: e.target.value }))
+                  }
+                  placeholder="e.g. Computer Lab Fee"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((d) => ({ ...d, description: e.target.value }))
+                  }
+                  placeholder="Brief description (optional)"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={form.description}
-                onChange={(e) =>
-                  setForm((d) => ({ ...d, description: e.target.value }))
-                }
-                placeholder="Brief description (optional)"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isPending || !form.name.trim()}
-            >
-              {isPending ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving…
-                </span>
-              ) : editing?.id ? (
-                "Update"
-              ) : (
-                "Create"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isPending || !form.name.trim()}
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="win11-spinner" />
+                    Saving…
+                  </span>
+                ) : editing?.id ? (
+                  "Update"
+                ) : (
+                  "Create"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

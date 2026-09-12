@@ -6,7 +6,6 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -21,7 +20,16 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { PlusCircle, UserPlus, BarChart3, Eye } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatGrid,
+  KpiCard,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
+import { PlusCircle, UserPlus, BarChart3, Eye, LayoutDashboard } from "lucide-react";
 
 interface Inquiry {
   id: string;
@@ -300,7 +308,7 @@ function AdmissionContent() {
             )}
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="text-xs text-[color:var(--w11-text-secondary)]">—</span>
         );
       },
     },
@@ -325,163 +333,193 @@ function AdmissionContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Admission CRM</h1>
-          <p className="text-muted-foreground">Manage inquiries and applications pipeline</p>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<UserPlus className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Admission CRM"
+        subtitle="Manage inquiries and applications pipeline"
+        actions={
+          <>
+            <Dialog
+              open={showApplication}
+              onOpenChange={(open) => {
+                setShowApplication(open);
+                if (!open) setNewAppGender("");
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline"><PlusCircle className="h-4 w-4 mr-2" /> New Application</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>New Application</DialogTitle></DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const payload = Object.fromEntries(fd) as unknown as Record<string, string>;
+                  if (newAppGender) payload.gender = newAppGender;
+                  createApplicationMut.mutate(payload);
+                }} className="space-y-4">
+                  <FormSection title="Student">
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="app-student-name">Student Name *</Label>
+                        <Input id="app-student-name" name="student_name" placeholder="Student Name" required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="app-dob">Date of Birth</Label>
+                          <BSDateInput name="dob" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Gender</Label>
+                          <Select value={newAppGender} onValueChange={setNewAppGender}>
+                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </FormSection>
+                  <FormSection title="Class & Previous School">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="app-class">Class Applied</Label>
+                        <Input id="app-class" name="class_applied" placeholder="e.g. Class 6" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="app-previous-school">Previous School</Label>
+                        <Input id="app-previous-school" name="previous_school" placeholder="Previous school" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 mt-3">
+                      <Label htmlFor="app-address">Address</Label>
+                      <Input id="app-address" name="address" placeholder="Address" />
+                    </div>
+                  </FormSection>
+                  <FormSection title="Parent / Guardian">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="app-parent-name">Parent Name</Label>
+                          <Input id="app-parent-name" name="parent_name" placeholder="Parent/Guardian name" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="app-parent-phone">Parent Phone *</Label>
+                          <Input id="app-parent-phone" name="parent_phone" placeholder="98XXXXXXXX" required />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="app-parent-email">Parent Email</Label>
+                        <Input id="app-parent-email" name="parent_email" type="email" placeholder="parent@example.com" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="app-guardian-name">Guardian Name</Label>
+                          <Input id="app-guardian-name" name="guardian_name" placeholder="If different from parent" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="app-guardian-phone">Guardian Phone</Label>
+                          <Input id="app-guardian-phone" name="guardian_phone" placeholder="98XXXXXXXX" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="app-guardian-email">Guardian Email</Label>
+                        <Input id="app-guardian-email" name="guardian_email" type="email" placeholder="guardian@example.com" />
+                      </div>
+                    </div>
+                  </FormSection>
+                  <FormSection title="Remarks">
+                    <Textarea id="app-remarks" name="remarks" rows={2} placeholder="Anything worth noting about this application" />
+                  </FormSection>
+                  <Button type="submit" disabled={createApplicationMut.isPending} className="w-full">
+                    {createApplicationMut.isPending ? "Creating..." : "Create Application"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={showInquiry} onOpenChange={setShowInquiry}>
+              <DialogTrigger asChild>
+                <Button><PlusCircle className="h-4 w-4 mr-2" /> New Inquiry</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add Inquiry</DialogTitle></DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  createInquiryMut.mutate(Object.fromEntries(fd) as unknown as Partial<Inquiry>);
+                }} className="space-y-4">
+                  <Input name="student_name" placeholder="Student Name" required />
+                  <Input name="guardian_name" placeholder="Guardian Name" required />
+                  <Input name="phone" placeholder="Phone" required />
+                  <Input name="class_applied" placeholder="Class Applied" />
+                  <Input name="source" placeholder="Source (walk-in, referral, online)" />
+                  <Textarea name="notes" placeholder="Notes" rows={2} />
+                  <Button type="submit" disabled={createInquiryMut.isPending} className="w-full">
+                    {createInquiryMut.isPending ? "Adding..." : "Add Inquiry"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
+      <AOSPageBody>
+        {/* Fluent pivot tabs */}
+        <div className="flex gap-1 mb-4 border-b border-[var(--w11-border-subtle)]">
+          {(["dashboard", "inquiries", "applications"] as const).map((t: any) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium capitalize -mb-px border-b-2 transition-colors ${
+                tab === t
+                  ? "border-[var(--w11-accent)] text-[color:var(--w11-text-primary)]"
+                  : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
+              }`}
+            >
+              {t === "dashboard" && <LayoutDashboard className="h-4 w-4" />}
+              {t === "inquiries" && <UserPlus className="h-4 w-4" />}
+              {t === "applications" && <BarChart3 className="h-4 w-4" />}
+              {t}
+            </button>
+          ))}
         </div>
-        <div className="flex gap-2">
-          <Dialog
-            open={showApplication}
-            onOpenChange={(open) => {
-              setShowApplication(open);
-              if (!open) setNewAppGender("");
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button variant="outline"><PlusCircle className="h-4 w-4 mr-2" /> New Application</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>New Application</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const payload = Object.fromEntries(fd) as unknown as Record<string, string>;
-                if (newAppGender) payload.gender = newAppGender;
-                createApplicationMut.mutate(payload);
-              }} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="app-student-name">Student Name *</Label>
-                  <Input id="app-student-name" name="student_name" placeholder="Student Name" required />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-dob">Date of Birth</Label>
-                    <BSDateInput name="dob" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Gender</Label>
-                    <Select value={newAppGender} onValueChange={setNewAppGender}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-class">Class Applied</Label>
-                    <Input id="app-class" name="class_applied" placeholder="e.g. Class 6" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-previous-school">Previous School</Label>
-                    <Input id="app-previous-school" name="previous_school" placeholder="Previous school" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="app-address">Address</Label>
-                  <Input id="app-address" name="address" placeholder="Address" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-parent-name">Parent Name</Label>
-                    <Input id="app-parent-name" name="parent_name" placeholder="Parent/Guardian name" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-parent-phone">Parent Phone *</Label>
-                    <Input id="app-parent-phone" name="parent_phone" placeholder="98XXXXXXXX" required />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="app-parent-email">Parent Email</Label>
-                  <Input id="app-parent-email" name="parent_email" type="email" placeholder="parent@example.com" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-guardian-name">Guardian Name</Label>
-                    <Input id="app-guardian-name" name="guardian_name" placeholder="If different from parent" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="app-guardian-phone">Guardian Phone</Label>
-                    <Input id="app-guardian-phone" name="guardian_phone" placeholder="98XXXXXXXX" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="app-guardian-email">Guardian Email</Label>
-                  <Input id="app-guardian-email" name="guardian_email" type="email" placeholder="guardian@example.com" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="app-remarks">Remarks</Label>
-                  <Textarea id="app-remarks" name="remarks" rows={2} placeholder="Anything worth noting about this application" />
-                </div>
-                <Button type="submit" disabled={createApplicationMut.isPending} className="w-full">
-                  {createApplicationMut.isPending ? "Creating..." : "Create Application"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showInquiry} onOpenChange={setShowInquiry}>
-            <DialogTrigger asChild>
-              <Button><PlusCircle className="h-4 w-4 mr-2" /> New Inquiry</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add Inquiry</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                createInquiryMut.mutate(Object.fromEntries(fd) as unknown as Partial<Inquiry>);
-              }} className="space-y-4">
-                <Input name="student_name" placeholder="Student Name" required />
-                <Input name="guardian_name" placeholder="Guardian Name" required />
-                <Input name="phone" placeholder="Phone" required />
-                <Input name="class_applied" placeholder="Class Applied" />
-                <Input name="source" placeholder="Source (walk-in, referral, online)" />
-                <Textarea name="notes" placeholder="Notes" rows={2} />
-                <Button type="submit" disabled={createInquiryMut.isPending} className="w-full">
-                  {createInquiryMut.isPending ? "Adding..." : "Add Inquiry"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
 
-      <div className="flex gap-2">
-        {(["dashboard", "inquiries", "applications"] as const).map((t: any) => (
-          <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
-            {t === "dashboard" && <BarChart3 className="h-4 w-4 mr-2" />}
-            {t === "inquiries" && <UserPlus className="h-4 w-4 mr-2" />}
-            {t}
-          </Button>
-        ))}
-      </div>
-
-      {tab === "dashboard" && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle>Total Inquiries</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold">{dashboard?.total_inquiries || 0}</p></CardContent>
-          </Card>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {PIPELINE_STAGES.map((stage) => (
-              <Card key={stage}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground capitalize">{statusLabel(stage)}</CardTitle>
-                </CardHeader>
-                <CardContent><p className="text-2xl font-bold">{pipeline[stage] || 0}</p></CardContent>
-              </Card>
-            ))}
+        {tab === "dashboard" && (
+          <div className="space-y-4">
+            <StatGrid min={160}>
+              <KpiCard
+                label="Total Inquiries"
+                value={dashboard?.total_inquiries || 0}
+                icon={<UserPlus className="h-5 w-5" style={{ color: "var(--w11-text-tertiary)" }} />}
+              />
+            </StatGrid>
+            <StatGrid min={130}>
+              {PIPELINE_STAGES.map((stage) => (
+                <KpiCard
+                  key={stage}
+                  label={<span className="capitalize">{statusLabel(stage)}</span>}
+                  value={pipeline[stage] || 0}
+                  color={
+                    stage === "enrolled" || stage === "accepted"
+                      ? "#107c10"
+                      : stage === "rejected"
+                        ? "#c42b1c"
+                        : stage === "waitlisted"
+                          ? "#d83b01"
+                          : undefined
+                  }
+                />
+              ))}
+            </StatGrid>
           </div>
-        </div>
-      )}
+        )}
 
-      {tab === "inquiries" && (loadingInq ? <PageLoader /> : (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "inquiries" && (loadingInq ? <PageLoader /> : (
+          <DataPanel bodyClassName="p-0">
             <DataTable
               columns={INQUIRY_COLUMNS}
               rows={inquiries ?? []}
@@ -491,13 +529,11 @@ function AdmissionContent() {
               exportFileName="admission-inquiries"
               empty={{ icon: UserPlus, title: "No inquiries yet", body: "Log your first admission inquiry." }}
             />
-          </CardContent>
-        </Card>
-      ))}
+          </DataPanel>
+        ))}
 
-      {tab === "applications" && (loadingApps ? <PageLoader /> : (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "applications" && (loadingApps ? <PageLoader /> : (
+          <DataPanel bodyClassName="p-0">
             <DataTable
               columns={APPLICATION_COLUMNS}
               rows={applications ?? []}
@@ -508,92 +544,102 @@ function AdmissionContent() {
               exportFileName="admission-applications"
               empty={{ icon: UserPlus, title: "No applications yet", body: "Convert inquiries or create applications directly." }}
             />
-          </CardContent>
-        </Card>
-      ))}
+          </DataPanel>
+        ))}
 
-      {detailApp ? (
-        <Dialog open onOpenChange={(open) => !open && setDetailApp(null)}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Applicant — {detail.student_name}</DialogTitle>
-            </DialogHeader>
-            {/* Status timeline — the ordered pipeline with the current stage
-                highlighted; side-states (rejected/waitlisted) get a banner. */}
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="flex items-start">
-                {TIMELINE_STAGES.map((stage, i) => {
-                  const curIdx = TIMELINE_STAGES.indexOf(detail.status);
-                  const reached = curIdx >= 0 && i <= curIdx;
-                  const isCurrent = stage === detail.status;
-                  return (
-                    <div key={stage} className="flex flex-1 items-start last:flex-none">
-                      <div className="flex flex-col items-center gap-1 px-1">
-                        <span
-                          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                            isCurrent
-                              ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
-                              : reached
-                                ? "bg-primary/20 text-primary"
-                                : "bg-muted text-muted-foreground border"
-                          }`}
-                        >
-                          {i + 1}
-                        </span>
-                        <span className={`text-[10px] leading-tight text-center ${isCurrent ? "font-semibold" : "text-muted-foreground"}`}>
-                          {statusLabel(stage)}
-                        </span>
+        {detailApp ? (
+          <Dialog open onOpenChange={(open) => !open && setDetailApp(null)}>
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Applicant — {detail.student_name}</DialogTitle>
+              </DialogHeader>
+              {/* Status timeline — the ordered pipeline with the current stage
+                  highlighted; side-states (rejected/waitlisted) get a banner. */}
+              <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] bg-[var(--w11-control-hover)] p-3">
+                <div className="flex items-start">
+                  {TIMELINE_STAGES.map((stage, i) => {
+                    const curIdx = TIMELINE_STAGES.indexOf(detail.status);
+                    const reached = curIdx >= 0 && i <= curIdx;
+                    const isCurrent = stage === detail.status;
+                    return (
+                      <div key={stage} className="flex flex-1 items-start last:flex-none">
+                        <div className="flex flex-col items-center gap-1 px-1">
+                          <span
+                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                              isCurrent
+                                ? "text-white"
+                                : reached
+                                  ? ""
+                                  : "border border-[var(--w11-border-default)] text-[color:var(--w11-text-secondary)]"
+                            }`}
+                            style={
+                              isCurrent
+                                ? { background: "var(--w11-accent)", boxShadow: "0 0 0 3px var(--w11-accent-light)" }
+                                : reached
+                                  ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" }
+                                  : { background: "var(--w11-control-hover)" }
+                            }
+                          >
+                            {i + 1}
+                          </span>
+                          <span className={`text-[10px] leading-tight text-center ${isCurrent ? "font-semibold" : "text-[color:var(--w11-text-secondary)]"}`}>
+                            {statusLabel(stage)}
+                          </span>
+                        </div>
+                        {i < TIMELINE_STAGES.length - 1 && (
+                          <div
+                            className={`mt-2.5 h-0.5 flex-1 ${reached && curIdx > i ? "" : ""}`}
+                            style={{ background: reached && curIdx > i ? "var(--w11-accent-light)" : "var(--w11-border-default)" }}
+                          />
+                        )}
                       </div>
-                      {i < TIMELINE_STAGES.length - 1 && (
-                        <div className={`mt-2.5 h-0.5 flex-1 ${reached && curIdx > i ? "bg-primary/40" : "bg-border"}`} />
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                {(detail.status === "rejected" || detail.status === "waitlisted") && (
+                  <p className="mt-2 text-xs font-medium capitalize text-center" style={{ color: "#c42b1c" }}>
+                    Current side-state: {statusLabel(detail.status)}
+                  </p>
+                )}
+                {detail.created_at && (
+                  <p className="mt-1 text-[10px] text-[color:var(--w11-text-secondary)] text-center">
+                    Applied on {detail.created_at.slice(0, 10)}
+                  </p>
+                )}
               </div>
-              {(detail.status === "rejected" || detail.status === "waitlisted") && (
-                <p className="mt-2 text-xs font-medium text-destructive capitalize text-center">
-                  Current side-state: {statusLabel(detail.status)}
-                </p>
-              )}
-              {detail.created_at && (
-                <p className="mt-1 text-[10px] text-muted-foreground text-center">
-                  Applied on {detail.created_at.slice(0, 10)}
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <Detail label="Class Applied" value={detail.class_applied} />
-              <Detail label="Status" value={statusLabel(detail.status)} />
-              <Detail label="Date of Birth" value={detail.dob} />
-              <Detail label="Gender" value={detail.gender} />
-              <Detail label="Previous School" value={detail.previous_school} />
-              <Detail label="Address" value={detail.address} />
-              <Detail label="Parent Name" value={detail.parent_name || detail.guardian_name} />
-              <Detail label="Parent Phone" value={detail.parent_phone || detail.guardian_phone} />
-              <Detail label="Parent Email" value={detail.parent_email || detail.guardian_email} />
-              <Detail label="Guardian Name" value={detail.guardian_name} />
-              <Detail label="Guardian Phone" value={detail.guardian_phone} />
-              <Detail label="Guardian Email" value={detail.guardian_email} />
-              <Detail label="Test Score" value={detail.test_score != null ? String(detail.test_score) : null} />
-              <Detail label="Interview Score" value={detail.interview_score != null ? String(detail.interview_score) : null} />
-              <Detail label="Merit Rank" value={detail.merit_rank != null ? String(detail.merit_rank) : null} />
-              <Detail label="Documents" value={detail.documents?.length ? `${detail.documents.length} attached` : null} />
-              <Detail label="Remarks" value={detail.remarks} />
-              <Detail label="Notes" value={detail.notes} />
-              <Detail label="Created" value={detail.created_at ? detail.created_at.slice(0, 10) : null} />
-            </div>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-    </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <Detail label="Class Applied" value={detail.class_applied} />
+                <Detail label="Status" value={statusLabel(detail.status)} />
+                <Detail label="Date of Birth" value={detail.dob} />
+                <Detail label="Gender" value={detail.gender} />
+                <Detail label="Previous School" value={detail.previous_school} />
+                <Detail label="Address" value={detail.address} />
+                <Detail label="Parent Name" value={detail.parent_name || detail.guardian_name} />
+                <Detail label="Parent Phone" value={detail.parent_phone || detail.guardian_phone} />
+                <Detail label="Parent Email" value={detail.parent_email || detail.guardian_email} />
+                <Detail label="Guardian Name" value={detail.guardian_name} />
+                <Detail label="Guardian Phone" value={detail.guardian_phone} />
+                <Detail label="Guardian Email" value={detail.guardian_email} />
+                <Detail label="Test Score" value={detail.test_score != null ? String(detail.test_score) : null} />
+                <Detail label="Interview Score" value={detail.interview_score != null ? String(detail.interview_score) : null} />
+                <Detail label="Merit Rank" value={detail.merit_rank != null ? String(detail.merit_rank) : null} />
+                <Detail label="Documents" value={detail.documents?.length ? `${detail.documents.length} attached` : null} />
+                <Detail label="Remarks" value={detail.remarks} />
+                <Detail label="Notes" value={detail.notes} />
+                <Detail label="Created" value={detail.created_at ? detail.created_at.slice(0, 10) : null} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : null}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-[color:var(--w11-text-secondary)]">{label}</p>
       <p className="font-medium truncate">{value || "—"}</p>
     </div>
   );

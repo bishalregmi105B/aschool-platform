@@ -5,12 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { DetailSheet } from "@/components/ui/sheet";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, FilterCommandBar,
+  DataPanel, StatusChip, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   Table,
   TableBody,
@@ -71,19 +72,6 @@ const STATUS_FILTERS = [
   { value: "paid", label: "Paid" },
   { value: "waived", label: "Waived" },
 ] as const;
-
-function statusVariant(status: string) {
-  switch (status) {
-    case "paid":
-      return "success" as const;
-    case "partial":
-      return "warning" as const;
-    case "waived":
-      return "secondary" as const;
-    default:
-      return "destructive" as const;
-  }
-}
 
 export default function FeeInvoicesPage() {
   return (
@@ -167,7 +155,7 @@ function InvoicesContent() {
       render: (i) => (
         <div>
           <p className="font-medium">{i.student_name}</p>
-          <p className="text-xs text-muted-foreground">{i.class_name || "—"}</p>
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">{i.class_name || "—"}</p>
         </div>
       ),
     },
@@ -179,7 +167,7 @@ function InvoicesContent() {
       render: (i) => (
         <div>
           <p>{i.title}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">
             {i.academic_year || "—"}
             {i.period_key ? ` • ${i.period_key}` : ""}
           </p>
@@ -198,7 +186,7 @@ function InvoicesContent() {
       label: "Status",
       sortable: true,
       value: (i) => i.status,
-      render: (i) => <Badge variant={statusVariant(i.status)}>{i.status}</Badge>,
+      render: (i) => <StatusChip status={i.status} />,
     },
     {
       key: "total_amount",
@@ -215,7 +203,7 @@ function InvoicesContent() {
       sortable: true,
       value: (i) => i.paid_amount,
       render: (i) => (
-        <span className="text-green-700">{formatNepaliCurrency(i.paid_amount || 0)}</span>
+        <span style={{ color: "#107c10" }}>{formatNepaliCurrency(i.paid_amount || 0)}</span>
       ),
     },
     {
@@ -225,7 +213,10 @@ function InvoicesContent() {
       sortable: true,
       value: (i) => i.due_amount,
       render: (i) => (
-        <span className={i.due_amount > 0 ? "font-bold text-red-600" : "text-muted-foreground"}>
+        <span
+          className={i.due_amount > 0 ? "font-bold" : "text-[color:var(--w11-text-secondary)]"}
+          style={i.due_amount > 0 ? { color: "#c42b1c" } : undefined}
+        >
           {formatNepaliCurrency(i.due_amount || 0)}
         </span>
       ),
@@ -238,40 +229,42 @@ function InvoicesContent() {
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading invoices…" /></AOSPage>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Fee Invoices</h1>
-        <p className="text-muted-foreground">
-          Per-student bill documents grouped from fee collections
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Fee Invoices"
+        subtitle={`Per-student bill documents grouped from fee collections${meta ? ` · ${meta.total} invoices` : ""}`}
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
+          <div className="flex flex-wrap gap-1">
+            {STATUS_FILTERS.map((f) => (
+              <Button
+                key={f.value}
+                size="sm"
+                variant={status === f.value ? "default" : "outline"}
+                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  setStatus(f.value);
+                  setPage(1);
+                }}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </FilterCommandBar>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <FileText className="h-4 w-4 text-primary" /> Invoices
-            <div className="ml-auto flex flex-wrap gap-1">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f.value}
-                  size="sm"
-                  variant={status === f.value ? "default" : "outline"}
-                  className="h-7 px-3 text-xs"
-                  onClick={() => {
-                    setStatus(f.value);
-                    setPage(1);
-                  }}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Invoices
+            </span>
+          }
+        >
           <DataTable<Invoice>
             columns={COLUMNS}
             rows={filtered}
@@ -305,138 +298,137 @@ function InvoicesContent() {
               body: "Invoices are created automatically when fee structures are applied to students.",
             }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <DetailSheet
-        open={Boolean(activeId)}
-        onOpenChange={(open) => !open && setActiveId(null)}
-        title={detail?.student_name || "Invoice"}
-        subtitle={
-          detail
-            ? `${detail.title} • ${detail.academic_year || ""}${
+        <DetailSheet
+          open={Boolean(activeId)}
+          onOpenChange={(open) => !open && setActiveId(null)}
+          title={detail?.student_name || "Invoice"}
+          subtitle={
+            detail
+              ? `${detail.title} • ${detail.academic_year || ""}${
                 detail.due_date_bs ? ` • Due ${formatNepaliDate(detail.due_date_bs)}` : ""
               }`
-            : undefined
-        }
-        size="lg"
-      >
-        {detailLoading || !detail ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "Total", value: detail.total_amount, cls: "" },
-                { label: "Paid", value: detail.paid_amount, cls: "text-green-700" },
-                { label: "Due", value: detail.due_amount, cls: "text-red-600" },
-              ].map((s) => (
-                <Card key={s.label}>
-                  <CardContent className="pt-4 pb-3 px-4">
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                    <p className={`text-lg font-bold ${s.cls}`}>
+              : undefined
+          }
+          size="lg"
+        >
+          {detailLoading || !detail ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: "Total", value: detail.total_amount, color: "var(--w11-text-primary)" },
+                  { label: "Paid", value: detail.paid_amount, color: "#107c10" },
+                  { label: "Due", value: detail.due_amount, color: "#c42b1c" },
+                ].map((s) => (
+                  <div key={s.label} className="win11-card pt-4 pb-3 px-4">
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.label}</p>
+                    <p className="text-lg font-bold" style={{ color: s.color }}>
                       {formatNepaliCurrency(s.value || 0)}
                     </p>
-                  </CardContent>
-                </Card>
-              ))}
-              <Card>
-                <CardContent className="pt-4 pb-3 px-4">
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <div className="mt-1">
-                    <Badge variant={statusVariant(detail.status)}>{detail.status}</Badge>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                ))}
+                <div className="win11-card pt-4 pb-3 px-4">
+                  <p className="text-xs text-[color:var(--w11-text-secondary)]">Status</p>
+                  <div className="mt-1">
+                    <StatusChip status={detail.status} />
+                  </div>
+                </div>
+              </div>
 
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fee Item</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Due</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Receipt</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(detail.lines ?? []).map((line) => (
-                    <TableRow key={line.id}>
-                      <TableCell>
-                        <p className="font-medium">{line.fee_type}</p>
-                        {Number(line.discount_amount) > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            Discount {formatNepaliCurrency(line.discount_amount)}
-                          </p>
-                        )}
-                        {Number(line.late_fine_amount) > 0 && (
-                          <p className="text-xs text-red-600">
-                            Late fine {formatNepaliCurrency(line.late_fine_amount)}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {line.month_bs
-                          ? line.month_bs
-                          : line.due_date
-                            ? displayBS(line.due_date)
-                            : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNepaliCurrency(line.net_amount || 0)}
-                      </TableCell>
-                      <TableCell className="text-right text-green-700">
-                        {formatNepaliCurrency(line.paid_amount || 0)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={line.due_amount > 0 ? "font-semibold text-red-600" : "text-muted-foreground"}>
-                          {formatNepaliCurrency(line.due_amount || 0)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(line.status)}>{line.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {line.receipt_id ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 text-xs"
-                            disabled={downloadingId === line.id}
-                            onClick={() => downloadReceipt(line)}
-                          >
-                            {downloadingId === line.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Download className="h-3 w-3" />
-                            )}
-                            {line.receipt_number || "PDF"}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!detail.lines?.length && (
+              <div className="rounded-lg border border-[var(--w11-border-subtle)] overflow-hidden">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                        No fee lines on this invoice.
-                      </TableCell>
+                      <TableHead>Fee Item</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Due</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Receipt</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {(detail.lines ?? []).map((line) => (
+                      <TableRow key={line.id}>
+                        <TableCell>
+                          <p className="font-medium">{line.fee_type}</p>
+                          {Number(line.discount_amount) > 0 && (
+                            <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                              Discount {formatNepaliCurrency(line.discount_amount)}
+                            </p>
+                          )}
+                          {Number(line.late_fine_amount) > 0 && (
+                            <p className="text-xs" style={{ color: "#c42b1c" }}>
+                              Late fine {formatNepaliCurrency(line.late_fine_amount)}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-[color:var(--w11-text-secondary)]">
+                          {line.month_bs
+                            ? line.month_bs
+                            : line.due_date
+                              ? displayBS(line.due_date)
+                              : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatNepaliCurrency(line.net_amount || 0)}
+                        </TableCell>
+                        <TableCell className="text-right" style={{ color: "#107c10" }}>
+                          {formatNepaliCurrency(line.paid_amount || 0)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={line.due_amount > 0 ? "font-semibold" : "text-[color:var(--w11-text-secondary)]"}
+                            style={line.due_amount > 0 ? { color: "#c42b1c" } : undefined}
+                          >
+                            {formatNepaliCurrency(line.due_amount || 0)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <StatusChip status={line.status} />
+                        </TableCell>
+                        <TableCell>
+                          {line.receipt_id ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 text-xs"
+                              disabled={downloadingId === line.id}
+                              onClick={() => downloadReceipt(line)}
+                            >
+                              {downloadingId === line.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              {line.receipt_number || "PDF"}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-[color:var(--w11-text-secondary)]">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!detail.lines?.length && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-8 text-center text-sm text-[color:var(--w11-text-secondary)]">
+                          No fee lines on this invoice.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>
-        )}
-      </DetailSheet>
-    </div>
+          )}
+        </DetailSheet>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

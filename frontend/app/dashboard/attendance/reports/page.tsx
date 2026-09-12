@@ -5,13 +5,21 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Download, Users, Calendar, TrendingUp } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  StatGrid,
+  KpiCard,
+} from "@/components/aos/kit/page-kit";
+import { Download, Users, Calendar, TrendingUp, BarChart3 } from "lucide-react";
 
 export default function AttendanceReportsPage() {
   return <PluginGate slug="attendance"><ReportsContent /></PluginGate>;
@@ -68,8 +76,11 @@ function ReportsContent() {
 
   if (isError)
     return (
-      <div className="p-6 border border-destructive/30 bg-destructive/5 rounded-lg text-center space-y-2">
-        <p className="text-sm text-destructive">Failed to load attendance report. Please try again.</p>
+      <div
+        className="rounded-[var(--w11-radius-lg)] border p-6 text-center space-y-2"
+        style={{ borderColor: "rgba(196,43,28,0.3)", background: "rgba(196,43,28,0.05)" }}
+      >
+        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load attendance report. Please try again.</p>
         <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
       </div>
     );
@@ -99,9 +110,9 @@ function ReportsContent() {
 
   const REPORT_COLUMNS: Column<any>[] = [
     { key: "student_name", label: "Student", sortable: true, value: (s) => s.student_name || "", render: (s) => <span className="font-medium">{s.student_name}</span> },
-    { key: "present", label: "Present", align: "right", sortable: true, value: (s) => s.present || 0, render: (s) => <span className="text-green-600">{s.present || 0}</span> },
-    { key: "absent", label: "Absent", align: "right", sortable: true, value: (s) => s.absent || 0, render: (s) => <span className="text-red-600">{s.absent || 0}</span> },
-    { key: "late", label: "Late", align: "right", sortable: true, value: (s) => s.late || 0, render: (s) => <span className="text-yellow-600">{s.late || 0}</span> },
+    { key: "present", label: "Present", align: "right", sortable: true, value: (s) => s.present || 0, render: (s) => <span style={{ color: "#107c10" }}>{s.present || 0}</span> },
+    { key: "absent", label: "Absent", align: "right", sortable: true, value: (s) => s.absent || 0, render: (s) => <span style={{ color: "#c42b1c" }}>{s.absent || 0}</span> },
+    { key: "late", label: "Late", align: "right", sortable: true, value: (s) => s.late || 0, render: (s) => <span style={{ color: "#d83b01" }}>{s.late || 0}</span> },
     { key: "leave", label: "Leave", align: "right", value: (s) => s.leave || 0 },
     {
       key: "percentage",
@@ -118,36 +129,58 @@ function ReportsContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Attendance Reports</h1><p className="text-muted-foreground">Monthly attendance analytics and student-wise reports</p></div>
-        <Button variant="outline" onClick={exportCSV} disabled={students.length === 0}><Download className="h-4 w-4 mr-2" /> Export CSV</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Attendance Reports"
+        subtitle="Monthly attendance analytics and student-wise reports"
+        actions={
+          <Button variant="outline" onClick={exportCSV} disabled={students.length === 0}>
+            <Download className="h-4 w-4 mr-2" /> Export CSV
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <AdvancedSelect
+            value={classId}
+            onChange={(v) => setClassId(v)}
+            options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+          />
+          <AdvancedSelect
+            className="w-44"
+            value={month}
+            onChange={(v) => setMonth(v)}
+            options={MONTH_OPTIONS}
+          />
+        </FilterCommandBar>
 
-      <div className="flex gap-4">
-        <AdvancedSelect
-          value={classId}
-          onChange={(v) => setClassId(v)}
-          options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
-        />
-        <AdvancedSelect
-          className="w-44"
-          value={month}
-          onChange={(v) => setMonth(v)}
-          options={MONTH_OPTIONS}
-        />
-      </div>
+        <StatGrid min={180}>
+          <KpiCard
+            label="Working Days"
+            value={summary.working_days || "—"}
+            icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-text-tertiary)" }} />}
+          />
+          <KpiCard
+            label="Avg Attendance"
+            value={summary.avg_attendance ? `${summary.avg_attendance}%` : (summary.attendance_rate ? `${summary.attendance_rate}%` : "—")}
+            color="#107c10"
+            icon={<TrendingUp className="h-5 w-5" style={{ color: "#107c10", opacity: 0.6 }} />}
+          />
+          <KpiCard
+            label="Total Students"
+            value={summary.total_students || students.length || "—"}
+            icon={<Users className="h-5 w-5" style={{ color: "var(--w11-text-tertiary)" }} />}
+          />
+          <KpiCard
+            label="Below 75%"
+            value={summary.below_threshold || students.filter((s: any) => (s.percentage || 0) < 75).length}
+            color="#c42b1c"
+            icon={<Users className="h-5 w-5" style={{ color: "#c42b1c", opacity: 0.6 }} />}
+          />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Working Days</p><p className="text-2xl font-bold">{summary.working_days || "—"}</p></div><Calendar className="h-8 w-8 text-muted-foreground" /></div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Avg Attendance</p><p className="text-2xl font-bold text-green-600">{summary.avg_attendance ? `${summary.avg_attendance}%` : (summary.attendance_rate ? `${summary.attendance_rate}%` : "—")}</p></div><TrendingUp className="h-8 w-8 text-green-600 opacity-50" /></div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Total Students</p><p className="text-2xl font-bold">{summary.total_students || students.length || "—"}</p></div><Users className="h-8 w-8 text-muted-foreground" /></div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Below 75%</p><p className="text-2xl font-bold text-red-600">{summary.below_threshold || students.filter((s: any) => (s.percentage || 0) < 75).length}</p></div><Users className="h-8 w-8 text-red-600 opacity-50" /></div></CardContent></Card>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle>Student-wise Attendance</CardTitle></CardHeader>
-        <CardContent>
+        <DataPanel title="Student-wise Attendance">
           <DataTable
             columns={REPORT_COLUMNS}
             rows={students}
@@ -157,8 +190,8 @@ function ReportsContent() {
             exportFileName={`attendance-${month}`}
             empty={{ icon: Users, title: "No data available", body: "Pick a class and month with recorded attendance." }}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

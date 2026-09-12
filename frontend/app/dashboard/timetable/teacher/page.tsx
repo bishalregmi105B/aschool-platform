@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Calendar, Clock } from "lucide-react";
 import { PageLoader } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 export default function TeacherTimetablePage() {
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
@@ -43,29 +50,22 @@ export default function TeacherTimetablePage() {
   if (isLoading) return <PageLoader />;
     if (isError) {
       return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load teacher list. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
+        <div className="win11-card p-6 text-center space-y-3">
+          <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load teacher list. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
         </div>
       );
     }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Calendar className="h-6 w-6" /> Teacher Timetable
-        </h1>
-        <p className="text-muted-foreground">View and manage individual class schedules for teachers</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Teacher</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Teacher Timetable"
+        subtitle="View and manage individual class schedules for teachers"
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
           <div className="max-w-md space-y-2">
             <Label>Teacher Name</Label>
             <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
@@ -79,61 +79,70 @@ export default function TeacherTimetablePage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {selectedTeacherId && (
-        <Card className="overflow-hidden">
-          {slotsLoading ? (
-            <PageLoader />
-          ) : slots.length === 0 ? (
-            <CardContent className="py-10 text-center text-muted-foreground">
-              No timetable slots assigned to this teacher.
-            </CardContent>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-                <thead className="bg-muted text-muted-foreground uppercase">
-                  <tr>
-                    <th className="px-6 py-4 border font-medium"><Clock className="h-4 w-4 inline mr-2" /> Time / Day</th>
-                    {periods.map((period) => (
-                      <th key={period} className="px-6 py-4 border font-medium text-center">Period {period}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {days.map((day) => (
-                    <tr key={day} className="bg-card hover:bg-muted/50 transition-colors border-b">
-                      <td className="px-6 py-4 border font-medium bg-muted/20">{day}</td>
-                      {periods.map((period) => {
-                        const slot = slots.find(
-                          (item) => item.day_of_week === day && Number(item.period_number) === period
-                        );
-
-                        return (
-                          <td key={`${day}-${period}`} className="px-4 py-3 border text-center relative group">
-                            {slot ? (
-                              <div className="flex flex-col items-center justify-center p-2 rounded bg-primary/10 border border-primary/20">
-                                <span className="font-semibold">
-                                  {[slot.class_name, slot.section_name].filter(Boolean).join(" ") || "Assigned"}
-                                </span>
-                                <span className="text-xs text-muted-foreground">{slot.subject_name || slot.subject || "Subject"}</span>
-                                {slot.time && <span className="text-[11px] text-muted-foreground">{slot.time}</span>}
-                              </div>
-                            ) : (
-                              <div className="text-muted-foreground/50 text-xs">Free</div>
-                            )}
-                          </td>
-                        );
-                      })}
+        {selectedTeacherId && (
+          <DataPanel bodyClassName="p-0">
+            {slotsLoading ? (
+              <PageLoader />
+            ) : slots.length === 0 ? (
+              <AOSEmptyState
+                title="No timetable slots"
+                description="No timetable slots assigned to this teacher."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr>
+                      <th className="px-6 py-4 border border-[var(--w11-border-default)] bg-[var(--w11-surface-solid)] font-medium text-[color:var(--w11-text-secondary)] uppercase">
+                        <Clock className="h-4 w-4 inline mr-2" /> Time / Day
+                      </th>
+                      {periods.map((period) => (
+                        <th key={period} className="px-6 py-4 border border-[var(--w11-border-default)] bg-[var(--w11-surface-solid)] font-medium text-center text-[color:var(--w11-text-secondary)]">Period {period}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
+                  </thead>
+                  <tbody>
+                    {days.map((day) => (
+                      <tr key={day} className="border-b border-[var(--w11-border-subtle)] transition-colors hover:bg-[var(--w11-control-hover)]">
+                        <td className="px-6 py-4 border border-[var(--w11-border-subtle)] font-medium bg-[var(--w11-control-hover)]">{day}</td>
+                        {periods.map((period) => {
+                          const slot = slots.find(
+                            (item) => item.day_of_week === day && Number(item.period_number) === period
+                          );
+
+                          return (
+                            <td key={`${day}-${period}`} className="px-4 py-3 border border-[var(--w11-border-subtle)] text-center relative group">
+                              {slot ? (
+                                <div
+                                  className="flex flex-col items-center justify-center p-2 rounded-[var(--w11-radius-md)] border"
+                                  style={{
+                                    background: "var(--w11-accent-light)",
+                                    borderColor: "var(--w11-accent)",
+                                  }}
+                                >
+                                  <span className="font-semibold">
+                                    {[slot.class_name, slot.section_name].filter(Boolean).join(" ") || "Assigned"}
+                                  </span>
+                                  <span className="text-xs text-[color:var(--w11-text-secondary)]">{slot.subject_name || slot.subject || "Subject"}</span>
+                                  {slot.time && <span className="text-[11px] text-[color:var(--w11-text-tertiary)]">{slot.time}</span>}
+                                </div>
+                              ) : (
+                                <div className="text-[color:var(--w11-text-tertiary)] text-xs">Free</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

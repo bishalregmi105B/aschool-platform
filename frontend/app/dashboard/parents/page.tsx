@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
@@ -27,10 +26,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PageLoader } from "@/components/ui/spinner";
 import {
-  ChevronLeft,
-  ChevronRight,
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  FilterCommandBar,
+  StatGrid,
+  KpiCard,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import {
   Plus,
   Search,
   ShieldCheck,
@@ -182,7 +189,7 @@ export default function ParentsPage() {
     onError: () => toast.error("Failed to update parent status"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading parents…" />;
 
   const parents = Array.isArray(data?.data) ? data.data : [];
 
@@ -195,7 +202,7 @@ export default function ParentsPage() {
       render: (pr) => (
         <div>
           <div className="text-sm">{pr.phone || "-"}</div>
-          {pr.email && <div className="text-xs text-muted-foreground">{pr.email}</div>}
+          {pr.email && <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{pr.email}</div>}
         </div>
       ),
     },
@@ -209,7 +216,7 @@ export default function ParentsPage() {
         <div>
           <Badge variant="secondary">{pr.children_count || 0} children</Badge>
           {(pr.children || []).slice(0, 2).map((child) => (
-            <div key={child.id} className="text-xs text-muted-foreground mt-1">
+            <div key={child.id} className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
               {child.name}
             </div>
           ))}
@@ -222,16 +229,14 @@ export default function ParentsPage() {
       sortable: true,
       value: (pr) => (pr.is_active ? "active" : "inactive"),
       render: (pr) => (
-        <Badge variant={pr.is_active ? "success" : "destructive"}>
-          {pr.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <StatusChip status={pr.is_active ? "active" : "inactive"} label={pr.is_active ? "Active" : "Inactive"} />
       ),
     },
     {
       key: "credentials",
       label: "Credentials",
       value: (pr) => pr.login_id ?? pr.email ?? pr.phone ?? "",
-      render: (pr) => <div className="text-xs text-muted-foreground">ID: {pr.login_id || pr.email || pr.phone}</div>,
+      render: (pr) => <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>ID: {pr.login_id || pr.email || pr.phone}</div>,
     },
     {
       key: "actions",
@@ -260,196 +265,202 @@ export default function ParentsPage() {
   const pagination = data?.meta?.pagination;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" /> Parents
-          </h1>
-          <p className="text-muted-foreground">Manage all parent accounts and child links</p>
-        </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Parents"
+        subtitle={
+          pagination?.total != null
+            ? `${pagination.total} parent accounts · Manage all parent accounts and child links`
+            : "Manage all parent accounts and child links"
+        }
+        actions={
+          <Dialog
+            open={showAdd}
+            onOpenChange={(open) => {
+              setShowAdd(open);
+              if (!open) {
+                setSelectedStudentIds([]);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" /> Add Parent
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Create Parent Account</DialogTitle>
+              </DialogHeader>
 
-        <Dialog
-          open={showAdd}
-          onOpenChange={(open) => {
-            setShowAdd(open);
-            if (!open) {
-              setSelectedStudentIds([]);
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" /> Add Parent
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Create Parent Account</DialogTitle>
-            </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input
+                      value={form.full_name}
+                      onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Parent full name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={form.phone}
+                      onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      placeholder="98XXXXXXXX"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input
-                    value={form.full_name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
-                    placeholder="Parent full name"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email (Optional)</Label>
+                    <Input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="parent@email.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password (Optional)</Label>
+                    <Input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                      placeholder="Leave blank for default"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="98XXXXXXXX"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email (Optional)</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="parent@email.com"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Default Relation</Label>
+                    <Select
+                      value={form.relation}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, relation: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="father">Father</SelectItem>
+                        <SelectItem value="mother">Mother</SelectItem>
+                        <SelectItem value="guardian">Guardian</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-xs self-end pb-2" style={{ color: "var(--w11-text-secondary)" }}>
+                    If password is empty, backend sets default as EMIS_ID@Last4Phone.
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Password (Optional)</Label>
-                  <Input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                    placeholder="Leave blank for default"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Default Relation</Label>
-                  <Select
-                    value={form.relation}
-                    onValueChange={(value) => setForm((prev) => ({ ...prev, relation: value }))}
+                  <Label>Link Students (Optional)</Label>
+                  <div
+                    className="max-h-56 overflow-y-auto border border-[color:var(--w11-border-subtle)] rounded-[var(--w11-radius-md)] p-3 space-y-2"
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="father">Father</SelectItem>
-                      <SelectItem value="mother">Mother</SelectItem>
-                      <SelectItem value="guardian">Guardian</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="text-xs text-muted-foreground self-end pb-2">
-                  If password is empty, backend sets default as EMIS_ID@Last4Phone.
-                </div>
-              </div>
+                    {(students || []).length === 0 ? (
+                      <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>No students found.</p>
+                    ) : (
+                      (students || []).map((student) => {
+                        const studentName = student.full_name || `${student.first_name || ""} ${student.last_name || ""}`.trim();
+                        const checked = selectedStudentIds.includes(student.id);
 
-              <div className="space-y-2">
-                <Label>Link Students (Optional)</Label>
-                <div className="max-h-56 overflow-y-auto border rounded-md p-3 space-y-2">
-                  {(students || []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No students found.</p>
-                  ) : (
-                    (students || []).map((student) => {
-                      const studentName = student.full_name || `${student.first_name || ""} ${student.last_name || ""}`.trim();
-                      const checked = selectedStudentIds.includes(student.id);
 
-                    
 
   return (
-                        <label
-                          key={student.id}
-                          className="flex items-center justify-between gap-3 p-2 rounded hover:bg-muted/40 cursor-pointer"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{studentName || "Unnamed student"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {student.class_name || "Class -"}
-                              {student.section_name ? ` • ${student.section_name}` : ""}
-                            </p>
-                          </div>
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) => {
-                              if (value) {
-                                setSelectedStudentIds((prev) => (prev.includes(student.id) ? prev : [...prev, student.id]));
-                              } else {
-                                setSelectedStudentIds((prev) => prev.filter((id) => id !== student.id));
-                              }
-                            }}
-                          />
-                        </label>
-                      );
-                    })
-                  )}
+                          <label
+                            key={student.id}
+                            className="flex items-center justify-between gap-3 p-2 rounded-[var(--w11-radius-sm)] hover:bg-[color:var(--w11-control-hover)] cursor-pointer"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{studentName || "Unnamed student"}</p>
+                              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                                {student.class_name || "Class -"}
+                                {student.section_name ? ` • ${student.section_name}` : ""}
+                              </p>
+                            </div>
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(value) => {
+                                if (value) {
+                                  setSelectedStudentIds((prev) => (prev.includes(student.id) ? prev : [...prev, student.id]));
+                                } else {
+                                  setSelectedStudentIds((prev) => prev.filter((id) => id !== student.id));
+                                }
+                              }}
+                            />
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => createParentMutation.mutate()}
-                disabled={createParentMutation.isPending || !form.full_name.trim() || !form.phone.trim()}
-              >
-                {createParentMutation.isPending ? "Saving..." : "Create Parent"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAdd(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => createParentMutation.mutate()}
+                  disabled={createParentMutation.isPending || !form.full_name.trim() || !form.phone.trim()}
+                >
+                  {createParentMutation.isPending ? "Saving..." : "Create Parent"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      <AOSPageBody>
+        {pagination?.total != null && (
+          <StatGrid min={170}>
+            <KpiCard label="Parent Accounts" value={pagination.total} />
+            <KpiCard label="Showing" value={parents.length} denominator={`/ ${pagination.total}`} color="#107c10" footnote={`Page ${pagination.page} of ${pagination.pages}`} />
+          </StatGrid>
+        )}
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search parent by name, phone, or email..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value);
+        <FilterCommandBar>
+          <div className="relative flex-1 min-w-[220px]">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
+              style={{ color: "var(--w11-text-tertiary)" }}
+            />
+            <Input
+              placeholder="Search parent by name, phone, or email..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="w-full md:w-52">
-                <SelectValue placeholder="Filter status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Parent Accounts</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full md:w-52">
+              <SelectValue placeholder="Filter status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterCommandBar>
+
+        <DataPanel title="Parent Accounts" bodyClassName="p-0">
           <DataTable<ParentUser>
             columns={PARENT_COLUMNS}
             rows={parents}
@@ -470,9 +481,8 @@ export default function ParentsPage() {
             onPageChange={setPage}
             empty={{ icon: ShieldCheck, title: "No parent accounts found", body: "Parent accounts are created from guardian records." }}
           />
-        </CardContent>
-
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

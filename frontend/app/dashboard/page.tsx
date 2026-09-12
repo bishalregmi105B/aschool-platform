@@ -1,18 +1,24 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useI18n } from "@/lib/i18n";
 import { useInstalledPlugins, getPluginDisplayName } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { SkeletonStat } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
 import { WidgetSlot } from "@/components/plugin-widgets/PluginWidgetHost";
 import { ThemedBarChart, ThemedLineChart } from "@/components/ui/charts";
 import { formatCurrency } from "@/lib/utils";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatGrid,
+  KpiCard,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 import {
   GraduationCap,
   Users,
@@ -20,6 +26,12 @@ import {
   ClipboardList,
   TrendingUp,
   Calendar,
+  LayoutDashboard,
+  RefreshCw,
+  UserCog,
+  BookOpen,
+  Bell,
+  Receipt,
 } from "lucide-react";
 
 interface TrendPoint {
@@ -50,6 +62,16 @@ interface DashboardData {
     by_subject?: Array<{ subject: string; average: number }>;
   };
 }
+
+/** Quick-launch tiles — jump straight into the core modules. */
+const QUICK_LAUNCH = [
+  { label: "Students", href: "/dashboard/students", icon: GraduationCap },
+  { label: "Teachers", href: "/dashboard/teachers", icon: UserCog },
+  { label: "Attendance", href: "/dashboard/attendance/mark", icon: ClipboardList },
+  { label: "Fees", href: "/dashboard/fees/collect", icon: Receipt },
+  { label: "Notices", href: "/dashboard/notices?action=add", icon: Bell },
+  { label: "Academics", href: "/dashboard/academics", icon: BookOpen },
+];
 
 /**
  * The school dashboard.
@@ -86,114 +108,97 @@ export default function DashboardPage() {
     active_plugins: installedPlugins.length,
   };
 
-  const cards = [
-    {
-      title: "Total Students",
-      value: stats.total_students,
-      icon: GraduationCap,
-      color: "text-ocean dark:text-mint",
-      bg: "bg-ocean/10 dark:bg-mint/20",
-    },
-    {
-      title: "Teachers & Staff",
-      value: stats.total_teachers + stats.total_staff,
-      icon: Users,
-      color: "text-emerald-700 dark:text-emerald-300",
-      bg: "bg-emerald-50 dark:bg-emerald-950/40",
-    },
-    {
-      title: "Fee Collection (Month)",
-      value: formatCurrency(stats.fee_collection_this_month),
-      icon: DollarSign,
-      color: "text-amber-700 dark:text-amber-300",
-      bg: "bg-amber-50 dark:bg-amber-950/40",
-    },
-    {
-      title: "Attendance Today",
-      value: `${stats.attendance_today_percent}%`,
-      icon: ClipboardList,
-      color: "text-ocean dark:text-mint",
-      bg: "bg-mint/30 dark:bg-mint/20",
-    },
-    {
-      title: "Pending Fees",
-      value: formatCurrency(stats.pending_fee_amount),
-      icon: TrendingUp,
-      color: "text-red-700 dark:text-red-300",
-      bg: "bg-red-50 dark:bg-red-950/40",
-    },
-    {
-      title: "Upcoming Events",
-      value: stats.upcoming_events,
-      icon: Calendar,
-      color: "text-ocean-light dark:text-mint",
-      bg: "bg-ocean/10 dark:bg-mint/15",
-    },
-  ];
-
   const activePlugins = installedPlugins.filter((p) => p.active);
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <AOSPage>
+      <AOSPageHeader
+        icon={<LayoutDashboard className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title={`Welcome back, ${user?.full_name?.split(" ")[0] || "Admin"}`}
-        description="Here's what's happening at your school today."
+        subtitle="Here's what's happening at your school today."
+        actions={
+          <button
+            type="button"
+            className="win11-chip"
+            onClick={() => refetch()}
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
+          </button>
+        }
       />
-
-      {/* Platform KPIs — skeletons keep the grid from jumping when data lands. */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {cards.map((c) => (
-            <SkeletonStat key={c.title} />
-          ))}
-        </div>
-      ) : isError ? (
-        <Card>
-          <CardContent className="p-0">
+      <AOSPageBody>
+        {/* Platform KPIs — skeletons keep the grid from jumping when data lands. */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mb-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonStat key={i} />
+            ))}
+          </div>
+        ) : isError ? (
+          <DataPanel className="mb-4">
             <ErrorState
               title="Couldn't load the school overview"
               body="The dashboard totals are unavailable right now. Plugin cards below may still work."
               onRetry={() => refetch()}
             />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {cards.map((card) => (
-            <Card key={card.title} className="shadow-sm">
-              <CardContent className="p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                      {card.title}
-                    </p>
-                    <p className="mt-0.5 text-xl font-bold">{card.value}</p>
-                  </div>
-                  <div className={`shrink-0 rounded-lg p-2 ${card.bg}`}>
-                    <card.icon className={`h-4 w-4 ${card.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+          </DataPanel>
+        ) : (
+          <StatGrid min={150}>
+            <KpiCard
+              label="Total Students"
+              value={stats.total_students}
+              icon={<GraduationCap className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+              color="var(--w11-accent)"
+            />
+            <KpiCard
+              label="Teachers & Staff"
+              value={stats.total_teachers + stats.total_staff}
+              icon={<Users className="h-4 w-4" style={{ color: "#107c10" }} />}
+              color="#107c10"
+            />
+            <KpiCard
+              label="Fee Collection (Month)"
+              value={formatCurrency(stats.fee_collection_this_month)}
+              icon={<DollarSign className="h-4 w-4" style={{ color: "#d83b01" }} />}
+              color="#d83b01"
+            />
+            <KpiCard
+              label="Attendance Today"
+              value={`${stats.attendance_today_percent}%`}
+              icon={<ClipboardList className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+              color="var(--w11-accent)"
+            />
+            <KpiCard
+              label="Pending Fees"
+              value={formatCurrency(stats.pending_fee_amount)}
+              icon={<TrendingUp className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+              color="#c42b1c"
+            />
+            <KpiCard
+              label="Upcoming Events"
+              value={stats.upcoming_events}
+              icon={<Calendar className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+              color="var(--w11-accent)"
+            />
+          </StatGrid>
+        )}
 
-      {/* Trends — real charts over the overview payload's richer halves
-          (attendance by class, fee monthly trend, subject averages). Each
-          panel hides itself when its series is empty instead of showing a
-          hollow frame. */}
-      {!isLoading && !isError && (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {(data?.fee_summary?.by_month?.length ?? 0) > 0 && (
-            <Card className="shadow-sm">
-              <CardHeader className="px-4 pb-1 pt-3">
-                <CardTitle className="text-[13px] font-semibold">
-                  Fee Collection Trend
-                </CardTitle>
-                <p className="text-[11px] text-muted-foreground">Collected vs pending, last months</p>
-              </CardHeader>
-              <CardContent className="px-2 pb-3">
+        {/* Trends — real charts over the overview payload's richer halves
+            (attendance by class, fee monthly trend, subject averages). Each
+            panel hides itself when its series is empty instead of showing a
+            hollow frame. */}
+        {!isLoading && !isError && (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 mb-4">
+            {(data?.fee_summary?.by_month?.length ?? 0) > 0 && (
+              <DataPanel
+                title="Fee Collection Trend"
+                actions={
+                  <span className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    Collected vs pending, last months
+                  </span>
+                }
+                bodyClassName="px-2 pb-3 pt-0"
+              >
                 <ThemedLineChart
                   data={(data?.fee_summary?.by_month ?? []) as unknown as TrendPoint[]}
                   xKey="month"
@@ -202,21 +207,19 @@ export default function DashboardPage() {
                     { key: "pending", name: "Pending", ne: "बाँकी" },
                   ]}
                 />
-              </CardContent>
-            </Card>
-          )}
-          {(data?.attendance_summary?.by_class?.length ?? 0) > 0 && (
-            <Card className="shadow-sm">
-              <CardHeader className="px-4 pb-1 pt-3">
-                <CardTitle className="text-[13px] font-semibold">
-                  Attendance by Class
-                </CardTitle>
-                <p className="text-[11px] text-muted-foreground">
-                  Best: {data?.attendance_summary?.best_class ?? "—"}
-                  {data?.attendance_summary?.worst_class ? ` · Needs attention: ${data.attendance_summary.worst_class}` : ""}
-                </p>
-              </CardHeader>
-              <CardContent className="px-2 pb-3">
+              </DataPanel>
+            )}
+            {(data?.attendance_summary?.by_class?.length ?? 0) > 0 && (
+              <DataPanel
+                title="Attendance by Class"
+                actions={
+                  <span className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    Best: {data?.attendance_summary?.best_class ?? "—"}
+                    {data?.attendance_summary?.worst_class ? ` · Needs attention: ${data.attendance_summary.worst_class}` : ""}
+                  </span>
+                }
+                bodyClassName="px-2 pb-3 pt-0"
+              >
                 <ThemedBarChart
                   data={(data?.attendance_summary?.by_class ?? []).map((c) => ({
                     class_name: c.class_name,
@@ -225,21 +228,20 @@ export default function DashboardPage() {
                   xKey="class_name"
                   bars={[{ key: "percentage", name: "Attendance %", ne: "उपस्थिति %" }]}
                 />
-              </CardContent>
-            </Card>
-          )}
-          {(data?.exam_summary?.by_subject?.length ?? 0) > 0 && (
-            <Card className="shadow-sm lg:col-span-2">
-              <CardHeader className="px-4 pb-1 pt-3">
-                <CardTitle className="text-[13px] font-semibold">
-                  Subject Averages
-                </CardTitle>
-                <p className="text-[11px] text-muted-foreground">
-                  Latest exam · avg score per subject
-                  {data?.exam_summary?.top_subject ? ` · top: ${data.exam_summary.top_subject}` : ""}
-                </p>
-              </CardHeader>
-              <CardContent className="px-2 pb-3">
+              </DataPanel>
+            )}
+            {(data?.exam_summary?.by_subject?.length ?? 0) > 0 && (
+              <DataPanel
+                title="Subject Averages"
+                className="lg:col-span-2"
+                actions={
+                  <span className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    Latest exam · avg score per subject
+                    {data?.exam_summary?.top_subject ? ` · top: ${data.exam_summary.top_subject}` : ""}
+                  </span>
+                }
+                bodyClassName="px-2 pb-3 pt-0"
+              >
                 <ThemedBarChart
                   data={(data?.exam_summary?.by_subject ?? []).map((s) => ({
                     subject: s.subject,
@@ -249,18 +251,30 @@ export default function DashboardPage() {
                   bars={[{ key: "average", name: "Average score", ne: "औसत अंक" }]}
                   height={240}
                 />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              </DataPanel>
+            )}
+          </div>
+        )}
 
-      {/* Plugin-contributed quick actions; falls back to the core four. */}
-      <Card className="shadow-sm">
-        <CardHeader className="px-4 pb-2 pt-3">
-          <CardTitle className="text-[13px] font-semibold">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-3">
+        {/* Quick launch — one-click jumps into the core modules. */}
+        <DataPanel title="Quick Launch" className="mb-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {QUICK_LAUNCH.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center justify-center gap-2 rounded-[var(--w11-radius-md)] border border-[color:var(--w11-border-subtle)] p-3 text-center text-[12px] font-medium transition-colors hover:border-[color:var(--w11-accent)] hover:bg-[color:var(--w11-accent-light)]"
+                style={{ color: "var(--w11-text-primary)" }}
+              >
+                <item.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </DataPanel>
+
+        {/* Plugin-contributed quick actions; falls back to the core four. */}
+        <DataPanel title="Quick Actions" className="mb-4">
           <WidgetSlot
             id="dashboard.actions"
             grid={false}
@@ -273,57 +287,56 @@ export default function DashboardPage() {
                   { label: "Create Notice", href: "/dashboard/notices?action=add" },
                   { label: "Collect Fee", href: "/dashboard/fees/collect" },
                 ].map((action) => (
-                  <a
+                  <Link
                     key={action.label}
                     href={action.href}
-                    className="flex items-center justify-center rounded border p-2.5 text-center text-[12px] font-medium transition-colors hover:bg-accent"
+                    className="flex items-center justify-center rounded-[var(--w11-radius-md)] border border-[color:var(--w11-border-default)] p-2.5 text-center text-[12px] font-medium transition-colors hover:bg-[color:var(--w11-accent-light)] hover:border-[color:var(--w11-accent)]"
+                    style={{ color: "var(--w11-text-primary)" }}
                   >
                     {action.label}
-                  </a>
+                  </Link>
                 ))}
               </div>
             }
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Every installed plugin's dashboard widgets, server-ordered. */}
-      <WidgetSlot id="dashboard.main" />
-      <WidgetSlot id="dashboard.wide" />
-      <WidgetSlot id="dashboard.side" />
+        {/* Every installed plugin's dashboard widgets, server-ordered. */}
+        <WidgetSlot id="dashboard.main" />
+        <WidgetSlot id="dashboard.wide" />
+        <WidgetSlot id="dashboard.side" />
 
-      <Card className="shadow-sm">
-        <CardHeader className="px-4 pb-2 pt-3">
-          <CardTitle className="text-[13px] font-semibold">Active Plugins</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-3">
+        <DataPanel title="Active Plugins">
           <div className="flex flex-wrap gap-1.5">
             {activePlugins.map((p) => (
-              <Badge
+              <StatusChip
                 key={p.plugin_slug}
-                variant="secondary"
-                className="py-0.5 text-[11px]"
-              >
-                {getPluginDisplayName(p.plugin_slug)}
-                {p.is_trial && (
-                  <span className="ml-1 text-[10px] text-amber-600">(trial)</span>
-                )}
-              </Badge>
+                status="user"
+                label={
+                  <>
+                    {getPluginDisplayName(p.plugin_slug)}
+                    {p.is_trial && (
+                      <span className="ml-1 text-[10px]" style={{ color: "#d83b01" }}>(trial)</span>
+                    )}
+                  </>
+                }
+              />
             ))}
             {activePlugins.length === 0 && (
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
                 No plugins installed yet.{" "}
-                <a
+                <Link
                   href="/dashboard/marketplace"
-                  className="text-primary hover:underline"
+                  className="hover:underline"
+                  style={{ color: "var(--w11-accent)" }}
                 >
                   Browse marketplace
-                </a>
+                </Link>
               </p>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

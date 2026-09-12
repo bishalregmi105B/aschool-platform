@@ -5,17 +5,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   CalendarRange,
   CalendarCheck,
@@ -141,7 +143,7 @@ function FeeStructureContent() {
     onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to generate fees"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading fee structures…" /></AOSPage>;
 
   const STRUCTURE_COLUMNS: Column<FeeStructure>[] = [
     {
@@ -152,8 +154,8 @@ function FeeStructureContent() {
       render: (s) => (
         <div>
           <p className="font-medium">{s.name}</p>
-          {s.scope_label && <p className="text-xs text-muted-foreground">{s.scope_label}</p>}
-          {s.effective_note && <p className="text-xs text-muted-foreground mt-1">{s.effective_note}</p>}
+          {s.scope_label && <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.scope_label}</p>}
+          {s.effective_note && <p className="text-xs text-[color:var(--w11-text-secondary)] mt-1">{s.effective_note}</p>}
         </div>
       ),
     },
@@ -168,7 +170,7 @@ function FeeStructureContent() {
       render: (s) => (
         <div>
           <p>{formatLabel(s.frequency)}</p>
-          <p className="text-xs text-muted-foreground">Due day: {s.due_day || "—"}</p>
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">Due day: {s.due_day || "—"}</p>
         </div>
       ),
     },
@@ -182,7 +184,7 @@ function FeeStructureContent() {
           <Badge variant={s.applied_count ? "success" : "secondary"}>
             {s.applied_count ? "Active Now" : "Template Only"}
           </Badge>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">
             {s.applied_count ? `${s.applied_count} billed` : "Not billed yet"}
           </p>
         </div>
@@ -201,34 +203,35 @@ function FeeStructureContent() {
           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); apply.mutate(s.id); }} disabled={apply.isPending}>
             <RefreshCw className="h-3.5 w-3.5 mr-1" /> Apply Now
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Fee Structure</h1><p className="text-muted-foreground">Define reusable fee templates for each class and academic year</p></div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
-            <Banknote className="h-4 w-4 mr-2" /> Generate Monthly Fees
-          </Button>
-          <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Structure</Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Banknote className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Fee Structure"
+        subtitle={`${structures.length} structures · Define reusable fee templates for each class and academic year`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
+              <Banknote className="h-4 w-4 mr-2" /> Generate Monthly Fees
+            </Button>
+            <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Structure</Button>
+          </div>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <DataPanel>
+          <p className="text-sm text-[color:var(--w11-text-secondary)]">
             New fee structures now create the current pending dues immediately for matching active students. Use Apply Now for older templates or to sync the current cycle again.
           </p>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Card>
-        <CardContent className="pt-6">
+        <DataPanel>
           <DataTable<FeeStructure>
             columns={STRUCTURE_COLUMNS}
             rows={structures}
@@ -238,90 +241,90 @@ function FeeStructureContent() {
             exportFileName="fee-structures"
             empty={{ icon: Banknote, title: "No fee structures defined", body: "Add your first structure — new ones bill matching students immediately." }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add Fee Structure</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Monthly Tuition" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <AdvancedSelect
-          value={form.fee_type}
-          onChange={(v) => setForm({ ...form, fee_type: v })}
-          options={[{ value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' }, { value: 'exam', label: 'Exam' }, { value: 'transport', label: 'Transport' }, { value: 'hostel', label: 'Hostel' }, { value: 'library', label: 'Library' }, { value: 'lab', label: 'Lab' }, { value: 'sports', label: 'Sports' }, { value: 'other', label: 'Other' }]}
-        />
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Fee Structure</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Monthly Tuition" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <AdvancedSelect
+            value={form.fee_type}
+            onChange={(v) => setForm({ ...form, fee_type: v })}
+            options={[{ value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' }, { value: 'exam', label: 'Exam' }, { value: 'transport', label: 'Transport' }, { value: 'hostel', label: 'Hostel' }, { value: 'library', label: 'Library' }, { value: 'lab', label: 'Lab' }, { value: 'sports', label: 'Sports' }, { value: 'other', label: 'Other' }]}
+          />
+                </div>
+                <div className="space-y-2"><Label>Amount (Rs.)</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
               </div>
-              <div className="space-y-2"><Label>Amount (Rs.)</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Class</Label>
+                  <AdvancedSelect
+            value={form.class_id}
+            onChange={(v) => setForm({ ...form, class_id: v })}
+            options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+          />
+                </div>
+                <div className="space-y-2">
+                  <Label>Frequency</Label>
+                  <AdvancedSelect
+            value={form.frequency}
+            onChange={(v) => setForm({ ...form, frequency: v })}
+            options={[{ value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'semi-annual', label: 'Semi-Annual' }, { value: 'annual', label: 'Annual' }, { value: 'one-time', label: 'One-Time' }]}
+          />
+                </div>
+              </div>
+              <div className="space-y-2"><Label>Due Day of Cycle</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
+              <FormCheckbox label="Optional fee" checked={form.is_optional} onCheckedChange={(v) => setForm({ ...form, is_optional: v })} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Class</Label>
-                <AdvancedSelect
-          value={form.class_id}
-          onChange={(v) => setForm({ ...form, class_id: v })}
-          options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
-        />
-              </div>
-              <div className="space-y-2">
-                <Label>Frequency</Label>
-                <AdvancedSelect
-          value={form.frequency}
-          onChange={(v) => setForm({ ...form, frequency: v })}
-          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'semi-annual', label: 'Semi-Annual' }, { value: 'annual', label: 'Annual' }, { value: 'one-time', label: 'One-Time' }]}
-        />
-              </div>
+            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Create Structure</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Batch Monthly Fees Dialog */}
+        <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Generate Monthly Fees</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-[color:var(--w11-text-secondary)]">
+              This will generate pending fee records for all active students based on
+              their active fee structures for the current billing cycle. Existing records
+              are skipped (safe to re-run).
+            </p>
+            <div className="space-y-2">
+              <Label>Filter by Class (optional)</Label>
+              <AdvancedSelect
+                value={batchClassId}
+                onChange={(v) => setBatchClassId(v)}
+                clearable
+                placeholder="All Classes"
+                options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+              />
             </div>
-            <div className="space-y-2"><Label>Due Day of Cycle</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
-            <FormCheckbox label="Optional fee" checked={form.is_optional} onCheckedChange={(v) => setForm({ ...form, is_optional: v })} />
-          </div>
-          <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Create Structure</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Cancel</Button>
+              <Button
+                onClick={() => batchMonthly.mutate(batchClassId || undefined)}
+                disabled={batchMonthly.isPending}
+              >
+                {batchMonthly.isPending ? <Spinner className="mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+                Generate Now
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Batch Monthly Fees Dialog */}
-      <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Generate Monthly Fees</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will generate pending fee records for all active students based on
-            their active fee structures for the current billing cycle. Existing records
-            are skipped (safe to re-run).
-          </p>
-          <div className="space-y-2">
-            <Label>Filter by Class (optional)</Label>
-            <AdvancedSelect
-              value={batchClassId}
-              onChange={(v) => setBatchClassId(v)}
-              clearable
-              placeholder="All Classes"
-              options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Cancel</Button>
-            <Button
-              onClick={() => batchMonthly.mutate(batchClassId || undefined)}
-              disabled={batchMonthly.isPending}
-            >
-              {batchMonthly.isPending ? <Spinner className="mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-              Generate Now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Installment schedule editor */}
-      <InstallmentsDialog
-        structure={installmentsFor}
-        onClose={() => setInstallmentsFor(null)}
-      />
-    </div>
+        {/* Installment schedule editor */}
+        <InstallmentsDialog
+          structure={installmentsFor}
+          onClose={() => setInstallmentsFor(null)}
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -462,7 +465,7 @@ function InstallmentsDialog({
                 <Badge variant={balanced ? "success" : "destructive"}>
                   {balanced ? "Balanced" : `Off by Rs. ${Math.abs(scheduledTotal - structureTotal).toLocaleString()}`}
                 </Badge>
-                <span className="text-muted-foreground">
+                <span className="text-[color:var(--w11-text-secondary)]">
                   Scheduled <strong>Rs. {scheduledTotal.toLocaleString()}</strong> of{" "}
                   <strong>Rs. {structureTotal.toLocaleString()}</strong> structure total
                 </span>
@@ -472,7 +475,7 @@ function InstallmentsDialog({
               </div>
 
               <div className="space-y-2">
-                <div className="grid grid-cols-[2rem_1fr_9rem_11rem_2rem] gap-2 text-xs font-medium text-muted-foreground">
+                <div className="grid grid-cols-[2rem_1fr_9rem_11rem_2rem] gap-2 text-xs font-medium text-[color:var(--w11-text-secondary)]">
                   <span>#</span>
                   <span>Label</span>
                   <span>Amount (Rs.)</span>
@@ -481,7 +484,7 @@ function InstallmentsDialog({
                 </div>
                 {rows.map((row, idx) => (
                   <div key={idx} className="grid grid-cols-[2rem_1fr_9rem_11rem_2rem] gap-2 items-center">
-                    <span className="text-sm text-muted-foreground tabular-nums">{idx + 1}</span>
+                    <span className="text-sm text-[color:var(--w11-text-secondary)] tabular-nums">{idx + 1}</span>
                     <Input
                       className="h-8"
                       value={row.label}
@@ -516,12 +519,12 @@ function InstallmentsDialog({
                       }}
                       aria-label={`Remove installment ${idx + 1}`}
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
                     </Button>
                   </div>
                 ))}
                 {rows.length === 0 && (
-                  <p className="py-4 text-center text-sm text-muted-foreground">
+                  <p className="py-4 text-center text-sm text-[color:var(--w11-text-secondary)]">
                     No installments yet — add rows below to split the structure total.
                   </p>
                 )}
@@ -546,7 +549,7 @@ function InstallmentsDialog({
                 </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">
                 The schedule must sum to the structure total (Rs. {structureTotal.toLocaleString()}).
                 BS due dates land on each generated bill. Saving does not touch
                 students — use “Apply to Students” to bill the split.
@@ -585,7 +588,7 @@ function InstallmentsDialog({
           <DialogHeader>
             <DialogTitle>Apply Installments to Students?</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
+          <div className="space-y-3 text-sm text-[color:var(--w11-text-secondary)]">
             <p>
               This bills every student matched by “{structure?.name}” with{" "}
               <strong>{rows.length}</strong> installment bill(s) of the schedule

@@ -26,15 +26,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +41,13 @@ import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
 import {
   BookMarked,
   BookOpen,
@@ -157,7 +155,7 @@ function RowActions({
           onClick={() => setShowDelete(true)}
           aria-label="Delete item"
         >
-          <Trash2 className="h-4 w-4 text-destructive" />
+          <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
         </Button>
       </div>
 
@@ -166,7 +164,7 @@ function RowActions({
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
           </DialogHeader>
-          <p className="py-4 text-sm text-muted-foreground">{deleteLabel}</p>
+          <p className="py-4 text-sm text-[color:var(--w11-text-secondary)]">{deleteLabel}</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleting}>
               Cancel
@@ -197,59 +195,61 @@ export default function AcademicsPage() {
   }, [pathname]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Academics</h1>
-        <p className="text-muted-foreground">
-          Manage academic years, classes, sections, subjects, and assignments
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Academics"
+        subtitle="Manage academic years, classes, sections, subjects, and assignments"
+      />
+      <AOSPageBody>
+        {/* Fluent pivot tabs */}
+        <div className="flex gap-1 mb-4 border-b border-[var(--w11-border-subtle)]">
+          {[
+            { key: "years" as const, label: "Academic Years", icon: BookOpen },
+            { key: "classes" as const, label: "Classes & Sections", icon: Users },
+            { key: "subjects" as const, label: "Subjects", icon: BookMarked },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+                tab === item.key
+                  ? "border-[var(--w11-accent)] text-[color:var(--w11-text-primary)]"
+                  : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
+              }`}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
-        {[
-          { key: "years" as const, label: "Academic Years", icon: BookOpen },
-          { key: "classes" as const, label: "Classes & Sections", icon: Users },
-          { key: "subjects" as const, label: "Subjects", icon: BookMarked },
-        ].map((item) => (
-          <button
-            key={item.key}
-            onClick={() => setTab(item.key)}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              tab === item.key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {ACADEMIC_TOOLS.map((tool) => (
-          <Link key={tool.href} href={tool.href} className="group">
-            <Card className="border-dashed transition-colors hover:border-primary/40 hover:bg-muted/30">
-              <CardContent className="flex items-start gap-3 p-4">
-                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+        <div className="grid gap-3 mb-4 md:grid-cols-2">
+          {ACADEMIC_TOOLS.map((tool) => (
+            <Link key={tool.href} href={tool.href} className="group">
+              <div className="win11-card flex items-start gap-3 p-4 transition-colors hover:border-[var(--w11-accent)]">
+                <div
+                  className="rounded-[var(--w11-radius-md)] p-2"
+                  style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}
+                >
                   <tool.icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold group-hover:text-primary">
+                  <div className="text-sm font-semibold group-hover:text-[color:var(--w11-accent)]">
                     {tool.label}
                   </div>
-                  <p className="text-sm text-muted-foreground">{tool.description}</p>
+                  <p className="text-sm text-[color:var(--w11-text-secondary)]">{tool.description}</p>
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-      {tab === "years" && <AcademicYearsTab />}
-      {tab === "classes" && <ClassesTab />}
-      {tab === "subjects" && <SubjectsTab />}
-    </div>
+        {tab === "years" && <AcademicYearsTab />}
+        {tab === "classes" && <ClassesTab />}
+        {tab === "subjects" && <SubjectsTab />}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -316,11 +316,9 @@ function AcademicYearsTab() {
 
   if (isError)
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
+      <div className="win11-card p-6 text-center space-y-3">
+        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     );
   if (isLoading) return <PageLoader />;
@@ -361,25 +359,30 @@ function AcademicYearsTab() {
 
   return (
     <>
-      <div className="flex justify-end">
-        <Button onClick={() => openYearDialog(null)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Year
-        </Button>
-      </div>
-      <DataTable<AcademicYear>
-        columns={YEAR_COLUMNS}
-        rows={years}
-        rowKey={(y) => y.id}
-        searchable
-        searchPlaceholder="Search years…"
-        exportFileName="academic-years"
-        empty={{
-          icon: BookOpen,
-          title: "No academic years yet",
-          body: "Create your first academic year — everything (classes, exams, fees) hangs off it.",
-          action: { label: "Add Year", onClick: () => openYearDialog(null) },
-        }}
-      />
+      <DataPanel
+        title="Academic Years"
+        actions={
+          <Button onClick={() => openYearDialog(null)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Year
+          </Button>
+        }
+        bodyClassName="p-0"
+      >
+        <DataTable<AcademicYear>
+          columns={YEAR_COLUMNS}
+          rows={years}
+          rowKey={(y) => y.id}
+          searchable
+          searchPlaceholder="Search years…"
+          exportFileName="academic-years"
+          empty={{
+            icon: BookOpen,
+            title: "No academic years yet",
+            body: "Create your first academic year — everything (classes, exams, fees) hangs off it.",
+            action: { label: "Add Year", onClick: () => openYearDialog(null) },
+          }}
+        />
+      </DataPanel>
 
       <Dialog
         open={showAdd || !!editItem}
@@ -420,41 +423,45 @@ function AcademicYearsTab() {
             }}
             className="space-y-4"
           >
-            <div className="space-y-2">
-              <Label>Name *</Label>
-              <Input name="name" required defaultValue={editItem?.name} placeholder="2082" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <BSDateInput
-                  name="start_date"
-                  value={pickedDates.start}
-                  onChange={(ad) => setPickedDates((p) => ({ ...p, start: ad }))}
-                />
+            <FormSection title="Year Details">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input name="name" required defaultValue={editItem?.name} placeholder="2082" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date *</Label>
+                    <BSDateInput
+                      name="start_date"
+                      value={pickedDates.start}
+                      onChange={(ad) => setPickedDates((p) => ({ ...p, start: ad }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date *</Label>
+                    <BSDateInput
+                      name="end_date"
+                      value={pickedDates.end}
+                      onChange={(ad) => setPickedDates((p) => ({ ...p, end: ad }))}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                  BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).
+                </p>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox
+                    checked={isCurrentYear}
+                    onCheckedChange={(v) => setIsCurrentYear(v === true)}
+                    aria-label="Set as current academic year"
+                  />
+                  Set as current academic year
+                </label>
+                {/* Radix Checkbox doesn't submit — mirror into FormData */}
+                <input type="hidden" name="is_current" value={isCurrentYear ? "on" : ""} />
               </div>
-              <div className="space-y-2">
-                <Label>End Date *</Label>
-                <BSDateInput
-                  name="end_date"
-                  value={pickedDates.end}
-                  onChange={(ad) => setPickedDates((p) => ({ ...p, end: ad }))}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).
-            </p>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Checkbox
-                checked={isCurrentYear}
-                onCheckedChange={(v) => setIsCurrentYear(v === true)}
-                aria-label="Set as current academic year"
-              />
-              Set as current academic year
-            </label>
-            {/* Radix Checkbox doesn't submit — mirror into FormData */}
-            <input type="hidden" name="is_current" value={isCurrentYear ? "on" : ""} />
+            </FormSection>
             <DialogFooter>
               <Button
                 type="button"
@@ -574,11 +581,9 @@ function ClassesTab() {
 
   if (isError)
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
+      <div className="win11-card p-6 text-center space-y-3">
+        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     );
   if (isLoading) return <PageLoader />;
@@ -594,7 +599,7 @@ function ClassesTab() {
       render: (k) => (
         <div>
           <div className="font-medium">{k.name}</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-[color:var(--w11-text-secondary)]">
             Manage sections and teacher assignments from here.
           </div>
         </div>
@@ -610,11 +615,11 @@ function ClassesTab() {
           {(k.sections || []).map((section) => (
             <div
               key={section.id}
-              className="flex items-center justify-between rounded-md border px-3 py-2"
+              className="flex items-center justify-between rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)] px-3 py-2"
             >
               <div>
                 <div className="font-medium">Section {section.name}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-[color:var(--w11-text-secondary)]">
                   Capacity: {section.capacity ?? "-"}
                 </div>
               </div>
@@ -646,13 +651,13 @@ function ClassesTab() {
                   }}
                   aria-label={`Delete section ${section.name}`}
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
                 </Button>
               </div>
             </div>
           ))}
           {(k.sections || []).length === 0 && (
-            <div className="text-sm text-muted-foreground">No sections yet.</div>
+            <div className="text-sm text-[color:var(--w11-text-secondary)]">No sections yet.</div>
           )}
           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setAddSectionFor(k); }}>
             <Plus className="mr-2 h-3.5 w-3.5" /> Add Section
@@ -681,29 +686,30 @@ function ClassesTab() {
 
   return (
     <>
-      <div className="flex justify-end">
-        <Button onClick={() => setShowAddClass(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Class
-        </Button>
-      </div>
-      <Card>
-        <CardContent className="p-0">
-          <DataTable<ClassItem>
-            columns={CLASS_COLUMNS}
-            rows={classes}
-            rowKey={(k) => k.id}
-            searchable
-            searchPlaceholder="Search classes…"
-            exportFileName="classes-sections"
-            empty={{
-              icon: Users,
-              title: "No classes created yet",
-              body: "Create your first class — sections and teachers hang off it.",
-              action: { label: "Add Class", onClick: () => setShowAddClass(true) },
-            }}
-          />
-        </CardContent>
-      </Card>
+      <DataPanel
+        title="Classes & Sections"
+        actions={
+          <Button onClick={() => setShowAddClass(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Class
+          </Button>
+        }
+        bodyClassName="p-0"
+      >
+        <DataTable<ClassItem>
+          columns={CLASS_COLUMNS}
+          rows={classes}
+          rowKey={(k) => k.id}
+          searchable
+          searchPlaceholder="Search classes…"
+          exportFileName="classes-sections"
+          empty={{
+            icon: Users,
+            title: "No classes created yet",
+            body: "Create your first class — sections and teachers hang off it.",
+            action: { label: "Add Class", onClick: () => setShowAddClass(true) },
+          }}
+        />
+      </DataPanel>
 
       <Dialog
         open={showAddClass || !!editClass}
@@ -743,33 +749,37 @@ function ClassesTab() {
             }}
             className="space-y-4"
           >
-            <div className="space-y-2">
-              <Label>Class Name</Label>
-              <Input name="name" required defaultValue={editClass?.name} placeholder="Class 10" />
-            </div>
-            <div className="space-y-2">
-              <Label>Grade Number</Label>
-              <Input
-                name="numeric_grade"
-                type="number"
-                min={1}
-                max={12}
-                required
-                defaultValue={editClass?.numeric_grade ?? undefined}
-              />
-            </div>
-            {!editClass && (
-              <div className="grid grid-cols-2 gap-4">
+            <FormSection title="Class Details">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Initial Section</Label>
-                  <Input name="initial_section_name" placeholder="A" />
+                  <Label>Class Name</Label>
+                  <Input name="name" required defaultValue={editClass?.name} placeholder="Class 10" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Section Capacity</Label>
-                  <Input name="initial_section_capacity" type="number" min={1} placeholder="40" />
+                  <Label>Grade Number</Label>
+                  <Input
+                    name="numeric_grade"
+                    type="number"
+                    min={1}
+                    max={12}
+                    required
+                    defaultValue={editClass?.numeric_grade ?? undefined}
+                  />
                 </div>
+                {!editClass && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Initial Section</Label>
+                      <Input name="initial_section_name" placeholder="A" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Section Capacity</Label>
+                      <Input name="initial_section_capacity" type="number" min={1} placeholder="40" />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </FormSection>
             <DialogFooter>
               <Button
                 type="button"
@@ -832,19 +842,23 @@ function ClassesTab() {
             }}
             className="space-y-4"
           >
-            <div className="space-y-2">
-              <Label>Section Name</Label>
-              <Input name="name" required defaultValue={sectionDialogItem?.name} placeholder="A" />
-            </div>
-            <div className="space-y-2">
-              <Label>Capacity</Label>
-              <Input
-                name="capacity"
-                type="number"
-                min={1}
-                defaultValue={sectionDialogItem?.capacity ?? 40}
-              />
-            </div>
+            <FormSection title="Section Details">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Section Name</Label>
+                  <Input name="name" required defaultValue={sectionDialogItem?.name} placeholder="A" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Capacity</Label>
+                  <Input
+                    name="capacity"
+                    type="number"
+                    min={1}
+                    defaultValue={sectionDialogItem?.capacity ?? 40}
+                  />
+                </div>
+              </div>
+            </FormSection>
             <DialogFooter>
               <Button
                 type="button"
@@ -908,11 +922,9 @@ function SubjectsTab() {
 
   if (isError)
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
+      <div className="win11-card p-6 text-center space-y-3">
+        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     );
   if (isLoading) return <PageLoader />;
@@ -932,7 +944,7 @@ function SubjectsTab() {
             <p>
               Th {s.full_marks ?? 0} / {s.pass_marks ?? 0}
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-[color:var(--w11-text-secondary)]">
               Pr {s.practical_full_marks} / {s.practical_pass_marks ?? 0}
             </p>
           </div>
@@ -982,25 +994,30 @@ function SubjectsTab() {
 
   return (
     <>
-      <div className="flex justify-end">
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Subject
-        </Button>
-      </div>
-      <DataTable<Subject>
-        columns={SUBJECT_COLUMNS}
-        rows={subjects}
-        rowKey={(s) => s.id}
-        searchable
-        searchPlaceholder="Search subjects…"
-        exportFileName="subjects"
-        empty={{
-          icon: BookMarked,
-          title: "No subjects yet",
-          body: "Add your first subject to start recording marks.",
-          action: { label: "Add Subject", onClick: () => setShowAdd(true) },
-        }}
-      />
+      <DataPanel
+        title="Subjects"
+        actions={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Subject
+          </Button>
+        }
+        bodyClassName="p-0"
+      >
+        <DataTable<Subject>
+          columns={SUBJECT_COLUMNS}
+          rows={subjects}
+          rowKey={(s) => s.id}
+          searchable
+          searchPlaceholder="Search subjects…"
+          exportFileName="subjects"
+          empty={{
+            icon: BookMarked,
+            title: "No subjects yet",
+            body: "Add your first subject to start recording marks.",
+            action: { label: "Add Subject", onClick: () => setShowAdd(true) },
+          }}
+        />
+      </DataPanel>
 
       <Dialog
         open={showAdd || !!editItem}
@@ -1045,97 +1062,105 @@ function SubjectsTab() {
             }}
             className="space-y-4"
           >
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Subject Name</Label>
-                <Input name="name" required defaultValue={editItem?.name} placeholder="Mathematics" />
+            <FormSection title="Subject Details">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Subject Name</Label>
+                    <Input name="name" required defaultValue={editItem?.name} placeholder="Mathematics" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Code</Label>
+                    <Input name="code" required defaultValue={editItem?.code} placeholder="MATH" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Credit Hours</Label>
+                    <Input
+                      name="credit_hours"
+                      type="number"
+                      min={1}
+                      required
+                      defaultValue={editItem?.credit_hours ?? 4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <AdvancedSelect
+                      name="is_optional"
+                      defaultValue={String(Boolean(editItem?.is_optional))}
+                      options={[
+                        { value: "false", label: "Compulsory" },
+                        { value: "true", label: "Optional" },
+                      ]}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Code</Label>
-                <Input name="code" required defaultValue={editItem?.code} placeholder="MATH" />
+            </FormSection>
+            <FormSection title="Marks & Grading">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Full Marks</Label>
+                    <Input
+                      name="full_marks"
+                      type="number"
+                      min={1}
+                      required
+                      defaultValue={editItem?.full_marks ?? 100}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pass Marks</Label>
+                    <Input
+                      name="pass_marks"
+                      type="number"
+                      min={0}
+                      required
+                      defaultValue={editItem?.pass_marks ?? 32}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Practical Component</Label>
+                  <AdvancedSelect
+                    name="has_practical"
+                    defaultValue={String(Boolean(editItem?.has_practical))}
+                    options={[
+                      { value: "false", label: "No practical" },
+                      { value: "true", label: "Has practical" },
+                    ]}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Practical Full Marks</Label>
+                    <Input
+                      name="practical_full_marks"
+                      type="number"
+                      min={0}
+                      defaultValue={editItem?.practical_full_marks ?? ""}
+                      placeholder="25"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Practical Pass Marks</Label>
+                    <Input
+                      name="practical_pass_marks"
+                      type="number"
+                      min={0}
+                      defaultValue={editItem?.practical_pass_marks ?? ""}
+                      placeholder="10"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                  Set practical full/pass marks to use subject-specific NEB grading. Leave them empty to keep the legacy exam-level split.
+                </p>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Credit Hours</Label>
-                <Input
-                  name="credit_hours"
-                  type="number"
-                  min={1}
-                  required
-                  defaultValue={editItem?.credit_hours ?? 4}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <AdvancedSelect
-                  name="is_optional"
-                  defaultValue={String(Boolean(editItem?.is_optional))}
-                  options={[
-                    { value: "false", label: "Compulsory" },
-                    { value: "true", label: "Optional" },
-                  ]}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Full Marks</Label>
-                <Input
-                  name="full_marks"
-                  type="number"
-                  min={1}
-                  required
-                  defaultValue={editItem?.full_marks ?? 100}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Pass Marks</Label>
-                <Input
-                  name="pass_marks"
-                  type="number"
-                  min={0}
-                  required
-                  defaultValue={editItem?.pass_marks ?? 32}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Practical Component</Label>
-              <AdvancedSelect
-                name="has_practical"
-                defaultValue={String(Boolean(editItem?.has_practical))}
-                options={[
-                  { value: "false", label: "No practical" },
-                  { value: "true", label: "Has practical" },
-                ]}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Practical Full Marks</Label>
-                <Input
-                  name="practical_full_marks"
-                  type="number"
-                  min={0}
-                  defaultValue={editItem?.practical_full_marks ?? ""}
-                  placeholder="25"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Practical Pass Marks</Label>
-                <Input
-                  name="practical_pass_marks"
-                  type="number"
-                  min={0}
-                  defaultValue={editItem?.practical_pass_marks ?? ""}
-                  placeholder="10"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Set practical full/pass marks to use subject-specific NEB grading. Leave them empty to keep the legacy exam-level split.
-            </p>
+            </FormSection>
             <DialogFooter>
               <Button
                 type="button"

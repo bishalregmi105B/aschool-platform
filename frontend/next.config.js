@@ -2,13 +2,16 @@
 
 // S-10 CSP: dashboard routes lock down hard (no third-party frame/embed
 // needs); public school sites allow Google Fonts + Maps iframes + GA.
+// `next dev` requires 'unsafe-eval' (react-refresh) and the dev-server
+// websocket, so the script/connect directives are relaxed in development.
+const isDev = process.env.NODE_ENV === "development";
 const dashboardCsp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.aschool.com.np https://*.r2.cloudflarestorage.com",
-  "font-src 'self' data:",
-  "connect-src 'self' https://api.groq.com",
+  `font-src 'self' data:${isDev ? " https://fonts.gstatic.com" : ""}`,
+  `connect-src 'self' https://api.groq.com${isDev ? " ws: http://localhost:*" : ""}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

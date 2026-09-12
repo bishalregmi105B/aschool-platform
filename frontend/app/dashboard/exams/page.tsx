@@ -3,27 +3,12 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageLoader } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BSDateInput } from "@/components/ui/bs-date-input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -33,10 +18,21 @@ import { useAuth } from "@/lib/auth-context";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  DataPanel, StatusChip, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import {
   Plus, FileText, BarChart3, ClipboardList, Calendar, GraduationCap,
   MoreHorizontal, Pencil, Trash2, Eye, BookOpen, Trophy, Printer,
 } from "lucide-react";
 import { formatNepaliDate, displayBS } from "@/lib/nepali_date";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BSDateInput } from "@/components/ui/bs-date-input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Exam {
   id: string;
@@ -74,13 +70,20 @@ const EXAM_TYPES = [
   { value: "class_test", label: "Class Test", icon: "✏️" },
 ];
 
-const STATUS_CONFIG: Record<string, { variant: "default"|"secondary"|"destructive"|"outline"|"success"|"warning"; label: string }> = {
-  draft: { variant: "secondary", label: "Draft" },
-  scheduled: { variant: "outline", label: "Scheduled" },
-  ongoing: { variant: "warning", label: "Ongoing" },
-  completed: { variant: "default", label: "Completed" },
-  result_published: { variant: "success", label: "Results Published" },
+// Exam status → display label + StatusChip tone key (page-kit auto-map
+// covers completed/published; ongoing needs the warning tone, so it rides
+// the "pending" key with an explicit label).
+const STATUS_CONFIG: Record<string, { tone: string; label: string }> = {
+  draft: { tone: "draft", label: "Draft" },
+  scheduled: { tone: "scheduled", label: "Scheduled" },
+  ongoing: { tone: "pending", label: "Ongoing" },
+  completed: { tone: "completed", label: "Completed" },
+  result_published: { tone: "published", label: "Results Published" },
 };
+
+/** Fluent status palette (same values the 11.css win11-chip tones use). */
+const W11_SUCCESS = "#107c10";
+const W11_WARNING = "#d83b01";
 
 export default function ExamsPage() {
   return <ExamsContent />;
@@ -146,7 +149,7 @@ function ExamRowActions({
             </DropdownMenuItem>
           )}
           {isAdmin && (
-            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(exam)}>
+            <DropdownMenuItem className="!text-[#c42b1c]" onClick={() => onDelete(exam)}>
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </DropdownMenuItem>
           )}
@@ -334,16 +337,22 @@ function ExamsContent() {
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load exams. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          title="Examinations"
+          subtitle="Manage exams, marks entry, results & report cards (NEB grading)"
+        />
+        <AOSPageBody>
+          <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <p className="text-sm text-[#c42b1c]">Failed to load exams. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </div>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading exams…" /></AOSPage>;
   const allExams = exams || [];
   const academicYearById = new Map<string, AcademicYearOption>(
     (academicYears || []).map((year) => [year.id, year]),
@@ -371,7 +380,7 @@ function ExamsContent() {
         <div>
           <p className="font-medium">{e.name}</p>
           {e.description && (
-            <p className="text-xs text-muted-foreground truncate max-w-xs">{e.description}</p>
+            <p className="text-xs text-[color:var(--w11-text-secondary)] truncate max-w-xs">{e.description}</p>
           )}
         </div>
       ),
@@ -405,7 +414,7 @@ function ExamsContent() {
       render: (e) => (
         <div className="text-xs">
           <p>{displayExamDate(e.start_date_bs, e.start_date)}</p>
-          <p className="text-muted-foreground">
+          <p className="text-[color:var(--w11-text-secondary)]">
             to {displayExamDate(e.end_date_bs, e.end_date)}
           </p>
         </div>
@@ -419,8 +428,8 @@ function ExamsContent() {
       render: (e) => (
         <div className="text-xs">
           <p>Full: {e.total_marks || "—"}</p>
-          <p className="text-muted-foreground">Pass: {e.pass_marks || "35"}</p>
-          {e.is_practical && <p className="text-blue-600">Practical: {e.practical_marks}</p>}
+          <p className="text-[color:var(--w11-text-secondary)]">Pass: {e.pass_marks || "35"}</p>
+          {e.is_practical && <p className="text-[color:var(--w11-accent)]">Practical: {e.practical_marks}</p>}
         </div>
       ),
     },
@@ -431,11 +440,7 @@ function ExamsContent() {
       value: (e) => e.status,
       render: (e) => {
         const sc = STATUS_CONFIG[e.status] || STATUS_CONFIG.scheduled;
-        return (
-          <Badge variant={sc.variant as any} className="capitalize">
-            {sc.label}
-          </Badge>
-        );
+        return <StatusChip status={sc.tone} label={sc.label} />;
       },
     },
     {
@@ -464,98 +469,67 @@ function ExamsContent() {
     },
   ];
 
+  const QUICK_LINKS = [
+    { href: "/dashboard/exams/marks", icon: ClipboardList, title: "Marks Entry", note: "Enter subject marks" },
+    { href: "/dashboard/exams/results", icon: BarChart3, title: "View Results", note: "NEB graded results" },
+    { href: "/dashboard/exams/report-cards", icon: FileText, title: "Report Cards", note: "AI-generated reports" },
+    { href: "/dashboard/exams/schedule", icon: Calendar, title: "Exam Schedule", note: "Subject-wise timetable" },
+  ];
+
+  // NEB grade tiles painted with the Fluent status palette (the same
+  // bg/border/text recipe the 11.css win11-chip tones use).
+  const NEB_GRADES = [
+    { grade: "A+", pct: "90-100%", gpa: "4.0", color: W11_SUCCESS },
+    { grade: "A", pct: "80-89%", gpa: "3.6", color: W11_SUCCESS },
+    { grade: "B+", pct: "70-79%", gpa: "3.2", color: "var(--w11-accent)" },
+    { grade: "B", pct: "60-69%", gpa: "2.8", color: "var(--w11-accent)" },
+    { grade: "C+", pct: "50-59%", gpa: "2.4", color: W11_WARNING },
+    { grade: "C", pct: "40-49%", gpa: "2.0", color: W11_WARNING },
+    { grade: "D", pct: "35-39%", gpa: "1.6", color: W11_WARNING },
+    { grade: "NG", pct: "<35%", gpa: "0.0", color: "#c42b1c" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Examinations</h1>
-          <p className="text-muted-foreground">Manage exams, marks entry, results & report cards (NEB grading)</p>
-        </div>
-        {isAdmin ? (
-          <Button onClick={() => { resetForm(); setEditExam(null); setCreateOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" /> Create Exam
-          </Button>
-        ) : (
-          <p className="text-xs text-muted-foreground">Only admins can create exams</p>
-        )}
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        title="Examinations"
+        subtitle={`${allExams.length} exams · Manage marks entry, results & report cards (NEB grading)`}
+        actions={
+          isAdmin ? (
+            <Button onClick={() => { resetForm(); setEditExam(null); setCreateOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" /> Create Exam
+            </Button>
+          ) : (
+            <span className="text-xs text-[color:var(--w11-text-secondary)]">Only admins can create exams</span>
+          )
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {/* Stats */}
+        <StatGrid className="mb-0">
+          <KpiCard label="Total Exams" value={stats.total} icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Scheduled" value={stats.scheduled} icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-text-primary)" }} />} color="var(--w11-text-primary)" />
+          <KpiCard label="Ongoing" value={stats.ongoing} icon={<ClipboardList className="h-5 w-5" style={{ color: W11_WARNING }} />} color={W11_WARNING} />
+          <KpiCard label="Completed" value={stats.completed} icon={<Trophy className="h-5 w-5" style={{ color: W11_SUCCESS }} />} color={W11_SUCCESS} />
+        </StatGrid>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Total Exams", value: stats.total, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Scheduled", value: stats.scheduled, icon: Calendar, color: "text-indigo-600", bg: "bg-indigo-50" },
-          { label: "Ongoing", value: stats.ongoing, icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50" },
-          { label: "Completed", value: stats.completed, icon: Trophy, color: "text-emerald-600", bg: "bg-emerald-50" },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+        {/* Quick Links */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {QUICK_LINKS.map((l) => (
+            <Link key={l.href} href={l.href}>
+              <div className="win11-card p-4 flex items-center gap-3 cursor-pointer transition-colors hover:border-[var(--w11-accent)]">
+                <l.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
                 <div>
-                  <p className="text-sm text-muted-foreground">{s.label}</p>
-                  <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                </div>
-                <div className={`p-2 rounded-lg ${s.bg}`}>
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
+                  <p className="text-sm font-medium">{l.title}</p>
+                  <p className="text-[10px] text-[color:var(--w11-text-secondary)]">{l.note}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Link href="/dashboard/exams/marks">
-          <Card className="hover:border-primary hover:shadow-sm transition-all cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <ClipboardList className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium">Marks Entry</p>
-                <p className="text-[10px] text-muted-foreground">Enter subject marks</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/exams/results">
-          <Card className="hover:border-primary hover:shadow-sm transition-all cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <BarChart3 className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm font-medium">View Results</p>
-                <p className="text-[10px] text-muted-foreground">NEB graded results</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/exams/report-cards">
-          <Card className="hover:border-primary hover:shadow-sm transition-all cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <FileText className="h-5 w-5 text-emerald-600" />
-              <div>
-                <p className="text-sm font-medium">Report Cards</p>
-                <p className="text-[10px] text-muted-foreground">AI-generated reports</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/exams/schedule">
-          <Card className="hover:border-primary hover:shadow-sm transition-all cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="text-sm font-medium">Exam Schedule</p>
-                <p className="text-[10px] text-muted-foreground">Subject-wise timetable</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Filters + Exam List — DataTable owns search/filters/actions */}
-      <Card>
-        <CardContent className="p-0">
+        {/* Filters + Exam List — DataTable owns search/filters/actions */}
+        <DataPanel title={`All Exams (${filtered.length})`}>
           <DataTable
             columns={EXAM_COLUMNS}
             rows={filtered}
@@ -606,259 +580,259 @@ function ExamsContent() {
               action: isAdmin ? { label: "Create Exam", onClick: () => setCreateOpen(true) } : undefined,
             }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* NEB Grading Reference */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <GraduationCap className="h-4 w-4" /> Nepal NEB Grading Scale
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        {/* NEB Grading Reference */}
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" /> Nepal NEB Grading Scale
+            </span>
+          }
+        >
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {[
-              { grade: "A+", pct: "90-100%", gpa: "4.0", color: "bg-emerald-100 text-emerald-800 border-emerald-300" },
-              { grade: "A", pct: "80-89%", gpa: "3.6", color: "bg-green-100 text-green-800 border-green-300" },
-              { grade: "B+", pct: "70-79%", gpa: "3.2", color: "bg-blue-100 text-blue-800 border-blue-300" },
-              { grade: "B", pct: "60-69%", gpa: "2.8", color: "bg-sky-100 text-sky-800 border-sky-300" },
-              { grade: "C+", pct: "50-59%", gpa: "2.4", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
-              { grade: "C", pct: "40-49%", gpa: "2.0", color: "bg-orange-100 text-orange-800 border-orange-300" },
-              { grade: "D", pct: "35-39%", gpa: "1.6", color: "bg-amber-100 text-amber-800 border-amber-300" },
-              { grade: "NG", pct: "<35%", gpa: "0.0", color: "bg-red-100 text-red-800 border-red-300" },
-            ].map((g) => (
-              <div key={g.grade} className={`p-2 rounded-lg border text-center ${g.color}`}>
+            {NEB_GRADES.map((g) => (
+              <div
+                key={g.grade}
+                className="p-2 rounded-lg border text-center"
+                style={{
+                  background: `color-mix(in srgb, ${g.color} 12%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${g.color} 30%, transparent)`,
+                  color: g.color,
+                }}
+              >
                 <p className="text-lg font-bold">{g.grade}</p>
                 <p className="text-[10px]">{g.pct}</p>
                 <p className="text-[10px] font-medium">GPA {g.gpa}</p>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Create / Edit Dialog */}
-      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) { setCreateOpen(false); setEditExam(null); } }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editExam ? "Edit Exam" : "Create New Exam"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2 col-span-2 sm:col-span-1">
-                <Label>Exam Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. First Terminal Exam 2082"
-                />
+        {/* Create / Edit Dialog */}
+        <Dialog open={createOpen} onOpenChange={(open) => { if (!open) { setCreateOpen(false); setEditExam(null); } }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editExam ? "Edit Exam" : "Create New Exam"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label>Exam Name *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. First Terminal Exam 2082"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label>Name (Nepali)</Label>
+                  <Input
+                    value={formData.name_nepali}
+                    onChange={(e) => setFormData({ ...formData, name_nepali: e.target.value })}
+                    placeholder="e.g. प्रथम सत्र परीक्षा"
+                  />
+                </div>
               </div>
-              <div className="space-y-2 col-span-2 sm:col-span-1">
-                <Label>Name (Nepali)</Label>
-                <Input
-                  value={formData.name_nepali}
-                  onChange={(e) => setFormData({ ...formData, name_nepali: e.target.value })}
-                  placeholder="e.g. प्रथम सत्र परीक्षा"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Exam Type *</Label>
-                <Select
-                  value={formData.exam_type}
-                  onValueChange={(v) => setFormData({ ...formData, exam_type: v })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {EXAM_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Exam Type *</Label>
+                  <Select
+                    value={formData.exam_type}
+                    onValueChange={(v) => setFormData({ ...formData, exam_type: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {EXAM_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Academic Session</Label>
+                  <Select
+                    value={formData.academic_year_id}
+                    onValueChange={(v) => setFormData({ ...formData, academic_year_id: v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Use current session" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="current">Use current active session</SelectItem>
+                      {(academicYears || []).map((year) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}{year.is_current ? " (Current)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Class</Label>
+                  <Select
+                    value={formData.class_id}
+                    onValueChange={(v) => setFormData({ ...formData, class_id: v, subject_ids: [] })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                    <SelectContent>
+                      {(classes || []).map((c: { id: string; name: string }) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Academic Session</Label>
-                <Select
-                  value={formData.academic_year_id}
-                  onValueChange={(v) => setFormData({ ...formData, academic_year_id: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Use current session" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="current">Use current active session</SelectItem>
-                    {(academicYears || []).map((year) => (
-                      <SelectItem key={year.id} value={year.id}>
-                        {year.name}{year.is_current ? " (Current)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Class</Label>
-                <Select
-                  value={formData.class_id}
-                  onValueChange={(v) => setFormData({ ...formData, class_id: v, subject_ids: [] })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                  <SelectContent>
-                    {(classes || []).map((c: { id: string; name: string }) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            {/* Subject selection — only when a class is picked */}
-            {formData.class_id && (
-              <div className="space-y-2">
-                <Label>
-                  Subjects Included in this Exam
-                  <span className="ml-2 text-xs text-muted-foreground">(marks config per subject from Academic setup)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto p-3 rounded-lg border bg-muted/30">
-                  {(subjectsForClass || []).length === 0 ? (
-                    <p className="col-span-2 text-xs text-muted-foreground text-center py-4">
-                      No subjects found for this class. Add subjects in Academic Setup.
-                    </p>
-                  ) : (
-                    (subjectsForClass || []).map((sub: { id: string; name: string; has_practical?: boolean; full_marks?: number; pass_marks?: number }) => (
-                      <label
-                        key={sub.id}
-                        className={`flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-background border transition-colors ${
-                          formData.subject_ids.includes(sub.id) ? "border-primary bg-primary/5" : "border-transparent"
-                        }`}
+              {/* Subject selection — only when a class is picked */}
+              {formData.class_id && (
+                <div className="space-y-2">
+                  <Label>
+                    Subjects Included in this Exam
+                    <span className="ml-2 text-xs text-[color:var(--w11-text-secondary)]">(marks config per subject from Academic setup)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto p-3 rounded-lg border border-[var(--w11-border-default)] bg-[color:var(--w11-control-hover)]">
+                    {(subjectsForClass || []).length === 0 ? (
+                      <p className="col-span-2 text-xs text-[color:var(--w11-text-secondary)] text-center py-4">
+                        No subjects found for this class. Add subjects in Academic Setup.
+                      </p>
+                    ) : (
+                      (subjectsForClass || []).map((sub: { id: string; name: string; has_practical?: boolean; full_marks?: number; pass_marks?: number }) => (
+                        <label
+                          key={sub.id}
+                          className={`flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-[color:var(--w11-control-bg)] border transition-colors ${
+                            formData.subject_ids.includes(sub.id)
+                              ? "border-[var(--w11-accent)] bg-[color:var(--w11-accent-light)]"
+                              : "border-transparent"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={formData.subject_ids.includes(sub.id)}
+                            onCheckedChange={() => toggleSubjectId(sub.id)}
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <p className="text-sm font-medium leading-none">{sub.name}</p>
+                            <p className="text-[10px] text-[color:var(--w11-text-secondary)] mt-0.5">
+                              FM: {sub.full_marks ?? "—"} | PM: {sub.pass_marks ?? "—"}
+                              {sub.has_practical && " | Practical"}
+                            </p>
+                          </div>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {(subjectsForClass || []).length > 0 && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-6"
+                        onClick={() => setFormData({ ...formData, subject_ids: (subjectsForClass || []).map((s: { id: string }) => s.id) })}
                       >
-                        <Checkbox
-                          checked={formData.subject_ids.includes(sub.id)}
-                          onCheckedChange={() => toggleSubjectId(sub.id)}
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <p className="text-sm font-medium leading-none">{sub.name}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            FM: {sub.full_marks ?? "—"} | PM: {sub.pass_marks ?? "—"}
-                            {sub.has_practical && " | Practical"}
-                          </p>
-                        </div>
-                      </label>
-                    ))
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-6"
+                        onClick={() => setFormData({ ...formData, subject_ids: [] })}
+                      >
+                        Clear All
+                      </Button>
+                    </div>
                   )}
                 </div>
-                {(subjectsForClass || []).length > 0 && (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs h-6"
-                      onClick={() => setFormData({ ...formData, subject_ids: (subjectsForClass || []).map((s: { id: string }) => s.id) })}
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs h-6"
-                      onClick={() => setFormData({ ...formData, subject_ids: [] })}
-                    >
-                      Clear All
-                    </Button>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date (BS)</Label>
+                  <BSDateInput
+                    value={formData.start_date_bs}
+                    onChange={(v) => setFormData({ ...formData, start_date_bs: v })}
+                    emit="bs"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date (BS)</Label>
+                  <BSDateInput
+                    value={formData.end_date_bs}
+                    onChange={(v) => setFormData({ ...formData, end_date_bs: v })}
+                    emit="bs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Default Full Marks <span className="text-xs text-[color:var(--w11-text-secondary)]">(overridden per subject)</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.total_marks}
+                    onChange={(e) => setFormData({ ...formData, total_marks: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Pass Marks <span className="text-xs text-[color:var(--w11-text-secondary)]">(NEB: 35%)</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.pass_marks}
+                    onChange={(e) => setFormData({ ...formData, pass_marks: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--w11-border-default)] bg-[color:var(--w11-control-hover)]">
+                <Checkbox
+                  id="is_practical"
+                  checked={formData.is_practical}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_practical: !!checked })}
+                />
+                <div className="flex-1">
+                  <label htmlFor="is_practical" className="text-sm font-medium cursor-pointer">
+                    Has Practical Component
+                  </label>
+                  <p className="text-[10px] text-[color:var(--w11-text-secondary)]">NEB: Theory must be ≥35%, Practical must be ≥40%</p>
+                </div>
+                {formData.is_practical && (
+                  <div className="w-24">
+                    <Input
+                      type="number"
+                      value={formData.practical_marks}
+                      onChange={(e) => setFormData({ ...formData, practical_marks: e.target.value })}
+                      placeholder="Practical marks"
+                      className="h-8 text-xs"
+                    />
                   </div>
                 )}
               </div>
-            )}
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date (BS)</Label>
-                <BSDateInput
-                  value={formData.start_date_bs}
-                  onChange={(v) => setFormData({ ...formData, start_date_bs: v })}
-                  emit="bs"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>End Date (BS)</Label>
-                <BSDateInput
-                  value={formData.end_date_bs}
-                  onChange={(v) => setFormData({ ...formData, end_date_bs: v })}
-                  emit="bs"
+                <Label>Description / Instructions</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Additional exam instructions..."
+                  rows={2}
                 />
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Default Full Marks <span className="text-xs text-muted-foreground">(overridden per subject)</span></Label>
-                <Input
-                  type="number"
-                  value={formData.total_marks}
-                  onChange={(e) => setFormData({ ...formData, total_marks: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Default Pass Marks <span className="text-xs text-muted-foreground">(NEB: 35%)</span></Label>
-                <Input
-                  type="number"
-                  value={formData.pass_marks}
-                  onChange={(e) => setFormData({ ...formData, pass_marks: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
-              <Checkbox
-                id="is_practical"
-                checked={formData.is_practical}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_practical: !!checked })}
-              />
-              <div className="flex-1">
-                <label htmlFor="is_practical" className="text-sm font-medium cursor-pointer">
-                  Has Practical Component
-                </label>
-                <p className="text-[10px] text-muted-foreground">NEB: Theory must be ≥35%, Practical must be ≥40%</p>
-              </div>
-              {formData.is_practical && (
-                <div className="w-24">
-                  <Input
-                    type="number"
-                    value={formData.practical_marks}
-                    onChange={(e) => setFormData({ ...formData, practical_marks: e.target.value })}
-                    placeholder="Practical marks"
-                    className="h-8 text-xs"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Description / Instructions</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Additional exam instructions..."
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditExam(null); }}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createMutation.mutate(formData)}
-              disabled={createMutation.isPending || !formData.name}
-            >
-              {createMutation.isPending ? "Saving..." : editExam ? "Update Exam" : "Create Exam"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setCreateOpen(false); setEditExam(null); }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createMutation.mutate(formData)}
+                disabled={createMutation.isPending || !formData.name}
+              >
+                {createMutation.isPending ? "Saving..." : editExam ? "Update Exam" : "Create Exam"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

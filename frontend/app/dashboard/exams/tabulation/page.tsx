@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,6 +13,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, FilterCommandBar,
+  DataPanel, StatusChip, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -73,6 +76,12 @@ export default function TabulationPage() {
 }
 
 type ActiveTab = "sheet" | "merit";
+
+/** Tabulation result ("PASS"/"NG") → StatusChip tone key. */
+const RESULT_TONE: Record<string, string> = {
+  pass: "pass",
+  ng: "fail",
+};
 
 function TabulationContent() {
   const [examId, setExamId] = useState("");
@@ -158,31 +167,26 @@ function TabulationContent() {
   const gradeChart = payload?.grade_chart || [];
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Table2 className="h-6 w-6" /> Tabulation Sheet
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Students × subjects grid with totals, GPA, result and merit order
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          disabled={!isReady || (activeTab === "sheet" ? !payload?.rows?.length : !merit.data?.rows?.length)}
-          onClick={() => openPrint(activeTab === "sheet" ? "tabulation" : "merit-list")}
-        >
-          <Printer className="h-4 w-4 mr-2" /> Print
-        </Button>
-      </div>
-
-      {/* Pickers */}
-      <Card>
-        <CardContent className="pt-4 pb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <Label>Exam</Label>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Table2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Tabulation Sheet"
+        subtitle="Students × subjects grid with totals, GPA, result and merit order"
+        actions={
+          <Button
+            variant="outline"
+            disabled={!isReady || (activeTab === "sheet" ? !payload?.rows?.length : !merit.data?.rows?.length)}
+            onClick={() => openPrint(activeTab === "sheet" ? "tabulation" : "merit-list")}
+          >
+            <Printer className="h-4 w-4 mr-2" /> Print
+          </Button>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {/* Pickers */}
+        <FilterCommandBar>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Exam</Label>
             <Select value={examId} onValueChange={setExamId}>
               <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
               <SelectContent>
@@ -192,8 +196,8 @@ function TabulationContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Class</Label>
+          <div className="space-y-1 w-full md:w-48">
+            <Label className="text-xs">Class</Label>
             <Select
               value={classId}
               onValueChange={(v) => {
@@ -209,8 +213,8 @@ function TabulationContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Section</Label>
+          <div className="space-y-1 w-full md:w-48">
+            <Label className="text-xs">Section</Label>
             <Select value={sectionId} onValueChange={setSectionId} disabled={!sections.length}>
               <SelectTrigger><SelectValue placeholder="All sections" /></SelectTrigger>
               <SelectContent>
@@ -221,58 +225,56 @@ function TabulationContent() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {/* Tabs */}
-      {isReady && (
-        <div className="border-b flex gap-0">
-          {(
-            [
-              { id: "sheet", label: "Tabulation Sheet" },
-              { id: "merit", label: "Merit List" },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+        {/* Tabs */}
+        {isReady && (
+          <div className="border-b border-[var(--w11-border-subtle)] flex gap-0">
+            {(
+              [
+                { id: "sheet", label: "Tabulation Sheet" },
+                { id: "merit", label: "Merit List" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "border-[var(--w11-accent)] text-[color:var(--w11-accent)]"
+                    : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* Grade legend strip */}
-      {activeTab === "sheet" && gradeChart.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {gradeChart.map((g) => (
-            <Badge key={g.grade_name} variant="outline" className="text-xs">
-              {g.grade_name} · GPA {Number(g.gpa ?? 0).toFixed(1)} · ≥{Number(g.percent_from ?? 0)}%
-            </Badge>
-          ))}
-        </div>
-      )}
+        {/* Grade legend strip */}
+        {activeTab === "sheet" && gradeChart.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {gradeChart.map((g) => (
+              <Badge key={g.grade_name} variant="outline" className="text-xs">
+                {g.grade_name} · GPA {Number(g.gpa ?? 0).toFixed(1)} · ≥{Number(g.percent_from ?? 0)}%
+              </Badge>
+            ))}
+          </div>
+        )}
 
-      {!isReady && (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="font-medium">Select an exam and class</p>
-            <p className="text-sm mt-1">The tabulation sheet builds from entered marks</p>
-          </CardContent>
-        </Card>
-      )}
+        {!isReady && (
+          <div className="win11-card">
+            <AOSEmptyState
+              icon={<GraduationCap className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
+              title="Select an exam and class"
+              description="The tabulation sheet builds from entered marks"
+            />
+          </div>
+        )}
 
-      {/* ── Tabulation sheet ─────────────────────────────────────────────── */}
-      {isReady && activeTab === "sheet" && (
-        <Card>
-          <CardContent className="p-0">
+        {/* ── Tabulation sheet ─────────────────────────────────────────────── */}
+        {isReady && activeTab === "sheet" && (
+          <DataPanel bodyClassName="p-0">
             {tabulation.isLoading ? (
               <PageLoader />
             ) : tabulation.isError ? (
@@ -292,41 +294,40 @@ function TabulationContent() {
               <div className="overflow-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="bg-muted/60">
-                      <th className="text-center px-3 py-2.5 font-medium border-b border-r sticky left-0 bg-muted/60 min-w-[50px]">
+                    <tr style={{ background: "var(--w11-control-hover)" }}>
+                      <th className="text-center px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] sticky left-0 min-w-[50px]" style={{ background: "var(--w11-control-hover)" }}>
                         Roll
                       </th>
-                      <th className="text-left px-3 py-2.5 font-medium border-b border-r sticky left-12 bg-muted/60 min-w-[160px]">
+                      <th className="text-left px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] sticky left-12 min-w-[160px]" style={{ background: "var(--w11-control-hover)" }}>
                         Student
                       </th>
                       {payload.subjects.map((s) => (
                         <th
                           key={s.id}
-                          className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[76px]"
+                          className="text-center px-2 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[76px]"
                           title={s.name}
                         >
                           <div className="truncate max-w-[76px]">{s.name}</div>
                         </th>
                       ))}
-                      <th className="text-center px-3 py-2.5 font-medium border-b border-r min-w-[90px]">Total</th>
-                      <th className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[60px]">%</th>
-                      <th className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[56px]">GPA</th>
-                      <th className="text-center px-2 py-2.5 font-medium border-b border-r min-w-[64px]">Result</th>
-                      <th className="text-center px-2 py-2.5 font-medium border-b min-w-[56px]">Merit</th>
+                      <th className="text-center px-3 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[90px]">Total</th>
+                      <th className="text-center px-2 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[60px]">%</th>
+                      <th className="text-center px-2 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[56px]">GPA</th>
+                      <th className="text-center px-2 py-2.5 font-medium border-b border-r border-[var(--w11-border-subtle)] min-w-[64px]">Result</th>
+                      <th className="text-center px-2 py-2.5 font-medium border-b border-[var(--w11-border-subtle)] min-w-[56px]">Merit</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-[var(--w11-border-subtle)]">
                     {payload.rows.map((row) => (
                       <tr
                         key={row.student_id}
-                        className={`hover:bg-muted/30 transition-colors ${
-                          row.result === "NG" ? "bg-red-50 dark:bg-red-950/20" : ""
-                        }`}
+                        className="transition-colors hover:bg-[color:var(--w11-control-hover)]"
+                        style={row.result === "NG" ? { background: "rgba(196,43,28,.06)" } : undefined}
                       >
-                        <td className="px-3 py-2 border-r sticky left-0 bg-inherit text-center font-mono text-xs">
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] sticky left-0 bg-inherit text-center font-mono text-xs">
                           {row.roll_number ?? "—"}
                         </td>
-                        <td className="px-3 py-2 border-r sticky left-12 bg-inherit font-medium">
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] sticky left-12 bg-inherit font-medium">
                           {row.student_name}
                         </td>
                         {payload.subjects.map((s) => {
@@ -336,41 +337,39 @@ function TabulationContent() {
                           return (
                             <td
                               key={s.id}
-                              className="px-2 py-2 border-r text-center"
+                              className="px-2 py-2 border-r border-[var(--w11-border-subtle)] text-center"
                               title={cell ? `${cell.obtained} / ${cell.full_marks}` : ""}
                             >
                               {!cell || !cell.entered || cell.is_absent ? (
-                                <span className="text-muted-foreground">
+                                <span className="text-[color:var(--w11-text-secondary)]">
                                   {cell?.is_absent ? "AB" : "—"}
                                 </span>
                               ) : (
                                 <div>
-                                  <div className={cell.grade === "NG" ? "text-red-600 font-medium" : ""}>
+                                  <div
+                                    className={cell.grade === "NG" ? "font-medium" : ""}
+                                    style={cell.grade === "NG" ? { color: "#c42b1c" } : undefined}
+                                  >
                                     {cell.obtained}
                                   </div>
-                                  <div className="text-[10px] text-muted-foreground">{cell.grade}</div>
+                                  <div className="text-[10px] text-[color:var(--w11-text-secondary)]">{cell.grade}</div>
                                 </div>
                               )}
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2 border-r text-center font-medium whitespace-nowrap">
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] text-center font-medium whitespace-nowrap">
                           {row.total_obtained}/{row.total_full}
                         </td>
-                        <td className="px-2 py-2 border-r text-center">{row.percentage?.toFixed(1)}%</td>
-                        <td className="px-2 py-2 border-r text-center font-medium">{row.gpa?.toFixed(2)}</td>
-                        <td className="px-2 py-2 border-r text-center">
-                          <Badge
-                            className={
-                              row.result === "NG"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }
-                          >
-                            {row.result}
-                          </Badge>
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] text-center">{row.percentage?.toFixed(1)}%</td>
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] text-center font-medium">{row.gpa?.toFixed(2)}</td>
+                        <td className="px-3 py-2 border-r border-[var(--w11-border-subtle)] text-center">
+                          <StatusChip
+                            status={RESULT_TONE[row.result?.toLowerCase()] ?? row.result}
+                            label={row.result}
+                          />
                         </td>
-                        <td className="px-2 py-2 text-center">
+                        <td className="px-3 py-2 text-center">
                           {row.merit_order <= 3 ? (
                             <Badge variant="secondary">#{row.merit_order}</Badge>
                           ) : (
@@ -383,14 +382,12 @@ function TabulationContent() {
                 </table>
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {/* ── Merit list ───────────────────────────────────────────────────── */}
-      {isReady && activeTab === "merit" && (
-        <Card>
-          <CardContent className="p-0">
+        {/* ── Merit list ───────────────────────────────────────────────────── */}
+        {isReady && activeTab === "merit" && (
+          <DataPanel bodyClassName="p-0">
             {merit.isLoading ? (
               <PageLoader />
             ) : merit.isError ? (
@@ -409,7 +406,7 @@ function TabulationContent() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/30">
+                  <TableRow style={{ background: "var(--w11-control-hover)" }}>
                     <TableHead className="w-16">Merit</TableHead>
                     <TableHead className="w-14">Roll</TableHead>
                     <TableHead>Student</TableHead>
@@ -421,12 +418,15 @@ function TabulationContent() {
                 </TableHeader>
                 <TableBody>
                   {merit.data.rows.map((r) => (
-                    <TableRow key={`${r.merit_order}-${r.roll_number}`} className={r.result === "NG" ? "bg-red-50/50 dark:bg-red-950/20" : ""}>
+                    <TableRow
+                      key={`${r.merit_order}-${r.roll_number}`}
+                      style={r.result === "NG" ? { background: "rgba(196,43,28,.04)" } : undefined}
+                    >
                       <TableCell>
                         {r.merit_order <= 3 ? (
                           <Badge variant={r.merit_order === 1 ? "default" : "secondary"}>#{r.merit_order}</Badge>
                         ) : (
-                          <span className="text-muted-foreground text-sm">#{r.merit_order}</span>
+                          <span className="text-[color:var(--w11-text-secondary)] text-sm">#{r.merit_order}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
@@ -435,24 +435,19 @@ function TabulationContent() {
                       <TableCell>{r.percentage?.toFixed(1)}%</TableCell>
                       <TableCell className="font-semibold">{r.gpa?.toFixed(2)}</TableCell>
                       <TableCell>
-                        <Badge
-                          className={
-                            r.result === "NG"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-emerald-100 text-emerald-700"
-                          }
-                        >
-                          {r.result}
-                        </Badge>
+                        <StatusChip
+                          status={RESULT_TONE[r.result?.toLowerCase()] ?? r.result}
+                          label={r.result}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

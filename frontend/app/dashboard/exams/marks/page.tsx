@@ -10,7 +10,6 @@ import {
   type MarksConfigSubject,
 } from "@/lib/exam-mark-config";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +24,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel,
+} from "@/components/aos/kit/page-kit";
 import { usePluginWidgets } from "@/lib/plugin-widgets/usePluginWidgets";
 import {
   resolveComponentWidget,
@@ -78,16 +81,22 @@ interface ExamOption extends MarksConfigExam {
   exam_type: string;
 }
 
-/** NEB grading — client-side for instant feedback */
+/** NEB grading — client-side for instant feedback.
+ *  Colors come from the Fluent status palette (the 11.css win11-chip tones). */
+const W11_SUCCESS = "#107c10";
+const W11_WARNING = "#d83b01";
+const W11_ERROR = "#c42b1c";
+const W11_ACCENT = "var(--w11-accent)";
+
 function nebGrade(pct: number): { grade: string; gpa: number; color: string } {
-  if (pct >= 90) return { grade: "A+", gpa: 4.0, color: "text-emerald-700 bg-emerald-50" };
-  if (pct >= 80) return { grade: "A",  gpa: 3.6, color: "text-green-700 bg-green-50" };
-  if (pct >= 70) return { grade: "B+", gpa: 3.2, color: "text-blue-700 bg-blue-50" };
-  if (pct >= 60) return { grade: "B",  gpa: 2.8, color: "text-sky-700 bg-sky-50" };
-  if (pct >= 50) return { grade: "C+", gpa: 2.4, color: "text-yellow-700 bg-yellow-50" };
-  if (pct >= 40) return { grade: "C",  gpa: 2.0, color: "text-orange-700 bg-orange-50" };
-  if (pct >= 35) return { grade: "D",  gpa: 1.6, color: "text-amber-700 bg-amber-50" };
-  return { grade: "NG", gpa: 0.0, color: "text-red-700 bg-red-50" };
+  if (pct >= 90) return { grade: "A+", gpa: 4.0, color: W11_SUCCESS };
+  if (pct >= 80) return { grade: "A",  gpa: 3.6, color: W11_SUCCESS };
+  if (pct >= 70) return { grade: "B+", gpa: 3.2, color: W11_ACCENT };
+  if (pct >= 60) return { grade: "B",  gpa: 2.8, color: W11_ACCENT };
+  if (pct >= 50) return { grade: "C+", gpa: 2.4, color: W11_WARNING };
+  if (pct >= 40) return { grade: "C",  gpa: 2.0, color: W11_WARNING };
+  if (pct >= 35) return { grade: "D",  gpa: 1.6, color: W11_WARNING };
+  return { grade: "NG", gpa: 0.0, color: W11_ERROR };
 }
 
 export default function MarksPage() {
@@ -364,49 +373,43 @@ function MarksContent() {
   const effectivePassMarks = hasComponents ? componentsPassMarks : totalPassMarks;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <AOSPage>
+      <AOSPageHeader
+        icon={
           <Link href="/dashboard/exams">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Marks Entry</h1>
-            <p className="text-muted-foreground">Enter subject-wise marks • NEB auto-grading</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/exams">
-            <Button variant="outline">Manage Exams</Button>
-          </Link>
-          {examId && subjectId && (
-            <Button variant="outline" onClick={() => setComponentsOpen(true)}>
-              <Layers className="h-4 w-4 mr-2" /> Components
-              {hasComponents && (
-                <Badge variant="secondary" className="ml-2">{components.length}</Badge>
-              )}
-            </Button>
-          )}
-          {examId && classId && subjectId && (
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              <Save className="h-4 w-4 mr-2" /> {saveMutation.isPending ? "Saving..." : "Save All Marks"}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <ClipboardList className="h-4 w-4" /> Select Exam, Class & Subject
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Exam</Label>
+        }
+        title="Marks Entry"
+        subtitle="Enter subject-wise marks • NEB auto-grading"
+        actions={
+          <>
+            <Link href="/dashboard/exams">
+              <Button variant="outline">Manage Exams</Button>
+            </Link>
+            {examId && subjectId && (
+              <Button variant="outline" onClick={() => setComponentsOpen(true)}>
+                <Layers className="h-4 w-4 mr-2" /> Components
+                {hasComponents && (
+                  <Badge variant="secondary" className="ml-2">{components.length}</Badge>
+                )}
+              </Button>
+            )}
+            {examId && classId && subjectId && (
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                <Save className="h-4 w-4 mr-2" /> {saveMutation.isPending ? "Saving..." : "Save All Marks"}
+              </Button>
+            )}
+          </>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        {/* Filters */}
+        <FilterCommandBar>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Exam</Label>
             <Select value={examId} onValueChange={setExamId}>
               <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
               <SelectContent>
@@ -416,8 +419,8 @@ function MarksContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Class</Label>
+          <div className="space-y-1 w-full md:w-48">
+            <Label className="text-xs">Class</Label>
             <Select value={classId} onValueChange={(v) => { setClassId(v); setSubjectId(""); }}>
               <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
               <SelectContent>
@@ -427,8 +430,8 @@ function MarksContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Subject</Label>
+          <div className="space-y-1 w-full md:w-56">
+            <Label className="text-xs">Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
               <SelectContent>
@@ -440,14 +443,12 @@ function MarksContent() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {examId && classId && subjectId && (
-        <Card>
-          <CardContent className="grid grid-cols-2 gap-4 py-4 md:grid-cols-5">
+        {examId && classId && subjectId && (
+          <div className="win11-card grid grid-cols-2 gap-4 p-4 md:grid-cols-5">
             <div>
-              <p className="text-xs text-muted-foreground">Config Source</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">Config Source</p>
               <p className="text-sm font-medium">
                 {usesSubjectPracticalConfig
                   ? "Subject theory + practical settings"
@@ -457,69 +458,62 @@ function MarksContent() {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Full Marks</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">Full Marks</p>
               <p className="text-sm font-medium">{effectiveFullMarks}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Pass Marks</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">Pass Marks</p>
               <p className="text-sm font-medium">{effectivePassMarks}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Components</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">Components</p>
               <p className="text-sm font-medium">
                 {hasComponents
                   ? components.map((c) => c.name).join(" + ")
                   : "None (theory/practical)"}
               </p>
               {hasComponents && (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-[color:var(--w11-text-secondary)]">
                   Σ {componentsFullMarks} of {effectiveFullMarks} full marks
                 </p>
               )}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Selected Subject</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">Selected Subject</p>
               <p className="text-sm font-medium">{selectedSubject?.name || "Using exam defaults"}</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* Stats Bar */}
-      {examId && classId && subjectId && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-lg border p-3 bg-blue-50 dark:bg-blue-950/30">
-            <p className="text-[10px] text-blue-600">Total Students</p>
-            <p className="text-lg font-bold text-blue-700">{studentList.length}</p>
-          </div>
-          <div className="rounded-lg border p-3 bg-amber-50 dark:bg-amber-950/30">
-            <p className="text-[10px] text-amber-600">Marks Entered</p>
-            <p className="text-lg font-bold text-amber-700">{entered} / {studentList.length}</p>
-          </div>
-          <div className="rounded-lg border p-3 bg-emerald-50 dark:bg-emerald-950/30">
-            <p className="text-[10px] text-emerald-600">Pass</p>
-            <p className="text-lg font-bold text-emerald-700">{passCount}</p>
-          </div>
-          <div className="rounded-lg border p-3 bg-red-50 dark:bg-red-950/30">
-            <p className="text-[10px] text-red-600">Fail / NG</p>
-            <p className="text-lg font-bold text-red-700">{entered - passCount}</p>
-          </div>
-        </div>
-      )}
+        {/* Stats Bar */}
+        {examId && classId && subjectId && (
+          <StatGrid className="mb-0">
+            <KpiCard label="Total Students" value={studentList.length} />
+            <KpiCard label="Marks Entered" value={entered} denominator={`/ ${studentList.length}`} color={W11_WARNING} />
+            <KpiCard label="Pass" value={passCount} color={W11_SUCCESS} />
+            <KpiCard label="Fail / NG" value={entered - passCount} color={W11_ERROR} />
+          </StatGrid>
+        )}
 
-      {/* Marks Table — the plugin-carried keyboard grid when served */}
-      {examId && classId && subjectId && (
-        <Card>
-          <CardContent className="p-0">
+        {/* Marks Table — the plugin-carried keyboard grid when served */}
+        {examId && classId && subjectId && (
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4" /> {selectedSubject?.name || "Marks"} ({studentList.length} students)
+              </span>
+            }
+            bodyClassName="p-0"
+          >
             {studentsError ? (
               <div className="flex flex-col items-center py-12 space-y-3">
-                <p className="text-sm text-destructive">Failed to load students. Please try again.</p>
+                <p className="text-sm text-[#c42b1c]">Failed to load students. Please try again.</p>
                 <Button variant="outline" size="sm" onClick={() => refetchStudents()}>Retry</Button>
               </div>
             ) : studentsLoading ? (
               <PageLoader />
             ) : studentList.length === 0 ? (
-              <p className="text-center py-12 text-muted-foreground">No students found in this class.</p>
+              <p className="text-center py-12 text-[color:var(--w11-text-secondary)]">No students found in this class.</p>
             ) : hasComponents ? (
               /* Component mode (A-32): one input column per defined mark
                  component — theory/practical are hidden; the total is the
@@ -533,7 +527,7 @@ function MarksContent() {
                       <TableHead key={c.id} className="w-24">
                         {c.name} ({c.max_mark})
                         {c.pass_mark != null && (
-                          <span className="block text-[10px] font-normal text-muted-foreground">
+                          <span className="block text-[10px] font-normal text-[color:var(--w11-text-secondary)]">
                             pass {c.pass_mark}
                           </span>
                         )}
@@ -556,7 +550,7 @@ function MarksContent() {
                     const g = any
                       ? isPass && gradePreview
                         ? gradePreview
-                        : { grade: "NG", gpa: 0.0, color: "text-red-700 bg-red-50" }
+                        : { grade: "NG", gpa: 0.0, color: W11_ERROR }
                       : null;
 
                     return (
@@ -564,7 +558,7 @@ function MarksContent() {
                         <TableCell className="text-center font-mono text-xs">{s.roll_number}</TableCell>
                         <TableCell>
                           <p className="font-medium text-sm">{s.first_name} {s.last_name}</p>
-                          <p className="text-[10px] text-muted-foreground">{s.student_id}</p>
+                          <p className="text-[10px] text-[color:var(--w11-text-secondary)]">{s.student_id}</p>
                         </TableCell>
                         {components.map((c) => {
                           const val = m?.components?.[c.id] ?? "";
@@ -580,7 +574,7 @@ function MarksContent() {
                                 value={val}
                                 onChange={(e) => updateComponentScore(s.id, c.id, e.target.value)}
                                 placeholder="0"
-                                className={`w-20 h-8 text-sm ${over || belowPass ? "border-red-400" : ""}`}
+                                className={`w-20 h-8 text-sm ${over || belowPass ? "!border-[#c42b1c]" : ""}`}
                               />
                             </TableCell>
                           );
@@ -589,7 +583,13 @@ function MarksContent() {
                         <TableCell className="text-sm">{any ? `${pct.toFixed(1)}%` : "—"}</TableCell>
                         <TableCell>
                           {g ? (
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${g.color}`}>
+                            <span
+                              className="px-2 py-0.5 rounded text-xs font-bold"
+                              style={{
+                                color: g.color,
+                                background: `color-mix(in srgb, ${g.color} 12%, transparent)`,
+                              }}
+                            >
                               {g.grade}
                             </span>
                           ) : "—"}
@@ -598,9 +598,9 @@ function MarksContent() {
                         <TableCell>
                           {any && (
                             isPass ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              <CheckCircle2 className="h-4 w-4" style={{ color: W11_SUCCESS }} />
                             ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
+                              <XCircle className="h-4 w-4" style={{ color: W11_ERROR }} />
                             )
                           )}
                         </TableCell>
@@ -641,7 +641,7 @@ function MarksContent() {
                     const g = total > 0
                       ? isPass
                         ? gradePreview
-                        : { grade: "NG", gpa: 0.0, color: "text-red-700 bg-red-50" }
+                        : { grade: "NG", gpa: 0.0, color: W11_ERROR }
                       : null;
 
                     return (
@@ -649,7 +649,7 @@ function MarksContent() {
                         <TableCell className="text-center font-mono text-xs">{s.roll_number}</TableCell>
                         <TableCell>
                           <p className="font-medium text-sm">{s.first_name} {s.last_name}</p>
-                          <p className="text-[10px] text-muted-foreground">{s.student_id}</p>
+                          <p className="text-[10px] text-[color:var(--w11-text-secondary)]">{s.student_id}</p>
                         </TableCell>
                         <TableCell>
                           <Input
@@ -659,7 +659,7 @@ function MarksContent() {
                             value={m.theory_marks}
                             onChange={(e) => updateMark(s.id, "theory_marks", e.target.value)}
                             placeholder="0"
-                            className={`w-24 h-8 text-sm ${total > 0 && !isPass ? "border-red-400" : ""}`}
+                            className={`w-24 h-8 text-sm ${total > 0 && !isPass ? "!border-[#c42b1c]" : ""}`}
                           />
                         </TableCell>
                         {hasPractical && (
@@ -679,7 +679,13 @@ function MarksContent() {
                         <TableCell className="text-sm">{total > 0 ? `${pct.toFixed(1)}%` : "—"}</TableCell>
                         <TableCell>
                           {g ? (
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${g.color}`}>
+                            <span
+                              className="px-2 py-0.5 rounded text-xs font-bold"
+                              style={{
+                                color: g.color,
+                                background: `color-mix(in srgb, ${g.color} 12%, transparent)`,
+                              }}
+                            >
                               {g.grade}
                             </span>
                           ) : "—"}
@@ -688,9 +694,9 @@ function MarksContent() {
                         <TableCell>
                           {total > 0 && (
                             isPass ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              <CheckCircle2 className="h-4 w-4" style={{ color: W11_SUCCESS }} />
                             ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
+                              <XCircle className="h-4 w-4" style={{ color: W11_ERROR }} />
                             )
                           )}
                         </TableCell>
@@ -700,22 +706,22 @@ function MarksContent() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {/* Components manager — define/edit the mark distribution for this
-          exam+subject (name, max mark, pass mark, order). */}
-      <ComponentsManagerDialog
-        open={componentsOpen}
-        onOpenChange={setComponentsOpen}
-        examId={examId}
-        subjectId={subjectId}
-        subjectName={selectedSubject?.name || ""}
-        defs={components}
-        fallbackFullMarks={totalFullMarks}
-      />
-    </div>
+        {/* Components manager — define/edit the mark distribution for this
+            exam+subject (name, max mark, pass mark, order). */}
+        <ComponentsManagerDialog
+          open={componentsOpen}
+          onOpenChange={setComponentsOpen}
+          examId={examId}
+          subjectId={subjectId}
+          subjectName={selectedSubject?.name || ""}
+          defs={components}
+          fallbackFullMarks={totalFullMarks}
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -850,7 +856,7 @@ function ComponentsManagerDialog({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  className="h-8 w-8 text-[color:var(--w11-text-secondary)] hover:!text-[#c42b1c]"
                   onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
                   aria-label="Remove component"
                 >
@@ -875,11 +881,12 @@ function ComponentsManagerDialog({
         </div>
 
         <div
-          className={`rounded-md border px-3 py-2 text-sm ${
+          className="rounded-md border px-3 py-2 text-sm"
+          style={
             overFull
-              ? "border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30"
-              : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
-          }`}
+              ? { background: "rgba(196,43,28,.08)", borderColor: "rgba(196,43,28,.3)", color: "#c42b1c" }
+              : { background: "rgba(16,124,16,.08)", borderColor: "rgba(16,124,16,.3)", color: "#107c10" }
+          }
         >
           Σ component total: <span className="font-bold">{sumMax}</span> / full marks{" "}
           {fallbackFullMarks}
