@@ -3,7 +3,6 @@ import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "./button";
 
 /**
  * Pagination — one control, matching the backend's pagination envelope.
@@ -45,6 +44,13 @@ export interface PaginationProps {
   className?: string;
 }
 
+const pageButtonClass = cn(
+  "commandbar-button",
+  "h-8 min-w-8 justify-center rounded-[var(--w11-radius-sm)] px-2 text-[12px]",
+  "border border-[var(--w11-control-border)] bg-[var(--w11-control-bg)]",
+  "hover:bg-[var(--w11-control-hover)] active:bg-[var(--w11-control-active)] active:scale-100"
+);
+
 function Pagination({
   meta,
   onPageChange,
@@ -61,18 +67,18 @@ function Pagination({
     <nav
       aria-label="Pagination"
       className={cn(
-        "flex flex-wrap items-center justify-between gap-2 text-[12px]",
+        "flex flex-wrap items-center justify-between gap-2",
         className
       )}
     >
-      <p className="text-muted-foreground">
+      <p className="text-[12px] text-[var(--w11-text-secondary)]">
         {first.toLocaleString()}–{last.toLocaleString()} of{" "}
         {total.toLocaleString()}
       </p>
 
       <div className="flex items-center gap-2">
         {onPageSizeChange && (
-          <label className="flex items-center gap-1.5 text-muted-foreground">
+          <label className="flex items-center gap-1.5 text-[12px] text-[var(--w11-text-secondary)]">
             <span className="hidden sm:inline">Rows</span>
             <AdvancedSelect
               value={String(per_page)}
@@ -84,48 +90,52 @@ function Pagination({
         )}
 
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2"
+          <button
+            type="button"
+            className={cn(pageButtonClass, "px-2")}
             disabled={!has_prev}
             onClick={() => onPageChange(page - 1)}
             aria-label="Previous page"
           >
             ‹
-          </Button>
+          </button>
           {pageWindow(page, pages).map((item, i) =>
             item === "…" ? (
               <span
                 key={`gap-${i}`}
-                className="px-1 text-muted-foreground"
+                className="px-1 text-[12px] text-[var(--w11-text-tertiary)]"
                 aria-hidden="true"
               >
                 …
               </span>
-            ) : (
-              <Button
+            ) : item === page ? (
+              <span
                 key={item}
-                variant={item === page ? "default" : "outline"}
-                size="sm"
-                className="h-7 min-w-7 px-2"
-                onClick={() => onPageChange(item)}
-                aria-current={item === page ? "page" : undefined}
+                aria-current="page"
+                className="win11-chip accent h-8 min-w-8 justify-center px-2.5 text-[12px]"
               >
                 {item}
-              </Button>
+              </span>
+            ) : (
+              <button
+                key={item}
+                type="button"
+                className={pageButtonClass}
+                onClick={() => onPageChange(item)}
+              >
+                {item}
+              </button>
             )
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2"
+          <button
+            type="button"
+            className={cn(pageButtonClass, "px-2")}
             disabled={!has_next}
             onClick={() => onPageChange(page + 1)}
             aria-label="Next page"
           >
             ›
-          </Button>
+          </button>
         </div>
       </div>
     </nav>

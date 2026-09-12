@@ -61,7 +61,7 @@ export function FormCheckbox({
           {ne ? `${label} / ${ne}` : label}
         </label>
         {description && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-tertiary !text-[11px]">
             {neDescription ?? description}
           </p>
         )}
