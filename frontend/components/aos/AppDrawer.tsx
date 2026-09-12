@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   AOSClassroomIcon,
   AOSFileManagerIcon,
@@ -17,9 +17,11 @@ import {
   AOSSettingsIcon,
   AOSLogo,
 } from "@/components/aos/AOSIcons";
-import { Search, X, Grid, Sparkles, Box } from "lucide-react";
+import { Search, X, Grid, Sparkles, Box, Folder, ChevronLeft } from "lucide-react";
 import { SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins } from "@/lib/plugins";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import type { ResolvedAOSDesktopFolder } from "@/lib/aos-launcher";
 
 interface AppDrawerProps {
   isOpen: boolean;
@@ -28,6 +30,8 @@ interface AppDrawerProps {
   currentRole?: SchoolRole;
   accentColor?: string;
   plugins?: EducationalPlugin[];
+  /** Resolved desktop folders; undefined hides the Folders view (backward compat). */
+  folders?: ResolvedAOSDesktopFolder[];
 }
 
 interface AppDrawerItem {
@@ -46,9 +50,11 @@ export default function AppDrawer({
   currentRole = "student",
   accentColor = "#0078d4",
   plugins = [],
+  folders,
 }: AppDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
 
   const { sidebarItems, installedPlugins } = useInstalledPlugins();
 
@@ -241,17 +247,65 @@ export default function AppDrawer({
     return [...core, ...pluginList, ...sidebarList];
   }, [currentRole, plugins, sidebarItems]);
 
+  const foldersViewEnabled = folders !== undefined;
+
+  const expandedFolder = useMemo(
+    () =>
+      folders && expandedFolderId
+        ? folders.find((f) => f.id === expandedFolderId) ?? null
+        : null,
+    [folders, expandedFolderId]
+  );
+
+  // Folders matching the query: folder name OR any of its app names.
+  const visibleFolders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return folders ?? [];
+    return (folders ?? []).filter(
+      (f) =>
+        f.name.toLowerCase().includes(q) ||
+        f.apps.some((a) => a.name.toLowerCase().includes(q))
+    );
+  }, [folders, searchQuery]);
+
+  // Reset the folder drill-down when the drawer closes.
+  useEffect(() => {
+    if (!isOpen) setExpandedFolderId(null);
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  // If the folders prop disappears while the drawer is open, fall back to
+  // the All Apps view instead of an empty "folders" category.
+  const effectiveCategory =
+    !foldersViewEnabled && activeCategory === "folders" ? "all" : activeCategory;
 
   const filteredApps = allApps.filter((app) => {
     const matchesSearch =
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.desc.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCat = activeCategory === "all" || app.category === activeCategory;
+    const matchesCat = effectiveCategory === "all" || app.category === effectiveCategory;
     return matchesSearch && matchesCat;
   });
 
+  const showingFoldersList =
+    foldersViewEnabled && effectiveCategory === "folders" && !expandedFolder;
+  const showingFolderDetail = foldersViewEnabled && !!expandedFolder;
+  // While browsing All Apps with an active search, matching folder cards are
+  // surfaced alongside the app results.
+  const showFoldersInSearch =
+    foldersViewEnabled && effectiveCategory === "all" && searchQuery.trim() !== "";
+
+  const folderDetailApps = expandedFolder
+    ? searchQuery.trim()
+      ? expandedFolder.apps.filter((a) =>
+          a.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+        )
+      : expandedFolder.apps
+    : [];
+
   const categories = [
+    ...(foldersViewEnabled ? [{ id: "folders", label: "Folders" }] : []),
     { id: "all", label: "All Apps" },
     { id: "academics", label: "Academics & Vault" },
     { id: "stem", label: "STEM & Science" },
@@ -260,6 +314,99 @@ export default function AppDrawer({
       ? [{ id: "admin", label: "Leadership & Finance" }]
       : []),
   ];
+
+  const renderDrawerCard = (
+    id: string,
+    name: string,
+    icon: React.ReactNode,
+    badge?: string
+  ) => (
+    <div
+      key={`drawer-${id}`}
+      className="aos-drawer-card aos-haptic-click"
+      onClick={() => {
+        onOpenApp(id);
+        onClose();
+      }}
+    >
+      <div style={{ position: "relative" }}>
+        {icon}
+        {badge && (
+          <span
+            style={{
+              position: "absolute",
+              top: "-4px",
+              right: "-6px",
+              background: "#ef4444",
+              color: "#ffffff",
+              fontSize: "9px",
+              fontWeight: 700,
+              padding: "1px 5px",
+              borderRadius: "8px",
+              border: "1.5px solid #ffffff",
+            }}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+      <span>{name}</span>
+    </div>
+  );
+
+  const renderFolderCard = (folder: ResolvedAOSDesktopFolder) => {
+    const gradient = SECTION_GRADIENTS[folder.name];
+    return (
+      <div
+        key={`folder-${folder.id}`}
+        className="aos-drawer-card aos-haptic-click"
+        onClick={() => {
+          setExpandedFolderId(folder.id);
+          setActiveCategory("folders");
+          setSearchQuery("");
+        }}
+      >
+        <div style={{ position: "relative" }}>
+          <div
+            style={{
+              width: "52px",
+              height: "52px",
+              borderRadius: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              background: gradient || "var(--w11-accent, #0078d4)",
+              backgroundImage:
+                gradient ||
+                "linear-gradient(135deg, var(--w11-accent, #0078d4) 0%, color-mix(in srgb, var(--w11-accent, #0078d4) 55%, #001a3a) 100%)",
+              boxShadow:
+                "0 8px 16px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+            }}
+          >
+            <Folder size={28} fill="rgba(255,255,255,0.18)" strokeWidth={2.2} />
+          </div>
+          <span
+            style={{
+              position: "absolute",
+              top: "-4px",
+              right: "-6px",
+              background: accentColor,
+              color: "#ffffff",
+              fontSize: "9px",
+              fontWeight: 700,
+              padding: "1px 5px",
+              borderRadius: "8px",
+              border: "1.5px solid #ffffff",
+            }}
+          >
+            {folder.apps.length}
+          </span>
+        </div>
+        <span>{folder.name}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="aos-app-drawer-overlay" onClick={onClose}>
@@ -380,8 +527,11 @@ export default function AppDrawer({
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={activeCategory === cat.id ? "accent" : "subtle"}
+              onClick={() => {
+                setActiveCategory(cat.id);
+                setExpandedFolderId(null);
+              }}
+              className={effectiveCategory === cat.id ? "accent" : "subtle"}
               style={{
                 fontSize: "12px",
                 padding: "6px 14px",
@@ -395,44 +545,109 @@ export default function AppDrawer({
           ))}
         </div>
 
-        {/* Apps Grid */}
-        <div className="aos-drawer-grid">
-          {filteredApps.map((app) => (
-            <div
-              key={`drawer-${app.id}`}
-              className="aos-drawer-card aos-haptic-click"
-              onClick={() => {
-                onOpenApp(app.id);
-                onClose();
+        {/* Folder detail header with back button */}
+        {showingFolderDetail && expandedFolder && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "14px",
+            }}
+          >
+            <button
+              className="subtle"
+              onClick={() => setExpandedFolderId(null)}
+              style={{
+                fontSize: "12px",
+                padding: "5px 12px",
+                borderRadius: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                cursor: "pointer",
               }}
             >
-              <div style={{ position: "relative" }}>
-                {app.icon}
-                {app.badge && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "-4px",
-                      right: "-6px",
-                      background: "#ef4444",
-                      color: "#ffffff",
-                      fontSize: "9px",
-                      fontWeight: 700,
-                      padding: "1px 5px",
-                      borderRadius: "8px",
-                      border: "1.5px solid #ffffff",
-                    }}
-                  >
-                    {app.badge}
-                  </span>
-                )}
-              </div>
-              <span>{app.name}</span>
-            </div>
-          ))}
+              <ChevronLeft size={14} /> All Folders
+            </button>
+            <span
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "var(--w11-text-primary)",
+              }}
+            >
+              {expandedFolder.name}
+            </span>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "var(--w11-text-secondary)",
+              }}
+            >
+              {expandedFolder.apps.length}{" "}
+              {expandedFolder.apps.length === 1 ? "app" : "apps"}
+            </span>
+          </div>
+        )}
+
+        {/* Apps / Folders Grid */}
+        <div className="aos-drawer-grid">
+          {showingFoldersList
+            ? visibleFolders.map(renderFolderCard)
+            : showingFolderDetail
+              ? folderDetailApps.map((app) =>
+                  renderDrawerCard(app.id, app.name, app.icon)
+                )
+              : [
+                  ...(showFoldersInSearch ? visibleFolders.map(renderFolderCard) : []),
+                  ...filteredApps.map((app) =>
+                    renderDrawerCard(app.id, app.name, app.icon, app.badge)
+                  ),
+                ]}
         </div>
 
-        {filteredApps.length === 0 && (
+        {showingFoldersList && visibleFolders.length === 0 && (
+          <div
+            style={{
+              padding: "40px 0",
+              textAlign: "center",
+              color: "var(--w11-text-secondary)",
+            }}
+          >
+            <Folder size={40} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+            <div style={{ fontSize: "15px", fontWeight: 600 }}>
+              No folders match &quot;{searchQuery}&quot;
+            </div>
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              Folders are grouped on the desktop — right-click an app icon to
+              organize it.
+            </div>
+          </div>
+        )}
+
+        {showingFolderDetail && folderDetailApps.length === 0 && (
+          <div
+            style={{
+              padding: "40px 0",
+              textAlign: "center",
+              color: "var(--w11-text-secondary)",
+            }}
+          >
+            <Grid size={40} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+            <div style={{ fontSize: "15px", fontWeight: 600 }}>
+              No apps in this folder match &quot;{searchQuery}&quot;
+            </div>
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              Try a different keyword, or go back to all folders.
+            </div>
+          </div>
+        )}
+
+        {!showingFoldersList &&
+          !showingFolderDetail &&
+          filteredApps.length === 0 &&
+          !(showFoldersInSearch && visibleFolders.length > 0) && (
           <div
             style={{
               padding: "40px 0",

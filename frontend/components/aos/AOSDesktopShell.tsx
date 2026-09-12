@@ -34,6 +34,12 @@ import {
   normalizeAOSRoute,
 } from "@/lib/aos-navigation";
 import { useAOSUserSettings } from "@/lib/aos-settings";
+import {
+  getDefaultFolders,
+  parseDesktopFolders,
+  resolveDesktopLayout,
+  type AOSDesktopFolder,
+} from "@/lib/aos-launcher";
 
 interface RouteLaunchMeta {
   moduleId: string;
@@ -280,6 +286,33 @@ export default function AOSDesktopShell() {
     }
     return apps;
   }, [sidebarItems, pluginBottomNav]);
+
+  // Desktop folder layout — DB-backed via desktop_folders. An empty persisted
+  // list means the user never customized folders, so defaults are derived from
+  // plugin manifest sections (re-deriving automatically on manifest/role
+  // changes) and are NOT persisted until the user edits something.
+  const persistedFolders = useMemo(
+    () => parseDesktopFolders(aosSettings.desktop_folders),
+    [aosSettings.desktop_folders]
+  );
+  const desktopFolders = useMemo(
+    () =>
+      persistedFolders.length > 0
+        ? persistedFolders
+        : getDefaultFolders(allApps, sidebarItems),
+    [persistedFolders, allApps, sidebarItems]
+  );
+  const desktopLayout = useMemo(
+    () => resolveDesktopLayout(allApps, desktopFolders),
+    [allApps, desktopFolders]
+  );
+  const handleUpdateDesktopFolders = useCallback(
+    (next: AOSDesktopFolder[]) => {
+      // Validate/sanitize before persisting (ids, names, appIds).
+      updateAOSSettings({ desktop_folders: parseDesktopFolders(next) });
+    },
+    [updateAOSSettings]
+  );
 
   // Window State Management
   const [windows, setWindows] = useState<WindowInstance[]>([]);
@@ -676,6 +709,8 @@ export default function AOSDesktopShell() {
         currentRole={currentRole}
         showTopBar={showTopBar}
         apps={allApps}
+        folders={desktopLayout.folders}
+        onUpdateFolders={handleUpdateDesktopFolders}
         onOpenApp={openWindow}
       >
         {/* Multi-Window Manager Canvas */}
@@ -830,6 +865,7 @@ export default function AOSDesktopShell() {
         onOpenApp={openWindow}
         currentRole={currentRole}
         accentColor={accentColor}
+        folders={desktopLayout.folders.length > 0 ? desktopLayout.folders : undefined}
       />
 
       {/* First-visit fullscreen offer */}

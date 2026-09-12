@@ -48,6 +48,10 @@ function AOSModuleFallback({ slug }: { slug?: string }) {
  * Dynamic registry mapping all 58 ASchool dashboard modules to lazy-loaded client components.
  */
 export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
+  // ── Home (dashboard root — the widget board) ─────────────────────────────
+  home: dynamic(() => import("@/app/dashboard/page"), { loading: AOSModuleLoading }),
+  dashboard: dynamic(() => import("@/app/dashboard/page"), { loading: AOSModuleLoading }),
+
   // ── Core Academics ────────────────────────────────────────────────────────
   students: dynamic(() => import("@/app/dashboard/students/page"), { loading: AOSModuleLoading }),
   teachers: dynamic(() => import("@/app/dashboard/teachers/page"), { loading: AOSModuleLoading }),
