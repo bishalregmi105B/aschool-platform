@@ -50,10 +50,24 @@ import GraphicsPanel   from "./GraphicsPanel";
 import ExplorePanel    from "./ExplorePanel";
 import { VersionHistoryButton } from "./VersionHistoryButton";
 
+const SHAPE_SVGS: Record<string, React.ReactNode> = {
+  rect: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>,
+  circle: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><circle cx="12" cy="12" r="9" /></svg>,
+  triangle: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,3 21,20 3,20" /></svg>,
+  line: <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-current stroke-2"><line x1="3" y1="12" x2="21" y2="12" /></svg>,
+  arrow: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M5 13h10v3l6-4-6-4v3H5z" /></svg>,
+  poly5: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,2 22,9 18,21 6,21 2,9" /></svg>,
+  poly6: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" /></svg>,
+  poly8: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="8,2 16,2 22,8 22,16 16,22 8,22 2,16 2,8" /></svg>,
+  star4: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,2 15,9 22,12 15,15 12,22 9,15 2,12 9,9" /></svg>,
+  star5: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" /></svg>,
+  star6: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><polygon points="12,2 15,7 20,4 18,10 22,14 16,15 15,21 12,17 9,21 8,15 2,14 6,10 4,4 9,7" /></svg>,
+};
+
 const SHAPE_GROUPS = [
-  { label: "Basic",    shapes: [{ id:"rect",label:"Rectangle",emoji:"⬜"},{ id:"circle",label:"Circle",emoji:"⭕"},{ id:"triangle",label:"Triangle",emoji:"🔺"},{ id:"line",label:"Line",emoji:"➖"},{ id:"arrow",label:"Arrow",emoji:"➡"}] },
-  { label: "Polygons", shapes: [{ id:"poly5",label:"Pentagon",emoji:"⬠"},{ id:"poly6",label:"Hexagon",emoji:"⬡"},{ id:"poly8",label:"Octagon",emoji:"🔷"}] },
-  { label: "Stars",    shapes: [{ id:"star4",label:"Star 4pt",emoji:"✦"},{ id:"star5",label:"Star 5pt",emoji:"⭐"},{ id:"star6",label:"Star 6pt",emoji:"✶"}] },
+  { label: "Basic",    shapes: [{ id:"rect",label:"Rectangle"},{ id:"circle",label:"Circle"},{ id:"triangle",label:"Triangle"},{ id:"line",label:"Line"},{ id:"arrow",label:"Arrow"}] },
+  { label: "Polygons", shapes: [{ id:"poly5",label:"Pentagon"},{ id:"poly6",label:"Hexagon"},{ id:"poly8",label:"Octagon"}] },
+  { label: "Stars",    shapes: [{ id:"star4",label:"Star 4pt"},{ id:"star5",label:"Star 5pt"},{ id:"star6",label:"Star 6pt"}] },
 ];
 
 const BG_PRESETS = [
@@ -69,8 +83,8 @@ const SIDEBAR_ICONS: SidebarIconDef[] = [
   { id: "text",       Icon: Type,           label: "Text"      },
   { id: "media",      Icon: LucideImage,    label: "Media"     },
   { id: "graphics",   Icon: Sparkles,       label: "Graphics"  },
-  { id: "background", Icon: Paintbrush,     label: "BG"        },
-  { id: "data",       Icon: Database,       label: "Data"      },
+  { id: "background", Icon: Paintbrush,     label: "Canvas BG" },
+  { id: "data",       Icon: Database,       label: "Data Fill" },
   { id: "layers",     Icon: Layers,         label: "Layers"    },
 ];
 
@@ -936,34 +950,38 @@ export default function CanvasEditor() {
         {/* BODY */}
         <div className="flex flex-1 min-h-0">
           {/* Icon bar */}
-          <div className="flex flex-col items-center gap-0.5 py-2 w-[60px] border-r bg-background shrink-0 overflow-y-auto">
+          <div className="flex flex-col items-center gap-1.5 py-3 w-[72px] border-r bg-card/60 backdrop-blur-md shrink-0 overflow-y-auto custom-scrollbar">
             {SIDEBAR_ICONS.map((item) => (
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => { setActivePanel(item.id); setShowAI(false); }}
-                    className={`flex flex-col items-center justify-center gap-1 w-12 h-[52px] rounded-xl text-[9px] font-medium transition-all duration-150 shrink-0
+                    className={`flex flex-col items-center justify-center gap-1.5 w-[60px] h-[56px] rounded-2xl text-[10px] font-medium transition-all duration-200 shrink-0 select-none
                       ${activePanel === item.id
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"}`}
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-[1.02]"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.02]"}`}
                   >
-                    <item.Icon className="h-[17px] w-[17px]" />
-                    <span className="leading-none">{item.label}</span>
+                    <item.Icon className="h-5 w-5" />
+                    <span className="leading-tight text-center truncate max-w-[56px]">{item.label}</span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
+                <TooltipContent side="right" className="font-medium">{item.label}</TooltipContent>
               </Tooltip>
             ))}
           </div>
 
           {/* Sliding panel */}
           {activePanel && (
-            <div className="w-72 border-r bg-background shrink-0 flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-150">
-              <div className="flex items-center justify-between px-3 py-2.5 border-b shrink-0">
-                <span className="font-semibold text-sm capitalize">{activePanel === "shapes" ? "Shapes" : activePanel === "data" ? "Data Fill" : activePanel}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActivePanel(activePanel)}><X className="h-3.5 w-3.5" /></Button>
+            <div className="w-80 border-r bg-background/95 backdrop-blur-md shrink-0 flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-200 shadow-sm z-10">
+              <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 bg-muted/15">
+                <span className="font-semibold text-sm capitalize text-foreground">
+                  {activePanel === "shapes" ? "Shapes & Vectors" : activePanel === "data" ? "Data Fill" : activePanel === "background" ? "Canvas Background" : activePanel}
+                </span>
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-muted" onClick={() => setActivePanel(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
 
                 {activePanel === "explore" && (
                   <ExplorePanel
@@ -976,17 +994,20 @@ export default function CanvasEditor() {
                 {activePanel === "templates" && (
                   <>
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                      <Input placeholder="Search…" value={tplSearch} onChange={(e) => setTplSearch(e.target.value)} className="pl-7 h-8 text-xs" />
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input placeholder="Search templates…" value={tplSearch} onChange={(e) => setTplSearch(e.target.value)} className="pl-8 h-8 text-xs bg-background/80 rounded-xl" />
                     </div>
                     {filteredTemplates.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-6">No templates found</p>
+                      <div className="text-center py-8 px-4 bg-muted/20 rounded-2xl border border-dashed border-border/60">
+                        <p className="text-xs text-muted-foreground font-medium">No templates found</p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">Try another search keyword</p>
+                      </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2.5">
                         {filteredTemplates.map((tpl: any) => (
                           <button key={tpl.id}
                             onClick={() => loadTemplate(tpl)}
-                            className="group relative rounded-xl overflow-hidden border border-border hover:border-primary hover:shadow-md transition-all duration-150 text-left bg-muted/20"
+                            className="group relative rounded-2xl overflow-hidden border border-border/70 hover:border-primary hover:shadow-lg hover:scale-[1.02] transition-all duration-200 text-left bg-card/60 shadow-xs"
                           >
                             {/* Thumbnail image area */}
                             <div className="relative overflow-hidden" style={{ paddingTop: "130%" }}>
@@ -994,7 +1015,7 @@ export default function CanvasEditor() {
                                 <img
                                   src={tpl.thumbnail_url}
                                   alt={tpl.name}
-                                  className="absolute inset-0 w-full h-full object-cover"
+                                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   loading="lazy"
                                 />
                               ) : (
@@ -1003,17 +1024,17 @@ export default function CanvasEditor() {
                                 </div>
                               )}
                               {/* Hover overlay */}
-                              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-150" />
+                              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-200" />
                               {/* Editor type badge */}
-                              <div className="absolute top-1 right-1">
-                                <span className="text-[8px] bg-black/50 text-white px-1 py-0.5 rounded font-medium backdrop-blur-sm">
+                              <div className="absolute top-1.5 right-1.5">
+                                <span className="text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-md shadow-xs">
                                   {tpl.editor_type === "writer" ? "W" : "D"}
                                 </span>
                               </div>
                             </div>
                             {/* Name */}
-                            <div className="px-1.5 py-1.5">
-                              <span className="text-[9px] font-medium text-foreground/80 leading-tight line-clamp-2 block">{tpl.name}</span>
+                            <div className="p-2 bg-background/80 backdrop-blur-xs border-t border-border/40">
+                              <span className="text-[10px] font-semibold text-foreground/90 leading-tight line-clamp-2 block group-hover:text-primary transition-colors">{tpl.name}</span>
                             </div>
                           </button>
                         ))}
@@ -1023,46 +1044,65 @@ export default function CanvasEditor() {
                 )}
 
                 {activePanel === "shapes" && (
-                  <>
+                  <div className="space-y-4">
                     {SHAPE_GROUPS.map((group) => (
-                      <div key={group.label}>
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">{group.label}</p>
+                      <div key={group.label} className="space-y-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
                         <div className="grid grid-cols-3 gap-2">
                           {group.shapes.map((s) => (
                             <button key={s.id} onClick={() => handleShape(s.id)}
-                              className="flex flex-col items-center justify-center gap-1 border rounded-lg p-2.5 hover:bg-primary/5 hover:border-primary transition-all">
-                              <span className="text-xl">{s.emoji}</span>
-                              <span className="text-[9px] text-muted-foreground">{s.label}</span>
+                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border/60 bg-card/40 hover:bg-primary/10 hover:border-primary/60 hover:shadow-md hover:scale-[1.04] transition-all duration-150 group">
+                              <div className="h-7 w-7 flex items-center justify-center text-foreground/80 group-hover:text-primary transition-colors">
+                                {SHAPE_SVGS[s.id] ?? <Shapes className="h-5 w-5" />}
+                              </div>
+                              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground truncate max-w-full">{s.label}</span>
                             </button>
                           ))}
                         </div>
                       </div>
                     ))}
-                  </>
+                  </div>
                 )}
 
                 {activePanel === "text" && (
-                  <>
-                    <p className="text-[10px] text-muted-foreground">Click to add text to canvas</p>
-                    <div className="space-y-2">
-                      {[
-                        { label:"Add a Heading",    action:() => canvas.addHeading(1), style:{fontSize:"22px", fontWeight:700} },
-                        { label:"Add a Subheading", action:() => canvas.addHeading(2), style:{fontSize:"18px", fontWeight:600} },
-                        { label:"Add body text",     action:() => canvas.addText("Body text"), style:{fontSize:"14px"} },
-                        { label:"Add a caption",     action:() => canvas.addText("Caption", {fontSize:11}), style:{fontSize:"11px",color:"#64748b"} },
-                      ].map((t) => (
-                        <button key={t.label} onClick={t.action}
-                          className="w-full text-left border rounded-lg px-3 py-2.5 hover:bg-primary/5 hover:border-primary transition-all"
-                          style={t.style}>{t.label}</button>
-                      ))}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-1">Typography</p>
+                      <p className="text-[10px] text-muted-foreground mb-3">Click any style to add to your canvas</p>
+                      <div className="space-y-2">
+                        {[
+                          { label: "Add a heading", desc: "Large title", action: () => canvas.addHeading(1), style: { fontSize: "19px", fontWeight: 700 } },
+                          { label: "Add a subheading", desc: "Section header", action: () => canvas.addHeading(2), style: { fontSize: "15px", fontWeight: 600 } },
+                          { label: "Add a little bit of body text", desc: "Standard text", action: () => canvas.addText("Body text"), style: { fontSize: "13px", fontWeight: 400 } },
+                          { label: "Add a caption / note", desc: "Small details", action: () => canvas.addText("Caption", { fontSize: 11 }), style: { fontSize: "11px", color: "var(--muted-foreground)" } },
+                        ].map((t) => (
+                          <button
+                            key={t.label}
+                            onClick={t.action}
+                            className="w-full text-left p-3.5 rounded-2xl border border-border/70 bg-card/40 hover:bg-primary/10 hover:border-primary/60 hover:shadow-md hover:scale-[1.01] transition-all duration-150 group"
+                          >
+                            <span className="block text-foreground group-hover:text-primary transition-colors leading-tight" style={t.style}>{t.label}</span>
+                            <span className="text-[10px] text-muted-foreground/80 mt-1 block">{t.desc}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <Separator />
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">School Labels</p>
-                    {["School Name","Student Name","Roll No","Class / Section","Date of Birth","Address","Phone","Academic Year"].map((label) => (
-                      <button key={label} onClick={() => canvas.addText(label, {fontSize:13})}
-                        className="w-full text-left text-xs px-2 py-1.5 border rounded hover:bg-muted transition-colors">{label}</button>
-                    ))}
-                  </>
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">School Dynamic Tokens</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {["School Name", "Student Name", "Roll No", "Class / Section", "Date of Birth", "Symbol No", "GPA / Grade", "Exam Name", "Academic Year"].map((label) => (
+                          <button
+                            key={label}
+                            onClick={() => canvas.addText(`{${label.toLowerCase().replace(/[\s/]+/g, "_")}}`, { fontSize: 13, fontWeight: 600 })}
+                            className="text-[10px] font-medium px-2.5 py-1 rounded-full border border-border/80 bg-background/80 hover:bg-primary/10 hover:border-primary hover:text-primary transition-all duration-150"
+                          >
+                            +{label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {activePanel === "media" && (
@@ -1161,43 +1201,62 @@ export default function CanvasEditor() {
 
           {/* Canvas + pages strip */}
           <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-background overflow-x-auto shrink-0">
-              {canvas.pages.map((pg, idx) => (
-                <span key={pg.id} className="relative shrink-0">
-                  <button onClick={() => canvas.goToPage(idx)}
-                    onDoubleClick={() => canvas.duplicatePage(idx)}
-                    title={canvas.currentPageIdx === idx ? "Current page" : "Click to open · double-click to duplicate"}
-                    className={`relative flex-shrink-0 flex items-center justify-center rounded border text-xs font-medium transition-all
-                      ${canvas.currentPageIdx === idx ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-border bg-background hover:bg-muted"}`}
-                    style={{ width:38, height:50 }}>
-                    {idx+1}
-                  </button>
-                  {canvas.pages.length > 1 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-background border text-muted-foreground hover:text-foreground flex items-center justify-center"
-                          onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="h-2.5 w-2.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={() => canvas.duplicatePage(idx)}>Duplicate</DropdownMenuItem>
-                        {idx !== canvas.currentPageIdx && (
-                          <DropdownMenuItem onClick={() => canvas.movePage(idx, canvas.currentPageIdx)}>Move here</DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem className="text-destructive" onClick={() => canvas.removePage(idx)}>Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </span>
-              ))}
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 border border-dashed" onClick={canvas.addPage} title="Add page"><Plus className="h-3.5 w-3.5" /></Button>
-              <span className="text-xs text-muted-foreground ml-auto shrink-0">{canvas.currentPageIdx+1} / {canvas.pages.length}</span>
+            {/* Page strip — sleek compact Canva-style toolbar */}
+            <div className="flex items-center gap-2 px-4 py-2 border-b bg-background/95 backdrop-blur-sm shrink-0 overflow-x-auto custom-scrollbar">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">Pages</span>
+              <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
+                {canvas.pages.map((pg, idx) => (
+                  <div key={pg.id} className="relative group shrink-0">
+                    <button
+                      onClick={() => canvas.goToPage(idx)}
+                      onDoubleClick={() => canvas.duplicatePage(idx)}
+                      title={canvas.currentPageIdx === idx ? "Current page · double-click to duplicate" : "Click to view page"}
+                      className={`h-7 px-3 rounded-lg border text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 select-none
+                        ${canvas.currentPageIdx === idx
+                          ? "border-primary bg-primary text-primary-foreground shadow-xs scale-[1.02]"
+                          : "border-border/70 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <span>Page {idx + 1}</span>
+                    </button>
+                    {canvas.pages.length > 1 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-background border border-border shadow-xs text-muted-foreground hover:text-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-2.5 w-2.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => canvas.duplicatePage(idx)}>Duplicate Page</DropdownMenuItem>
+                          {idx !== canvas.currentPageIdx && (
+                            <DropdownMenuItem onClick={() => canvas.movePage(idx, canvas.currentPageIdx)}>Move here</DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="text-destructive" onClick={() => canvas.removePage(idx)}>Delete Page</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-3 text-xs rounded-lg gap-1 border-dashed shrink-0 hover:border-primary hover:text-primary transition-colors"
+                onClick={canvas.addPage}
+                title="Add new blank page"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Page
+              </Button>
+              <div className="ml-auto text-xs text-muted-foreground shrink-0 font-medium px-2 py-0.5 rounded-md bg-muted/40">
+                {canvas.currentPageIdx + 1} of {canvas.pages.length}
+              </div>
             </div>
             <div
               ref={scrollAreaRef}
               data-canvas-scroll
-              className="flex-1 min-h-0 overflow-auto flex bg-[#f0f0f0] p-8"
+              className="flex-1 min-h-0 overflow-auto flex bg-muted/30 p-8 custom-scrollbar"
               onContextMenu={onCanvasContextMenu}
             >
               {/* wrapper scales with zoom (m-auto keeps it centered AND fully

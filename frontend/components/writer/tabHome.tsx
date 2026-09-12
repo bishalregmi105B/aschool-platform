@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { RibbonGroup, RBtn, BtnCol, VSep, ColorSplitBtn, ColorGrid } from "@/components/writer/ribbon";
 import type { WriterCtx } from "@/components/writer/context";
+import { cn } from "@/lib/utils";
 import { ALL_FONTS, FONT_SIZES, LINE_SPACINGS, HIGHLIGHT_COLORS } from "@/lib/writer/settings";
 
 export function HomeTab({ ctx }: { ctx: WriterCtx }) {
@@ -270,52 +271,47 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
         </div>
       </RibbonGroup>
 
-      {/* Styles */}
-      <RibbonGroup label="Styles" className="min-w-[120px]">
-        <div className="flex flex-col gap-0.5 w-[118px]">
-          <Select value={styleValue} onValueChange={(v) => {
-            if (v === "p") ch.setParagraph().run();
-            else if (v === "quote") ch.toggleBlockquote().run();
-            else if (v === "code") ch.toggleCodeBlock().run();
-            else ch.toggleHeading({ level: Number(v[1]) as 1 | 2 | 3 | 4 }).run();
-          }}>
-            <SelectTrigger className="w-full h-7 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="p">Normal</SelectItem>
-              <SelectItem value="h1"><span className="text-base font-semibold">Heading 1</span></SelectItem>
-              <SelectItem value="h2"><span className="text-sm font-semibold text-slate-600">Heading 2</span></SelectItem>
-              <SelectItem value="h3"><span className="text-xs font-semibold text-slate-500">Heading 3</span></SelectItem>
-              <SelectItem value="h4"><span className="text-[11px] font-semibold text-slate-500">Heading 4</span></SelectItem>
-              <SelectItem value="quote">Quote</SelectItem>
-              <SelectItem value="code">Code block</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex gap-0.5">
-            {(["p", "h1", "h2", "h3", "quote", "code"] as const).map((s) => (
+      {/* Styles (Word 365 Quick Styles Gallery) */}
+      <RibbonGroup label="Styles">
+        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5 max-w-[420px]">
+          {[
+            { id: "p", title: "Normal", sample: "AaBbCc", sampleStyle: "text-xs font-normal text-foreground" },
+            { id: "h1", title: "Heading 1", sample: "AaBbCc", sampleStyle: "text-xs font-bold text-[#0078d4]" },
+            { id: "h2", title: "Heading 2", sample: "AaBbCc", sampleStyle: "text-[11px] font-semibold text-[#106ebe]" },
+            { id: "h3", title: "Heading 3", sample: "AaBbCc", sampleStyle: "text-[11px] font-medium text-slate-700 dark:text-slate-300" },
+            { id: "quote", title: "Quote", sample: "“AaBb”", sampleStyle: "text-xs italic text-slate-500" },
+            { id: "code", title: "Code", sample: "<code>", sampleStyle: "text-[11px] font-mono text-emerald-600" },
+          ].map((item) => {
+            const isActive = blockBtn(item.id === "p" ? "paragraph" : item.id);
+            return (
               <button
-                key={s}
+                key={item.id}
                 type="button"
-                title={`Style: ${s}`}
                 onClick={() => {
-                  if (s === "p") ch.setParagraph().run();
-                  else if (s === "quote") ch.toggleBlockquote().run();
-                  else if (s === "code") ch.toggleCodeBlock().run();
-                  else ch.toggleHeading({ level: Number(s[1]) as 1 | 2 | 3 }).run();
+                  if (item.id === "p") ch.setParagraph().run();
+                  else if (item.id === "quote") ch.toggleBlockquote().run();
+                  else if (item.id === "code") ch.toggleCodeBlock().run();
+                  else ch.toggleHeading({ level: Number(item.id[1]) as 1 | 2 | 3 }).run();
                 }}
-                className={`h-6 flex-1 rounded border text-[9px] ${blockBtn(s === "p" ? "paragraph" : s) ? "border-blue-500 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                className={cn(
+                  "word-style-tile",
+                  isActive && "active",
+                )}
+                title={`Apply style: ${item.title}`}
               >
-                {s === "p" ? "N" : s.toUpperCase()}
+                <span className={cn("leading-none select-none truncate max-w-full", item.sampleStyle)}>{item.sample}</span>
+                <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 mt-1 select-none">{item.title}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </RibbonGroup>
 
       {/* Editing */}
       <RibbonGroup label="Editing">
         <BtnCol>
-          <RBtn icon={<Search className="h-4 w-4" />} label="Find" title="Find & replace (Ctrl+F)" onClick={() => ctx.openFindReplace(false)} />
-          <div className="flex">
+          <RBtn icon={<Search className="h-3.5 w-3.5" />} label="Find" title="Find & replace (Ctrl+F)" onClick={() => ctx.openFindReplace(false)} />
+          <div className="flex gap-0.5">
             <RBtn icon={<TextCursorInput className="h-3.5 w-3.5" />} title="Replace" onClick={() => ctx.openFindReplace(true)} />
             <RBtn icon={<span className="text-[10px] font-semibold">All</span>} title="Select all (Ctrl+A)" onClick={() => editor.chain().focus().selectAll().run()} />
           </div>
