@@ -268,8 +268,16 @@ export default function AOSDesktopShell() {
     (slug: string, options: OpenWindowOptions = {}) => {
       closeAllFlyouts();
 
-      const windowId = options.windowId || slug;
-      const moduleId = options.moduleId || slug;
+      // "settings" from shell chrome (QuickSettings gear, context menu,
+      // TopMenuBar system menu, iOS control center) means the OS
+      // personalization app — the school settings module keeps its own id.
+      const effectiveSlug =
+        !options.moduleId && !Object.prototype.hasOwnProperty.call(options, "route") && slug === "settings"
+          ? "aos-settings"
+          : slug;
+
+      const windowId = options.windowId || effectiveSlug;
+      const moduleId = options.moduleId || effectiveSlug;
       const hasRouteOverride = Object.prototype.hasOwnProperty.call(options, "route");
 
       setWindows((prevWindows) => {

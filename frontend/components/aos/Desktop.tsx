@@ -59,8 +59,17 @@ export default function Desktop({
           return { id: app.id, name: app.name, icon: app.icon };
         });
 
+    // Sidebar subitems can normalize to the same module id as their parent
+    // (e.g. Website → /settings/website-design); one desktop icon per module.
+    const seen = new Set<string>();
+    const deduped = list.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+
     // Add Academic Archive (Recycle Bin) at the end
-    list.push({
+    deduped.push({
       id: "recycle_bin",
       name: "Academic Archive",
       icon: (
@@ -70,7 +79,7 @@ export default function Desktop({
       ),
     });
 
-    return list;
+    return deduped;
   }, [externalApps, sidebarItems]);
 
   const getWallpaperBackground = () => {
