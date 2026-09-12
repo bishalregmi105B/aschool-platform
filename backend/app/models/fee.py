@@ -97,6 +97,8 @@ class FeeCollection(SchoolModel):
     installment_id = Column(UUID(as_uuid=True), ForeignKey("fee_installments.id"))
     # Last BS date a late fine was accrued on (fine-accrual idempotency stamp).
     fine_accrued_on_bs = Column(String(20))
+    # A-31: yearly-ledger anchor (nullable; backfilled opportunistically)
+    enrollment_id = Column(UUID(as_uuid=True), ForeignKey("student_enrollments.id"))
 
     student = relationship("Student", backref="fee_collections")
     collected_by = relationship("User")
@@ -191,6 +193,9 @@ class PaymentInitiation(SchoolModel):
     gateway_ref = Column(String(200), nullable=False, index=True)
     amount = Column(Numeric(12, 2), nullable=False)
     status = Column(String(20), default="initiated")  # initiated|completed|failed
+    # S-A5 (A-22): what desk the money belongs to — guest flows (public
+    # site) anchor completion to the same row as desk collections.
+    context = Column(String(30), server_default="desk")  # desk|guest_fee|admission_fee|event_ticket
     initiated_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     completed_at = Column(DateTime)
 

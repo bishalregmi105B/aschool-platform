@@ -26,6 +26,13 @@ capabilities:
 ui:
   nav:
     route: /dashboard/admission
+    subitems:
+      - label: Online Applications
+        label_nepali: अनलाइन आवेदन
+        route: /dashboard/admission/registrations
+      - label: Seat Caps
+        label_nepali: सिट सीमा
+        route: /dashboard/admission/seats
     section: Money
     label: Admission
     label_nepali: भर्ना

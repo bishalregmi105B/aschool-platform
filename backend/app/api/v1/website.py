@@ -8,7 +8,9 @@ from app.models.notice import Notice
 from app.models.website import WebsitePage
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.response import error_response, success_response
+from sqlalchemy import or_
+
+from app.utils.response import created_response, error_response, success_response
 from extensions import db, limiter
 from flask_limiter.util import get_remote_address
 
@@ -1001,3 +1003,286 @@ def mark_contact_read(message_id):
     msg.read_at = datetime.now(timezone.utc)
     db.session.commit()
     return success_response({"read": True})
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A5 — A-09 public admission registration + A-22 guest payments
+# (unauthenticated, slug-scoped, rate-limited; staging rows only —
+# provisioning happens in the office, via /admission/registrations/*)
+# ══════════════════════════════════════════════════════════════════════════
+
+@website_bp.route("/public/<slug>/admission/registration", methods=["POST"])
+@limiter.limit("5/hour;20/day", key_func=_public_form_key)
+def submit_public_admission_registration(slug):
+    """Public admission application — lands in the staging queue."""
+    from app.services.admission_funnel import DuplicateRegistrationError, submit_public_registration
+
+    school, err = _public_site_guard(slug)
+    if err is not None:
+        return err
+    data = request.get_json(silent=True) or {}
+    try:
+        reg = submit_public_registration(school, data)
+    except DuplicateRegistrationError:
+        return error_response(
+            "An application with these details was already submitted recently",
+            409,
+        )
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+    from extensions import db
+
+    db.session.add(reg)
+    db.session.commit()
+    # verification_token rides ONLY the submission response — it is the
+    # applicant's status-tracking receipt (the enumeration guard for the
+    # status endpoint).
+    return created_response({
+        "id": str(reg.id),
+        "registration_number": reg.registration_number,
+        "verification_token": reg.verification_token,
+        "status": reg.status,
+        "message": "Application received. The school office will contact you.",
+    })
+
+
+@website_bp.route("/public/<slug>/admission/registration/<uuid:registration_id>", methods=["GET"])
+def public_registration_status(slug, registration_id):
+    """Applicant status view — requires the verification token from the
+    submission response (enumeration guard); minimal PII."""
+    from app.models.admission import AdmissionRegistration
+
+    school, err = _public_site_guard(slug)
+    if err is not None:
+        return err
+    token = (request.args.get("token") or "").strip()
+    reg = AdmissionRegistration.query.filter_by(
+        id=registration_id, school_id=school.id, is_deleted=False
+    ).first()
+    if reg is None or not token or token != (reg.verification_token or ""):
+        return error_response("Registration not found", 404)
+    return success_response({
+        "registration_number": reg.registration_number,
+        "status": reg.status,
+        "student_name": f"{reg.student_first_name} {reg.student_last_name or ''}".strip(),
+        "review_notes": reg.review_notes if reg.status == "rejected" else None,
+        "submitted_at": reg.created_at.isoformat() if reg.created_at else None,
+    })
+
+
+@website_bp.route("/public/<slug>/payments/lookup", methods=["POST"])
+@limiter.limit("10/hour;30/day", key_func=_public_form_key)
+def guest_fee_lookup(slug):
+    """A-22 guest payments, step 1: find a student's dues without an
+    account (enrollment number or guardian phone). Minimal PII."""
+    from app.models.fee import FeeCollection
+    from app.models.student import Guardian, Student
+
+    school, err = _public_site_guard(slug)
+    if err is not None:
+        return err
+    data = request.get_json(silent=True) or {}
+    identifier = str(data.get("student_identifier") or "").strip()
+    if not identifier:
+        return error_response("student_identifier is required", 400)
+
+    student = Student.query.filter(
+        Student.school_id == school.id,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+        or_(Student.enrollment_number == identifier,
+            Student.student_id == identifier),
+    ).first()
+    if student is None:
+        guardian = Guardian.query.filter(
+            Guardian.student_id == Student.id,
+            Guardian.school_id == school.id,
+            Guardian.is_deleted.is_(False),
+            Guardian.phone == identifier[-10:],
+        ).first()
+        student = (
+            Student.query.filter_by(id=guardian.student_id, is_deleted=False).first()
+            if guardian else None
+        )
+    if student is None:
+        return error_response("No student found for that identifier", 404)
+
+    dues = FeeCollection.query.filter(
+        FeeCollection.school_id == school.id,
+        FeeCollection.student_id == student.id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+    ).all()
+    outstanding = []
+    for bill in dues:
+        try:
+            from app.api.v1.fees import _collection_payable_total, _extract_partial_paid
+
+            payable = float(_collection_payable_total(bill))
+            paid = min(float(_extract_partial_paid(bill)), payable)
+            due = max(payable - paid, 0.0)
+        except Exception:
+            payable = float(bill.amount or 0)
+            due = payable
+        if due > 0.005:
+            outstanding.append({
+                "collection_id": str(bill.id),
+                "fee_type": bill.fee_item_name,
+                "due_amount": round(due, 2),
+                "month_bs": bill.month_bs,
+            })
+    return success_response({
+        "student_id": str(student.id),
+        "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip(),
+        "class_name": (student.to_dict() or {}).get("class_name"),
+        "outstanding": outstanding,
+    })
+
+
+@website_bp.route("/public/<slug>/payments/initiate", methods=["POST"])
+@limiter.limit("5/hour;20/day", key_func=_public_form_key)
+def guest_fee_initiate(slug):
+    """A-22 guest payments, step 2: create guest PaymentInitiation rows and
+    return the gateway hosted-checkout payload. Completion rides the
+    EXISTING /webhooks/<gateway>/callback + success routes — the initiation
+    row (context='guest_fee') is the server-side anchor."""
+    from app.models.fee import FeeCollection, PaymentInitiation
+
+    school, err = _public_site_guard(slug)
+    if err is not None:
+        return err
+    data = request.get_json(silent=True) or {}
+    collection_ids = data.get("collection_ids") or []
+    payer_phone = str(data.get("payer_phone") or "").strip()[:20]
+    provider = str(data.get("provider") or "esewa").strip().lower()
+    if provider not in ("esewa", "khalti", "fonepay"):
+        return error_response("provider must be esewa|khalti|fonepay", 400)
+    if not isinstance(collection_ids, list) or not collection_ids:
+        return error_response("collection_ids is required", 400)
+
+    bills = []
+    total = 0.0
+    for cid in collection_ids[:20]:
+        parsed = _parse_uuid_safe(cid)
+        if not parsed:
+            continue
+        bill = FeeCollection.query.filter(
+            FeeCollection.id == parsed,
+            FeeCollection.school_id == school.id,
+            FeeCollection.is_deleted.is_(False),
+            FeeCollection.payment_status.in_(("pending", "partial")),
+        ).first()
+        if bill is None:
+            continue
+        try:
+            from app.api.v1.fees import _collection_payable_total, _extract_partial_paid
+
+            payable = float(_collection_payable_total(bill))
+            paid = min(float(_extract_partial_paid(bill)), payable)
+        except Exception:
+            payable = float(bill.amount or 0)
+            paid = 0.0
+        due = max(payable - paid, 0.0)
+        if due > 0.005:
+            bills.append((bill, round(due, 2)))
+            total += due
+    if not bills:
+        return error_response("No valid outstanding bills to pay", 400)
+
+    from app.services.payments.esewa_gateway import EsewaGateway
+    from app.services.payments.khalti_gateway import KhaltiGateway
+
+    # Per-school credentials — the SAME configured-methods resolver the desk
+    # path uses (its method rows carry merchant_code/secret_key).
+    from app.api.v1.fees import _get_configured_payment_methods
+
+    with_current_app = None
+    from flask import current_app as _app
+
+    with_current_app = _app
+    methods = _get_configured_payment_methods.__wrapped__() \
+        if hasattr(_get_configured_payment_methods, "__wrapped__") \
+        else None
+    if methods is None:
+        # Not a decorated function: call needs app+g context; the public
+        # request has no g.school_id — resolve the school's methods directly
+        # from the fees plugin config store instead.
+        from app.plugins.config_store import get_plugin_config
+
+        methods = _methods_from_plugin_config(school.id)
+    method_index = {m["key"]: m for m in (methods or [])}
+    selected = method_index.get(provider)
+    if not selected or not selected.get("enabled"):
+        return error_response(f"Payment provider '{provider}' is not enabled", 400)
+
+    first_bill, _ = bills[0]
+    # The first bill's id doubles as the transaction anchor (same shape as
+    # the desk path: esewa transaction_uuid = collection id).
+    anchor_id = str(first_bill.id)
+    base_url = request.host_url.rstrip("/")
+    try:
+        if provider == "esewa":
+            payload = EsewaGateway.initiate_payment(
+                transaction_uuid=anchor_id,
+                amount=round(total, 2),
+                product_code=(selected.get("merchant_code") or "").strip(),
+                secret_key=(selected.get("secret_key") or "").strip(),
+                success_url=f"{base_url}/webhooks/esewa/callback",
+                failure_url=f"{base_url}/webhooks/esewa/callback",
+            )
+        else:
+            result = KhaltiGateway.initiate_payment(
+                purchase_order_id=anchor_id,
+                purchase_order_name=f"Guest fee payment ({school.name})",
+                amount_paisa=int(round(total, 2) * 100),
+                return_url=f"{base_url}/webhooks/khalti/callback",
+                secret_key=(selected.get("secret_key") or "").strip(),
+                customer_info={"phone": payer_phone} if payer_phone else None,
+            )
+            payload = result
+    except ValueError as exc:
+        return error_response(f"Payment gateway not configured: {exc}", 400)
+    except Exception as exc:  # noqa: BLE001 — gateway outages are user-facing
+        return error_response(f"Payment gateway error: {exc}", 502)
+
+    for bill, due in bills:
+        db.session.add(PaymentInitiation(
+            school_id=school.id,
+            collection_id=bill.id,
+            gateway=provider,
+            gateway_ref=anchor_id,
+            amount=due,
+            status="initiated",
+            context="guest_fee",
+        ))
+    db.session.commit()
+    return created_response({
+        "total_amount": round(total, 2),
+        "provider": provider,
+        "checkout": payload,
+        "message": "Complete the payment, then keep the reference — the school "
+                   "is notified automatically when the gateway confirms.",
+    })
+
+
+def _parse_uuid_safe(value):
+    import uuid as _uuid
+
+    try:
+        return _uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+def _methods_from_plugin_config(school_id):
+    """Per-school payment-method rows from the fees plugin config (the
+    guest path has no JWT, so fees.py's g-bound resolver can't run)."""
+    try:
+        from app.plugins.config_store import get_plugin_config
+
+        cfg = get_plugin_config(str(school_id), "fees", {}) or {}
+        methods = cfg.get("payment_methods")
+        if isinstance(methods, list):
+            return methods
+    except Exception:  # noqa: BLE001
+        pass
+    return []

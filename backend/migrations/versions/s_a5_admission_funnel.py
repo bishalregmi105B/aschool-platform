@@ -142,7 +142,8 @@ def upgrade():
     op.add_column("students", sa.Column("dynamic_fields",
                                         postgresql.JSONB(astext_type=sa.Text()),
                                         nullable=True))
-    op.add_column("staff", sa.Column("dynamic_fields",
+    # Staff are users with role staff/teacher (no separate staff table).
+    op.add_column("users", sa.Column("dynamic_fields",
                                      postgresql.JSONB(astext_type=sa.Text()),
                                      nullable=True))
 
@@ -234,7 +235,7 @@ def downgrade():
     op.drop_index("ix_admission_registrations_token", table_name="admission_registrations")
     op.drop_index("ix_admission_registrations_status", table_name="admission_registrations")
     op.drop_table("admission_registrations")
-    op.drop_column("staff", "dynamic_fields")
+    op.drop_column("users", "dynamic_fields")
     op.drop_column("students", "dynamic_fields")
     op.drop_index("ix_custom_field_defs_form_name", table_name="custom_field_defs")
     op.drop_table("custom_field_defs")

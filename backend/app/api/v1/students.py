@@ -6,6 +6,7 @@ import zipfile
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
+from app.models.school import School
 from app.models.student import Guardian, Student
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import upload_file as _upload_file
@@ -145,7 +146,19 @@ def create_student():
                 f"Roll number {roll_number} is already assigned in this class", 409
             )
 
-    student = Student(school_id=g.school_id)
+    # A-35: validate + persist custom registration fields (unknown keys
+    # dropped, required/choices enforced server-side).
+    from app.api.v1.custom_fields import validate_dynamic_fields
+
+    dyn_ok, dyn_clean, dyn_errors = validate_dynamic_fields(
+        g.school_id, "student_registration", data.get("dynamic_fields") or {}
+    )
+    if not dyn_ok:
+        return error_response(
+            {"message": "Invalid custom field values", "errors": dyn_errors}, 400
+        )
+
+    student = Student(school_id=g.school_id, dynamic_fields=dyn_clean)
     _populate_student(student, data)
     # E235: auto-assign the enrollment (admission) number and the next free
     # class roll when the caller did not provide them. Generation takes a
@@ -1339,3 +1352,180 @@ def list_promotion_records(student_id):
             for r in rows
         ]
     })
+
+
+# ── S-A5 (A-36): student exit documents ──────────────────────────────────
+
+_EXIT_DOC_TYPES = ("transfer_certificate", "character_certificate", "bonafide", "transcript")
+
+
+def _student_dues_total(school_id, student) -> float:
+    """Outstanding = Σ(net payable − paid) over pending/partial bills — the
+    same math the fees API uses; replicated locally to avoid a cycle."""
+    from app.models.fee import FeeCollection
+
+    rows = FeeCollection.query.filter(
+        FeeCollection.school_id == school_id,
+        FeeCollection.student_id == student.id,
+        FeeCollection.is_deleted.is_(False),
+        FeeCollection.payment_status.in_(("pending", "partial")),
+    ).all()
+    total = 0.0
+    for row in rows:
+        amount = float(row.amount or 0) + float(row.late_fine_amount or 0) \
+            - float(row.discount_amount or 0)
+        amount = max(amount, 0.0)
+        notes = row.notes or ""
+        paid = 0.0
+        if "[partial_paid:" in notes:
+            try:
+                paid = float(notes.split("[partial_paid:", 1)[1].split("]", 1)[0])
+            except (ValueError, IndexError):
+                paid = 0.0
+        total += max(amount - min(paid, amount), 0.0)
+    return round(total, 2)
+
+
+def _exit_doc_dict(doc):
+    student = doc.student
+    return {
+        "id": str(doc.id),
+        "student_id": str(doc.student_id),
+        "student_name": (
+            f"{student.first_name or ''} {student.last_name or ''}".strip()
+            if student else None
+        ),
+        "class_name": (student.to_dict() or {}).get("class_name") if student else None,
+        "doc_type": doc.doc_type,
+        "document_number": doc.document_number,
+        "issued_on_bs": doc.issued_on_bs,
+        "reason": doc.reason,
+        "dues_cleared": bool(doc.dues_cleared),
+        "revoked_at": doc.revoked_at.isoformat() if doc.revoked_at else None,
+        "issued_at": doc.created_at.isoformat() if doc.created_at else None,
+    }
+
+
+@students_bp.route("/<uuid:student_id>/exit-documents", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def issue_exit_document(student_id):
+    """Issue a TC/character/bonafide/transcript. Dues must be cleared first
+    (409 with the total) — and a transfer certificate disables the student
+    (the MSP auto-disable behavior, made explicit)."""
+    import secrets as _secrets
+
+    from app.models.exit_document import StudentExitDocument
+
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if student is None:
+        return error_response("Student not found", 404)
+    data = request.get_json(silent=True) or {}
+    doc_type = str(data.get("doc_type") or "").strip()
+    if doc_type not in _EXIT_DOC_TYPES:
+        return error_response(f"doc_type must be one of {_EXIT_DOC_TYPES}", 400)
+
+    dues = _student_dues_total(str(g.school_id), student)
+    if dues > 0:
+        return error_response(
+            {
+                "message": f"Outstanding fees of NPR {dues:,.2f} must be cleared "
+                           "before issuing an exit document",
+                "dues_total": dues,
+            },
+            409,
+        )
+
+    school = School.query.get(g.school_id)
+    slug4 = (school.slug or "sch").replace("-", "")[:4].upper() if school else "SCH"
+    from app.models.exit_document import StudentExitDocument as _D
+
+    seq = _D.query.filter(
+        _D.school_id == g.school_id,
+        _D.doc_type == doc_type,
+        _D.is_deleted.is_(False),
+    ).count()
+    document_number = f"{doc_type[:2].upper()}-{slug4}-{seq + 1:04d}"
+
+    doc = StudentExitDocument(
+        school_id=g.school_id,
+        student_id=student.id,
+        doc_type=doc_type,
+        document_number=document_number,
+        issued_on_bs=str(data.get("issued_on_bs") or "").strip()[:10] or None,
+        reason=str(data.get("reason") or "").strip()[:1000] or None,
+        dues_cleared=True,
+        meta={"issued_by": str(g.user_id)},
+    )
+    db.session.add(doc)
+    if doc_type == "transfer_certificate":
+        student.status = "transferred_out"
+    db.session.commit()
+    return created_response(_exit_doc_dict(doc))
+
+
+@students_bp.route("/<uuid:student_id>/exit-documents", methods=["GET"])
+@jwt_required()
+@school_required
+def list_exit_documents(student_id):
+    from app.models.exit_document import StudentExitDocument
+
+    rows = StudentExitDocument.query.filter(
+        StudentExitDocument.school_id == g.school_id,
+        StudentExitDocument.student_id == student_id,
+        StudentExitDocument.is_deleted.is_(False),
+    ).order_by(StudentExitDocument.created_at.desc()).all()
+    return success_response({"documents": [_exit_doc_dict(d) for d in rows]})
+
+
+@students_bp.route("/exit-documents/verify", methods=["GET"])
+def verify_exit_document():
+    """PUBLIC verification (the InstiKit TC-verification steal): exact
+    document-number match, minimal PII."""
+    from app.models.exit_document import StudentExitDocument
+
+    number = (request.args.get("number") or "").strip()
+    if not number:
+        return error_response("number is required", 400)
+    doc = StudentExitDocument.query.filter(
+        StudentExitDocument.document_number == number,
+        StudentExitDocument.is_deleted.is_(False),
+    ).first()
+    if doc is None:
+        return error_response("Document not found", 404)
+    student = doc.student
+    return success_response({
+        "document_number": doc.document_number,
+        "doc_type": doc.doc_type,
+        "student_name": (
+            f"{student.first_name or ''} {student.last_name or ''}".strip()
+            if student else None
+        ),
+        "class_name": (student.to_dict() or {}).get("class_name") if student else None,
+        "issued_on_bs": doc.issued_on_bs,
+        "revoked": doc.revoked_at is not None,
+    })
+
+
+@students_bp.route("/exit-documents/<uuid:doc_id>/revoke", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def revoke_exit_document(doc_id):
+    from app.models.exit_document import StudentExitDocument
+
+    doc = StudentExitDocument.query.filter_by(
+        id=doc_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if doc is None:
+        return error_response("Document not found", 404)
+    if doc.revoked_at is not None:
+        return error_response("Document already revoked", 409)
+    from datetime import datetime, timezone
+
+    doc.revoked_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return success_response(_exit_doc_dict(doc))

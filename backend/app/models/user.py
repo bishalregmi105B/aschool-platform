@@ -61,6 +61,8 @@ class User(BaseModel):
     # A-37: set when an admin resets a password or policy demands rotation;
     # the apps surface a change-password screen before anything else.
     must_change_password = Column(Boolean, default=False, nullable=False, server_default="false")
+    # A-35: staff-registration custom-field values (keyed by def id)
+    dynamic_fields = Column(JSONB, default=dict)
     locked_until = Column(DateTime, nullable=True)  # UTC; None means not locked
 
     # Tokens issued before this UTC timestamp are rejected by the blocklist

@@ -95,6 +95,7 @@ api_v1_bp.register_blueprint(search_bp)
 from app.api.v1.files import files_bp
 from app.api.v1.iemis_importer import iemis_importer_bp
 from app.api.v1.communications import communications_bp
+from app.api.v1.custom_fields import custom_fields_bp
 from app.api.v1.sliders import sliders_bp
 from app.api.v1.themes import themes_bp
 from app.api.v1.elibrary import elibrary_bp
@@ -103,6 +104,7 @@ from app.api.v1.design_studio import design_studio_bp
 api_v1_bp.register_blueprint(files_bp)
 api_v1_bp.register_blueprint(iemis_importer_bp)
 api_v1_bp.register_blueprint(communications_bp)
+api_v1_bp.register_blueprint(custom_fields_bp)
 api_v1_bp.register_blueprint(sliders_bp)
 api_v1_bp.register_blueprint(themes_bp)
 api_v1_bp.register_blueprint(elibrary_bp)

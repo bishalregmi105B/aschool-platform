@@ -57,6 +57,8 @@ class Student(SchoolModel):
     shift_id = Column(UUID(as_uuid=True), ForeignKey("shifts.id"))
     medium_id = Column(UUID(as_uuid=True), ForeignKey("mediums.id"))
     academic_year = Column(String(10))
+    # A-35: dynamic registration/custom-field values (keyed by def id)
+    dynamic_fields = Column(JSONB, default=dict)
     admission_date_bs = Column(String(10))
     admission_date_ad = Column(Date)
     admission_number = Column(String(50))

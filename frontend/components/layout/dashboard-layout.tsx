@@ -1,8 +1,7 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { useViewMode } from "@/lib/view-mode-context";
 import { PageLoader } from "@/components/ui/spinner";
 
 const AOSDesktopShell = dynamic(
@@ -22,9 +21,17 @@ const MobileExperience = dynamic(
 );
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAOSMobile } = useViewMode();
+  const [isMobile, setIsMobile] = useState(false);
 
-  if (isAOSMobile) {
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  if (isMobile) {
     return (
       <Suspense fallback={<PageLoader />}>
         <MobileExperience />
