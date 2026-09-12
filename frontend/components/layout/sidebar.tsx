@@ -99,7 +99,7 @@ import { useI18n } from "@/lib/i18n";
 import { useState, useEffect, useMemo } from "react";
 
 // ── Icon Registry (maps YAML icon string → Lucide component) ───────────────
-const ICON_MAP: Record<string, LucideIcon> = {
+export const ICON_MAP: Record<string, LucideIcon> = {
   // People & Academics
   Users,
   GraduationCap,

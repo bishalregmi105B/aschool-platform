@@ -156,3 +156,28 @@
 .compact-content [role="tablist"] { height: 2rem; }
 .compact-content [role="tab"]    { font-size: 0.75rem; padding: 0 0.75rem; }
 
+/* ── AOS Window Content Containment ────────────────────────────────────────
+   Traps position:fixed elements inside floating windows. Required for
+   modules like designer/editor that use fixed overlays covering the screen. */
+.aos-window-content {
+  contain: layout paint;
+  transform: translateZ(0);
+  overflow: auto;
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+/* Remap viewport heights to window frame height inside AOS windows */
+.aos-window-content .h-screen   { height: 100% !important; }
+.aos-window-content .min-h-screen { min-height: 100% !important; }
+.aos-window-content .max-h-screen { max-height: 100% !important; }
+
+/* AOS Desktop root — covers entire viewport, sits above General Portal */
+.aos-desktop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  user-select: none;
+}
+
