@@ -17,7 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { Award, Medal, Plus, Star, Trophy, Users } from "lucide-react";
+import { Award, Medal, Plus, Star, Trophy, Users, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   AOSPage,
   AOSPageHeader,
@@ -26,6 +29,14 @@ import {
   StatGrid,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+
+// Quick links — the gamification manifest ui.nav.subitems.
+const QUICK_LINKS = [
+  { label: "Badges", desc: "Define and award achievement badges", icon: "Award", href: "/dashboard/gamification/badges" },
+  { label: "Leaderboard", desc: "Full student standings", icon: "Trophy", href: "/dashboard/gamification/leaderboard" },
+  { label: "Houses", desc: "House system and house points", icon: "Users", href: "/dashboard/gamification/houses" },
+  { label: "Rewards", desc: "Redeemable rewards catalogue", icon: "Star", href: "/dashboard/gamification/rewards" },
+];
 
 interface BadgeItem {
   id: string;
@@ -130,7 +141,43 @@ function GamificationContent() {
           <KpiCard label="Ranked Students" value={leaderboard?.length || 0} icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
           <KpiCard label="Badges" value={badges?.length || 0} icon={<Award className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
           <KpiCard label="Houses" value={houses?.length || 0} icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard
+            label="Points (Top 20)"
+            value={(leaderboard || []).reduce((a: number, e: LeaderEntry) => a + (e.total_points || 0), 0)}
+            color="#d83b01"
+            icon={<Star className="h-5 w-5" style={{ color: "#d83b01" }} />}
+          />
         </StatGrid>
+
+        {/* Quick links — 44px gradient icon tile + label, as next/link */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          {QUICK_LINKS.map((l) => {
+            const Icon = ICON_MAP[l.icon] || ChevronRight;
+            return (
+              <Link key={l.href} href={l.href} className="block h-full">
+                <div
+                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                  style={{ cursor: "pointer", marginBottom: 0 }}
+                >
+                  <div
+                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: SECTION_GRADIENTS["Student Life"],
+                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                    {l.label}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 border-b border-[color:var(--w11-border-subtle)] pb-2 mb-4">
