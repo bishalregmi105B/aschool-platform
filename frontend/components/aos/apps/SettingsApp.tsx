@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   User,
   Palette,
@@ -19,30 +21,41 @@ import {
   Sparkles,
 } from "lucide-react";
 import { SchoolRole, SCHOOL_PROFILES } from "../RoleSwitcherModal";
-import {
-  AOSClassroomIcon,
-  AOSFileManagerIcon,
-  AOSGradebookIcon,
-  AOSTimetableIcon,
-  AOSLibraryIcon,
-  AOSExamIcon,
-  AOSCampusIcon,
-  AOSNotebookIcon,
-  AOSLabIcon,
-  AOSTerminalIcon,
-  AOSAdminIcon,
-  AOSFinanceIcon,
-  AOSSettingsIcon,
-} from "../AOSIcons";
+import { AOSSettingsIcon } from "../AOSIcons";
 import { useAuth } from "@/lib/auth-context";
+import { useInstalledPlugins } from "@/lib/plugins";
+import { getAOSAppForModule } from "@/lib/aos-app-adapter";
+import {
+  getStorageUsage,
+  type StorageUsage,
+} from "@/lib/services/files.service";
 
-export interface SettingsAppProps {
-  themeMode?: "light" | "dark";
-  onToggleTheme?: () => void;
-  accentColor?: string;
-  onChangeAccent?: (color: string) => void;
-  wallpaper?: string;
-  onChangeWallpaper?: (wp: string) => void;
+// Version comes from package.json at build time when available (Next inlines
+// npm_package_version for the package being built); fallback keeps the card
+// meaningful in standalone builds.
+const APP_VERSION = process.env.npm_package_version || "3.5.0";
+
+// The school vault quota shown in Settings (matches the institutional plan).
+const STORAGE_QUOTA_GB = 128;
+
+// Last-known storage usage for instant paint / offline fallback — mirrors the
+// localStorage cache pattern used by useAOSUserSettings.
+const STORAGE_CACHE_KEY = "aschool_aos_storage_cache";
+
+interface PinnableApp {
+  id: string;
+  name: string;
+  desc: string;
+  icon: React.ReactNode;
+}
+
+interface SettingsAppProps {
+  themeMode: "light" | "dark";
+  onToggleTheme: () => void;
+  accentColor: string;
+  onChangeAccent: (color: string) => void;
+  wallpaper: string;
+  onChangeWallpaper: (wp: string) => void;
   dockStyle?: "mac" | "win11";
   onChangeDockStyle?: (style: "mac" | "win11") => void;
   dockSize?: "small" | "medium" | "large";
@@ -53,10 +66,10 @@ export interface SettingsAppProps {
   onChangeTopBarHeight?: (h: "compact" | "standard" | "large") => void;
   blurIntensity?: number;
   onChangeBlurIntensity?: (val: number) => void;
-  taskbarAlign?: "center" | "left";
-  onToggleTaskbarAlign?: () => void;
-  brightness?: number;
-  onChangeBrightness?: (b: number) => void;
+  taskbarAlign: "center" | "left";
+  onToggleTaskbarAlign: () => void;
+  brightness: number;
+  onChangeBrightness: (b: number) => void;
   currentRole?: SchoolRole;
   onOpenRoleSwitcher?: () => void;
   pinnedAppIds?: string[];
@@ -64,12 +77,12 @@ export interface SettingsAppProps {
 }
 
 export default function SettingsApp({
-  themeMode = "dark",
-  onToggleTheme = () => {},
-  accentColor = "#0078d4",
-  onChangeAccent = () => {},
-  wallpaper = "bloom-dark",
-  onChangeWallpaper = () => {},
+  themeMode,
+  onToggleTheme,
+  accentColor,
+  onChangeAccent,
+  wallpaper,
+  onChangeWallpaper,
   dockStyle = "mac",
   onChangeDockStyle,
   dockSize = "medium",
@@ -80,44 +93,22 @@ export default function SettingsApp({
   onChangeTopBarHeight,
   blurIntensity = 30,
   onChangeBlurIntensity,
-  taskbarAlign = "center",
+  taskbarAlign,
   onToggleTaskbarAlign,
-  brightness = 100,
+  brightness,
   onChangeBrightness,
   currentRole = "student",
-  onOpenRoleSwitcher = () => {},
-  pinnedAppIds = ["classroom", "filemanager", "gradebook", "timetable", "library", "exam", "campus", "notebook", "lab", "terminal", "appstore", "settings"],
+  onOpenRoleSwitcher,
+  pinnedAppIds = [],
   onTogglePinApp,
 }: SettingsAppProps) {
   const { user } = useAuth();
+  const { sidebarItems } = useInstalledPlugins();
   const [activeCategory, setActiveCategory] = useState("personalization");
   const [mobileActiveSection, setMobileActiveSection] = useState<string | null>(null);
   const [examMode, setExamMode] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState("");
   const [isMobileScreen, setIsMobileScreen] = useState(false);
-
-  // Map backend user role or fallback to simulated profile
-  const effectiveRole: SchoolRole = (user?.role as SchoolRole) in SCHOOL_PROFILES
-    ? (user?.role as SchoolRole)
-    : currentRole;
-
-  const fallbackProfile = SCHOOL_PROFILES[effectiveRole] || SCHOOL_PROFILES.student;
-  const profile = {
-    id: user?.id ? `USR-${user.id.slice(0, 8).toUpperCase()}` : fallbackProfile.id,
-    name: user?.full_name || fallbackProfile.name,
-    role: effectiveRole,
-    roleLabel: user?.role
-      ? user.role.charAt(0).toUpperCase() + user.role.slice(1).replace(/_/g, " ")
-      : fallbackProfile.roleLabel,
-    department: user?.email || fallbackProfile.department,
-    avatar: user?.full_name ? user.full_name.charAt(0).toUpperCase() : fallbackProfile.avatar,
-    avatarUrl: user?.avatar_url,
-    badgeColor: fallbackProfile.badgeColor,
-    tagline: fallbackProfile.tagline,
-    phone: user?.phone,
-    schoolId: user?.school_id,
-    language: user?.preferred_language || "en",
-  };
 
   useEffect(() => {
     const checkScreen = () => {
@@ -127,6 +118,56 @@ export default function SettingsApp({
     window.addEventListener("resize", checkScreen);
     return () => window.removeEventListener("resize", checkScreen);
   }, []);
+
+  // Real ASchool user profile — falls back to the simulated school profile
+  // when the session user is not hydrated yet.
+  const effectiveRole: SchoolRole =
+    user?.role && SCHOOL_PROFILES[user.role]
+      ? (user.role as SchoolRole)
+      : currentRole;
+  const fallbackProfile = SCHOOL_PROFILES[effectiveRole] || SCHOOL_PROFILES.student;
+  const profile = {
+    name: user?.full_name || fallbackProfile.name,
+    roleLabel: user?.role
+      ? user.role.charAt(0).toUpperCase() + user.role.slice(1).replace(/_/g, " ")
+      : fallbackProfile.roleLabel,
+    avatar: user?.full_name
+      ? user.full_name.charAt(0).toUpperCase()
+      : fallbackProfile.avatar,
+    avatarUrl: user?.avatar_url,
+    badgeColor: fallbackProfile.badgeColor,
+    email: user?.email,
+    school: user?.school_id,
+  };
+
+  // Real storage usage from /files/usage (react-query). A localStorage cache
+  // gives instant first paint and an offline fallback, like aos-settings.
+  const { data: usage } = useQuery({
+    queryKey: ["aos-settings-storage-usage"],
+    queryFn: async () => {
+      const data = await getStorageUsage();
+      try {
+        localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(data));
+      } catch {
+        // Ignore storage access issues
+      }
+      return data;
+    },
+    retry: false,
+    initialData: () => {
+      if (typeof window === "undefined") return undefined;
+      try {
+        const cached = localStorage.getItem(STORAGE_CACHE_KEY);
+        return cached ? (JSON.parse(cached) as StorageUsage) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  });
+
+  const usedGB = typeof usage?.total_mb === "number" ? usage.total_mb / 1024 : null;
+  const usedPct =
+    usedGB != null ? Math.min(100, Math.round((usedGB / STORAGE_QUOTA_GB) * 100)) : 0;
 
   const colors = [
     { name: "Academic Blue", hex: "#0078d4" },
@@ -139,147 +180,242 @@ export default function SettingsApp({
     { name: "Cyber Cyan", hex: "#06b6d4" },
   ];
 
+  // Previews match Desktop.tsx's getWallpaperBackground 1:1 so what you pick
+  // is exactly what the desktop renders.
   const wallpapers = [
-    { id: "bloom-dark", name: "Win11 Bloom Dark", desc: "Classic Deep Mica", preview: "#0b1220" },
-    { id: "bloom-light", name: "Win11 Bloom Light", desc: "Daylight Mica", preview: "#e2e8f0" },
-    { id: "sonoma", name: "macOS Sonoma Aurora", desc: "Vibrant Indigo Glass", preview: "linear-gradient(135deg, #1e1b4b, #4338ca)" },
-    { id: "ventura", name: "macOS Ventura Sunburst", desc: "Warm Sunset Glow", preview: "linear-gradient(135deg, #ea580c, #c2410c)" },
-    { id: "blueprint", name: "AOS Engineering Blueprint", desc: "Academic Technical", preview: "linear-gradient(135deg, #0f172a, #0284c7)" },
-    { id: "nebula", name: "Cosmic Nebula", desc: "Astrophysics Deep Sky", preview: "linear-gradient(135deg, #09090b, #701a75)" },
-    { id: "forest", name: "Emerald Campus Forest", desc: "Organic Botanical", preview: "linear-gradient(135deg, #022c22, #065f46)" },
-    { id: "minimal", name: "Minimalist Slate", desc: "Zero Distraction Dark", preview: "linear-gradient(135deg, #18181b, #09090b)" },
+    { id: "bloom-dark", name: "Win11 Bloom Dark", desc: "Classic Deep Mica", preview: "linear-gradient(135deg, #0b192c 0%, #1e3a8a 50%, #0f172a 100%)" },
+    { id: "bloom-light", name: "Win11 Bloom Light", desc: "Daylight Mica", preview: "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 40%, #7dd3fc 80%, #38bdf8 100%)" },
+    { id: "sonoma", name: "macOS Sonoma Aurora", desc: "Vibrant Sunset Glass", preview: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)" },
+    { id: "ventura", name: "macOS Ventura Sunburst", desc: "Pastel Dusk Glow", preview: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)" },
+    { id: "blueprint", name: "AOS Engineering Blueprint", desc: "Academic Technical", preview: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #93c5fd 100%)" },
+    { id: "nebula", name: "Cosmic Nebula", desc: "Astrophysics Deep Sky", preview: "radial-gradient(ellipse at top, #312e81, #0c0a09)" },
+    { id: "forest", name: "Emerald Campus Forest", desc: "Organic Botanical", preview: "linear-gradient(135deg, #14532d 0%, #166534 50%, #052e16 100%)" },
+    { id: "minimal", name: "Minimalist Slate", desc: "Zero Distraction Light", preview: "linear-gradient(135deg, #f5f5f5, #e5e5e5)" },
   ];
 
-  const pinnableApps = [
-    { id: "classroom", name: "Live Classroom", desc: "Lecture streaming & whiteboard", icon: <AOSClassroomIcon size={28} /> },
-    { id: "filemanager", name: "School Cloud Vault", desc: "Course materials & lab storage", icon: <AOSFileManagerIcon size={28} /> },
-    { id: "gradebook", name: "Academic Gradebook", desc: "GPA scorecard & exams", icon: <AOSGradebookIcon size={28} /> },
-    { id: "timetable", name: "Weekly Bell Timetable", desc: "Lecture schedule & rooms", icon: <AOSTimetableIcon size={28} /> },
-    { id: "library", name: "Knowledge Vault", desc: "12,500+ research papers & e-books", icon: <AOSLibraryIcon size={28} /> },
-    { id: "exam", name: "Assessment Center", desc: "Midterms & proctor quizzes", icon: <AOSExamIcon size={28} /> },
-    { id: "campus", name: "Campus Transit", desc: "Fleet GPS tracking & cafeterias", icon: <AOSCampusIcon size={28} /> },
-    { id: "notebook", name: "Study Notebook", desc: "Markdown notes & study binder", icon: <AOSNotebookIcon size={28} /> },
-    { id: "lab", name: "Science Lab Studio", desc: "Interactive physics simulations", icon: <AOSLabIcon size={28} /> },
-    { id: "terminal", name: "CS Lab Shell", desc: "Linux Bash shell & Python", icon: <AOSTerminalIcon size={28} /> },
-    { id: "appstore", name: "AOS App Store", desc: "Educational plugin marketplace", icon: <Sparkles size={28} color="#0ea5e9" /> },
-    { id: "settings", name: "AOS Settings", desc: "Personalization & customization", icon: <AOSSettingsIcon size={28} /> },
-    ...(effectiveRole === "admin" ? [{ id: "admin", name: "Principal Hub", desc: "Executive command center", icon: <AOSAdminIcon size={28} /> }] : []),
-    ...(effectiveRole === "accountant" ? [{ id: "finance", name: "Tuition Ledger", desc: "Accounts & student bursar", icon: <AOSFinanceIcon size={28} /> }] : []),
-  ];
+  // Real pinnable apps: every installed ASchool module (sidebarItems mapped
+  // through the AOS adapter, same as the AppDrawer/Shell pattern) plus the
+  // native AOS system apps.
+  const pinnableApps: PinnableApp[] = useMemo(() => {
+    const list: PinnableApp[] = [];
+
+    sidebarItems.forEach((item) => {
+      const app = getAOSAppForModule(item);
+      if (list.some((entry) => entry.id === app.id)) return;
+      list.push({
+        id: app.id,
+        name: app.name,
+        desc: item.section ? `${item.section} module` : "Installed ASchool module",
+        icon: (
+          <div
+            style={{
+              width: "32px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ transform: "scale(0.62)" }}>{app.icon}</div>
+          </div>
+        ),
+      });
+    });
+
+    list.push(
+      {
+        id: "appstore",
+        name: "AOS App Store",
+        desc: "Educational plugin marketplace",
+        icon: <Sparkles size={28} color="#0ea5e9" />,
+      },
+      {
+        id: "aos-settings",
+        name: "AOS Settings",
+        desc: "Personalization & customization",
+        icon: <AOSSettingsIcon size={28} />,
+      }
+    );
+
+    return list;
+  }, [sidebarItems]);
+
+  const storageDesc =
+    usedGB != null
+      ? `${usedGB.toFixed(1)} GB of ${STORAGE_QUOTA_GB} GB used`
+      : "Cloud vault space & uploaded files";
 
   const categories = [
     { id: "personalization", label: "Themes & Wallpapers", icon: <Palette size={16} />, desc: "Mica blur, dark mode, 8 wallpapers" },
     { id: "dock", label: "Dock, Taskbar & Top Bar", icon: <Layout size={16} />, desc: "Top bar height, dock style, pin apps" },
     { id: "profile", label: "User Account & Role", icon: <User size={16} />, desc: `${profile.name} (${profile.roleLabel})` },
-    { id: "storage", label: "School Cloud Storage", icon: <HardDrive size={16} />, desc: "Vault space, cached lab files" },
-    { id: "exammode", label: "Exam Focus Mode", icon: <Shield size={16} />, desc: "Proctor lockdown, distractions" },
-    { id: "network", label: "Campus Network", icon: <Wifi size={16} />, desc: "5G Campus Wi-Fi & latency" },
-    { id: "about", label: "About AOS", icon: <GraduationCap size={16} />, desc: "Version 3.4.0 (Dual-View)" },
+    { id: "storage", label: "Cloud Vault Storage", icon: <HardDrive size={16} />, desc: storageDesc },
+    { id: "exammode", label: "Exam & Focus Mode", icon: <Shield size={16} />, desc: examMode ? "Lockdown active" : "Normal mode" },
+    { id: "network", label: "Campus Network", icon: <Wifi size={16} />, desc: "Campus 5G Secure (Connected)" },
+    { id: "about", label: "About AOS", icon: <GraduationCap size={16} />, desc: `Version ${APP_VERSION} (2026)` },
   ];
 
   // ==========================================
-  // MOBILE NAVIGATION LAYOUT (< 768px)
+  // 1. MOBILE iOS SETTINGS VIEW
   // ==========================================
   if (isMobileScreen) {
-    if (mobileActiveSection) {
-      return (
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--w11-window-bg)" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "12px 16px",
-              borderBottom: "1px solid var(--w11-border-subtle)",
-              background: "var(--w11-control-bg)",
-            }}
-          >
-            <button
-              className="subtle"
-              onClick={() => setMobileActiveSection(null)}
-              style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "13px" }}
-            >
-              <ChevronLeft size={16} />
-              <span>Back</span>
-            </button>
-            <div style={{ fontSize: "15px", fontWeight: 700, marginLeft: "auto", marginRight: "auto" }}>
-              {categories.find((c) => c.id === mobileActiveSection)?.label}
-            </div>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-            {renderCategoryContent(mobileActiveSection)}
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div style={{ height: "100%", overflowY: "auto", background: "var(--w11-window-bg)", padding: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-          <div
-            style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "50%",
-              background: profile.badgeColor,
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "18px",
-              fontWeight: 700,
-            }}
-          >
-            {profile.avatar}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "15px", fontWeight: 700 }}>{profile.name}</div>
-            <div style={{ fontSize: "12px", color: profile.badgeColor, fontWeight: 600 }}>{profile.roleLabel}</div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {categories.map((c) => (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--w11-window-bg)", color: "var(--w11-text-primary)", overflowY: "auto" }}>
+        {mobileActiveSection ? (
+          /* Sub-category Detail View with iOS Back Button */
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div
-              key={c.id}
-              onClick={() => setMobileActiveSection(c.id)}
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                gap: "6px",
                 padding: "12px 14px",
-                borderRadius: "10px",
+                background: "var(--w11-control-bg)",
+                borderBottom: "1px solid var(--w11-border-subtle)",
+                position: "sticky",
+                top: 0,
+                zIndex: 20,
+              }}
+            >
+              <button
+                onClick={() => setMobileActiveSection(null)}
+                style={{
+                  all: "unset",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "2px",
+                  color: accentColor,
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <ChevronLeft size={20} />
+                <span>Settings</span>
+              </button>
+              <span style={{ marginLeft: "12px", fontSize: "15px", fontWeight: 700 }}>
+                {categories.find((c) => c.id === mobileActiveSection)?.label}
+              </span>
+            </div>
+
+            <div style={{ padding: "16px", flex: 1, overflowY: "auto" }}>
+              {renderCategoryContent(mobileActiveSection)}
+            </div>
+          </div>
+        ) : (
+          /* Root iOS Settings View: Profile + Grouped Table */
+          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Apple ID Style Profile Card */}
+            <div
+              onClick={onOpenRoleSwitcher}
+              style={{
                 background: "var(--w11-card-bg)",
-                border: "1px solid var(--w11-border-subtle)",
+                borderRadius: "16px",
+                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                border: `1px solid ${profile.badgeColor}40`,
+                boxShadow: "var(--w11-shadow-card)",
                 cursor: "pointer",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ color: accentColor }}>{c.icon}</div>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: 600 }}>{c.label}</div>
-                  <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>{c.desc}</div>
+              <div
+                style={{
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "50%",
+                  background: profile.badgeColor,
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  overflow: "hidden",
+                }}
+              >
+                {profile.avatarUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+                ) : (
+                  profile.avatar
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.2 }}>{profile.name}</div>
+                <div style={{ fontSize: "12px", color: profile.badgeColor, fontWeight: 600 }}>{profile.roleLabel}</div>
+                <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)", marginTop: "2px" }}>
+                  ASchool ID • Tap to switch
                 </div>
               </div>
-              <ChevronRight size={16} color="var(--w11-text-tertiary)" />
+              <ChevronRight size={18} color="var(--w11-text-tertiary)" />
             </div>
-          ))}
-        </div>
+
+            {/* iOS Grouped Categories Table */}
+            <div
+              style={{
+                background: "var(--w11-card-bg)",
+                borderRadius: "16px",
+                border: "1px solid var(--w11-border-subtle)",
+                overflow: "hidden",
+              }}
+            >
+              {categories.map((c, idx) => (
+                <div
+                  key={c.id}
+                  onClick={() => setMobileActiveSection(c.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "13px 16px",
+                    cursor: "pointer",
+                    borderBottom: idx < categories.length - 1 ? "1px solid var(--w11-border-subtle)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "8px",
+                        background: `${accentColor}25`,
+                        color: accentColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {c.icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "14px", fontWeight: 600 }}>{c.label}</div>
+                      <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>{c.desc}</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} color="var(--w11-text-tertiary)" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   // ==========================================
-  // DESKTOP TWO-COLUMN NAVIGATION LAYOUT
+  // 2. DESKTOP SETTINGS VIEW (Sidebar + Detail)
   // ==========================================
   return (
-    <div style={{ display: "flex", height: "100%", background: "var(--w11-window-bg)" }}>
-      {/* Left Navigation Sidebar */}
+    <div style={{ display: "flex", height: "100%", background: "var(--w11-window-bg)", color: "var(--w11-text-primary)" }}>
+      {/* Desktop Left Sidebar */}
       <div
         style={{
           width: "240px",
-          borderRight: "1px solid var(--w11-border-subtle)",
           background: "var(--w11-control-bg)",
+          borderRight: "1px solid var(--w11-border-subtle)",
           padding: "16px 10px",
           display: "flex",
           flexDirection: "column",
@@ -287,23 +423,26 @@ export default function SettingsApp({
           flexShrink: 0,
         }}
       >
-        {/* User Mini Profile Card */}
+        {/* User Identity Banner */}
         <div
+          onClick={onOpenRoleSwitcher}
           style={{
             display: "flex",
             alignItems: "center",
             gap: "10px",
-            padding: "8px",
-            borderRadius: "10px",
-            background: "rgba(0,120,212,0.06)",
+            padding: "10px",
             marginBottom: "12px",
-            border: "1px solid var(--w11-border-subtle)",
+            borderRadius: "10px",
+            background: "var(--w11-control-hover)",
+            border: `1px solid ${profile.badgeColor}40`,
+            cursor: "pointer",
           }}
+          title="Click to Switch School User"
         >
           <div
             style={{
-              width: "36px",
-              height: "36px",
+              width: "38px",
+              height: "38px",
               borderRadius: "50%",
               background: profile.badgeColor,
               color: "#fff",
@@ -312,10 +451,16 @@ export default function SettingsApp({
               justifyContent: "center",
               fontSize: "14px",
               fontWeight: 700,
+              overflow: "hidden",
               flexShrink: 0,
             }}
           >
-            {profile.avatar}
+            {profile.avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+            ) : (
+              profile.avatar
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "13px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -424,65 +569,80 @@ export default function SettingsApp({
                 })}
               </div>
 
-              {/* Custom Image URL Wallpaper Input */}
-              <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid var(--w11-border-subtle)" }}>
-                <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>Custom School Photo URL Wallpaper:</div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/school-aerial.jpg"
-                    value={customWallpaperInput}
-                    onChange={(e) => setCustomWallpaperInput(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="accent"
-                    onClick={() => {
-                      if (customWallpaperInput.trim()) {
-                        onChangeWallpaper(customWallpaperInput.trim());
-                      }
-                    }}
-                  >
-                    Apply Photo
-                  </button>
-                </div>
+              {/* Custom Image URL */}
+              <div style={{ marginTop: "14px", display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  placeholder="Paste custom wallpaper image URL (https://...)"
+                  value={customWallpaperInput}
+                  onChange={(e) => setCustomWallpaperInput(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: "var(--w11-control-bg)",
+                    border: "1px solid var(--w11-border-subtle)",
+                    borderRadius: "6px",
+                    padding: "6px 12px",
+                    color: "inherit",
+                    fontSize: "12px",
+                  }}
+                />
+                <button
+                  className="subtle"
+                  onClick={() => {
+                    const url = customWallpaperInput.trim();
+                    if (url) {
+                      onChangeWallpaper(`custom:${url}`);
+                      toast.success("Custom wallpaper applied");
+                    }
+                  }}
+                >
+                  Apply
+                </button>
               </div>
             </div>
 
-            {/* Accent Color Palette */}
+            {/* Accent Color Picker */}
             <div className="win11-card">
-              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>System Accent Color</div>
-              <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginBottom: "14px" }}>
-                Fluent accents apply to active window borders, buttons, and parabolic dock highlights.
-              </div>
-
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "10px" }}>Academic Accent Color</div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                {colors.map((c) => {
-                  const isSelected = accentColor === c.hex;
-                  return (
-                    <button
-                      key={c.hex}
-                      onClick={() => onChangeAccent(c.hex)}
-                      title={c.name}
-                      style={{
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "50%",
-                        background: c.hex,
-                        border: isSelected ? "3px solid #fff" : "none",
-                        boxShadow: isSelected ? `0 0 0 2px ${c.hex}, 0 4px 10px rgba(0,0,0,0.3)` : "0 2px 4px rgba(0,0,0,0.2)",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#fff",
-                      }}
-                    >
-                      {isSelected && <Check size={16} />}
-                    </button>
-                  );
-                })}
+                {colors.map((c) => (
+                  <div
+                    key={c.hex}
+                    onClick={() => onChangeAccent(c.hex)}
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "50%",
+                      background: c.hex,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      boxShadow: accentColor === c.hex ? `0 0 0 3px var(--w11-window-bg), 0 0 0 5px ${c.hex}` : undefined,
+                    }}
+                    title={c.name}
+                  >
+                    {accentColor === c.hex && <Check size={15} />}
+                  </div>
+                ))}
               </div>
+            </div>
+
+            {/* Display Brightness */}
+            <div className="win11-card">
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "8px" }}>
+                Display Brightness & Dimmer ({brightness}%)
+              </div>
+              <input
+                type="range"
+                className="win11-slider"
+                min={20}
+                max={100}
+                value={brightness}
+                onChange={(e) => onChangeBrightness(Number(e.target.value))}
+                style={{ width: "100%" }}
+              />
             </div>
           </div>
         );
@@ -490,66 +650,59 @@ export default function SettingsApp({
       case "dock":
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>Dock, Taskbar & macOS Top Bar</h2>
+            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>Dock, Taskbar & Top Menu Bar Customization</h2>
 
-            {/* macOS Top Bar Toggle & Height */}
+            {/* Top Menu Bar Resizer Settings */}
             <div className="win11-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>macOS Frosted Top Menu Bar</div>
-                  <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)" }}>
-                    Displays Apple/AOS menu, active app menu items, control center flyout, and clock.
-                  </div>
-                </div>
-                <button className={showTopBar ? "accent" : "subtle"} onClick={onToggleTopBar}>
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>macOS Top Menu Bar Size & Scaling</div>
+              <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginBottom: "12px" }}>
+                Adjust top bar height between compact for laptops or larger touch-friendly sizes.
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px" }}>
+                {([
+                  { id: "compact", label: "Compact (26px)" },
+                  { id: "standard", label: "Standard (30px)" },
+                  { id: "large", label: "Large (38px)" },
+                ] as const).map((item) => (
+                  <button
+                    key={item.id}
+                    className={topBarHeight === item.id ? "accent" : "subtle"}
+                    onClick={() => onChangeTopBarHeight && onChangeTopBarHeight(item.id)}
+                    style={{ fontSize: "12px", padding: "6px 14px" }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--w11-border-subtle)", paddingTop: "10px" }}>
+                <span style={{ fontSize: "13px" }}>Show macOS Top Menu Bar</span>
+                <button className={showTopBar ? "accent" : "subtle"} onClick={onToggleTopBar} style={{ fontSize: "12px" }}>
                   {showTopBar ? "Visible" : "Hidden"}
                 </button>
               </div>
-
-              {showTopBar && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--w11-border-subtle)", paddingTop: "12px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 600 }}>Top Bar Height Preset</span>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    {(["compact", "standard", "large"] as const).map((h) => (
-                      <button
-                        key={h}
-                        className={topBarHeight === h ? "accent" : "subtle"}
-                        onClick={() => onChangeTopBarHeight && onChangeTopBarHeight(h)}
-                        style={{ fontSize: "11px", padding: "4px 10px", textTransform: "capitalize" }}
-                      >
-                        {h}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Dock Style: macOS Parabolic vs Win11 Centered Taskbar */}
+            {/* Desktop Navigation Shell Style */}
             <div className="win11-card">
-              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>
-                Bottom Navigation Architecture
-              </div>
-              <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginBottom: "14px" }}>
-                Switch between fluid parabolic magnification (macOS) and centered taskbar (Windows 11).
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "6px" }}>Desktop Bottom Shell Style</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                 <div
                   onClick={() => onChangeDockStyle && onChangeDockStyle("mac")}
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
                     border: dockStyle === "mac" ? "2px solid var(--w11-accent)" : "1px solid var(--w11-border-subtle)",
-                    background: dockStyle === "mac" ? "rgba(0,120,212,0.1)" : "var(--w11-control-bg)",
+                    background: "var(--w11-control-bg)",
                     cursor: "pointer",
                   }}
                 >
                   <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "4px" }}>
-                     macOS Parabolic Dock
+                     macOS Floating Glass Dock
                   </div>
                   <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
-                    120 FPS magnetic cursor magnification curve and floating frosted glass shelf.
+                    Parabolic hover magnification, running app dots, and bounce.
                   </div>
                 </div>
 
@@ -559,7 +712,7 @@ export default function SettingsApp({
                     padding: "14px",
                     borderRadius: "10px",
                     border: dockStyle === "win11" ? "2px solid var(--w11-accent)" : "1px solid var(--w11-border-subtle)",
-                    background: dockStyle === "win11" ? "rgba(0,120,212,0.1)" : "var(--w11-control-bg)",
+                    background: "var(--w11-control-bg)",
                     cursor: "pointer",
                   }}
                 >
@@ -608,8 +761,8 @@ export default function SettingsApp({
                 <input
                   type="range"
                   className="win11-slider"
-                  min="0"
-                  max="50"
+                  min={0}
+                  max={50}
                   value={blurIntensity}
                   onChange={(e) => onChangeBlurIntensity && onChangeBlurIntensity(Number(e.target.value))}
                   style={{ width: "100%" }}
@@ -626,7 +779,7 @@ export default function SettingsApp({
                 </span>
               </div>
               <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginBottom: "14px" }}>
-                Select which educational apps appear pinned to the bottom shelf.
+                Select which ASchool apps appear pinned to the bottom shelf.
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -645,11 +798,11 @@ export default function SettingsApp({
                         border: "1px solid var(--w11-border-subtle)",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                        <div style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           {app.icon}
                         </div>
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 600 }}>{app.name}</div>
                           <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>{app.desc}</div>
                         </div>
@@ -658,7 +811,7 @@ export default function SettingsApp({
                       <button
                         className={isPinned ? "accent" : "subtle"}
                         onClick={() => onTogglePinApp && onTogglePinApp(app.id)}
-                        style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+                        style={{ fontSize: "11px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}
                       >
                         {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
                         <span>{isPinned ? "Pinned" : "Pin"}</span>
@@ -689,6 +842,7 @@ export default function SettingsApp({
                   fontSize: "22px",
                   fontWeight: 700,
                   overflow: "hidden",
+                  flexShrink: 0,
                 }}
               >
                 {profile.avatarUrl ? (
@@ -698,51 +852,17 @@ export default function SettingsApp({
                   profile.avatar
                 )}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "17px", fontWeight: 700 }}>{profile.name}</div>
                 <div style={{ fontSize: "13px", color: profile.badgeColor, fontWeight: 600 }}>{profile.roleLabel}</div>
                 <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)", marginTop: "4px" }}>
-                  {profile.department} • Active Station
+                  {profile.email || "ASchool workstation account"}
+                  {profile.school ? ` • School ${profile.school.slice(0, 8).toUpperCase()}` : ""}
                 </div>
               </div>
               <button className="accent" onClick={onOpenRoleSwitcher}>
                 Switch Role
               </button>
-            </div>
-
-            {/* Account Details */}
-            <div className="win11-card" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ fontWeight: 600, fontSize: "14px" }}>Authentication & Identity Details</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12px" }}>
-                <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                  <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>User ID</div>
-                  <div style={{ fontWeight: 600 }} className="font-mono">{profile.id}</div>
-                </div>
-                <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                  <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>Assigned Role</div>
-                  <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{profile.roleLabel}</div>
-                </div>
-                {profile.phone && (
-                  <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                    <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>Registered Mobile</div>
-                    <div style={{ fontWeight: 600 }}>{profile.phone}</div>
-                  </div>
-                )}
-                {profile.schoolId && (
-                  <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                    <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>School Tenant</div>
-                    <div style={{ fontWeight: 600 }} className="font-mono">{profile.schoolId}</div>
-                  </div>
-                )}
-                <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                  <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>Interface Language</div>
-                  <div style={{ fontWeight: 600 }}>{profile.language.toUpperCase()}</div>
-                </div>
-                <div style={{ background: "var(--w11-control-bg)", padding: "10px", borderRadius: "8px" }}>
-                  <div style={{ color: "var(--w11-text-secondary)", marginBottom: "2px" }}>Session Protocol</div>
-                  <div style={{ fontWeight: 600, color: "#10b981" }}>HttpOnly TLS Cookie</div>
-                </div>
-              </div>
             </div>
           </div>
         );
@@ -754,10 +874,17 @@ export default function SettingsApp({
             <div className="win11-card">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span>Storage Utilization</span>
-                <span style={{ fontWeight: 700 }}>84.2 GB / 128 GB</span>
+                <span style={{ fontWeight: 700 }}>
+                  {usedGB != null ? `${usedGB.toFixed(1)} GB / ${STORAGE_QUOTA_GB} GB` : "— / —"}
+                </span>
               </div>
               <div style={{ height: "8px", background: "var(--w11-border-subtle)", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: "65%", height: "100%", background: accentColor }} />
+                <div style={{ width: `${usedPct}%`, height: "100%", background: accentColor, transition: "width 0.3s ease" }} />
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)", marginTop: "8px" }}>
+                {usage
+                  ? `${usage.total_files} files • ${usage.total_mb.toFixed(1)} MB uploaded to the school vault`
+                  : "Usage service unreachable — showing the last known state."}
               </div>
             </div>
           </div>
@@ -776,7 +903,14 @@ export default function SettingsApp({
               </div>
               <button
                 className={examMode ? "accent" : "subtle"}
-                onClick={() => setExamMode(!examMode)}
+                onClick={() => {
+                  setExamMode(!examMode);
+                  if (!examMode) {
+                    toast.success("Exam lockdown enabled");
+                  } else {
+                    toast.info("Exam lockdown disabled");
+                  }
+                }}
                 style={{ background: examMode ? "#ef4444" : undefined }}
               >
                 {examMode ? "Lockdown Enabled" : "Disabled"}
@@ -802,14 +936,16 @@ export default function SettingsApp({
       default:
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>About AOS (A School OS)</h2>
+            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>About ASchool OS</h2>
             <div className="win11-card">
-              <div style={{ fontSize: "16px", fontWeight: 700, color: accentColor }}>AOS Workstation Release 3.4.0</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: accentColor }}>ASchool OS Workstation Release {APP_VERSION}</div>
               <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginTop: "6px", lineHeight: 1.5 }}>
-                A modern hybrid Operating System environment combining macOS glass elegance with Windows 11 Fluent 2 power and iOS mobile agility for next-generation school management systems.
+                ASchool OS is a modern hybrid desktop environment combining macOS glass elegance with
+                Windows 11 Fluent 2 power and iOS mobile agility — the AOS workstation for
+                next-generation school management.
               </div>
               <div style={{ fontSize: "11px", color: "var(--w11-text-tertiary)", marginTop: "12px" }}>
-                (C) 2026 ASchool Platform. All rights reserved.
+                © 2026 ASchool. All rights reserved.
               </div>
             </div>
           </div>

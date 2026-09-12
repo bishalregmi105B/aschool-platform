@@ -44,6 +44,18 @@ interface RouteLaunchMeta {
   isSubroute: boolean;
 }
 
+// Dock pinning defaults — used while aosSettings.pinned_apps is empty (i.e.
+// the user has never customized the dock). Ids are AOS module ids.
+const DEFAULT_PINNED_APPS = [
+  "students",
+  "teachers",
+  "fees",
+  "attendance",
+  "notices",
+  "aos-settings",
+  "appstore",
+];
+
 interface OpenWindowOptions {
   windowId?: string;
   moduleId?: string;
@@ -114,6 +126,30 @@ export default function AOSDesktopShell() {
   const setTaskbarAlign = useCallback(
     (a: "center" | "left") => updateAOSSettings({ taskbar_align: a }),
     [updateAOSSettings]
+  );
+
+  // Dock pinning — DB-backed via pinned_apps. An empty list means the user has
+  // never customized the dock, so the default pinned set is shown instead.
+  const pinnedAppIds = useMemo(
+    () =>
+      aosSettings.pinned_apps.length > 0
+        ? aosSettings.pinned_apps
+        : DEFAULT_PINNED_APPS,
+    [aosSettings.pinned_apps]
+  );
+
+  const handleTogglePinApp = useCallback(
+    (id: string) => {
+      const base =
+        aosSettings.pinned_apps.length > 0
+          ? aosSettings.pinned_apps
+          : DEFAULT_PINNED_APPS;
+      const next = base.includes(id)
+        ? base.filter((appId) => appId !== id)
+        : [...base, id];
+      updateAOSSettings({ pinned_apps: next });
+    },
+    [aosSettings.pinned_apps, updateAOSSettings]
   );
 
   // User role state
@@ -665,6 +701,8 @@ export default function AOSDesktopShell() {
           onChangeDockSize={setDockSize}
           showTopBar={showTopBar}
           onToggleTopBar={() => setShowTopBar(!showTopBar)}
+          topBarHeight={topBarHeight}
+          onChangeTopBarHeight={setTopBarHeight}
           blurIntensity={blurIntensity}
           onChangeBlurIntensity={setBlurIntensity}
           taskbarAlign={taskbarAlign}
@@ -675,6 +713,8 @@ export default function AOSDesktopShell() {
           onChangeBrightness={setBrightness}
           currentRole={currentRole}
           onOpenRoleSwitcher={() => setIsRoleSwitcherOpen(true)}
+          pinnedAppIds={pinnedAppIds}
+          onTogglePinApp={handleTogglePinApp}
           onOpenRoute={openRouteInAOS}
         />
       </Desktop>
@@ -698,6 +738,7 @@ export default function AOSDesktopShell() {
           accentColor={accentColor}
           currentRole={currentRole}
           dockSize={dockSize}
+          pinnedAppIds={pinnedAppIds}
           onToggleStart={() => {
             const next = !isStartOpen;
             closeAllFlyouts("start");

@@ -132,6 +132,7 @@ export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   appstore: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
   "plugin-runner": dynamic(() => import("./apps/PluginRunnerApp"), { loading: AOSModuleLoading }),
   "aos-settings": dynamic(() => import("./apps/SettingsApp"), { loading: AOSModuleLoading }),
+  filemanager: dynamic(() => import("./apps/FileManagerApp"), { loading: AOSModuleLoading }),
 };
 
 /**
@@ -146,7 +147,11 @@ const MODULE_ALIASES: Record<string, string> = {
   "timetable-management": "timetable",
   file_management: "files",
   "file-management": "files",
-  filemanager: "files",
+  // "filemanager" resolves directly to the AOS native FileManager app above;
+  // these aliases route the Vault naming onto it. Note "files" itself stays a
+  // direct registry entry pointing at the dashboard files page.
+  file_manager: "filemanager",
+  vault: "filemanager",
   campus: "transport",
   notebook: "assignments",
   lab: "ai-workbench",

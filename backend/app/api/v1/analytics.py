@@ -288,7 +288,7 @@ def _overview_payload(school_id):
 @analytics_bp.route("/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@role_required("school_admin", "teacher", "accountant")
+@role_required("school_admin", "superadmin", "teacher", "accountant")
 def overview():
     cache_key = f"analytics_overview:{g.school_id}"
     cached = cache.get(cache_key)
