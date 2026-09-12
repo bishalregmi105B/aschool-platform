@@ -26,12 +26,6 @@ models:
 - app.models.teaching_content
 events:
   emits:
-  - ai_teacher.lesson_started
-  - ai_teacher.lesson_completed
-  - ai_teacher.mastery_updated
-  - ai_teacher.moderation_flagged
-  - ai_teacher.cost_ceiling_reached
-  - ai_teacher.service_unavailable
   listens:
   - curriculum.content_published
   - student.consent_revoked

@@ -24,9 +24,15 @@ ui:
     - label: Notification Settings
       label_nepali: सूचना सेटिङ
       route: /settings/notifications
+    - label: Notification Matrix
+      label_nepali: सूचना म्याट्रिक्स
+      route: /dashboard/notifications/matrix
     - label: Roles & Permissions
       label_nepali: भूमिका र अनुमति
       route: /settings/roles
+    - label: Access Logs
+      label_nepali: पहुँच इतिबृत
+      route: /dashboard/settings/access-logs
     - label: AI Content Review
       label_nepali: एआई सामग्री समीक्षा
       route: /dashboard/content-review

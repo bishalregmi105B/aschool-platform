@@ -87,7 +87,7 @@ def create_incident():
 
     from app.plugins.events import emit
     emit(
-        "incident.created",
+        "incident.reported",
         school_id=str(g.school_id),
         incident_id=str(incident.id),
         severity=incident.severity or "low",

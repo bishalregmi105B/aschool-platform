@@ -16,6 +16,7 @@ events:
   - exams.scheduled
   - exams.marks_entered
   - exams.result_published
+  - online_exam.submitted
   listens:
   - attendance.marked
 capabilities:

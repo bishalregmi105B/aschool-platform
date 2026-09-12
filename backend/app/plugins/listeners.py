@@ -8,8 +8,8 @@ Import this module from the plugin loader or app factory to ensure listeners
 are registered at startup.
 
 Event flow:
-    1. Plugin A emits: emit("fee.paid", school_id=..., student_id=..., amount=...)
-    2. This module's @on("fee.paid") listener fires
+    1. Plugin A emits: emit("fees.collected", school_id=..., student_id=..., amount=...)
+    2. This module's @on("fees.collected") listener fires
     3. Listener triggers push notification, gamification points, analytics, etc.
 """
 import logging
@@ -66,7 +66,7 @@ def on_attendance_marked(school_id: str, date, count: int, **kwargs):
         logger.exception("Failed to create attendance in-app notifications")
 
 
-@on("attendance.student_absent")
+@on("attendance.absent_alert")
 def on_student_absent(school_id: str, student_id: str, date, **kwargs):
     """Absent alert for ONE student — notify their guardians specifically.
 
@@ -144,7 +144,11 @@ def on_student_absent(school_id: str, student_id: str, date, **kwargs):
                             logger.exception("Absent-alert FCM failed (guardian=%s)", guardian.id)
 
             # 2. SMS to the primary guardian (cost-bearing channel).
-            if guardian.is_primary and guardian.phone:
+            # A-02: the notification matrix can disable the SMS leg per school.
+            from app.services.notification_rules import channel_enabled
+
+            sms_enabled = channel_enabled(school_id, "attendance.absent_alert", "sms")
+            if sms_enabled and guardian.is_primary and guardian.phone:
                 try:
                     from app.tasks.sms_sender import send_sms
 
@@ -228,7 +232,7 @@ def on_assignment_created(school_id: str, assignment_id: str, title: str = "", c
 # ═══════════════════════════════════════════════════════════════════════════
 # FEE EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
-@on("fee.paid")
+@on("fees.collected")
 def on_fee_paid(school_id: str, student_id: str, amount: float, **kwargs):
     """Triggered when a fee payment is recorded.
 
@@ -290,7 +294,7 @@ def on_fee_paid(school_id: str, student_id: str, amount: float, **kwargs):
 # NOTICE EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-@on("notice.created")
+@on("notice.published")
 def on_notice_created(school_id: str, notice_id: str, **kwargs):
     """Triggered when a new notice/circular is published.
 
@@ -334,7 +338,7 @@ def on_notice_created(school_id: str, notice_id: str, **kwargs):
 # EXAM EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-@on("marks.submitted")
+@on("exams.marks_entered")
 def on_marks_submitted(school_id: str, exam_id: str, **kwargs):
     """Triggered when marks are submitted for an exam.
 
@@ -347,7 +351,7 @@ def on_marks_submitted(school_id: str, exam_id: str, **kwargs):
     )
 
 
-@on("results.published")
+@on("exams.result_published")
 def on_results_published(school_id: str, exam_id: str, **kwargs):
     """Triggered when exam results are published.
 
@@ -896,7 +900,7 @@ def on_assignment_submitted(
 # INCIDENT EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-@on("incident.created")
+@on("incident.reported")
 def on_incident_created(
     school_id: str, incident_id: str, severity: str = "low", title: str = "", **kwargs
 ):
@@ -961,7 +965,7 @@ def on_incident_created(
 # EMERGENCY EVENTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-@on("emergency.alert_broadcast")
+@on("emergency.alert_triggered")
 def on_emergency_alert(
     school_id: str, alert_id: str, alert_type: str = "general", title: str = "", **kwargs
 ):

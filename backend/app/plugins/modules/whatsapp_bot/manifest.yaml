@@ -14,7 +14,6 @@ conflicts_with: []
 events:
   emits:
   - whatsapp.message_received
-  - whatsapp.message_sent
   listens:
   - attendance.marked
   - fees.collected

@@ -4,7 +4,7 @@ import os
 import secrets
 from functools import wraps
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from extensions import limiter
@@ -19,6 +19,45 @@ ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
 ACCESS_COOKIE_MAX_AGE = 3600  # keep in sync with JWT_ACCESS_TOKEN_EXPIRES
 REFRESH_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
+
+
+def _log_access(event: str, user_id=None, login_id: str | None = None,
+                meta: dict | None = None) -> None:
+    """A-37: best-effort access log — a logging failure must NEVER break a
+    login/logout (InstiKit's access-log surface, on our rails)."""
+    try:
+        from app.models.user_access_log import UserAccessLog
+        from extensions import db as _db
+
+        platform = "web"
+        ua = (request.headers.get("User-Agent") or "")[:300]
+        lowered = ua.lower()
+        if "android" in lowered:
+            platform = "android"
+        elif "iphone" in lowered or "ipad" in lowered or "ios" in lowered:
+            platform = "ios"
+        elif "flutter" in lowered:
+            platform = "android"
+        row = UserAccessLog(
+            school_id=getattr(g, "school_id", None),
+            user_id=user_id,
+            event=event,
+            ip=(request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                or request.remote_addr or "")[:45],
+            user_agent=ua,
+            platform=platform,
+            login_id=(login_id or "")[:200] or None,
+            meta=meta or {},
+        )
+        _db.session.add(row)
+        _db.session.commit()
+    except Exception:  # noqa: BLE001 — logging must not break auth
+        try:
+            from extensions import db as _db
+
+            _db.session.rollback()
+        except Exception:
+            pass
 
 # ── Password recovery (E96) ──────────────────────────────────────────────────
 # Tokens are random 32-byte urlsafe strings; ONLY their SHA-256 hash is stored
@@ -183,7 +222,11 @@ def login():
 
     result = AuthService.login_with_password(email_or_phone, password)
     if "error" in result:
+        _log_access("login_failed", login_id=email_or_phone,
+                    meta={"reason": str(result["error"])[:100]})
         return error_response(result["error"], 401)
+    _log_access("login", user_id=result.get("user", {}).get("id") or result.get("user_id"),
+                login_id=email_or_phone)
     return _tokens_response(result)
 
 
@@ -199,7 +242,11 @@ def student_login():
 
     result = AuthService.login_student(student_id, password)
     if "error" in result:
+        _log_access("login_failed", login_id=str(student_id),
+                    meta={"reason": str(result["error"])[:100], "method": "student_id"})
         return error_response(result["error"], 401)
+    _log_access("login", user_id=result.get("user", {}).get("id") or result.get("user_id"),
+                login_id=str(student_id))
     return _tokens_response(result)
 
 
@@ -270,12 +317,15 @@ def change_password():
         return error_response("Current password is incorrect", 401)
 
     user.set_password(new_password)
+    # A-37: a forced rotation is satisfied by any successful change.
+    user.must_change_password = False
     # Invalidate tokens on all other devices (blocklist loader checks iat).
     from datetime import datetime, timezone
     user.tokens_invalid_before = datetime.now(timezone.utc)
 
     from extensions import db
     db.session.commit()
+    _log_access("password_changed", user_id=user.id)
     return success_response({"message": "Password changed successfully"})
 
 
@@ -582,6 +632,7 @@ def logout():
         from datetime import datetime, timezone
         expires_at = datetime.now(timezone.utc) + delta
         RevokedToken.revoke(jti=jti, token_type="access", expires_at=expires_at)
+    _log_access("logout", user_id=get_jwt_identity())
     resp = jsonify({"success": True, "data": {"message": "Logged out successfully"}, "error": None, "meta": {}})
     return _clear_auth_cookies(resp)
 

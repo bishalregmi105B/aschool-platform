@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.16.0'
 
 dependencies:
+  package_info_plus: ^9.0.1
   flutter:
     sdk: flutter
   aschool_shared:

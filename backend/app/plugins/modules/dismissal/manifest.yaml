@@ -12,7 +12,6 @@ depends_on: []
 conflicts_with: []
 events:
   emits:
-  - dismissal.student_picked_up
   listens: []
 capabilities:
   api_blueprint: app.api.v1.dismissal

@@ -5,9 +5,11 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -121,3 +123,32 @@ class InAppNotification(SchoolModel):
 
     user = relationship("User", backref="in_app_notifications")
 
+
+
+class NotificationRule(SchoolModel):
+    """A-02 per-event notification matrix — one row per (event × channel ×
+    audience role) the school has an OPINION about. Absence of a row means
+    "default on" for that channel: the matrix only records overrides, so a
+    fresh tenant behaves exactly like today until an admin disables
+    something (empty-table semantics = no behavior change).
+
+    event_key uses the canonical plugin-event vocabulary (see
+    services/notification_rules.KNOWN_EVENTS); audience_role '' = all
+    recipients of the event."""
+
+    __tablename__ = "notification_rules"
+
+    event_key = Column(String(100), nullable=False, index=True)
+    channel = Column(String(20), nullable=False)  # push|sms|email|whatsapp
+    audience_role = Column(String(30), nullable=False, server_default="")
+    enabled = Column(Boolean, nullable=False, default=True)
+    template_key = Column(String(100))
+
+    __table_args__ = (
+        Index(
+            "uq_notification_rules_event_channel_role",
+            "school_id", "event_key", "channel", "audience_role",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )

@@ -13,9 +13,8 @@ depends_on:
 conflicts_with: []
 events:
   emits:
-  - admission.application_received
   - admission.accepted
-  - admission.lead_created
+  - admission.enrolled
   listens:
   - social.admission_lead
 capabilities:

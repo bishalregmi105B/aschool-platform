@@ -783,7 +783,7 @@ def _finalize_fee_payment(collection, gateway, amount, transaction_id, initiatio
     try:
         from app.plugins.events import emit
         emit(
-            "fee.paid",
+            "fees.collected",
             school_id=str(collection.school_id),
             student_id=str(collection.student_id),
             amount=recorded_amount,

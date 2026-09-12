@@ -71,6 +71,24 @@ def submit_mood():
     )
     db.session.add(entry)
     db.session.commit()
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school(
+            "wellbeing.mood_logged",
+            school_id=str(g.school_id),
+            student_id=str(student_id),
+            mood=str(entry.mood or ""),
+        )
+        if str(entry.mood or "").lower() in _NEGATIVE_MOODS:
+            emit_for_school(
+                "wellbeing.alert_triggered",
+                school_id=str(g.school_id),
+                student_id=str(student_id),
+                mood=str(entry.mood or ""),
+            )
+    except Exception:
+        pass
     return created_response(_mood_dict(entry))
 
 

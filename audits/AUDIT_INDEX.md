@@ -287,6 +287,32 @@ existing fees suites 9/9; plugin widgets + contract + S0 suites 36/36; drift gat
 `flutter analyze` 0 errors (shared/parent/student/teacher). Full-suite run per founder instruction:
 NOT run for this sprint (targeted suites only).
 
+## 2026-09-12 — S-A3: Platform services (branch `feat/sa3-platform-services`)
+
+Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A3 (A-02 notification matrix + P-F events
+E-01..E-05 + A-07 ops flags + A-30 crash/coach marks + A-37 ops surfaces + A-19/O-04 roles).
+
+| ID | What landed | Files |
+|---|---|---|
+| E-01 | **Canonical event vocabulary** enforced: 19 emit/listener sites renamed (fee.paid→fees.collected, results.published→exams.result_published, notice.created→notice.published, attendance.student_absent→attendance.absent_alert, incident.created→incident.reported, emergency.alert_broadcast→emergency.alert_triggered, library.book_overdue→library.overdue, marks.submitted→exams.marks_entered) | api/v1/{exams,fees,notices,incidents,emergency}.py, tasks/{attendance_alerts,library_overdue}.py, api/webhooks, plugins/listeners.py |
+| E-02 | Missing high-value emits added (post-commit, fail-safe): timetable.generated (generate+save), fees.overdue + fees.reminder_sent (reminder task), wellbeing.alert_triggered + wellbeing.mood_logged (mood submit; negative mood ⇒ alert), conference.booked, library.returned, website.published, sms.sent, exams.scheduled (both create paths), academics.class_created | respective api/tasks files |
+| E-05 | Manifest emits pruned to the truth: ai_teacher.*, lms.*, transport.*, timetable.substitution, iemis.students_imported, health/compliance/curriculum, website.page_published, academics.year_started, emergency.all_clear deleted (nothing emits them); admission.enrolled / gamification.streak_milestone / online_exam.submitted declared | 19 manifest.yaml files |
+| E-04 | **CI vocabulary test**: every manifest emit has a runtime emitter; every runtime emit is declared (socket-only allowlist: gps_update, join_school); every @on listener has an emitter | `backend/tests/test_event_vocabulary.py` (3 tests) |
+| A-02 | **Per-event notification matrix**: NotificationRule (event×channel×audience, unique; absence = default-on), `channels_for()/channel_enabled()` resolver, `GET/PUT/DELETE /notifications/rules` (+ KNOWN_EVENTS catalog), ENFORCED on the two cost-bearing SMS paths (absent-alert listener + fee reminders) | `models/notification.py`, `services/notification_rules.py`, `api/v1/notifications.py`, `plugins/listeners.py`, `tasks/fee_reminders.py` |
+| A-37 | **Access logs + forced rotation**: UserAccessLog (login/login_failed/logout/password_changed w/ IP+platform, best-effort — never breaks auth), `GET /users/access-logs`, `GET /users/stats` (per-role counts — the roles page's data), `POST /users/<id>/force-password-change`, resets force rotation, change-password clears + logs, `must_change_password` in the login payload | `models/user_access_log.py`, `models/user.py`, `api/v1/auth.py`, `api/v1/users.py` |
+| A-07 | **/mobile/version ops flags**: per-app maintenance flags + message (School.settings `mobile_ops`), admin-settable via PUT; user_min_version/user_store_url added | `api/v1/mobile.py` |
+| A-30 | **Crash reporting**: `POST /mobile/crash` (auth-optional, payload caps, PII redaction in context, school/user resolution) + MobileCrashReport model | `api/v1/mobile.py`, `models/monitoring.py` |
+| A-07/A-30 mobile | OpsGate in all 5 apps (maintenance screen replaces home; non-dismissible force-update; fail-open on network error), CrashReporter.init in every main() (dedupe, 20/session), teacher coach-marks tour (showcaseview, once-only) | `aschool_shared/lib/{services/mobile_version_service,services/crash_reporter,widgets/{maintenance_screen,ops_gate}}.dart`, 5 app main.darts, `flutter_teacher/lib/features/dashboard/coach_marks.dart` |
+| A-19/O-04/A-02 web | Real roles page (B-17 closed: live stats, per-role user drawer, toggle-active, force-password-change), access-logs viewer, notification matrix (event rows × channel switches + override dots + reset) | `frontend/app/dashboard/settings/{roles,access-logs}/page.tsx`, `frontend/app/dashboard/notifications/matrix/page.tsx`, settings_core manifest nav |
+| Migration | s_a3_platform_services: user_access_logs, notification_rules, mobile_crash_reports + users.must_change_password | `migrations/versions/s_a3_platform_services.py` |
+
+**Verification:** `tests/test_sa3_platform_services.py` 10/10 (matrix default-on + disable
+roundtrip + gated absent-alert listener SMS, access logs on login success/failure, forced
+rotation lifecycle incl. change-password clears, maintenance flags per-app, crash caps + PII
+redaction, canonical-name pins); `test_event_vocabulary.py` 3/3; cross-sprint regression
+S-A1+S-A2+plugin-contract+fees-summary 32/32; drift gate PASS (0 blocking / 485); plugin_doctor
+49/0/0; `tsc --noEmit` clean; `flutter analyze` 0 errors across shared + 5 apps.
+
 ## 2026-09-12 — S-A2: Exam & attendance integrity (branch `feat/sa2-exam-attendance`)
 
 Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A2 (A-05 online-exam hardening + A-32 marks

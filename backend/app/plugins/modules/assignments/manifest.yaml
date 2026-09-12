@@ -15,7 +15,6 @@ events:
   emits:
   - assignment.created
   - assignment.submitted
-  - assignment.graded
   listens: []
 capabilities:
   api_blueprint: app.api.v1.assignments

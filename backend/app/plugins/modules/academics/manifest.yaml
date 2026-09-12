@@ -12,7 +12,6 @@ depends_on: []
 conflicts_with: []
 events:
   emits:
-  - academics.year_started
   - academics.class_created
   listens: []
 capabilities:

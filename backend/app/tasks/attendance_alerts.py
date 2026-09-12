@@ -66,7 +66,7 @@ def send_daily_absent_alerts():
 
             for record in absent_records:
                 emit_for_school(
-                    "attendance.student_absent",
+                    "attendance.absent_alert",
                     school_id=str(school_id),
                     student_id=str(record.student_id),
                     date=str(today),
