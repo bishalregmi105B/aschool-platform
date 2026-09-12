@@ -5,10 +5,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { PageLoader } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type Thread = {
   id: string;
@@ -65,7 +65,7 @@ export default function ParentChatPage() {
     }
   };
 
-  if (threads.isLoading) return <PageLoader />;
+  if (threads.isLoading) return <AOSModuleLoadingState label="Loading…" />;
   if (threads.isError)
     return <ErrorState title="Couldn't load messages" onRetry={() => threads.refetch()} />;
 
@@ -87,9 +87,12 @@ export default function ParentChatPage() {
               <button
                 key={t.id}
                 onClick={() => setActiveThread(t.id)}
-                className={`w-full text-left rounded-md px-3 py-2 transition-colors ${
-                  activeThread === t.id ? "bg-accent" : "hover:bg-muted"
-                }`}
+                className="w-full text-left rounded-md px-3 py-2 transition-colors"
+                style={
+                  activeThread === t.id
+                    ? { background: "var(--w11-accent-light)" }
+                    : undefined
+                }
               >
                 <p className="text-sm font-medium">{t.teacher_name || "Teacher"}</p>
                 {t.last_message && (
@@ -111,16 +114,19 @@ export default function ParentChatPage() {
               {!activeThread && (
                 <p className="text-sm text-muted-foreground">Pick a conversation to read it.</p>
               )}
-              {activeThread && messages.isLoading && <PageLoader />}
+              {activeThread && messages.isLoading && <AOSModuleLoadingState label="Loading…" />}
               {activeThread &&
                 (messages.data || []).map((m) => (
                   <div
                     key={m.id}
                     className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                      m.sender_role === "parent"
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : "bg-muted"
+                      m.sender_role === "parent" ? "ml-auto" : ""
                     }`}
+                    style={
+                      m.sender_role === "parent"
+                        ? { background: "var(--w11-accent)", color: "var(--w11-accent-text)" }
+                        : { background: "var(--w11-control-hover)", color: "var(--w11-text-primary)" }
+                    }
                   >
                     {m.body || m.content}
                   </div>

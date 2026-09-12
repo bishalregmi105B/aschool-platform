@@ -5,15 +5,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { MapPin, Plus, Pencil, Trash2, Search } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { MapPin, Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function StopsPage() {
   return <PluginGate slug="gps_tracking"><StopsContent /></PluginGate>;
@@ -73,10 +79,10 @@ function StopsContent() {
   });
 
   const STOP_COLUMNS: Column<any>[] = [
-    { key: "sequence_number", label: "#", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span className="text-muted-foreground">{s.sequence_number}</span> },
-    { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name ?? "", render: (s) => <div className="flex items-center gap-2 font-medium"><MapPin className="h-4 w-4 text-muted-foreground" />{s.name}</div> },
+    { key: "sequence_number", label: "#", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span style={{ color: "var(--w11-text-secondary)" }}>{s.sequence_number}</span> },
+    { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name ?? "", render: (s) => <div className="flex items-center gap-2 font-medium"><MapPin className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />{s.name}</div> },
     { key: "route", label: "Route", sortable: true, value: (s) => routeNameById[s.route_id] ?? "", render: (s) => <span className="text-sm">{routeNameById[s.route_id] || "—"}</span> },
-    { key: "coords", label: "Coordinates", value: (s) => (s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : ""), render: (s) => <span className="text-xs text-muted-foreground">{s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : "—"}</span> },
+    { key: "coords", label: "Coordinates", value: (s) => (s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : ""), render: (s) => <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : "—"}</span> },
     {
       key: "actions",
       label: "Actions",
@@ -84,69 +90,66 @@ function StopsContent() {
       render: (s) => (
         <span className="text-right space-x-1">
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(s); }}><Pencil className="h-4 w-4" /></Button>
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }} disabled={remove.isPending}><Trash2 className="h-4 w-4" /></Button>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }} disabled={remove.isPending}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
         </span>
       ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading stops…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><MapPin className="h-6 w-6" /> Pickup Stops</h1>
-          <p className="text-muted-foreground">Manage bus pickup and drop-off points</p>
-        </div>
-        <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add Stop</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<MapPin className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Pickup Stops"
+        subtitle={`${stops.length} pickup and drop-off ${stops.length === 1 ? "point" : "points"}`}
+        actions={
+          <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add Stop</Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
+          <DataTable
+            columns={STOP_COLUMNS}
+            rows={stops}
+            rowKey={(s: any) => s.id}
+            searchable
+            searchPlaceholder="Search stops…"
+            exportFileName="transport-stops"
+            empty={{ icon: MapPin, title: "No stops defined yet", body: "Add stops to build your routes." }}
+          />
+        </DataPanel>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-10" placeholder="Search stops..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
-
-      <Card><CardContent className="pt-6">
-        <DataTable
-          columns={STOP_COLUMNS}
-          rows={stops}
-          rowKey={(s: any) => s.id}
-          searchable
-          searchPlaceholder="Search stops…"
-          exportFileName="transport-stops"
-          empty={{ icon: MapPin, title: "No stops defined yet", body: "Add stops to build your routes." }}
-        />
-      </CardContent></Card>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editItem ? "Edit Stop" : "Add Stop"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Stop Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Baneshwor Chowk" /></div>
-              <div className="space-y-2"><Label>Sequence #</Label><Input type="number" value={form.sequence_number} onChange={(e) => setForm({ ...form, sequence_number: e.target.value })} /></div>
-            </div>
-            <div className="space-y-2">
-              <Label>Route</Label>
-              <AdvancedSelect
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{editItem ? "Edit Stop" : "Add Stop"}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Stop Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Baneshwor Chowk" /></div>
+                <div className="space-y-2"><Label>Sequence #</Label><Input type="number" value={form.sequence_number} onChange={(e) => setForm({ ...form, sequence_number: e.target.value })} /></div>
+              </div>
+              <div className="space-y-2">
+                <Label>Route</Label>
+                <AdvancedSelect
           value={form.route_id}
           onChange={(v) => setForm({ ...form, route_id: v })}
           options={(routesData || []).map((r: any) => ({ value: r.id, label: r.name }))}
         />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="27.7172" /></div>
+                <div className="space-y-2"><Label>Longitude</Label><Input type="number" step="any" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="85.3240" /></div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Latitude</Label><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="27.7172" /></div>
-              <div className="space-y-2"><Label>Longitude</Label><Input type="number" step="any" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="85.3240" /></div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => save.mutate()} disabled={!form.name || !form.route_id || save.isPending}>
-              {save.isPending ? <Spinner className="mr-2" /> : null} {editItem ? "Update" : "Add Stop"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button onClick={() => save.mutate()} disabled={!form.name || !form.route_id || save.isPending}>
+                {save.isPending ? <Spinner className="mr-2" /> : null} {editItem ? "Update" : "Add Stop"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

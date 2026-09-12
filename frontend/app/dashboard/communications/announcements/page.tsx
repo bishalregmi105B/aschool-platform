@@ -5,21 +5,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Megaphone, Plus, Trash2, Pin, Eye } from "lucide-react";
 import Link from "next/link";
 
@@ -101,16 +106,21 @@ function AnnouncementsContent() {
     }));
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading announcements…" />;
 
   if (isError) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load announcements. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent>
-      </Card>
+      <AOSPage>
+        <AOSPageHeader title="Announcements" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load announcements. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -123,10 +133,10 @@ function AnnouncementsContent() {
       render: (a) => (
         <div>
           <div className="flex items-center gap-2">
-            {a.is_pinned && <Pin className="h-3.5 w-3.5 text-primary" />}
+            {a.is_pinned && <Pin className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} />}
             <span className="font-medium text-sm">{a.title}</span>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{a.content}</p>
+          <p className="text-xs line-clamp-1 mt-0.5" style={{ color: "var(--w11-text-secondary)" }}>{a.content}</p>
         </div>
       ),
     },
@@ -137,7 +147,7 @@ function AnnouncementsContent() {
       render: (a) => (
         <div className="flex flex-wrap gap-1">
           {(a.target_audience ?? []).map((aud: string) => (
-            <Badge key={aud} variant="secondary" className="text-xs capitalize">{aud}</Badge>
+            <span key={aud} className="win11-chip subtle text-xs capitalize">{aud}</span>
           ))}
         </div>
       ),
@@ -148,9 +158,7 @@ function AnnouncementsContent() {
       sortable: true,
       value: (a) => (a.published_at ? "published" : "draft"),
       render: (a) => (
-        <Badge variant={a.published_at ? "default" : "secondary"}>
-          {a.published_at ? "Published" : "Draft"}
-        </Badge>
+        <StatusChip status={a.published_at ? "published" : "pending"} label={a.published_at ? "Published" : "Draft"} />
       ),
     },
     {
@@ -158,7 +166,7 @@ function AnnouncementsContent() {
       label: "Date",
       sortable: true,
       value: (a) => a.created_at ?? "",
-      render: (a) => <span className="text-xs text-muted-foreground">{a.created_at ? new Date(a.created_at).toLocaleDateString() : "—"}</span>,
+      render: (a) => <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{a.created_at ? new Date(a.created_at).toLocaleDateString() : "—"}</span>,
     },
     {
       key: "actions",
@@ -170,10 +178,10 @@ function AnnouncementsContent() {
             <Link href="/dashboard/notices"><Eye className="h-3.5 w-3.5" /></Link>
           </Button>
           <Button
-            variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+            variant="ghost" size="icon" className="h-7 w-7"
             onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(a.id); }}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
@@ -181,41 +189,34 @@ function AnnouncementsContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Megaphone className="h-6 w-6" /> Announcements
-          </h1>
-          <p className="text-muted-foreground">Broadcast announcements to your school community</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/notices">All Notices</Link>
-          </Button>
-          <Button onClick={() => setShowDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" /> New Announcement
-          </Button>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Megaphone className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Announcements"
+        subtitle={`${announcements?.length ?? 0} announcements · ${announcements?.filter((a) => a.is_pinned).length ?? 0} pinned`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/notices">All Notices</Link>
+            </Button>
+            <Button onClick={() => setShowDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" /> New Announcement
+            </Button>
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {[
+            { label: "Total", value: announcements?.length ?? 0 },
+            { label: "Pinned", value: announcements?.filter((a) => a.is_pinned).length ?? 0 },
+            { label: "Published", value: announcements?.filter((a) => a.published_at).length ?? 0 },
+          ].map(({ label, value }) => (
+            <KpiCard key={label} label={label} value={value} />
+          ))}
+        </StatGrid>
 
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total", value: announcements?.length ?? 0 },
-          { label: "Pinned", value: announcements?.filter((a) => a.is_pinned).length ?? 0 },
-          { label: "Published", value: announcements?.filter((a) => a.published_at).length ?? 0 },
-        ].map(({ label, value }) => (
-          <Card key={label}>
-            <CardContent className="pt-4">
-              <p className="text-2xl font-bold">{value}</p>
-              <p className="text-sm text-muted-foreground">{label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={ANNOUNCEMENT_COLUMNS}
             rows={announcements ?? []}
@@ -225,70 +226,78 @@ function AnnouncementsContent() {
             exportFileName="announcements"
             empty={{ icon: Megaphone, title: "No announcements yet", body: "Create one to notify your school community.", action: { label: "New Announcement", onClick: () => setShowDialog(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>New Announcement</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Title *</Label>
-              <Input
-                value={form.title}
-                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                placeholder="Announcement title..."
-              />
-            </div>
-            <div>
-              <Label>Content *</Label>
-              <Textarea
-                value={form.content}
-                onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
-                placeholder="Announcement details..."
-                rows={4}
-              />
-            </div>
-            <div>
-              <Label className="mb-2 block">Target Audience</Label>
-              <div className="flex flex-wrap gap-2">
-                {AUDIENCES.map((aud) => (
-                  <button
-                    key={aud}
-                    type="button"
-                    onClick={() => toggleAudience(aud)}
-                    className={`px-3 py-1 rounded-full text-xs border transition-colors capitalize ${
-                      form.target_audience.includes(aud)
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border text-muted-foreground hover:border-primary"
-                    }`}
-                  >
-                    {aud === "all" ? "Everyone" : aud}
-                  </button>
-                ))}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>New Announcement</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Title *</Label>
+                <Input
+                  value={form.title}
+                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="Announcement title..."
+                />
+              </div>
+              <div>
+                <Label>Content *</Label>
+                <Textarea
+                  value={form.content}
+                  onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
+                  placeholder="Announcement details..."
+                  rows={4}
+                />
+              </div>
+              <div>
+                <Label className="mb-2 block">Target Audience</Label>
+                <div className="flex flex-wrap gap-2">
+                  {AUDIENCES.map((aud) => (
+                    <button
+                      key={aud}
+                      type="button"
+                      onClick={() => toggleAudience(aud)}
+                      className="px-3 py-1 rounded-full text-xs border transition-colors capitalize"
+                      style={
+                        form.target_audience.includes(aud)
+                          ? {
+                              background: "var(--w11-accent)",
+                              color: "#fff",
+                              borderColor: "var(--w11-accent)",
+                            }
+                          : {
+                              borderColor: "var(--w11-border-default)",
+                              color: "var(--w11-text-secondary)",
+                            }
+                      }
+                    >
+                      {aud === "all" ? "Everyone" : aud}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <FormCheckbox
+                  id="is_pinned"
+                  label="Pin to top"
+                  checked={form.is_pinned}
+                  onCheckedChange={(v) => setForm((p: any) => ({ ...p, is_pinned: v }))}
+                />
+                <Label htmlFor="is_pinned">Pin this announcement</Label>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <FormCheckbox
-                id="is_pinned"
-                label="Pin to top"
-                checked={form.is_pinned}
-                onCheckedChange={(v) => setForm((p: any) => ({ ...p, is_pinned: v }))}
-              />
-              <Label htmlFor="is_pinned">Pin this announcement</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-            <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-              {createMutation.isPending ? <Spinner size="sm" className="mr-2" /> : null}
-              Publish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+              <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+                {createMutation.isPending ? <Spinner size="sm" className="mr-2" /> : null}
+                Publish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -4,24 +4,29 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ArrowLeft, Rocket, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FormSection,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface Activity { title: string; description: string; difficulty?: string }
 interface Result { activities: Activity[] }
 
-const TONE: Record<string, string> = {
-  stretch: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  challenge: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  project: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+const DIFF_TONE: Record<string, "success" | "warning" | "accent"> = {
+  stretch: "success",
+  challenge: "accent",
+  project: "warning",
 };
 
 export default function EnrichmentPlannerPage() {
@@ -43,48 +48,54 @@ function Content() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/ai-tools"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <div><h1 className="text-2xl font-bold">Enrichment Planner</h1><p className="text-muted-foreground">Stretch activities for early finishers — no busywork</p></div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle>Scope</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Subject</Label><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Maths" /></div>
-              <div className="space-y-2"><Label>Grade</Label><Input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="e.g. 7" /></div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Rocket className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Enrichment Planner"
+        subtitle="Stretch activities for early finishers — no busywork"
+        actions={
+          <Link href="/dashboard/ai-tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          </Link>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <FormSection title="Scope">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Subject</Label><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Maths" /></div>
+                <div className="space-y-2"><Label>Grade</Label><Input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="e.g. 7" /></div>
+              </div>
+              <div className="space-y-2"><Label>Current topic (optional)</Label><Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Fractions" /></div>
+              <Button className="w-full" onClick={() => gen.mutate()} disabled={!subject || !grade || gen.isPending}>
+                <Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Designing…" : "Design activities"}
+              </Button>
             </div>
-            <div className="space-y-2"><Label>Current topic (optional)</Label><Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Fractions" /></div>
-            <Button className="w-full" onClick={() => gen.mutate()} disabled={!subject || !grade || gen.isPending}>
-              <Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Designing…" : "Design activities"}
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Activities</CardTitle></CardHeader>
-          <CardContent>
+          </FormSection>
+          <DataPanel title="Activities">
             {gen.isPending ? <PageLoader /> : error ? (
               <EmptyState title="Couldn't design activities" body={error} action={{ label: "Try again", onClick: () => gen.mutate() }} />
             ) : !result ? (
-              <div className="text-center py-16 text-muted-foreground"><Rocket className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Every activity produces something students can show.</p></div>
+              <div className="text-center py-16 text-[color:var(--w11-text-secondary)]"><Rocket className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Every activity produces something students can show.</p></div>
             ) : (
               <div className="space-y-3">
                 {result.activities?.map((a, i) => (
-                  <div key={i} className="rounded-md border p-3">
+                  <div key={i} className="rounded-md border border-[color:var(--w11-border-subtle)] p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{a.title}</p>
-                      {a.difficulty && <Badge variant="outline" className={`shrink-0 ${TONE[a.difficulty] ?? ""}`}>{a.difficulty}</Badge>}
+                      <p className="text-sm font-medium text-[color:var(--w11-text-primary)]">{a.title}</p>
+                      {a.difficulty && (
+                        <span className={`win11-chip ${DIFF_TONE[a.difficulty] ?? ""} shrink-0`}>{a.difficulty}</span>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{a.description}</p>
+                    <p className="text-sm mt-1 text-[color:var(--w11-text-secondary)]">{a.description}</p>
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

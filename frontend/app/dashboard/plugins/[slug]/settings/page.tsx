@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -21,14 +20,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import {
   FormRenderer,
   getPath as frGetPath,
   setPath as frSetPath,
   type V2Schema,
 } from "@/components/config/form-renderer";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, Trash2, Plug } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 /**
  * Per-plugin settings — a friendly form over SchoolPlugin.config (audit E166),
@@ -397,30 +403,35 @@ export default function PluginSettingsPage() {
     );
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading plugin settings…" />;
 
   if (isError || !data) {
     const status =
       (error as { response?: { status?: number } })?.response?.status ?? null;
     return (
-      <div className="space-y-4 pb-10">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/plugins">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Installed Plugins
-          </Link>
-        </Button>
-        <Card>
-          <CardHeader>
-            <CardTitle>{getPluginDisplayName(slug)}</CardTitle>
-            <CardDescription>
+      <AOSPage>
+        <AOSPageHeader
+          title={getPluginDisplayName(slug)}
+          subtitle="Per-school configuration for this plugin"
+          actions={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/plugins">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Installed Plugins
+              </Link>
+            </Button>
+          }
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl" title={getPluginDisplayName(slug)}>
+            <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               {status === 404
                 ? "This plugin is not installed on your school — install it from the marketplace to configure it."
                 : "Settings could not be loaded. Please try again."}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+            </p>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -428,27 +439,33 @@ export default function PluginSettingsPage() {
   const hasSchema = schemaFields.length > 0;
 
   return (
-    <div className="space-y-6 pb-10 max-w-3xl">
-      <div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/plugins">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Installed Plugins
-          </Link>
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          {getPluginDisplayName(slug)}
-          <Badge variant="secondary" className="font-mono text-xs">{slug}</Badge>
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Per-school configuration for this plugin. Changes apply immediately
-          after saving.
-          {!canManage && " (Only school admins can save changes.)"}
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Plug className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={
+          <span className="flex items-center gap-3">
+            {getPluginDisplayName(slug)}
+            <Badge variant="secondary" className="font-mono text-xs">{slug}</Badge>
+          </span>
+        }
+        subtitle={
+          <>
+            Per-school configuration for this plugin. Changes apply immediately
+            after saving.
+            {!canManage && " (Only school admins can save changes.)"}
+          </>
+        }
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/plugins">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Installed Plugins
+            </Link>
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <div className="space-y-4 max-w-3xl">
 
       {v2Schema && (
         <FormRenderer
@@ -488,15 +505,12 @@ export default function PluginSettingsPage() {
       )}
 
       {!v2Schema && hasSchema && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Settings</CardTitle>
-            <CardDescription>
+        <DataPanel title="Settings">
+          <div className="space-y-5">
+            <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               Defined by the plugin&apos;s settings schema — labels and
               defaults come from the plugin itself.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+            </p>
             {schemaFields.map((f) => {
               const field = schemaDrafts[f.key];
               if (!field) return null;
@@ -509,7 +523,7 @@ export default function PluginSettingsPage() {
                         {field.kind}
                       </Badge>
                       {f.key !== f.label && (
-                        <span className="font-mono text-[10px] text-muted-foreground">{f.key}</span>
+                        <span className="font-mono text-[10px]" style={{ color: "var(--w11-text-tertiary)" }}>{f.key}</span>
                       )}
                     </div>
                   </div>
@@ -517,28 +531,25 @@ export default function PluginSettingsPage() {
                     setSchemaDrafts((prev) => ({ ...prev, [f.key]: next }))
                   )}
                   {f.help && (
-                    <p className="text-xs text-muted-foreground">{f.help}</p>
+                    <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{f.help}</p>
                   )}
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </DataPanel>
       )}
 
       {!v2Schema && (
-      <Card>
-        <CardHeader>
-          <CardTitle>{hasSchema ? "Other settings" : "Settings"}</CardTitle>
-          <CardDescription>
+      <DataPanel title={hasSchema ? "Other settings" : "Settings"}>
+        <div className="space-y-5">
+          <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
             {hasSchema
               ? "Additional keys this plugin stored that its schema doesn't declare."
               : "Text and number fields save as strings and numbers; checkboxes save as true/false; JSON fields save as their parsed value."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+          </p>
           {extraKeys.length === 0 && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               {hasSchema
                 ? "No additional settings."
                 : "This plugin has no settings yet — add the first one below."}
@@ -550,7 +561,7 @@ export default function PluginSettingsPage() {
             return (
               <div key={key} className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor={`cfg-${key}`} className="font-mono text-xs text-muted-foreground">
+                  <Label htmlFor={`cfg-${key}`} className="font-mono text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                     {key}
                   </Label>
                   <div className="flex items-center gap-2">
@@ -561,7 +572,7 @@ export default function PluginSettingsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 px-2 text-muted-foreground hover:text-red-600"
+                        className="h-6 px-2"
                         onClick={() =>
                           setExtraDrafts((prev) => {
                             const next = { ...prev };
@@ -584,7 +595,7 @@ export default function PluginSettingsPage() {
           })}
 
           {canManage && (
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t border-[var(--w11-border-subtle)] pt-4 space-y-2">
               <Label className="text-sm font-medium">Add a setting</Label>
               <div className="flex flex-wrap items-center gap-2">
                 <Input
@@ -613,7 +624,7 @@ export default function PluginSettingsPage() {
           )}
 
           {canManage && (
-            <div className="flex justify-end border-t pt-4">
+            <div className="flex justify-end border-t border-[var(--w11-border-subtle)] pt-4">
               <Button onClick={handleSave} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (
                   <Spinner size="sm" />
@@ -626,9 +637,11 @@ export default function PluginSettingsPage() {
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </DataPanel>
       )}
-    </div>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,17 +5,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { Plus, AlertCircle, Search } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Plus, AlertCircle } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function IncidentsPage() {
@@ -51,37 +57,47 @@ function IncidentsContent() {
     onError: () => toast.error("Failed to record"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading incidents…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Incident Reports" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
 
-  const severityColor = (s: string) => s === "high" ? "destructive" : s === "medium" ? "secondary" : "outline";
+  const severityTone = (s: string) => s === "high" ? "error" : s === "medium" ? "warning" : "subtle";
 
   const INCIDENT_COLUMNS: Column<any>[] = [
     { key: "created_at", label: "Date", sortable: true, value: (i) => i.created_at ?? "", render: (i) => (i.created_at ? displayBS(i.created_at) : "—") },
     { key: "title", label: "Title", sortable: true, value: (i) => i.title ?? "", render: (i) => <span className="font-medium">{i.title}</span> },
-    { key: "incident_type", label: "Type", sortable: true, value: (i) => i.incident_type ?? "", render: (i) => <Badge variant="outline">{i.incident_type}</Badge> },
-    { key: "severity", label: "Severity", sortable: true, value: (i) => i.severity ?? "", render: (i) => <Badge variant={severityColor(i.severity)}>{i.severity}</Badge> },
+    { key: "incident_type", label: "Type", sortable: true, value: (i) => i.incident_type ?? "", render: (i) => <span className="win11-chip subtle">{i.incident_type}</span> },
+    { key: "severity", label: "Severity", sortable: true, value: (i) => i.severity ?? "", render: (i) => <StatusChip status={severityTone(i.severity)} label={i.severity} /> },
     { key: "student_name", label: "Student", value: (i) => i.student_name ?? "", render: (i) => i.student_name || "—" },
-    { key: "status", label: "Status", sortable: true, value: (i) => i.status ?? "open", render: (i) => <Badge variant={i.status === "resolved" ? "default" : "secondary"}>{i.status || "open"}</Badge> },
+    { key: "status", label: "Status", sortable: true, value: (i) => i.status ?? "open", render: (i) => <StatusChip status={i.status === "resolved" ? "resolved" : "pending"} label={i.status || "open"} /> },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Incident Reports</h1><p className="text-muted-foreground">Record and track student/campus incidents</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Report Incident</Button>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<AlertCircle className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Incident Reports"
+        subtitle={`${incidents.length} ${incidents.length === 1 ? "incident" : "incidents"} recorded`}
+        actions={
+          <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Report Incident</Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={INCIDENT_COLUMNS}
             rows={incidents}
@@ -93,38 +109,38 @@ function IncidentsContent() {
             exportFileName="incidents"
             empty={{ icon: AlertCircle, title: "No incidents recorded", body: "Record incidents to build the disciplinary history.", action: { label: "Report Incident", onClick: () => setShowDialog(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Report Incident</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief incident title" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <AdvancedSelect
-          value={form.type}
-          onChange={(v) => setForm({ ...form, type: v })}
-          options={[{ value: 'behavioral', label: 'Behavior' }, { value: 'bullying', label: 'Bullying' }, { value: 'fighting', label: 'Fighting' }, { value: 'vandalism', label: 'Vandalism' }, { value: 'theft', label: 'Theft' }, { value: 'medical', label: 'Medical' }, { value: 'other', label: 'Other' }]}
-        />
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Report Incident</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief incident title" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <AdvancedSelect
+            value={form.type}
+            onChange={(v) => setForm({ ...form, type: v })}
+            options={[{ value: 'behavioral', label: 'Behavior' }, { value: 'bullying', label: 'Bullying' }, { value: 'fighting', label: 'Fighting' }, { value: 'vandalism', label: 'Vandalism' }, { value: 'theft', label: 'Theft' }, { value: 'medical', label: 'Medical' }, { value: 'other', label: 'Other' }]}
+          />
+                </div>
+                <div className="space-y-2">
+                  <Label>Severity</Label>
+                  <AdvancedSelect
+            value={form.severity}
+            onChange={(v) => setForm({ ...form, severity: v })}
+            options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
+          />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Severity</Label>
-                <AdvancedSelect
-          value={form.severity}
-          onChange={(v) => setForm({ ...form, severity: v })}
-          options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
-        />
-              </div>
+              <div className="space-y-2"><Label>Student ID (optional)</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
             </div>
-            <div className="space-y-2"><Label>Student ID (optional)</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
-          </div>
-          <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Submit</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Submit</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

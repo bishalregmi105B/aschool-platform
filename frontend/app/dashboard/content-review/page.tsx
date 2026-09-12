@@ -3,14 +3,19 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, CheckCircle2, Flag, Send } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 
 interface ContentSource {
   id: string;
@@ -52,11 +57,11 @@ interface ChunkRow {
   is_published: boolean;
 }
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  published: "default",
-  review: "secondary",
-  failed: "destructive",
-  registered: "outline",
+const STATUS_TONE: Record<string, string> = {
+  published: "success",
+  review: "warning",
+  failed: "error",
+  registered: "",
 };
 
 export default function ContentReviewPage() {
@@ -123,7 +128,7 @@ export default function ContentReviewPage() {
       render: (s) => (
         <div>
           <p className="font-medium">{s.title_ne || s.title_en || s.id.slice(0, 8)}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">
             {[s.kind, s.grade ? `Grade ${s.grade}` : null, s.medium, s.edition_bs].filter(Boolean).join(" · ")}
           </p>
         </div>
@@ -134,7 +139,7 @@ export default function ContentReviewPage() {
     {
       key: "status", label: "Status",
       render: (s) => (
-        <Badge variant={STATUS_VARIANT[s.ingest_status] ?? "secondary"}>{s.ingest_status}</Badge>
+        <StatusChip status={s.ingest_status === "published" ? "published" : s.ingest_status} />
       ),
     },
     {
@@ -148,36 +153,31 @@ export default function ContentReviewPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {selected && (
-            <Button variant="ghost" size="icon" aria-label="Back to sources" onClick={() => setSelected(null)}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <div>
-            <h1 className="text-lg font-semibold flex items-center gap-2">
-              <BookOpen className="h-5 w-5" /> AI Content Review
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Human gate over ingested textbooks and question papers — nothing reaches AI tools
-              until it is reviewed and published.
-            </p>
-          </div>
-        </div>
-        {selected && detail && detail.ingest_status !== "published" && (
-          <Button onClick={() => publish.mutate(selected.id)} disabled={publish.isPending}>
-            <Send className="mr-1 h-4 w-4" /> Publish source
-          </Button>
-        )}
-      </div>
-
-      {!selected && (
-        <Card>
-          <CardContent className="pt-6">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="AI Content Review"
+        subtitle="Human gate over ingested textbooks and question papers — nothing reaches AI tools until it is reviewed and published."
+        actions={
+          <>
+            {selected && (
+              <Button variant="outline" size="sm" aria-label="Back to sources" onClick={() => setSelected(null)}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            {selected && detail && detail.ingest_status !== "published" && (
+              <Button onClick={() => publish.mutate(selected.id)} disabled={publish.isPending}>
+                <Send className="mr-1 h-4 w-4" /> Publish source
+              </Button>
+            )}
+          </>
+        }
+      />
+      <AOSPageBody>
+        {!selected && (
+          <DataPanel bodyClassName="p-0 pt-0">
             {isLoading ? (
-              <PageLoader />
+              <div className="p-4"><PageLoader /></div>
             ) : (
               <DataTable
                 columns={columns}
@@ -190,23 +190,23 @@ export default function ContentReviewPage() {
                 }}
               />
             )}
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {selected && detail && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                {selected.title_ne || selected.title_en} — units ({detail.units.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
+        {selected && detail && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DataPanel
+              title={`${selected.title_ne || selected.title_en} — units (${detail.units.length})`}
+              bodyClassName="space-y-2"
+            >
               {detail.units.map((u) => (
                 <button
                   key={u.id}
-                  className={`w-full rounded-md border p-2 text-left transition-colors hover:bg-muted ${openUnit?.id === u.id ? "border-primary" : ""}`}
+                  className={`w-full rounded-md border p-2 text-left transition-colors ${openUnit?.id === u.id ? "win11-card interactive" : ""}`}
+                  style={{
+                    borderColor: openUnit?.id === u.id ? "var(--w11-accent)" : "var(--w11-border-subtle)",
+                    background: "var(--w11-card-bg)",
+                  }}
                   onClick={() => setOpenUnit(openUnit?.id === u.id ? null : u)}
                 >
                   <div className="flex items-center justify-between">
@@ -214,16 +214,16 @@ export default function ContentReviewPage() {
                       {u.unit_no_ascii ? `${u.unit_no_ascii}. ` : ""}
                       {u.title_ne || u.title_en || u.unit_path}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-[color:var(--w11-text-secondary)]">
                       pp.{u.page_start}–{u.page_end} · {u.chunks.total} chunks
                       {u.chunks.flagged > 0 && (
-                        <Badge variant="destructive" className="ml-2 text-[10px]">
+                        <span className="win11-chip error ml-2 text-[10px]">
                           {u.chunks.flagged} flagged
-                        </Badge>
+                        </span>
                       )}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-[color:var(--w11-text-secondary)]">
                     {u.chunks.published}/{u.chunks.total} published
                     {u.align_method ? ` · aligned (${u.align_method})` : " · unaligned"}
                   </p>
@@ -232,43 +232,40 @@ export default function ContentReviewPage() {
               {detail.units.length === 0 && (
                 <EmptyState size="sm" title="No units staged" />
               )}
-            </CardContent>
-          </Card>
+            </DataPanel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                {openUnit ? `Chunks — ${openUnit.title_ne || openUnit.unit_path}` : "Chunk review"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="max-h-[520px] space-y-2 overflow-y-auto">
+            <DataPanel
+              title={openUnit ? `Chunks — ${openUnit.title_ne || openUnit.unit_path}` : "Chunk review"}
+              bodyClassName="max-h-[520px] space-y-2 overflow-y-auto"
+            >
               {openUnit && (chunks ?? []).map((c) => (
-                <div key={c.id} className="rounded-md border p-2">
+                <div key={c.id} className="rounded-md border border-[color:var(--w11-border-subtle)] p-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-[color:var(--w11-text-secondary)]">
                         #{c.ordinal} · {c.kind} · page {c.page_no ?? "—"}
                         {c.bbox ? ` · bbox [${c.bbox.join(", ")}]` : ""}
                       </p>
                       <p className="mt-1 line-clamp-4 text-sm">{c.text_display}</p>
                     </div>
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <Badge variant={c.qa_status === "passed" ? "default" : c.qa_status === "flagged" ? "destructive" : "secondary"}>
-                        {c.qa_status}
-                      </Badge>
+                    <div className="flex shrink-0 flex-col gap-1 items-end">
+                      <StatusChip
+                        status={c.qa_status === "passed" ? "completed" : c.qa_status === "flagged" ? "failed" : "pending"}
+                        label={c.qa_status}
+                      />
                       <Button
                         size="sm" variant="ghost"
                         aria-label="Mark chunk as passed"
                         onClick={() => reviewChunk.mutate({ chunkId: c.id, action: "pass" })}
                       >
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
                       </Button>
                       <Button
                         size="sm" variant="ghost"
                         aria-label="Flag chunk for fixing"
                         onClick={() => reviewChunk.mutate({ chunkId: c.id, action: "flag" })}
                       >
-                        <Flag className="h-4 w-4 text-amber-600" />
+                        <Flag className="h-4 w-4" style={{ color: "#9d5d00" }} />
                       </Button>
                     </div>
                   </div>
@@ -284,10 +281,10 @@ export default function ContentReviewPage() {
                   body="Select a unit on the left to review its chunks against the printed page."
                 />
               )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
+            </DataPanel>
+          </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -6,10 +6,17 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Award, BadgeCheck, Plus, Search, Star, Trophy, Loader2, X } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 // Contract: backend /portfolio/students/<uuid>/items (E-numbering: E72).
 // Item serializer fields: id, portfolio_id, title, description, item_type,
@@ -44,6 +51,13 @@ export default function PortfolioPage() {
     </PluginGate>
   );
 }
+
+const inputStyle = {
+  background: "var(--w11-control-bg)",
+  color: "var(--w11-text-primary)",
+  border: "1px solid var(--w11-border-default)",
+  borderRadius: "var(--w11-radius-md)",
+};
 
 function PortfolioContent() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
@@ -168,383 +182,387 @@ function PortfolioContent() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <AOSPage>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Award className="h-5 w-5 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold">Student Portfolio</h1>
+      <AOSPageHeader
+        icon={
+          <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "var(--w11-accent-light)" }}>
+            <Award className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
           </div>
-          <p className="text-muted-foreground">
-            Track achievements, credentials, and project showcases
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowAdd(true)}
-          disabled={!selectedStudentId}
-          title={
-            selectedStudentId
-              ? undefined
-              : "Select a student first to add achievements"
-          }
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Achievement
-        </Button>
-      </div>
-
-      {/* Student selector + Search */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <AdvancedSelect
-          className="sm:max-w-xs"
-          value={selectedStudentId}
-          onChange={(v) => setSelectedStudentId(v)}
-          clearable
-          searchable
-          placeholder="Select student…"
-          options={(students || []).map(
-            (s: { id: string; first_name: string; last_name: string }) => ({
-              value: s.id,
-              label: `${s.first_name} ${s.last_name}`,
-            }),
-          )}
-        />
-        <div className="relative sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search achievements..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+        }
+        title="Student Portfolio"
+        subtitle="Track achievements, credentials, and project showcases"
+        actions={
+          <Button
+            onClick={() => setShowAdd(true)}
+            disabled={!selectedStudentId}
+            title={
+              selectedStudentId
+                ? undefined
+                : "Select a student first to add achievements"
+            }
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Achievement
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        {/* Student selector + Search */}
+        <FilterCommandBar>
+          <AdvancedSelect
+            className="sm:max-w-xs"
+            value={selectedStudentId}
+            onChange={(v) => setSelectedStudentId(v)}
+            clearable
+            searchable
+            placeholder="Select student…"
+            options={(students || []).map(
+              (s: { id: string; first_name: string; last_name: string }) => ({
+                value: s.id,
+                label: `${s.first_name} ${s.last_name}`,
+              }),
+            )}
           />
-        </div>
-      </div>
-
-      {/* Content */}
-      {!selectedStudentId ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
-          <p className="font-medium">Select a student to view their portfolio</p>
-          <p className="text-sm mt-1">
-            Achievements, credentials, and showcases are tracked per student
-          </p>
-        </div>
-      ) : isError ? (
-        <div className="max-w-2xl">
-          <Card>
-            <CardContent className="py-10 text-center space-y-3">
-              <p className="text-sm text-destructive">
-                Failed to load this student&apos;s portfolio. Please try again.
-              </p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : Object.keys(grouped).length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
-          <p className="font-medium">No achievements yet</p>
-          <p className="text-sm mt-1">
-            {search
-              ? "No achievements match your search"
-              : "Start by adding student achievements"}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {Object.entries(grouped).map(([category, catItems]) => (
-            <div key={category}>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Star className="h-3.5 w-3.5" />
-                {category}
-                <span className="bg-muted px-2 py-0.5 rounded-full text-xs">
-                  {catItems.length}
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {catItems.map((item) => (
-                  <Card key={item.id}>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{item.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedStudent
-                              ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-                      {item.created_at && (
-                        <p className="text-xs text-muted-foreground">
-                          Added{" "}
-                          {new Date(item.created_at).toLocaleDateString(
-                            "en-GB",
-                            { day: "numeric", month: "short", year: "numeric" },
-                          )}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Micro-credentials (GET/POST /portfolio/students/:id/credentials) */}
-      {selectedStudentId && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <BadgeCheck className="h-3.5 w-3.5" />
-              Micro-credentials
-              {credentials && credentials.length > 0 && (
-                <span className="bg-muted px-2 py-0.5 rounded-full text-xs">
-                  {credentials.length}
-                </span>
-              )}
-            </h2>
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowAddCred(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              Add Credential
-            </Button>
+          <div className="relative sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--w11-text-secondary)]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search achievements..."
+              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm"
+              style={inputStyle}
+            />
           </div>
-          {credsError ? (
-            <Card>
-              <CardContent className="py-6 text-center space-y-3">
-                <p className="text-sm text-destructive">Failed to load credentials. Please try again.</p>
-                <Button variant="outline" size="sm" onClick={() => credsRefetch()}>Retry</Button>
-              </CardContent>
-            </Card>
-          ) : credsLoading ? (
-            <div className="flex justify-center py-6">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : !credentials || credentials.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No credentials recorded for this student yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {credentials.map((cred) => (
-                <Card key={cred.id}>
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start gap-2">
-                      <BadgeCheck className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-semibold">{cred.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {cred.issuer || "Issuer not set"}
-                          {cred.issued_at
-                            ? ` · ${new Date(cred.issued_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-                            : ""}
-                        </p>
-                        {cred.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{cred.description}</p>
+        </FilterCommandBar>
+
+        {/* Content */}
+        {!selectedStudentId ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Trophy className="h-12 w-12" />}
+              title="Select a student to view their portfolio"
+              description="Achievements, credentials, and showcases are tracked per student"
+            />
+          </DataPanel>
+        ) : isError ? (
+          <div className="max-w-2xl">
+            <DataPanel>
+              <div className="py-10 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>
+                  Failed to load this student&apos;s portfolio. Please try again.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Retry
+                </Button>
+              </div>
+            </DataPanel>
+          </div>
+        ) : isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+          </div>
+        ) : Object.keys(grouped).length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Trophy className="h-12 w-12" />}
+              title="No achievements yet"
+              description={
+                search
+                  ? "No achievements match your search"
+                  : "Start by adding student achievements"
+              }
+            />
+          </DataPanel>
+        ) : (
+          <div className="space-y-8">
+            {Object.entries(grouped).map(([category, catItems]) => (
+              <div key={category}>
+                <h2 className="text-sm font-semibold uppercase tracking-wider mb-3 flex items-center gap-2 text-[color:var(--w11-text-secondary)]">
+                  <Star className="h-3.5 w-3.5" />
+                  {category}
+                  <span className="win11-chip">{catItems.length}</span>
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {catItems.map((item) => (
+                    <div key={item.id} className="win11-card" style={{ marginBottom: 0 }}>
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{item.title}</p>
+                            <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                              {selectedStudent
+                                ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+                        {item.description && (
+                          <p className="text-sm text-[color:var(--w11-text-secondary)] line-clamp-2">
+                            {item.description}
+                          </p>
                         )}
-                        {cred.credential_url && (
-                          <a
-                            href={cred.credential_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary underline mt-1 inline-block"
-                          >
-                            View credential
-                          </a>
+                        {item.created_at && (
+                          <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                            Added{" "}
+                            {new Date(item.created_at).toLocaleDateString(
+                              "en-GB",
+                              { day: "numeric", month: "short", year: "numeric" },
+                            )}
+                          </p>
                         )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* Add Achievement Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+        {/* Micro-credentials (GET/POST /portfolio/students/:id/credentials) */}
+        {selectedStudentId && (
+          <div className="space-y-3 mt-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">
-                Add Achievement
-                {selectedStudent && (
-                  <span className="block text-sm font-normal text-muted-foreground">
-                    for {selectedStudent.first_name}{" "}
-                    {selectedStudent.last_name}
-                  </span>
+              <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-[color:var(--w11-text-secondary)]">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Micro-credentials
+                {credentials && credentials.length > 0 && (
+                  <span className="win11-chip">{credentials.length}</span>
                 )}
               </h2>
-              <button
-                onClick={() => setShowAdd(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Title</label>
-                <input
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData((d) => ({ ...d, title: e.target.value }))
-                  }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Achievement title"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Category</label>
-                <AdvancedSelect
-                  value={formData.item_type}
-                  onChange={(v) => setFormData((d) => ({ ...d, item_type: v }))}
-                  options={(categories || []).map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))}
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((d) => ({
-                      ...d,
-                      description: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Describe the achievement..."
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => addMutation.mutate(formData)}
-                disabled={addMutation.isPending || !formData.title}
-                className="flex-1 gap-2"
-              >
-                {addMutation.isPending && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
-                Add Achievement
-              </Button>
-              <Button variant="outline" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Credential Modal */}
-      {showAddCred && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">
-                Add Credential
-                {selectedStudent && (
-                  <span className="block text-sm font-normal text-muted-foreground">
-                    for {selectedStudent.first_name}{" "}
-                    {selectedStudent.last_name}
-                  </span>
-                )}
-              </h2>
-              <button
-                onClick={() => setShowAddCred(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Title</label>
-                <input
-                  value={credForm.title}
-                  onChange={(e) =>
-                    setCredForm((d) => ({ ...d, title: e.target.value }))
-                  }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="e.g. NEB SEE Merit Certificate"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Issuer</label>
-                <input
-                  value={credForm.issuer}
-                  onChange={(e) =>
-                    setCredForm((d) => ({ ...d, issuer: e.target.value }))
-                  }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="e.g. NEB, Coursera, Red Cross"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Credential URL</label>
-                <input
-                  value={credForm.credential_url}
-                  onChange={(e) =>
-                    setCredForm((d) => ({ ...d, credential_url: e.target.value }))
-                  }
-                  className="w-full mt-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="https://…"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Issued on</label>
-                <BSDateInput
-                  value={credForm.issued_at}
-                  onChange={(v) =>
-                    setCredForm((d) => ({ ...d, issued_at: v }))
-                  }
-                  className="w-full mt-1"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => addCredential.mutate()}
-                disabled={addCredential.isPending || !credForm.title}
-                className="flex-1 gap-2"
-              >
-                {addCredential.isPending && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowAddCred(true)}>
+                <Plus className="h-3.5 w-3.5" />
                 Add Credential
               </Button>
-              <Button variant="outline" onClick={() => setShowAddCred(false)}>
-                Cancel
-              </Button>
+            </div>
+            {credsError ? (
+              <DataPanel>
+                <div className="py-6 text-center space-y-3">
+                  <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load credentials. Please try again.</p>
+                  <Button variant="outline" size="sm" onClick={() => credsRefetch()}>Retry</Button>
+                </div>
+              </DataPanel>
+            ) : credsLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-[color:var(--w11-text-secondary)]" />
+              </div>
+            ) : !credentials || credentials.length === 0 ? (
+              <p className="text-sm py-4 text-[color:var(--w11-text-secondary)]">
+                No credentials recorded for this student yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {credentials.map((cred) => (
+                  <div key={cred.id} className="win11-card" style={{ marginBottom: 0 }}>
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <BadgeCheck className="h-5 w-5 mt-0.5 shrink-0" style={{ color: "var(--w11-accent)" }} />
+                        <div className="min-w-0">
+                          <p className="font-semibold">{cred.title}</p>
+                          <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                            {cred.issuer || "Issuer not set"}
+                            {cred.issued_at
+                              ? ` · ${new Date(cred.issued_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                              : ""}
+                          </p>
+                          {cred.description && (
+                            <p className="text-sm text-[color:var(--w11-text-secondary)] line-clamp-2 mt-1">{cred.description}</p>
+                          )}
+                          {cred.credential_url && (
+                            <a
+                              href={cred.credential_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs underline mt-1 inline-block"
+                              style={{ color: "var(--w11-accent)" }}
+                            >
+                              View credential
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Add Achievement Modal */}
+        {showAdd && (
+          <div className="win11-modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="win11-dialog max-w-md w-full p-6 space-y-4" style={{ background: "var(--w11-surface-solid)" }}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[color:var(--w11-text-primary)]">
+                  Add Achievement
+                  {selectedStudent && (
+                    <span className="block text-sm font-normal text-[color:var(--w11-text-secondary)]">
+                      for {selectedStudent.first_name}{" "}
+                      {selectedStudent.last_name}
+                    </span>
+                  )}
+                </h2>
+                <button
+                  onClick={() => setShowAdd(false)}
+                  className="text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Title</label>
+                  <input
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData((d) => ({ ...d, title: e.target.value }))
+                    }
+                    className="w-full mt-1 rounded-lg px-3 py-2 text-sm"
+                    style={inputStyle}
+                    placeholder="Achievement title"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Category</label>
+                  <AdvancedSelect
+                    value={formData.item_type}
+                    onChange={(v) => setFormData((d) => ({ ...d, item_type: v }))}
+                    options={(categories || []).map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((d) => ({
+                        ...d,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className="w-full mt-1 rounded-lg px-3 py-2 text-sm resize-none"
+                    style={inputStyle}
+                    placeholder="Describe the achievement..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => addMutation.mutate(formData)}
+                  disabled={addMutation.isPending || !formData.title}
+                  className="flex-1 gap-2"
+                >
+                  {addMutation.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Add Achievement
+                </Button>
+                <Button variant="outline" onClick={() => setShowAdd(false)}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Add Credential Modal */}
+        {showAddCred && (
+          <div className="win11-modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="win11-dialog max-w-md w-full p-6 space-y-4" style={{ background: "var(--w11-surface-solid)" }}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[color:var(--w11-text-primary)]">
+                  Add Credential
+                  {selectedStudent && (
+                    <span className="block text-sm font-normal text-[color:var(--w11-text-secondary)]">
+                      for {selectedStudent.first_name}{" "}
+                      {selectedStudent.last_name}
+                    </span>
+                  )}
+                </h2>
+                <button
+                  onClick={() => setShowAddCred(false)}
+                  className="text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Title</label>
+                  <input
+                    value={credForm.title}
+                    onChange={(e) =>
+                      setCredForm((d) => ({ ...d, title: e.target.value }))
+                    }
+                    className="w-full mt-1 rounded-lg px-3 py-2 text-sm"
+                    style={inputStyle}
+                    placeholder="e.g. NEB SEE Merit Certificate"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Issuer</label>
+                  <input
+                    value={credForm.issuer}
+                    onChange={(e) =>
+                      setCredForm((d) => ({ ...d, issuer: e.target.value }))
+                    }
+                    className="w-full mt-1 rounded-lg px-3 py-2 text-sm"
+                    style={inputStyle}
+                    placeholder="e.g. NEB, Coursera, Red Cross"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Credential URL</label>
+                  <input
+                    value={credForm.credential_url}
+                    onChange={(e) =>
+                      setCredForm((d) => ({ ...d, credential_url: e.target.value }))
+                    }
+                    className="w-full mt-1 rounded-lg px-3 py-2 text-sm"
+                    style={inputStyle}
+                    placeholder="https://…"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Issued on</label>
+                  <BSDateInput
+                    value={credForm.issued_at}
+                    onChange={(v) =>
+                      setCredForm((d) => ({ ...d, issued_at: v }))
+                    }
+                    className="w-full mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => addCredential.mutate()}
+                  disabled={addCredential.isPending || !credForm.title}
+                  className="flex-1 gap-2"
+                >
+                  {addCredential.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Add Credential
+                </Button>
+                <Button variant="outline" onClick={() => setShowAddCred(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

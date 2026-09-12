@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +17,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 const CATEGORIES = [
   { id: "all",          label: "All" },
@@ -95,208 +102,272 @@ export default function DesignerPage() {
 
   if (isError) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-6xl">
-        <h1 className="text-2xl font-bold tracking-tight mb-1">Design Studio</h1>
-        <Card className="mt-6"><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load templates. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Design Studio" subtitle="Create school documents, certificates, ID cards, and more." />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>
+                Failed to load templates. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      {/* Hero / Quick Start */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight mb-1">Design Studio</h1>
-        <p className="text-muted-foreground text-sm mb-6">
-          Create school documents, certificates, ID cards, and more.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {/* Bulk ID Cards — most common task */}
-          <Card
-            className="cursor-pointer border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all group"
-            onClick={() => router.push("/dashboard/designer/bulk")}
-          >
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                <WalletCards className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-semibold text-base flex items-center gap-1">
-                  Bulk ID Cards
-                  <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pick a class — ID cards auto-filled with photos, ready to export
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* New Canvas Design */}
-          <Card
-            className="cursor-pointer border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all group"
-            onClick={() => router.push("/dashboard/designer/editor")}
-          >
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors">
-                <Palette className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <div className="font-semibold text-base flex items-center gap-1">
-                  New Canvas Design
-                  <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Drag-and-drop canvas — shapes, images, multi-page
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* New Document (Writer) */}
-          <Card
-            className="cursor-pointer border-2 border-dashed hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-all group"
-            onClick={() => router.push("/dashboard/designer/writer")}
-          >
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 group-hover:bg-violet-200 dark:group-hover:bg-violet-900/60 flex items-center justify-center shrink-0 transition-colors">
-                <FileText className="h-6 w-6 text-violet-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-base text-violet-700 dark:text-violet-400 flex items-center gap-1">
-                  New Document
-                  <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Rich-text writer — fonts, styles, PDF export
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* My Designs — recent saved documents */}
-      {(myDocs as any[]).length > 0 && (
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Palette className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Design Studio"
+        subtitle="Create school documents, certificates, ID cards, and more."
+      />
+      <AOSPageBody>
+        {/* Hero / Quick Start */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" /> My Designs
-            </h2>
-            <span className="text-xs text-muted-foreground">{(myDocs as any[]).length} saved</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {(myDocs as any[]).slice(0, 12).map((doc: any) => (
-              <div key={doc.id} className="group relative border rounded-xl overflow-hidden bg-background hover:shadow-md transition-shadow">
-                <button
-                  className="block w-full text-left"
-                  onClick={() => {
-                    const state = doc.canvas_state;
-                    const isWriter = state?.type === "writer" || state?.type === "writer2";
-                    router.push(isWriter ? `/dashboard/designer/writer?doc=${doc.id}` : `/dashboard/designer/editor?doc=${doc.id}`);
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {/* Bulk ID Cards — most common task */}
+            <div
+              className="win11-card cursor-pointer transition-all group"
+              style={{ border: "2px dashed var(--w11-border-default)" }}
+              onClick={() => router.push("/dashboard/designer/bulk")}
+            >
+              <div className="flex items-center gap-4 p-5">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: "var(--w11-accent)",
+                    color: "var(--w11-accent-text)",
+                    borderRadius: "var(--w11-radius-xl)",
                   }}
                 >
-                  <div className="aspect-[4/3] bg-muted/40 flex items-center justify-center overflow-hidden">
-                    {doc.thumbnail_url ? (
-                      <img src={doc.thumbnail_url} alt={doc.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Palette className="h-8 w-8 text-muted-foreground/30" />
-                    )}
+                  <WalletCards className="h-6 w-6" />
+                </div>
+                <div>
+                  <div
+                    className="font-semibold text-base flex items-center gap-1"
+                    style={{ color: "var(--w11-text-primary)" }}
+                  >
+                    Bulk ID Cards
+                    <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="p-2">
-                    <p className="text-xs font-medium truncate">{doc.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : ""}
-                    </p>
-                  </div>
-                </button>
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="h-6 w-6 rounded-full bg-background/90 border flex items-center justify-center hover:bg-muted">
-                        <MoreVertical className="h-3 w-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => {
-                        const name = window.prompt("Rename design", doc.name);
-                        if (name && name.trim()) renameDocMutation.mutate({ id: doc.id, name: name.trim() });
-                      }}>
-                        <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/designer/editor?doc=${doc.id}`)}>
-                        <RotateCcw className="h-3.5 w-3.5 mr-2" /> Open in editor
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => {
-                        if (window.confirm(`Delete "${doc.name}"?`)) deleteDocMutation.mutate(doc.id);
-                      }}>
-                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--w11-text-secondary)" }}>
+                    Pick a class — ID cards auto-filled with photos, ready to export
+                  </p>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* New Canvas Design */}
+            <div
+              className="win11-card cursor-pointer transition-all group"
+              style={{ border: "2px dashed var(--w11-border-default)" }}
+              onClick={() => router.push("/dashboard/designer/editor")}
+            >
+              <div className="flex items-center gap-4 p-5">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                  style={{
+                    background: "var(--w11-accent-light)",
+                    borderRadius: "var(--w11-radius-xl)",
+                  }}
+                >
+                  <Palette className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
+                </div>
+                <div>
+                  <div
+                    className="font-semibold text-base flex items-center gap-1"
+                    style={{ color: "var(--w11-text-primary)" }}
+                  >
+                    New Canvas Design
+                    <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--w11-text-secondary)" }}>
+                    Drag-and-drop canvas — shapes, images, multi-page
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* New Document (Writer) */}
+            <div
+              className="win11-card cursor-pointer transition-all group"
+              style={{ border: "2px dashed var(--w11-border-default)" }}
+              onClick={() => router.push("/dashboard/designer/writer")}
+            >
+              <div className="flex items-center gap-4 p-5">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                  style={{
+                    background: "var(--w11-accent-light)",
+                    borderRadius: "var(--w11-radius-xl)",
+                  }}
+                >
+                  <FileText className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
+                </div>
+                <div>
+                  <div
+                    className="font-semibold text-base flex items-center gap-1"
+                    style={{ color: "var(--w11-text-primary)" }}
+                  >
+                    New Document
+                    <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--w11-text-secondary)" }}>
+                    Rich-text writer — fonts, styles, PDF export
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Templates Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Templates</h2>
-          <div className="relative w-56">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-xs"
-            />
-          </div>
-        </div>
-
-        {/* Category tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="h-8 flex flex-wrap gap-1 bg-transparent p-0">
-            {CATEGORIES.map((c) => (
-              <TabsTrigger
-                key={c.id}
-                value={c.id}
-                className="h-7 text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+        {/* My Designs — recent saved documents */}
+        {(myDocs as any[]).length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className="text-lg font-semibold flex items-center gap-2"
+                style={{ color: "var(--w11-text-primary)" }}
               >
-                {CATEGORY_ICON[c.id] ?? null}
-                <span className="ml-1">{c.label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
-        {/* Template grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-xl border bg-muted animate-pulse aspect-[3/4]" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">
-            No templates found{search ? ` for "${search}"` : ""}.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {filtered.map((tpl: any) => (
-              <TemplateCard key={tpl.id} template={tpl} />
-            ))}
+                <Clock className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> My Designs
+              </h2>
+              <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                {(myDocs as any[]).length} saved
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {(myDocs as any[]).slice(0, 12).map((doc: any) => (
+                <div
+                  key={doc.id}
+                  className="group relative rounded-xl overflow-hidden hover:shadow-md transition-shadow win11-card"
+                  style={{ padding: 0 }}
+                >
+                  <button
+                    className="block w-full text-left"
+                    onClick={() => {
+                      const state = doc.canvas_state;
+                      const isWriter = state?.type === "writer" || state?.type === "writer2";
+                      router.push(isWriter ? `/dashboard/designer/writer?doc=${doc.id}` : `/dashboard/designer/editor?doc=${doc.id}`);
+                    }}
+                  >
+                    <div
+                      className="aspect-[4/3] flex items-center justify-center overflow-hidden"
+                      style={{ background: "var(--w11-control-hover)" }}
+                    >
+                      {doc.thumbnail_url ? (
+                        <img src={doc.thumbnail_url} alt={doc.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Palette className="h-8 w-8" style={{ color: "var(--w11-text-tertiary)" }} />
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--w11-text-primary)" }}>{doc.name}</p>
+                      <p className="text-[10px]" style={{ color: "var(--w11-text-secondary)" }}>
+                        {doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : ""}
+                      </p>
+                    </div>
+                  </button>
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="h-6 w-6 rounded-full border flex items-center justify-center"
+                          style={{
+                            background: "var(--w11-surface-solid)",
+                            borderColor: "var(--w11-border-default)",
+                          }}
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => {
+                          const name = window.prompt("Rename design", doc.name);
+                          if (name && name.trim()) renameDocMutation.mutate({ id: doc.id, name: name.trim() });
+                        }}>
+                          <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/dashboard/designer/editor?doc=${doc.id}`)}>
+                          <RotateCcw className="h-3.5 w-3.5 mr-2" /> Open in editor
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive" onClick={() => {
+                          if (window.confirm(`Delete "${doc.name}"?`)) deleteDocMutation.mutate(doc.id);
+                        }}>
+                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-      </div>
-    </div>
+
+        {/* Templates Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--w11-text-primary)" }}>Templates</h2>
+            <div className="relative w-56">
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
+                style={{ color: "var(--w11-text-tertiary)" }}
+              />
+              <Input
+                placeholder="Search templates..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Category tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList className="h-8 flex flex-wrap gap-1 bg-transparent p-0">
+              {CATEGORIES.map((c) => (
+                <TabsTrigger
+                  key={c.id}
+                  value={c.id}
+                  className="h-7 text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  {CATEGORY_ICON[c.id] ?? null}
+                  <span className="ml-1">{c.label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {/* Template grid */}
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl animate-pulse aspect-[3/4]"
+                  style={{ background: "var(--w11-control-hover)" }}
+                />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <AOSEmptyState
+              title={`No templates found${search ? ` for "${search}"` : ""}.`}
+            />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {filtered.map((tpl: any) => (
+                <TemplateCard key={tpl.id} template={tpl} />
+              ))}
+            </div>
+          )}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -314,14 +385,15 @@ function TemplateCard({ template }: { template: any }) {
     : `/dashboard/designer/editor?template=${template.id}`;
 
   return (
-    <Card
-      className="group cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+    <div
+      className="win11-card group cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
+      style={{ padding: 0 }}
       onClick={() => router.push(dest)}
     >
       {/* Thumbnail */}
       <div
-        className="bg-gradient-to-br from-muted to-muted/60 relative overflow-hidden"
-        style={{ paddingTop: `${Math.min(ratio * 100, 133)}%` }}
+        className="relative overflow-hidden"
+        style={{ paddingTop: `${Math.min(ratio * 100, 133)}%`, background: "var(--w11-control-hover)" }}
       >
         {template.thumbnail_url ? (
           <img
@@ -330,19 +402,22 @@ function TemplateCard({ template }: { template: any }) {
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40">
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ color: "var(--w11-text-tertiary)" }}
+          >
             {CATEGORY_ICON[template.category] ?? <LayoutTemplate className="h-8 w-8" />}
           </div>
         )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
         {/* Tool indicator */}
         <div className="absolute top-1.5 right-1.5">
-          <Badge variant="outline" className={`text-[9px] h-4 px-1.5 backdrop-blur-sm ${useWriter ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-blue-50 text-blue-600 border-blue-200"}`}>
+          <Badge variant="outline" className="text-[9px] h-4 px-1.5 backdrop-blur-sm">
             {useWriter ? "Writer" : "Designer"}
           </Badge>
         </div>
         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button size="sm" className={`h-7 text-xs gap-1 ${useWriter ? "bg-violet-600 hover:bg-violet-700" : ""}`}>
+          <Button size="sm" className="h-7 text-xs gap-1">
             {useWriter ? <FileText className="h-3 w-3" /> : <Plus className="h-3 w-3" />} {useWriter ? "Open" : "Use"}
           </Button>
         </div>
@@ -350,18 +425,18 @@ function TemplateCard({ template }: { template: any }) {
 
       {/* Info */}
       <div className="p-2.5">
-        <p className="font-medium text-xs truncate">{template.name}</p>
+        <p className="font-medium text-xs truncate" style={{ color: "var(--w11-text-primary)" }}>{template.name}</p>
         <div className="flex items-center justify-between mt-1">
           <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
             {template.category?.replace("_", " ")}
           </Badge>
           {template.width && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px]" style={{ color: "var(--w11-text-secondary)" }}>
               {template.width}×{template.height}
             </span>
           )}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

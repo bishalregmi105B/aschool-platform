@@ -4,14 +4,20 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { ArrowLeft, Sparkles, Copy } from "lucide-react";
+import { ArrowLeft, Sparkles, Copy, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FormSection,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface RemarkRow {
   student_name: string;
@@ -100,15 +106,19 @@ function RemarksContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/ai-tools"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <div><h1 className="text-2xl font-bold">AI Report Remarks</h1><p className="text-muted-foreground">Generate personalized remarks for each student</p></div>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle>Settings</CardTitle></CardHeader>
-        <CardContent>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="AI Report Remarks"
+        subtitle="Generate personalized remarks for each student"
+        actions={
+          <Link href="/dashboard/ai-tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          </Link>
+        }
+      />
+      <AOSPageBody>
+        <FormSection title="Settings">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Exam</Label>
@@ -146,20 +156,17 @@ function RemarksContent() {
             </Button>
             {remarks.some((r) => r.remark) && <Button variant="outline" onClick={copyAll}><Copy className="h-4 w-4 mr-2" /> Copy All</Button>}
           </div>
-        </CardContent>
-      </Card>
+        </FormSection>
 
-      {remarks.length > 0 ? (
-        <Card>
-          <CardHeader><CardTitle>Generated Remarks ({remarks.filter((r) => r.remark).length}/{remarks.length} students)</CardTitle></CardHeader>
-          <CardContent>
+        {remarks.length > 0 ? (
+          <DataPanel title={`Generated Remarks (${remarks.filter((r) => r.remark).length}/${remarks.length} students)`} bodyClassName="p-0">
             <Table>
               <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Remark</TableHead><TableHead className="w-16"></TableHead></TableRow></TableHeader>
               <TableBody>
                 {remarks.map((r, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium whitespace-nowrap">{r.student_name}</TableCell>
-                    <TableCell className="text-sm">{r.remark || <span className="text-muted-foreground">— not generated (quota or AI provider unavailable)</span>}</TableCell>
+                    <TableCell className="text-sm">{r.remark || <span className="text-[color:var(--w11-text-secondary)]">— not generated (quota or AI provider unavailable)</span>}</TableCell>
                     <TableCell>
                       {r.remark && (
                         <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(r.remark || ""); toast.success("Copied!"); }}>
@@ -171,11 +178,13 @@ function RemarksContent() {
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      ) : !generating && (
-        <Card><CardContent className="py-16 text-center text-muted-foreground"><Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Select exam and class to generate personalized remarks</p></CardContent></Card>
-      )}
-    </div>
+          </DataPanel>
+        ) : !generating && (
+          <DataPanel>
+            <div className="py-16 text-center text-[color:var(--w11-text-secondary)]"><Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Select exam and class to generate personalized remarks</p></div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

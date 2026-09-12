@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, Plus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +17,13 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 
 interface TeachingSection {
   id: string;
@@ -126,19 +131,19 @@ export default function TeachingContentPage() {
       render: (s) => (
         <div>
           <p className="font-medium">{s.title_en}</p>
-          {s.title_ne && <p className="text-xs text-muted-foreground">{s.title_ne}</p>}
+          {s.title_ne && <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.title_ne}</p>}
         </div>
       ),
     },
-    { key: "code", label: "Code", value: (s) => s.code, render: (s) => <span className="text-muted-foreground text-xs">{s.code}</span> },
-    { key: "kind", label: "Kind", value: (s) => s.kind, render: (s) => <Badge variant="outline" className="text-xs">{s.kind}</Badge> },
+    { key: "code", label: "Code", value: (s) => s.code, render: (s) => <span className="text-[color:var(--w11-text-secondary)] text-xs">{s.code}</span> },
+    { key: "kind", label: "Kind", value: (s) => s.kind, render: (s) => <span className="win11-chip text-xs">{s.kind}</span> },
     {
       key: "status", label: "Published", value: (s) => s.published_version_no ?? 0,
       render: (s) =>
         s.published_version_no ? (
-          <Badge variant="default" className="text-xs">v{s.published_version_no}</Badge>
+          <StatusChip status="published" label={`v${s.published_version_no}`} />
         ) : (
-          <Badge variant="secondary" className="text-xs">draft</Badge>
+          <StatusChip status="pending" label="draft" />
         ),
     },
     {
@@ -152,30 +157,26 @@ export default function TeachingContentPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/academics">
-            <Button variant="ghost" size="icon" aria-label="Back">
-              <ArrowLeft className="h-4 w-4" />
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Chapter Content"
+        subtitle="Bilingual teaching sections — versioned, reviewable, publishable"
+        actions={
+          <>
+            <Link href="/dashboard/academics">
+              <Button variant="outline" size="sm" aria-label="Back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" /> New section
             </Button>
-          </Link>
-          <div>
-            <h1 className="text-lg font-semibold flex items-center gap-2">
-              <BookOpen className="h-5 w-5" /> Chapter Content
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Bilingual teaching sections — versioned, reviewable, publishable
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" /> New section
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+          </>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0 pt-0">
           {isLoading ? (
             <PageLoader />
           ) : (
@@ -190,10 +191,9 @@ export default function TeachingContentPage() {
               }}
             />
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New teaching section</DialogTitle>
@@ -276,11 +276,11 @@ export default function TeachingContentPage() {
           </DialogHeader>
           <div className="space-y-2">
             {(versions ?? []).map((v) => (
-              <div key={v.version_no} className="flex items-center justify-between rounded-md border p-2">
+              <div key={v.version_no} className="flex items-center justify-between rounded-md border border-[color:var(--w11-border-subtle)] p-2">
                 <div>
                   <p className="text-sm font-medium">v{v.version_no} · {v.status}</p>
                   {v.change_note && (
-                    <p className="text-xs text-muted-foreground">{v.change_note}</p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">{v.change_note}</p>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -315,11 +315,12 @@ export default function TeachingContentPage() {
               </div>
             ))}
             {versions && versions.length === 0 && (
-              <p className="text-sm text-muted-foreground">No versions yet.</p>
+              <p className="text-sm text-[color:var(--w11-text-secondary)]">No versions yet.</p>
             )}
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -15,9 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,7 +26,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  ArrowLeft,
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import {
   CheckCircle,
   DollarSign,
   FileText,
@@ -37,7 +45,6 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
-import Link from "next/link";
 
 interface PayrollRow {
   id: string;
@@ -177,204 +184,177 @@ function PayrollContent() {
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/hr">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Payroll Management</h1>
-        </div>
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">
-              Failed to load payroll records. Please try again.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Payroll Management" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load payroll records. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading payroll…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/hr">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">Payroll Management</h1>
-          <p className="text-muted-foreground">
-            Monthly salary processing and payslips
-          </p>
-        </div>
-        <input
-          type="month"
-          className="border rounded-md px-3 py-2"
-          value={month}
-          onChange={(e) => {
-            setMonth(e.target.value);
-            setSelectedIds([]);
-          }}
-        />
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Wallet className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Payroll Management"
+        subtitle={`Monthly salary processing and payslips · ${month}`}
+        actions={
+          <input
+            type="month"
+            className="win11-select border rounded-md px-3 py-2"
+            style={{ background: "var(--w11-control-bg)", color: "var(--w11-text-primary)" }}
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setSelectedIds([]);
+            }}
+          />
+        }
+      />
+      <AOSPageBody>
+        <StatGrid min={180}>
+          <KpiCard
+            label="Total Staff"
+            value={payroll.length || summary.total_staff || 0}
+            icon={<DollarSign className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          <KpiCard
+            label="Gross Salary"
+            value={`Rs. ${(
+              summary.gross_total ||
+              payroll.reduce(
+                (s: number, p: any) => s + (p.gross_salary || 0),
+                0,
+              )
+            ).toLocaleString()}`}
+          />
+          <KpiCard
+            label="Deductions"
+            value={`Rs. ${(
+              summary.total_deductions ||
+              payroll.reduce(
+                (s: number, p: any) => s + (p.deductions || 0),
+                0,
+              )
+            ).toLocaleString()}`}
+            color="#c42b1c"
+          />
+          <KpiCard
+            label="Net Pay"
+            value={`Rs. ${(
+              summary.net_total ||
+              payroll.reduce(
+                (s: number, p: any) => s + (p.net_salary || 0),
+                0,
+              )
+            ).toLocaleString()}`}
+            color="#107c10"
+          />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Staff</p>
-            <p className="text-2xl font-bold">
-              {payroll.length || summary.total_staff || 0}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Gross Salary</p>
-            <p className="text-2xl font-bold">
-              Rs.{" "}
-              {(
-                summary.gross_total ||
-                payroll.reduce(
-                  (s: number, p: any) => s + (p.gross_salary || 0),
-                  0,
-                )
-              ).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Deductions</p>
-            <p className="text-2xl font-bold text-red-600">
-              Rs.{" "}
-              {(
-                summary.total_deductions ||
-                payroll.reduce(
-                  (s: number, p: any) => s + (p.deductions || 0),
-                  0,
-                )
-              ).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Net Pay</p>
-            <p className="text-2xl font-bold text-green-600">
-              Rs.{" "}
-              {(
-                summary.net_total ||
-                payroll.reduce(
-                  (s: number, p: any) => s + (p.net_salary || 0),
-                  0,
-                )
-              ).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
-          {generate.isPending ? (
-            <Spinner className="mr-2" />
-          ) : (
-            <DollarSign className="h-4 w-4 mr-2" />
-          )}{" "}
-          Generate Payroll
-        </Button>
-        {draftSelected.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={() =>
-              setPendingBulk({ action: "approve", count: draftSelected.length })
-            }
-            disabled={bulkAction.isPending}
-          >
-            {bulkAction.isPending ? (
-              <Spinner size="sm" className="mr-2" />
+        <FilterCommandBar>
+          <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
+            {generate.isPending ? (
+              <Spinner className="mr-2" />
             ) : (
-              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-            )}
-            Approve selected ({draftSelected.length})
+              <DollarSign className="h-4 w-4 mr-2" />
+            )}{" "}
+            Generate Payroll
           </Button>
-        )}
-        {approvedSelected.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={() =>
-              setPendingBulk({
-                action: "mark_paid",
-                count: approvedSelected.length,
-              })
-            }
-            disabled={bulkAction.isPending}
-          >
-            {bulkAction.isPending ? (
-              <Spinner size="sm" className="mr-2" />
-            ) : (
-              <Wallet className="h-4 w-4 mr-2 text-blue-600" />
-            )}
-            Mark selected paid ({approvedSelected.length})
-          </Button>
-        )}
-      </div>
-
-      <Dialog
-        open={!!pendingBulk}
-        onOpenChange={(open) => !open && setPendingBulk(null)}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {pendingBulk?.action === "approve"
-                ? "Approve payroll records"
-                : "Mark payroll records as paid"}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            {pendingBulk?.action === "approve"
-              ? `You are about to approve ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month}. Approved records unlock payment.`
-              : `You are about to mark ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month} as paid. Only approved records are affected; this records the payment date.`}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingBulk(null)}>
-              Cancel
-            </Button>
+          {draftSelected.length > 0 && (
             <Button
-              onClick={() => {
-                if (!pendingBulk) return;
-                bulkAction.mutate({
-                  action: pendingBulk.action,
-                  ids:
-                    pendingBulk.action === "approve"
-                      ? draftSelected.map((p) => p.id)
-                      : approvedSelected.map((p) => p.id),
-                });
-                setPendingBulk(null);
-              }}
+              variant="outline"
+              onClick={() =>
+                setPendingBulk({ action: "approve", count: draftSelected.length })
+              }
               disabled={bulkAction.isPending}
             >
               {bulkAction.isPending ? (
                 <Spinner size="sm" className="mr-2" />
-              ) : null}
-              Confirm
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" style={{ color: "#107c10" }} />
+              )}
+              Approve selected ({draftSelected.length})
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+          {approvedSelected.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                setPendingBulk({
+                  action: "mark_paid",
+                  count: approvedSelected.length,
+                })
+              }
+              disabled={bulkAction.isPending}
+            >
+              {bulkAction.isPending ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <Wallet className="h-4 w-4 mr-2" style={{ color: "var(--w11-accent)" }} />
+              )}
+              Mark selected paid ({approvedSelected.length})
+            </Button>
+          )}
+        </FilterCommandBar>
 
-      <Card>
-        <CardContent className="pt-6">
+        <Dialog
+          open={!!pendingBulk}
+          onOpenChange={(open) => !open && setPendingBulk(null)}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {pendingBulk?.action === "approve"
+                  ? "Approve payroll records"
+                  : "Mark payroll records as paid"}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+              {pendingBulk?.action === "approve"
+                ? `You are about to approve ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month}. Approved records unlock payment.`
+                : `You are about to mark ${pendingBulk?.count} payroll record${pendingBulk?.count === 1 ? "" : "s"} for ${month} as paid. Only approved records are affected; this records the payment date.`}
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingBulk(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!pendingBulk) return;
+                  bulkAction.mutate({
+                    action: pendingBulk.action,
+                    ids:
+                      pendingBulk.action === "approve"
+                        ? draftSelected.map((p) => p.id)
+                        : approvedSelected.map((p) => p.id),
+                  });
+                  setPendingBulk(null);
+                }}
+                disabled={bulkAction.isPending}
+              >
+                {bulkAction.isPending ? (
+                  <Spinner size="sm" className="mr-2" />
+                ) : null}
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <DataPanel bodyClassName="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -402,7 +382,8 @@ function PayrollContent() {
                 <TableRow>
                   <TableCell
                     colSpan={8}
-                    className="text-center py-8 text-muted-foreground"
+                    className="text-center py-8"
+                    style={{ color: "var(--w11-text-secondary)" }}
                   >
                     No payroll data. Click Generate Payroll.
                   </TableCell>
@@ -425,27 +406,17 @@ function PayrollContent() {
                     <TableCell>
                       Rs. {(p.basic_salary || 0).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-green-700">
+                    <TableCell style={{ color: "#107c10" }}>
                       Rs. {(p.allowances || 0).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-red-600">
+                    <TableCell style={{ color: "#c42b1c" }}>
                       Rs. {(p.deductions || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="font-bold text-base">
                       Rs. {(p.net_salary || 0).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          p.status === "paid"
-                            ? "default"
-                            : p.status === "approved"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {p.status || "draft"}
-                      </Badge>
+                      <StatusChip status={p.status || "draft"} className="capitalize" />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -507,7 +478,7 @@ function PayrollContent() {
                               }
                             }}
                           >
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-4 w-4" style={{ color: "#107c10" }} />
                           </Button>
                         )}
                         {/* Mark Paid */}
@@ -530,7 +501,7 @@ function PayrollContent() {
                               }
                             }}
                           >
-                            <Wallet className="h-4 w-4 text-blue-600" />
+                            <Wallet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
                           </Button>
                         )}
                       </div>
@@ -540,16 +511,16 @@ function PayrollContent() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {editing ? (
-        <EditComponentsDialog
-          payroll={editing}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
-    </div>
+        {editing ? (
+          <EditComponentsDialog
+            payroll={editing}
+            onClose={() => setEditing(null)}
+          />
+        ) : null}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -637,7 +608,7 @@ function EditComponentsDialog({
             size="icon"
             onClick={() => setRows(rows.filter((_, i) => i !== index))}
           >
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ))}
@@ -678,20 +649,23 @@ function EditComponentsDialog({
             <Label>Deductions</Label>
             {renderRows(deductionRows, setDeductionRows)}
           </div>
-          <div className="rounded-lg bg-muted/40 px-4 py-3 text-sm space-y-1">
+          <div
+            className="rounded-lg px-4 py-3 text-sm space-y-1"
+            style={{ background: "var(--w11-control-hover)" }}
+          >
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Gross Salary</span>
+              <span style={{ color: "var(--w11-text-secondary)" }}>Gross Salary</span>
               <span className="font-medium">Rs. {gross.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Deductions</span>
-              <span className="font-medium text-red-600">
+              <span style={{ color: "var(--w11-text-secondary)" }}>Total Deductions</span>
+              <span className="font-medium" style={{ color: "#c42b1c" }}>
                 Rs. {deductionsTotal.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium">Net Pay</span>
-              <span className="font-bold text-green-700">
+              <span className="font-bold" style={{ color: "#107c10" }}>
                 Rs. {net.toLocaleString()}
               </span>
             </div>

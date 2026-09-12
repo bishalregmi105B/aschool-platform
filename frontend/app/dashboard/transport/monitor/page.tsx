@@ -8,14 +8,20 @@ import { useI18n } from "@/lib/i18n";
 import { useServerTime } from "@/lib/use-server-time";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { DetailSheet } from "@/components/ui/sheet";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 import {
   Bus, CheckCircle2, Circle, CircleDot, Flag, Navigation, Play,
   RefreshCw, Square, UserCheck, UserX,
@@ -63,12 +69,12 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-function statusVariant(status: Instance["status"]) {
+function statusTone(status: Instance["status"]) {
   switch (status) {
-    case "running": return "success" as const;
-    case "completed": return "default" as const;
-    case "cancelled": return "destructive" as const;
-    default: return "secondary" as const;
+    case "running": return "active";
+    case "completed": return "completed";
+    case "cancelled": return "cancelled";
+    default: return "subtle";
   }
 }
 
@@ -96,11 +102,11 @@ function timeAgo(iso: string | null): string {
 }
 
 /** ride_status: 0 waiting | 1 onboard | 2 missed | 3 dropped */
-const RIDE_STATUS: Record<number, { label: string; variant: "secondary" | "success" | "destructive" | "default" }> = {
-  0: { label: "Waiting", variant: "secondary" },
-  1: { label: "Onboard", variant: "success" },
-  2: { label: "Missed", variant: "destructive" },
-  3: { label: "Dropped", variant: "default" },
+const RIDE_STATUS: Record<number, { label: string; tone: "subtle" | "active" | "error" | "success" }> = {
+  0: { label: "Waiting", tone: "subtle" },
+  1: { label: "Onboard", tone: "active" },
+  2: { label: "Missed", tone: "error" },
+  3: { label: "Dropped", tone: "success" },
 };
 
 function errMessage(err: unknown, fallback?: string): string | null {
@@ -143,83 +149,83 @@ function MonitorContent() {
   const errorMessage = errMessage(error);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Navigation className="h-6 w-6" /> {t("Run Monitor", "रन मनिटर")}
-          </h1>
-          <p className="text-muted-foreground">
-            {runningCount > 0
-              ? t(`${runningCount} trip${runningCount > 1 ? "s" : ""} running now`, `${runningCount} ट्रिप चालु छ`)
-              : t("Today's bus trips and live progress", "आजका बस ट्रिपहरू र प्रगति")}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <BSDateInput
-            emit="ad"
-            value={date}
-            onChange={setDate}
-            className="w-[180px]"
-            placeholder={t("Pick date", "मिति छान्नुहोस्")}
-          />
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} title="Refresh">
-            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {STATUS_FILTERS.map((f) => (
-          <Button
-            key={f.value}
-            size="sm"
-            variant={status === f.value ? "default" : "outline"}
-            onClick={() => setStatus(f.value)}
-          >
-            {f.label}
-          </Button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Card key={i}><CardContent className="space-y-3 pt-6">
-              <Skeleton className="h-5 w-2/3" />
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-2 w-full" />
-              <Skeleton className="h-3 w-1/2" />
-            </CardContent></Card>
-          ))}
-        </div>
-      ) : errorMessage ? (
-        <ErrorState body={errorMessage} onRetry={() => refetch()} />
-      ) : instances.length === 0 ? (
-        <Card><CardContent className="pt-6">
-          <EmptyState
-            icon={Bus}
-            title={t("No runs for this day", "यो दिनका रनहरू छैनन्")}
-            body={t(
-              "Trips scheduled for this weekday appear here. Check the date or trip schedules.",
-              "यो बारका तालिकाबद्ध ट्रिपहरू यहाँ देखिन्छन्। मिति वा ट्रिप तालिका जाँच्नुहोस्।"
-            )}
-          />
-        </CardContent></Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {instances.map((inst) => (
-            <InstanceCard key={inst.id} inst={inst} onOpen={() => setOpenId(inst.id)} />
-          ))}
-        </div>
-      )}
-
-      <InstanceDrawer
-        open={openId !== null}
-        instanceId={openId}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Navigation className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={t("Run Monitor", "रन मनिटर")}
+        subtitle={
+          runningCount > 0
+            ? t(`${runningCount} trip${runningCount > 1 ? "s" : ""} running now`, `${runningCount} ट्रिप चालु छ`)
+            : t("Today's bus trips and live progress", "आजका बस ट्रिपहरू र प्रगति")
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <BSDateInput
+              emit="ad"
+              value={date}
+              onChange={setDate}
+              className="w-[180px]"
+              placeholder={t("Pick date", "मिति छान्नुहोस्")}
+            />
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} title="Refresh">
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            </Button>
+          </div>
+        }
       />
-    </div>
+      <AOSPageBody>
+        <FilterCommandBar>
+          {STATUS_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              size="sm"
+              variant={status === f.value ? "default" : "outline"}
+              onClick={() => setStatus(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </FilterCommandBar>
+
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="win11-card space-y-3">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : errorMessage ? (
+          <ErrorState body={errorMessage} onRetry={() => refetch()} />
+        ) : instances.length === 0 ? (
+          <DataPanel>
+            <EmptyState
+              icon={Bus}
+              title={t("No runs for this day", "यो दिनका रनहरू छैनन्")}
+              body={t(
+                "Trips scheduled for this weekday appear here. Check the date or trip schedules.",
+                "यो बारका तालिकाबद्ध ट्रिपहरू यहाँ देखिन्छन्। मिति वा ट्रिप तालिका जाँच्नुहोस्।"
+              )}
+            />
+          </DataPanel>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {instances.map((inst) => (
+              <InstanceCard key={inst.id} inst={inst} onOpen={() => setOpenId(inst.id)} />
+            ))}
+          </div>
+        )}
+
+        <InstanceDrawer
+          open={openId !== null}
+          instanceId={openId}
+          onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -231,45 +237,46 @@ function InstanceCard({ inst, onOpen }: { inst: Instance; onOpen: () => void }) 
   const fix = timeAgo(inst.last_fix_at);
 
   return (
-    <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
+    <div
+      className="win11-card cursor-pointer transition-shadow hover:shadow-md"
       onClick={onOpen}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}
     >
-      <CardContent className="space-y-3 pt-6">
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}
+            >
               <Bus className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{inst.bus || t("Unassigned bus", "बस छैन")}</p>
-              <p className="text-xs capitalize text-muted-foreground">
+              <p className="truncate text-sm font-semibold" style={{ color: "var(--w11-text-primary)" }}>{inst.bus || t("Unassigned bus", "बस छैन")}</p>
+              <p className="text-xs capitalize" style={{ color: "var(--w11-text-secondary)" }}>
                 {inst.direction === "morning" ? t("Morning", "बिहान") : t("Afternoon", "दिउँसो")}
               </p>
             </div>
           </div>
-          <Badge variant={statusVariant(inst.status)} className="capitalize shrink-0">
-            {inst.status}
-          </Badge>
+          <StatusChip status={statusTone(inst.status)} label={inst.status} className="capitalize shrink-0" />
         </div>
 
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs" style={{ color: "var(--w11-text-secondary)" }}>
             <span>{t("Stops", "स्टपहरू")}</span>
-            <span className="font-medium tabular-nums text-foreground">{visited}/{stops.length}</span>
+            <span className="font-medium tabular-nums" style={{ color: "var(--w11-text-primary)" }}>{visited}/{stops.length}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--w11-control-hover)" }}>
             <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${pct}%` }}
+              className="h-full rounded-full transition-all"
+              style={{ width: `${pct}%`, background: "var(--w11-accent)" }}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
           <span className="inline-flex items-center gap-1">
             <CircleDot className="h-3 w-3" />
             {fix ? t(`GPS ${fix}`, `GPS ${fix}`) : t("No GPS fix", "GPS छैन")}
@@ -278,8 +285,8 @@ function InstanceCard({ inst, onOpen }: { inst: Instance; onOpen: () => void }) 
             <span className="tabular-nums">{t("Started", "सुरु")} {hhmm(inst.started_at)}</span>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -390,7 +397,7 @@ function InstanceDrawer({
               </Button>
             ) : isRunning ? (
               <>
-                <span className="text-[12px] text-muted-foreground">
+                <span className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
                   {t(`${onboardCount} onboard`, `${onboardCount} बसमा`)}
                 </span>
                 <Button
@@ -403,9 +410,7 @@ function InstanceDrawer({
                 </Button>
               </>
             ) : (
-              <Badge variant={statusVariant(inst.status)} className="capitalize">
-                {inst.status === "completed" ? t("Completed", "समाप्त") : t("Cancelled", "रद्द")}
-              </Badge>
+              <StatusChip status={statusTone(inst.status)} label={inst.status === "completed" ? t("Completed", "समाप्त") : t("Cancelled", "रद्द")} className="capitalize" />
             )}
           </div>
         ) : null
@@ -418,12 +423,12 @@ function InstanceDrawer({
       ) : !inst ? null : (
         <div className="space-y-6">
           <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
               {t("Stop timeline", "स्टप टाइमलाइन")}
               <span className="ml-2 font-normal normal-case">{visitedCount}/{stops.length}</span>
             </h3>
             {stops.length === 0 ? (
-              <p className="text-[12px] text-muted-foreground">{t("No stops on this route.", "यो बाटोमा स्टपहरू छैनन्।")}</p>
+              <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>{t("No stops on this route.", "यो बाटोमा स्टपहरू छैनन्।")}</p>
             ) : (
               <ol className="relative space-y-0">
                 {stops.map((s, idx) => {
@@ -433,31 +438,33 @@ function InstanceDrawer({
                     <li key={s.stop_id} className="relative flex gap-3 pb-4">
                       {!last && (
                         <span
-                          className={cn(
-                            "absolute left-[7px] top-4 h-full w-0.5",
-                            done ? "bg-primary/40" : "bg-muted"
-                          )}
+                          className="absolute left-[7px] top-4 h-full w-0.5"
+                          style={{
+                            background: done
+                              ? "var(--w11-accent-light)"
+                              : "var(--w11-control-hover)",
+                          }}
                           aria-hidden
                         />
                       )}
                       <span className="relative z-10 mt-0.5 shrink-0">
                         {done ? (
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                          <CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
                         ) : (
-                          <Circle className="h-4 w-4 text-muted-foreground/40" />
+                          <Circle className="h-4 w-4" style={{ color: "var(--w11-text-disabled)" }} />
                         )}
                       </span>
                       <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className={cn("truncate text-[13px] font-medium", !done && "text-muted-foreground")}>
+                          <p className={cn("truncate text-[13px] font-medium")} style={{ color: done ? "var(--w11-text-primary)" : "var(--w11-text-secondary)" }}>
                             {s.stop_name || `#${s.seq}`}
                           </p>
-                          <p className="text-[11px] tabular-nums text-muted-foreground">
+                          <p className="text-[11px] tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>
                             {t("Planned", "योजना")} {hhmm(s.planned_ts)}
                             {done && (
                               <>
                                 {" · "}
-                                <span className="font-medium text-primary">
+                                <span className="font-medium" style={{ color: "var(--w11-accent)" }}>
                                   {t("Actual", "वास्तविक")} {hhmm(s.actual_ts)}
                                 </span>
                               </>
@@ -489,31 +496,31 @@ function InstanceDrawer({
           </section>
 
           <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
               {t("Passengers", "यात्रुहरू")}
               <span className="ml-2 font-normal normal-case">
                 {t(`${passengers.filter((p) => p.ride_status === 1).length} onboard`, `${passengers.filter((p) => p.ride_status === 1).length} बसमा`)}
               </span>
             </h3>
             {passengers.length === 0 ? (
-              <p className="text-[12px] text-muted-foreground">{t("No students allocated to this trip.", "यो ट्रिपमा विद्यार्थी छुट्याइएको छैन।")}</p>
+              <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>{t("No students allocated to this trip.", "यो ट्रिपमा विद्यार्थी छुट्याइएको छैन।")}</p>
             ) : (
-              <ul className="divide-y rounded-md border">
+              <ul className="divide-y divide-[var(--w11-border-subtle)] rounded-md border border-[var(--w11-border-subtle)]">
                 {passengers.map((p) => {
                   const rs = RIDE_STATUS[p.ride_status] ?? RIDE_STATUS[0];
                   return (
                     <li key={p.student_id} className="flex items-center justify-between gap-2 px-3 py-2">
                       <div className="min-w-0">
-                        <p className="truncate text-[13px] font-medium">{p.student_name || p.student_id}</p>
+                        <p className="truncate text-[13px] font-medium" style={{ color: "var(--w11-text-primary)" }}>{p.student_name || p.student_id}</p>
                         {(p.boarded_at || p.dropped_at) && (
-                          <p className="text-[11px] tabular-nums text-muted-foreground">
+                          <p className="text-[11px] tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>
                             {p.boarded_at && `${t("On", "चढेको")} ${hhmm(p.boarded_at)}`}
                             {p.dropped_at && ` · ${t("Off", "ओर्लेको")} ${hhmm(p.dropped_at)}`}
                           </p>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <Badge variant={rs.variant} className="text-[10px]">{rs.label}</Badge>
+                        <span className={`win11-chip ${rs.tone} text-[10px]`}>{rs.label}</span>
                         {isRunning && p.ride_status === 0 && (
                           <>
                             <Button
@@ -524,7 +531,7 @@ function InstanceDrawer({
                               disabled={pickup.isPending}
                               onClick={() => pickup.mutate({ studentId: p.student_id, missed: false })}
                             >
-                              <UserCheck className="h-4 w-4 text-primary" />
+                              <UserCheck className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
                             </Button>
                             <Button
                               size="icon"
@@ -534,7 +541,7 @@ function InstanceDrawer({
                               disabled={pickup.isPending}
                               onClick={() => pickup.mutate({ studentId: p.student_id, missed: true })}
                             >
-                              <UserX className="h-4 w-4 text-destructive" />
+                              <UserX className="h-4 w-4" style={{ color: "#c42b1c" }} />
                             </Button>
                           </>
                         )}

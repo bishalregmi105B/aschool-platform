@@ -11,7 +11,6 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +27,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ArrowLeft, Copy, Gauge, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FormSection,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface LevelerResult {
   text: string;
@@ -75,89 +81,79 @@ function TextLevelerContent() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/ai-tools">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Text Leveler</h1>
-          <p className="text-muted-foreground">
-            Same content, different reading level — for mixed-ability classes
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Source text</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Paste the passage</Label>
-              <Textarea
-                rows={10}
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder="Paste any passage, instructions or letter here…"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Gauge className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Text Leveler"
+        subtitle="Same content, different reading level — for mixed-ability classes"
+        actions={
+          <Link href="/dashboard/ai-tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          </Link>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <FormSection title="Source text">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Direction</Label>
-                <Select value={direction} onValueChange={setDirection}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easier">Easier (−3 levels)</SelectItem>
-                    <SelectItem value="same">Same level, clearer</SelectItem>
-                    <SelectItem value="harder">Harder (+3 levels)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Target grade</Label>
-                <Input
-                  value={grade}
-                  onChange={(e) => setGrade(e.target.value)}
-                  placeholder="e.g. 5"
+                <Label>Paste the passage</Label>
+                <Textarea
+                  rows={10}
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="Paste any passage, instructions or letter here…"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Direction</Label>
+                  <Select value={direction} onValueChange={setDirection}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easier">Easier (−3 levels)</SelectItem>
+                      <SelectItem value="same">Same level, clearer</SelectItem>
+                      <SelectItem value="harder">Harder (+3 levels)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Target grade</Label>
+                  <Input
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    placeholder="e.g. 5"
+                  />
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => generate.mutate()}
+                disabled={!source.trim() || generate.isPending}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {generate.isPending ? "Rewriting…" : "Rewrite"}
+              </Button>
             </div>
-            <Button
-              className="w-full"
-              onClick={() => generate.mutate()}
-              disabled={!source.trim() || generate.isPending}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {generate.isPending ? "Rewriting…" : "Rewrite"}
-            </Button>
-          </CardContent>
-        </Card>
+          </FormSection>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Rewritten</CardTitle>
-              {result && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(result.text);
-                    toast.success("Copied!");
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-1" /> Copy
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+          <DataPanel
+            title="Rewritten"
+            actions={result ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(result.text);
+                  toast.success("Copied!");
+                }}
+              >
+                <Copy className="h-4 w-4 mr-1" /> Copy
+              </Button>
+            ) : undefined}
+          >
             {generate.isPending ? (
               <PageLoader />
             ) : error ? (
@@ -167,35 +163,33 @@ function TextLevelerContent() {
                 action={{ label: "Try again", onClick: () => generate.mutate() }}
               />
             ) : !result ? (
-              <div className="text-center py-16 text-muted-foreground">
+              <div className="text-center py-16 text-[color:var(--w11-text-secondary)]">
                 <Gauge className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Paste a passage and pick a direction.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-lg bg-muted p-4 text-sm whitespace-pre-wrap">
+                <div className="rounded-lg p-4 text-sm whitespace-pre-wrap" style={{ background: "var(--w11-control-bg)" }}>
                   {result.text}
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-2 text-xs">
                   {result.grade_band && (
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                      {result.grade_band}
-                    </span>
+                    <span className="win11-chip accent">{result.grade_band}</span>
                   )}
                   {result.stats && (
                     <>
-                      <span className="rounded-full bg-muted px-2.5 py-1">
+                      <span className="win11-chip">
                         {result.stats.words} words
                       </span>
-                      <span className="rounded-full bg-muted px-2.5 py-1">
+                      <span className="win11-chip">
                         {result.stats.avg_sentence_words} words/sentence avg
                       </span>
                     </>
                   )}
                 </div>
                 {(result.changes_made?.length ?? 0) > 0 && (
-                  <div className="rounded-md border p-3">
-                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">
+                  <div className="rounded-md border border-[color:var(--w11-border-subtle)] p-3">
+                    <p className="text-xs font-semibold mb-1.5 text-[color:var(--w11-text-secondary)]">
                       WHAT CHANGED
                     </p>
                     <ul className="space-y-1 text-xs">
@@ -211,9 +205,9 @@ function TextLevelerContent() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

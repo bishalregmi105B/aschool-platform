@@ -5,13 +5,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { CreditCard as IdCard, Printer, Download, Archive } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 interface AcademicClass { id: string; name: string; }
 interface TemplateItem  { id: string; name: string; category: string; }
@@ -275,35 +281,33 @@ export default function StudentIdCardsPage() {
   const errorCount   = cards.filter((c) => c.status === "error").length;
   const isGenerating = generateMutation.isPending || renderPhase === "rendering";
 
-  if (isClassesLoading || isTemplatesLoading) return <PageLoader />;
+  if (isClassesLoading || isTemplatesLoading) return <AOSModuleLoadingState label="Loading ID card options…" />;
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IdCard className="h-6 w-6" /> Bulk Student ID Cards
-          </h1>
-          <p className="text-muted-foreground">Generate high-quality PNG ID cards for an entire class</p>
-        </div>
-        {renderPhase === "done" && doneCount > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={printAll}>
-              <Printer className="h-4 w-4 mr-2" /> Print All
-            </Button>
-            <Button onClick={downloadZip}>
-              <Archive className="h-4 w-4 mr-2" /> Download ZIP ({doneCount})
-            </Button>
-          </div>
-        )}
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<IdCard className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Bulk Student ID Cards"
+        subtitle="Generate high-quality PNG ID cards for an entire class"
+        actions={
+          renderPhase === "done" && doneCount > 0 ? (
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" onClick={printAll}>
+                <Printer className="h-4 w-4 mr-2" /> Print All
+              </Button>
+              <Button onClick={downloadZip}>
+                <Archive className="h-4 w-4 mr-2" /> Download ZIP ({doneCount})
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
+      <AOSPageBody>
+        <div className="space-y-4">
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Batch Generation Options</CardTitle>
-          <CardDescription>Select a class to generate ID cards for all active students</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <DataPanel title="Batch Generation Options">
+          <div className="space-y-6">
+          <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Select a class to generate ID cards for all active students</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
             <div className="space-y-2">
               <Label>Select Class</Label>
@@ -339,7 +343,7 @@ export default function StudentIdCardsPage() {
 
           {renderPhase === "rendering" && (
             <div className="space-y-1 max-w-md">
-              <div className="flex justify-between text-sm text-muted-foreground">
+              <div className="flex justify-between text-sm" style={{ color: "var(--w11-text-secondary)" }}>
                 <span>Rendering PNG {doneCount + errorCount} / {cards.length}</span>
                 <span>{renderProgress}%</span>
               </div>
@@ -352,22 +356,22 @@ export default function StudentIdCardsPage() {
               {errorCount > 0 && <Badge variant="destructive">{errorCount} failed</Badge>}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        </DataPanel>
 
-      {cards.length > 0 && (
+        {cards.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold mb-4">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--w11-text-primary)" }}>
             Generated ID Cards
             {renderPhase === "rendering" && (
-              <span className="text-muted-foreground font-normal text-sm ml-2">rendering...</span>
+              <span className="font-normal text-sm ml-2" style={{ color: "var(--w11-text-secondary)" }}>rendering...</span>
             )}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {cards.map((card) => (
               <div
                 key={card.index}
-                className="group relative rounded-lg overflow-hidden border bg-white shadow-sm hover:shadow-md transition-shadow"
+                className="group relative rounded-lg overflow-hidden border border-[var(--w11-border-default)] shadow-sm hover:shadow-md transition-shadow" style={{ background: "#ffffff" }}
               >
                 {card.status === "done" ? (
                   <>
@@ -382,15 +386,15 @@ export default function StudentIdCardsPage() {
                         <Download className="h-3 w-3 mr-1" /> PNG
                       </Button>
                     </div>
-                    <div className="px-2 py-1.5 bg-white border-t">
-                      <p className="text-xs font-medium truncate">{card.name}</p>
-                      <p className="text-xs text-muted-foreground">Roll: {card.roll}</p>
+                    <div className="px-2 py-1.5 border-t border-[var(--w11-border-subtle)]" style={{ background: "var(--w11-card-bg)" }}>
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--w11-text-primary)" }}>{card.name}</p>
+                      <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Roll: {card.roll}</p>
                     </div>
                   </>
                 ) : card.status === "error" ? (
                   <div
-                    className="flex flex-col items-center justify-center p-4 text-destructive"
-                    style={{ aspectRatio: "300/189" }}
+                    className="flex flex-col items-center justify-center p-4"
+                    style={{ aspectRatio: "300/189", color: "var(--w11-text-secondary)" }}
                   >
                     <span className="text-xs text-center">Render failed</span>
                   </div>
@@ -400,7 +404,7 @@ export default function StudentIdCardsPage() {
                     style={{ aspectRatio: "300/189" }}
                   >
                     <Spinner size="sm" />
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                       {card.status === "rendering" ? "Rendering..." : "Queued"}
                     </span>
                   </div>
@@ -410,7 +414,9 @@ export default function StudentIdCardsPage() {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

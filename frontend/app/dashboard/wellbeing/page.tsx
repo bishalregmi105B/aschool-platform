@@ -6,16 +6,20 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { Smile, Frown, Meh, Brain, TrendingUp, FileHeart } from "lucide-react";
+import { Smile, Frown, Meh, Brain, TrendingUp, FileHeart, HeartPulse } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
 
 interface MoodEntry {
   id: string;
@@ -33,19 +37,19 @@ interface MoodSummary {
 }
 
 const moodIcons: Record<string, React.ReactNode> = {
-  happy: <Smile className="h-5 w-5 text-green-500" />,
-  neutral: <Meh className="h-5 w-5 text-yellow-500" />,
-  sad: <Frown className="h-5 w-5 text-blue-500" />,
-  anxious: <Brain className="h-5 w-5 text-purple-500" />,
-  angry: <Frown className="h-5 w-5 text-red-500" />,
+  happy: <Smile className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />,
+  neutral: <Meh className="h-5 w-5" style={{ color: "#9d5d00" }} />,
+  sad: <Frown className="h-5 w-5 text-[color:var(--w11-text-secondary)]" />,
+  anxious: <Brain className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />,
+  angry: <Frown className="h-5 w-5" style={{ color: "#c42b1c" }} />,
 };
 
-const moodColors: Record<string, string> = {
-  happy: "bg-green-100 text-green-800",
-  neutral: "bg-yellow-100 text-yellow-800",
-  sad: "bg-blue-100 text-blue-800",
-  anxious: "bg-purple-100 text-purple-800",
-  angry: "bg-red-100 text-red-800",
+const moodChipTone: Record<string, string> = {
+  happy: "success",
+  neutral: "warning",
+  sad: "",
+  anxious: "accent",
+  angry: "error",
 };
 
 export default function WellbeingPage() {
@@ -99,10 +103,21 @@ function WellbeingContent() {
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<HeartPulse className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Student Wellbeing"
+          subtitle="Mood tracking, counselor notes, and wellbeing surveys"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -110,69 +125,61 @@ function WellbeingContent() {
   const distribution = summary?.mood_distribution || {};
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Student Wellbeing</h1>
-        <p className="text-muted-foreground">Mood tracking, counselor notes, and wellbeing surveys</p>
-      </div>
-
-      <div className="flex gap-2">
-        {(["overview", "check-in", "entries"] as const).map((t: any) => (
-          <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
-            {t === "overview" && <TrendingUp className="h-4 w-4 mr-2" />}
-            {t === "check-in" && <FileHeart className="h-4 w-4 mr-2" />}
-            {t.replace("-", " ")}
-          </Button>
-        ))}
-      </div>
-
-      {tab === "overview" && (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-5">
-            {Object.entries(moodIcons).map(([mood, icon]) => (
-              <Card key={mood}>
-                <CardContent className="flex items-center gap-3 py-4">
-                  {icon}
-                  <div>
-                    <p className="text-2xl font-bold">{distribution[mood] || 0}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{mood}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <Card>
-            <CardHeader><CardTitle>7-Day Summary</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Total check-ins: <strong>{summary?.total_entries || 0}</strong></p>
-              {summary?.total_entries === 0 && (
-                <p className="mt-2 text-sm text-muted-foreground">No mood entries yet. Encourage students to do daily check-ins.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {tab === "check-in" && <MoodCheckIn onSubmit={(data) => submitMoodMut.mutate(data)} loading={submitMoodMut.isPending} />}      {tab === "entries" && (
-        <div className="space-y-3">
-          {entries?.map((entry: any) => (
-            <Card key={entry.id}>
-              <CardContent className="flex items-center gap-4 py-4">
-                {moodIcons[entry.mood] || <Meh className="h-5 w-5" />}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge className={moodColors[entry.mood] || ""} variant="outline">{entry.mood}</Badge>
-                    <span className="text-xs text-muted-foreground">Energy: {entry.energy_level}/5</span>
-                    <span className="text-xs text-muted-foreground">{displayBS(entry.created_at)}</span>
-                  </div>
-                  {entry.notes && <p className="text-sm mt-1">{entry.notes}</p>}
-                </div>
-              </CardContent>
-            </Card>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<HeartPulse className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Student Wellbeing"
+        subtitle="Mood tracking, counselor notes, and wellbeing surveys"
+      />
+      <AOSPageBody>
+        <div className="flex gap-2 mb-4">
+          {(["overview", "check-in", "entries"] as const).map((t: any) => (
+            <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
+              {t === "overview" && <TrendingUp className="h-4 w-4 mr-2" />}
+              {t === "check-in" && <FileHeart className="h-4 w-4 mr-2" />}
+              {t.replace("-", " ")}
+            </Button>
           ))}
         </div>
-      )}
-    </div>
+
+        {tab === "overview" && (
+          <div className="space-y-4">
+            <StatGrid min={140}>
+              {Object.entries(moodIcons).map(([mood, icon]) => (
+                <KpiCard key={mood} label={mood} value={distribution[mood] || 0} icon={icon} />
+              ))}
+            </StatGrid>
+            <DataPanel title="7-Day Summary">
+              <p className="text-[color:var(--w11-text-secondary)]">Total check-ins: <strong>{summary?.total_entries || 0}</strong></p>
+              {summary?.total_entries === 0 && (
+                <p className="mt-2 text-sm text-[color:var(--w11-text-secondary)]">No mood entries yet. Encourage students to do daily check-ins.</p>
+              )}
+            </DataPanel>
+          </div>
+        )}
+
+        {tab === "check-in" && <MoodCheckIn onSubmit={(data) => submitMoodMut.mutate(data)} loading={submitMoodMut.isPending} />}
+        {tab === "entries" && (
+          <div className="space-y-3">
+            {entries?.map((entry: any) => (
+              <div key={entry.id} className="win11-card" style={{ marginBottom: 0 }}>
+                <div className="flex items-center gap-4 py-2">
+                  {moodIcons[entry.mood] || <Meh className="h-5 w-5" />}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`win11-chip ${moodChipTone[entry.mood] || ""}`}>{entry.mood}</span>
+                      <span className="text-xs text-[color:var(--w11-text-secondary)]">Energy: {entry.energy_level}/5</span>
+                      <span className="text-xs text-[color:var(--w11-text-secondary)]">{displayBS(entry.created_at)}</span>
+                    </div>
+                    {entry.notes && <p className="text-sm mt-1">{entry.notes}</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -194,20 +201,23 @@ function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; e
   const [studentId, setStudentId] = useState("");
 
   return (
-    <Card>
-      <CardHeader><CardTitle>How are you feeling today?</CardTitle></CardHeader>
-      <CardContent className="space-y-6">
+    <FormSection title="How are you feeling today?">
+      <div className="space-y-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">Log on behalf of</label>
           <AdvancedSelect value={studentId} onChange={(v) => setStudentId(v)} clearable searchable placeholder="Select student…"
             options={(students || []).map((s) => ({ value: s.id, label: `${s.first_name} ${s.last_name}` }))} />
-          <p className="text-xs text-muted-foreground">Wellbeing check-ins are recorded per student.</p>
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">Wellbeing check-ins are recorded per student.</p>
         </div>
 
         <div className="flex gap-3 justify-center">
           {(["happy", "neutral", "sad", "anxious", "angry"] as const).map((m: any) => (
             <button key={m} onClick={() => setMood(m)}
-              className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${mood === m ? "border-primary bg-primary/5" : "border-transparent hover:border-muted"}`}>
+              className="flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors"
+              style={{
+                borderColor: mood === m ? "var(--w11-accent)" : "transparent",
+                background: mood === m ? "var(--w11-accent-light)" : undefined,
+              }}>
               {moodIcons[m]}
               <span className="text-xs capitalize">{m}</span>
             </button>
@@ -224,7 +234,7 @@ function MoodCheckIn({ onSubmit, loading }: { onSubmit: (data: { mood: string; e
         <Button onClick={() => onSubmit({ mood, energy_level: energy, notes, student_id: studentId || undefined })} disabled={!mood || !studentId || loading} className="w-full">
           {loading ? "Submitting..." : "Submit Check-in"}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </FormSection>
   );
 }

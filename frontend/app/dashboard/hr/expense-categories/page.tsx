@@ -7,13 +7,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Plus, Tags, Search, Pencil, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Plus, Tags, Pencil, Trash2 } from "lucide-react";
 
 interface Category {
   id: string;
@@ -66,7 +72,7 @@ export default function ExpenseCategoriesPage() {
 
   const CATEGORY_COLUMNS: Column<Category>[] = [
     { key: "name", label: "Category Name", sortable: true, value: (c) => c.name ?? "", render: (c) => <span className="font-medium">{c.name}</span> },
-    { key: "description", label: "Description", value: (c) => c.description ?? "", render: (c) => <span className="text-muted-foreground">{c.description || "—"}</span> },
+    { key: "description", label: "Description", value: (c) => c.description ?? "", render: (c) => <span style={{ color: "var(--w11-text-secondary)" }}>{c.description || "—"}</span> },
     {
       key: "actions",
       label: "Actions",
@@ -80,14 +86,14 @@ export default function ExpenseCategoriesPage() {
             e.stopPropagation();
             if(confirm("Are you sure?")) deleteMutation.mutate(c.id);
           }}>
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading categories…" />;
 
   const categories = (data || []).filter((c: Category) =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,31 +101,19 @@ export default function ExpenseCategoriesPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Tags className="h-6 w-6" /> Expense Categories
-          </h1>
-          <p className="text-muted-foreground">Manage classifications for school expenses</p>
-        </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Add Category
-        </Button>
-      </div>
-
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search categories..."
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Tags className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Expense Categories"
+        subtitle={`${categories.length} ${categories.length === 1 ? "category" : "categories"} for school expenses`}
+        actions={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Category
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable<Category>
             columns={CATEGORY_COLUMNS}
             rows={categories}
@@ -131,48 +125,48 @@ export default function ExpenseCategoriesPage() {
             exportFileName="expense-categories"
             empty={{ icon: Tags, title: "No categories found", body: "Add categories like Transport, Utilities, Maintenance.", action: { label: "Add Category", onClick: () => setShowAdd(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
-        if (!open) { setShowAdd(false); setEditItem(null); }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Category" : "Add Category"}</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const payload = {
-                name: fd.get("name"),
-                description: fd.get("description"),
-              };
-              if (editItem) updateMutation.mutate(payload);
-              else createMutation.mutate(payload);
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input name="name" required defaultValue={editItem?.name} />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input name="description" defaultValue={editItem?.description} />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : "Save"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
+          if (!open) { setShowAdd(false); setEditItem(null); }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editItem ? "Edit Category" : "Add Category"}</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const payload = {
+                  name: fd.get("name"),
+                  description: fd.get("description"),
+                };
+                if (editItem) updateMutation.mutate(payload);
+                else createMutation.mutate(payload);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input name="name" required defaultValue={editItem?.name} />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input name="description" defaultValue={editItem?.description} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

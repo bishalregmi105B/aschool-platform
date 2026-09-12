@@ -7,15 +7,21 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Plus, Route, Search, Pencil, Trash2, Map } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Plus, Route, Pencil, Trash2, Map } from "lucide-react";
 
 interface TransportRoute {
   id: string;
@@ -70,7 +76,7 @@ export default function RoutesPage() {
   });
 
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) => 
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       api.put(`/transport/routes/${id}`, { is_active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transport-routes"] });
@@ -78,7 +84,7 @@ export default function RoutesPage() {
     onError: () => toast.error("Failed to toggle status"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading routes…" />;
 
   const routesList = (data || []).filter((r: TransportRoute) =>
     r.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -94,10 +100,10 @@ export default function RoutesPage() {
       render: (r) => (
         <div>
           <div className="font-medium flex items-center gap-2">
-            <Map className="h-4 w-4 text-muted-foreground" />
+            <Map className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
             {r.name}
           </div>
-          {r.description && <div className="text-xs text-muted-foreground mt-1 max-w-md truncate">{r.description}</div>}
+          {r.description && <div className="text-xs mt-1 max-w-md truncate" style={{ color: "var(--w11-text-secondary)" }}>{r.description}</div>}
         </div>
       ),
     },
@@ -115,9 +121,7 @@ export default function RoutesPage() {
             onCheckedChange={(checked) => toggleStatusMutation.mutate({ id: r.id, is_active: checked })}
             disabled={toggleStatusMutation.isPending}
           />
-          <Badge variant={r.is_active ? "success" : "secondary"}>
-            {r.is_active ? "Active" : "Inactive"}
-          </Badge>
+          <StatusChip status={r.is_active ? "active" : "inactive"} />
         </div>
       ),
     },
@@ -134,7 +138,7 @@ export default function RoutesPage() {
             e.stopPropagation();
             if(confirm("Are you sure you want to delete this route?")) deleteMutation.mutate(r.id);
           }}>
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
@@ -142,21 +146,19 @@ export default function RoutesPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Route className="h-6 w-6" /> Transport Routes
-          </h1>
-          <p className="text-muted-foreground">Manage bus routes and paths</p>
-        </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Add Route
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Route className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Transport Routes"
+        subtitle={`${routesList.length} ${routesList.length === 1 ? "route" : "routes"} · ${routesList.filter((r) => r.is_active).length} active`}
+        actions={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Route
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable<TransportRoute>
             columns={ROUTE_COLUMNS}
             rows={routesList}
@@ -168,60 +170,60 @@ export default function RoutesPage() {
             exportFileName="transport-routes"
             empty={{ icon: Route, title: "No routes found", body: "Add bus routes to organize student transport.", action: { label: "Add Route", onClick: () => setShowAdd(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
-        if (!open) { setShowAdd(false); setEditItem(null); }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Route" : "Add Route"}</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const payload = {
-                name: fd.get("name"),
-                description: fd.get("description"),
-                distance_km: fd.get("distance_km") ? Number(fd.get("distance_km")) : undefined,
-                estimated_time_mins: fd.get("estimated_time_mins") ? Number(fd.get("estimated_time_mins")) : undefined,
-              };
-              if (editItem) updateMutation.mutate(payload);
-              else createMutation.mutate(payload);
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Route Name</Label>
-              <Input name="name" required defaultValue={editItem?.name} placeholder="e.g. Ring Road Express" />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input name="description" defaultValue={editItem?.description} placeholder="Key stops or areas covered" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
+          if (!open) { setShowAdd(false); setEditItem(null); }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editItem ? "Edit Route" : "Add Route"}</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const payload = {
+                  name: fd.get("name"),
+                  description: fd.get("description"),
+                  distance_km: fd.get("distance_km") ? Number(fd.get("distance_km")) : undefined,
+                  estimated_time_mins: fd.get("estimated_time_mins") ? Number(fd.get("estimated_time_mins")) : undefined,
+                };
+                if (editItem) updateMutation.mutate(payload);
+                else createMutation.mutate(payload);
+              }}
+              className="space-y-4"
+            >
               <div className="space-y-2">
-                <Label>Distance (km)</Label>
-                <Input name="distance_km" type="number" step="0.1" defaultValue={editItem?.distance_km} />
+                <Label>Route Name</Label>
+                <Input name="name" required defaultValue={editItem?.name} placeholder="e.g. Ring Road Express" />
               </div>
               <div className="space-y-2">
-                <Label>Estimated Time (mins)</Label>
-                <Input name="estimated_time_mins" type="number" defaultValue={editItem?.estimated_time_mins} />
+                <Label>Description</Label>
+                <Input name="description" defaultValue={editItem?.description} placeholder="Key stops or areas covered" />
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : "Save"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Distance (km)</Label>
+                  <Input name="distance_km" type="number" step="0.1" defaultValue={editItem?.distance_km} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Estimated Time (mins)</Label>
+                  <Input name="estimated_time_mins" type="number" defaultValue={editItem?.estimated_time_mins} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

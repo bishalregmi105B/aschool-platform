@@ -5,9 +5,14 @@ import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Bus, Navigation } from "lucide-react";
 import type { BusPosition } from "@/components/transport/LiveBusMap";
 import { connectSocket, disconnectSocket, onGPSUpdate, joinSchoolRoom } from "@/lib/socket";
@@ -18,7 +23,10 @@ const LiveBusMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[26rem] flex items-center justify-center text-muted-foreground bg-muted rounded-lg">
+      <div
+        className="h-[26rem] flex items-center justify-center rounded-lg"
+        style={{ background: "var(--w11-control-hover)", color: "var(--w11-text-secondary)" }}
+      >
         Loading map…
       </div>
     ),
@@ -79,17 +87,22 @@ function MapContent() {
     refetchInterval: 15000,
   });
 
-  if (isLoading) return <PageLoader />;
-    if (isError) {
-      return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load bus locations. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
-      );
-    }
+  if (isLoading) return <AOSModuleLoadingState label="Loading live map…" />;
+  if (isError) {
+    return (
+      <AOSPage>
+        <AOSPageHeader title="Live Map" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load bus locations. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
+    );
+  }
 
   const logs: any[] = logsData || [];
   const buses: any[] = busesData || [];
@@ -127,62 +140,59 @@ function MapContent() {
   const positions = Object.values(merged);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Navigation className="h-6 w-6" /> Live Map
-        </h1>
-        <p className="text-muted-foreground">
-          Real-time bus locations — live via WebSocket, polling fallback every 15 seconds
-        </p>
-      </div>
-
-      <Card>
-        <CardContent className="p-0 overflow-hidden">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Navigation className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Live Map"
+        subtitle={`${positions.length} of ${buses.length} buses reporting — live via WebSocket, polling fallback every 15s`}
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0 overflow-hidden" className="mb-4">
           <LiveBusMap buses={positions} />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {buses.map((bus: any) => {
-          const pos = merged[bus.id];
-          return (
-            <Card key={bus.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Bus className="h-4 w-4" /> {labelByBus[bus.id] || "Bus"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                {pos ? (
-                  <>
-                    <p className="text-muted-foreground">
-                      {pos.lat.toFixed(5)}, {pos.lng.toFixed(5)}
-                    </p>
-                    {typeof pos.speed === "number" && (
-                      <p>Speed: {pos.speed.toFixed(0)} km/h</p>
-                    )}
-                    {pos.updatedAt && (
-                      <p className="text-muted-foreground text-xs">
-                        Last update: {new Date(pos.updatedAt).toLocaleString()}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {buses.map((bus: any) => {
+            const pos = merged[bus.id];
+            return (
+              <div key={bus.id} className="win11-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Bus className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                  <span className="text-base font-semibold" style={{ color: "var(--w11-text-primary)" }}>
+                    {labelByBus[bus.id] || "Bus"}
+                  </span>
+                </div>
+                <div className="text-sm space-y-1">
+                  {pos ? (
+                    <>
+                      <p style={{ color: "var(--w11-text-secondary)" }}>
+                        {pos.lat.toFixed(5)}, {pos.lng.toFixed(5)}
                       </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">No GPS data yet — waiting for device…</p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-        {buses.length === 0 && (
-          <Card className="md:col-span-2 lg:col-span-3">
-            <CardContent className="py-10 text-center text-muted-foreground">
-              No buses registered yet. Add buses under Transport → Buses to see them here.
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
+                      {typeof pos.speed === "number" && (
+                        <p style={{ color: "var(--w11-text-primary)" }}>Speed: {pos.speed.toFixed(0)} km/h</p>
+                      )}
+                      {pos.updatedAt && (
+                        <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                          Last update: {new Date(pos.updatedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p style={{ color: "var(--w11-text-secondary)" }}>No GPS data yet — waiting for device…</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {buses.length === 0 && (
+            <DataPanel className="md:col-span-2 lg:col-span-3">
+              <div className="py-10 text-center" style={{ color: "var(--w11-text-secondary)" }}>
+                No buses registered yet. Add buses under Transport → Buses to see them here.
+              </div>
+            </DataPanel>
+          )}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -4,12 +4,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 import {
   AlertTriangle, Bus, History,
 } from "lucide-react";
@@ -76,11 +81,11 @@ function DateRangePicker({
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1.5">
-        <Label className="text-[11px] text-muted-foreground">From</Label>
+        <Label className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>From</Label>
         <BSDateInput emit="ad" value={from} onChange={onFrom} className="w-[170px]" placeholder="From date" />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[11px] text-muted-foreground">To</Label>
+        <Label className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>To</Label>
         <BSDateInput emit="ad" value={to} onChange={onTo} className="w-[170px]" placeholder="To date" />
       </div>
     </div>
@@ -95,29 +100,29 @@ function ReportsContent() {
   const [histTo, setHistTo] = useState(localTodayAD());
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <History className="h-6 w-6" /> Transport Reports
-        </h1>
-        <p className="text-muted-foreground">Missed pickups and per-trip history over a date range</p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<History className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Transport Reports"
+        subtitle="Missed pickups and per-trip history over a date range"
+      />
+      <AOSPageBody>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "missed" | "history")}>
+          <TabsList>
+            <TabsTrigger value="missed">Missed Pickups</TabsTrigger>
+            <TabsTrigger value="history">Trip History</TabsTrigger>
+          </TabsList>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "missed" | "history")}>
-        <TabsList>
-          <TabsTrigger value="missed">Missed Pickups</TabsTrigger>
-          <TabsTrigger value="history">Trip History</TabsTrigger>
-        </TabsList>
+          <TabsContent value="missed">
+            <MissedPickupsReport from={missedFrom} to={missedTo} onFrom={setMissedFrom} onTo={setMissedTo} />
+          </TabsContent>
 
-        <TabsContent value="missed">
-          <MissedPickupsReport from={missedFrom} to={missedTo} onFrom={setMissedFrom} onTo={setMissedTo} />
-        </TabsContent>
-
-        <TabsContent value="history">
-          <TripHistoryReport from={histFrom} to={histTo} onFrom={setHistFrom} onTo={setHistTo} />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="history">
+            <TripHistoryReport from={histFrom} to={histTo} onFrom={setHistFrom} onTo={setHistTo} />
+          </TabsContent>
+        </Tabs>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -154,7 +159,7 @@ function MissedPickupsReport({
       render: (r) => (
         <div>
           <div className="font-medium">{r.date_bs || r.date}</div>
-          {r.date_bs && <div className="text-xs text-muted-foreground tabular-nums">{r.date} AD</div>}
+          {r.date_bs && <div className="text-xs tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>{r.date} AD</div>}
         </div>
       ),
     },
@@ -163,7 +168,7 @@ function MissedPickupsReport({
       label: "Student",
       sortable: true,
       value: (r) => r.student_name ?? "",
-      render: (r) => r.student_name || <span className="text-muted-foreground">Unknown student</span>,
+      render: (r) => r.student_name || <span style={{ color: "var(--w11-text-secondary)" }}>Unknown student</span>,
     },
     {
       key: "direction",
@@ -171,9 +176,9 @@ function MissedPickupsReport({
       sortable: true,
       value: (r) => r.direction ?? "",
       render: (r) => (
-        <Badge variant="outline" className="capitalize">
+        <span className="win11-chip subtle capitalize">
           {r.direction === "morning" ? "Morning" : "Afternoon"}
-        </Badge>
+        </span>
       ),
     },
     {
@@ -188,24 +193,22 @@ function MissedPickupsReport({
   return (
     <div className="space-y-4">
       <DateRangePicker from={from} to={to} onFrom={onFrom} onTo={onTo} />
-      <Card>
-        <CardContent className="p-0">
-          <DataTable<MissedPickup>
-            columns={COLUMNS}
-            rows={data || []}
-            rowKey={(r) => `${r.student_id}-${r.date}-${r.direction}`}
-            loading={isLoading || isFetching}
-            error={errorMessage}
-            onRetry={() => refetch()}
-            exportFileName="missed-pickups"
-            empty={{
-              icon: AlertTriangle,
-              title: "No missed pickups in this range",
-              body: "Every allocated student was picked up — nothing to report.",
-            }}
-          />
-        </CardContent>
-      </Card>
+      <DataPanel bodyClassName="p-0">
+        <DataTable<MissedPickup>
+          columns={COLUMNS}
+          rows={data || []}
+          rowKey={(r) => `${r.student_id}-${r.date}-${r.direction}`}
+          loading={isLoading || isFetching}
+          error={errorMessage}
+          onRetry={() => refetch()}
+          exportFileName="missed-pickups"
+          empty={{
+            icon: AlertTriangle,
+            title: "No missed pickups in this range",
+            body: "Every allocated student was picked up — nothing to report.",
+          }}
+        />
+      </DataPanel>
     </div>
   );
 }
@@ -234,8 +237,11 @@ function TripHistoryReport({
 
   const errorMessage = errMessage(error);
 
-  const statusVariant = (status: string) =>
-    status === "running" ? "success" : status === "cancelled" ? "destructive" : status === "completed" ? "default" : "secondary";
+  const statusTone = (status: string) =>
+    status === "running" ? "active"
+    : status === "cancelled" ? "cancelled"
+    : status === "completed" ? "completed"
+    : "subtle";
 
   const COLUMNS: Column<TripHistoryRow>[] = [
     {
@@ -246,7 +252,7 @@ function TripHistoryReport({
       render: (r) => (
         <div>
           <div className="font-medium">{r.date_bs || r.date}</div>
-          {r.date_bs && <div className="text-xs text-muted-foreground tabular-nums">{r.date} AD</div>}
+          {r.date_bs && <div className="text-xs tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>{r.date} AD</div>}
         </div>
       ),
     },
@@ -256,9 +262,9 @@ function TripHistoryReport({
       sortable: true,
       value: (r) => r.direction ?? "",
       render: (r) => (
-        <Badge variant="outline" className="capitalize">
+        <span className="win11-chip subtle capitalize">
           {r.direction === "morning" ? "Morning" : "Afternoon"}
-        </Badge>
+        </span>
       ),
     },
     {
@@ -274,9 +280,7 @@ function TripHistoryReport({
       sortable: true,
       value: (r) => r.status ?? "",
       render: (r) => (
-        <Badge variant={statusVariant(r.status)} className="capitalize">
-          {r.status}
-        </Badge>
+        <StatusChip status={statusTone(r.status)} label={r.status} className="capitalize" />
       ),
     },
     {
@@ -304,7 +308,7 @@ function TripHistoryReport({
             {Math.round((r.stops_on_time / r.stops_visited) * 100)}%
           </span>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span style={{ color: "var(--w11-text-secondary)" }}>—</span>
         ),
     },
     {
@@ -323,9 +327,9 @@ function TripHistoryReport({
       value: (r) => r.missed ?? 0,
       render: (r) =>
         r.missed > 0 ? (
-          <span className="font-medium tabular-nums text-destructive">{r.missed}</span>
+          <span className="font-medium tabular-nums" style={{ color: "#c42b1c" }}>{r.missed}</span>
         ) : (
-          <span className="tabular-nums text-muted-foreground">0</span>
+          <span className="tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>0</span>
         ),
     },
   ];
@@ -333,24 +337,22 @@ function TripHistoryReport({
   return (
     <div className="space-y-4">
       <DateRangePicker from={from} to={to} onFrom={onFrom} onTo={onTo} />
-      <Card>
-        <CardContent className="p-0">
-          <DataTable<TripHistoryRow>
-            columns={COLUMNS}
-            rows={data || []}
-            rowKey={(r) => r.instance_id}
-            loading={isLoading || isFetching}
-            error={errorMessage}
-            onRetry={() => refetch()}
-            exportFileName="trip-history"
-            empty={{
-              icon: Bus,
-              title: "No trips in this range",
-              body: "Trips appear here once runs are generated for these dates.",
-            }}
-          />
-        </CardContent>
-      </Card>
+      <DataPanel bodyClassName="p-0">
+        <DataTable<TripHistoryRow>
+          columns={COLUMNS}
+          rows={data || []}
+          rowKey={(r) => r.instance_id}
+          loading={isLoading || isFetching}
+          error={errorMessage}
+          onRetry={() => refetch()}
+          exportFileName="trip-history"
+          empty={{
+            icon: Bus,
+            title: "No trips in this range",
+            body: "Trips appear here once runs are generated for these dates.",
+          }}
+        />
+      </DataPanel>
     </div>
   );
 }

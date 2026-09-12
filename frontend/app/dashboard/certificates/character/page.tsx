@@ -6,11 +6,17 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { GraduationCap, Search, Printer, FileText } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 interface TemplateItem {
   id: string;
@@ -103,25 +109,19 @@ export default function CharacterCertificatePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <GraduationCap className="h-6 w-6" /> Character Certificates
-          </h1>
-          <p className="text-muted-foreground">Generate official character certificates for students</p>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle>Search Student</CardTitle>
-            <CardDescription>Find a student to generate their certificate</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Character Certificates"
+        subtitle="Generate official character certificates for students"
+      />
+      <AOSPageBody>
+        <div className="grid md:grid-cols-3 gap-4">
+        <DataPanel className="md:col-span-1 h-fit" title="Search Student">
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Find a student to generate their certificate</p>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--w11-text-tertiary)" }} />
               <Input
                 placeholder="Search by name or ID..."
                 className="pl-10"
@@ -132,7 +132,7 @@ export default function CharacterCertificatePage() {
             
             {studentsError ? (
               <div className="text-center py-6 space-y-3">
-                <p className="text-sm text-destructive">Failed to load students. Please try again.</p>
+                <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>Failed to load students. Please try again.</p>
                 <Button variant="outline" size="sm" onClick={() => refetchStudents()}>Retry</Button>
               </div>
             ) : (
@@ -144,33 +144,33 @@ export default function CharacterCertificatePage() {
                   <div
                     key={student.id}
                     onClick={() => setSelectedStudentId(student.id)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedStudentId === student.id ? "bg-primary/10 border-primary" : "hover:bg-muted"
-                    }`}
+                    className="p-3 border rounded-lg cursor-pointer transition-colors"
+                    style={
+                      selectedStudentId === student.id
+                        ? { background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)" }
+                        : { borderColor: "var(--w11-border-default)" }
+                    }
                   >
-                    <div className="font-medium">{student.label}</div>
-                    <div className="text-xs text-muted-foreground">{student.subtitle}</div>
+                    <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{student.label}</div>
+                    <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{student.subtitle}</div>
                   </div>
                 ))
               )}
               {students?.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground py-4">No students found</div>
+                <div className="text-center text-sm py-4" style={{ color: "var(--w11-text-secondary)" }}>No students found</div>
               )}
             </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataPanel>
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Certificate Preview Options</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <DataPanel className="md:col-span-2" title="Certificate Preview Options">
+          <div>
             {!selectedStudentId ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
-                <FileText className="h-12 w-12 mb-4 opacity-50" />
-                <p>Select a student from the list to preview and generate.</p>
-              </div>
+              <AOSEmptyState
+                icon={<FileText className="h-12 w-12" />}
+                title="Select a student from the list to preview and generate."
+              />
             ) : (
               <div className="space-y-6">
                 {(() => {
@@ -179,22 +179,25 @@ export default function CharacterCertificatePage() {
                   
                   return (
                     <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border">
+                      <div
+                        className="grid grid-cols-2 gap-4 p-4 rounded-lg border"
+                        style={{ background: "var(--w11-control-hover)", borderColor: "var(--w11-border-default)" }}
+                      >
                         <div>
-                          <Label className="text-muted-foreground text-xs">Student Name</Label>
-                          <div className="font-medium">{student.fields.name}</div>
+                          <Label className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Student Name</Label>
+                          <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{student.fields.name}</div>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground text-xs">Admission No.</Label>
-                          <div className="font-medium">{student.fields.admission_number || "—"}</div>
+                          <Label className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Admission No.</Label>
+                          <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{student.fields.admission_number || "—"}</div>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground text-xs">Date of Birth</Label>
-                          <div className="font-medium">{student.fields.dob || "—"}</div>
+                          <Label className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Date of Birth</Label>
+                          <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{student.fields.dob || "—"}</div>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground text-xs">Father&apos;s Name</Label>
-                          <div className="font-medium">{student.fields.father_name || "—"}</div>
+                          <Label className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Father&apos;s Name</Label>
+                          <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{student.fields.father_name || "—"}</div>
                         </div>
                       </div>
                       
@@ -212,7 +215,7 @@ export default function CharacterCertificatePage() {
                         </Select>
                       </div>
 
-                      <div className="pt-4 border-t flex justify-end gap-2">
+                      <div className="pt-4 border-t border-[var(--w11-border-subtle)] flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setSelectedStudentId("")}>
                           Cancel
                         </Button>
@@ -229,9 +232,10 @@ export default function CharacterCertificatePage() {
                 })()}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

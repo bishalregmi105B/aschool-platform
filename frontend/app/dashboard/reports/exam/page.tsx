@@ -3,12 +3,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, BarChart3, Download, TrendingUp, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 interface ExamItem {
   id: string;
@@ -129,33 +138,40 @@ export default function ExamReportsPage() {
 
   if (examsError) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load the exam list. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetchExams()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Exam Analytics & Reports"
+          subtitle="Comprehensive performance analysis across classes and subjects"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load the exam list. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetchExams()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
   if (examsLoading) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="h-6 w-6" /> Exam Analytics & Reports
-          </h1>
-          <p className="text-muted-foreground">Comprehensive performance analysis across classes and subjects</p>
-        </div>
-        <Button variant="outline" onClick={exportReport} disabled={subjects.length === 0}>
-          <Download className="h-4 w-4 mr-2" /> Export Report
-        </Button>
-      </div>
-
-      <Card className="bg-muted/30">
-        <CardContent className="p-4 grid gap-4 md:grid-cols-2 items-end">
-          <div className="space-y-2">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Exam Analytics & Reports"
+        subtitle="Comprehensive performance analysis across classes and subjects"
+        actions={
+          <Button variant="outline" onClick={exportReport} disabled={subjects.length === 0}>
+            <Download className="h-4 w-4 mr-2" /> Export Report
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar className="mb-0">
+          <div className="space-y-2 flex-1 min-w-[220px]">
             <Label>Term / Exam</Label>
             <Select value={examId} onValueChange={setExamId}>
               <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
@@ -166,7 +182,7 @@ export default function ExamReportsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 w-64">
             <Label>Class Filter</Label>
             <Select value={classId} onValueChange={setClassId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -178,102 +194,85 @@ export default function ExamReportsPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {!examId ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Select an exam to generate analytics from recorded marks.
-          </CardContent>
-        </Card>
-      ) : isFetching ? (
-        <PageLoader />
-      ) : subjects.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No marks are recorded for this exam and class filter.
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid md:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Average Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{weightedAverage.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" /> Weighted by subject entries
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Pass Rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{passRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground mt-1">{totalStudents} subject mark entries</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Highest Subject</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold truncate">{highestSubject?.subject_name || "Subject"}</div>
-                <p className="text-xs text-muted-foreground mt-1">Average: {highestSubject?.avg_marks ?? 0}/{highestSubject?.full_marks ?? 100}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Failed Entries</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{failedStudents}</div>
-                <p className="text-xs text-red-600 flex items-center mt-1">
-                  <AlertTriangle className="h-3 w-3 mr-1" /> Lowest pass rate: {attentionSubject?.subject_name || "Subject"}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        {!examId ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<BarChart3 className="h-12 w-12" />}
+              title="Select an exam"
+              description="Select an exam to generate analytics from recorded marks."
+            />
+          </DataPanel>
+        ) : isFetching ? (
+          <PageLoader />
+        ) : subjects.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<BarChart3 className="h-12 w-12" />}
+              title="No marks recorded"
+              description="No marks are recorded for this exam and class filter."
+            />
+          </DataPanel>
+        ) : (
+          <>
+            <StatGrid min={200} className="mb-0">
+              <KpiCard
+                label="Average Score"
+                value={`${weightedAverage.toFixed(1)}%`}
+                icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+                footnote="Weighted by subject entries"
+              />
+              <KpiCard label="Pass Rate" value={`${passRate.toFixed(1)}%`} footnote={`${totalStudents} subject mark entries`} />
+              <KpiCard
+                label="Highest Subject"
+                value={highestSubject?.subject_name || "Subject"}
+                footnote={`Average: ${highestSubject?.avg_marks ?? 0}/${highestSubject?.full_marks ?? 100}`}
+              />
+              <KpiCard
+                label="Failed Entries"
+                value={failedStudents}
+                color="#c42b1c"
+                icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+                footnote={`Lowest pass rate: ${attentionSubject?.subject_name || "Subject"}`}
+              />
+            </StatGrid>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5" /> Subject Performance Distribution</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {subjects.map((subject) => {
-                const percentage = subject.full_marks > 0 ? (subject.avg_marks / subject.full_marks) * 100 : 0;
-                return (
-                  <div key={subject.subject_id} className="space-y-2">
-                    <div className="flex items-center justify-between gap-4 text-sm">
-                      <span className="font-medium">{subject.subject_name || subject.subject_id}</span>
-                      <span className="text-muted-foreground">
-                        Avg {subject.avg_marks}/{subject.full_marks} • Pass {subject.pass_rate}%
-                      </span>
+            <DataPanel title={<span className="flex items-center gap-2"><Trophy className="h-5 w-5" /> Subject Performance Distribution</span>}>
+              <div className="space-y-4">
+                {subjects.map((subject) => {
+                  const percentage = subject.full_marks > 0 ? (subject.avg_marks / subject.full_marks) * 100 : 0;
+                  return (
+                    <div key={subject.subject_id} className="space-y-2">
+                      <div className="flex items-center justify-between gap-4 text-sm">
+                        <span className="font-medium">{subject.subject_name || subject.subject_id}</span>
+                        <span className="text-[color:var(--w11-text-secondary)]">
+                          Avg {subject.avg_marks}/{subject.full_marks} • Pass {subject.pass_rate}%
+                        </span>
+                      </div>
+                      <div className="h-3 rounded-full overflow-hidden" style={{ background: "var(--w11-control-hover)" }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.max(2, percentage))}%`,
+                            background: percentage >= 60 ? "#0f7b0f" : percentage >= 40 ? "#9d5d00" : "#c42b1c",
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-4 text-xs text-[color:var(--w11-text-secondary)]">
+                        <span>Students: {subject.student_count}</span>
+                        <span>Highest: {subject.max_marks}</span>
+                        <span>Lowest: {subject.min_marks}</span>
+                        <span>Failed: {subject.failed_count}</span>
+                      </div>
                     </div>
-                    <div className="h-3 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={percentage >= 60 ? "h-full rounded-full bg-green-600" : percentage >= 40 ? "h-full rounded-full bg-yellow-600" : "h-full rounded-full bg-red-600"}
-                        style={{ width: `${Math.min(100, Math.max(2, percentage))}%` }}
-                      />
-                    </div>
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span>Students: {subject.student_count}</span>
-                      <span>Highest: {subject.max_marks}</span>
-                      <span>Lowest: {subject.min_marks}</span>
-                      <span>Failed: {subject.failed_count}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
+                  );
+                })}
+              </div>
+            </DataPanel>
+          </>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -9,7 +9,6 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +22,16 @@ import {
 } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ArrowLeft, BookOpen, Download, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, Download, Languages, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FormSection,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface VocabTerm {
   term: string;
@@ -97,96 +103,90 @@ function VocabContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/ai-tools">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Vocabulary Builder</h1>
-          <p className="text-muted-foreground">
-            Bilingual (EN/NE) term banks for any unit
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Word bank scope</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Languages className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Vocabulary Builder"
+        subtitle="Bilingual (EN/NE) term banks for any unit"
+        actions={
+          <Link href="/dashboard/ai-tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          </Link>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <FormSection title="Word bank scope" className="lg:col-span-2">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="e.g. Science"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Grade</Label>
+                  <Input
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    placeholder="e.g. 8"
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label>Subject</Label>
+                <Label>Unit / topic</Label>
                 <Input
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Science"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder="e.g. Photosynthesis"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Grade</Label>
+                <Label>How many terms</Label>
                 <Input
-                  value={grade}
-                  onChange={(e) => setGrade(e.target.value)}
-                  placeholder="e.g. 8"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={count}
+                  onChange={(e) => setCount(e.target.value)}
                 />
               </div>
+              <Button
+                className="w-full"
+                onClick={() => generate.mutate()}
+                disabled={!subject || !grade || generate.isPending}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {generate.isPending ? "Building bank…" : "Generate word bank"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Unit / topic</Label>
-              <Input
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="e.g. Photosynthesis"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>How many terms</Label>
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={count}
-                onChange={(e) => setCount(e.target.value)}
-              />
-            </div>
-            <Button
-              className="w-full"
-              onClick={() => generate.mutate()}
-              disabled={!subject || !grade || generate.isPending}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {generate.isPending ? "Building bank…" : "Generate word bank"}
-            </Button>
-          </CardContent>
-        </Card>
+          </FormSection>
 
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{result?.title || "Word bank"}</CardTitle>
-              {result && result.terms.length > 0 && (
-                <Button variant="outline" size="sm" onClick={exportCsv}>
-                  <Download className="h-4 w-4 mr-1" /> CSV
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+          <DataPanel
+            className="lg:col-span-3"
+            title={result?.title || "Word bank"}
+            actions={result && result.terms.length > 0 ? (
+              <Button variant="outline" size="sm" onClick={exportCsv}>
+                <Download className="h-4 w-4 mr-1" /> CSV
+              </Button>
+            ) : undefined}
+            bodyClassName="p-0"
+          >
             {generate.isPending ? (
-              <PageLoader />
+              <div className="p-4"><PageLoader /></div>
             ) : error ? (
-              <EmptyState
-                title="Couldn't build the word bank"
-                body={error}
-                action={{ label: "Try again", onClick: () => generate.mutate() }}
-              />
+              <div className="p-4">
+                <EmptyState
+                  title="Couldn't build the word bank"
+                  body={error}
+                  action={{ label: "Try again", onClick: () => generate.mutate() }}
+                />
+              </div>
             ) : !result || result.terms.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
+              <div className="text-center py-16 text-[color:var(--w11-text-secondary)]">
                 <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Pick a subject, grade and unit to build the bank.</p>
               </div>
@@ -208,7 +208,7 @@ function VocabContent() {
                       <TableCell className="text-sm" lang="ne">
                         {t.definition_ne || "—"}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-[color:var(--w11-text-secondary)]">
                         {t.example || "—"}
                       </TableCell>
                     </TableRow>
@@ -216,9 +216,9 @@ function VocabContent() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
