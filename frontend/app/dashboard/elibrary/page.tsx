@@ -5,15 +5,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { BookOpen, Search, Upload, Download, Plus } from "lucide-react";
+import { BookOpen, Search, Download, Plus } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 export default function ELibraryPage() {
   return <PluginGate slug="elibrary"><ELibraryContent /></PluginGate>;
@@ -51,9 +57,9 @@ function ELibraryContent() {
   });
 
   const RESOURCE_COLUMNS: Column<any>[] = [
-    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div> },
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-[color:var(--w11-text-secondary)]" />{b.title}</div> },
     { key: "author", label: "Author", sortable: true, value: (b) => b.author ?? "", render: (b) => b.author || "—" },
-    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <span className="win11-chip">{b.category}</span> },
     { key: "subject", label: "Subject", value: (b) => b.subject ?? "", render: (b) => b.subject || "—" },
     { key: "class_name", label: "Class", sortable: true, value: (b) => b.class_name ?? "", render: (b) => b.class_name || "All" },
     {
@@ -72,35 +78,43 @@ function ELibraryContent() {
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <div><h1 className="text-2xl font-bold">E-Library</h1><p className="text-muted-foreground">Digital resource library and book management</p></div>
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load the e-library. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="E-Library"
+          subtitle="Digital resource library and book management"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load the e-library. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">E-Library</h1><p className="text-muted-foreground">Digital resource library and book management</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Resource</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="E-Library"
+        subtitle="Digital resource library and book management"
+        actions={
+          <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Resource</Button>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid>
+          <KpiCard label="Total Books" value={stats.total || books.length} />
+          <KpiCard label="Textbooks" value={stats.textbooks || 0} />
+          <KpiCard label="E-Books" value={stats.ebooks || 0} />
+          <KpiCard label="Journals" value={stats.journals || 0} />
+        </StatGrid>
 
-      <div className="grid grid-cols-4 gap-4">
-        {[{ label: "Total Books", val: stats.total || books.length }, { label: "Textbooks", val: stats.textbooks || 0 }, { label: "E-Books", val: stats.ebooks || 0 }, { label: "Journals", val: stats.journals || 0 }].map((s) => (
-          <Card key={s.label}><CardContent className="py-4"><p className="text-sm text-muted-foreground">{s.label}</p><p className="text-2xl font-bold">{s.val}</p></CardContent></Card>
-        ))}
-      </div>
-
-      <div className="flex gap-4">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search books, authors..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+        <DataPanel bodyClassName="p-0 pt-0">
           <DataTable
             columns={RESOURCE_COLUMNS}
             rows={books}
@@ -112,24 +126,24 @@ function ELibraryContent() {
             exportFileName="elibrary"
             empty={{ icon: BookOpen, title: "No resources found", body: "Add digital books, e-books and journals to the library.", action: { label: "Add Resource", onClick: () => setShowDialog(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add Resource</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
-            <div className="space-y-2">
-              <Label>File URL / Link</Label>
-              <Input value={form.file_url} onChange={(e) => setForm({ ...form, file_url: e.target.value })} placeholder="https://… or /uploads/… (upload files from the Upload Resources page)" />
-              <p className="text-xs text-muted-foreground">To attach a real file, use Upload Resources — it stores the file and fills this URL for you.</p>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Resource</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>File URL / Link</Label>
+                <Input value={form.file_url} onChange={(e) => setForm({ ...form, file_url: e.target.value })} placeholder="https://… or /uploads/… (upload files from the Upload Resources page)" />
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">To attach a real file, use Upload Resources — it stores the file and fills this URL for you.</p>
+              </div>
             </div>
-          </div>
-          <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

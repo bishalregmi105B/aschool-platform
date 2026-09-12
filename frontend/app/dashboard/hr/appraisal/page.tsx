@@ -5,18 +5,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { ArrowLeft, Star, Plus } from "lucide-react";
-import Link from "next/link";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Star, Plus } from "lucide-react";
 
 export default function AppraisalPage() {
   return <PluginGate slug="hr"><AppraisalContent /></PluginGate>;
@@ -55,6 +60,10 @@ function AppraisalContent() {
     onError: () => toast.error("Failed to save"),
   });
 
+  const renderStars = (score: number) => (
+    <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, i) => <Star key={i} className={`h-4 w-4 ${i < score ? "fill-current" : ""}`} style={{ color: i < score ? "#d83b01" : "var(--w11-text-disabled)" }} />)}</div>
+  );
+
   const APPRAISAL_COLUMNS: Column<any>[] = [
     { key: "staff_name", label: "Staff", sortable: true, value: (a) => a.staff_name ?? "", render: (a) => <span className="font-medium">{a.staff_name}</span> },
     { key: "period", label: "Period", sortable: true, value: (a) => a.period ?? "" },
@@ -69,28 +78,28 @@ function AppraisalContent() {
       value: (a) => ((a.teaching_score || 0) + (a.attendance_score || 0) + (a.teamwork_score || 0)) / 3,
       render: (a) => {
         const avg = ((a.teaching_score || 0) + (a.attendance_score || 0) + (a.teamwork_score || 0)) / 3;
-        return <Badge variant={avg >= 4 ? "default" : avg >= 3 ? "secondary" : "destructive"}>{avg.toFixed(1)}/5</Badge>;
+        return <StatusChip status={avg >= 4 ? "pass" : avg >= 3 ? "pending" : "fail"} label={`${avg.toFixed(1)}/5`} />;
       },
     },
     { key: "comments", label: "Comments", value: (a) => a.comments ?? "", render: (a) => <span className="max-w-[200px] truncate block">{a.comments || "—"}</span> },
   ];
 
-  if (isLoading) return <PageLoader />;
-
-  const renderStars = (score: number) => (
-    <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, i) => <Star key={i} className={`h-4 w-4 ${i < score ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`} />)}</div>
-  );
+  if (isLoading) return <AOSModuleLoadingState label="Loading appraisals…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/hr"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <div className="flex-1"><h1 className="text-2xl font-bold">Staff Appraisal</h1><p className="text-muted-foreground">Performance evaluation and reviews</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> New Appraisal</Button>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Star className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Staff Appraisal"
+        subtitle={`${appraisals.length} performance ${appraisals.length === 1 ? "review" : "reviews"}`}
+        actions={
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Appraisal
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={APPRAISAL_COLUMNS}
             rows={appraisals}
@@ -100,37 +109,37 @@ function AppraisalContent() {
             exportFileName="appraisals"
             empty={{ icon: Plus, title: "No appraisals found", body: "Record performance reviews per staff member.", action: { label: "New Appraisal", onClick: () => setShowDialog(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Appraisal</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Staff Member</Label>
-                <AdvancedSelect value={form.staff_id} onChange={(v) => setForm({ ...form, staff_id: v })}
-                  clearable searchable placeholder="Select staff"
-                  options={(staffOptions || []).map((staff: any) => ({ value: staff.id, label: `${staff.full_name} (${staff.role})` }))} />
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>New Appraisal</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Staff Member</Label>
+                  <AdvancedSelect value={form.staff_id} onChange={(v) => setForm({ ...form, staff_id: v })}
+                    clearable searchable placeholder="Select staff"
+                    options={(staffOptions || []).map((staff: any) => ({ value: staff.id, label: `${staff.full_name} (${staff.role})` }))} />
+                </div>
+                <div className="space-y-2"><Label>Period</Label><Input value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} placeholder="e.g. 2024" /></div>
               </div>
-              <div className="space-y-2"><Label>Period</Label><Input value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} placeholder="e.g. 2024" /></div>
+              {[
+                { key: "teaching_score", label: "Teaching Quality (1-5)" },
+                { key: "attendance_score", label: "Attendance & Punctuality (1-5)" },
+                { key: "teamwork_score", label: "Teamwork & Communication (1-5)" },
+              ].map((s: any) => (
+                <div key={s.key} className="space-y-2">
+                  <Label>{s.label}</Label>
+                  <Input type="number" min="1" max="5" value={(form as any)[s.key]} onChange={(e) => setForm({ ...form, [s.key]: e.target.value })} />
+                </div>
+              ))}
+              <div className="space-y-2"><Label>Comments</Label><Textarea value={form.comments} onChange={(e) => setForm({ ...form, comments: e.target.value })} rows={3} /></div>
             </div>
-            {[
-              { key: "teaching_score", label: "Teaching Quality (1-5)" },
-              { key: "attendance_score", label: "Attendance & Punctuality (1-5)" },
-              { key: "teamwork_score", label: "Teamwork & Communication (1-5)" },
-            ].map((s: any) => (
-              <div key={s.key} className="space-y-2">
-                <Label>{s.label}</Label>
-                <Input type="number" min="1" max="5" value={(form as any)[s.key]} onChange={(e) => setForm({ ...form, [s.key]: e.target.value })} />
-              </div>
-            ))}
-            <div className="space-y-2"><Label>Comments</Label><Textarea value={form.comments} onChange={(e) => setForm({ ...form, comments: e.target.value })} rows={3} /></div>
-          </div>
-          <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.staff_id || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Save Appraisal</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.staff_id || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Save Appraisal</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

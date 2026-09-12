@@ -5,14 +5,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { QrCode, UserCheck, Clock, Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { QrCode, UserCheck, Clock } from "lucide-react";
 
 export default function DismissalPage() {
   return <PluginGate slug="dismissal"><DismissalContent /></PluginGate>;
@@ -45,34 +52,37 @@ function DismissalContent() {
     { key: "picked_up_by", label: "Guardian", value: (q) => q.picked_up_by ?? "", render: (q) => q.picked_up_by || "—" },
     { key: "dismissed_at", label: "Time", sortable: true, value: (q) => q.dismissed_at ?? "", render: (q) => (q.dismissed_at ? new Date(q.dismissed_at).toLocaleTimeString() : "—") },
     // A DismissalRecord only exists once the student has been released
-    { key: "status", label: "Status", value: () => "released", render: () => <Badge variant="default">released</Badge> },
+    { key: "status", label: "Status", value: () => "released", render: () => <span className="win11-chip success">released</span> },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading dismissals…" />;
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Student Dismissal</h1><p className="text-muted-foreground">QR-verified safe pickup and parent notification</p></div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<QrCode className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Student Dismissal"
+        subtitle={`QR-verified safe pickup · ${stats.released || queue.filter((q: any) => q.status === "released").length} released today`}
+      />
+      <AOSPageBody>
+        <StatGrid>
+          <KpiCard label="Waiting" value={stats.waiting || queue.filter((q: any) => q.status === "waiting").length} icon={<Clock className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />} />
+          <KpiCard label="Released" value={stats.released || queue.filter((q: any) => q.status === "released").length} color="#107c10" icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />} />
+          <KpiCard label="Total Today" value={stats.total || queue.length} />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-6"><Clock className="h-5 w-5 mb-2 text-muted-foreground" /><p className="text-2xl font-bold">{stats.waiting || queue.filter((q: any) => q.status === "waiting").length}</p><p className="text-sm text-muted-foreground">Waiting</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><UserCheck className="h-5 w-5 mb-2 text-green-600" /><p className="text-2xl font-bold text-green-600">{stats.released || queue.filter((q: any) => q.status === "released").length}</p><p className="text-sm text-muted-foreground">Released</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-2xl font-bold">{stats.total || queue.length}</p><p className="text-sm text-muted-foreground">Total Today</p></CardContent></Card>
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardContent className="pt-6 space-y-2">
-            <Label className="flex items-center gap-2"><QrCode className="h-4 w-4" /> Scan QR Code</Label>
-            <div className="flex gap-2">
-              <Input value={qrCode} onChange={(e) => setQrCode(e.target.value)} placeholder="Enter or scan QR..." onKeyDown={(e) => e.key === "Enter" && qrCode && verify.mutate(qrCode)} />
-              <Button onClick={() => verify.mutate(qrCode)} disabled={!qrCode || verify.isPending}>{verify.isPending ? <Spinner /> : "Verify"}</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <DataPanel className="mb-4" title={
+          <span className="flex items-center gap-2">
+            <QrCode className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> Scan QR Code
+          </span>
+        }>
+          <div className="flex gap-2">
+            <Input value={qrCode} onChange={(e) => setQrCode(e.target.value)} placeholder="Enter or scan QR..." onKeyDown={(e) => e.key === "Enter" && qrCode && verify.mutate(qrCode)} />
+            <Button onClick={() => verify.mutate(qrCode)} disabled={!qrCode || verify.isPending}>{verify.isPending ? <Spinner /> : "Verify"}</Button>
+          </div>
+        </DataPanel>
 
-      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search student..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-
-      <Card>
-        <CardContent className="pt-6">
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={DISMISSAL_COLUMNS}
             rows={queue}
@@ -84,8 +94,8 @@ function DismissalContent() {
             exportFileName="dismissals-today"
             empty={{ icon: UserCheck, title: "No dismissal records today", body: "Records appear as students are released via QR verification." }}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

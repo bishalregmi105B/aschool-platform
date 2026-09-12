@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +22,14 @@ import { Plus, Pin, Calendar, Bell } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
+
 interface Notice {
   id: string;
   title: string;
@@ -105,217 +111,212 @@ function NoticesContent() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Notices & Events</h1>
-          <p className="text-muted-foreground">Communicate with your school community</p>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Notices & Events"
+        subtitle="Communicate with your school community"
+        actions={
+          <Button onClick={() => (tab === "notices" ? setShowAddNotice(true) : setShowAddEvent(true))}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add {tab === "notices" ? "Notice" : "Event"}
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <div
+          className="flex gap-1 p-1 rounded-lg w-fit mb-4"
+          style={{ background: "var(--w11-control-bg)" }}
+        >
+          <button
+            onClick={() => setTab("notices")}
+            className={`win11-tab ${tab === "notices" ? "active" : ""} flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium`}
+            style={tab !== "notices" ? { color: "var(--w11-text-secondary)" } : undefined}
+          >
+            <Bell className="h-4 w-4" /> Notices
+          </button>
+          <button
+            onClick={() => setTab("events")}
+            className={`win11-tab ${tab === "events" ? "active" : ""} flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium`}
+            style={tab !== "events" ? { color: "var(--w11-text-secondary)" } : undefined}
+          >
+            <Calendar className="h-4 w-4" /> Events
+          </button>
         </div>
-        <Button onClick={() => (tab === "notices" ? setShowAddNotice(true) : setShowAddEvent(true))}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add {tab === "notices" ? "Notice" : "Event"}
-        </Button>
-      </div>
 
-      <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-        <button
-          onClick={() => setTab("notices")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "notices" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Bell className="h-4 w-4" /> Notices
-        </button>
-        <button
-          onClick={() => setTab("events")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "events" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Calendar className="h-4 w-4" /> Events
-        </button>
-      </div>
-
-      {tab === "notices" && (
-        loadingNotices ? <PageLoader /> : errorNotices ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-3">
-              <p className="text-sm text-destructive">Failed to load notices. Please try again.</p>
-              <Button variant="outline" size="sm" onClick={() => refetchNotices()}>Retry</Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {(notices || []).length === 0 && (
-              <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  No notices yet.
-                </CardContent>
-              </Card>
-            )}
-            {(notices || []).map((notice) => (
-              <Card key={notice.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+        {tab === "notices" && (
+          loadingNotices ? <PageLoader /> : errorNotices ? (
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="p-4 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load notices. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchNotices()}>Retry</Button>
+              </div>
+            </DataPanel>
+          ) : (
+            <div className="space-y-4">
+              {(notices || []).length === 0 && (
+                <DataPanel>
+                  <div className="p-4 text-center text-[color:var(--w11-text-secondary)]">
+                    No notices yet.
+                  </div>
+                </DataPanel>
+              )}
+              {(notices || []).map((notice) => (
+                <div key={notice.id} className="win11-card" style={{ marginBottom: 0 }}>
+                  <div className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-[color:var(--w11-border-subtle)]">
                     <div className="flex items-center gap-2">
-                      {notice.is_pinned && <Pin className="h-4 w-4 text-amber-500" />}
-                      <CardTitle className="text-lg">{notice.title}</CardTitle>
+                      {notice.is_pinned && <Pin className="h-4 w-4" style={{ color: "#9d5d00" }} />}
+                      <h3 className="text-lg font-semibold text-[color:var(--w11-text-primary)]">{notice.title}</h3>
                     </div>
                     <div className="flex gap-2">
-                      <Badge variant={notice.is_published ? "success" : "secondary"}>
-                        {notice.is_published ? "Published" : "Draft"}
-                      </Badge>
+                      <StatusChip status={notice.is_published ? "published" : "pending"} label={notice.is_published ? "Published" : "Draft"} />
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {notice.content}
-                  </p>
-                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                    {notice.author_name && <span>By {notice.author_name}</span>}
-                    <span>{displayBS(notice.created_at)}</span>
-                    <div className="flex gap-1">
-                      {notice.target_roles.map((r) => (
-                        <Badge key={r} variant="outline" className="text-xs">
-                          {r.replace("_", " ")}
-                        </Badge>
-                      ))}
+                  <div className="px-4 py-3">
+                    <p className="text-sm whitespace-pre-wrap text-[color:var(--w11-text-secondary)]">
+                      {notice.content}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-[color:var(--w11-text-secondary)]">
+                      {notice.author_name && <span>By {notice.author_name}</span>}
+                      <span>{displayBS(notice.created_at)}</span>
+                      <div className="flex gap-1">
+                        {notice.target_roles.map((r) => (
+                          <span key={r} className="win11-chip text-xs">
+                            {r.replace("_", " ")}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )
-      )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
-      {tab === "events" && (
-        loadingEvents ? <PageLoader /> : errorEvents ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-3">
-              <p className="text-sm text-destructive">Failed to load events. Please try again.</p>
-              <Button variant="outline" size="sm" onClick={() => refetchEvents()}>Retry</Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(events || []).length === 0 && (
-              <p className="col-span-3 text-center py-8 text-muted-foreground">
-                No events yet.
-              </p>
-            )}
-            {(events || []).map((event) => (
-              <Card key={event.id}>
-                <CardHeader>
+        {tab === "events" && (
+          loadingEvents ? <PageLoader /> : errorEvents ? (
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="p-4 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load events. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetchEvents()}>Retry</Button>
+              </div>
+            </DataPanel>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(events || []).length === 0 && (
+                <p className="col-span-3 text-center py-8 text-[color:var(--w11-text-secondary)]">
+                  No events yet.
+                </p>
+              )}
+              {(events || []).map((event) => (
+                <div key={event.id} className="win11-card" style={{ marginBottom: 0 }}>
                   <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">{event.title}</CardTitle>
-                    {event.is_holiday && <Badge variant="warning">Holiday</Badge>}
+                    <h3 className="text-base font-semibold text-[color:var(--w11-text-primary)]">{event.title}</h3>
+                    {event.is_holiday && <StatusChip status="on_leave" label="Holiday" />}
                   </div>
-                </CardHeader>
-                <CardContent>
                   {event.description && (
-                    <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+                    <p className="text-sm mt-2 mb-3 text-[color:var(--w11-text-secondary)]">{event.description}</p>
                   )}
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-[color:var(--w11-text-secondary)]">
                     <Calendar className="h-3 w-3 inline mr-1" />
                     {displayEventDate(event.start_date_bs, event.start_date)}
                     {event.end_date && event.end_date !== event.start_date && ` — ${displayEventDate(event.end_date_bs, event.end_date)}`}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )
-      )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
-      {/* Add Notice Dialog */}
-      <Dialog open={showAddNotice} onOpenChange={setShowAddNotice}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Notice</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              createNoticeMutation.mutate({
-                title: fd.get("title"),
-                content: fd.get("content"),
-                is_published: true,
-                is_pinned: fd.get("is_pinned") === "on",
-                target_roles: ["school_admin", "teacher", "parent", "student"],
-              });
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input name="title" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Content</Label>
-              <Textarea name="content" required rows={5} />
-            </div>
-            <FormCheckbox id="is_pinned" name="is_pinned" label="Pin this notice" />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddNotice(false)}>Cancel</Button>
-              <Button type="submit" disabled={createNoticeMutation.isPending}>
-                {createNoticeMutation.isPending ? <Spinner size="sm" /> : "Create"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Event Dialog */}
-      <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Event</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              createEventMutation.mutate({
-                title: fd.get("title"),
-                description: fd.get("description") || undefined,
-                start_date: fd.get("start_date"),
-                end_date: fd.get("end_date") || undefined,
-                is_holiday: fd.get("is_holiday") === "on",
-              });
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input name="title" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea name="description" rows={3} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        {/* Add Notice Dialog */}
+        <Dialog open={showAddNotice} onOpenChange={setShowAddNotice}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Notice</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                createNoticeMutation.mutate({
+                  title: fd.get("title"),
+                  content: fd.get("content"),
+                  is_published: true,
+                  is_pinned: fd.get("is_pinned") === "on",
+                  target_roles: ["school_admin", "teacher", "parent", "student"],
+                });
+              }}
+              className="space-y-4"
+            >
               <div className="space-y-2">
-                <Label>Start Date</Label>
-                <BSDateInput name="start_date" required />
+                <Label>Title</Label>
+                <Input name="title" required />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
-                <BSDateInput name="end_date" />
+                <Label>Content</Label>
+                <Textarea name="content" required rows={5} />
               </div>
-            </div>
-            <FormCheckbox id="is_holiday" name="is_holiday" label="Mark as holiday" />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddEvent(false)}>Cancel</Button>
-              <Button type="submit" disabled={createEventMutation.isPending}>
-                {createEventMutation.isPending ? <Spinner size="sm" /> : "Create"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <FormCheckbox id="is_pinned" name="is_pinned" label="Pin this notice" />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowAddNotice(false)}>Cancel</Button>
+                <Button type="submit" disabled={createNoticeMutation.isPending}>
+                  {createNoticeMutation.isPending ? <Spinner size="sm" /> : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Event Dialog */}
+        <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Event</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                createEventMutation.mutate({
+                  title: fd.get("title"),
+                  description: fd.get("description") || undefined,
+                  start_date: fd.get("start_date"),
+                  end_date: fd.get("end_date") || undefined,
+                  is_holiday: fd.get("is_holiday") === "on",
+                });
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input name="title" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea name="description" rows={3} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <BSDateInput name="start_date" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <BSDateInput name="end_date" />
+                </div>
+              </div>
+              <FormCheckbox id="is_holiday" name="is_holiday" label="Mark as holiday" />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowAddEvent(false)}>Cancel</Button>
+                <Button type="submit" disabled={createEventMutation.isPending}>
+                  {createEventMutation.isPending ? <Spinner size="sm" /> : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

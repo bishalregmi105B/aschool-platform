@@ -2,10 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
 import { Users, ClipboardCheck, BookOpen, Calendar, Bell } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 export default function TeacherDashboard() {
   const { data, isLoading } = useQuery({
@@ -16,72 +21,106 @@ export default function TeacherDashboard() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading teacher dashboard…" />;
 
   const stats = [
-    { label: "My Classes", value: String(data?.stats?.my_classes || 0), icon: Users, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Recent Notices", value: String(data?.stats?.recent_notices || 0), icon: ClipboardCheck, color: "bg-blue-50 text-blue-600" },
-    { label: "Assignments", value: String(data?.stats?.pending_assignments || 0), icon: BookOpen, color: "bg-orange-50 text-orange-600" },
-    { label: "Today's Periods", value: String(data?.stats?.todays_periods || 0), icon: Calendar, color: "bg-purple-50 text-purple-600" },
+    { label: "My Classes", value: String(data?.stats?.my_classes || 0), icon: Users },
+    { label: "Recent Notices", value: String(data?.stats?.recent_notices || 0), icon: ClipboardCheck },
+    { label: "Assignments", value: String(data?.stats?.pending_assignments || 0), icon: BookOpen },
+    { label: "Today's Periods", value: String(data?.stats?.todays_periods || 0), icon: Calendar },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Good Morning, Teacher! 👋</h1>
-        <p className="text-muted-foreground">Here&apos;s your day at a glance</p>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>
+          Good Morning, Teacher! 👋
+        </h1>
+        <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+          Here&apos;s your day at a glance
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <StatGrid min={200}>
         {stats.map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${stat.color}`}>
-                <stat.icon className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <KpiCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            icon={<stat.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
         ))}
-      </div>
+      </StatGrid>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />Today&apos;s Schedule</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {(data?.schedule || []).map((period: any, i: number) => (
-                <div key={i} className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-0">
-                  <span className="text-sm text-muted-foreground w-28 flex-shrink-0">{period.time}</span>
-                  <span className="font-medium">{period.subject}</span>
-                  <span className="text-sm text-muted-foreground ml-auto">{period.class_name}</span>
-                </div>
-              ))}
-              {(data?.schedule || []).length === 0 && <p className="text-sm text-muted-foreground">No timetable slots assigned for today.</p>}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid md:grid-cols-2 gap-4">
+        <DataPanel
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Today&apos;s Schedule
+            </span>
+          }
+        >
+          <div className="space-y-3">
+            {(data?.schedule || []).map((period: any, i: number) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 py-2 border-b border-[var(--w11-border-subtle)] last:border-0"
+              >
+                <span
+                  className="text-sm w-28 flex-shrink-0"
+                  style={{ color: "var(--w11-text-secondary)" }}
+                >
+                  {period.time}
+                </span>
+                <span className="font-medium" style={{ color: "var(--w11-text-primary)" }}>
+                  {period.subject}
+                </span>
+                <span className="text-sm ml-auto" style={{ color: "var(--w11-text-secondary)" }}>
+                  {period.class_name}
+                </span>
+              </div>
+            ))}
+            {(data?.schedule || []).length === 0 && (
+              <AOSEmptyState title="No timetable slots assigned for today." />
+            )}
+          </div>
+        </DataPanel>
 
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />Recent Notices</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {(data?.notices || []).map((notice: any, i: number) => (
-                <div key={i} className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${notice.urgent ? "bg-red-500" : "bg-gray-300"}`} />
-                  <div>
-                    <p className="font-medium text-sm">{notice.title}</p>
-                    <p className="text-xs text-muted-foreground">{notice.date ? displayBS(notice.date) : "—"}</p>
-                  </div>
+        <DataPanel
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Bell className="h-4 w-4" /> Recent Notices
+            </span>
+          }
+        >
+          <div className="space-y-3">
+            {(data?.notices || []).map((notice: any, i: number) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 py-2 border-b border-[var(--w11-border-subtle)] last:border-0"
+              >
+                <div
+                  className="w-2 h-2 mt-2"
+                  style={{
+                    background: notice.urgent ? "var(--w11-accent)" : "var(--w11-border-strong)",
+                    borderRadius: "var(--w11-radius-full)",
+                  }}
+                />
+                <div>
+                  <p className="font-medium text-sm" style={{ color: "var(--w11-text-primary)" }}>
+                    {notice.title}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                    {notice.date ? displayBS(notice.date) : "—"}
+                  </p>
                 </div>
-              ))}
-              {(data?.notices || []).length === 0 && <p className="text-sm text-muted-foreground">No recent notices.</p>}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            ))}
+            {(data?.notices || []).length === 0 && (
+              <AOSEmptyState title="No recent notices." />
+            )}
+          </div>
+        </DataPanel>
       </div>
     </div>
   );

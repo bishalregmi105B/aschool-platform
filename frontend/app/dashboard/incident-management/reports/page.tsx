@@ -4,13 +4,19 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/spinner";
-import { FileText, TrendingDown, AlertOctagon } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { FileText, AlertOctagon } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function IncidentReportsPage() {
@@ -26,13 +32,20 @@ function ReportsContent() {
     retry: 1,
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading incident reports…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load incident reports. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Incident Reports" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load incident reports. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -41,76 +54,76 @@ function ReportsContent() {
   const resolved: any[] = data?.resolved_cases ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FileText className="h-6 w-6 text-blue-600" />
-          <div><h1 className="text-2xl font-bold">Incident Reports</h1><p className="text-muted-foreground">Analytics and resolved case history</p></div>
-        </div>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="this_week">This Week</SelectItem>
-            <SelectItem value="this_month">This Month</SelectItem>
-            <SelectItem value="this_year">This Year</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Incident Reports"
+        subtitle="Analytics and resolved case history"
+        actions={
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="this_week">This Week</SelectItem>
+              <SelectItem value="this_month">This Month</SelectItem>
+              <SelectItem value="this_year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {[
+            { label: "Total Incidents", value: stats.total ?? "—" },
+            { label: "Resolved", value: stats.resolved ?? "—", color: "#107c10" },
+            { label: "Escalated", value: stats.escalated ?? "—", color: "#d83b01" },
+            { label: "Avg Resolution Days", value: stats.avg_resolution_days ?? "—" },
+          ].map((s) => (
+            <KpiCard key={s.label} label={s.label} value={s.value} color={s.color} />
+          ))}
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Incidents", value: stats.total ?? "—" },
-          { label: "Resolved", value: stats.resolved ?? "—" },
-          { label: "Escalated", value: stats.escalated ?? "—" },
-          { label: "Avg Resolution Days", value: stats.avg_resolution_days ?? "—" },
-        ].map((s) => (
-          <Card key={s.label}><CardContent className="pt-6 text-center">
-            <p className="text-3xl font-bold">{s.value}</p>
-            <p className="text-sm text-muted-foreground mt-1">{s.label}</p>
-          </CardContent></Card>
-        ))}
-      </div>
-
-      {byType.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><AlertOctagon className="h-5 w-5" />Incidents by Type</CardTitle></CardHeader>
-          <CardContent>
+        {byType.length > 0 && (
+          <DataPanel
+            className="mb-4"
+            title={
+              <span className="flex items-center gap-2">
+                <AlertOctagon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />Incidents by Type
+              </span>
+            }
+          >
             <div className="space-y-3">
               {byType.map((t: any) => (
                 <div key={t.type} className="flex items-center gap-4">
-                  <span className="w-28 text-sm capitalize">{t.type}</span>
-                  <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${(t.count / (stats.total || 1)) * 100}%` }} />
+                  <span className="w-28 text-sm capitalize" style={{ color: "var(--w11-text-primary)" }}>{t.type}</span>
+                  <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ background: "var(--w11-control-hover)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${(t.count / (stats.total || 1)) * 100}%`, background: "var(--w11-accent)" }} />
                   </div>
-                  <span className="text-sm font-medium w-8 text-right">{t.count}</span>
+                  <span className="text-sm font-medium w-8 text-right" style={{ color: "var(--w11-text-primary)" }}>{t.count}</span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      <Card>
-        <CardHeader><CardTitle>Resolved Cases</CardTitle></CardHeader>
-        <CardContent>
+        <DataPanel title="Resolved Cases" bodyClassName="p-0">
           <Table>
             <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Type</TableHead><TableHead>Student</TableHead><TableHead>Resolved On</TableHead><TableHead>Resolution</TableHead></TableRow></TableHeader>
             <TableBody>
               {resolved.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No resolved cases in this period</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-6" style={{ color: "var(--w11-text-secondary)" }}>No resolved cases in this period</TableCell></TableRow>
               ) : resolved.map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.title}</TableCell>
-                  <TableCell><Badge variant="outline">{c.type}</Badge></TableCell>
+                  <TableCell><span className="win11-chip subtle">{c.type}</span></TableCell>
                   <TableCell>{c.student_name ?? "—"}</TableCell>
                   <TableCell>{c.resolved_at ? displayBS(c.resolved_at) : "—"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate text-muted-foreground">{c.resolution ?? "—"}</TableCell>
+                  <TableCell className="max-w-[200px] truncate" style={{ color: "var(--w11-text-secondary)" }}>{c.resolution ?? "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

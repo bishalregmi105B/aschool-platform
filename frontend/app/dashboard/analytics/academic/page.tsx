@@ -3,14 +3,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { ArrowLeft, BookOpen, Trophy, TrendingUp, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 
 export default function AcademicAnalyticsPage() {
   const [examId, setExamId] = useState("");
@@ -36,81 +43,91 @@ export default function AcademicAnalyticsPage() {
     { key: "class_name", label: "Class", sortable: true, value: (s) => s.class_name ?? "" },
     { key: "avg_percentage", label: "Average", align: "right", sortable: true, value: (s) => s.avg_percentage ?? 0, render: (s) => <>{s.avg_percentage}%</> },
     { key: "failed_subjects", label: "Failed Subjects", align: "right", sortable: true, value: (s) => s.failed_subjects ?? 0 },
-    { key: "risk_level", label: "Risk Level", sortable: true, value: (s) => s.risk_level ?? "", render: (s) => <Badge variant="destructive">{s.risk_level || "High"}</Badge> },
+    { key: "risk_level", label: "Risk Level", sortable: true, value: (s) => s.risk_level ?? "", render: (s) => <StatusChip status="failed" label={s.risk_level || "High"} /> },
   ];
 
   if (isLoading) return <PageLoader />;
     if (isError) {
   return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load academic analytics. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
+        <AOSPage>
+          <AOSPageHeader
+            icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+            title="Academic Analytics"
+            subtitle="Student performance analysis and trends"
+          />
+          <AOSPageBody>
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="py-10 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load academic analytics. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            </DataPanel>
+          </AOSPageBody>
+        </AOSPage>
       );
     }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/analytics"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-        <div className="flex-1"><h1 className="text-2xl font-bold">Academic Analytics</h1><p className="text-muted-foreground">Student performance analysis and trends</p></div>
-        <AdvancedSelect
-          value={examId}
-          onChange={(v) => setExamId(v)}
-          options={(exams || []).map((e: any) => ({ value: e.id, label: e.name }))}
-        />
-        
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Academic Analytics"
+        subtitle="Student performance analysis and trends"
+        actions={
+          <>
+            <Link href="/dashboard/analytics">
+              <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4" /></Button>
+            </Link>
+            <AdvancedSelect
+              value={examId}
+              onChange={(v) => setExamId(v)}
+              options={(exams || []).map((e: any) => ({ value: e.id, label: e.name }))}
+            />
+          </>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid min={180}>
+          <KpiCard label="Students" value={analytics.total_students || 0} icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Pass Rate" value={analytics.pass_rate ? `${analytics.pass_rate}%` : "—"} icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Average Score" value={analytics.avg_percentage ? `${analytics.avg_percentage}%` : "—"} icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="At-Risk Students" value={atRisk.length || analytics.at_risk_count || 0} color="#c42b1c" icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />} />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-6"><BookOpen className="h-5 w-5 text-blue-600 mb-2" /><p className="text-2xl font-bold">{analytics.total_students || 0}</p><p className="text-sm text-muted-foreground">Students</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><Trophy className="h-5 w-5 text-green-600 mb-2" /><p className="text-2xl font-bold text-green-600">{analytics.pass_rate ? `${analytics.pass_rate}%` : "—"}</p><p className="text-sm text-muted-foreground">Pass Rate</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><TrendingUp className="h-5 w-5 text-purple-600 mb-2" /><p className="text-2xl font-bold">{analytics.avg_percentage ? `${analytics.avg_percentage}%` : "—"}</p><p className="text-sm text-muted-foreground">Average Score</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><AlertTriangle className="h-5 w-5 text-red-600 mb-2" /><p className="text-2xl font-bold text-red-600">{atRisk.length || analytics.at_risk_count || 0}</p><p className="text-sm text-muted-foreground">At-Risk Students</p></CardContent></Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle>Class-wise Performance</CardTitle></CardHeader>
-          <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <DataPanel title="Class-wise Performance">
             {classWise.length > 0 ? (
               <div className="space-y-3">
                 {classWise.map((c: any, i: number) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1"><span className="font-medium">{c.class_name}</span><span>{c.pass_rate || c.avg_percentage}%</span></div>
-                    <div className="w-full bg-gray-200 rounded-full h-3"><div className="bg-blue-600 h-3 rounded-full transition-all" style={{ width: `${Math.min(100, c.pass_rate || c.avg_percentage || 0)}%` }} /></div>
-                    <div className="flex gap-4 text-xs text-muted-foreground mt-1"><span>Students: {c.total_students}</span><span>Passed: {c.passed}</span><span>Failed: {c.failed}</span></div>
+                    <div className="w-full rounded-full h-3" style={{ background: "var(--w11-control-hover)" }}><div className="h-3 rounded-full transition-all" style={{ width: `${Math.min(100, c.pass_rate || c.avg_percentage || 0)}%`, background: "var(--w11-accent)" }} /></div>
+                    <div className="flex gap-4 text-xs mt-1 text-[color:var(--w11-text-secondary)]"><span>Students: {c.total_students}</span><span>Passed: {c.passed}</span><span>Failed: {c.failed}</span></div>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-center text-muted-foreground py-8">No class data available</p>}
-          </CardContent>
-        </Card>
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No class data available</p>}
+          </DataPanel>
 
-        <Card>
-          <CardHeader><CardTitle>Subject-wise Scores</CardTitle></CardHeader>
-          <CardContent>
+          <DataPanel title="Subject-wise Scores">
             {subjectWise.length > 0 ? (
               <div className="space-y-3">
                 {subjectWise.map((s: any, i: number) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1"><span className="font-medium">{s.subject_name}</span><span>Avg: {s.avg_score}%</span></div>
-                    <div className="w-full bg-gray-200 rounded-full h-3"><div className={`h-3 rounded-full ${(s.avg_score || 0) >= 60 ? "bg-green-600" : (s.avg_score || 0) >= 40 ? "bg-yellow-600" : "bg-red-600"}`} style={{ width: `${Math.min(100, s.avg_score || 0)}%` }} /></div>
-                    <div className="flex gap-4 text-xs text-muted-foreground mt-1"><span>Highest: {s.highest}</span><span>Lowest: {s.lowest}</span></div>
+                    <div className="w-full rounded-full h-3" style={{ background: "var(--w11-control-hover)" }}><div className="h-3 rounded-full" style={{ width: `${Math.min(100, s.avg_score || 0)}%`, background: (s.avg_score || 0) >= 60 ? "#0f7b0f" : (s.avg_score || 0) >= 40 ? "#9d5d00" : "#c42b1c" }} /></div>
+                    <div className="flex gap-4 text-xs mt-1 text-[color:var(--w11-text-secondary)]"><span>Highest: {s.highest}</span><span>Lowest: {s.lowest}</span></div>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-center text-muted-foreground py-8">No subject data available</p>}
-          </CardContent>
-        </Card>
-      </div>
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No subject data available</p>}
+          </DataPanel>
+        </div>
 
-      {atRisk.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> At-Risk Students</CardTitle></CardHeader>
-          <CardContent>
+        {atRisk.length > 0 && (
+          <DataPanel
+            title={<span className="flex items-center gap-2"><AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} /> At-Risk Students</span>}
+          >
             <DataTable
               columns={AT_RISK_COLUMNS}
               rows={atRisk}
@@ -120,9 +137,9 @@ export default function AcademicAnalyticsPage() {
               exportFileName="at-risk-students"
               dense
             />
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

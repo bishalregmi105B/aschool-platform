@@ -7,19 +7,24 @@ import { PluginGate } from "@/lib/plugins";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { TimePicker } from "@/components/ui/time-picker";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 import { CalendarClock, Clock, Pencil, Plus, Route as RouteIcon, Trash2, Archive, ArchiveRestore } from "lucide-react";
 
 interface Trip {
@@ -255,11 +260,11 @@ function TripsContent() {
       value: (t) => t.route_name ?? "",
       render: (t) => (
         <div className="flex items-center gap-2">
-          <RouteIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <RouteIcon className="h-4 w-4 shrink-0" style={{ color: "var(--w11-text-secondary)" }} />
           <div className="min-w-0">
             <div className="font-medium truncate">{t.name || t.route_name || "—"}</div>
             {t.name && t.route_name && (
-              <div className="text-xs text-muted-foreground truncate">{t.route_name}</div>
+              <div className="text-xs truncate" style={{ color: "var(--w11-text-secondary)" }}>{t.route_name}</div>
             )}
           </div>
         </div>
@@ -271,9 +276,9 @@ function TripsContent() {
       sortable: true,
       value: (t) => t.direction ?? "",
       render: (t) => (
-        <Badge variant="outline" className="capitalize">
+        <span className="win11-chip subtle capitalize">
           {t.direction === "morning" ? "Morning" : "Afternoon"}
-        </Badge>
+        </span>
       ),
     },
     {
@@ -281,7 +286,7 @@ function TripsContent() {
       label: "Bus",
       sortable: true,
       value: (t) => t.bus ?? "",
-      render: (t) => t.bus || <span className="text-muted-foreground">Unassigned</span>,
+      render: (t) => t.bus || <span style={{ color: "var(--w11-text-secondary)" }}>Unassigned</span>,
     },
     {
       key: "weekdays",
@@ -289,18 +294,18 @@ function TripsContent() {
       value: (t) => (t.weekdays || []).map((d) => WEEKDAYS[d]?.label ?? "").join(" "),
       render: (t) =>
         (t.weekdays || []).length === 0 ? (
-          <span className="text-muted-foreground">Daily off</span>
+          <span style={{ color: "var(--w11-text-secondary)" }}>Daily off</span>
         ) : (
           <div className="flex flex-wrap gap-1">
             {WEEKDAYS.map((d) => (
               <span
                 key={d.value}
-                className={cn(
-                  "inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold",
+                className="inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold"
+                style={
                   t.weekdays.includes(d.value)
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground/60"
-                )}
+                    ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" }
+                    : { background: "var(--w11-control-hover)", color: "var(--w11-text-tertiary)" }
+                }
               >
                 {d.label[0]}
               </span>
@@ -317,7 +322,7 @@ function TripsContent() {
       render: (t) =>
         t.first_stop_time ? (
           <span className="inline-flex items-center gap-1 tabular-nums">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <Clock className="h-3.5 w-3.5" style={{ color: "var(--w11-text-secondary)" }} />
             {t.first_stop_time.slice(0, 5)}
           </span>
         ) : (
@@ -330,9 +335,7 @@ function TripsContent() {
       sortable: true,
       value: (t) => t.status ?? "",
       render: (t) => (
-        <Badge variant={t.status === "active" ? "success" : "secondary"} className="capitalize">
-          {t.status}
-        </Badge>
+        <StatusChip status={t.status} className="capitalize" />
       ),
     },
     {
@@ -357,9 +360,9 @@ function TripsContent() {
             onClick={(e) => { e.stopPropagation(); handleRetire(t); }}
           >
             {t.status === "active" ? (
-              <Archive className="h-4 w-4 text-muted-foreground" />
+              <Archive className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
             ) : (
-              <ArchiveRestore className="h-4 w-4 text-muted-foreground" />
+              <ArchiveRestore className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
             )}
           </Button>
           <Button
@@ -368,7 +371,7 @@ function TripsContent() {
             title="Delete trip"
             onClick={(e) => { e.stopPropagation(); handleDelete(t); }}
           >
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
@@ -378,21 +381,19 @@ function TripsContent() {
   const errorMessage = errMessage(error);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarClock className="h-6 w-6" /> Trip Schedules
-          </h1>
-          <p className="text-muted-foreground">Recurring bus trips per route — morning and afternoon runs</p>
-        </div>
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4 mr-2" /> Add Trip
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<CalendarClock className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Trip Schedules"
+        subtitle={`${trips.length} recurring ${trips.length === 1 ? "trip" : "trips"} — morning and afternoon runs`}
+        actions={
+          <Button onClick={openAdd}>
+            <Plus className="h-4 w-4 mr-2" /> Add Trip
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable<Trip>
             columns={TRIP_COLUMNS}
             rows={trips}
@@ -429,148 +430,155 @@ function TripsContent() {
               action: search || directionFilter ? undefined : { label: "Add Trip", onClick: openAdd },
             }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Trip" : "Add Trip"}</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Route</Label>
-              <AdvancedSelect
-                value={form.route_id}
-                onChange={(v) => setForm({ ...form, route_id: v })}
-                options={(routes || []).map((r) => ({ value: r.id, label: r.name }))}
-                placeholder="Select route"
-                searchable
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Direction</Label>
-              <div className="grid grid-cols-2 gap-1 rounded-md border p-1">
-                {(["morning", "afternoon"] as const).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setForm({ ...form, direction: d })}
-                    className={cn(
-                      "rounded px-3 py-1.5 text-[13px] font-medium capitalize transition-colors",
-                      form.direction === d
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent"
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Runs on</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((d) => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => toggleWeekday(d.value)}
-                    className={cn(
-                      "h-8 w-10 rounded-md border text-[12px] font-medium transition-colors",
-                      form.weekdays.includes(d.value)
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-accent"
-                    )}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editItem ? "Edit Trip" : "Add Trip"}</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
+              className="space-y-4"
+            >
               <div className="space-y-2">
-                <Label>First stop time</Label>
-                <TimePicker
-                  value={form.first_stop_time}
-                  onChange={(v) => setForm({ ...form, first_stop_time: v })}
-                  placeholder="HH:MM"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stop-to-stop avg (mins)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.stop_to_stop_avg_mins}
-                  onChange={(e) => setForm({ ...form, stop_to_stop_avg_mins: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Bus (optional)</Label>
+                <Label>Route</Label>
                 <AdvancedSelect
-                  value={form.bus_id}
-                  onChange={(v) => setForm({ ...form, bus_id: v })}
-                  options={(buses || []).map((b) => ({ value: b.id, label: b.vehicle_number }))}
-                  placeholder="Select bus"
-                  clearable
+                  value={form.route_id}
+                  onChange={(v) => setForm({ ...form, route_id: v })}
+                  options={(routes || []).map((r) => ({ value: r.id, label: r.name }))}
+                  placeholder="Select route"
                   searchable
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Driver (optional)</Label>
-                <AdvancedSelect
-                  value={form.driver_id}
-                  onChange={(v) => setForm({ ...form, driver_id: v })}
-                  options={(staff || []).map((s) => ({ value: s.id, label: s.full_name }))}
-                  placeholder="Select driver"
-                  clearable
-                  searchable
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Trip name (optional)</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Ring Road Morning"
-                />
+                <Label>Direction</Label>
+                <div className="grid grid-cols-2 gap-1 rounded-md border border-[var(--w11-control-border)] p-1">
+                  {(["morning", "afternoon"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setForm({ ...form, direction: d })}
+                      className={cn("rounded px-3 py-1.5 text-[13px] font-medium capitalize transition-colors")}
+                      style={
+                        form.direction === d
+                          ? { background: "var(--w11-accent)", color: "#fff" }
+                          : { color: "var(--w11-text-secondary)" }
+                      }
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Effective from (BS)</Label>
-                <BSDateInput
-                  emit="bs"
-                  value={form.effective_date_bs}
-                  onChange={(v) => setForm({ ...form, effective_date_bs: v })}
-                  placeholder="Pick date"
-                />
-              </div>
-            </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!form.route_id || save.isPending}>
-                {save.isPending ? <Spinner size="sm" className="mr-2" /> : null}
-                {editItem ? "Update" : "Add Trip"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <div className="space-y-2">
+                <Label>Runs on</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((d) => (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => toggleWeekday(d.value)}
+                      className="h-8 w-10 rounded-md border text-[12px] font-medium transition-colors"
+                      style={
+                        form.weekdays.includes(d.value)
+                          ? {
+                              borderColor: "var(--w11-accent)",
+                              background: "var(--w11-accent-light)",
+                              color: "var(--w11-accent)",
+                            }
+                          : {
+                              borderColor: "var(--w11-control-border)",
+                              color: "var(--w11-text-secondary)",
+                            }
+                      }
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>First stop time</Label>
+                  <TimePicker
+                    value={form.first_stop_time}
+                    onChange={(v) => setForm({ ...form, first_stop_time: v })}
+                    placeholder="HH:MM"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Stop-to-stop avg (mins)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.stop_to_stop_avg_mins}
+                    onChange={(e) => setForm({ ...form, stop_to_stop_avg_mins: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Bus (optional)</Label>
+                  <AdvancedSelect
+                    value={form.bus_id}
+                    onChange={(v) => setForm({ ...form, bus_id: v })}
+                    options={(buses || []).map((b) => ({ value: b.id, label: b.vehicle_number }))}
+                    placeholder="Select bus"
+                    clearable
+                    searchable
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Driver (optional)</Label>
+                  <AdvancedSelect
+                    value={form.driver_id}
+                    onChange={(v) => setForm({ ...form, driver_id: v })}
+                    options={(staff || []).map((s) => ({ value: s.id, label: s.full_name }))}
+                    placeholder="Select driver"
+                    clearable
+                    searchable
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Trip name (optional)</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="e.g. Ring Road Morning"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Effective from (BS)</Label>
+                  <BSDateInput
+                    emit="bs"
+                    value={form.effective_date_bs}
+                    onChange={(v) => setForm({ ...form, effective_date_bs: v })}
+                    placeholder="Pick date"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!form.route_id || save.isPending}>
+                  {save.isPending ? <Spinner size="sm" className="mr-2" /> : null}
+                  {editItem ? "Update" : "Add Trip"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

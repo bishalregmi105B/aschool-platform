@@ -5,10 +5,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type Slot = { id: string; start_time?: string; end_time?: string };
 
@@ -59,7 +59,7 @@ export default function ParentConferencesPage() {
     }
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading…" />;
   if (isError)
     return <ErrorState title="Couldn't load conferences" onRetry={() => refetch()} />;
 
@@ -68,8 +68,8 @@ export default function ParentConferencesPage() {
   return (
     <div className="space-y-6">
       <PortalHeader portal="parent" title="PT Conferences" />
-      {note && <p className="rounded-md bg-muted px-3 py-2 text-sm">{note}</p>}
-      {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+      {note && <p className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--w11-control-hover)", color: "var(--w11-text-primary)" }}>{note}</p>}
+      {error && <p className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--w11-control-hover)", color: "var(--w11-text-primary)" }}>{error}</p>}
       {conferences.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">

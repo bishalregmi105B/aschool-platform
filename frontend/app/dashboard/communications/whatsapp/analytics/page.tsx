@@ -1,9 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import {
-  ArrowLeft,
   CheckCircle2,
   Inbox,
   MessageSquare,
@@ -13,11 +11,17 @@ import {
 
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   Bar,
   BarChart,
@@ -53,9 +57,9 @@ const SENDER_COLUMNS: Column<TopSender>[] = [
     sortable: true,
     value: (s) => (s.inbound_count > 0 ? s.handled_count / s.inbound_count : 0),
     render: (s) => (
-      <Badge variant={s.handled_count >= s.inbound_count ? "secondary" : "destructive"}>
+      <span className={`win11-chip ${s.handled_count >= s.inbound_count ? "subtle" : "error"}`}>
         {s.inbound_count > 0 ? `${Math.round((s.handled_count / s.inbound_count) * 100)}%` : "—"}
-      </Badge>
+      </span>
     ),
   },
   {
@@ -64,7 +68,7 @@ const SENDER_COLUMNS: Column<TopSender>[] = [
     sortable: true,
     value: (s) => s.last_message_at ?? "",
     render: (s) => (
-      <span className="text-muted-foreground">
+      <span style={{ color: "var(--w11-text-secondary)" }}>
         {s.last_message_at ? new Date(s.last_message_at).toLocaleString() : "—"}
       </span>
     ),
@@ -104,16 +108,21 @@ function WhatsAppAnalyticsContent() {
     retry: 1,
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading analytics…" />;
 
   if (isError || !stats) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load analytics. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent>
-      </Card>
+      <AOSPage>
+        <AOSPageHeader title="WhatsApp Analytics" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load analytics. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -135,71 +144,58 @@ function WhatsAppAnalyticsContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/communications/whatsapp">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">WhatsApp Analytics</h1>
-          <p className="text-muted-foreground">
-            Message volume, reply coverage, and top senders — counted live from WhatsApp messages.
-          </p>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="WhatsApp Analytics"
+        subtitle={`Message volume, reply coverage, and top senders over the last ${stats.days} days`}
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {kpis.map((kpi) => (
+            <KpiCard
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              footnote={kpi.hint}
+              icon={<kpi.icon className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            />
+          ))}
+        </StatGrid>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label}>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                <kpi.icon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <p className="mt-1 text-2xl font-bold">{kpi.value}</p>
-              {kpi.hint && <p className="mt-0.5 text-xs text-muted-foreground">{kpi.hint}</p>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Inbound vs Outbound — last {stats.days} days</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <DataPanel
+          className="mb-4"
+          title={<span className="text-sm">Inbound vs Outbound — last {stats.days} days</span>}
+        >
           {stats.timeline.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="py-8 text-center text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               No WhatsApp messages in the last {stats.days} days.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={stats.timeline}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-[var(--w11-border-default)]" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                 <RechartTooltip />
                 <Legend />
-                <Bar dataKey="inbound" name="Inbound" fill="#0ea5e9" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="outbound" name="Outbound" fill="#22c55e" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="inbound" name="Inbound" fill="#0067c0" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="outbound" name="Outbound" fill="#107c10" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4" />
-            Top Senders
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+              Top Senders
+            </span>
+          }
+        >
           {stats.top_senders.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No inbound messages yet.</p>
+            <p className="py-8 text-center text-sm" style={{ color: "var(--w11-text-secondary)" }}>No inbound messages yet.</p>
           ) : (
             <DataTable<TopSender>
               columns={SENDER_COLUMNS}
@@ -211,8 +207,8 @@ function WhatsAppAnalyticsContent() {
               empty={{ icon: Users, title: "No inbound messages yet" }}
             />
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

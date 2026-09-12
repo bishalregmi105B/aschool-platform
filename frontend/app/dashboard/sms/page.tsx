@@ -9,6 +9,15 @@ import { PluginGate } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import { displayBS } from "@/lib/nepali_date";
 import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
+import {
   MessageSquare,
   Send,
   FileText,
@@ -20,6 +29,13 @@ import {
   XCircle,
   RefreshCw,
 } from "lucide-react";
+
+const inputStyle = {
+  background: "var(--w11-control-bg)",
+  color: "var(--w11-text-primary)",
+  border: "1px solid var(--w11-border-default)",
+  borderRadius: "var(--w11-radius-md)",
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SmsTemplate {
@@ -74,48 +90,46 @@ function SmsPageContent() {
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-            <MessageSquare className="h-5 w-5 text-primary" />
+    <AOSPage>
+      <AOSPageHeader
+        icon={
+          <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "var(--w11-accent-light)" }}>
+            <MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
           </div>
-          <h1 className="text-2xl font-bold">SMS Notifications</h1>
+        }
+        title="SMS Notifications"
+        subtitle="Send SMS to parents, students and staff via Sparrow SMS"
+      />
+      <AOSPageBody>
+        {/* Tabs */}
+        <div className="border-b border-[color:var(--w11-border-subtle)] mb-4">
+          <nav className="-mb-px flex gap-0">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
+                style={{
+                  borderColor: activeTab === tab.id ? "var(--w11-accent)" : "transparent",
+                  color: activeTab === tab.id ? "var(--w11-accent)" : "var(--w11-text-secondary)",
+                }}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
-        <p className="text-muted-foreground">
-          Send SMS to parents, students and staff via Sparrow SMS
-        </p>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b">
-        <nav className="-mb-px flex gap-0">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
-              }`}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
-      <div>
-        {activeTab === "send" && <SendSmsTab isAdmin={isAdmin} />}
-        {activeTab === "templates" && <TemplatesTab isAdmin={isAdmin} />}
-        {activeTab === "history" && <HistoryTab />}
-        {activeTab === "credits" && <CreditsTab />}
-      </div>
-    </div>
+        {/* Tab Content */}
+        <div>
+          {activeTab === "send" && <SendSmsTab isAdmin={isAdmin} />}
+          {activeTab === "templates" && <TemplatesTab isAdmin={isAdmin} />}
+          {activeTab === "history" && <HistoryTab />}
+          {activeTab === "credits" && <CreditsTab />}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -176,7 +190,7 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
       <div className="space-y-2">
         <label className="text-sm font-medium">
           Recipients
-          <span className="text-muted-foreground font-normal ml-1">
+          <span className="font-normal ml-1 text-[color:var(--w11-text-secondary)]">
             (phone numbers, comma or newline separated)
           </span>
         </label>
@@ -185,9 +199,10 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
           onChange={(e) => setRecipients(e.target.value)}
           placeholder="9841234567&#10;9851234567&#10;..."
           rows={4}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+          className="w-full rounded-lg px-3 py-2 text-sm resize-none font-mono"
+          style={inputStyle}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-[color:var(--w11-text-secondary)]">
           {
             recipients
               .split(/[\n,]+/)
@@ -222,9 +237,10 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
           placeholder="Type your message here..."
           rows={5}
           maxLength={960}
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="w-full rounded-lg px-3 py-2 text-sm resize-none"
+          style={inputStyle}
         />
-        <div className="flex justify-between text-xs text-muted-foreground">
+        <div className="flex justify-between text-xs text-[color:var(--w11-text-secondary)]">
           <span>{charsUsed}/160 chars</span>
           <span>
             {smsCount} SMS credit{smsCount > 1 ? "s" : ""}
@@ -234,13 +250,7 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
 
       {/* Result feedback */}
       {result && (
-        <div
-          className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm ${
-            result.success
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
+        <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm ${result.success ? "win11-infobar success" : "win11-infobar error"}`}>
           {result.success ? (
             <CheckCircle2 className="h-4 w-4 shrink-0" />
           ) : (
@@ -260,7 +270,7 @@ function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
           disabled={
             sendMutation.isPending || !message.trim() || !recipients.trim()
           }
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="win11-btn accent flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm"
         >
           {sendMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -308,7 +318,7 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
+          className="win11-btn accent flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
         >
           <Plus className="h-4 w-4" />
           Add Template
@@ -317,8 +327,8 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
 
       {/* Create form */}
       {showForm && (
-        <div className="border rounded-xl p-5 space-y-4 bg-muted/30">
-          <h3 className="font-semibold">New Template</h3>
+        <div className="win11-card p-5 space-y-4">
+          <h3 className="font-semibold text-[color:var(--w11-text-primary)]">New Template</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Name</label>
@@ -327,7 +337,8 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
                 onChange={(e) =>
                   setFormData((d) => ({ ...d, name: e.target.value }))
                 }
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={inputStyle}
                 placeholder="Template name"
               />
             </div>
@@ -354,10 +365,11 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
                 setFormData((d) => ({ ...d, content: e.target.value }))
               }
               rows={3}
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full rounded-lg px-3 py-2 text-sm resize-none"
+              style={inputStyle}
               placeholder="SMS message content…"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[color:var(--w11-text-secondary)]">
               {formData.content.length}/160 chars
             </p>
           </div>
@@ -369,7 +381,7 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
                 !formData.name.trim() ||
                 !formData.content.trim()
               }
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+              className="win11-btn accent flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
             >
               {createMutation.isPending && (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -378,7 +390,7 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg"
+              className="win11-btn px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -389,43 +401,43 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
       {/* Templates list */}
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
         </div>
       ) : templates && templates.length > 0 ? (
-        <div className="border rounded-xl overflow-x-auto">
+        <DataPanel bodyClassName="p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
+            <thead className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Name</th>
                 <th className="text-left px-4 py-3 font-medium">Category</th>
                 <th className="text-left px-4 py-3 font-medium">Content</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-[color:var(--w11-border-subtle)]">
               {templates.map((t) => (
-                <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                <tr key={t.id}>
                   <td className="px-4 py-3 font-medium">{t.name}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary font-medium capitalize">
+                    <span className="win11-chip accent capitalize">
                       {t.category}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground max-w-sm truncate">
+                  <td className="px-4 py-3 max-w-sm truncate text-[color:var(--w11-text-secondary)]">
                     {t.content}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </DataPanel>
       ) : (
-        <div className="text-center py-16 text-muted-foreground">
-          <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No templates yet</p>
-          <p className="text-sm mt-1">
-            Create a template to reuse common SMS messages
-          </p>
-        </div>
+        <DataPanel>
+          <AOSEmptyState
+            icon={<FileText className="h-10 w-10" />}
+            title="No templates yet"
+            description="Create a template to reuse common SMS messages"
+          />
+        </DataPanel>
       )}
     </div>
   );
@@ -446,11 +458,11 @@ function HistoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Recent SMS logs</p>
+        <p className="text-sm text-[color:var(--w11-text-secondary)]">Recent SMS logs</p>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1.5 text-sm text-[color:var(--w11-text-secondary)]"
         >
           <RefreshCw
             className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
@@ -461,12 +473,12 @@ function HistoryTab() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
         </div>
       ) : data && data.length > 0 ? (
-        <div className="border rounded-xl overflow-x-auto">
+        <DataPanel bodyClassName="p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
+            <thead className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Date</th>
                 <th className="text-left px-4 py-3 font-medium">Message</th>
@@ -474,17 +486,14 @@ function HistoryTab() {
                 <th className="text-left px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-[color:var(--w11-border-subtle)]">
               {data.map((log) => (
-                <tr
-                  key={log.id}
-                  className="hover:bg-muted/30 transition-colors"
-                >
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                <tr key={log.id}>
+                  <td className="px-4 py-3 whitespace-nowrap text-[color:var(--w11-text-secondary)]">
                     {displayBS(log.created_at)}
                   </td>
                   <td className="px-4 py-3 max-w-xs truncate">{log.message}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 text-[color:var(--w11-text-secondary)]">
                     {log.to_phone}
                   </td>
                   <td className="px-4 py-3">
@@ -494,13 +503,15 @@ function HistoryTab() {
               ))}
             </tbody>
           </table>
-        </div>
+        </DataPanel>
       ) : (
-        <div className="text-center py-16 text-muted-foreground">
-          <History className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No SMS history</p>
-          <p className="text-sm mt-1">Sent messages will appear here</p>
-        </div>
+        <DataPanel>
+          <AOSEmptyState
+            icon={<History className="h-10 w-10" />}
+            title="No SMS history"
+            description="Sent messages will appear here"
+          />
+        </DataPanel>
       )}
     </div>
   );
@@ -509,17 +520,15 @@ function HistoryTab() {
 function StatusBadge({ status }: { status: SmsLog["status"] }) {
   // "queued" is the state every /sms/send row starts in (Celery flips it to
   // sent/failed) — a missing entry here crashed the whole history table.
-  const config: Record<string, { label: string; cls: string }> = {
-    sent: { label: "Sent", cls: "bg-green-100 text-green-700" },
-    failed: { label: "Failed", cls: "bg-red-100 text-red-700" },
-    queued: { label: "Queued", cls: "bg-yellow-100 text-yellow-700" },
-    pending: { label: "Pending", cls: "bg-yellow-100 text-yellow-700" },
+  const config: Record<string, { label: string; tone: string }> = {
+    sent: { label: "Sent", tone: "success" },
+    failed: { label: "Failed", tone: "error" },
+    queued: { label: "Queued", tone: "warning" },
+    pending: { label: "Pending", tone: "warning" },
   };
-  const badge = config[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+  const badge = config[status] ?? { label: status, tone: "" };
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}
-    >
+    <span className={`win11-chip ${badge.tone}`}>
       {badge.label}
     </span>
   );
@@ -541,18 +550,18 @@ function CreditsTab() {
   if (isError) {
     return (
       <div className="space-y-4 max-w-xl">
-        <div className="border border-destructive/30 bg-destructive/5 rounded-lg p-4 space-y-2">
-          <p className="text-sm font-medium text-destructive">
+        <div className="win11-infobar error rounded-lg p-4 space-y-2">
+          <p className="text-sm font-medium">
             Couldn&apos;t load SMS credits
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs">
             {error instanceof axios.AxiosError && error.response?.status === 403
               ? "The SMS Notifications plugin is not active for your school. Activate it under Installed Plugins."
               : "The SMS service didn't respond. Check your connection and try again."}
           </p>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-2 border px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors"
+            className="win11-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Retry
           </button>
@@ -565,33 +574,22 @@ function CreditsTab() {
     <div className="space-y-6 max-w-xl">
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
         </div>
       ) : (
         <>
           {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <StatCard
-              label="Credits Available"
-              value={data?.credits_available ?? "—"}
-              highlight
-            />
-            <StatCard
-              label="This Month Sent"
-              value={data?.this_month_sent ?? "—"}
-            />
-            <StatCard label="Total Sent" value={data?.total_sent ?? "—"} />
-            <StatCard
-              label="Total Failed"
-              value={data?.total_failed ?? "—"}
-              danger={!!data?.total_failed}
-            />
-          </div>
+          <StatGrid min={200} className="mb-0">
+            <KpiCard label="Credits Available" value={data?.credits_available ?? "—"} />
+            <KpiCard label="This Month Sent" value={data?.this_month_sent ?? "—"} />
+            <KpiCard label="Total Sent" value={data?.total_sent ?? "—"} />
+            <KpiCard label="Total Failed" value={data?.total_failed ?? "—"} color={!!data?.total_failed ? "#c42b1c" : undefined} />
+          </StatGrid>
 
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-2 border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            className="win11-btn flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
           >
             <RefreshCw
               className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
@@ -599,7 +597,7 @@ function CreditsTab() {
             {isFetching ? "Checking…" : "Check Balance"}
           </button>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">
             Credits are provided by Sparrow SMS. Contact your administrator to
             top up credits.
           </p>
@@ -612,32 +610,11 @@ function CreditsTab() {
 function StatCard({
   label,
   value,
-  highlight,
-  danger,
 }: {
   label: string;
   value: number | string;
-  highlight?: boolean;
-  danger?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-xl border p-4 ${
-        highlight
-          ? "bg-primary/5 border-primary/20"
-          : danger
-            ? "bg-red-50 border-red-100"
-            : "bg-card"
-      }`}
-    >
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p
-        className={`text-2xl font-bold ${
-          highlight ? "text-primary" : danger ? "text-red-600" : ""
-        }`}
-      >
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </p>
-    </div>
+    <KpiCard label={label} value={typeof value === "number" ? value.toLocaleString() : value} />
   );
 }

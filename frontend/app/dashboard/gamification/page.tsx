@@ -6,9 +6,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import {
   Dialog,
@@ -20,6 +18,14 @@ import {
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Award, Medal, Plus, Star, Trophy, Users } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface BadgeItem {
   id: string;
@@ -92,77 +98,58 @@ function GamificationContent() {
   if (lbLoading) return <PageLoader />;
   if (lbError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load gamification data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => lbRefetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Gamification"
+          subtitle="Points, badges, houses & leaderboard"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load gamification data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => lbRefetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Gamification</h1>
-          <p className="text-muted-foreground">Points, badges, houses & leaderboard</p>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Gamification"
+        subtitle="Points, badges, houses & leaderboard"
+        actions={<AwardPointsDialog onAwarded={() => lbRefetch()} />}
+      />
+      <AOSPageBody>
+        {/* Stats */}
+        <StatGrid min={180}>
+          <KpiCard label="Ranked Students" value={leaderboard?.length || 0} icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Badges" value={badges?.length || 0} icon={<Award className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Houses" value={houses?.length || 0} icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+        </StatGrid>
+
+        {/* Tabs */}
+        <div className="flex gap-2 border-b border-[color:var(--w11-border-subtle)] pb-2 mb-4">
+          <Button variant={tab === "leaderboard" ? "default" : "ghost"} size="sm" onClick={() => setTab("leaderboard")}>
+            <Trophy className="h-4 w-4 mr-1" /> Leaderboard
+          </Button>
+          <Button variant={tab === "badges" ? "default" : "ghost"} size="sm" onClick={() => setTab("badges")}>
+            <Medal className="h-4 w-4 mr-1" /> Badges
+          </Button>
+          <Button variant={tab === "houses" ? "default" : "ghost"} size="sm" onClick={() => setTab("houses")}>
+            <Users className="h-4 w-4 mr-1" /> Houses
+          </Button>
         </div>
-        <AwardPointsDialog onAwarded={() => lbRefetch()} />
-      </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Trophy className="h-8 w-8 text-yellow-500" />
-              <div>
-                <p className="text-2xl font-bold">{leaderboard?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Ranked Students</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Award className="h-8 w-8 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{badges?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Badges</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">{houses?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Houses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <Button variant={tab === "leaderboard" ? "default" : "ghost"} size="sm" onClick={() => setTab("leaderboard")}>
-          <Trophy className="h-4 w-4 mr-1" /> Leaderboard
-        </Button>
-        <Button variant={tab === "badges" ? "default" : "ghost"} size="sm" onClick={() => setTab("badges")}>
-          <Medal className="h-4 w-4 mr-1" /> Badges
-        </Button>
-        <Button variant={tab === "houses" ? "default" : "ghost"} size="sm" onClick={() => setTab("houses")}>
-          <Users className="h-4 w-4 mr-1" /> Houses
-        </Button>
-      </div>
-
-      {tab === "leaderboard" && <LeaderboardTab data={leaderboard || []} />}
-      {tab === "badges" && <BadgesTab data={badges || []} />}
-      {tab === "houses" && <HousesTab data={houses || []} />}
-    </div>
+        {tab === "leaderboard" && <LeaderboardTab data={leaderboard || []} />}
+        {tab === "badges" && <BadgesTab data={badges || []} />}
+        {tab === "houses" && <HousesTab data={houses || []} />}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -177,7 +164,7 @@ function LeaderboardTab({ data }: { data: LeaderEntry[] }) {
         i < 3 ? (
           <span className="text-xl">{["🥇", "🥈", "🥉"][i]}</span>
         ) : (
-          <span className="text-sm text-muted-foreground">#{e.rank || i + 1}</span>
+          <span className="text-sm text-[color:var(--w11-text-secondary)]">#{e.rank || i + 1}</span>
         ),
     },
     { key: "student_name", label: "Student", sortable: true, value: (e) => e.student_name, render: (e) => <span className="font-medium">{e.student_name}</span> },
@@ -188,17 +175,14 @@ function LeaderboardTab({ data }: { data: LeaderEntry[] }) {
       sortable: true,
       value: (e) => e.total_points,
       render: (e) => (
-        <Badge variant="outline">
-          <Star className="h-3 w-3 mr-1 text-yellow-500" /> {e.total_points}
-        </Badge>
+        <span className="win11-chip">
+          <Star className="h-3 w-3 mr-1 inline" /> {e.total_points}
+        </span>
       ),
     },
   ];
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Top Students</CardTitle>
-      </CardHeader>
+    <DataPanel title="Top Students">
       <DataTable<LeaderEntry>
         columns={LEADER_COLUMNS}
         rows={data}
@@ -208,7 +192,7 @@ function LeaderboardTab({ data }: { data: LeaderEntry[] }) {
         exportFileName="leaderboard"
         dense
       />
-    </Card>
+    </DataPanel>
   );
 }
 
@@ -265,31 +249,34 @@ function BadgesTab({ data }: { data: BadgeItem[] }) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {data.length === 0 ? (
-          <p className="text-muted-foreground col-span-full text-center py-8">No badges yet</p>
+          <p className="col-span-full text-center py-8 text-[color:var(--w11-text-secondary)]">No badges yet</p>
         ) : (
           data.map((badge) => (
-            <Card key={badge.id}>
-              <CardContent className="pt-6">
+            <div key={badge.id} className="win11-card" style={{ marginBottom: 0 }}>
+              <div className="pt-2">
                 <div className="flex items-start gap-3">
-                  <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Medal className="h-6 w-6 text-purple-600" />
+                  <div
+                    className="h-12 w-12 rounded-full flex items-center justify-center"
+                    style={{ background: "var(--w11-accent-light)" }}
+                  >
+                    <Medal className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold">{badge.name}</h3>
-                    <p className="text-sm text-muted-foreground">{badge.description}</p>
+                    <h3 className="font-semibold text-[color:var(--w11-text-primary)]">{badge.name}</h3>
+                    <p className="text-sm text-[color:var(--w11-text-secondary)]">{badge.description}</p>
                     <div className="flex gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs">{badge.criteria}</Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        <Star className="h-3 w-3 mr-1" /> {badge.points_value} pts
-                      </Badge>
+                      <span className="win11-chip text-xs">{badge.criteria}</span>
+                      <span className="win11-chip accent text-xs">
+                        <Star className="h-3 w-3 mr-1 inline" /> {badge.points_value} pts
+                      </span>
                     </div>
                     <div className="mt-3">
                       <AwardBadgeDialog badgeId={badge.id} badgeName={badge.name} />
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))
         )}
       </div>
@@ -338,7 +325,7 @@ function HousesTab({ data }: { data: House[] }) {
               <Input name="name" placeholder="House name (e.g., Red Eagles)" required />
               <div className="flex gap-2 items-center">
                 <input name="color" type="color" defaultValue="#e11d48" className="h-10 w-14 rounded border" />
-                <span className="text-sm text-muted-foreground">House color</span>
+                <span className="text-sm text-[color:var(--w11-text-secondary)]">House color</span>
               </div>
               <Input name="motto" placeholder="Motto" />
               <Button type="submit" disabled={createMut.isPending} className="w-full">
@@ -351,21 +338,21 @@ function HousesTab({ data }: { data: House[] }) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {data.length === 0 ? (
-          <p className="text-muted-foreground col-span-full text-center py-8">No houses yet</p>
+          <p className="col-span-full text-center py-8 text-[color:var(--w11-text-secondary)]">No houses yet</p>
         ) : (
           data.map((house) => (
-            <Card key={house.id} className="overflow-hidden">
+            <div key={house.id} className="win11-card overflow-hidden" style={{ marginBottom: 0 }}>
               <div className="h-2" style={{ backgroundColor: house.color }} />
-              <CardContent className="pt-4">
-                <h3 className="font-bold text-lg">{house.name}</h3>
-                <p className="text-sm text-muted-foreground italic">{house.motto || "—"}</p>
+              <div className="pt-4">
+                <h3 className="font-bold text-lg text-[color:var(--w11-text-primary)]">{house.name}</h3>
+                <p className="text-sm italic text-[color:var(--w11-text-secondary)]">{house.motto || "—"}</p>
                 <div className="mt-3 flex items-center gap-1">
-                  <Trophy className="h-4 w-4 text-yellow-500" />
-                  <span className="font-bold text-lg">{house.total_points || 0}</span>
-                  <span className="text-sm text-muted-foreground">points</span>
+                  <Trophy className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                  <span className="font-bold text-lg text-[color:var(--w11-text-primary)]">{house.total_points || 0}</span>
+                  <span className="text-sm text-[color:var(--w11-text-secondary)]">points</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))
         )}
       </div>

@@ -5,17 +5,22 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Download, CreditCard, Award, FileText, Printer, Layers, FileOutput, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 type BulkType = "id_cards" | "marksheets" | "certificates" | "admit_cards" | "attendance_ledger";
 type OutputMode = "editor" | "pdf" | "zip";
@@ -254,227 +259,249 @@ function BulkContent() {
   const Icon = typeIcon;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4 justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/designer">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Bulk Generation</h1>
-            <p className="text-muted-foreground">Generate documents for a whole class in one go</p>
-          </div>
-        </div>
-        <Badge variant="secondary" className="gap-1"><Layers className="h-3 w-3" /> Designer</Badge>
-      </div>
-
-      {/* Type tabs */}
-      <div className="flex flex-wrap gap-2">
-        {TYPES.map((t) => (
-          <button key={t.id} onClick={() => { setType(t.id); setTemplateId(""); setProgress(null); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all
-              ${type === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>
-            <t.icon className="h-4 w-4" /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon className="h-5 w-5" /> Generation Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Class</Label>
-              <Select value={classId} onValueChange={(v) => { setClassId(v); setSectionId(""); }}>
-                <SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger>
-                <SelectContent>
-                  {(classes || []).map((c: { id: string; name: string; sections?: { id: string; name: string }[] }) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {type !== "attendance_ledger" && selectedClass?.sections?.length > 0 && (
-              <div className="space-y-2">
-                <Label>Section (optional)</Label>
-                <Select value={sectionId} onValueChange={setSectionId}>
-                  <SelectTrigger><SelectValue placeholder="All sections" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All sections</SelectItem>
-                    {selectedClass.sections.map((s: { id: string; name: string }) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {type === "attendance_ledger" ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
-                  <Label>BS Year</Label>
-                  <Select value={ledgerYear} onValueChange={setLedgerYear}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 4 }, (_, i) => String(currentBsYear() - 2 + i)).map((y) => (
-                        <SelectItem key={y} value={y}>{y} BS</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>BS Month</Label>
-                  <Select value={ledgerMonth} onValueChange={setLedgerMonth}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BS_MONTHS.map((m, i) => (
-                        <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : (
-            <div className="space-y-2">
-              <Label>Select Template</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger><SelectValue placeholder="Choose a template" /></SelectTrigger>
-                <SelectContent>
-                  {(templates || []).map((t: { id: string; name: string }) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            )}
-
-            {needsExam && (
-              <div className="space-y-2">
-                <Label>Select Exam</Label>
-                <Select value={examId} onValueChange={setExamId}>
-                  <SelectTrigger><SelectValue placeholder="Choose an exam" /></SelectTrigger>
-                  <SelectContent>
-                    {(exams || []).map((e: { id: string; name: string }) => (
-                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {type === "certificates" && (
-              <div className="space-y-2">
-                <Label>Certificate Type</Label>
-                <Select value={certType} onValueChange={setCertType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="character">Character Certificate</SelectItem>
-                    <SelectItem value="transfer">Transfer Certificate</SelectItem>
-                    <SelectItem value="merit">Merit Certificate</SelectItem>
-                    <SelectItem value="participation">Participation Certificate</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Output</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { id: "pdf" as OutputMode, label: "Print PDF", icon: FileOutput, hint: "Best for print shops" },
-                  { id: "editor" as OutputMode, label: "Designer", icon: Layers, hint: "Preview & export in editor" },
-                  { id: "zip" as OutputMode, label: "PNG ZIP", icon: Download, hint: "One image per record" },
-                ]).map((o) => (
-                  <button key={o.id} onClick={() => setOutput(o.id)} title={o.hint}
-                    className={`flex flex-col items-center gap-1 border rounded-lg p-2.5 text-xs transition-all
-                      ${output === o.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted"}`}>
-                    <o.icon className="h-4 w-4" />
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-              {output === "pdf" && (
-                <p className="text-[10px] text-muted-foreground">
-                  Print-ready server PDF — correct Nepali text, selectable, one page per record.
-                </p>
-              )}
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={() => bulkMutation.mutate()}
-              disabled={!classId || bulkMutation.isPending || (needsExam && !examId) || (type !== "attendance_ledger" && !templateId)}
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Layers className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={
+          <span className="flex items-center gap-3">
+            <Link href="/dashboard/designer" className="inline-flex">
+              <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            </Link>
+            Bulk Generation
+          </span>
+        }
+        subtitle="Generate documents for a whole class in one go"
+        actions={
+          <Badge variant="secondary" className="gap-1"><Layers className="h-3 w-3" /> Designer</Badge>
+        }
+      />
+      <AOSPageBody>
+        {/* Type tabs */}
+        <FilterCommandBar>
+          {TYPES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => { setType(t.id); setTemplateId(""); setProgress(null); }}
+              className={`win11-chip ${type === t.id ? "accent" : ""}`}
             >
-              <Download className="h-4 w-4 mr-2" />
-              {bulkMutation.isPending ? (progress || "Working…") : "Generate Batch"}
-            </Button>
-            {bulkMutation.isPending && progress && (
-              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                <div className="bg-primary h-full animate-pulse w-2/3 rounded-full" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              <t.icon className="h-4 w-4" /> {t.label}
+            </button>
+          ))}
+        </FilterCommandBar>
 
-        <Card>
-          <CardHeader><CardTitle>What gets generated</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              {type === "id_cards" && (
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>- Student photo, name, class, section</li>
-                  <li>- Student ID number & verification QR</li>
-                  <li>- School logo, name, address</li>
-                  <li>- One page per student</li>
-                </ul>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <DataPanel
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Icon className="h-4 w-4" /> Generation Settings
+              </span>
+            }
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Select Class</Label>
+                <Select value={classId} onValueChange={(v) => { setClassId(v); setSectionId(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger>
+                  <SelectContent>
+                    {(classes || []).map((c: { id: string; name: string; sections?: { id: string; name: string }[] }) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {type !== "attendance_ledger" && selectedClass?.sections?.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Section (optional)</Label>
+                  <Select value={sectionId} onValueChange={setSectionId}>
+                    <SelectTrigger><SelectValue placeholder="All sections" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All sections</SelectItem>
+                      {selectedClass.sections.map((s: { id: string; name: string }) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
-              {type === "marksheets" && (
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>- Subject marks, totals, percentage, and rank</li>
-                  <li>- School branding and template styling</li>
-                  <li>- One page per student</li>
-                </ul>
+
+              {type === "attendance_ledger" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>BS Year</Label>
+                    <Select value={ledgerYear} onValueChange={setLedgerYear}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 4 }, (_, i) => String(currentBsYear() - 2 + i)).map((y) => (
+                          <SelectItem key={y} value={y}>{y} BS</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>BS Month</Label>
+                    <Select value={ledgerMonth} onValueChange={setLedgerMonth}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {BS_MONTHS.map((m, i) => (
+                          <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : (
+              <div className="space-y-2">
+                <Label>Select Template</Label>
+                <Select value={templateId} onValueChange={setTemplateId}>
+                  <SelectTrigger><SelectValue placeholder="Choose a template" /></SelectTrigger>
+                  <SelectContent>
+                    {(templates || []).map((t: { id: string; name: string }) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               )}
+
+              {needsExam && (
+                <div className="space-y-2">
+                  <Label>Select Exam</Label>
+                  <Select value={examId} onValueChange={setExamId}>
+                    <SelectTrigger><SelectValue placeholder="Choose an exam" /></SelectTrigger>
+                    <SelectContent>
+                      {(exams || []).map((e: { id: string; name: string }) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {type === "certificates" && (
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>- Student name, class, section</li>
-                  <li>- Selected certificate type & title</li>
-                  <li>- Principal signature field</li>
-                </ul>
+                <div className="space-y-2">
+                  <Label>Certificate Type</Label>
+                  <Select value={certType} onValueChange={setCertType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="character">Character Certificate</SelectItem>
+                      <SelectItem value="transfer">Transfer Certificate</SelectItem>
+                      <SelectItem value="merit">Merit Certificate</SelectItem>
+                      <SelectItem value="participation">Participation Certificate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
-              {type === "admit_cards" && (
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>- Student photo, name, roll number</li>
-                  <li>- Exam name, type & academic year</li>
-                  <li>- QR code for verification</li>
-                </ul>
-              )}
-              {type === "attendance_ledger" && (
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>- 20 roll-wise rows × day columns 1..31</li>
-                  <li>- P / A / L / H / Lv marks from real attendance</li>
-                  <li>- Per-student present &amp; absent totals</li>
-                  <li>- One A4 page per 20 students</li>
-                </ul>
+
+              <div className="space-y-2">
+                <Label>Output</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: "pdf" as OutputMode, label: "Print PDF", icon: FileOutput, hint: "Best for print shops" },
+                    { id: "editor" as OutputMode, label: "Designer", icon: Layers, hint: "Preview & export in editor" },
+                    { id: "zip" as OutputMode, label: "PNG ZIP", icon: Download, hint: "One image per record" },
+                  ]).map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => setOutput(o.id)}
+                      title={o.hint}
+                      className="win11-chip flex-col h-auto py-2"
+                      style={output === o.id ? { borderColor: "var(--w11-accent)", background: "var(--w11-accent-light)" } : undefined}
+                    >
+                      <o.icon className="h-4 w-4" />
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                {output === "pdf" && (
+                  <p className="text-[10px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    Print-ready server PDF — correct Nepali text, selectable, one page per record.
+                  </p>
+                )}
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={() => bulkMutation.mutate()}
+                disabled={!classId || bulkMutation.isPending || (needsExam && !examId) || (type !== "attendance_ledger" && !templateId)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {bulkMutation.isPending ? (progress || "Working…") : "Generate Batch"}
+              </Button>
+              {bulkMutation.isPending && progress && (
+                <div
+                  className="w-full rounded-full h-1.5 overflow-hidden"
+                  style={{ background: "var(--w11-control-hover)" }}
+                >
+                  <div
+                    className="h-full animate-pulse w-2/3 rounded-full"
+                    style={{ background: "var(--w11-accent)" }}
+                  />
+                </div>
               )}
             </div>
-            <div className="text-sm text-muted-foreground flex items-center gap-2">
-              {output === "pdf" ? <Printer className="h-4 w-4" /> : <Badge variant="secondary">{output.toUpperCase()}</Badge>}
-              {output === "pdf"
-                ? "Single print-ready PDF — hand it straight to the print shop."
-                : output === "editor"
-                ? "Opens in the visual designer for multi-page preview and export."
-                : "One PNG per record, named per student, zipped."}
+          </DataPanel>
+
+          <DataPanel title="What gets generated">
+            <div className="space-y-4">
+              <div
+                className="p-4 rounded-lg space-y-2"
+                style={{ background: "var(--w11-control-hover)" }}
+              >
+                {type === "id_cards" && (
+                  <ul className="text-sm space-y-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    <li>- Student photo, name, class, section</li>
+                    <li>- Student ID number & verification QR</li>
+                    <li>- School logo, name, address</li>
+                    <li>- One page per student</li>
+                  </ul>
+                )}
+                {type === "marksheets" && (
+                  <ul className="text-sm space-y-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    <li>- Subject marks, totals, percentage, and rank</li>
+                    <li>- School branding and template styling</li>
+                    <li>- One page per student</li>
+                  </ul>
+                )}
+                {type === "certificates" && (
+                  <ul className="text-sm space-y-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    <li>- Student name, class, section</li>
+                    <li>- Selected certificate type & title</li>
+                    <li>- Principal signature field</li>
+                  </ul>
+                )}
+                {type === "admit_cards" && (
+                  <ul className="text-sm space-y-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    <li>- Student photo, name, roll number</li>
+                    <li>- Exam name, type & academic year</li>
+                    <li>- QR code for verification</li>
+                  </ul>
+                )}
+                {type === "attendance_ledger" && (
+                  <ul className="text-sm space-y-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    <li>- 20 roll-wise rows × day columns 1..31</li>
+                    <li>- P / A / L / H / Lv marks from real attendance</li>
+                    <li>- Per-student present &amp; absent totals</li>
+                    <li>- One A4 page per 20 students</li>
+                  </ul>
+                )}
+              </div>
+              <div
+                className="text-sm flex items-center gap-2"
+                style={{ color: "var(--w11-text-secondary)" }}
+              >
+                {output === "pdf" ? <Printer className="h-4 w-4" /> : <Badge variant="secondary">{output.toUpperCase()}</Badge>}
+                {output === "pdf"
+                  ? "Single print-ready PDF — hand it straight to the print shop."
+                  : output === "editor"
+                    ? "Opens in the visual designer for multi-page preview and export."
+                    : "One PNG per record, named per student, zipped."}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

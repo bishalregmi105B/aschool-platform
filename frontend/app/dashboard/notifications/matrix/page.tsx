@@ -4,12 +4,17 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { Bell, Mail, MessageCircle, Smartphone } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 /**
  * Notification Matrix (A-02) — per-event × per-channel notification rules.
@@ -146,67 +151,71 @@ export default function NotificationMatrixPage() {
 
   if (isError) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">
-              Failed to load the notification matrix. Please try again.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Notification Matrix"
+          subtitle="Choose which channel delivers each event."
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load the notification matrix. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   const busy = toggle.isPending || reset.isPending;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bell className="h-6 w-6" />
-            Notification Matrix
-          </h1>
-          <p className="text-muted-foreground">
-            Choose which channel delivers each event. Everything is on by
-            default — switch a cell off to silence it.
-          </p>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Notification Matrix"
+        subtitle="Choose which channel delivers each event. Everything is on by default — switch a cell off to silence it."
+      />
+      <AOSPageBody>
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-4 text-xs text-[color:var(--w11-text-secondary)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#9d5d00" }} />
+            Custom override — click to reset to default
+          </span>
+          <span>Default for every event and channel: on.</span>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
-          Custom override — click to reset to default
-        </span>
-        <span>Default for every event and channel: on.</span>
-      </div>
-
-      {groups.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Bell className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="text-muted-foreground">No notification events defined.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-5">
-          {groups.map(([prefix, events]) => (
-            <Card key={prefix}>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold">{groupLabel(prefix)}</h2>
-                  <Badge variant="outline">{events.length} events</Badge>
-                </div>
-                <div className="overflow-x-auto rounded-lg border">
+        {groups.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Bell className="h-12 w-12" />}
+              title="No notification events defined."
+            />
+          </DataPanel>
+        ) : (
+          <div className="space-y-5">
+            {groups.map(([prefix, events]) => (
+              <DataPanel
+                key={prefix}
+                title={
+                  <span className="flex items-center justify-between">
+                    {groupLabel(prefix)}
+                    <span className="win11-chip">{events.length} events</span>
+                  </span>
+                }
+                bodyClassName="p-0"
+              >
+                <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b bg-muted/40">
+                      <tr className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
                         <th className="px-3 py-2 text-left font-medium">Event</th>
                         {CHANNEL_META.map((c) => {
                           const Icon = c.icon;
@@ -216,7 +225,7 @@ export default function NotificationMatrixPage() {
                               className="px-3 py-2 text-center font-medium w-28"
                             >
                               <span className="inline-flex items-center gap-1.5">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                <Icon className="h-4 w-4 text-[color:var(--w11-text-secondary)]" />
                                 {c.label}
                               </span>
                             </th>
@@ -226,10 +235,10 @@ export default function NotificationMatrixPage() {
                     </thead>
                     <tbody>
                       {events.map((e) => (
-                        <tr key={e.event_key} className="border-b last:border-b-0">
+                        <tr key={e.event_key} className="border-b border-[color:var(--w11-border-subtle)] last:border-b-0">
                           <td className="px-3 py-2">
                             <p className="font-medium">{eventLabel(e.event_key)}</p>
-                            <p className="font-mono text-[11px] text-muted-foreground">
+                            <p className="font-mono text-[11px] text-[color:var(--w11-text-secondary)]">
                               {e.event_key}
                             </p>
                           </td>
@@ -271,12 +280,13 @@ export default function NotificationMatrixPage() {
                                         })
                                       }
                                     >
-                                      <span className="block h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-500/25" />
+                                      <span className="block h-2.5 w-2.5 rounded-full" style={{ background: "#9d5d00", boxShadow: "0 0 0 2px rgba(157,93,0,.25)" }} />
                                     </button>
                                   )}
                                   {cellPending && (
                                     <span
-                                      className="h-3 w-3 shrink-0 rounded-full border-2 border-primary border-t-transparent animate-spin"
+                                      className="h-3 w-3 shrink-0 rounded-full border-2 border-t-transparent animate-spin"
+                                      style={{ borderColor: "var(--w11-accent)", borderTopColor: "transparent" }}
                                       aria-hidden="true"
                                     />
                                   )}
@@ -289,11 +299,11 @@ export default function NotificationMatrixPage() {
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+              </DataPanel>
+            ))}
+          </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Brain, Plus } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 export default function CounselorPage() {
   return <PluginGate slug="wellbeing"><CounselorContent /></PluginGate>;
@@ -53,43 +58,55 @@ function CounselorContent() {
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load counselor notes. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Brain className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Counselor Notes"
+          subtitle="Record counseling sessions and follow-ups"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load counselor notes. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   const NOTE_COLUMNS: Column<any>[] = [
     { key: "student_name", label: "Student", sortable: true, value: (n) => n.student_name ?? "", render: (n) => <span className="font-medium">{n.student_name || n.student_id}</span> },
-    { key: "note_type", label: "Type", sortable: true, value: (n) => n.note_type ?? "", render: (n) => <span className="capitalize text-sm">{n.note_type || "general"}</span> },
+    { key: "note_type", label: "Type", sortable: true, value: (n) => n.note_type ?? "", render: (n) => <span className="win11-chip capitalize">{n.note_type || "general"}</span> },
     { key: "content", label: "Note", value: (n) => n.content ?? "", render: (n) => <span className="text-sm max-w-xs truncate block">{n.content || "—"}</span> },
     { key: "created_at", label: "Date", sortable: true, value: (n) => n.created_at ?? "", render: (n) => <span className="text-sm">{n.created_at ? new Date(n.created_at).toLocaleDateString() : "—"}</span> },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Brain className="h-6 w-6" /> Counselor Notes</h1>
-          <p className="text-muted-foreground">Record counseling sessions and follow-ups</p>
-        </div>
-        <Button onClick={() => { setForm({ student_id: "", note: "", session_type: "individual", action_taken: "" }); setShowDialog(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> New Note
-        </Button>
-      </div>
-
-      <Card><CardContent className="pt-6">
-        <DataTable
-          columns={NOTE_COLUMNS}
-          rows={notes}
-          rowKey={(n: any) => n.id}
-          searchable
-          searchPlaceholder="Search notes…"
-          exportFileName="counselor-notes"
-          empty={{ icon: Brain, title: "No counselor notes yet", body: "Record a session to start the counseling log.", action: { label: "New Note", onClick: () => setShowDialog(true) } }}
-        />
-      </CardContent></Card>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Brain className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Counselor Notes"
+        subtitle="Record counseling sessions and follow-ups"
+        actions={
+          <Button onClick={() => { setForm({ student_id: "", note: "", session_type: "individual", action_taken: "" }); setShowDialog(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> New Note
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0 pt-0">
+          <DataTable
+            columns={NOTE_COLUMNS}
+            rows={notes}
+            rowKey={(n: any) => n.id}
+            searchable
+            searchPlaceholder="Search notes…"
+            exportFileName="counselor-notes"
+            empty={{ icon: Brain, title: "No counselor notes yet", body: "Record a session to start the counseling log.", action: { label: "New Note", onClick: () => setShowDialog(true) } }}
+          />
+        </DataPanel>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
@@ -116,6 +133,7 @@ function CounselorContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

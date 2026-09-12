@@ -3,13 +3,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Download, IndianRupee, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+} from "@/components/aos/kit/page-kit";
 
 interface Expense {
   id: string;
@@ -46,12 +54,21 @@ export default function ExpenseReportsPage() {
 
   if (expensesError) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load expense reports. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetchExpenses()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<PieChart className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Expense Reports"
+          subtitle="Financial breakdown of school expenditures"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load expense reports. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetchExpenses()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
   if (expensesLoading) return <PageLoader />;
@@ -99,56 +116,43 @@ export default function ExpenseReportsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <PieChart className="h-6 w-6" /> Expense Reports
-          </h1>
-          <p className="text-muted-foreground">Financial breakdown of school expenditures</p>
-        </div>
-        <Button variant="outline" onClick={exportCsv} disabled={distribution.length === 0}>
-          <Download className="h-4 w-4 mr-2" /> Export CSV
-        </Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<PieChart className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Expense Reports"
+        subtitle="Financial breakdown of school expenditures"
+        actions={
+          <Button variant="outline" onClick={exportCsv} disabled={distribution.length === 0}>
+            <Download className="h-4 w-4 mr-2" /> Export CSV
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <div className="space-y-2 w-64">
+            <Label>Time Period</Label>
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="this_month">This Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="this_year">This Academic Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </FilterCommandBar>
 
-      <div className="grid md:grid-cols-4 gap-6">
-        <Card className="md:col-span-1 bg-primary text-primary-foreground">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium opacity-80">Total Expenditure</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold flex items-center">
-              <IndianRupee className="h-6 w-6 mr-1" />
-              {totalExpense.toLocaleString()}
-            </div>
-            <p className="text-xs opacity-80 mt-1">For the selected period</p>
-          </CardContent>
-        </Card>
+        <StatGrid min={220} className="mb-0">
+          <KpiCard
+            label="Total Expenditure"
+            value={totalExpense.toLocaleString()}
+            icon={<IndianRupee className="h-5 w-5" />}
+            footnote="For the selected period"
+          />
+        </StatGrid>
 
-        <Card className="md:col-span-3">
-          <CardContent className="p-4 flex gap-4 items-end">
-            <div className="space-y-2 flex-1">
-              <Label>Time Period</Label>
-              <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="this_month">This Month</SelectItem>
-                  <SelectItem value="last_month">Last Month</SelectItem>
-                  <SelectItem value="this_year">This Academic Year</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenditure by Category</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="grid md:grid-cols-2 gap-4">
+          <DataPanel title="Expenditure by Category">
             <DataTable
               columns={EXPENSE_DIST_COLUMNS}
               rows={distribution}
@@ -158,39 +162,34 @@ export default function ExpenseReportsPage() {
               exportFileName="expense-by-category"
               empty={{ icon: Receipt, title: "No expenses recorded for this period." }}
             />
-          </CardContent>
-        </Card>
+          </DataPanel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Expense Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <DataPanel title="Expense Distribution">
             {distribution.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">No expense distribution available.</p>
+              <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No expense distribution available.</p>
             ) : (
               <div className="space-y-4">
                 {distribution.map((item) => (
                   <div key={item.catId} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{item.name}</span>
-                      <span className="text-muted-foreground">{item.percentage.toFixed(1)}%</span>
+                      <span className="text-[color:var(--w11-text-secondary)]">{item.percentage.toFixed(1)}%</span>
                     </div>
-                    <div className="h-3 rounded-full bg-muted overflow-hidden">
+                    <div className="h-3 rounded-full overflow-hidden" style={{ background: "var(--w11-control-hover)" }}>
                       <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${Math.max(2, item.percentage)}%` }}
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.max(2, item.percentage)}%`, background: "var(--w11-accent)" }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">Rs. {item.amount.toLocaleString()}</p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">Rs. {item.amount.toLocaleString()}</p>
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

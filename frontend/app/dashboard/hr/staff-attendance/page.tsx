@@ -5,15 +5,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TimePicker } from "@/components/ui/time-picker";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Calendar, Save, CheckCircle, XCircle, Clock } from "lucide-react";
-import { format } from "date-fns";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 interface User {
@@ -32,7 +36,7 @@ interface AttendanceRecord {
 export default function StaffAttendancePage() {
   const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({});
-  
+
   const queryClient = useQueryClient();
 
   const { data: staffData, isLoading: staffLoading } = useQuery<any>({
@@ -51,7 +55,7 @@ export default function StaffAttendancePage() {
     queryKey: ["staff-attendance", date],
     queryFn: async () => {
       const res = await api.get<ApiResponse<any[]>>(`/attendance/teachers/list?date=${date}`);
-      
+
       // Pre-fill local state
       const newRecords: Record<string, AttendanceRecord> = {};
       (res.data.data || []).forEach((record: any) => {
@@ -97,39 +101,37 @@ export default function StaffAttendancePage() {
       toast.error("No attendance changes to save");
       return;
     }
-    
+
     saveMutation.mutate({
       date,
       records: payloadRecords
     });
   };
 
-  if (staffLoading || attLoading) return <PageLoader />;
+  if (staffLoading || attLoading) return <AOSModuleLoadingState label="Loading staff attendance…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Calendar className="h-6 w-6" /> Staff Attendance
-          </h1>
-          <p className="text-muted-foreground">Mark daily attendance for teachers and staff</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <BSDateInput
-            value={date}
-            onChange={setDate}
-            className="w-auto"
-          />
-          <Button onClick={handleSave} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Attendance
-          </Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Staff Attendance"
+        subtitle={`${(staffData || []).length} teachers and staff · mark daily attendance`}
+        actions={
+          <div className="flex items-center gap-2">
+            <BSDateInput
+              value={date}
+              onChange={setDate}
+              className="w-auto"
+            />
+            <Button onClick={handleSave} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Attendance
+            </Button>
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -152,54 +154,54 @@ export default function StaffAttendancePage() {
             <TableBody>
               {(staffData || []).map((staff: any) => {
                 const record = records[staff.id] || { status: "absent" };
-                
+
                 return (
                   <TableRow key={staff.id}>
                     <TableCell className="font-medium">{staff.full_name}</TableCell>
-                    <TableCell className="capitalize text-muted-foreground">{staff.role.replace("_", " ")}</TableCell>
+                    <TableCell className="capitalize" style={{ color: "var(--w11-text-secondary)" }}>{staff.role.replace("_", " ")}</TableCell>
                     <TableCell>
-                      <TimePicker 
-                        value={record.check_in_time || ""} 
+                      <TimePicker
+                        value={record.check_in_time || ""}
                         onChange={(v) => setRecords(prev => ({
                           ...prev,
                           [staff.id]: { ...prev[staff.id], user_id: staff.id, check_in_time: v }
                         }))}
-                        className="w-32" 
+                        className="w-32"
                       />
                     </TableCell>
                     <TableCell>
-                      <TimePicker 
-                        value={record.check_out_time || ""} 
+                      <TimePicker
+                        value={record.check_out_time || ""}
                         onChange={(v) => setRecords(prev => ({
                           ...prev,
                           [staff.id]: { ...prev[staff.id], user_id: staff.id, check_out_time: v }
                         }))}
-                        className="w-32" 
+                        className="w-32"
                       />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button 
+                        <Button
                           variant={record.status === "present" ? "default" : "outline"}
                           size="sm"
-                          className={record.status === "present" ? "bg-green-600 hover:bg-green-700" : ""}
                           onClick={() => handleStatusChange(staff.id, "present")}
+                          style={record.status === "present" ? { backgroundColor: "#107c10" } : undefined}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" /> Present
                         </Button>
-                        <Button 
+                        <Button
                           variant={record.status === "absent" ? "default" : "outline"}
                           size="sm"
-                          className={record.status === "absent" ? "bg-red-600 hover:bg-red-700" : ""}
                           onClick={() => handleStatusChange(staff.id, "absent")}
+                          style={record.status === "absent" ? { backgroundColor: "#c42b1c" } : undefined}
                         >
                           <XCircle className="h-4 w-4 mr-1" /> Absent
                         </Button>
-                        <Button 
+                        <Button
                           variant={record.status === "late" ? "default" : "outline"}
                           size="sm"
-                          className={record.status === "late" ? "bg-amber-500 hover:bg-amber-600" : ""}
                           onClick={() => handleStatusChange(staff.id, "late")}
+                          style={record.status === "late" ? { backgroundColor: "#d83b01" } : undefined}
                         >
                           <Clock className="h-4 w-4 mr-1" /> Late
                         </Button>
@@ -210,15 +212,15 @@ export default function StaffAttendancePage() {
               })}
               {(!staffData || staffData.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>
                     No staff members found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

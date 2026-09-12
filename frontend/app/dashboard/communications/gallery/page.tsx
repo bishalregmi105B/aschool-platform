@@ -7,10 +7,16 @@ import Link from "next/link";
 
 import { api, ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  AOSEmptyState,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { displayBS } from "@/lib/nepali_date";
 
 type GalleryFile = {
@@ -67,80 +73,85 @@ function GalleryContent() {
 
   const files = data || [];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading gallery…" />;
     if (isError) {
       return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load gallery images. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
+        <AOSPage>
+          <AOSPageHeader title="Gallery" />
+          <AOSPageBody>
+            <DataPanel className="max-w-2xl mx-auto">
+              <div className="py-10 text-center space-y-3">
+                <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load gallery images. Please try again.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              </div>
+            </DataPanel>
+          </AOSPageBody>
+        </AOSPage>
       );
     }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Image className="h-6 w-6" /> Gallery
-          </h1>
-          <p className="text-muted-foreground">Manage school photo albums and media</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/files">
-              <Upload className="h-4 w-4 mr-2" /> Upload
-            </Link>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Image className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Gallery"
+        subtitle={`${files.length} photo${files.length === 1 ? "" : "s"} in school media${year !== "all" ? ` · ${year}` : ""}`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/files">
+                <Upload className="h-4 w-4 mr-2" /> Upload
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/files">
+                <Plus className="h-4 w-4 mr-2" /> Create Album
+              </Link>
+            </Button>
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <Button variant={year === "all" ? "default" : "outline"} size="sm" onClick={() => setYear("all")}>
+            All Years
           </Button>
-          <Button asChild>
-            <Link href="/dashboard/files">
-              <Plus className="h-4 w-4 mr-2" /> Create Album
-            </Link>
-          </Button>
-        </div>
-      </div>
+          {years.map((value) => (
+            <Button key={value} variant={year === value ? "default" : "outline"} size="sm" onClick={() => setYear(value)}>
+              {value}
+            </Button>
+          ))}
+        </FilterCommandBar>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant={year === "all" ? "default" : "outline"} size="sm" onClick={() => setYear("all")}>
-          All Years
-        </Button>
-        {years.map((value) => (
-          <Button key={value} variant={year === value ? "default" : "outline"} size="sm" onClick={() => setYear(value)}>
-            {value}
-          </Button>
-        ))}
-      </div>
-
-      {files.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            No gallery photos found for the selected year.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {files.map((file) => (
-            <Card key={file.id}>
-              <CardContent className="p-3">
-                <div className="aspect-[4/3] overflow-hidden rounded-md bg-muted">
+        {files.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Image className="h-10 w-10" />}
+              title="No gallery photos found"
+              description="No gallery photos found for the selected year."
+            />
+          </DataPanel>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {files.map((file) => (
+              <div key={file.id} className="win11-card p-3">
+                <div className="aspect-[4/3] overflow-hidden rounded-md" style={{ background: "var(--w11-control-hover)" }}>
                   <img src={file.url} alt={file.original_name || "Gallery image"} className="h-full w-full object-cover" />
                 </div>
                 <div className="mt-3 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{file.original_name || "Gallery image"}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-medium truncate" style={{ color: "var(--w11-text-primary)" }}>{file.original_name || "Gallery image"}</p>
+                    <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
                       {file.created_at ? displayBS(file.created_at) : ""}
                     </p>
                   </div>
-                  {file.folder ? <Badge variant="outline">{file.folder}</Badge> : null}
+                  {file.folder ? <span className="win11-chip subtle">{file.folder}</span> : null}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

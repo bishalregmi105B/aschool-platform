@@ -5,16 +5,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { BookOpen, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { BookOpen, Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function CatalogPage() {
   return <PluginGate slug="library"><CatalogContent /></PluginGate>;
@@ -93,23 +99,30 @@ function CatalogContent() {
 
   const save = editingId ? update : create;
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading catalog…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load the catalog. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Book Catalog" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load the catalog. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   const CATALOG_COLUMNS: Column<any>[] = [
-    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-muted-foreground" />{b.title}</div> },
+    { key: "title", label: "Title", sortable: true, value: (b) => b.title ?? "", render: (b) => <div className="flex items-center gap-2 font-medium"><BookOpen className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />{b.title}</div> },
     { key: "author", label: "Author", sortable: true, value: (b) => b.author ?? "", render: (b) => b.author || "—" },
     { key: "isbn", label: "ISBN", value: (b) => b.isbn ?? "", render: (b) => <span className="text-sm">{b.isbn || "—"}</span> },
-    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category ?? "", render: (b) => <span className="win11-chip subtle">{b.category}</span> },
     { key: "total_copies", label: "Copies", align: "right", sortable: true, value: (b) => b.total_copies ?? 0 },
-    { key: "available_copies", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies ?? 0, render: (b) => <Badge variant={b.available_copies > 0 ? "default" : "destructive"}>{b.available_copies || 0}</Badge> },
+    { key: "available_copies", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies ?? 0, render: (b) => <StatusChip status={b.available_copies > 0 ? "active" : "inactive"} label={String(b.available_copies || 0)} /> },
     { key: "shelf_location", label: "Shelf", value: (b) => b.shelf_location ?? "", render: (b) => <span className="text-sm">{b.shelf_location || "—"}</span> },
     {
       key: "actions",
@@ -121,14 +134,14 @@ function CatalogContent() {
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
-            variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+            variant="ghost" size="icon" className="h-8 w-8"
             title="Delete"
             onClick={(e) => {
               e.stopPropagation();
               if (window.confirm(`Delete "${b.title}" from the catalog?`)) remove.mutate(b.id);
             }}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
@@ -136,64 +149,61 @@ function CatalogContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Book Catalog</h1>
-          <p className="text-muted-foreground">Browse and manage the library catalog</p>
-        </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" /> Add Book</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Book Catalog"
+        subtitle={`${books.length} ${books.length === 1 ? "title" : "titles"} in the catalog`}
+        actions={
+          <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" /> Add Book</Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
+          <DataTable
+            columns={CATALOG_COLUMNS}
+            rows={books}
+            rowKey={(b: any) => b.id}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by title, author, ISBN..."
+            exportFileName="library-catalog"
+            empty={{ icon: BookOpen, title: "No books found", body: "Add books to build the catalog.", action: { label: "Add Book", onClick: openCreate } }}
+          />
+        </DataPanel>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Search by title, author, ISBN..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
-
-      <Card><CardContent className="pt-6">
-        <DataTable
-          columns={CATALOG_COLUMNS}
-          rows={books}
-          rowKey={(b: any) => b.id}
-          searchable
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Search by title, author, ISBN..."
-          exportFileName="library-catalog"
-          empty={{ icon: BookOpen, title: "No books found", body: "Add books to build the catalog.", action: { label: "Add Book", onClick: openCreate } }}
-        />
-      </CardContent></Card>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingId ? "Edit Book" : "Add Book to Catalog"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
-              <div className="space-y-2"><Label>ISBN</Label><Input value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <AdvancedSelect
-          value={form.category}
-          onChange={(v) => setForm({ ...form, category: v })}
-          options={[{ value: 'general', label: 'General' }, { value: 'textbook', label: 'Textbook' }, { value: 'fiction', label: 'Fiction' }, { value: 'reference', label: 'Reference' }, { value: 'science', label: 'Science' }, { value: 'nepali', label: 'Nepali' }]}
-        />
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{editingId ? "Edit Book" : "Add Book to Catalog"}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
+                <div className="space-y-2"><Label>ISBN</Label><Input value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} /></div>
               </div>
-              <div className="space-y-2"><Label>Copies</Label><Input type="number" value={form.copies} onChange={(e) => setForm({ ...form, copies: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Shelf</Label><Input value={form.shelf_location} onChange={(e) => setForm({ ...form, shelf_location: e.target.value })} placeholder="A-1" /></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <AdvancedSelect
+            value={form.category}
+            onChange={(v) => setForm({ ...form, category: v })}
+            options={[{ value: 'general', label: 'General' }, { value: 'textbook', label: 'Textbook' }, { value: 'fiction', label: 'Fiction' }, { value: 'reference', label: 'Reference' }, { value: 'science', label: 'Science' }, { value: 'nepali', label: 'Nepali' }]}
+          />
+                </div>
+                <div className="space-y-2"><Label>Copies</Label><Input type="number" value={form.copies} onChange={(e) => setForm({ ...form, copies: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Shelf</Label><Input value={form.shelf_location} onChange={(e) => setForm({ ...form, shelf_location: e.target.value })} placeholder="A-1" /></div>
+              </div>
+              <div className="space-y-2"><Label>Publisher</Label><Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} /></div>
             </div>
-            <div className="space-y-2"><Label>Publisher</Label><Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} /></div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => save.mutate()} disabled={!form.title || save.isPending}>
-              {save.isPending ? <Spinner className="mr-2" /> : null} {editingId ? "Save Changes" : "Add to Catalog"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button onClick={() => save.mutate()} disabled={!form.title || save.isPending}>
+                {save.isPending ? <Spinner className="mr-2" /> : null} {editingId ? "Save Changes" : "Add to Catalog"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

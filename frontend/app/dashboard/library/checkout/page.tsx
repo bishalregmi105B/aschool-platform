@@ -5,12 +5,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+} from "@/components/aos/kit/page-kit";
 import { BookMarked, RotateCcw, ScanLine, Search } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -36,9 +41,14 @@ function ScanPanel({ onResolved }: { onResolved: (d: any) => void }) {
   });
 
   return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><ScanLine className="h-5 w-5" /> Scan copy</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
+    <DataPanel
+      title={
+        <span className="flex items-center gap-2">
+          <ScanLine className="h-5 w-5" style={{ color: "var(--w11-accent)" }} /> Scan copy
+        </span>
+      }
+    >
+      <div className="space-y-3">
         <form
           onSubmit={(e) => { e.preventDefault(); if (code.trim()) lookup.mutate(code); }}
           className="flex gap-2"
@@ -52,21 +62,24 @@ function ScanPanel({ onResolved }: { onResolved: (d: any) => void }) {
           <Button type="submit" disabled={lookup.isPending || !code.trim()}>Look up</Button>
         </form>
         {scan?.copy && (
-          <div className="rounded-md border p-3 text-sm space-y-1">
-            <div className="font-medium">{scan.copy.book_title}</div>
-            <div className="text-muted-foreground">
+          <div
+            className="rounded-md border border-[var(--w11-border-subtle)] p-3 text-sm space-y-1"
+            style={{ background: "var(--w11-control-hover)" }}
+          >
+            <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{scan.copy.book_title}</div>
+            <div style={{ color: "var(--w11-text-secondary)" }}>
               {scan.copy.accession_no} • {scan.copy.status}
             </div>
             {scan.issue && scan.student && (
-              <div>
+              <div style={{ color: "var(--w11-text-primary)" }}>
                 Issued to <span className="font-medium">{scan.student.name}</span> — due{" "}
                 {scan.issue.due_date ? displayBS(scan.issue.due_date) : "—"}
               </div>
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </DataPanel>
   );
 }
 
@@ -169,109 +182,115 @@ function CheckoutContent() {
   const loanDays = Number(settings?.circulation?.loan_days);
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Book Checkout / Return</h1><p className="text-muted-foreground">Issue and return library books</p></div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookMarked className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Book Checkout / Return"
+        subtitle="Issue and return library books"
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <Button variant={mode === "checkout" ? "default" : "outline"} onClick={() => { setMode("checkout"); setResult(null); }}><BookMarked className="h-4 w-4 mr-2" /> Issue Book</Button>
+          <Button variant={mode === "return" ? "default" : "outline"} onClick={() => { setMode("return"); setResult(null); }}><RotateCcw className="h-4 w-4 mr-2" /> Return Book</Button>
+        </FilterCommandBar>
 
-      <div className="flex gap-2">
-        <Button variant={mode === "checkout" ? "default" : "outline"} onClick={() => { setMode("checkout"); setResult(null); }}><BookMarked className="h-4 w-4 mr-2" /> Issue Book</Button>
-        <Button variant={mode === "return" ? "default" : "outline"} onClick={() => { setMode("return"); setResult(null); }}><RotateCcw className="h-4 w-4 mr-2" /> Return Book</Button>
-      </div>
+        <div className="space-y-4">
+          <ScanPanel onResolved={(d) => {
+            if (d?.copy?.book_id && d?.copy?.status === "available") { setBookId(d.copy.book_id); }
+          }} />
 
-      <ScanPanel onResolved={(d) => {
-        if (d?.copy?.book_id && d?.copy?.status === "available") { setBookId(d.copy.book_id); }
-      }} />
-
-      <Card>
-        <CardHeader><CardTitle>{mode === "checkout" ? "Issue Book to Student" : "Return Book"}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {/* Book picker */}
-          <div className="space-y-1.5">
-            <Label>Book</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search by title, author or ISBN…"
-                value={selectedBook ? `${selectedBook.title} (${selectedBook.available_copies}/${selectedBook.total_copies} available)` : bookQuery}
-                onFocus={() => { setBookId(""); setBookQuery(""); }}
-                onChange={(e) => { setBookId(""); setBookQuery(e.target.value); }}
-                className="pl-7"
-              />
-            </div>
-            {!selectedBook && bookQuery.trim() && (
-              <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
-                {books.length === 0 && <p className="text-xs text-muted-foreground p-3">No books match.</p>}
-                {books.map((b: any) => (
-                  <button key={b.id}
-                    onClick={() => { setBookId(b.id); }}
-                    disabled={(b.available_copies ?? 0) <= 0 && mode === "checkout"}
-                    className="w-full flex items-center justify-between p-2 text-left text-sm hover:bg-muted disabled:opacity-40">
-                    <span className="min-w-0 truncate">{b.title} <span className="text-muted-foreground">— {b.author}</span></span>
-                    <Badge variant={(b.available_copies ?? 0) > 0 ? "secondary" : "destructive"} className="ml-2 shrink-0">
-                      {b.available_copies}/{b.total_copies}
-                    </Badge>
-                  </button>
-                ))}
+          <DataPanel title={mode === "checkout" ? "Issue Book to Student" : "Return Book"}>
+            <div className="space-y-4">
+              {/* Book picker */}
+              <div className="space-y-1.5">
+                <Label>Book</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--w11-text-secondary)" }} />
+                  <Input
+                    placeholder="Search by title, author or ISBN…"
+                    value={selectedBook ? `${selectedBook.title} (${selectedBook.available_copies}/${selectedBook.total_copies} available)` : bookQuery}
+                    onFocus={() => { setBookId(""); setBookQuery(""); }}
+                    onChange={(e) => { setBookId(""); setBookQuery(e.target.value); }}
+                    className="pl-7"
+                  />
+                </div>
+                {!selectedBook && bookQuery.trim() && (
+                  <div className="border border-[var(--w11-border-subtle)] rounded-md max-h-48 overflow-y-auto divide-y divide-[var(--w11-border-subtle)]">
+                    {books.length === 0 && <p className="text-xs p-3" style={{ color: "var(--w11-text-secondary)" }}>No books match.</p>}
+                    {books.map((b: any) => (
+                      <button key={b.id}
+                        onClick={() => { setBookId(b.id); }}
+                        disabled={(b.available_copies ?? 0) <= 0 && mode === "checkout"}
+                        className="w-full flex items-center justify-between p-2 text-left text-sm hover:bg-[var(--w11-control-hover)] disabled:opacity-40">
+                        <span className="min-w-0 truncate">{b.title} <span style={{ color: "var(--w11-text-secondary)" }}>— {b.author}</span></span>
+                        <span
+                          className={`win11-chip ml-2 shrink-0 ${(b.available_copies ?? 0) > 0 ? "subtle" : "error"}`}
+                        >
+                          {b.available_copies}/{b.total_copies}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Student picker */}
-          <div className="space-y-1.5">
-            <Label>Student</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search student by name or ID (min 2 characters)…"
-                value={selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : studentQuery}
-                onFocus={() => { setStudentId(""); }}
-                onChange={(e) => { setStudentId(""); setStudentQuery(e.target.value); }}
-                className="pl-7"
-              />
-            </div>
-            {!selectedStudent && studentQuery.trim().length >= 2 && (
-              <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
-                {students.length === 0 && <p className="text-xs text-muted-foreground p-3">No students match.</p>}
-                {students.map((s: any) => (
-                  <button key={s.id}
-                    onClick={() => setStudentId(s.id)}
-                    className="w-full flex items-center justify-between p-2 text-left text-sm hover:bg-muted">
-                    <span>{s.first_name} {s.last_name}</span>
-                    <span className="text-xs text-muted-foreground">{s.student_id || s.admission_number || ""}</span>
-                  </button>
-                ))}
+              {/* Student picker */}
+              <div className="space-y-1.5">
+                <Label>Student</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--w11-text-secondary)" }} />
+                  <Input
+                    placeholder="Search student by name or ID (min 2 characters)…"
+                    value={selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : studentQuery}
+                    onFocus={() => { setStudentId(""); }}
+                    onChange={(e) => { setStudentId(""); setStudentQuery(e.target.value); }}
+                    className="pl-7"
+                  />
+                </div>
+                {!selectedStudent && studentQuery.trim().length >= 2 && (
+                  <div className="border border-[var(--w11-border-subtle)] rounded-md max-h-48 overflow-y-auto divide-y divide-[var(--w11-border-subtle)]">
+                    {students.length === 0 && <p className="text-xs p-3" style={{ color: "var(--w11-text-secondary)" }}>No students match.</p>}
+                    {students.map((s: any) => (
+                      <button key={s.id}
+                        onClick={() => setStudentId(s.id)}
+                        className="w-full flex items-center justify-between p-2 text-left text-sm hover:bg-[var(--w11-control-hover)]">
+                        <span>{s.first_name} {s.last_name}</span>
+                        <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{s.student_id || s.admission_number || ""}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <Button onClick={handleSubmit} disabled={isPending || !bookId || !studentId} className="w-full">
-            {isPending ? <Spinner className="mr-2" /> : null} {mode === "checkout" ? "Issue Book" : "Return Book"}
-          </Button>
+              <Button onClick={handleSubmit} disabled={isPending || !bookId || !studentId} className="w-full">
+                {isPending ? <Spinner className="mr-2" /> : null} {mode === "checkout" ? "Issue Book" : "Return Book"}
+              </Button>
 
-          {(perDay !== null || maxFine !== null || Number.isFinite(loanDays)) && (
-            <p className="text-xs text-muted-foreground">
-              {Number.isFinite(loanDays) && <>Loan period: {loanDays} day(s). </>}
-              {perDay !== null && maxFine !== null && <>Fine: Rs {perDay}/day, max Rs {maxFine}. </>}
-              {perDay !== null && maxFine === null && <>Fine: Rs {perDay}/day. </>}
-              Configurable in plugin settings.
-            </p>
+              {(perDay !== null || maxFine !== null || Number.isFinite(loanDays)) && (
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  {Number.isFinite(loanDays) && <>Loan period: {loanDays} day(s). </>}
+                  {perDay !== null && maxFine !== null && <>Fine: Rs {perDay}/day, max Rs {maxFine}. </>}
+                  {perDay !== null && maxFine === null && <>Fine: Rs {perDay}/day. </>}
+                  Configurable in plugin settings.
+                </p>
+              )}
+            </div>
+          </DataPanel>
+
+          {result && (
+            <div className="win11-infobar success" role="status">
+              <h3 className="font-semibold mb-2">✅ {mode === "checkout" ? "Book Issued" : "Book Returned"} Successfully</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {result.book_title && <div><span style={{ color: "var(--w11-text-secondary)" }}>Book:</span> {result.book_title}</div>}
+                {result.student_name && <div><span style={{ color: "var(--w11-text-secondary)" }}>Student:</span> {result.student_name}</div>}
+                {result.due_date && <div><span style={{ color: "var(--w11-text-secondary)" }}>Due Date:</span> {displayBS(result.due_date)}</div>}
+                {!!result.overdue_days && <div style={{ color: "#c42b1c" }}><span className="opacity-70">Overdue:</span> {result.overdue_days} day(s)</div>}
+                {!!result.fine && <div style={{ color: "#c42b1c" }}><span className="opacity-70">Fine:</span> Rs. {result.fine}</div>}
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-
-      {result && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="pt-6">
-            <h3 className="font-semibold text-green-800 mb-2">✅ {mode === "checkout" ? "Book Issued" : "Book Returned"} Successfully</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {result.book_title && <div><span className="text-muted-foreground">Book:</span> {result.book_title}</div>}
-              {result.student_name && <div><span className="text-muted-foreground">Student:</span> {result.student_name}</div>}
-              {result.due_date && <div><span className="text-muted-foreground">Due Date:</span> {displayBS(result.due_date)}</div>}
-              {!!result.overdue_days && <div className="text-red-700"><span className="text-muted-foreground">Overdue:</span> {result.overdue_days} day(s)</div>}
-              {!!result.fine && <div className="text-red-700"><span className="text-muted-foreground">Fine:</span> Rs. {result.fine}</div>}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
