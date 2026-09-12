@@ -420,8 +420,16 @@ class BulkGeneratorService:
         exam_id: str,
         class_id: str,
         template_id: str | None = None,
+        section_id: str | None = None,
+        student_ids: list | None = None,
     ) -> list[dict]:
-        """Generate marksheets for all students who took an exam."""
+        """Generate marksheets for all students who took an exam.
+
+        ``section_id`` / ``student_ids`` narrow the roster (bulk results UI
+        passes the admin's selection; marks for students outside the roster
+        are still loaded so ranks stay class-wide — matching the exam
+        results page's ranking).
+        """
         from app.models.student import Student
         from app.models.exam import Exam, Marks
         from app.models.school import School
@@ -464,7 +472,7 @@ class BulkGeneratorService:
                 for subj in Subject.query.filter(Subject.class_ids.any(klass.id)).all():
                     subject_map[str(subj.id)] = subj
 
-        students = (
+        students_query = (
             Student.query.options(
                 db.selectinload(Student.klass),
                 db.selectinload(Student.section),
@@ -472,8 +480,25 @@ class BulkGeneratorService:
             )
             .filter_by(school_id=school_id, class_id=class_id, status="active")
             .order_by(Student.roll_number)
-            .all()
         )
+        if section_id:
+            students_query = students_query.filter_by(section_id=section_id)
+        if student_ids:
+            students_query = students_query.filter(Student.id.in_([str(s) for s in student_ids]))
+        students = students_query.all()
+
+        # Rank + percentage computation always runs over the WHOLE class
+        # (fair class ranking like the exams results page), even when the
+        # roster was narrowed by section_id / student_ids.
+        ranking_students = students
+        if (section_id or student_ids) and not student_ids:
+            ranking_query = (
+                Student.query.filter_by(school_id=school_id, class_id=class_id, status="active")
+                .order_by(Student.roll_number)
+            )
+            ranking_students = ranking_query.all()
+        elif student_ids:
+            ranking_students = students_query.all() if len(students) > len(student_ids) else students
 
         # Batch-fetch every mark for these students in ONE query (avoids
         # a per-student SELECT + lazy subject loads → N+1).
@@ -607,6 +632,10 @@ class BulkGeneratorService:
                 "grade": overall_grade,
                 "gpa": gpa_avg,
                 "total_credit_hours": total_credit_hours,
+                # pass/fail for templates like "has {status} the examination"
+                "status": "passed" if all(
+                    s.get("grade") not in ("NG", "—", "") for s in subjects_data
+                ) and percentage >= 32 else "failed",
                 **school_fields,
             }
 

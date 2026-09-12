@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate, usePluginEnabled } from "@/lib/plugins";
 import { toast } from "sonner";
@@ -31,6 +31,10 @@ import {
   Download,
   TableIcon,
   GraduationCap,
+  Layers,
+  FileArchive,
+  LayoutTemplate,
+  Loader2,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -135,6 +139,7 @@ function ResultsContent() {
   const [loadingStudentHtml, setLoadingStudentHtml] = useState(false);
   const [previewingTemplate, setPreviewingTemplate] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const hasDesigner = usePluginEnabled("design_studio");
 
@@ -343,6 +348,17 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
         actions={
           isReady && hasDesigner ? (
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Bulk generate — any result template, merged PDF or ZIP */}
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setBulkOpen(true)}
+                title="Bulk-generate marksheets for every student with any result template"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Generate Results
+              </Button>
+
               {/* Marksheet group */}
               <div className="flex items-center gap-1 rounded-lg border border-[var(--w11-border-subtle)] p-1" style={{ background: "var(--w11-control-hover)" }}>
                 <span className="px-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#107c10" }}>
@@ -855,7 +871,197 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
             </div>
           </div>
         )}
+        {/* Bulk Result Generation Dialog (designer templates) */}
+        {bulkOpen && (
+          <BulkResultsDialog
+            examId={examId}
+            examName={(exams || []).find((e: { id: string; name: string }) => e.id === examId)?.name || "Exam"}
+            classId={classId}
+            className_={(classes || []).find((c: { id: string; name: string }) => c.id === classId)?.name || ""}
+            onClose={() => setBulkOpen(false)}
+          />
+        )}
       </AOSPageBody>
     </AOSPage>
+  );
+}
+
+// ── Bulk result generation dialog ─────────────────────────────────────────
+//
+// Exam + class are fixed by the page filters; the admin picks any result
+// template (reports/marksheet category designer OR writer templates — both
+// carry the same {name}/{subjects_marks}/{grade} tokens) and an output
+// format, then POSTs /design-studio/generate/results which merges every
+// student's marks into the template and returns a merged PDF or a ZIP of
+// per-student PDFs.
+
+function BulkResultsDialog({
+  examId, examName, classId, className_, onClose,
+}: {
+  examId: string;
+  examName: string;
+  classId: string;
+  className_: string;
+  onClose: () => void;
+}) {
+  const [templateId, setTemplateId] = useState("");
+  const [format, setFormat] = useState<"pdf" | "zip">("pdf");
+  const [progress, setProgress] = useState<string | null>(null);
+
+  // result-capable templates: reports + certificates categories cover
+  // marksheet / grade sheet / report card templates
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery({
+    queryKey: ["result-templates"],
+    queryFn: async () => {
+      const res = await api.get("/design-studio/templates");
+      const all = Array.isArray(res.data?.data) ? res.data.data : [];
+      return (all as any[]).filter(
+        (t) => t.editor_type === "writer" || ["reports", "marksheets", "certificates"].includes(t.category),
+      );
+    },
+  });
+
+  const generate = useMutation({
+    mutationFn: async () => {
+      setProgress("Merging marks into the template…");
+      const res = await api.post(
+        "/design-studio/generate/results",
+        {
+          exam_id: examId,
+          class_id: classId,
+          template_id: templateId || undefined,
+          format,
+        },
+        { responseType: "blob", timeout: 300000 },
+      );
+      return res.data as Blob;
+    },
+    onSuccess: (blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `results_${examName || examId}.${format}`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success(format === "zip" ? "ZIP of result PDFs downloaded" : "Result PDF downloaded");
+      onClose();
+    },
+    onError: () => {
+      toast.error("Bulk generation failed — check that marks exist for this exam");
+      setProgress(null);
+    },
+  });
+
+  const resultTemplates = templates.filter((t: any) =>
+    (t.fields || []).some((f: string) => f === "subjects_marks" || f === "exam_name"),
+  );
+  const options = resultTemplates.length ? resultTemplates : templates;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-xl shadow-xl max-w-md w-full border border-[var(--w11-window-border)] overflow-hidden"
+        style={{ background: "var(--w11-surface-solid)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--w11-border-subtle)]">
+          <div className="flex items-center gap-2">
+            <LayoutTemplate className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+            <div>
+              <h2 className="text-sm font-bold">Generate Results</h2>
+              <p className="text-[11px] text-[color:var(--w11-text-secondary)]">
+                {examName} • {className_ || "Class"} — one page per student
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-[color:var(--w11-control-hover)] text-[color:var(--w11-text-secondary)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* body */}
+        <div className="px-5 py-4 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Template</Label>
+            {loadingTemplates ? (
+              <div className="h-9 flex items-center gap-2 text-xs text-[color:var(--w11-text-secondary)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading templates…
+              </div>
+            ) : (
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger><SelectValue placeholder="Default marksheet" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="marksheet">NEB Marksheet (default)</SelectItem>
+                  <SelectItem value="grade_sheet">NEB Grade Sheet</SelectItem>
+                  <SelectItem value="report_card_writer">Report Card (Document)</SelectItem>
+                  {options
+                    .filter((t: any) => !["marksheet", "grade_sheet", "report_card_writer"].includes(t.template_key || t.id))
+                    .map((t: any) => (
+                      <SelectItem key={t.id} value={t.template_key || t.id}>{t.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-[10px] text-[color:var(--w11-text-tertiary)]">
+              Templates carry {"{name}"}, {"{subjects_marks}"}, {"{grade}"} tokens — each student&apos;s marks are merged at render time.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Output</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setFormat("pdf")}
+                className="rounded-lg border p-2.5 text-left transition-colors"
+                style={
+                  format === "pdf"
+                    ? { borderColor: "var(--w11-accent)", background: "var(--w11-accent-light)" }
+                    : { borderColor: "var(--w11-border-default)" }
+                }
+              >
+                <Download className="h-4 w-4 mb-1" style={{ color: "var(--w11-accent)" }} />
+                <div className="text-xs font-semibold">Merged PDF</div>
+                <div className="text-[10px] text-[color:var(--w11-text-secondary)]">One file, one page per student</div>
+              </button>
+              <button
+                onClick={() => setFormat("zip")}
+                className="rounded-lg border p-2.5 text-left transition-colors"
+                style={
+                  format === "zip"
+                    ? { borderColor: "var(--w11-accent)", background: "var(--w11-accent-light)" }
+                    : { borderColor: "var(--w11-border-default)" }
+                }
+              >
+                <FileArchive className="h-4 w-4 mb-1 text-amber-600" />
+                <div className="text-xs font-semibold">ZIP of PDFs</div>
+                <div className="text-[10px] text-[color:var(--w11-text-secondary)]">One PDF per student, named</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* footer */}
+        <div className="border-t border-[var(--w11-border-subtle)] px-5 py-3 flex items-center gap-3">
+          {generate.isPending && progress && (
+            <span className="text-[11px] flex items-center gap-1.5 text-[color:var(--w11-text-secondary)]">
+              <Loader2 className="h-3 w-3 animate-spin" /> {progress}
+            </span>
+          )}
+          <span className="ml-auto" />
+          <Button size="sm" variant="outline" onClick={onClose} disabled={generate.isPending}>Cancel</Button>
+          <Button size="sm" onClick={() => generate.mutate()} disabled={generate.isPending}>
+            {generate.isPending ? "Generating…" : "Generate"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

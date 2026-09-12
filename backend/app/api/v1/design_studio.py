@@ -495,9 +495,15 @@ def bulk_id_cards():
 @jwt_required()
 @school_required
 @plugin_required("design_studio")
-@role_required("superadmin", "school_admin")
+@role_required("superadmin", "school_admin", "teacher")
 def bulk_marksheets():
-    """Generate marksheets for all students in a class for an exam."""
+    """Generate marksheets for all students in a class for an exam.
+
+    Body: {exam_id, class_id, template_id?, section_id?, student_ids?}.
+    - template_id defaults to the "marksheet" registry template; any
+      reports-category template (writer or designer) can be chosen.
+    - section_id / student_ids narrow the roster.
+    """
     from app.services.designer.bulk_generator import BulkGeneratorService
 
     data = request.get_json(silent=True) or {}
@@ -511,8 +517,170 @@ def bulk_marksheets():
         exam_id=exam_id,
         class_id=class_id,
         template_id=data.get("template_id"),
+        section_id=data.get("section_id"),
+        student_ids=data.get("student_ids"),
     )
     return success_response({"count": len(marksheets), "marksheets": marksheets})
+
+
+@design_studio_bp.route("/generate/results", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("design_studio")
+@role_required("superadmin", "school_admin", "teacher")
+def generate_results():
+    """Result/marksheet bulk generation: exam + class(es) + template → PDF.
+
+    Mechanism (aligned with the commercial ERPs researched — InfixEdu /
+    InstiKit / Mighty School Pro):
+      1. admin picks a result template (any template, writer or designer;
+         the reports/marksheet category ones carry {name}/{subjects_marks}/
+         {grade} tokens — InstiKit's schedule→template selection model),
+      2. for every student with marks in the exam, their marks are merged
+         into the template (per-student render loop, like InfixEdu's
+         @foreach($students) blade loop),
+      3. every render is one PDF page; all pages are merged into a single
+         print-ready PDF (WeasyPrint, Nepali-safe fonts) with per-student
+         bookmarks/filenames, OR returned as a ZIP of individual PDFs.
+
+    Body: {exam_id, class_id (single) | class_ids (list), template_id?,
+           section_id?, student_ids?, format: "pdf"|"zip"}.
+    """
+    from io import BytesIO
+
+    data = request.get_json(silent=True) or {}
+    exam_id = data.get("exam_id")
+    class_ids = data.get("class_ids") or ([data.get("class_id")] if data.get("class_id") else [])
+    class_ids = [c for c in class_ids if c]
+    if not exam_id or not class_ids:
+        return error_response("exam_id and class_id(s) are required", 400)
+
+    output_format = (data.get("format") or "pdf").lower()
+
+    # ── resolve exam (school-scoped) ─────────────────────────────────
+    from app.models.exam import Exam
+
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+
+    # ── template selection: explicit pick, else the marksheet default ──
+    from app.services.designer.template_engine import TemplateEngineService
+
+    template_id = data.get("template_id") or "marksheet"
+    resolved_template_id = TemplateEngineService.resolve_template_id(template_id)
+    if not TemplateEngineService.get_template(resolved_template_id, school_id=g.school_id):
+        return error_response("Template not found", 404)
+
+    # ── per-student render loop (one page per student, batched per class) ──
+    from app.services.designer.bulk_generator import BulkGeneratorService
+
+    try:
+        from weasyprint import HTML
+
+        from app.services.designer.pdf_css import wrap_pdf_html
+    except ImportError:
+        return error_response("PDF export is unavailable on this server", 501)
+
+    def _slug(text: str) -> str:
+        import re as _re
+
+        return _re.sub(r"[^a-zA-Z0-9._-]+", "_", str(text or "")).strip("_") or "student"
+
+    all_items = []  # (filename, html, meta) in roll order per class
+    errors = []
+    for cid in class_ids:
+        try:
+            items = BulkGeneratorService.generate_bulk_marksheets(
+                school_id=g.school_id,
+                exam_id=exam_id,
+                class_id=cid,
+                template_id=resolved_template_id,
+                section_id=data.get("section_id"),
+                student_ids=data.get("student_ids"),
+            )
+        except Exception as exc:  # one bad class must not kill the batch
+            errors.append({"class_id": str(cid), "error": str(exc)})
+            continue
+        for it in items:
+            if not it.get("html"):
+                continue
+            all_items.append({
+                "filename": f"{it.get('rank', '') or ''}_{_slug(it.get('student_name', 'student'))}".lstrip("_"),
+                "html": it["html"],
+                "meta": it,
+            })
+
+    if not all_items:
+        detail = f" ({'; '.join(e['error'] for e in errors)})" if errors else ""
+        return error_response(f"No students with marks found for this selection{detail}", 404)
+
+    # ── page size from the template's writer config (marksheet @page) ──
+    template_meta = TemplateEngineService.get_template(resolved_template_id, school_id=g.school_id) or {}
+    _wj = template_meta.get("writer_json") if isinstance(template_meta.get("writer_json"), dict) else {}
+    _cfg = (_wj or {}).get("config", {}) if _wj else {}
+    _pg_size = str(_cfg.get("size") or "A4").upper()
+    _pg_ori = str(_cfg.get("orientation") or "portrait").lower()
+    page_css_size = _pg_size + (" landscape" if _pg_ori == "landscape" else "")
+
+    if output_format == "zip":
+        import zipfile as _zipfile
+
+        buf = BytesIO()
+        with _zipfile.ZipFile(buf, "w", _zipfile.ZIP_DEFLATED) as zf:
+            for idx, item in enumerate(all_items, 1):
+                pdf_bytes = HTML(
+                    string=wrap_pdf_html(item["html"], page_size=page_css_size)
+                ).write_pdf()
+                zf.writestr(f"{idx:03d}_{item['filename']}.pdf", pdf_bytes)
+        buf.seek(0)
+        download = f"results_{exam.name or exam_id}.zip".replace(" ", "_")
+        return send_file(
+            buf,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=download,
+        )
+
+    # single merged PDF — one page per student (page-break-after in each item)
+    pages_html = [
+        f"<div class='aschool-result-page' style='page-break-after:always;'>{item['html']}</div>"
+        for item in all_items
+    ]
+    combined = (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        f"<style>@page{{size:{page_css_size};margin:0}}"
+        ".aschool-result-page:last-child{page-break-after:avoid;}</style>"
+        "</head><body>" + "".join(pages_html) + "</body></html>"
+    )
+    try:
+        pdf_bytes = HTML(string=combined).write_pdf()
+    except Exception as exc:
+        return error_response(f"PDF generation failed: {exc}", 500)
+
+    payload = {
+        "count": len(all_items),
+        "exam_id": str(exam_id),
+        "template_id": resolved_template_id,
+        "students": [
+            {
+                "student_id": item["meta"].get("student_id"),
+                "student_name": item["meta"].get("student_name"),
+                "percentage": item["meta"].get("percentage"),
+                "rank": item["meta"].get("rank"),
+            }
+            for item in all_items
+        ],
+    }
+    if errors:
+        payload["errors"] = errors
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"results_{_slug(exam.name or 'exam')}.pdf",
+    )
 
 
 @design_studio_bp.route("/bulk/admit-cards", methods=["POST"])
