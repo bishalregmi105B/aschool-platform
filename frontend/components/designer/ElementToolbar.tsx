@@ -3,6 +3,10 @@
 /**
  * ElementToolbar — left sidebar for adding elements to the canvas.
  * Sections: Text | Shapes | Media | Arrange
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the rail
+ * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
+ * win11 scope, so no scope of its own is needed.
  */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -51,7 +55,7 @@ function ToolBtn({ icon: Icon, label, action, danger = false }: {
         <Button
           variant="ghost"
           size="icon"
-          className={`h-9 w-9 ${danger ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-primary/10 hover:text-primary"}`}
+          className={`h-9 w-9 ${danger ? "hover:!bg-red-500/10 hover:!text-red-500" : ""}`}
           onClick={action}
         >
           {Icon ? <Icon className="h-4 w-4" /> : null}
@@ -64,9 +68,9 @@ function ToolBtn({ icon: Icon, label, action, danger = false }: {
 
 function Section({ label }: { label: string }) {
   return (
-    <p className="text-[9px] text-muted-foreground uppercase tracking-wide w-full text-center pt-0.5 select-none">
+    <div className="text-[9px] text-[var(--w11-text-tertiary)] uppercase tracking-wide w-full text-center pt-0.5 select-none">
       {label}
-    </p>
+    </div>
   );
 }
 
@@ -76,7 +80,10 @@ export default function ElementToolbar({ canvas }: Props) {
   const [showImagePicker, setShowImagePicker] = useState(false);
 
   return (
-    <div className="w-14 border-r bg-background flex flex-col items-center py-2 gap-0.5 shrink-0 overflow-y-auto">
+    <div
+      className="w-14 border-r border-[var(--w11-border-default)] flex flex-col items-center py-2 gap-0.5 shrink-0 overflow-y-auto"
+      style={{ background: "var(--w11-surface-solid)" }}
+    >
       <FilePicker
         open={showImagePicker}
         onOpenChange={setShowImagePicker}
@@ -97,7 +104,7 @@ export default function ElementToolbar({ canvas }: Props) {
       <ToolBtn icon={Heading3} label="Heading 3" action={() => canvas.addHeading(3)} />
       <ToolBtn icon={Type}     label="Body Text"  action={() => canvas.addText()} />
 
-      <Separator className="my-1 w-8" />
+      <Separator className="my-1 w-8 bg-[var(--w11-border-subtle)]" />
 
       {/* ── Shapes ───────────────────────────────── */}
       <Section label="Shapes" />
@@ -112,7 +119,7 @@ export default function ElementToolbar({ canvas }: Props) {
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 hover:text-primary text-base leading-none">
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-base leading-none">
                 ⬡
               </Button>
             </PopoverTrigger>
@@ -120,7 +127,7 @@ export default function ElementToolbar({ canvas }: Props) {
           <TooltipContent side="right">More Shapes</TooltipContent>
         </Tooltip>
         <PopoverContent side="right" className="w-44 p-2">
-          <p className="text-xs font-semibold text-muted-foreground mb-2">More Shapes</p>
+          <div className="text-xs font-semibold text-[var(--w11-text-secondary)] mb-2">More Shapes</div>
           <div className="grid grid-cols-3 gap-1">
             {EXTRA_SHAPES.map(({ label, icon, action }) => (
               <Tooltip key={label}>
@@ -141,7 +148,7 @@ export default function ElementToolbar({ canvas }: Props) {
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 hover:text-primary">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Frame className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -149,7 +156,7 @@ export default function ElementToolbar({ canvas }: Props) {
           <TooltipContent side="right">Image Frames</TooltipContent>
         </Tooltip>
         <PopoverContent side="right" className="w-44 p-2">
-          <p className="text-xs font-semibold text-muted-foreground mb-2">Image Frames</p>
+          <div className="text-xs font-semibold text-[var(--w11-text-secondary)] mb-2">Image Frames</div>
           <div className="grid grid-cols-4 gap-1">
             {FRAMES.map(({ label, icon, kind }) => (
               <Tooltip key={kind}>
@@ -162,13 +169,13 @@ export default function ElementToolbar({ canvas }: Props) {
               </Tooltip>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-1">
             Drop an image over a frame to clip it into the shape.
-          </p>
+          </div>
         </PopoverContent>
       </Popover>
 
-      <Separator className="my-1 w-8" />
+      <Separator className="my-1 w-8 bg-[var(--w11-border-subtle)]" />
 
       {/* ── Media ────────────────────────────────── */}
       <Section label="Media" />
@@ -179,7 +186,7 @@ export default function ElementToolbar({ canvas }: Props) {
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 hover:text-primary">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Link2 className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -187,7 +194,7 @@ export default function ElementToolbar({ canvas }: Props) {
           <TooltipContent side="right">Image URL</TooltipContent>
         </Tooltip>
         <PopoverContent side="right" className="w-64 p-3">
-          <p className="text-xs font-semibold mb-2">Add Image from URL</p>
+          <p className="text-xs font-semibold text-[var(--w11-text-primary)] mb-2">Add Image from URL</p>
           <Input
             placeholder="https://example.com/image.jpg"
             value={urlInput}
@@ -204,18 +211,18 @@ export default function ElementToolbar({ canvas }: Props) {
           }}>
             Add Image
           </Button>
-          <p className="text-[10px] text-muted-foreground mt-2">Tip: Use Unsplash, Pexels or direct image URLs</p>
+          <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-2">Tip: Use Unsplash, Pexels or direct image URLs</div>
         </PopoverContent>
       </Popover>
 
-      <Separator className="my-1 w-8" />
+      <Separator className="my-1 w-8 bg-[var(--w11-border-subtle)]" />
 
       {/* ── Edit ─────────────────────────────────── */}
       <Section label="Edit" />
       <ToolBtn icon={Copy}  label="Duplicate"  action={() => canvas.duplicateSelected()} />
       <ToolBtn icon={Trash2} label="Delete"    action={() => canvas.deleteSelected()} danger />
 
-      <Separator className="my-1 w-8" />
+      <Separator className="my-1 w-8 bg-[var(--w11-border-subtle)]" />
 
       {/* ── Order ────────────────────────────────── */}
       <Section label="Order" />
@@ -224,7 +231,7 @@ export default function ElementToolbar({ canvas }: Props) {
       <ToolBtn icon={Layers}       label="Group"          action={() => canvas.groupSelected()} />
       <ToolBtn icon={Ungroup}      label="Ungroup"        action={() => canvas.ungroupSelected()} />
 
-      <Separator className="my-1 w-8" />
+      <Separator className="my-1 w-8 bg-[var(--w11-border-subtle)]" />
 
       {/* ── Align ────────────────────────────────── */}
       <Section label="Align" />

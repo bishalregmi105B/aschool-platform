@@ -4,6 +4,11 @@
  * Writer v2 — Word-style ribbon chrome: primitives (grouped controls,
  * small labeled buttons, color grids) + the tabbed ribbon shell
  * (Home / Insert / Layout / Review / View) with collapse support.
+ *
+ * All chrome is skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) —
+ * so the ribbon adapts to the AOS light AND dark themes. Command buttons
+ * follow the commandbar-button pattern: borderless, control-hover on hover,
+ * accent-light + accent text when active.
  */
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -30,16 +35,19 @@ export const TABS: { id: RibbonTabId; label: string }[] = [
   { id: "view", label: "View" },
 ];
 
-// ── primitives ─────────────────────────────────────────────────────────
+/** Shared Fluent micro-transition for chrome controls. */
+const FAST = {
+  transition: "background var(--w11-transition-fast), color var(--w11-transition-fast), border-color var(--w11-transition-fast)",
+} as const;
 
 // ── primitives ─────────────────────────────────────────────────────────
 
 /** A Word ribbon group: clustered controls with a bottom caption + divider. */
 export function RibbonGroup({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col shrink-0 px-2.5 pt-0.5 border-r border-slate-200/70 dark:border-slate-800 last:border-r-0", className)}>
+    <div className={cn("flex flex-col shrink-0 px-2.5 pt-0.5 border-r border-[var(--w11-border-subtle)] last:border-r-0", className)}>
       <div className="flex flex-1 items-center gap-1 min-h-[50px]">{children}</div>
-      <div className="text-[9px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 text-center select-none pt-1 pb-0.5 uppercase">{label}</div>
+      <div className="text-[9px] font-semibold tracking-wider text-[var(--w11-text-tertiary)] text-center select-none pt-1 pb-0.5 uppercase">{label}</div>
     </div>
   );
 }
@@ -59,7 +67,7 @@ interface RBtnProps {
   onClick?: () => void;
 }
 
-/** Small ribbon button — icon (+ optional micro label), Word 365 style. */
+/** Small ribbon button — icon (+ optional micro label), Fluent commandbar style. */
 export function RBtn({ icon, label, title, active, disabled, wide, onClick }: RBtnProps) {
   return (
     <button
@@ -67,11 +75,16 @@ export function RBtn({ icon, label, title, active, disabled, wide, onClick }: RB
       title={title || label}
       disabled={disabled}
       onClick={onClick}
+      style={{
+        borderRadius: "var(--w11-radius-md)",
+        transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+        ...(active ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : null),
+      }}
       className={cn(
-        "h-7 rounded-lg px-2 flex items-center justify-center gap-1.5 text-xs text-slate-700 dark:text-slate-200 select-none",
-        "hover:bg-slate-100 dark:hover:bg-slate-800 active:bg-slate-200/80 dark:active:bg-slate-700 transition-all duration-150",
+        // commandbar-button (11.css): borderless, transparent, control-hover
+        "commandbar-button h-7 !min-h-0 px-2 text-xs select-none",
         wide ? "min-w-[48px]" : "min-w-[28px]",
-        active && "bg-blue-50 dark:bg-blue-950/80 text-[#0078d4] dark:text-[#38bdf8] font-semibold border border-blue-200 dark:border-blue-900 shadow-xs",
+        active && "!font-semibold",
         disabled && "opacity-40 pointer-events-none",
       )}
     >
@@ -82,7 +95,7 @@ export function RBtn({ icon, label, title, active, disabled, wide, onClick }: RB
 }
 
 export function VSep() {
-  return <div className="w-px self-stretch my-1.5 bg-slate-200 dark:bg-slate-800 mx-1" />;
+  return <div className="w-px self-stretch my-1.5 bg-[var(--w11-border-subtle)] mx-1" />;
 }
 
 /** Color palette grid used by font color / highlight split buttons. */
@@ -94,7 +107,10 @@ export function ColorGrid({
   allowNone?: boolean;
 }) {
   return (
-    <div className="p-2.5 w-[200px] bg-popover rounded-xl border border-border shadow-md">
+    <div
+      className="p-2.5 w-[200px] rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-default)] shadow-[var(--w11-elevation-flyout)]"
+      style={{ background: "var(--w11-surface-flyout)" }}
+    >
       <div className="grid grid-cols-8 gap-1.5">
         {colors.map((c) => (
           <button
@@ -103,7 +119,9 @@ export function ColorGrid({
             title={c}
             onClick={() => onPick(c)}
             className={cn(
-              "w-4 h-4 rounded-md border border-slate-300 dark:border-slate-700 hover:scale-110 transition-transform shadow-xs",
+              // important resets: keep the 16px swatch compact against the
+              // 11.css element-level button chrome (min-height/padding/shadow)
+              "!h-4 !w-4 !min-h-0 !p-0 !shadow-none rounded-[var(--w11-radius-sm)] border border-[var(--w11-border-default)] hover:scale-110 transition-transform",
               c === "none" && "bg-[linear-gradient(135deg,transparent_45%,#ef4444_45%,#ef4444_55%,transparent_55%)]",
             )}
             style={{ background: c === "none" ? undefined : c }}
@@ -114,7 +132,7 @@ export function ColorGrid({
         <button
           type="button"
           onClick={() => onPick("none")}
-          className="mt-2 w-full text-center text-[10px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:underline pt-1 border-t border-border/50"
+          className="mt-2 w-full text-center text-[10px] font-medium text-[var(--w11-text-secondary)] hover:text-[var(--w11-text-primary)] hover:underline pt-1 border-t border-[var(--w11-border-subtle)]"
         >
           No color (transparent)
         </button>
@@ -140,7 +158,12 @@ export function ColorSplitBtn({
         <RBtn icon={icon} title={title} onClick={() => onPick(currentColor || colors?.[0] || "#dc2626")} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" title={`${title} — more colors`} className="h-7 w-3.5 rounded-r-md flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
+            <button
+              type="button"
+              title={`${title} — more colors`}
+              className="commandbar-button !h-7 !min-h-0 w-3.5 !px-0 text-[var(--w11-text-secondary)]"
+              style={{ borderRadius: "var(--w11-radius-sm)", ...FAST }}
+            >
               <ChevronDown className="h-3 w-3" />
             </button>
           </DropdownMenuTrigger>
@@ -166,36 +189,53 @@ export function Ribbon({
   const [tab, setTab] = useState<RibbonTabId>("home");
 
   return (
-    <div className="writer-ribbon shrink-0 border-b border-slate-200 dark:border-slate-800 bg-[#f0f4f9] dark:bg-slate-900 shadow-xs">
-      {/* Word 365 tab strip */}
-      <div className="flex items-center h-9 px-2 gap-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => { setTab(t.id); if (collapsed) onToggleCollapse(); }}
-            className={cn(
-              "word-ribbon-tab",
-              tab === t.id && !collapsed && "active",
-              collapsed && tab === t.id && "bg-[#dbe7f5] dark:bg-slate-800 text-[#0078d4] dark:text-[#38bdf8]",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+    <div
+      className="writer-ribbon shrink-0 border-b border-[var(--w11-border-default)] shadow-xs"
+      style={{ background: "var(--w11-surface-solid)" }}
+    >
+      {/* Word 365 tab strip — commandbar buttons, accent underline when active */}
+      <div className="flex items-center h-9 px-2 gap-1" style={{ background: "var(--w11-window-bg)" }}>
+        {TABS.map((t) => {
+          const isActive = tab === t.id && !collapsed;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => { setTab(t.id); if (collapsed) onToggleCollapse(); }}
+              style={{
+                ...FAST,
+                ...(isActive ? { color: "var(--w11-accent)" } : null),
+                ...(collapsed && tab === t.id ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : null),
+              }}
+              className={cn(
+                // commandbar-button: borderless tab, control-hover on hover
+                "commandbar-button relative h-[32px] !min-h-0 px-3.5 text-xs font-medium select-none",
+                "after:content-[''] after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-[2.5px] after:rounded-t-[2px] after:bg-transparent",
+                isActive && "!font-semibold after:bg-[var(--w11-accent)]",
+                !isActive && "text-[var(--w11-text-secondary)] hover:!text-[var(--w11-text-primary)]",
+              )}
+            >
+              {t.label}
+            </button>
+          );
+        })}
         <button
           type="button"
           title={collapsed ? "Pin ribbon (expand)" : "Collapse ribbon"}
           onClick={onToggleCollapse}
-          className="ml-auto self-center h-6 w-6 rounded-lg hover:bg-slate-200/80 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors"
+          className="commandbar-button ml-auto self-center !h-6 !min-h-0 w-6 text-[var(--w11-text-secondary)]"
+          style={{ borderRadius: "var(--w11-radius-sm)", ...FAST }}
         >
           <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", collapsed && "rotate-180")} />
         </button>
       </div>
 
-      {/* Ribbon tab content — Word 365 canvas */}
+      {/* Ribbon tab content — Fluent control surface */}
       {!collapsed && (
-        <div className="flex items-stretch min-h-[82px] bg-white dark:bg-slate-950 border-t border-slate-200/80 dark:border-slate-800 overflow-x-auto custom-scrollbar px-1 py-1">
+        <div
+          className="flex items-stretch min-h-[82px] border-t border-[var(--w11-border-subtle)] overflow-x-auto custom-scrollbar px-1 py-1"
+          style={{ background: "var(--w11-surface-solid)" }}
+        >
           {tab === "home" && <HomeTab ctx={ctx} />}
           {tab === "insert" && <InsertTab ctx={ctx} />}
           {tab === "layout" && <LayoutTab ctx={ctx} />}

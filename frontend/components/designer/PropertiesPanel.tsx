@@ -4,6 +4,10 @@
  * PropertiesPanel — right panel with object properties + page settings.
  * When nothing is selected → Page Settings (size, orientation, margins, bg).
  * When an object is selected → its type-specific properties.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
+ * win11 scope, so no scope of its own is needed.
  */
 import React, { useEffect, useState, useCallback } from "react";
 import { Input }  from "@/components/ui/input";
@@ -32,6 +36,25 @@ const GOOGLE_FONTS = [
 ];
 
 const ALL_FONTS = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
+
+/** Fluent section card: control surface + subtle border + soft radius. */
+function SectionCard({ title, children, className = "" }: {
+  title?: string; children: React.ReactNode; className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] space-y-2.5 ${className}`}
+      style={{ background: "var(--w11-control-bg)" }}
+    >
+      {title && (
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--w11-text-tertiary)]">
+          {title}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
 
 function loadGoogleFont(family: string) {
   const id = `gfont-${family.replace(/\s+/g, "-")}`;
@@ -72,76 +95,73 @@ export default function PropertiesPanel({ canvas }: Props) {
   const isImage = obj.type === "image";
 
   return (
-    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar">
+    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar text-[var(--w11-text-primary)]">
 
       {/* Position & Size */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
-        <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Transform &amp; Dimensions</p>
+      <SectionCard title="Transform & Dimensions">
         <div className="grid grid-cols-2 gap-2">
           {[
             ["X", "left"],
             ["Y", "top"],
           ].map(([label, prop]) => (
             <div key={prop} className="relative flex items-center">
-              <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">{label}</span>
-              <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={Math.round(obj[prop] ?? 0)}
+              <span className="absolute left-2.5 text-[10px] font-bold text-[var(--w11-text-tertiary)] pointer-events-none">{label}</span>
+              <Input type="number" className="h-8 pl-7 text-xs" value={Math.round(obj[prop] ?? 0)}
                 onChange={(e) => set({ [prop]: Number(e.target.value) })} />
             </div>
           ))}
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">W</span>
-            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl"
+            <span className="absolute left-2.5 text-[10px] font-bold text-[var(--w11-text-tertiary)] pointer-events-none">W</span>
+            <Input type="number" className="h-8 pl-7 text-xs"
               value={Math.round(obj.getScaledWidth?.() ?? obj.width ?? 0)}
               onChange={(e) => set({ scaleX: Number(e.target.value) / (obj.width || 1) })} />
           </div>
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">H</span>
-            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl"
+            <span className="absolute left-2.5 text-[10px] font-bold text-[var(--w11-text-tertiary)] pointer-events-none">H</span>
+            <Input type="number" className="h-8 pl-7 text-xs"
               value={Math.round(obj.getScaledHeight?.() ?? obj.height ?? 0)}
               onChange={(e) => set({ scaleY: Number(e.target.value) / (obj.height || 1) })} />
           </div>
         </div>
 
         {/* Rotation & Opacity */}
-        <div className="space-y-2 pt-2 border-t border-border/40">
+        <div className="space-y-2 pt-2 border-t border-[var(--w11-border-subtle)]">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Rotation</Label>
-              <span className="text-[10px] font-mono text-foreground font-semibold">{Math.round(obj.angle ?? 0)}°</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Rotation</Label>
+              <span className="text-[10px] font-mono text-[var(--w11-text-primary)] font-semibold">{Math.round(obj.angle ?? 0)}°</span>
             </div>
             <Slider min={0} max={360} step={1} value={[obj.angle ?? 0]}
               onValueChange={([v]) => set({ angle: v })} />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Opacity</Label>
-              <span className="text-[10px] font-mono text-foreground font-semibold">{Math.round((obj.opacity ?? 1) * 100)}%</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Opacity</Label>
+              <span className="text-[10px] font-mono text-[var(--w11-text-primary)] font-semibold">{Math.round((obj.opacity ?? 1) * 100)}%</span>
             </div>
             <Slider min={0} max={100} step={1} value={[Math.round((obj.opacity ?? 1) * 100)]}
               onValueChange={([v]) => set({ opacity: v / 100 })} />
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* ── Text properties ──────────────────────────────── */}
       {isText && (
-        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
-          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Text &amp; Typography</p>
-
+        <SectionCard title="Text & Typography" className="space-y-3">
           {/* Font family */}
           <div>
-            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Font Family</Label>
+            <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Font Family</Label>
             <Select value={obj.fontFamily ?? "Arial"} onValueChange={(v) => {
               if (GOOGLE_FONTS.includes(v)) loadGoogleFont(v);
               set({ fontFamily: v });
             }}>
-              <SelectTrigger className="h-8 text-xs bg-background/80 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent className="max-h-64">
-                <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold">System Fonts</div>
+                <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold">System Fonts</div>
                 {SYSTEM_FONTS.map(f => (
                   <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>
                 ))}
-                <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold mt-1">Google Fonts</div>
+                <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold mt-1">Google Fonts</div>
                 {GOOGLE_FONTS.map(f => (
                   <SelectItem key={f} value={f}>
                     <span style={{ fontFamily: SYSTEM_FONTS.includes(f) ? f : undefined }}>{f}</span>
@@ -154,48 +174,54 @@ export default function PropertiesPanel({ canvas }: Props) {
           {/* Size + color */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Font Size</Label>
-              <Input type="number" className="h-8 text-xs bg-background/80 rounded-xl" value={obj.fontSize ?? 20}
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Font Size</Label>
+              <Input type="number" className="h-8 text-xs" value={obj.fontSize ?? 20}
                 onChange={(e) => set({ fontSize: Number(e.target.value) })} />
             </div>
             <div>
-              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Color</Label>
-              <div className="flex items-center gap-2 p-1 rounded-xl border border-border/70 bg-background/80">
-                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Color</Label>
+              <div className="flex items-center gap-2 p-1 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
+                style={{ background: "var(--w11-control-bg)" }}>
+                <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
                   value={typeof obj.fill === "string" && obj.fill.startsWith("#") ? obj.fill : "#000000"}
                   onChange={(e) => set({ fill: e.target.value })} />
-                <span className="text-[10px] font-mono text-muted-foreground uppercase truncate">{typeof obj.fill === "string" ? obj.fill : "#000"}</span>
+                <span className="text-[10px] font-mono text-[var(--w11-text-tertiary)] uppercase truncate">{typeof obj.fill === "string" ? obj.fill : "#000"}</span>
               </div>
             </div>
           </div>
 
           {/* Bold / Italic / Underline / Strike */}
           <div>
-            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Formatting</Label>
+            <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Formatting</Label>
             <div className="flex gap-1">
               {([
                 ["B", "fontWeight",  "bold",   "normal"],
                 ["I", "fontStyle",   "italic", "normal"],
                 ["U", "underline",   true,     false   ],
                 ["S", "linethrough", true,     false   ],
-              ] as const).map(([lbl, prop, on, off]) => (
-                <button key={lbl as string}
-                  className={`flex-1 h-8 text-xs rounded-xl border font-bold transition-all ${
-                    obj[prop as string] === on
-                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                      : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
-                  }`}
-                  onClick={() => set({ [prop as string]: obj[prop as string] === on ? off : on })}
-                >{lbl as string}</button>
-              ))}
+              ] as const).map(([lbl, prop, on, off]) => {
+                const active = obj[prop as string] === on;
+                return (
+                  <button key={lbl as string}
+                    className="flex-1 h-8 text-xs rounded-[var(--w11-radius-md)] border font-bold"
+                    style={{
+                      transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                      ...(active
+                        ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", borderColor: "transparent" }
+                        : { background: "var(--w11-control-bg)", color: "var(--w11-text-secondary)", borderColor: "var(--w11-border-default)" }),
+                    }}
+                    onClick={() => set({ [prop as string]: obj[prop as string] === on ? off : on })}
+                  >{lbl as string}</button>
+                );
+              })}
             </div>
           </div>
 
           {/* Line height */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Line Height</Label>
-              <span className="text-[10px] font-mono font-semibold">{(obj.lineHeight ?? 1.4).toFixed(1)}</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Line Height</Label>
+              <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{(obj.lineHeight ?? 1.4).toFixed(1)}</span>
             </div>
             <Slider min={8} max={30} step={1} value={[Math.round((obj.lineHeight ?? 1.4) * 10)]}
               onValueChange={([v]) => set({ lineHeight: v / 10 })} />
@@ -204,8 +230,8 @@ export default function PropertiesPanel({ canvas }: Props) {
           {/* Char spacing */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Letter Spacing</Label>
-              <span className="text-[10px] font-mono font-semibold">{obj.charSpacing ?? 0}</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Letter Spacing</Label>
+              <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj.charSpacing ?? 0}</span>
             </div>
             <Slider min={-100} max={400} step={10} value={[obj.charSpacing ?? 0]}
               onValueChange={([v]) => set({ charSpacing: v })} />
@@ -213,51 +239,57 @@ export default function PropertiesPanel({ canvas }: Props) {
 
           {/* Alignment */}
           <div>
-            <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Alignment</Label>
+            <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Alignment</Label>
             <div className="flex gap-1">
-              {["left", "center", "right", "justify"].map(a => (
-                <button key={a}
-                  className={`flex-1 py-1 text-[11px] rounded-xl border capitalize font-medium transition-all ${
-                    obj.textAlign === a
-                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                      : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
-                  }`}
-                  onClick={() => set({ textAlign: a })}
-                >{a[0].toUpperCase() + a.slice(1)}</button>
-              ))}
+              {["left", "center", "right", "justify"].map(a => {
+                const active = obj.textAlign === a;
+                return (
+                  <button key={a}
+                    className="flex-1 py-1 text-[11px] rounded-[var(--w11-radius-md)] border capitalize font-medium"
+                    style={{
+                      transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                      ...(active
+                        ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", borderColor: "transparent" }
+                        : { background: "var(--w11-control-bg)", color: "var(--w11-text-secondary)", borderColor: "var(--w11-border-default)" }),
+                    }}
+                    onClick={() => set({ textAlign: a })}
+                  >{a[0].toUpperCase() + a.slice(1)}</button>
+                );
+              })}
             </div>
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* ── Shape properties ─────────────────────────────── */}
       {isShape && (
-        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
-          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Shape &amp; Style</p>
+        <SectionCard title="Shape & Style" className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Fill</Label>
-              <div className="flex items-center gap-2 p-1.5 rounded-xl border border-border/70 bg-background/80">
-                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Fill</Label>
+              <div className="flex items-center gap-2 p-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
+                style={{ background: "var(--w11-control-bg)" }}>
+                <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
                   value={typeof obj.fill === "string" && obj.fill.startsWith("#") ? obj.fill : "#3b82f6"}
                   onChange={(e) => set({ fill: e.target.value })} />
-                <span className="text-[10px] font-mono uppercase text-muted-foreground truncate">{typeof obj.fill === "string" ? obj.fill : "Color"}</span>
+                <span className="text-[10px] font-mono uppercase text-[var(--w11-text-tertiary)] truncate">{typeof obj.fill === "string" ? obj.fill : "Color"}</span>
               </div>
             </div>
             <div>
-              <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Stroke</Label>
-              <div className="flex items-center gap-2 p-1.5 rounded-xl border border-border/70 bg-background/80">
-                <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Stroke</Label>
+              <div className="flex items-center gap-2 p-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
+                style={{ background: "var(--w11-control-bg)" }}>
+                <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
                   value={obj.stroke ?? "#000000"}
                   onChange={(e) => set({ stroke: e.target.value })} />
-                <span className="text-[10px] font-mono uppercase text-muted-foreground truncate">{obj.stroke || "None"}</span>
+                <span className="text-[10px] font-mono uppercase text-[var(--w11-text-tertiary)] truncate">{obj.stroke || "None"}</span>
               </div>
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Stroke Width</Label>
-              <span className="text-[10px] font-mono font-semibold">{obj.strokeWidth ?? 0}px</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Stroke Width</Label>
+              <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj.strokeWidth ?? 0}px</span>
             </div>
             <Slider min={0} max={20} step={1} value={[obj.strokeWidth ?? 0]}
               onValueChange={([v]) => set({ strokeWidth: v })} />
@@ -265,16 +297,16 @@ export default function PropertiesPanel({ canvas }: Props) {
           {obj.type === "rect" && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-[10px] font-medium text-muted-foreground">Corner Radius</Label>
-                <span className="text-[10px] font-mono font-semibold">{obj.rx ?? 0}px</span>
+                <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Corner Radius</Label>
+                <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj.rx ?? 0}px</span>
               </div>
               <Slider min={0} max={60} step={1} value={[obj.rx ?? 0]}
                 onValueChange={([v]) => set({ rx: v, ry: v })} />
             </div>
           )}
           {/* Shadow */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/40">
-            <Label className="text-xs font-medium">Drop Shadow</Label>
+          <div className="flex items-center justify-between pt-2 border-t border-[var(--w11-border-subtle)]">
+            <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Drop Shadow</Label>
             <Switch checked={!!obj.shadow}
               onCheckedChange={(v) => {
                 if (v) {
@@ -285,22 +317,21 @@ export default function PropertiesPanel({ canvas }: Props) {
                 } else { set({ shadow: null }); }
               }} />
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* ── Image properties ─────────────────────────────── */}
       {isImage && (
-        <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-3 shadow-xs">
-          <p className="font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Image Filters &amp; Effects</p>
+        <SectionCard title="Image Filters & Effects" className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-xs font-medium">Lock Aspect Ratio</Label>
+            <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Lock Aspect Ratio</Label>
             <Switch checked={!!obj.lockUniScaling}
               onCheckedChange={(v) => set({ lockUniScaling: v })} />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-muted-foreground">Brightness</Label>
-              <span className="text-[10px] font-mono font-semibold">{obj._fbBrightness ?? 0}</span>
+              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Brightness</Label>
+              <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj._fbBrightness ?? 0}</span>
             </div>
             <Slider min={-100} max={100} step={5}
               value={[obj._fbBrightness ?? 0]}
@@ -317,17 +348,17 @@ export default function PropertiesPanel({ canvas }: Props) {
           <ImageEffects obj={obj} refresh={refresh} />
           <PhotoFrames obj={obj} refresh={refresh} />
           <CropTool obj={obj} refresh={refresh} />
-        </div>
+        </SectionCard>
       )}
 
       {/* Lock Position */}
-      <div className="p-3 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm flex items-center justify-between shadow-xs">
-        <Label className="text-xs font-medium">Lock Position (Freeze)</Label>
+      <SectionCard className="!space-y-0 p-3 flex items-center justify-between">
+        <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Lock Position (Freeze)</Label>
         <Switch
           checked={!!obj.lockMovementX}
           onCheckedChange={(v) => set({ lockMovementX: v, lockMovementY: v })}
         />
-      </div>
+      </SectionCard>
     </div>
   );
 }
@@ -375,27 +406,36 @@ function ImageEffects({ obj, refresh }: { obj: any; refresh: () => void }) {
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs">Effects</Label>
+      <Label className="text-xs text-[var(--w11-text-primary)]">Effects</Label>
       <div className="flex flex-wrap gap-1">
-        {["Grayscale", "Sepia", "Blur"].map((t) => (
-          <button key={t} onClick={() => toggle(t)}
-            className={`text-[10px] px-2 py-1 rounded border transition-colors ${active(t) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
-            {t}
-          </button>
-        ))}
+        {["Grayscale", "Sepia", "Blur"].map((t) => {
+          const on = active(t);
+          return (
+            <button key={t} onClick={() => toggle(t)}
+              className="text-[10px] px-2 py-1 rounded-[var(--w11-radius-sm)] border"
+              style={{
+                transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                ...(on
+                  ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", borderColor: "transparent" }
+                  : { background: "var(--w11-control-bg)", color: "var(--w11-text-secondary)", borderColor: "var(--w11-border-default)" }),
+              }}>
+              {t}
+            </button>
+          );
+        })}
       </div>
       <div>
         <div className="flex items-center justify-between mb-0.5">
-          <Label className="text-[10px]">Contrast</Label>
-          <span className="text-[10px] text-muted-foreground">{current("Contrast")}</span>
+          <Label className="text-[10px] text-[var(--w11-text-secondary)]">Contrast</Label>
+          <span className="text-[10px] text-[var(--w11-text-tertiary)]">{current("Contrast")}</span>
         </div>
         <Slider min={-100} max={100} step={5} value={[current("Contrast")]}
           onValueChange={([v]) => adjust("Contrast", v)} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-0.5">
-          <Label className="text-[10px]">Saturation</Label>
-          <span className="text-[10px] text-muted-foreground">{current("Saturation")}</span>
+          <Label className="text-[10px] text-[var(--w11-text-secondary)]">Saturation</Label>
+          <span className="text-[10px] text-[var(--w11-text-tertiary)]">{current("Saturation")}</span>
         </div>
         <Slider min={-100} max={100} step={5} value={[current("Saturation")]}
           onValueChange={([v]) => adjust("Saturation", v)} />
@@ -464,9 +504,9 @@ function CropTool({ obj, refresh }: { obj: any; refresh: () => void }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs">Crop</Label>
+        <Label className="text-xs text-[var(--w11-text-primary)]">Crop</Label>
         {crop && (
-          <button className="text-[10px] text-muted-foreground hover:text-foreground underline"
+          <button className="text-[10px] text-[var(--w11-text-tertiary)] hover:text-[var(--w11-text-primary)] underline"
             onClick={() => { setCrop(null); applyCrop(0, 0, 0, 0); }}>
             Reset
           </button>
@@ -475,14 +515,14 @@ function CropTool({ obj, refresh }: { obj: any; refresh: () => void }) {
       {([["l", "Left"], ["t", "Top"], ["r", "Right"], ["b", "Bottom"]] as const).map(([side, label]) => (
         <div key={side}>
           <div className="flex items-center justify-between mb-0.5">
-            <Label className="text-[10px]">{label}</Label>
-            <span className="text-[10px] text-muted-foreground">{num(crop?.[side])}%</span>
+            <Label className="text-[10px] text-[var(--w11-text-secondary)]">{label}</Label>
+            <span className="text-[10px] text-[var(--w11-text-tertiary)]">{num(crop?.[side])}%</span>
           </div>
           <Slider min={0} max={45} step={1} value={[num(crop?.[side])]}
             onValueChange={([v]) => setSide(side, v)} />
         </div>
       ))}
-      <p className="text-[9px] text-muted-foreground">Trim edges without deleting pixels — re-crop anytime.</p>
+      <div className="text-[9px] text-[var(--w11-text-tertiary)]">Trim edges without deleting pixels — re-crop anytime.</div>
     </div>
   );
 }
@@ -544,14 +584,23 @@ function PhotoFrames({ obj, refresh }: { obj: any; refresh: () => void }) {
 
   return (
     <div>
-      <Label className="text-xs">Photo Frame</Label>
+      <Label className="text-xs text-[var(--w11-text-primary)]">Photo Frame</Label>
       <div className="grid grid-cols-3 gap-1 mt-1">
-        {FRAME_SHAPES.map((f) => (
-          <button key={f.id} onClick={() => applyFrame(f.id)}
-            className={`text-[10px] px-1.5 py-1 rounded border transition-colors ${current === f.id ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
-            {f.label}
-          </button>
-        ))}
+        {FRAME_SHAPES.map((f) => {
+          const on = current === f.id;
+          return (
+            <button key={f.id} onClick={() => applyFrame(f.id)}
+              className="text-[10px] px-1.5 py-1 rounded-[var(--w11-radius-sm)] border"
+              style={{
+                transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                ...(on
+                  ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", borderColor: "transparent" }
+                  : { background: "var(--w11-control-bg)", color: "var(--w11-text-secondary)", borderColor: "var(--w11-border-default)" }),
+              }}>
+              {f.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -576,17 +625,17 @@ function PageSettingsPanel({ canvas, page }: { canvas: any; page: any }) {
   };
 
   return (
-    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar">
-      <div className="text-center p-3.5 bg-muted/20 border border-border/60 rounded-2xl">
-        <p className="font-semibold text-xs text-foreground">Canvas Setup</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">Configure page dimensions and canvas background</p>
+    <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar text-[var(--w11-text-primary)]">
+      <div className="text-center p-3.5 rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)]"
+        style={{ background: "var(--w11-control-hover)" }}>
+        <p className="font-semibold text-xs text-[var(--w11-text-primary)]">Canvas Setup</p>
+        <div className="text-[10px] text-[var(--w11-text-secondary)] mt-0.5">Configure page dimensions and canvas background</div>
       </div>
 
       {/* Page Size */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
-        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Document Format</Label>
+      <SectionCard title="Document Format">
         <Select value={sizeName} onValueChange={(v) => canvas.changePageSize(v)}>
-          <SelectTrigger className="h-8 text-xs bg-background/80 rounded-xl"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             {Object.keys(PAGE_SIZES).map(s => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -595,69 +644,73 @@ function PageSettingsPanel({ canvas, page }: { canvas: any; page: any }) {
         </Select>
         <div className="grid grid-cols-2 gap-2">
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">W</span>
-            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={page?.width ?? 794}
+            <span className="absolute left-2.5 text-[10px] font-bold text-[var(--w11-text-tertiary)] pointer-events-none">W</span>
+            <Input type="number" className="h-8 pl-7 text-xs" value={page?.width ?? 794}
               placeholder="W"
               onChange={(e) => canvas.updatePageSettings({ width: Number(e.target.value) })} />
           </div>
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-[10px] font-bold text-muted-foreground pointer-events-none">H</span>
-            <Input type="number" className="h-8 pl-7 text-xs bg-background/80 rounded-xl" value={page?.height ?? 1123}
+            <span className="absolute left-2.5 text-[10px] font-bold text-[var(--w11-text-tertiary)] pointer-events-none">H</span>
+            <Input type="number" className="h-8 pl-7 text-xs" value={page?.height ?? 1123}
               placeholder="H"
               onChange={(e) => canvas.updatePageSettings({ height: Number(e.target.value) })} />
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Orientation */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
-        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Orientation</Label>
+      <SectionCard title="Orientation" className="space-y-2">
         <div className="flex gap-2">
-          {(["portrait", "landscape"] as const).map(o => (
-            <button key={o}
-              className={`flex-1 py-1.5 text-xs rounded-xl border capitalize font-medium transition-all ${
-                page?.orientation === o
-                  ? "bg-primary text-primary-foreground border-primary shadow-xs font-semibold"
-                  : "border-border/70 bg-background/80 hover:bg-muted text-muted-foreground"
-              }`}
-              onClick={() => canvas.updatePageSettings({ orientation: o })}
-            >
-              {o === "portrait" ? "Portrait" : "Landscape"}
-            </button>
-          ))}
+          {(["portrait", "landscape"] as const).map(o => {
+            const on = page?.orientation === o;
+            return (
+              <button key={o}
+                className="flex-1 py-1.5 text-xs rounded-[var(--w11-radius-md)] border capitalize font-medium"
+                style={{
+                  transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                  ...(on
+                    ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", borderColor: "transparent", fontWeight: 600 }
+                    : { background: "var(--w11-control-bg)", color: "var(--w11-text-secondary)", borderColor: "var(--w11-border-default)" }),
+                }}
+                onClick={() => canvas.updatePageSettings({ orientation: o })}
+              >
+                {o === "portrait" ? "Portrait" : "Landscape"}
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Background */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
-        <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Page Background</Label>
+      <SectionCard title="Page Background" className="space-y-2">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 p-1 rounded-xl border border-border/70 bg-background/80">
-            <input type="color" className="h-6 w-8 rounded-lg border-0 cursor-pointer block p-0"
+          <div className="flex items-center gap-2 p-1 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
+            style={{ background: "var(--w11-control-bg)" }}>
+            <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
               value={page?.background ?? "#ffffff"}
               onChange={(e) => canvas.updatePageSettings({ background: e.target.value })} />
-            <span className="text-[10px] font-mono text-muted-foreground uppercase">{page?.background ?? "#fff"}</span>
+            <span className="text-[10px] font-mono text-[var(--w11-text-tertiary)] uppercase">{page?.background ?? "#fff"}</span>
           </div>
           <div className="flex gap-1 ml-auto">
             {["#ffffff", "#f8fafc", "#1e293b", "#dbeafe", "#fef3c7"].map(c => (
-              <button key={c} className="w-6 h-6 rounded-full border border-border/70 transition-transform hover:scale-110 shadow-xs"
+              <button key={c} className="w-6 h-6 rounded-full border border-[var(--w11-border-default)] transition-transform hover:scale-110"
                 style={{ backgroundColor: c }}
                 title={c}
                 onClick={() => canvas.updatePageSettings({ background: c })} />
             ))}
           </div>
         </div>
-      </div>
+      </SectionCard>
 
-      <Separator />
+      <Separator className="bg-[var(--w11-border-subtle)]" />
 
       {/* Margins */}
       <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Margins (px)</Label>
+        <Label className="text-xs font-semibold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Margins (px)</Label>
         <div className="grid grid-cols-2 gap-2 mt-2">
           {(["top", "right", "bottom", "left"] as const).map(side => (
             <div key={side}>
-              <Label className="text-xs capitalize">{side}</Label>
+              <Label className="text-xs capitalize text-[var(--w11-text-secondary)]">{side}</Label>
               <Input type="number" className="h-7 text-xs"
                 value={margins[side]}
                 onChange={(e) => {
@@ -678,7 +731,8 @@ function PageSettingsPanel({ canvas, page }: { canvas: any; page: any }) {
       </div>
 
       {/* Current page info */}
-      <div className="text-xs text-muted-foreground space-y-1 p-2 bg-muted/30 rounded">
+      <div className="text-xs text-[var(--w11-text-secondary)] space-y-1 p-2 rounded-[var(--w11-radius-md)]"
+        style={{ background: "var(--w11-control-hover)" }}>
         <p>Size: {page?.width ?? 794} × {page?.height ?? 1123} px</p>
         <p>Orientation: {page?.orientation ?? "portrait"}</p>
         <p>Pages: {canvas.pages?.length ?? 1}</p>

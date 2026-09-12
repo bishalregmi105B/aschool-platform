@@ -15,9 +15,9 @@ import { Button } from "@/components/ui/button";
 
 function Stat({ n, label }: { n: number | string; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center h-[52px] w-[56px] rounded hover:bg-slate-100">
-      <span className="text-base font-semibold text-slate-800 leading-none">{n}</span>
-      <span className="text-[9px] text-slate-500 mt-0.5">{label}</span>
+    <div className="flex flex-col items-center justify-center h-[52px] w-[56px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)]" style={{ transition: "background var(--w11-transition-fast)" }}>
+      <span className="text-base font-semibold text-[var(--w11-text-primary)] leading-none">{n}</span>
+      <span className="text-[9px] text-[var(--w11-text-tertiary)] mt-0.5">{label}</span>
     </div>
   );
 }

@@ -87,7 +87,7 @@ export function LayoutTab({ ctx }: { ctx: WriterCtx }) {
       <RibbonGroup label="Page Setup">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1">
-            <FileText className="h-3.5 w-3.5 text-slate-500" />
+            <FileText className="h-3.5 w-3.5 text-[var(--w11-text-secondary)]" />
             <Select value={settings.pageSize} onValueChange={(v) => update({ pageSize: v as PageId })}>
               <SelectTrigger className="w-[92px] h-7 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -98,7 +98,7 @@ export function LayoutTab({ ctx }: { ctx: WriterCtx }) {
             </Select>
           </div>
           <div className="flex items-center gap-1">
-            <Square className="h-3.5 w-3.5 text-slate-500" />
+            <Square className="h-3.5 w-3.5 text-[var(--w11-text-secondary)]" />
             <Select value={settings.orientation} onValueChange={(v) => update({ orientation: v as "portrait" | "landscape" })}>
               <SelectTrigger className="w-[92px] h-7 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -129,12 +129,12 @@ export function LayoutTab({ ctx }: { ctx: WriterCtx }) {
               <SelectItem value="Custom">Custom…</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex gap-1 text-[9px] text-slate-500 px-1">
+          <div className="flex gap-1 text-[9px] text-[var(--w11-text-secondary)] px-1">
             <span>T {mm(settings.marginTop)}</span>
             <span>B {mm(settings.marginBottom)}</span>
             <span>L {mm(settings.marginLeft)}</span>
             <span>R {mm(settings.marginRight)}</span>
-            <span className="text-slate-400">mm</span>
+            <span className="text-[var(--w11-text-tertiary)]">mm</span>
           </div>
         </div>
         <MarginsCustomDialog ctx={ctx} open={marginsOpen} onClose={() => setMarginsOpen(false)} />
@@ -153,7 +153,15 @@ export function LayoutTab({ ctx }: { ctx: WriterCtx }) {
               type="button"
               title="Divider line between columns"
               onClick={() => update({ columnDivider: !settings.columnDivider })}
-              className={`h-6 px-1.5 rounded text-[10px] border ${settings.columnDivider ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+              className={`h-6 !min-h-0 px-1.5 !rounded-[var(--w11-radius-sm)] text-[10px] border ${settings.columnDivider ? "!font-medium" : ""}`}
+              style={{
+                transition: "background var(--w11-transition-fast), border-color var(--w11-transition-fast)",
+                ...(settings.columnDivider ? {
+                  background: "var(--w11-accent-light)",
+                  borderColor: "var(--w11-accent)",
+                  color: "var(--w11-accent)",
+                } : {}),
+              }}
             >
               Divider
             </button>

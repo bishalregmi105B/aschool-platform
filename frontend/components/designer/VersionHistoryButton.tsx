@@ -57,19 +57,19 @@ export function VersionHistoryButton({ docId, onRestored }: { docId: string | nu
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-2">
         {!docId ? (
-          <p className="text-xs text-muted-foreground p-2">Save the design first — every save creates a restorable snapshot.</p>
+          <div className="text-xs text-[var(--w11-text-secondary)] p-2">Save the design first — every save creates a restorable snapshot.</div>
         ) : revisions.isLoading ? (
-          <p className="text-xs text-muted-foreground p-2 flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Loading versions…</p>
+          <div className="text-xs text-[var(--w11-text-secondary)] p-2 flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Loading versions…</div>
         ) : !revisions.data?.length ? (
-          <p className="text-xs text-muted-foreground p-2">No earlier versions yet. Each save keeps a snapshot (last 10).</p>
+          <div className="text-xs text-[var(--w11-text-secondary)] p-2">No earlier versions yet. Each save keeps a snapshot (last 10).</div>
         ) : (
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">Saved versions</p>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--w11-text-tertiary)] px-1">Saved versions</div>
             {revisions.data.map((rev) => (
-              <div key={rev.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+              <div key={rev.id} className="flex items-center gap-2 rounded-[var(--w11-radius-sm)] px-2 py-1.5 hover:bg-[var(--w11-control-hover)] transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{rev.name || "Version"}</p>
-                  <p className="text-[10px] text-muted-foreground">{new Date(rev.created_at).toLocaleString()}</p>
+                  <div className="text-[10px] text-[var(--w11-text-tertiary)]">{new Date(rev.created_at).toLocaleString()}</div>
                 </div>
                 <Button
                   size="sm" variant="outline" className="h-6 text-[10px] gap-1 px-1.5"

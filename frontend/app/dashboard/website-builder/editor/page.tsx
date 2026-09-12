@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { revalidateSchoolSite } from "@/lib/revalidate";
@@ -395,7 +395,7 @@ function EditableSectionBlock({
 
 export default function WebsiteEditor() {
   const qc = useQueryClient();
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const pageId = searchParams.get("page");
 
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);

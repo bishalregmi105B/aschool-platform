@@ -178,7 +178,7 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
               onPick={(c) => editor.chain().focus().setColor(c).run()}
             />
             <ColorSplitBtn
-              icon={<span className="text-[11px] font-bold leading-none border border-slate-400 rounded-sm px-0.5">ab</span>}
+              icon={<span className="text-[11px] font-bold leading-none border border-[var(--w11-border-strong)] rounded-[var(--w11-radius-sm)] px-0.5">ab</span>}
               title="Text highlight color"
               colors={HIGHLIGHT_COLORS}
               allowNone
@@ -215,7 +215,7 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
             {/* line spacing */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" title="Line spacing" className="h-7 px-1.5 rounded flex items-center gap-1 text-[11px] hover:bg-slate-100">
+                <button type="button" title="Line spacing" className="commandbar-button !h-7 !min-h-0 px-1.5 text-[11px]" style={{ transition: "background var(--w11-transition-fast)" }}>
                   <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M3 4h14M3 10h14M3 16h14" /><path d="M17 6.5 15.5 5 14 6.5M14 13.5 15.5 15 17 13.5" />
                   </svg>
@@ -234,21 +234,21 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
             <div className="flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" title="Borders" className="h-7 px-1 rounded hover:bg-slate-100 flex items-center">
+                  <button type="button" title="Borders" className="commandbar-button !h-7 !min-h-0 px-1" style={{ transition: "background var(--w11-transition-fast)" }}>
                     <RectangleHorizontal className="h-3.5 w-3.5" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => setBorders("none")}><Minus className="h-3 w-3 mr-2" />None</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setBorders("top")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2"><rect x="1" y="2" width="14" height="2" fill="#64748b" /></svg>Top</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setBorders("bottom")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2"><rect x="1" y="12" width="14" height="2" fill="#64748b" /></svg>Bottom</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setBorders("topbottom")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2"><rect x="1" y="2" width="14" height="2" fill="#64748b" /><rect x="1" y="12" width="14" height="2" fill="#64748b" /></svg>Top & bottom</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setBorders("box")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2"><rect x="1" y="2" width="14" height="12" fill="none" stroke="#64748b" strokeWidth="2" /></svg>Box</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBorders("top")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2 text-[var(--w11-text-secondary)]"><rect x="1" y="2" width="14" height="2" fill="currentColor" /></svg>Top</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBorders("bottom")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2 text-[var(--w11-text-secondary)]"><rect x="1" y="12" width="14" height="2" fill="currentColor" /></svg>Bottom</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBorders("topbottom")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2 text-[var(--w11-text-secondary)]"><rect x="1" y="2" width="14" height="2" fill="currentColor" /><rect x="1" y="12" width="14" height="2" fill="currentColor" /></svg>Top & bottom</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBorders("box")}><svg viewBox="0 0 16 16" className="h-3 w-3 mr-2 text-[var(--w11-text-secondary)]"><rect x="1" y="2" width="14" height="12" fill="none" stroke="currentColor" strokeWidth="2" /></svg>Box</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" title="Shading" className="h-7 px-1 rounded hover:bg-slate-100 flex flex-col items-center">
+                  <button type="button" title="Shading" className="commandbar-button !h-7 !min-h-0 px-1 flex-col" style={{ transition: "background var(--w11-transition-fast)" }}>
                     <span className="text-[9px] font-bold leading-none">ab</span>
                     <span className="block w-4 h-[3px] rounded-sm" style={{ background: shadingAttr || "transparent" }} />
                   </button>
@@ -271,16 +271,16 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
         </div>
       </RibbonGroup>
 
-      {/* Styles (Word 365 Quick Styles Gallery) */}
+      {/* Styles (Word 365 Quick Styles Gallery) — token-driven tiles */}
       <RibbonGroup label="Styles">
         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5 max-w-[420px]">
           {[
-            { id: "p", title: "Normal", sample: "AaBbCc", sampleStyle: "text-xs font-normal text-foreground" },
-            { id: "h1", title: "Heading 1", sample: "AaBbCc", sampleStyle: "text-xs font-bold text-[#0078d4]" },
-            { id: "h2", title: "Heading 2", sample: "AaBbCc", sampleStyle: "text-[11px] font-semibold text-[#106ebe]" },
-            { id: "h3", title: "Heading 3", sample: "AaBbCc", sampleStyle: "text-[11px] font-medium text-slate-700 dark:text-slate-300" },
-            { id: "quote", title: "Quote", sample: "“AaBb”", sampleStyle: "text-xs italic text-slate-500" },
-            { id: "code", title: "Code", sample: "<code>", sampleStyle: "text-[11px] font-mono text-emerald-600" },
+            { id: "p", title: "Normal", sample: "AaBbCc", sampleStyle: "text-xs font-normal text-[var(--w11-text-primary)]" },
+            { id: "h1", title: "Heading 1", sample: "AaBbCc", sampleStyle: "text-xs font-bold text-[var(--w11-accent)]" },
+            { id: "h2", title: "Heading 2", sample: "AaBbCc", sampleStyle: "text-[11px] font-semibold text-[var(--w11-accent)] opacity-80" },
+            { id: "h3", title: "Heading 3", sample: "AaBbCc", sampleStyle: "text-[11px] font-medium text-[var(--w11-text-primary)]" },
+            { id: "quote", title: "Quote", sample: "“AaBb”", sampleStyle: "text-xs italic text-[var(--w11-text-secondary)]" },
+            { id: "code", title: "Code", sample: "<code>", sampleStyle: "text-[11px] font-mono text-emerald-600 dark:text-emerald-400" },
           ].map((item) => {
             const isActive = blockBtn(item.id === "p" ? "paragraph" : item.id);
             return (
@@ -294,13 +294,22 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
                   else ch.toggleHeading({ level: Number(item.id[1]) as 1 | 2 | 3 }).run();
                 }}
                 className={cn(
-                  "word-style-tile",
-                  isActive && "active",
+                  "flex flex-col items-center justify-center !px-2 min-w-[64px] h-[48px] cursor-pointer select-none",
+                  isActive && "!font-semibold",
                 )}
+                style={{
+                  borderRadius: "var(--w11-radius-md)",
+                  transition: "background var(--w11-transition-fast), border-color var(--w11-transition-fast)",
+                  ...(isActive ? {
+                    background: "var(--w11-accent-light)",
+                    borderColor: "var(--w11-accent)",
+                    boxShadow: "0 0 0 1px var(--w11-accent)",
+                  } : {}),
+                }}
                 title={`Apply style: ${item.title}`}
               >
                 <span className={cn("leading-none select-none truncate max-w-full", item.sampleStyle)}>{item.sample}</span>
-                <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 mt-1 select-none">{item.title}</span>
+                <span className="text-[9px] font-medium text-[var(--w11-text-tertiary)] mt-1 select-none">{item.title}</span>
               </button>
             );
           })}
