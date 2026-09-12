@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * In-process navigation for the AOS desktop.
@@ -70,4 +71,27 @@ export function AOSNavigateProvider({
 /** In-process navigation anywhere in the shell (windows, widgets, flyouts). */
 export function useAOSNavigate(): AOSNavigateFn | null {
   return useContext(NavigateContext);
+}
+
+/**
+ * Router-compatible navigation that prefers the in-process AOS navigate
+ * (no URL change) and falls back to the Next router (e.g. inside aos_embed
+ * iframes, where no AOS shell provides the navigate context).
+ *
+ * Drop-in replacement for `const router = useRouter(); router.push(x)` in
+ * dashboard pages: `const navigate = useAOSRouterNavigate(); navigate(x)`.
+ */
+export function useAOSRouterNavigate(): (route: string) => void {
+  const aosNavigate = useContext(NavigateContext);
+  const router = useRouter();
+  return useCallback(
+    (route: string) => {
+      if (aosNavigate) {
+        aosNavigate(route);
+      } else {
+        router.push(route);
+      }
+    },
+    [aosNavigate, router]
+  );
 }

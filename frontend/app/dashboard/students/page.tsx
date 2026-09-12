@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,7 @@ export default function StudentsPage() {
   const [viewStudent, setViewStudent] = useState<Student | null>(null);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
 
   // Fetch classes for proper class/section filter
   const { data: classesData } = useQuery({
@@ -358,12 +358,12 @@ export default function StudentsPage() {
     {
       key: "promote",
       label: "Promote…",
-      onClick: () => router.push("/dashboard/students/promote"),
+      onClick: () => router("/dashboard/students/promote"),
     },
     {
       key: "reset-pw",
       label: "Reset passwords…",
-      onClick: () => router.push("/dashboard/students/reset-password"),
+      onClick: () => router("/dashboard/students/reset-password"),
     },
   ];
 
@@ -374,7 +374,7 @@ export default function StudentsPage() {
         title="Students"
         subtitle={`${pagination?.total || 0} students enrolled`}
         actions={
-          <Button onClick={() => router.push("/dashboard/students/new")}>
+          <Button onClick={() => router("/dashboard/students/new")}>
             <Plus className="h-4 w-4 mr-2" />
             Add Student
           </Button>
@@ -471,13 +471,13 @@ export default function StudentsPage() {
                   placeholder="All Statuses"
                   options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
                 />
-                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/bulk-import")}>
+                <Button variant="outline" size="sm" onClick={() => router("/dashboard/students/bulk-import")}>
                   <Upload className="h-3.5 w-3.5 mr-1" /> Import
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/students/profile-images")}>
+                <Button variant="outline" size="sm" onClick={() => router("/dashboard/students/profile-images")}>
                   <ImagePlus className="h-3.5 w-3.5 mr-1" /> Photos
                 </Button>
-                <Button onClick={() => router.push("/dashboard/students/new")}>
+                <Button onClick={() => router("/dashboard/students/new")}>
                   <Plus className="h-4 w-4 mr-1" /> Add Student
                 </Button>
               </div>
@@ -546,7 +546,7 @@ export default function StudentsPage() {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onClick={() => router.push(`/dashboard/students/${viewStudent.id}`)}
+                    onClick={() => router(`/dashboard/students/${viewStudent.id}`)}
                   >
                     Full Profile
                   </Button>
