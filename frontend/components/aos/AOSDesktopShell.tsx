@@ -25,7 +25,7 @@ import {
 } from "@/lib/aos-app-adapter";
 import { useAuth } from "@/lib/auth-context";
 import { fetchUnreadCount } from "@/lib/services/notifications.service";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Maximize2 } from "lucide-react";
 import {
   AOS_MODE_STORAGE_KEY,
   extractAOSModuleSlug,
@@ -167,6 +167,58 @@ export default function AOSDesktopShell() {
     if (!isNotificationsOpen) return;
     refetchUnread();
   }, [isNotificationsOpen, refetchUnread]);
+
+  // Fullscreen: the desktop OS works best without browser chrome. On the
+  // first visit per browser we offer it once (dismissal is remembered);
+  // afterwards a menubar toggle controls it.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false);
+
+  useEffect(() => {
+    if (document.fullscreenElement) setIsFullscreen(true);
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    try {
+      if (!localStorage.getItem("aschool_aos_fullscreen_prompted")) {
+        setShowFullscreenPrompt(true);
+      }
+    } catch {
+      // ignore
+    }
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const enterFullscreen = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Browser refused (iframe policy / not user-gesture) — non-fatal.
+    } finally {
+      try {
+        localStorage.setItem("aschool_aos_fullscreen_prompted", "1");
+      } catch {
+        // ignore
+      }
+      setShowFullscreenPrompt(false);
+    }
+  }, []);
+
+  const dismissFullscreenPrompt = useCallback(() => {
+    try {
+      localStorage.setItem("aschool_aos_fullscreen_prompted", "1");
+    } catch {
+      // ignore
+    }
+    setShowFullscreenPrompt(false);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
 
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
@@ -530,6 +582,9 @@ export default function AOSDesktopShell() {
       {showTopBar && (
         <TopMenuBar
           currentRole={currentRole}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          sidebarItems={sidebarItems}
           onOpenRoleSwitcher={() => {
             closeAllFlyouts("roleSwitcher");
             setIsRoleSwitcherOpen(true);
@@ -735,6 +790,55 @@ export default function AOSDesktopShell() {
         currentRole={currentRole}
         accentColor={accentColor}
       />
+
+      {/* First-visit fullscreen offer */}
+      {showFullscreenPrompt && (
+        <div
+          className="aos-desktop-prompt-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10060,
+            background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={dismissFullscreenPrompt}
+        >
+          <div
+            className="win11-dialog"
+            style={{ width: "420px", maxWidth: "92vw", padding: "22px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-header" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Maximize2 size={20} style={{ color: "var(--w11-accent)" }} />
+              <span>Enter Fullscreen Mode?</span>
+            </div>
+            <div
+              className="dialog-body"
+              style={{ fontSize: "13px", lineHeight: 1.5, color: "var(--w11-text-secondary)" }}
+            >
+              ASchool OS works best in fullscreen — the whole desktop, dock, and
+              windows get the complete screen with no browser chrome in the way.
+              You can toggle it anytime from the menu bar.
+            </div>
+            <div
+              className="dialog-footer"
+              style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}
+            >
+              <button className="subtle" onClick={dismissFullscreenPrompt} style={{ fontSize: "12px" }}>
+                Not Now
+              </button>
+              <button className="accent" onClick={enterFullscreen} style={{ fontSize: "12px" }}>
+                <Maximize2 size={13} /> Enter Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Role Switcher Session Modal */}
       <RoleSwitcherModal
