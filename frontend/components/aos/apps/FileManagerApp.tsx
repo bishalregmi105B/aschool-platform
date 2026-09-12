@@ -1527,17 +1527,24 @@ export default function FileManagerApp() {
                     >
                       <div style={{ marginBottom: "6px" }}>{renderFileIcon(item.iconType, 38)}</div>
                       <span
+                        title={item.name}
                         style={{
                           fontSize: "11px",
                           textAlign: "center",
-                          wordBreak: "break-word",
                           color: "var(--w11-text-primary)",
                           lineHeight: 1.25,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: "100%",
+                          wordBreak: "break-word",
                         }}
                       >
                         {item.name}
                       </span>
-                      <span style={{ fontSize: "10px", color: "var(--w11-text-secondary)", marginTop: "2px" }}>
+                      <span style={{ fontSize: "10px", color: "var(--w11-text-secondary)", marginTop: "2px", whiteSpace: "nowrap" }}>
                         {item.kind === "folder"
                           ? `${item.fileCount ?? 0} item${item.fileCount === 1 ? "" : "s"}`
                           : formatBytes(item.sizeBytes)}
@@ -1566,9 +1573,11 @@ export default function FileManagerApp() {
                       onDragStart={(e) => handleItemDragStart(e, item)}
                       style={{ cursor: "pointer", background: selectedItem?.id === item.id ? "var(--w11-control-hover)" : undefined }}
                     >
-                      <td style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <td style={{ display: "flex", alignItems: "center", gap: "8px", maxWidth: "320px" }}>
                         {renderFileIcon(item.iconType, 18)}
-                        <span style={{ fontWeight: 500 }}>{item.name}</span>
+                        <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.name}>
+                          {item.name}
+                        </span>
                       </td>
                       <td style={{ textTransform: "uppercase", fontSize: "11px", color: "var(--w11-text-secondary)" }}>{item.typeLabel}</td>
                       <td>{item.kind === "folder" ? "—" : formatBytes(item.sizeBytes)}</td>

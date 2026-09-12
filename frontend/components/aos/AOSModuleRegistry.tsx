@@ -152,8 +152,8 @@ const MODULE_ALIASES: Record<string, string> = {
   exam: "exams",
   timetable_management: "timetable",
   "timetable-management": "timetable",
-  file_management: "files",
-  "file-management": "files",
+  file_management: "filemanager",
+  "file-management": "filemanager",
   // "filemanager" resolves directly to the AOS native FileManager app above;
   // these aliases route the Vault naming onto it. Note "files" itself stays a
   // direct registry entry pointing at the dashboard files page.

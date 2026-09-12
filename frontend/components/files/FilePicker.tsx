@@ -268,9 +268,15 @@ function FileTile({
         style={{
           fontSize: "11px",
           textAlign: "center",
-          wordBreak: "break-word",
           color: "var(--w11-text-primary)",
           lineHeight: 1.25,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: "100%",
+          wordBreak: "break-word",
         }}
       >
         {file.original_name}
