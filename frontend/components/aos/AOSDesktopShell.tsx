@@ -25,15 +25,21 @@ import {
 } from "@/lib/aos-app-adapter";
 import { useAuth } from "@/lib/auth-context";
 import { fetchUnreadCount } from "@/lib/services/notifications.service";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Maximize2 } from "lucide-react";
 import {
-  AOS_THEME_STORAGE_KEY,
   AOS_MODE_STORAGE_KEY,
   extractAOSModuleSlug,
   formatAOSRouteTitle,
   isAOSRootModuleRoute,
   normalizeAOSRoute,
 } from "@/lib/aos-navigation";
+import { useAOSUserSettings } from "@/lib/aos-settings";
+import {
+  getDefaultFolders,
+  parseDesktopFolders,
+  resolveDesktopLayout,
+  type AOSDesktopFolder,
+} from "@/lib/aos-launcher";
 
 interface RouteLaunchMeta {
   moduleId: string;
@@ -43,6 +49,18 @@ interface RouteLaunchMeta {
   defaultHeight: number;
   isSubroute: boolean;
 }
+
+// Dock pinning defaults — used while aosSettings.pinned_apps is empty (i.e.
+// the user has never customized the dock). Ids are AOS module ids.
+const DEFAULT_PINNED_APPS = [
+  "students",
+  "teachers",
+  "fees",
+  "attendance",
+  "notices",
+  "aos-settings",
+  "appstore",
+];
 
 interface OpenWindowOptions {
   windowId?: string;
@@ -61,17 +79,84 @@ export default function AOSDesktopShell() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Desktop appearance customization state
-  const [themeMode, setThemeMode] = useState<"light" | "dark">("dark");
-  const [accentColor, setAccentColor] = useState("#0078d4");
-  const [wallpaper, setWallpaper] = useState("bloom-dark");
-  const [brightness, setBrightness] = useState(100);
-  const [dockStyle, setDockStyle] = useState<"mac" | "win11">("mac");
-  const [dockSize, setDockSize] = useState<"small" | "medium" | "large">("medium");
-  const [showTopBar, setShowTopBar] = useState(true);
-  const [topBarHeight, setTopBarHeight] = useState<"compact" | "standard" | "large">("standard");
-  const [blurIntensity, setBlurIntensity] = useState(30);
-  const [taskbarAlign, setTaskbarAlign] = useState<"center" | "left">("center");
+  // Desktop customization state — DB-backed (cross-device) via
+  // useAOSUserSettings; localStorage cache provides instant first paint.
+  const { settings: aosSettings, updateSettings: updateAOSSettings } = useAOSUserSettings();
+  const themeMode = aosSettings.theme_mode;
+  const accentColor = aosSettings.accent_color;
+  const wallpaper = aosSettings.wallpaper;
+  const brightness = aosSettings.brightness;
+  const dockStyle = aosSettings.dock_style;
+  const dockSize = aosSettings.dock_size;
+  const showTopBar = aosSettings.show_top_bar;
+  const topBarHeight = aosSettings.top_bar_height;
+  const blurIntensity = aosSettings.blur_intensity;
+  const taskbarAlign = aosSettings.taskbar_align;
+
+  const setThemeMode = useCallback(
+    (mode: "light" | "dark") => updateAOSSettings({ theme_mode: mode }),
+    [updateAOSSettings]
+  );
+  const setAccentColor = useCallback(
+    (color: string) => updateAOSSettings({ accent_color: color }),
+    [updateAOSSettings]
+  );
+  const setWallpaper = useCallback(
+    (wp: string) => updateAOSSettings({ wallpaper: wp }),
+    [updateAOSSettings]
+  );
+  const setBrightness = useCallback(
+    (b: number) => updateAOSSettings({ brightness: b }),
+    [updateAOSSettings]
+  );
+  const setDockStyle = useCallback(
+    (style: "mac" | "win11") => updateAOSSettings({ dock_style: style }),
+    [updateAOSSettings]
+  );
+  const setDockSize = useCallback(
+    (size: "small" | "medium" | "large") => updateAOSSettings({ dock_size: size }),
+    [updateAOSSettings]
+  );
+  const setShowTopBar = useCallback(
+    (show: boolean) => updateAOSSettings({ show_top_bar: show }),
+    [updateAOSSettings]
+  );
+  const setTopBarHeight = useCallback(
+    (h: "compact" | "standard" | "large") => updateAOSSettings({ top_bar_height: h }),
+    [updateAOSSettings]
+  );
+  const setBlurIntensity = useCallback(
+    (v: number) => updateAOSSettings({ blur_intensity: v }),
+    [updateAOSSettings]
+  );
+  const setTaskbarAlign = useCallback(
+    (a: "center" | "left") => updateAOSSettings({ taskbar_align: a }),
+    [updateAOSSettings]
+  );
+
+  // Dock pinning — DB-backed via pinned_apps. An empty list means the user has
+  // never customized the dock, so the default pinned set is shown instead.
+  const pinnedAppIds = useMemo(
+    () =>
+      aosSettings.pinned_apps.length > 0
+        ? aosSettings.pinned_apps
+        : DEFAULT_PINNED_APPS,
+    [aosSettings.pinned_apps]
+  );
+
+  const handleTogglePinApp = useCallback(
+    (id: string) => {
+      const base =
+        aosSettings.pinned_apps.length > 0
+          ? aosSettings.pinned_apps
+          : DEFAULT_PINNED_APPS;
+      const next = base.includes(id)
+        ? base.filter((appId) => appId !== id)
+        : [...base, id];
+      updateAOSSettings({ pinned_apps: next });
+    },
+    [aosSettings.pinned_apps, updateAOSSettings]
+  );
 
   // User role state
   const [currentRole, setCurrentRole] = useState<string>(user?.role || "admin");
@@ -82,27 +167,9 @@ export default function AOSDesktopShell() {
     }
   }, [user?.role]);
 
-  useEffect(() => {
-    try {
-      const storedTheme = localStorage.getItem(AOS_THEME_STORAGE_KEY);
-      if (storedTheme === "light" || storedTheme === "dark") {
-        setThemeMode(storedTheme);
-      }
-    } catch {
-      // Ignore storage access issues
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(AOS_THEME_STORAGE_KEY, themeMode);
-    } catch {
-      // Ignore storage write issues
-    }
-  }, [themeMode]);
-
-  // Manual desktop/iOS mode override — persists across reloads; absence of a
-  // stored value keeps the viewport-based decision in dashboard-layout.
+  // Manual desktop/iOS mode override — persists across reloads (DB-backed
+  // with a localStorage mirror that dashboard-layout reads synchronously);
+  // absence of a stored value keeps the viewport-based decision.
   const handleToggleSystemMode = useCallback(() => {
     try {
       const current = localStorage.getItem(AOS_MODE_STORAGE_KEY);
@@ -111,11 +178,12 @@ export default function AOSDesktopShell() {
         (current !== "desktop" && window.matchMedia("(max-width: 767px)").matches);
       const next = isMobileNow ? "desktop" : "mobile";
       localStorage.setItem(AOS_MODE_STORAGE_KEY, next);
+      updateAOSSettings({ system_mode: next });
       window.location.reload();
     } catch {
       // Ignore storage access issues
     }
-  }, []);
+  }, [updateAOSSettings]);
 
   // Flyout and modal toggles
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
@@ -142,6 +210,58 @@ export default function AOSDesktopShell() {
     refetchUnread();
   }, [isNotificationsOpen, refetchUnread]);
 
+  // Fullscreen: the desktop OS works best without browser chrome. On the
+  // first visit per browser we offer it once (dismissal is remembered);
+  // afterwards a menubar toggle controls it.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false);
+
+  useEffect(() => {
+    if (document.fullscreenElement) setIsFullscreen(true);
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    try {
+      if (!localStorage.getItem("aschool_aos_fullscreen_prompted")) {
+        setShowFullscreenPrompt(true);
+      }
+    } catch {
+      // ignore
+    }
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const enterFullscreen = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Browser refused (iframe policy / not user-gesture) — non-fatal.
+    } finally {
+      try {
+        localStorage.setItem("aschool_aos_fullscreen_prompted", "1");
+      } catch {
+        // ignore
+      }
+      setShowFullscreenPrompt(false);
+    }
+  }, []);
+
+  const dismissFullscreenPrompt = useCallback(() => {
+    try {
+      localStorage.setItem("aschool_aos_fullscreen_prompted", "1");
+    } catch {
+      // ignore
+    }
+    setShowFullscreenPrompt(false);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
   // Dynamic AOS Apps from plugins
   const allApps: AOSApp[] = useMemo(() => {
     const apps = sidebarItems.map(getAOSAppForModule);
@@ -166,6 +286,33 @@ export default function AOSDesktopShell() {
     }
     return apps;
   }, [sidebarItems, pluginBottomNav]);
+
+  // Desktop folder layout — DB-backed via desktop_folders. An empty persisted
+  // list means the user never customized folders, so defaults are derived from
+  // plugin manifest sections (re-deriving automatically on manifest/role
+  // changes) and are NOT persisted until the user edits something.
+  const persistedFolders = useMemo(
+    () => parseDesktopFolders(aosSettings.desktop_folders),
+    [aosSettings.desktop_folders]
+  );
+  const desktopFolders = useMemo(
+    () =>
+      persistedFolders.length > 0
+        ? persistedFolders
+        : getDefaultFolders(allApps, sidebarItems),
+    [persistedFolders, allApps, sidebarItems]
+  );
+  const desktopLayout = useMemo(
+    () => resolveDesktopLayout(allApps, desktopFolders),
+    [allApps, desktopFolders]
+  );
+  const handleUpdateDesktopFolders = useCallback(
+    (next: AOSDesktopFolder[]) => {
+      // Validate/sanitize before persisting (ids, names, appIds).
+      updateAOSSettings({ desktop_folders: parseDesktopFolders(next) });
+    },
+    [updateAOSSettings]
+  );
 
   // Window State Management
   const [windows, setWindows] = useState<WindowInstance[]>([]);
@@ -504,6 +651,9 @@ export default function AOSDesktopShell() {
       {showTopBar && (
         <TopMenuBar
           currentRole={currentRole}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          sidebarItems={sidebarItems}
           onOpenRoleSwitcher={() => {
             closeAllFlyouts("roleSwitcher");
             setIsRoleSwitcherOpen(true);
@@ -559,6 +709,8 @@ export default function AOSDesktopShell() {
         currentRole={currentRole}
         showTopBar={showTopBar}
         apps={allApps}
+        folders={desktopLayout.folders}
+        onUpdateFolders={handleUpdateDesktopFolders}
         onOpenApp={openWindow}
       >
         {/* Multi-Window Manager Canvas */}
@@ -575,7 +727,7 @@ export default function AOSDesktopShell() {
           accentColor={accentColor}
           onChangeAccent={setAccentColor}
           themeMode={themeMode}
-          onToggleTheme={() => setThemeMode((m) => (m === "dark" ? "light" : "dark"))}
+          onToggleTheme={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
           wallpaper={wallpaper}
           onChangeWallpaper={setWallpaper}
           dockStyle={dockStyle}
@@ -583,17 +735,21 @@ export default function AOSDesktopShell() {
           dockSize={dockSize}
           onChangeDockSize={setDockSize}
           showTopBar={showTopBar}
-          onToggleTopBar={() => setShowTopBar((prev) => !prev)}
+          onToggleTopBar={() => setShowTopBar(!showTopBar)}
+          topBarHeight={topBarHeight}
+          onChangeTopBarHeight={setTopBarHeight}
           blurIntensity={blurIntensity}
           onChangeBlurIntensity={setBlurIntensity}
           taskbarAlign={taskbarAlign}
           onToggleTaskbarAlign={() =>
-            setTaskbarAlign((prev) => (prev === "center" ? "left" : "center"))
+            setTaskbarAlign(taskbarAlign === "center" ? "left" : "center")
           }
           brightness={brightness}
           onChangeBrightness={setBrightness}
           currentRole={currentRole}
           onOpenRoleSwitcher={() => setIsRoleSwitcherOpen(true)}
+          pinnedAppIds={pinnedAppIds}
+          onTogglePinApp={handleTogglePinApp}
           onOpenRoute={openRouteInAOS}
         />
       </Desktop>
@@ -617,6 +773,7 @@ export default function AOSDesktopShell() {
           accentColor={accentColor}
           currentRole={currentRole}
           dockSize={dockSize}
+          pinnedAppIds={pinnedAppIds}
           onToggleStart={() => {
             const next = !isStartOpen;
             closeAllFlyouts("start");
@@ -708,7 +865,57 @@ export default function AOSDesktopShell() {
         onOpenApp={openWindow}
         currentRole={currentRole}
         accentColor={accentColor}
+        folders={desktopLayout.folders.length > 0 ? desktopLayout.folders : undefined}
       />
+
+      {/* First-visit fullscreen offer */}
+      {showFullscreenPrompt && (
+        <div
+          className="aos-desktop-prompt-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10060,
+            background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={dismissFullscreenPrompt}
+        >
+          <div
+            className="win11-dialog"
+            style={{ width: "420px", maxWidth: "92vw", padding: "22px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-header" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Maximize2 size={20} style={{ color: "var(--w11-accent)" }} />
+              <span>Enter Fullscreen Mode?</span>
+            </div>
+            <div
+              className="dialog-body"
+              style={{ fontSize: "13px", lineHeight: 1.5, color: "var(--w11-text-secondary)" }}
+            >
+              ASchool OS works best in fullscreen — the whole desktop, dock, and
+              windows get the complete screen with no browser chrome in the way.
+              You can toggle it anytime from the menu bar.
+            </div>
+            <div
+              className="dialog-footer"
+              style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}
+            >
+              <button className="subtle" onClick={dismissFullscreenPrompt} style={{ fontSize: "12px" }}>
+                Not Now
+              </button>
+              <button className="accent" onClick={enterFullscreen} style={{ fontSize: "12px" }}>
+                <Maximize2 size={13} /> Enter Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Role Switcher Session Modal */}
       <RoleSwitcherModal

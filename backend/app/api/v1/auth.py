@@ -10,6 +10,7 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from extensions import limiter
 from app.services.auth_service import AuthService
 from app.models.user import User
+from app.models.user_aos_settings import UserAOSSettings
 from app.utils.response import error_response, success_response
 from app.utils.validators import validate_password_strength
 
@@ -292,6 +293,88 @@ def update_me():
     from extensions import db
     db.session.commit()
     return success_response(user.to_dict())
+
+
+# ── AOS desktop state ─────────────────────────────────────────────────
+# Per-user OS appearance/launcher state persisted server-side so it follows
+# the user across devices.
+
+_AOS_STRING_FIELDS = {
+    "theme_mode": {"dark", "light"},
+    "accent_color": None,  # any hex string, length-capped by column
+    "wallpaper": None,
+    "brightness": None,
+    "dock_style": {"mac", "win11"},
+    "dock_size": {"small", "medium", "large"},
+    "show_top_bar": {"true", "false"},
+    "top_bar_height": {"compact", "standard", "large"},
+    "blur_intensity": None,
+    "taskbar_align": {"center", "left"},
+    "system_mode": {"", "desktop", "mobile"},
+}
+_AOS_JSON_FIELDS = {"pinned_apps": list, "desktop_folders": list, "home_widgets": list}
+
+
+def _get_or_create_aos_settings(user_id):
+    settings = UserAOSSettings.query.filter_by(user_id=user_id).first()
+    if settings is None:
+        settings = UserAOSSettings(user_id=user_id)
+        from extensions import db
+
+        db.session.add(settings)
+        db.session.flush()
+    return settings
+
+
+@auth_bp.route("/aos-settings", methods=["GET"])
+@jwt_required()
+def get_aos_settings():
+    """Get current user's AOS desktop state (defaults if never saved)."""
+    user_id = get_jwt_identity()
+    settings = UserAOSSettings.query.filter_by(user_id=user_id).first()
+    if settings is None:
+        from extensions import db
+
+        settings = UserAOSSettings(user_id=user_id)
+        db.session.add(settings)
+        db.session.commit()
+    return success_response(settings.to_dict())
+
+
+@auth_bp.route("/aos-settings", methods=["PUT"])
+@jwt_required()
+def update_aos_settings():
+    """Update current user's AOS desktop state (partial merge)."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user or user.is_deleted:
+        return error_response("User not found", 404)
+
+    data = request.get_json(silent=True) or {}
+    settings = _get_or_create_aos_settings(user_id)
+
+    for field, allowed in _AOS_STRING_FIELDS.items():
+        if field in data:
+            value = str(data[field])
+            if len(value) > 200:
+                return error_response(f"{field} too long", 400)
+            if allowed is not None and value not in allowed:
+                return error_response(f"invalid value for {field}", 400)
+            setattr(settings, field, value)
+
+    for field, expected_type in _AOS_JSON_FIELDS.items():
+        if field in data:
+            value = data[field]
+            if not isinstance(value, expected_type):
+                return error_response(f"{field} must be a list", 400)
+            if len(value) > 200:
+                return error_response(f"{field} too long", 400)
+            setattr(settings, field, value)
+
+    from extensions import db
+
+    db.session.commit()
+    return success_response(settings.to_dict())
 
 
 @auth_bp.route("/change-password", methods=["POST"])
