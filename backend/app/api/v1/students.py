@@ -694,6 +694,89 @@ def promote_preview():
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
+
+
+def _record_promotion_snapshot(school_id, promoted_students, source_class, target_class, target_year_id):
+    """A-31: for each promoted student — flag the old enrollment as
+    superseded, upsert the new-year enrollment row, and write an immutable
+    PromotionRecord. Best-effort per student: snapshot failures are logged
+    and never roll the promotion back (the live profile move already
+    succeeded and is the source of truth)."""
+    import logging as _logging
+
+    from app.models.student_enrollment import PromotionRecord, StudentEnrollment
+
+    logger = _logging.getLogger(__name__)
+    for student in promoted_students:
+        try:
+            from_enrollment = StudentEnrollment.query.filter(
+                StudentEnrollment.school_id == school_id,
+                StudentEnrollment.student_id == student.id,
+                StudentEnrollment.academic_year_id == (
+                    source_class.academic_year_id or student.academic_year_id
+                ),
+                StudentEnrollment.is_deleted.is_(False),
+            ).first()
+            if from_enrollment is None:
+                from_enrollment = StudentEnrollment.query.filter(
+                    StudentEnrollment.school_id == school_id,
+                    StudentEnrollment.student_id == student.id,
+                    StudentEnrollment.is_default.is_(True),
+                    StudentEnrollment.is_deleted.is_(False),
+                ).first()
+            if from_enrollment is not None:
+                from_enrollment.is_default = False
+                from_enrollment.is_promoted = True
+
+            to_enrollment = StudentEnrollment.query.filter(
+                StudentEnrollment.school_id == school_id,
+                StudentEnrollment.student_id == student.id,
+                StudentEnrollment.academic_year_id == target_year_id,
+                StudentEnrollment.is_deleted.is_(False),
+            ).first() if target_year_id else None
+            if to_enrollment is None:
+                to_enrollment = StudentEnrollment(
+                    school_id=school_id,
+                    student_id=student.id,
+                    academic_year_id=target_year_id,
+                    academic_year_label=getattr(student, "academic_year", None),
+                    class_id=to_class_id,
+                    section_id=student.section_id,
+                    roll_number=student.roll_number,
+                    is_promoted=False,
+                    is_default=True,
+                    promoted_from_enrollment_id=(
+                        from_enrollment.id if from_enrollment else None
+                    ),
+                )
+                db.session.add(to_enrollment)
+                db.session.flush()
+            else:
+                to_enrollment.class_id = to_class_id
+                to_enrollment.section_id = student.section_id
+                to_enrollment.roll_number = student.roll_number
+                to_enrollment.is_default = True
+
+            db.session.add(
+                PromotionRecord(
+                    school_id=school_id,
+                    student_id=student.id,
+                    from_enrollment_id=from_enrollment.id if from_enrollment else None,
+                    to_enrollment_id=to_enrollment.id,
+                    from_class_id=source_class.id,
+                    to_class_id=target_class.id,
+                    from_roll_number=from_enrollment.roll_number if from_enrollment else None,
+                    to_roll_number=student.roll_number,
+                    academic_year_id=target_year_id,
+                    performed_by_id=g.user_id,
+                )
+            )
+        except Exception:  # noqa: BLE001 — snapshot must not break promotion
+            logger.exception(
+                "promotion snapshot failed for student %s", student.id
+            )
+            db.session.rollback()
+
 def promote_students():
     """Promote students of one class into another class.
 
@@ -816,6 +899,11 @@ def promote_students():
             _renumber_class_rolls(g.school_id, to_class_id)
         else:
             roll_conflicts = _find_roll_conflicts(g.school_id, to_class_id)
+        # A-31: promotion snapshot + new-year enrollment rows. Additive —
+        # the existing live-profile mutation above is unchanged.
+        _record_promotion_snapshot(
+            g.school_id, promoted_students, source, target, target_year_id
+        )
         db.session.commit()
     except Exception:
         import logging
@@ -1174,3 +1262,80 @@ def _guardian_dict(guardian: Guardian) -> dict:
         "occupation": getattr(guardian, "occupation", None),
         "is_primary": guardian.is_primary,
     }
+
+
+# ── S-A5 (A-31): multi-year enrollment records ───────────────────────────
+
+@students_bp.route("/<uuid:student_id>/enrollments", methods=["GET"])
+@jwt_required()
+@school_required
+def list_student_enrollments(student_id):
+    """The student's yearly enrollment history (A-31) — one row per academic
+    year with class/section/roll + promotion lineage."""
+    from app.models.student_enrollment import StudentEnrollment
+
+    student = Student.query.filter_by(
+        id=student_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if student is None:
+        return error_response("Student not found", 404)
+    rows = (
+        StudentEnrollment.query.filter(
+            StudentEnrollment.school_id == g.school_id,
+            StudentEnrollment.student_id == student_id,
+            StudentEnrollment.is_deleted.is_(False),
+        )
+        .order_by(StudentEnrollment.created_at.desc())
+        .all()
+    )
+    return success_response({
+        "enrollments": [
+            {
+                "id": str(e.id),
+                "academic_year_id": str(e.academic_year_id) if e.academic_year_id else None,
+                "academic_year_label": e.academic_year_label,
+                "class_id": str(e.class_id) if e.class_id else None,
+                "class_name": e.klass.name if e.klass else None,
+                "section_id": str(e.section_id) if e.section_id else None,
+                "section_name": e.section.name if e.section else None,
+                "roll_number": e.roll_number,
+                "is_default": bool(e.is_default),
+                "is_promoted": bool(e.is_promoted),
+                "is_graduated": bool(e.is_graduated),
+            }
+            for e in rows
+        ]
+    })
+
+
+@students_bp.route("/<uuid:student_id>/promotion-records", methods=["GET"])
+@jwt_required()
+@school_required
+def list_promotion_records(student_id):
+    """Immutable promotion snapshots (A-31) — the audit artifact."""
+    from app.models.student_enrollment import PromotionRecord
+
+    rows = (
+        PromotionRecord.query.filter(
+            PromotionRecord.school_id == g.school_id,
+            PromotionRecord.student_id == student_id,
+            PromotionRecord.is_deleted.is_(False),
+        )
+        .order_by(PromotionRecord.created_at.desc())
+        .all()
+    )
+    return success_response({
+        "records": [
+            {
+                "id": str(r.id),
+                "from_class_id": str(r.from_class_id) if r.from_class_id else None,
+                "to_class_id": str(r.to_class_id) if r.to_class_id else None,
+                "from_roll_number": r.from_roll_number,
+                "to_roll_number": r.to_roll_number,
+                "academic_year_id": str(r.academic_year_id) if r.academic_year_id else None,
+                "performed_by_id": str(r.performed_by_id) if r.performed_by_id else None,
+                "performed_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+    })
