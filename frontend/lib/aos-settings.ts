@@ -160,11 +160,17 @@ export function useAOSUserSettings() {
 
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        const payload = JSON.stringify(next);
+        // Canonical wire format: the backend stores strings — serialize
+        // booleans to "true"/"false" so the whitelist validation passes.
+        const wire = {
+          ...next,
+          show_top_bar: next.show_top_bar ? "true" : "false",
+        };
+        const payload = JSON.stringify(wire);
         if (payload === lastPushedRef.current) return;
         lastPushedRef.current = payload;
         api
-          .put<APIResponse<RawAOS>>("/auth/aos-settings", next)
+          .put<APIResponse<RawAOS>>("/auth/aos-settings", wire)
           .catch(() => {
             // Failed pushes are retried implicitly on next change; the
             // cache keeps the intent for the next session.

@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { toast } from "sonner";
@@ -88,7 +88,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function MarketplacePage() {
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const querySearch = (searchParams.get("search") || "").trim();
   const initialSearch = querySearch;
   const [search, setSearch] = useState(initialSearch);

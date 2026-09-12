@@ -62,7 +62,7 @@ import {
   type ManagedFile,
 } from "@/lib/services/files.service";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
 
@@ -99,7 +99,7 @@ export default function IemisImportPage() {
 }
 
 function IemisImportContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const initialFormat = searchParams.get("format") || "";
   const [selectedFormat, setSelectedFormat] = useState<string>(
     initialFormat === "student_namewise" || initialFormat === "school_level" ? initialFormat : "",

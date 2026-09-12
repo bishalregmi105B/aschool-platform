@@ -4,6 +4,10 @@
  * LayersPanel — Canva-style object list.
  * Reverse-stacked (top object first), with rename, lock, hide, select and
  * drag/arrow z-reorder. Reads live objects from the fabric canvas.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
+ * win11 scope, so no scope of its own is needed.
  */
 import { useEffect, useState } from "react";
 import {
@@ -90,9 +94,9 @@ export default function LayersPanel({ canvas }: { canvas: any }) {
 
   if (layers.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground text-center py-8">
+      <div className="text-xs text-[var(--w11-text-secondary)] text-center py-8">
         No layers yet. Add elements from the left panels.
-      </p>
+      </div>
     );
   }
 
@@ -101,12 +105,17 @@ export default function LayersPanel({ canvas }: { canvas: any }) {
       {layers.map((l, i) => (
         <div
           key={l.name}
-          className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-all cursor-pointer
-            ${l.selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-transparent hover:bg-muted"}`}
+          className="group flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--w11-radius-md)] border text-xs cursor-pointer transition-colors"
+          style={{
+            transitionDuration: "var(--w11-transition-fast)",
+            ...(l.selected
+              ? { background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)", color: "var(--w11-accent)" }
+              : { borderColor: "transparent", color: "var(--w11-text-primary)" }),
+          }}
           onClick={() => select(l.name)}
         >
-          <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-          <span className="text-muted-foreground shrink-0">{iconFor(l.type)}</span>
+          <GripVertical className="h-3 w-3 text-[var(--w11-text-disabled)] shrink-0" />
+          <span className="text-[var(--w11-text-secondary)] shrink-0" style={l.selected ? { color: "var(--w11-accent)" } : undefined}>{iconFor(l.type)}</span>
           {renaming === l.name ? (
             <Input
               autoFocus
@@ -135,18 +144,18 @@ export default function LayersPanel({ canvas }: { canvas: any }) {
               onClick={(e) => { e.stopPropagation(); move(l.name, -1); }}><ChevronDown className="h-3 w-3" /></Button>
             <Button variant="ghost" size="icon" className="h-5 w-5" title={l.locked ? "Unlock" : "Lock"}
               onClick={(e) => { e.stopPropagation(); canvas.setLocked(l.name, !l.locked); }}>
-              {l.locked ? <Lock className="h-3 w-3 text-amber-600" /> : <Unlock className="h-3 w-3" />}
+              {l.locked ? <Lock className="h-3 w-3 text-amber-500" /> : <Unlock className="h-3 w-3" />}
             </Button>
             <Button variant="ghost" size="icon" className="h-5 w-5" title={l.visible ? "Hide" : "Show"}
               onClick={(e) => { e.stopPropagation(); canvas.toggleVisible(l.name); }}>
-              {l.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3 text-muted-foreground" />}
+              {l.visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3 text-[var(--w11-text-tertiary)]" />}
             </Button>
           </div>
         </div>
       ))}
-      <p className="text-[10px] text-muted-foreground text-center pt-2">
+      <div className="text-[10px] text-[var(--w11-text-tertiary)] text-center pt-2">
         Double-click to rename · drag with ↑↓ buttons to reorder
-      </p>
+      </div>
     </div>
   );
 }

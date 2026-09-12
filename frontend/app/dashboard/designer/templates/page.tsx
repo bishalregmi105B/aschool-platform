@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import {
   AOSModuleLoadingState,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { TemplateThumb } from "@/components/designer/TemplateThumb";
+import { LayoutTemplate } from "lucide-react";
 
 const CATEGORY_LABELS: Record<string, string> = {
   id_cards: "ID Cards",
@@ -52,7 +54,7 @@ export default function TemplatesPage() {
 }
 
 function TemplatesContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const categoryFilter = searchParams.get("category") || "";
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState(categoryFilter);
@@ -85,6 +87,9 @@ function TemplatesContent() {
   }
 
   const filtered = (templates || []).filter((t: Template) => {
+    // Designer templates only — writer templates live in the Writer's own
+    // template gallery.
+    if (t.editor_type === "writer") return false;
     if (activeCategory && t.category !== activeCategory) return false;
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -141,23 +146,18 @@ function TemplatesContent() {
               return (
               <div key={t.id} className="win11-card overflow-hidden hover:shadow-lg transition-shadow" style={{ padding: 0 }}>
                 <div
-                  className="aspect-[3/4] flex items-center justify-center relative"
+                  className="aspect-[3/4] relative overflow-hidden"
                   style={{ background: "var(--w11-control-hover)" }}
                 >
-                  {t.thumbnail_url ? (
-                    <>
-                      <img
-                        src={t.thumbnail_url}
-                        alt={t.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      <Badge variant="outline" className="absolute top-2 left-2 text-[10px] h-5 px-1.5 backdrop-blur-sm">
-                        Demo
-                      </Badge>
-                    </>
-                  ) : (
-                    <span className="text-4xl">{t.thumbnail_emoji || "📄"}</span>
+                  <TemplateThumb
+                    url={t.thumbnail_url}
+                    name={t.name}
+                    icon={<LayoutTemplate className="h-5 w-5" />}
+                  />
+                  {t.thumbnail_url && (
+                    <Badge variant="outline" className="absolute top-2 left-2 text-[10px] h-5 px-1.5 backdrop-blur-sm">
+                      Demo
+                    </Badge>
                   )}
                   {/* tool badge — matches the card on the designer home */}
                   <Badge variant="outline" className="absolute top-2 right-2 text-[9px] h-4 px-1.5 backdrop-blur-sm">

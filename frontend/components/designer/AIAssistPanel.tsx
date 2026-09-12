@@ -4,6 +4,10 @@
  * AIAssistPanel — asks the AI to generate text for the selected element
  * or the overall document. Routes through /design-studio/ai/suggest
  * which enforces per-school quota via AITokenHub.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
+ * win11 scope, so no scope of its own is needed.
  */
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -93,9 +97,9 @@ export default function AIAssistPanel({ canvas }: Props) {
   };
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="p-3 space-y-4 text-[var(--w11-text-primary)]">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-violet-500" />
+        <Sparkles className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
         <p className="font-semibold text-sm">AI Content Generator</p>
       </div>
 
@@ -121,12 +125,15 @@ export default function AIAssistPanel({ canvas }: Props) {
 
       {/* Quick Prompts */}
       <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">Quick prompts</Label>
+        <Label className="text-xs text-[var(--w11-text-secondary)] mb-1 block">Quick prompts</Label>
         <div className="space-y-1">
           {QUICK_PROMPTS.map((p) => (
             <button
               key={p}
-              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-violet-50 hover:text-violet-700 flex items-center gap-1.5 transition-colors border border-transparent hover:border-violet-100"
+              className="w-full text-left text-xs px-2 py-1.5 rounded-[var(--w11-radius-md)] flex items-center gap-1.5 transition-colors border border-transparent hover:border-[var(--w11-border-default)]"
+              style={{ transitionDuration: "var(--w11-transition-fast)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--w11-accent-light)"; e.currentTarget.style.color = "var(--w11-accent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = ""; e.currentTarget.style.color = ""; }}
               onClick={() => setPrompt(p)}
             >
               <ChevronRight className="h-3 w-3 shrink-0" /> {p}
@@ -136,7 +143,7 @@ export default function AIAssistPanel({ canvas }: Props) {
       </div>
 
       <Button
-        className="w-full gap-2 bg-violet-600 hover:bg-violet-700"
+        className="w-full gap-2"
         size="sm"
         onClick={() => aiMutation.mutate()}
         disabled={!prompt.trim() || aiMutation.isPending}
@@ -154,7 +161,10 @@ export default function AIAssistPanel({ canvas }: Props) {
               <Badge variant="secondary" className="text-xs">{tokensUsed} tokens</Badge>
             )}
           </div>
-          <div className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+          <div
+            className="text-xs rounded-[var(--w11-radius-md)] p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto"
+            style={{ background: "var(--w11-control-hover)" }}
+          >
             {result}
           </div>
           <div className="flex gap-2">
@@ -168,9 +178,9 @@ export default function AIAssistPanel({ canvas }: Props) {
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground text-center pt-2">
+      <div className="text-xs text-[var(--w11-text-tertiary)] text-center pt-2">
         Powered by Groq AI · Token usage tracked per school
-      </p>
+      </div>
     </div>
   );
 }

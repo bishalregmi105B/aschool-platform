@@ -78,7 +78,7 @@ export function FindReplaceDialog({
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </div>
-            <div className="text-[10px] text-slate-500 mt-1">
+            <div className="text-[10px] text-[var(--w11-text-secondary)] mt-1">
               {query ? `${matchCount} match${matchCount === 1 ? "" : "es"} highlighted` : "All matches are highlighted as you type"}
             </div>
           </div>
@@ -98,7 +98,7 @@ export function FindReplaceDialog({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-xs text-slate-600">
+          <label className="flex items-center gap-2 text-xs text-[var(--w11-text-primary)]">
             <Switch checked={caseSensitive} onCheckedChange={setCaseSensitive} />
             Match case
           </label>
@@ -132,7 +132,7 @@ export function WordArtDialog({
               key={s.name}
               type="button"
               onClick={() => { onInsert(text || "WordArt", i); onClose(); }}
-              className="h-12 rounded border border-slate-200 hover:border-blue-500 flex items-center justify-center overflow-hidden"
+              className="h-12 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-default)] hover:!border-[var(--w11-accent)] bg-[var(--w11-control-bg)] flex items-center justify-center overflow-hidden"
             >
               <span
                 className="text-lg"
@@ -203,7 +203,7 @@ export function HeaderFooterDialog({
             <Label className="text-[10px]">Footer text (bottom of every page)</Label>
             <Input value={footer} onChange={(e) => setFooter(e.target.value)} className="h-8 text-sm" placeholder="e.g. Confidential — for internal use" />
           </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600">
+          <label className="flex items-center gap-2 text-xs text-[var(--w11-text-primary)]">
             <Switch checked={pageNo} onCheckedChange={setPageNo} />
             Show &quot;Page X of Y&quot; in the footer
           </label>

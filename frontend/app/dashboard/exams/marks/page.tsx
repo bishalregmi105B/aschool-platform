@@ -36,7 +36,7 @@ import {
 import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft, Layers, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 
 interface Student {
   id: string;
@@ -109,7 +109,7 @@ export default function MarksPage() {
 
 function MarksContent() {
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const [examId, setExamId] = useState(searchParams.get("exam") || "");
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");

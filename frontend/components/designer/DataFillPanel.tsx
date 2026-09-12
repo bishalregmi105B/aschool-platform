@@ -6,6 +6,9 @@
  * search, click-a-field-to-insert-token, live value preview on apply.
  *
  * Used in both the Canvas Designer and the Writer.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes (renders inside a win11 scope).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -131,7 +134,7 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
   if (!activeSource) {
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-[var(--w11-text-secondary)]">
           <Database className="h-3.5 w-3.5" />
           <span>Auto-fill template fields from your school data</span>
         </div>
@@ -139,13 +142,14 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
         <div className="space-y-2">
           {sources.map((src: any) => (
             <button key={src.id} onClick={() => setActiveSource(src.id)}
-              className="w-full flex items-center gap-3 p-3 border rounded-lg hover:bg-primary/5 hover:border-primary transition-all text-left">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary shrink-0">
+              className="w-full flex items-center gap-3 p-3 border border-[var(--w11-border-default)] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-accent-light)] hover:border-[var(--w11-accent)] transition-colors text-left"
+              style={{ background: "var(--w11-control-bg)" }}>
+              <div className="flex items-center justify-center w-10 h-10 rounded-[var(--w11-radius-md)] shrink-0" style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}>
                 {SOURCE_ICONS[src.id] || <span className="text-xl">{src.icon}</span>}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{src.name}</p>
-                <p className="text-[10px] text-muted-foreground">{src.description}</p>
+                <div className="text-[10px] text-[var(--w11-text-secondary)]">{src.description}</div>
               </div>
             </button>
           ))}
@@ -155,32 +159,32 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
 
         {/* Built-in date tokens — always available, no data source needed */}
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+          <div className="text-[10px] font-semibold text-[var(--w11-text-tertiary)] uppercase tracking-wide mb-1.5 flex items-center gap-1">
             📅 Auto Dates (always live)
-          </p>
+          </div>
           <div className="flex flex-wrap gap-1">
             {["today_bs", "today_bs_nepali", "today_ad", "bs_year", "bs_month_name", "bs_day", "ad_year", "ad_month_name", "current_time", "academic_year_bs", "weekday_name"].map((f) => (
               <button key={f}
                 onClick={() => onInsertToken?.(`{${f}}`)}
                 title={`Insert {${f}} — filled automatically on every render/export`}
-                className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-[9px] font-mono text-amber-800 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-colors inline-flex items-center gap-0.5">
+                className="px-1.5 py-0.5 rounded-[var(--w11-radius-sm)] border border-amber-500/30 bg-amber-500/10 text-[9px] font-mono text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-colors inline-flex items-center gap-0.5">
                 <Plus className="h-2 w-2" />{f}
               </button>
             ))}
           </div>
-          <p className="text-[9px] text-muted-foreground mt-1">
+          <div className="text-[9px] text-[var(--w11-text-tertiary)] mt-1">
             These fill with the current Nepali (BS) / English (AD) date at render & export time — never stale.
-          </p>
+          </div>
         </div>
 
         <Separator />
-        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-          <p className="text-[10px] text-blue-700 font-medium mb-1">💡 How it works</p>
-          <p className="text-[10px] text-blue-600 leading-relaxed">
+        <div className="rounded-[var(--w11-radius-md)] border border-[var(--w11-border-default)] p-3" style={{ background: "var(--w11-control-hover)" }}>
+          <p className="text-[10px] text-[var(--w11-text-primary)] font-medium mb-1">💡 How it works</p>
+          <div className="text-[10px] text-[var(--w11-text-secondary)] leading-relaxed">
             Pick a record to fill the design — apply is <strong>non-destructive</strong>:
             switch to another student anytime. Insert <code className="font-mono">{"{field}"}</code> tokens
             to bind text layers. For bulk (whole class), use the designer hub → Bulk.
-          </p>
+          </div>
         </div>
       </div>
     );
@@ -190,13 +194,13 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
   return (
     <div className="space-y-3">
       <button onClick={() => { setActiveSource(null); setSearch(""); setAppliedId(null); setSectionId(""); }}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        className="flex items-center gap-1.5 text-xs text-[var(--w11-text-secondary)] hover:text-[var(--w11-text-primary)] transition-colors">
         <ChevronLeft className="h-3.5 w-3.5" />
         <span>Back to sources</span>
       </button>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary shrink-0">
+        <div className="flex items-center justify-center w-7 h-7 rounded-[var(--w11-radius-sm)] shrink-0" style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}>
           {SOURCE_ICONS[activeSource] || <Database className="h-4 w-4" />}
         </div>
         <span className="text-sm font-semibold">{currentSource?.name || activeSource}</span>
@@ -229,7 +233,7 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
       {activeSource === "exam_result" && (
         <div className="space-y-1.5">
           {exams.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No exams found — create one under Exams first.</p>
+            <div className="text-xs text-[var(--w11-text-secondary)]">No exams found — create one under Exams first.</div>
           ) : (
             <Select value={examId} onValueChange={setExamId}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select exam…" /></SelectTrigger>
@@ -245,7 +249,7 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--w11-text-tertiary)]" />
         <Input
           placeholder="Search records…"
           value={search}
@@ -257,16 +261,16 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
       {/* Available fields — click to insert token */}
       {currentSource?.fields && (
         <div>
-          <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1.5">
+          <div className="text-[10px] text-[var(--w11-text-secondary)] flex items-center gap-1 mb-1.5">
             <MousePointerClick className="h-3 w-3" />
             Click a field to insert its token
-          </p>
+          </div>
           <div className="flex flex-wrap gap-1">
             {currentSource.fields.map((f: string) => (
               <button key={f}
                 onClick={() => insertToken(f)}
                 title={`Insert {${f}}`}
-                className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono hover:bg-primary hover:text-primary-foreground transition-colors inline-flex items-center gap-0.5">
+                className="px-1.5 py-0.5 rounded-[var(--w11-radius-sm)] text-[9px] font-mono inline-flex items-center gap-0.5 transition-colors" style={{ background: "var(--w11-control-hover)" }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--w11-accent)"; e.currentTarget.style.color = "var(--w11-accent-text)"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "var(--w11-control-hover)"; e.currentTarget.style.color = ""; }}>
                 <Plus className="h-2 w-2" />{f}
               </button>
             ))}
@@ -279,13 +283,13 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
       {/* Records */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="h-5 w-5 border-2 rounded-full animate-spin" style={{ borderColor: "var(--w11-accent)", borderTopColor: "transparent" }} />
         </div>
       ) : records.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-xs text-muted-foreground">No records found</p>
+          <div className="text-xs text-[var(--w11-text-secondary)]">No records found</div>
           {activeSource === "exam_result" && !examId && (
-            <p className="text-[10px] text-muted-foreground mt-1">Select an exam above first</p>
+            <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-1">Select an exam above first</div>
           )}
         </div>
       ) : (
@@ -295,15 +299,16 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
               <button
                 key={record.id}
                 onClick={() => handleApply(record)}
-                className={`w-full flex items-center gap-2.5 p-2.5 border rounded-lg transition-all text-left
+                className={`w-full flex items-center gap-2.5 p-2.5 border rounded-[var(--w11-radius-md)] transition-colors text-left
                   ${appliedId === record.id
-                    ? "border-green-500 bg-green-50"
-                    : "hover:bg-muted/50 hover:border-primary/30"
+                    ? "border-green-500/60 bg-green-500/10 dark:bg-green-500/15"
+                    : "border-[var(--w11-border-default)] hover:bg-[var(--w11-control-hover)]"
                   }`}
+                  style={appliedId === record.id ? undefined : { background: "var(--w11-control-bg)" }}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{record.label}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{record.subtitle}</p>
+                  <div className="text-[10px] text-[var(--w11-text-secondary)] truncate">{record.subtitle}</div>
                 </div>
                 {appliedId === record.id ? (
                   <Check className="h-4 w-4 text-green-600 shrink-0" />

@@ -9,6 +9,10 @@
  *  - writer mode: TipTap editor (insert at cursor / replace selection / bullets)
  *
  * Every call is quota-tracked server-side via AITokenHub.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes (inside a win11 scope; the writer
+ * provides its own scope around this panel).
  */
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -110,14 +114,14 @@ export function AIChatPanel({ mode, executeAction, getContext, onClose }: AIChat
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 text-[var(--w11-text-primary)]">
       {/* header */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b shrink-0">
-        <Sparkles className="h-3.5 w-3.5 text-violet-600" />
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[var(--w11-border-subtle)] shrink-0">
+        <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} />
         <span className="text-xs font-semibold">AI Assistant</span>
-        <span className="text-[10px] text-muted-foreground ml-1">{mode === "designer" ? "canvas" : "document"}</span>
+        <span className="text-[10px] text-[var(--w11-text-tertiary)] ml-1">{mode === "designer" ? "canvas" : "document"}</span>
         {onClose && (
-          <button onClick={onClose} className="ml-auto text-muted-foreground hover:text-foreground" title="Close">
+          <button onClick={onClose} className="ml-auto text-[var(--w11-text-tertiary)] hover:text-[var(--w11-text-primary)]" title="Close">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
@@ -127,12 +131,13 @@ export function AIChatPanel({ mode, executeAction, getContext, onClose }: AIChat
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0">
         {messages.length === 0 && (
           <div className="space-y-1.5 pt-1">
-            <p className="text-[11px] text-muted-foreground">Ask me to write or edit anything — I can add it straight onto your {mode === "designer" ? "canvas" : "document"}:</p>
+            <div className="text-[11px] text-[var(--w11-text-secondary)]">Ask me to write or edit anything — I can add it straight onto your {mode === "designer" ? "canvas" : "document"}:</div>
             {QUICK_PROMPTS[mode].map((p) => (
               <button
                 key={p}
                 onClick={() => send(p)}
-                className="block w-full text-left text-[11px] px-2 py-1.5 rounded-md border bg-muted/40 hover:bg-muted"
+                className="block w-full text-left text-[11px] px-2 py-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)] hover:bg-[var(--w11-control-hover)] transition-colors"
+                style={{ background: "var(--w11-control-bg)" }}
               >
                 {p}
               </button>
@@ -142,17 +147,23 @@ export function AIChatPanel({ mode, executeAction, getContext, onClose }: AIChat
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`text-[11px] leading-relaxed whitespace-pre-wrap rounded-lg px-2.5 py-1.5 max-w-[92%] ${
+            className={`text-[11px] leading-relaxed whitespace-pre-wrap rounded-[var(--w11-radius-md)] px-2.5 py-1.5 max-w-[92%] ${
               m.role === "user"
-                ? "ml-auto bg-primary text-primary-foreground"
-                : "mr-auto bg-muted"
+                ? "ml-auto"
+                : "mr-auto"
             }`}
+            style={m.role === "user"
+              ? { background: "var(--w11-accent)", color: "var(--w11-accent-text)" }
+              : { background: "var(--w11-control-hover)" }}
           >
             {m.content}
           </div>
         ))}
         {mutation.isPending && (
-          <div className="mr-auto bg-muted rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div
+            className="mr-auto rounded-[var(--w11-radius-md)] px-2.5 py-1.5 flex items-center gap-1.5 text-[11px] text-[var(--w11-text-secondary)]"
+            style={{ background: "var(--w11-control-hover)" }}
+          >
             <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
           </div>
         )}
@@ -160,7 +171,7 @@ export function AIChatPanel({ mode, executeAction, getContext, onClose }: AIChat
 
       {/* composer */}
       <form
-        className="flex items-center gap-1.5 px-2 py-2 border-t shrink-0"
+        className="flex items-center gap-1.5 px-2 py-2 border-t border-[var(--w11-border-subtle)] shrink-0"
         onSubmit={(e) => { e.preventDefault(); send(); }}
       >
         <Input

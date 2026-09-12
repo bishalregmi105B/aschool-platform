@@ -2127,6 +2127,7 @@ export default function Desktop({
                   key={app.id}
                   onClick={(e) => {
                     e.stopPropagation();
+                    setFolderPopup(null);
                     onOpenApp(app.id);
                   }}
                   style={{

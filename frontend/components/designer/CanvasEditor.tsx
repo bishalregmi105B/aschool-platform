@@ -7,7 +7,9 @@
  * menu, page duplicate/reorder, save-as-template.
  */
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
+import { useWin11Scope } from "@/lib/win11-scope";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,6 +20,7 @@ import { useExport } from "@/lib/hooks/useExport";
 import { useDesignerStore, type DesignerPanel } from "@/lib/designer/store";
 import { attachShortcuts } from "@/lib/designer/shortcuts";
 import { absolutizeImageUrl } from "@/lib/designer/canvasImages";
+import { TemplateThumb } from "@/components/designer/TemplateThumb";
 import { fetchManagedFileAsFile, type ManagedFile } from "@/lib/services/files.service";
 
 import { Button }   from "@/components/ui/button";
@@ -122,7 +125,11 @@ function canvasPointFromClient(e: { clientX: number; clientY: number }): { x: nu
 
 export default function CanvasEditor() {
   const router       = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
+  // Win11 token scope mirrored from the AOS shell — the editor layout
+  // hardcodes `win11` (light only), so re-establish the scope here to make
+  // every --w11-* token flip with the OS light/dark theme (same as writer2).
+  const win11        = useWin11Scope();
   const queryClient  = useQueryClient();
   const docId        = searchParams.get("doc");
   const templateId   = searchParams.get("template");
@@ -503,7 +510,7 @@ export default function CanvasEditor() {
       return types.includes("Files") || types.includes("text/uri-list");
     };
     const showHint = () => {
-      el.style.outline = "2px dashed rgb(99 102 241 / 0.7)";
+      el.style.outline = "2px dashed var(--w11-accent)";
       el.style.outlineOffset = "-2px";
     };
     const hideHint = () => { el.style.outline = ""; };
@@ -732,7 +739,11 @@ export default function CanvasEditor() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-screen overflow-hidden bg-muted/20">
+      <div
+        className={`flex flex-col h-screen overflow-hidden ${win11.className}`}
+        data-theme={win11.theme}
+        style={{ background: "var(--w11-window-bg)" }}
+      >
         <FilePicker
           open={showImagePicker}
           onOpenChange={setShowImagePicker}
@@ -754,43 +765,59 @@ export default function CanvasEditor() {
           title="Select Design File"
         />
 
-        {/* CONTEXT MENU */}
+        {/* CONTEXT MENU — Fluent flyout (token-driven surface + elevation) */}
         {ctxMenu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
-            <div className="fixed z-50 min-w-44 bg-background border rounded-lg shadow-lg py-1 text-sm"
-              style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 300) }}>
+            <div
+              className="fixed z-50 min-w-44 rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-default)] shadow-[var(--w11-elevation-flyout)] py-1 text-[13px]"
+              style={{
+                left: Math.min(ctxMenu.x, window.innerWidth - 200),
+                top: Math.min(ctxMenu.y, window.innerHeight - 300),
+                background: "var(--w11-surface-flyout)",
+                color: "var(--w11-text-primary)",
+              }}
+            >
               {[
                 { label: "Duplicate", action: canvas.duplicateSelected, hint: "Ctrl+D" },
                 { label: "Copy", action: canvas.copySelected, hint: "Ctrl+C" },
                 { label: "Paste here", action: canvas.pasteClipboard, hint: "Ctrl+V" },
               ].map((i) => (
-                <button key={i.label} className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between"
-                  onClick={() => { i.action(); setCtxMenu(null); }}>
-                  {i.label}<span className="text-muted-foreground text-xs">{i.hint}</span>
+                <button
+                  key={i.label}
+                  className="w-full text-left px-3 py-1.5 flex justify-between rounded-[var(--w11-radius-sm)] mx-1 transition-colors duration-100 hover:bg-[var(--w11-control-hover)]"
+                  style={{ transitionTimingFunction: "cubic-bezier(0.1, 0.9, 0.2, 1)" }}
+                  onClick={() => { i.action(); setCtxMenu(null); }}
+                >
+                  {i.label}<span className="text-[var(--w11-text-tertiary)] text-xs">{i.hint}</span>
                 </button>
               ))}
               <DropdownMenuSeparator />
-              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between" onClick={() => { canvas.bringToFront(); setCtxMenu(null); }}>
-                Bring to front<span className="text-muted-foreground text-xs">Ctrl+]</span>
+              <button className="w-full text-left px-3 py-1.5 flex justify-between rounded-[var(--w11-radius-sm)] mx-1 hover:bg-[var(--w11-control-hover)]" onClick={() => { canvas.bringToFront(); setCtxMenu(null); }}>
+                Bring to front<span className="text-[var(--w11-text-tertiary)] text-xs">Ctrl+]</span>
               </button>
-              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex justify-between" onClick={() => { canvas.sendToBack(); setCtxMenu(null); }}>
-                Send to back<span className="text-muted-foreground text-xs">Ctrl+[</span>
+              <button className="w-full text-left px-3 py-1.5 flex justify-between rounded-[var(--w11-radius-sm)] mx-1 hover:bg-[var(--w11-control-hover)]" onClick={() => { canvas.sendToBack(); setCtxMenu(null); }}>
+                Send to back<span className="text-[var(--w11-text-tertiary)] text-xs">Ctrl+[</span>
               </button>
               <DropdownMenuSeparator />
-              <button className="w-full text-left px-3 py-1.5 hover:bg-muted text-destructive" onClick={() => { canvas.deleteSelected(); setCtxMenu(null); }}>
+              <button className="w-full text-left px-3 py-1.5 rounded-[var(--w11-radius-sm)] mx-1 text-red-600 hover:bg-[var(--w11-control-hover)] dark:text-red-400" onClick={() => { canvas.deleteSelected(); setCtxMenu(null); }}>
                 Delete
               </button>
             </div>
           </>
         )}
 
-        {/* TOP BAR */}
-        <div className="flex items-center gap-1.5 px-3 h-12 border-b bg-background shrink-0 z-10">
+        {/* TOP BAR — Fluent command surface */}
+        <div
+          className="flex items-center gap-1.5 px-3 h-12 border-b border-[var(--w11-border-default)] shrink-0 z-10"
+          style={{ background: "var(--w11-surface-solid)" }}
+        >
           <Link href="/dashboard/designer">
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
-          <Input value={docName} onChange={(e) => setDocName(e.target.value)} className="w-44 h-7 text-sm font-medium shrink-0" />
+          {/* Doc name — Fluent underline focus (borderless until focused) */}
+          <Input value={docName} onChange={(e) => setDocName(e.target.value)}
+            className="w-44 h-7 text-sm font-semibold shrink-0 border-transparent focus:border-[var(--w11-accent)] bg-transparent hover:bg-[var(--w11-control-hover)] transition-colors px-2" />
           <Select value={currentSizeName} onValueChange={(v) => canvas.changePageSize(v)}>
             <SelectTrigger className="w-24 h-7 text-xs shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>{Object.keys(PAGE_SIZES).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -799,47 +826,53 @@ export default function CanvasEditor() {
             onClick={() => canvas.updatePageSettings({ orientation: canvas.currentPageSettings?.orientation === "portrait" ? "landscape" : "portrait" })}>
             {canvas.currentPageSettings?.orientation === "portrait" ? "Portrait" : "Landscape"}
           </Button>
-          <Separator orientation="vertical" className="h-6 shrink-0" />
+          <Separator orientation="vertical" className="h-6 shrink-0 bg-[var(--w11-border-subtle)]" />
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.undo} disabled={!canUndo} title="Undo (Ctrl+Z)"><Undo2 className="h-3.5 w-3.5" /></Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.redo} disabled={!canRedo} title="Redo (Ctrl+⇧+Z)"><Redo2 className="h-3.5 w-3.5" /></Button>
-          <Separator orientation="vertical" className="h-6 shrink-0" />
+          <Separator orientation="vertical" className="h-6 shrink-0 bg-[var(--w11-border-subtle)]" />
           <div className="flex items-center gap-0.5">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.zoomAt(zoom - 0.1)} title="Zoom out"><ZoomOut className="h-3.5 w-3.5" /></Button>
-            <button className="text-xs w-12 text-center hover:bg-muted rounded px-1 py-0.5" onClick={() => canvas.zoomAt(1)}>{Math.round(zoom * 100)}%</button>
+            <button
+              className="commandbar-button text-xs w-12 !min-h-0 h-7 !px-1 font-medium"
+              onClick={() => canvas.zoomAt(1)}
+            >{Math.round(zoom * 100)}%</button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => canvas.zoomAt(zoom + 0.1)} title="Zoom in"><ZoomIn className="h-3.5 w-3.5" /></Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.zoomToFit} title="Zoom to fit (Ctrl+0)"><Maximize className="h-3.5 w-3.5" /></Button>
           </div>
-          <Separator orientation="vertical" className="h-6 shrink-0" />
-          <Button variant={snapping ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={toggleSnapping} title="Smart snapping (magnet)">
+          <Separator orientation="vertical" className="h-6 shrink-0 bg-[var(--w11-border-subtle)]" />
+          {/* toggle buttons — accent-light + accent text when active (commandbar pattern) */}
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSnapping} title="Smart snapping (magnet)"
+            style={snapping ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : undefined}>
             <Magnet className="h-3.5 w-3.5" />
           </Button>
-          <Button variant={showGrid ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => useDesignerStore.getState().toggleGrid()} title="Grid overlay">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => useDesignerStore.getState().toggleGrid()} title="Grid overlay"
+            style={showGrid ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : undefined}>
             <Grid3x3 className="h-3.5 w-3.5" />
           </Button>
           {hasSelection && (
             <>
-              <Separator orientation="vertical" className="h-6 shrink-0" />
+              <Separator orientation="vertical" className="h-6 shrink-0 bg-[var(--w11-border-subtle)]" />
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={canvas.duplicateSelected} title="Duplicate (Ctrl+D)"><Copy className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={canvas.deleteSelected} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400" onClick={canvas.deleteSelected} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
             </>
           )}
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-violet-600" onClick={() => { setShowAI(!showAI); setActivePanel(null); }}>
-              <Sparkles className="h-3.5 w-3.5" /> AI
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setShowAI(!showAI); setActivePanel(null); }}>
+              <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} /> AI
             </Button>
             <Button size="sm" className="h-7 text-xs gap-1" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               <Save className="h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save"}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[280px]">
                 {/* ── Quality selector — visible segmented pill row ── */}
                 <div className="px-3 py-2.5 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold">Export Quality</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">{Math.round(dpiScale * 96)} DPI</span>
+                    <span className="text-[10px] text-[var(--w11-text-tertiary)] font-mono">{Math.round(dpiScale * 96)} DPI</span>
                   </div>
                   <div className="flex gap-1">
                     {([
@@ -850,10 +883,11 @@ export default function CanvasEditor() {
                     ] as { v: number; label: string }[]).map(({ v, label }) => (
                       <button key={v}
                         onClick={() => setDpiScale(v)}
-                        className={`flex-1 text-[10px] py-1.5 rounded-lg border transition-all font-medium leading-none
+                        className={`flex-1 text-[10px] py-1.5 rounded-[var(--w11-radius-md)] border font-medium leading-none transition-all
                           ${dpiScale === v
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "border-border hover:border-primary/40 hover:bg-muted text-muted-foreground"}`}
+                            ? "border-transparent"
+                            : "border-[var(--w11-border-default)] text-[var(--w11-text-secondary)] hover:bg-[var(--w11-control-hover)]"}`}
+                        style={dpiScale === v ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : undefined}
                       >
                         {label}
                       </button>
@@ -863,10 +897,11 @@ export default function CanvasEditor() {
                     {(["jpeg", "png"] as const).map((fmt) => (
                       <button key={fmt}
                         onClick={() => setExportJpeg(fmt === "jpeg")}
-                        className={`flex-1 text-[10px] py-1 rounded-lg border transition-all font-medium
+                        className={`flex-1 text-[10px] py-1 rounded-[var(--w11-radius-md)] border font-medium transition-all
                           ${(exportJpeg ? "jpeg" : "png") === fmt
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "border-border hover:border-primary/40 hover:bg-muted text-muted-foreground"}`}
+                            ? "border-transparent"
+                            : "border-[var(--w11-border-default)] text-[var(--w11-text-secondary)] hover:bg-[var(--w11-control-hover)]"}`}
+                        style={(exportJpeg ? "jpeg" : "png") === fmt ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : undefined}
                       >
                         {fmt === "jpeg" ? "JPEG · smaller" : "PNG · lossless"}
                       </button>
@@ -879,21 +914,21 @@ export default function CanvasEditor() {
                   <FileOutput className="h-4 w-4 mr-2.5 text-red-500 shrink-0" />
                   <div>
                     <div className="text-xs font-medium">PDF — Print-ready</div>
-                    <div className="text-[10px] text-muted-foreground">Server-rendered · Nepali fonts · vector text</div>
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">Server-rendered · Nepali fonts · vector text</div>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("pdf")}>
                   <FileDown className="h-4 w-4 mr-2.5 text-orange-500 shrink-0" />
                   <div>
                     <div className="text-xs font-medium">PDF — Quick export</div>
-                    <div className="text-[10px] text-muted-foreground">Browser-rendered · instant</div>
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">Browser-rendered · instant</div>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>
                   <FileImage className="h-4 w-4 mr-2.5 text-blue-500 shrink-0" />
                   <div>
                     <div className="text-xs font-medium">PNG / JPEG Image</div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">
                       {exporting ? "Exporting…" : `${(canvas.toFullJSON() as any)?.pages?.length > 1 ? "ZIP of all pages" : "Current page"} · ${Math.round(dpiScale * 96)} DPI`}
                     </div>
                   </div>
@@ -910,7 +945,7 @@ export default function CanvasEditor() {
                   <PanelTop className="h-4 w-4 mr-2.5 text-amber-500 shrink-0" />
                   <div>
                     <div className="text-xs font-medium">PPTX — PowerPoint</div>
-                    <div className="text-[10px] text-muted-foreground">One slide per page</div>
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">One slide per page</div>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={exporting} onClick={() => {
@@ -925,7 +960,7 @@ export default function CanvasEditor() {
                   <Code2 className="h-4 w-4 mr-2.5 text-purple-500 shrink-0" />
                   <div>
                     <div className="text-xs font-medium">SVG — Vector</div>
-                    <div className="text-[10px] text-muted-foreground">Editable in Figma / Inkscape</div>
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">Editable in Figma / Inkscape</div>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -949,17 +984,25 @@ export default function CanvasEditor() {
 
         {/* BODY */}
         <div className="flex flex-1 min-h-0">
-          {/* Icon bar */}
-          <div className="flex flex-col items-center gap-1.5 py-3 w-[72px] border-r bg-card/60 backdrop-blur-md shrink-0 overflow-y-auto custom-scrollbar">
+          {/* Icon bar — Fluent nav rail */}
+          <div
+            className="flex flex-col items-center gap-1.5 py-3 w-[72px] border-r border-[var(--w11-border-default)] shrink-0 overflow-y-auto custom-scrollbar"
+            style={{ background: "var(--w11-surface-solid)" }}
+          >
             {SIDEBAR_ICONS.map((item) => (
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => { setActivePanel(item.id); setShowAI(false); }}
-                    className={`flex flex-col items-center justify-center gap-1.5 w-[60px] h-[56px] rounded-2xl text-[10px] font-medium transition-all duration-200 shrink-0 select-none
-                      ${activePanel === item.id
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-[1.02]"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.02]"}`}
+                    // commandbar-button (11.css): borderless, control-hover on hover
+                    className="commandbar-button !min-h-0 flex flex-col items-center justify-center gap-1.5 w-[60px] h-[56px] !px-0 text-[10px] font-semibold shrink-0 select-none"
+                    style={{
+                      borderRadius: "var(--w11-radius-lg)",
+                      transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                      ...(activePanel === item.id
+                        ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" }
+                        : { color: "var(--w11-text-secondary)" }),
+                    }}
                   >
                     <item.Icon className="h-5 w-5" />
                     <span className="leading-tight text-center truncate max-w-[56px]">{item.label}</span>
@@ -970,14 +1013,17 @@ export default function CanvasEditor() {
             ))}
           </div>
 
-          {/* Sliding panel */}
+          {/* Sliding panel — Fluent side panel */}
           {activePanel && (
-            <div className="w-80 border-r bg-background/95 backdrop-blur-md shrink-0 flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-200 shadow-sm z-10">
-              <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 bg-muted/15">
-                <span className="font-semibold text-sm capitalize text-foreground">
+            <div
+              className="w-80 border-r border-[var(--w11-border-default)] shrink-0 flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-200 z-10"
+              style={{ background: "var(--w11-surface-solid)" }}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--w11-border-subtle)] shrink-0">
+                <span className="font-semibold text-[13px] capitalize text-[var(--w11-text-primary)]">
                   {activePanel === "shapes" ? "Shapes & Vectors" : activePanel === "data" ? "Data Fill" : activePanel === "background" ? "Canvas Background" : activePanel}
                 </span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-muted" onClick={() => setActivePanel(null)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setActivePanel(null)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -994,47 +1040,43 @@ export default function CanvasEditor() {
                 {activePanel === "templates" && (
                   <>
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                      <Input placeholder="Search templates…" value={tplSearch} onChange={(e) => setTplSearch(e.target.value)} className="pl-8 h-8 text-xs bg-background/80 rounded-xl" />
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--w11-text-tertiary)] pointer-events-none" />
+                      <Input placeholder="Search templates…" value={tplSearch} onChange={(e) => setTplSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-[var(--w11-radius-md)]" />
                     </div>
                     {filteredTemplates.length === 0 ? (
-                      <div className="text-center py-8 px-4 bg-muted/20 rounded-2xl border border-dashed border-border/60">
-                        <p className="text-xs text-muted-foreground font-medium">No templates found</p>
-                        <p className="text-[10px] text-muted-foreground/70 mt-1">Try another search keyword</p>
+                      <div className="text-center py-8 px-4 rounded-[var(--w11-radius-lg)] border border-dashed border-[var(--w11-border-default)]">
+                        <div className="text-xs text-[var(--w11-text-secondary)] font-medium">No templates found</div>
+                        <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-1">Try another search keyword</div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2.5">
                         {filteredTemplates.map((tpl: any) => (
                           <button key={tpl.id}
                             onClick={() => loadTemplate(tpl)}
-                            className="group relative rounded-2xl overflow-hidden border border-border/70 hover:border-primary hover:shadow-lg hover:scale-[1.02] transition-all duration-200 text-left bg-card/60 shadow-xs"
+                            className="group relative rounded-[var(--w11-radius-lg)] overflow-hidden border border-[var(--w11-border-default)] hover:border-[var(--w11-accent)] text-left transition-colors"
+                            style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}
                           >
-                            {/* Thumbnail image area */}
+                            {/* Thumbnail image area — real thumbnail or
+                                deterministic gradient tile (never blank) */}
                             <div className="relative overflow-hidden" style={{ paddingTop: "130%" }}>
-                              {tpl.thumbnail_url ? (
-                                <img
-                                  src={tpl.thumbnail_url}
-                                  alt={tpl.name}
-                                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
-                                  <LayoutTemplate className="h-8 w-8 opacity-25" />
-                                </div>
-                              )}
+                              <TemplateThumb
+                                url={tpl.thumbnail_url}
+                                name={tpl.name}
+                                icon={<LayoutTemplate className="h-5 w-5" />}
+                                className="group-hover:scale-105 transition-transform duration-300"
+                              />
                               {/* Hover overlay */}
-                              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-200" />
+                              <div className="absolute inset-0 bg-[var(--w11-accent-light)] opacity-0 group-hover:opacity-40 transition-opacity duration-200 pointer-events-none" />
                               {/* Editor type badge */}
                               <div className="absolute top-1.5 right-1.5">
-                                <span className="text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded-md font-semibold backdrop-blur-md shadow-xs">
+                                <span className="text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded-[var(--w11-radius-sm)] font-semibold backdrop-blur-md">
                                   {tpl.editor_type === "writer" ? "W" : "D"}
                                 </span>
                               </div>
                             </div>
                             {/* Name */}
-                            <div className="p-2 bg-background/80 backdrop-blur-xs border-t border-border/40">
-                              <span className="text-[10px] font-semibold text-foreground/90 leading-tight line-clamp-2 block group-hover:text-primary transition-colors">{tpl.name}</span>
+                            <div className="p-2 border-t border-[var(--w11-border-subtle)]">
+                              <span className="text-[10px] font-semibold text-[var(--w11-text-primary)] leading-tight line-clamp-2 block group-hover:text-[var(--w11-accent)] transition-colors">{tpl.name}</span>
                             </div>
                           </button>
                         ))}
@@ -1047,15 +1089,16 @@ export default function CanvasEditor() {
                   <div className="space-y-4">
                     {SHAPE_GROUPS.map((group) => (
                       <div key={group.label} className="space-y-2">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
+                        <div className="text-[11px] font-semibold text-[var(--w11-text-tertiary)] uppercase tracking-wider">{group.label}</div>
                         <div className="grid grid-cols-3 gap-2">
                           {group.shapes.map((s) => (
                             <button key={s.id} onClick={() => handleShape(s.id)}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border/60 bg-card/40 hover:bg-primary/10 hover:border-primary/60 hover:shadow-md hover:scale-[1.04] transition-all duration-150 group">
-                              <div className="h-7 w-7 flex items-center justify-center text-foreground/80 group-hover:text-primary transition-colors">
+                              className="group flex flex-col items-center justify-center gap-1.5 p-3 rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] hover:border-[var(--w11-accent)] hover:bg-[var(--w11-accent-light)] transition-colors"
+                              style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}>
+                              <div className="h-7 w-7 flex items-center justify-center text-[var(--w11-text-secondary)] group-hover:text-[var(--w11-accent)] transition-colors">
                                 {SHAPE_SVGS[s.id] ?? <Shapes className="h-5 w-5" />}
                               </div>
-                              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground truncate max-w-full">{s.label}</span>
+                              <span className="text-[10px] font-medium text-[var(--w11-text-secondary)] group-hover:text-[var(--w11-text-primary)] truncate max-w-full">{s.label}</span>
                             </button>
                           ))}
                         </div>
@@ -1067,35 +1110,37 @@ export default function CanvasEditor() {
                 {activePanel === "text" && (
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs font-semibold text-foreground mb-1">Typography</p>
-                      <p className="text-[10px] text-muted-foreground mb-3">Click any style to add to your canvas</p>
+                      <p className="text-xs font-semibold text-[var(--w11-text-primary)] mb-1">Typography</p>
+                      <div className="text-[10px] text-[var(--w11-text-tertiary)] mb-3">Click any style to add to your canvas</div>
                       <div className="space-y-2">
                         {[
                           { label: "Add a heading", desc: "Large title", action: () => canvas.addHeading(1), style: { fontSize: "19px", fontWeight: 700 } },
                           { label: "Add a subheading", desc: "Section header", action: () => canvas.addHeading(2), style: { fontSize: "15px", fontWeight: 600 } },
                           { label: "Add a little bit of body text", desc: "Standard text", action: () => canvas.addText("Body text"), style: { fontSize: "13px", fontWeight: 400 } },
-                          { label: "Add a caption / note", desc: "Small details", action: () => canvas.addText("Caption", { fontSize: 11 }), style: { fontSize: "11px", color: "var(--muted-foreground)" } },
+                          { label: "Add a caption / note", desc: "Small details", action: () => canvas.addText("Caption", { fontSize: 11 }), style: { fontSize: "11px", color: "var(--w11-text-tertiary)" } },
                         ].map((t) => (
                           <button
                             key={t.label}
                             onClick={t.action}
-                            className="w-full text-left p-3.5 rounded-2xl border border-border/70 bg-card/40 hover:bg-primary/10 hover:border-primary/60 hover:shadow-md hover:scale-[1.01] transition-all duration-150 group"
+                            className="w-full text-left p-3.5 rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] hover:border-[var(--w11-accent)] hover:bg-[var(--w11-accent-light)] transition-colors group"
+                            style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}
                           >
-                            <span className="block text-foreground group-hover:text-primary transition-colors leading-tight" style={t.style}>{t.label}</span>
-                            <span className="text-[10px] text-muted-foreground/80 mt-1 block">{t.desc}</span>
+                            <span className="block text-[var(--w11-text-primary)] group-hover:text-[var(--w11-accent)] transition-colors leading-tight" style={t.style}>{t.label}</span>
+                            <span className="text-[10px] text-[var(--w11-text-tertiary)] mt-1 block">{t.desc}</span>
                           </button>
                         ))}
                       </div>
                     </div>
-                    <Separator />
+                    <Separator className="bg-[var(--w11-border-subtle)]" />
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">School Dynamic Tokens</p>
+                      <div className="text-[11px] font-semibold text-[var(--w11-text-tertiary)] uppercase tracking-wider mb-2">School Dynamic Tokens</div>
                       <div className="flex flex-wrap gap-1.5">
                         {["School Name", "Student Name", "Roll No", "Class / Section", "Date of Birth", "Symbol No", "GPA / Grade", "Exam Name", "Academic Year"].map((label) => (
                           <button
                             key={label}
                             onClick={() => canvas.addText(`{${label.toLowerCase().replace(/[\s/]+/g, "_")}}`, { fontSize: 13, fontWeight: 600 })}
-                            className="text-[10px] font-medium px-2.5 py-1 rounded-full border border-border/80 bg-background/80 hover:bg-primary/10 hover:border-primary hover:text-primary transition-all duration-150"
+                            className="text-[10px] font-medium px-2.5 py-1 rounded-[var(--w11-radius-full)] border border-[var(--w11-border-default)] hover:bg-[var(--w11-accent-light)] hover:border-[var(--w11-accent)] hover:text-[var(--w11-accent)] transition-colors"
+                            style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}
                           >
                             +{label}
                           </button>
@@ -1111,7 +1156,7 @@ export default function CanvasEditor() {
                       <Upload className="h-4 w-4" /> Upload Image
                     </Button>
                     <div>
-                      <p className="text-xs font-medium mb-1.5">Image from URL</p>
+                      <p className="text-xs font-medium text-[var(--w11-text-primary)] mb-1.5">Image from URL</p>
                       <div className="flex gap-1.5">
                         <Input placeholder="https://..." value={imgUrlInput} onChange={(e) => setImgUrlInput(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter" && imgUrlInput.trim()) { canvas.addImage(imgUrlInput.trim()); setImgUrlInput(""); }}}
@@ -1120,10 +1165,10 @@ export default function CanvasEditor() {
                           onClick={() => { if (imgUrlInput.trim()) { canvas.addImage(imgUrlInput.trim()); setImgUrlInput(""); }}}>Add</Button>
                       </div>
                     </div>
-                    <Separator />
-                    <p className="text-[10px] text-muted-foreground">
+                    <Separator className="bg-[var(--w11-border-subtle)]" />
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">
                       Tip: uploaded school assets appear here from the Brand panel (Media library coming together).
-                    </p>
+                    </div>
                   </>
                 )}
 
@@ -1137,20 +1182,25 @@ export default function CanvasEditor() {
 
                 {activePanel === "background" && (
                   <>
-                    <p className="text-xs font-medium">Solid Colors</p>
+                    <p className="text-xs font-medium text-[var(--w11-text-primary)]">Solid Colors</p>
                     <div className="grid grid-cols-5 gap-2">
                       {BG_PRESETS.map((c) => (
                         <button key={c} onClick={() => { setBgColor(c); canvas.updatePageSettings({ background: c }); }}
-                          className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 ${bgColor === c ? "border-primary ring-2 ring-primary/30" : "border-transparent"}`}
-                          style={{ background: c }} title={c} />
+                          className="w-10 h-10 rounded-[var(--w11-radius-md)] border-2 transition-transform hover:scale-110"
+                          style={{
+                            background: c,
+                            borderColor: bgColor === c ? "var(--w11-accent)" : "transparent",
+                            boxShadow: bgColor === c ? "0 0 0 2px var(--w11-accent-light)" : undefined,
+                            transitionDuration: "var(--w11-transition-fast)",
+                          }} title={c} />
                       ))}
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-xs">Custom:</label>
+                      <label className="text-xs text-[var(--w11-text-primary)]">Custom:</label>
                       <input type="color" value={bgColor}
                         onChange={(e) => { setBgColor(e.target.value); canvas.updatePageSettings({ background: e.target.value }); }}
-                        className="w-8 h-8 rounded border cursor-pointer" />
-                      <span className="text-xs font-mono text-muted-foreground">{bgColor}</span>
+                        className="w-8 h-8 rounded-[var(--w11-radius-sm)] border border-[var(--w11-border-default)] cursor-pointer bg-transparent" />
+                      <span className="text-xs font-mono text-[var(--w11-text-secondary)]">{bgColor}</span>
                     </div>
                     <Button variant="outline" size="sm" className="w-full h-7 text-xs"
                       onClick={() => canvas.updatePageSettings({ background: bgColor }, true)}>
@@ -1201,9 +1251,12 @@ export default function CanvasEditor() {
 
           {/* Canvas + pages strip */}
           <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
-            {/* Page strip — sleek compact Canva-style toolbar */}
-            <div className="flex items-center gap-2 px-4 py-2 border-b bg-background/95 backdrop-blur-sm shrink-0 overflow-x-auto custom-scrollbar">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">Pages</span>
+            {/* Page strip — compact Canva-style toolbar */}
+            <div
+              className="flex items-center gap-2 px-4 py-2 border-b border-[var(--w11-border-subtle)] shrink-0 overflow-x-auto custom-scrollbar"
+              style={{ background: "var(--w11-surface-solid)" }}
+            >
+              <span className="text-[11px] font-semibold text-[var(--w11-text-tertiary)] uppercase tracking-wider mr-1 shrink-0">Pages</span>
               <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
                 {canvas.pages.map((pg, idx) => (
                   <div key={pg.id} className="relative group shrink-0">
@@ -1211,10 +1264,12 @@ export default function CanvasEditor() {
                       onClick={() => canvas.goToPage(idx)}
                       onDoubleClick={() => canvas.duplicatePage(idx)}
                       title={canvas.currentPageIdx === idx ? "Current page · double-click to duplicate" : "Click to view page"}
-                      className={`h-7 px-3 rounded-lg border text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 select-none
-                        ${canvas.currentPageIdx === idx
-                          ? "border-primary bg-primary text-primary-foreground shadow-xs scale-[1.02]"
-                          : "border-border/70 bg-card/60 hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                      className={`h-7 px-3 rounded-[var(--w11-radius-md)] border text-xs font-semibold flex items-center gap-1.5 select-none
+                        ${canvas.currentPageIdx === idx ? "border-transparent" : "border-[var(--w11-border-default)] hover:bg-[var(--w11-control-hover)] text-[var(--w11-text-secondary)] hover:text-[var(--w11-text-primary)]"}`}
+                      style={{
+                        transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                        ...(canvas.currentPageIdx === idx ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" } : { background: "var(--w11-control-bg)" }),
+                      }}
                     >
                       <span>Page {idx + 1}</span>
                     </button>
@@ -1222,7 +1277,8 @@ export default function CanvasEditor() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-background border border-border shadow-xs text-muted-foreground hover:text-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full border border-[var(--w11-border-default)] text-[var(--w11-text-secondary)] hover:text-[var(--w11-text-primary)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ background: "var(--w11-surface-solid)" }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-2.5 w-2.5" />
@@ -1233,7 +1289,7 @@ export default function CanvasEditor() {
                           {idx !== canvas.currentPageIdx && (
                             <DropdownMenuItem onClick={() => canvas.movePage(idx, canvas.currentPageIdx)}>Move here</DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="text-destructive" onClick={() => canvas.removePage(idx)}>Delete Page</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600 dark:text-red-400" onClick={() => canvas.removePage(idx)}>Delete Page</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -1243,28 +1299,31 @@ export default function CanvasEditor() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 px-3 text-xs rounded-lg gap-1 border-dashed shrink-0 hover:border-primary hover:text-primary transition-colors"
+                className="h-7 px-3 text-xs rounded-[var(--w11-radius-md)] gap-1 border-dashed shrink-0 hover:border-[var(--w11-accent)] hover:text-[var(--w11-accent)] transition-colors"
                 onClick={canvas.addPage}
                 title="Add new blank page"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Page
               </Button>
-              <div className="ml-auto text-xs text-muted-foreground shrink-0 font-medium px-2 py-0.5 rounded-md bg-muted/40">
+              <div className="ml-auto text-xs text-[var(--w11-text-secondary)] shrink-0 font-medium px-2 py-0.5 rounded-[var(--w11-radius-md)]"
+                style={{ background: "var(--w11-control-hover)" }}>
                 {canvas.currentPageIdx + 1} of {canvas.pages.length}
               </div>
             </div>
             <div
               ref={scrollAreaRef}
               data-canvas-scroll
-              className="flex-1 min-h-0 overflow-auto flex bg-muted/30 p-8 custom-scrollbar"
+              className="flex-1 min-h-0 overflow-auto flex p-8 custom-scrollbar"
+              style={{ background: "var(--w11-window-bg)" }}
               onContextMenu={onCanvasContextMenu}
             >
               {/* wrapper scales with zoom (m-auto keeps it centered AND fully
                   scrollable when larger than the viewport — flex justify-center
                   would clip the top/left overflow) */}
               <div
-                className="relative shadow-2xl m-auto"
+                className="relative m-auto"
                 style={{
+                  boxShadow: "var(--w11-elevation-card)",
                   width: (canvas.canvasSize?.width ?? 794) * zoom,
                   height: (canvas.canvasSize?.height ?? 1123) * zoom,
                 }}
@@ -1274,8 +1333,10 @@ export default function CanvasEditor() {
                 {showGrid && (
                   <div className="absolute inset-0 pointer-events-none"
                     style={{
-                      backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)",
+                      // grid = editor chrome, token-driven so it flips with the theme
+                      backgroundImage: "linear-gradient(to right, var(--w11-border-strong) 1px, transparent 1px), linear-gradient(to bottom, var(--w11-border-strong) 1px, transparent 1px)",
                       backgroundSize: `${50 * zoom}px ${50 * zoom}px`,
+                      opacity: 0.18,
                     }} />
                 )}
                 <canvas ref={overlayRef} className="absolute left-0 top-0 pointer-events-none"
@@ -1286,18 +1347,21 @@ export default function CanvasEditor() {
             </div>
           </div>
 
-          {/* Right: Properties / AI */}
-          <div className="w-64 border-l bg-background flex flex-col shrink-0">
+          {/* Right: Properties / AI — Fluent side panel */}
+          <div
+            className="w-64 border-l border-[var(--w11-border-default)] flex flex-col shrink-0"
+            style={{ background: "var(--w11-surface-solid)" }}
+          >
             {showAI ? (
               <>
-                <div className="flex items-center justify-between px-3 py-2.5 border-b shrink-0">
-                  <span className="text-sm font-semibold flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-violet-500" /> AI Assist
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--w11-border-subtle)] shrink-0">
+                  <span className="text-[13px] font-semibold flex items-center gap-1.5 text-[var(--w11-text-primary)]">
+                    <Sparkles className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> AI Assist
                   </span>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAI(false)}><X className="h-3.5 w-3.5" /></Button>
                 </div>
                 <div className="flex-1 overflow-y-auto"><AIAssistPanel canvas={canvas} /></div>
-                <div className="h-80 border-t shrink-0">
+                <div className="h-80 border-t border-[var(--w11-border-subtle)] shrink-0">
                   <AIChatPanel
                     mode="designer"
                     executeAction={executeAgentAction}
@@ -1308,11 +1372,11 @@ export default function CanvasEditor() {
               </>
             ) : (
               <>
-                <div className="px-3 py-2 border-b shrink-0 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">
+                <div className="px-3 py-2 border-b border-[var(--w11-border-subtle)] shrink-0 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--w11-text-secondary)]">
                     {canvas.selectedObject ? "Properties" : "Page Settings"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" />{activePanel === "layers" ? "Layers panel left" : ""}</span>
+                  <span className="text-[10px] text-[var(--w11-text-tertiary)] flex items-center gap-1"><Layers className="h-3 w-3" />{activePanel === "layers" ? "Layers panel left" : ""}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto"><PropertiesPanel canvas={canvas} /></div>
               </>
