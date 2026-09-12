@@ -2,12 +2,12 @@
 import uuid as uuid_mod
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, g, request
+from flask import Blueprint, Response, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import String, func
 
 from app.models.academic import Class, Section
-from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest
+from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest, SubjectAttendance
 from app.models.student import Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
@@ -749,3 +749,520 @@ def _coerce_uuid(value):
         return uuid_mod.UUID(str(value))
     except (TypeError, ValueError, AttributeError):
         return None
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A2 — Attendance depth (A-33): subject/period-wise register, holiday
+# marking, monthly register print twin, 3-step bulk import. A-33 detail:
+# the absent-SMS digest reads SubjectAttendance (task side, fees-style
+# windows live in tasks/attendance_alerts.py).
+# ══════════════════════════════════════════════════════════════════════════
+
+def _resolve_request_date(date_value, date_bs_value):
+    """Explicit (date AD, date_bs BS) resolution — the fields are separate
+    because a BS string ("2083-04-15") is also a valid AD ISO date and
+    guessing would silently bill attendance into the wrong century.
+
+    Returns (ad_date, date_bs)."""
+    from app.utils.nepali_date import ad_to_bs, bs_to_ad
+
+    bs_raw = str(date_bs_value or "").strip()
+    if bs_raw:
+        ad = bs_to_ad(bs_raw)
+        if ad is None:
+            return None, None
+        return ad, bs_raw
+    raw = str(date_value or "").strip()
+    if not raw:
+        return None, None
+    try:
+        ad = date.fromisoformat(raw)
+    except ValueError:
+        return None, None
+    try:
+        return ad, ad_to_bs(ad)
+    except Exception:
+        return ad, None
+
+
+def _parse_bs_or_ad_date(value):
+    """Legacy single-field resolution: AD ISO first (unchanged contract for
+    callers that already use it); new endpoints use _resolve_request_date."""
+    from app.utils.nepali_date import ad_to_bs, bs_to_ad
+
+    raw = str(value or "").strip()
+    if not raw:
+        return None, None
+    try:
+        ad = date.fromisoformat(raw)
+        try:
+            return ad, ad_to_bs(ad)
+        except Exception:
+            return ad, None
+    except ValueError:
+        pass
+    ad = bs_to_ad(raw)
+    if ad is None:
+        return None, None
+    return ad, raw
+
+
+@attendance_bp.route("/subject/mark", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+@role_required("school_admin", "teacher")
+def mark_subject_attendance():
+    """Mark subject-wise attendance for one class+subject+date.
+
+    Body: {class_id, subject_id, section_id?, date | date_bs,
+           entries: [{student_id, status: present|absent|late|half_day|leave, remarks?}]}
+    Upsert per (student, subject, date); one transaction; teacher scope
+    enforced like the daily register."""
+    data = request.get_json(silent=True) or {}
+    class_uuid = _coerce_uuid(data.get("class_id"))
+    subject_uuid = _coerce_uuid(data.get("subject_id"))
+    section_uuid = _coerce_uuid(data.get("section_id"))
+    if not class_uuid or not subject_uuid:
+        return error_response("class_id and subject_id are required", 400)
+    ad_date, date_bs = _resolve_request_date(data.get("date"), data.get("date_bs"))
+    if ad_date is None:
+        return error_response("date (AD YYYY-MM-DD) or date_bs (BS) is required", 400)
+    entries = data.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return error_response("entries must be a non-empty list", 400)
+
+    from app.models.academic import Subject as SubjectModel
+
+    klass = Class.query.filter_by(id=class_uuid, school_id=g.school_id, is_deleted=False).first()
+    subject = SubjectModel.query.filter_by(
+        id=subject_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if klass is None or subject is None:
+        return error_response("class_id/subject_id do not match this school", 404)
+
+    user_id = get_jwt_identity()
+    if g.role == "teacher":
+        allowed = teacher_class_teacher_class_ids(g.school_id, user_id)
+        if allowed and str(class_uuid) not in {str(c) for c in allowed}:
+            return error_response("Not allowed to mark attendance for this class", 403)
+
+    saved = 0
+    seen = set()
+    for idx, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            return error_response(f"entries[{idx}] must be an object", 400)
+        student_uuid = _coerce_uuid(entry.get("student_id"))
+        status = str(entry.get("status") or "").strip().lower()
+        if not student_uuid:
+            return error_response(f"entries[{idx}].student_id is required", 400)
+        if status not in ("present", "absent", "late", "half_day", "leave"):
+            return error_response(
+                f"entries[{idx}].status must be present|absent|late|half_day|leave", 400
+            )
+        key = str(student_uuid)
+        if key in seen:
+            return error_response(f"entries[{idx}]: duplicate student_id", 400)
+        seen.add(key)
+        student = Student.query.filter_by(
+            id=student_uuid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if student is None:
+            return error_response(
+                f"entries[{idx}].student_id does not match this school", 404
+            )
+
+        row = SubjectAttendance.query.filter(
+            SubjectAttendance.school_id == g.school_id,
+            SubjectAttendance.student_id == student_uuid,
+            SubjectAttendance.subject_id == subject_uuid,
+            SubjectAttendance.date == ad_date,
+            SubjectAttendance.is_deleted.is_(False),
+        ).first()
+        if row is None:
+            row = SubjectAttendance(
+                school_id=g.school_id,
+                student_id=student_uuid,
+                class_id=class_uuid,
+                section_id=section_uuid or student.section_id,
+                subject_id=subject_uuid,
+                date=ad_date,
+                date_bs=date_bs,
+                status=status,
+                marked_by_id=user_id,
+                remarks=entry.get("remarks"),
+            )
+            db.session.add(row)
+        else:
+            row.status = status
+            row.marked_by_id = user_id
+            row.remarks = entry.get("remarks")
+            row.date_bs = date_bs or row.date_bs
+        saved += 1
+
+    db.session.commit()
+    return success_response({"marked": saved, "date": str(ad_date), "date_bs": date_bs})
+
+
+@attendance_bp.route("/subject/list", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+def list_subject_attendance():
+    """The subject register for one class+subject+date (or a date range)."""
+    class_uuid = _coerce_uuid(request.args.get("class_id"))
+    subject_uuid = _coerce_uuid(request.args.get("subject_id"))
+    if not class_uuid or not subject_uuid:
+        return error_response("class_id and subject_id are required", 400)
+    query = SubjectAttendance.query.filter(
+        SubjectAttendance.school_id == g.school_id,
+        SubjectAttendance.class_id == class_uuid,
+        SubjectAttendance.subject_id == subject_uuid,
+        SubjectAttendance.is_deleted.is_(False),
+    )
+    ad_date, _ = _resolve_request_date(request.args.get("date"), request.args.get("date_bs"))
+    if ad_date is not None:
+        query = query.filter(SubjectAttendance.date == ad_date)
+    else:
+        from_d, _ = _parse_bs_or_ad_date(request.args.get("from"))
+        to_d, _ = _parse_bs_or_ad_date(request.args.get("to"))
+        if from_d:
+            query = query.filter(SubjectAttendance.date >= from_d)
+        if to_d:
+            query = query.filter(SubjectAttendance.date <= to_d)
+    rows = query.order_by(SubjectAttendance.date, SubjectAttendance.student_id).all()
+    return success_response({
+        "records": [
+            {
+                "id": str(r.id),
+                "student_id": str(r.student_id),
+                "subject_id": str(r.subject_id),
+                "date": r.date.isoformat(),
+                "date_bs": r.date_bs,
+                "status": r.status,
+                "remarks": r.remarks,
+            }
+            for r in rows
+        ]
+    })
+
+
+@attendance_bp.route("/subject/report", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+def subject_attendance_report():
+    """Per-student attendance percentage per subject over a range (the
+    subject-average report the monthly print register complements)."""
+    class_uuid = _coerce_uuid(request.args.get("class_id"))
+    if not class_uuid:
+        return error_response("class_id is required", 400)
+    subject_uuid = _coerce_uuid(request.args.get("subject_id"))
+    from_d, _ = _parse_bs_or_ad_date(request.args.get("from"))
+    to_d, _ = _parse_bs_or_ad_date(request.args.get("to"))
+    query = SubjectAttendance.query.filter(
+        SubjectAttendance.school_id == g.school_id,
+        SubjectAttendance.class_id == class_uuid,
+        SubjectAttendance.is_deleted.is_(False),
+    )
+    if subject_uuid:
+        query = query.filter(SubjectAttendance.subject_id == subject_uuid)
+    if from_d:
+        query = query.filter(SubjectAttendance.date >= from_d)
+    if to_d:
+        query = query.filter(SubjectAttendance.date <= to_d)
+    rows = query.all()
+
+    agg: dict = {}
+    for r in rows:
+        key = (str(r.student_id), str(r.subject_id))
+        cell = agg.setdefault(key, {"present": 0, "total": 0})
+        cell["total"] += 1
+        if r.status in ("present", "late", "half_day"):
+            cell["present"] += 1
+    students = Student.query.filter(
+        Student.school_id == g.school_id,
+        Student.class_id == class_uuid,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+    ).all()
+    report = []
+    for student in students:
+        for (sid, subj), cell in agg.items():
+            if sid != str(student.id):
+                continue
+            report.append({
+                "student_id": sid,
+                "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip(),
+                "subject_id": subj,
+                "present": cell["present"],
+                "total": cell["total"],
+                "percentage": round(cell["present"] / cell["total"] * 100, 1) if cell["total"] else 0.0,
+            })
+    report.sort(key=lambda x: (x["student_name"], x["subject_id"]))
+    return success_response({"report": report})
+
+
+@attendance_bp.route("/holiday", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+@role_required("school_admin", "superadmin")
+def mark_holiday():
+    """Record a holiday in the register (A-33): every active student of the
+    selected classes (or the whole school) gets a `holiday` row so monthly
+    registers and absent digests treat the day as explained. Idempotent."""
+    data = request.get_json(silent=True) or {}
+    ad_date, date_bs = _resolve_request_date(data.get("date"), data.get("date_bs"))
+    if ad_date is None:
+        return error_response("date (AD) or date_bs (BS) is required", 400)
+    class_ids = data.get("class_ids") or []
+    note = str(data.get("note") or "Holiday")[:200]
+
+    student_query = Student.query.filter(
+        Student.school_id == g.school_id,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+    )
+    if class_ids:
+        parsed = [c for c in (_coerce_uuid(x) for x in class_ids) if c]
+        if not parsed:
+            return error_response("class_ids invalid", 400)
+        student_query = student_query.filter(Student.class_id.in_(parsed))
+    students = student_query.all()
+
+    marked = 0
+    for student in students:
+        row = Attendance.query.filter(
+            Attendance.school_id == g.school_id,
+            Attendance.student_id == student.id,
+            Attendance.date == ad_date,
+            Attendance.is_deleted.is_(False),
+        ).first()
+        if row is None:
+            db.session.add(Attendance(
+                school_id=g.school_id,
+                student_id=student.id,
+                class_id=student.class_id,
+                academic_year_id=getattr(student, "academic_year_id", None),
+                section_id=student.section_id,
+                date=ad_date,
+                date_bs=date_bs,
+                status="holiday",
+                marked_by_id=get_jwt_identity(),
+                remarks=note,
+            ))
+        else:
+            row.status = "holiday"
+            row.remarks = note
+            row.date_bs = date_bs or row.date_bs
+        marked += 1
+    db.session.commit()
+    return success_response({"marked": marked, "date": str(ad_date), "date_bs": date_bs})
+
+
+@attendance_bp.route("/register/print", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+def attendance_register_print():
+    """Monthly register print twin (A-04): a student × day grid for one BS
+    month, P/A/L/H(half)/L(eave)/H(oliday) cells, printable HTML."""
+    from html import escape as e
+
+    from app.utils.nepali_date import current_month_bs
+
+    class_uuid = _coerce_uuid(request.args.get("class_id"))
+    section_uuid = _coerce_uuid(request.args.get("section_id"))
+    if not class_uuid:
+        return error_response("class_id is required", 400)
+    month_bs = str(request.args.get("month_bs") or current_month_bs()).strip()
+    if not month_bs[:7].count("-") and len(month_bs) != 7:
+        return error_response("month_bs must be YYYY-MM (BS)", 400)
+    year_bs, month = month_bs.split("-")[:2]
+
+    klass = Class.query.filter_by(id=class_uuid, school_id=g.school_id, is_deleted=False).first()
+    if klass is None:
+        return error_response("Class not found", 404)
+
+    # Days in the BS month via nepali_datetime; register rows for the range.
+    import nepali_datetime
+
+    first_bs = nepali_datetime.date(int(year_bs), int(month), 1)
+    try:
+        last_day = nepali_datetime.date(int(year_bs) + (1 if int(month) == 12 else 0),
+                                        1 if int(month) == 12 else int(month) + 1, 1)
+        day_count = (last_day - nepali_datetime.timedelta(days=1)).day
+    except Exception:
+        day_count = 30
+    start_ad = first_bs.to_datetime_date()
+    end_ad = start_ad + timedelta(days=day_count - 1)
+
+    q = Attendance.query.filter(
+        Attendance.school_id == g.school_id,
+        Attendance.class_id == class_uuid,
+        Attendance.date >= start_ad,
+        Attendance.date <= end_ad,
+        Attendance.is_deleted.is_(False),
+    )
+    if section_uuid:
+        q = q.filter(Attendance.section_id == section_uuid)
+    rows = q.all()
+    cell_map = {(str(r.student_id), r.date.day): r.status for r in rows}
+    status_letter = {"present": "P", "absent": "A", "late": "L",
+                     "half_day": "H", "leave": "Lv", "holiday": "Hol"}
+
+    students_q = Student.query.filter(
+        Student.school_id == g.school_id,
+        Student.class_id == class_uuid,
+        Student.is_deleted.is_(False),
+        Student.status == "active",
+    )
+    if section_uuid:
+        students_q = students_q.filter(Student.section_id == section_uuid)
+    students = students_q.order_by(Student.roll_number).all()
+
+    header = "".join(f"<th>{d}</th>" for d in range(1, day_count + 1))
+    body = []
+    for s in students:
+        cells = []
+        p = a = 0
+        for d in range(1, day_count + 1):
+            st = cell_map.get((str(s.id), d))
+            letter = status_letter.get(st, "·")
+            if st == "present":
+                p += 1
+            elif st == "absent":
+                a += 1
+            css = "abs" if st == "absent" else ("hol" if st == "holiday" else "")
+            cells.append(f"<td class='{css}'>{letter}</td>")
+        body.append(
+            f"<tr><td>{e(str(s.roll_number or ''))}</td>"
+            f"<td class='name'>{e((s.first_name or '') + ' ' + (s.last_name or ''))}</td>"
+            + "".join(cells) + f"<td>{p}</td><td>{a}</td></tr>"
+        )
+    return Response(f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Attendance Register — {e(klass.name)} {e(month_bs)}</title><style>
+body{{font-family:'Noto Sans Devanagari',sans-serif;margin:16px;color:#0d1f14}}
+h1{{font-size:18px;color:#0e3b2e}} table{{border-collapse:collapse;font-size:10px;width:100%}}
+th,td{{border:1px solid #0e3b2e33;padding:2px 4px;text-align:center}}
+th{{background:#0e3b2e;color:#c5f4dd}} .name{{text-align:left;white-space:nowrap}}
+td.abs{{background:#fde8e8;color:#b91c1c;font-weight:700}} td.hol{{background:#eef7f2}}
+@media print{{.noprint{{display:none}}}}
+</style></head><body>
+<h1>Attendance Register — {e(klass.name)} ({e(month_bs)} BS)</h1>
+<p>P present · A absent · L late · H half-day · Lv leave · Hol holiday</p>
+<table><thead><tr><th>Roll</th><th>Student</th>{header}<th>P</th><th>A</th></tr></thead>
+<tbody>{''.join(body)}</tbody></table>
+<p class="noprint"><button onclick="window.print()">Print</button></p>
+</body></html>""", mimetype="text/html")
+
+
+@attendance_bp.route("/import/preview", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+@role_required("school_admin", "teacher")
+def attendance_import_preview():
+    """Step 1+2 of the 3-step import UX (A-28): validate entries and return
+    the preview split (valid rows + per-row errors) WITHOUT writing. The
+    client sends the same payload to /import/commit to apply."""
+    return _attendance_import(data=request.get_json(silent=True) or {}, commit=False)
+
+
+@attendance_bp.route("/import/commit", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("attendance")
+@role_required("school_admin", "teacher")
+def attendance_import_commit():
+    """Step 3: apply the validated rows (same payload the preview returned)."""
+    return _attendance_import(data=request.get_json(silent=True) or {}, commit=True)
+
+
+def _attendance_import(data, commit):
+    """Shared validate (+apply) for the attendance bulk import."""
+    entries = data.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return error_response("entries must be a non-empty list", 400)
+    if len(entries) > 2000:
+        return error_response("entries exceeds the 2000-row limit per batch", 400)
+
+    valid = []
+    errors = []
+    seen_keys = set()
+    for idx, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            errors.append({"row": idx, "error": "entry must be an object"})
+            continue
+        student_uuid = _coerce_uuid(entry.get("student_id"))
+        status = str(entry.get("status") or "").strip().lower()
+        ad_date, date_bs = _resolve_request_date(entry.get("date"), entry.get("date_bs"))
+        if not student_uuid:
+            errors.append({"row": idx, "error": "student_id missing/invalid"})
+            continue
+        if status not in ("present", "absent", "late", "half_day", "leave", "holiday"):
+            errors.append({"row": idx, "error": f"invalid status '{status}'"})
+            continue
+        if ad_date is None:
+            errors.append({"row": idx, "error": "date missing/invalid (AD or BS)"})
+            continue
+        student = Student.query.filter_by(
+            id=student_uuid, school_id=g.school_id, is_deleted=False
+        ).first()
+        if student is None:
+            errors.append({"row": idx, "error": "student not found at this school"})
+            continue
+        key = (str(student_uuid), str(ad_date))
+        if key in seen_keys:
+            errors.append({"row": idx, "error": "duplicate student+date in batch"})
+            continue
+        seen_keys.add(key)
+        valid.append({
+            "student_id": str(student_uuid),
+            "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip(),
+            "class_id": str(student.class_id) if student.class_id else None,
+            "section_id": str(student.section_id) if student.section_id else None,
+            "date": str(ad_date),
+            "date_bs": date_bs,
+            "status": status,
+            "remarks": entry.get("remarks"),
+        })
+
+    if not commit:
+        return success_response({
+            "valid_count": len(valid),
+            "error_count": len(errors),
+            "errors": errors[:100],
+            "preview": valid[:100],
+        })
+
+    # Apply: one row per (student, date) — same upsert the daily register uses.
+    upserted = 0
+    for row_data in valid:
+        ad = date.fromisoformat(row_data["date"])
+        existing = Attendance.query.filter(
+            Attendance.school_id == g.school_id,
+            Attendance.student_id == _coerce_uuid(row_data["student_id"]),
+            Attendance.date == ad,
+            Attendance.is_deleted.is_(False),
+        ).first()
+        if existing is None:
+            db.session.add(Attendance(
+                school_id=g.school_id,
+                student_id=_coerce_uuid(row_data["student_id"]),
+                class_id=_coerce_uuid(row_data["class_id"]),
+                section_id=_coerce_uuid(row_data["section_id"]),
+                date=ad,
+                date_bs=row_data["date_bs"],
+                status=row_data["status"],
+                marked_by_id=get_jwt_identity(),
+                remarks=row_data.get("remarks"),
+            ))
+        else:
+            existing.status = row_data["status"]
+            existing.remarks = row_data.get("remarks")
+            existing.marked_by_id = get_jwt_identity()
+        upserted += 1
+    db.session.commit()
+    return success_response({"applied": upserted, "skipped_invalid": len(errors)})

@@ -34,9 +34,11 @@ import {
   Loader2,
   Users,
   BarChart3,
+  CalendarOff,
 } from "lucide-react";
 import Link from "next/link";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { MarkHolidayDialog } from "@/components/attendance/mark-holiday-dialog";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type AttendanceStatus = "present" | "absent" | "late" | "leave";
@@ -90,6 +92,7 @@ function AttendanceContent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isTeacher = user?.role === "teacher";
+  const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [date, setDate] = useState(
@@ -102,6 +105,7 @@ function AttendanceContent() {
   // ── Records state for mark mode ───────────────────────────────────────────
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [holidayOpen, setHolidayOpen] = useState(false);
 
   // ── Classes & sections ────────────────────────────────────────────────────
   const { data: classes } = useQuery({
@@ -274,12 +278,25 @@ function AttendanceContent() {
             Mark and track student attendance by class
           </p>
         </div>
-        <Link href="/dashboard/attendance/reports">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <BarChart3 className="h-4 w-4" />
-            Monthly Reports
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setHolidayOpen(true)}
+            >
+              <CalendarOff className="h-4 w-4" />
+              Mark Holiday
+            </Button>
+          )}
+          <Link href="/dashboard/attendance/reports">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              Monthly Reports
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── Filter Row ─────────────────────────────────────────────────── */}
@@ -645,6 +662,13 @@ function AttendanceContent() {
           </CardContent>
         </Card>
       )}
+
+      {/* Mark holiday (A-33) — whole school or per class, with a note */}
+      <MarkHolidayDialog
+        open={holidayOpen}
+        onOpenChange={setHolidayOpen}
+        defaultClassId={classId !== "none" ? classId : undefined}
+      />
     </div>
   );
 }

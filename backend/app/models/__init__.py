@@ -6,8 +6,21 @@ from app.models.user import User  # noqa: F401
 from app.models.student import Student, Guardian  # noqa: F401
 from app.models.student_transfer import StudentTransfer  # noqa: F401
 from app.models.academic import AcademicYear, Semester, Medium, Stream, Shift, Class, Section, Subject  # noqa: F401
-from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest  # noqa: F401
-from app.models.exam import Exam, Marks, ReportCard, OnlineExam, OnlineExamAttempt  # noqa: F401
+from app.models.attendance import (  # noqa: F401
+    Attendance,
+    TeacherAttendance,
+    LeaveRequest,
+    SubjectAttendance,
+)
+from app.models.exam import (  # noqa: F401
+    Exam,
+    Marks,
+    ReportCard,
+    OnlineExam,
+    OnlineExamAttempt,
+    MarkComponent,
+    GradeScale,
+)
 from app.models.fee import (  # noqa: F401
     FeeStructure,
     FeeCollection,

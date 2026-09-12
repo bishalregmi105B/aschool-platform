@@ -21,13 +21,16 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/spinner";
 import { usePluginWidgets } from "@/lib/plugin-widgets/usePluginWidgets";
 import {
   resolveComponentWidget,
   type ComponentWidgetProps,
 } from "@/lib/plugin-widgets/registry";
-import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft, Layers, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -44,6 +47,17 @@ interface MarkEntry {
   student_id: string;
   theory_marks: string;
   practical_marks: string;
+  components?: Record<string, string>;
+}
+
+/** Row of GET /exams/<id>/components — the N-way mark distribution. */
+interface MarkComponentDef {
+  id: string;
+  name: string;
+  max_mark: number;
+  pass_mark: number | null;
+  seq: number;
+  subject_id?: string;
 }
 
 interface SubjectOption {
@@ -137,15 +151,44 @@ function MarksContent() {
     enabled: !!examId && !!classId && !!subjectId,
   });
 
+  // ── Mark components (A-32): the N-way distribution for this exam+subject.
+  // When defined, the grid renders one column per component and theory /
+  // practical inputs collapse into computed per-component totals.
+  const { data: componentDefs } = useQuery({
+    queryKey: ["exam-components", examId, subjectId],
+    queryFn: async () => {
+      const res = await api.get(`/exams/${examId}/components?subject_id=${subjectId}`);
+      return (res.data?.data?.components || []) as MarkComponentDef[];
+    },
+    enabled: !!examId && !!subjectId,
+  });
+  const components = componentDefs || [];
+  const hasComponents = components.length > 0;
+  const componentsFullMarks = components.reduce((sum, c) => sum + (Number(c.max_mark) || 0), 0);
+  const componentsPassMarks = components.reduce(
+    (sum, c) => sum + (c.pass_mark != null ? Number(c.pass_mark) : 0),
+    0,
+  );
+
+  // Components manager dialog (define/edit the distribution)
+  const [componentsOpen, setComponentsOpen] = useState(false);
+
   // Populate marks from existing data
   useEffect(() => {
     if (existingMarks && existingMarks.length > 0) {
       const loaded: Record<string, MarkEntry> = {};
       for (const m of existingMarks) {
+        const componentScores: Record<string, string> = {};
+        if (m.components && typeof m.components === "object") {
+          for (const [cid, score] of Object.entries(m.components)) {
+            componentScores[cid] = String(score ?? "");
+          }
+        }
         loaded[m.student_id] = {
           student_id: m.student_id,
           theory_marks: String(m.theory_marks || ""),
           practical_marks: String(m.practical_marks || ""),
+          components: Object.keys(componentScores).length ? componentScores : undefined,
         };
       }
       setMarks(loaded);
@@ -168,17 +211,33 @@ function MarksContent() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const entries = Object.entries(marks)
-        .filter(([_, entry]) => entry.theory_marks || entry.practical_marks)
-        .map(([studentId, entry]) => ({
-          student_id: studentId,
-          subject_id: subjectId,
-          class_id: classId,
-          theory_marks: parseFloat(entry.theory_marks) || 0,
-          practical_marks: parseFloat(entry.practical_marks) || 0,
-          full_marks: totalFullMarks,
-          pass_marks: totalPassMarks,
-        }));
+      let entries;
+      if (hasComponents) {
+        // Component mode: one score per defined component; the backend sums
+        // them into the obtained total (theory/practical are not sent).
+        entries = Object.entries(marks)
+          .map(([studentId, entry]) => {
+            const compMap: Record<string, number> = {};
+            for (const c of components) {
+              const raw = entry.components?.[c.id];
+              if (raw !== undefined && raw !== "") compMap[c.id] = parseFloat(raw) || 0;
+            }
+            return { student_id: studentId, components: compMap };
+          })
+          .filter((e) => Object.keys(e.components).length > 0);
+      } else {
+        entries = Object.entries(marks)
+          .filter(([_, entry]) => entry.theory_marks || entry.practical_marks)
+          .map(([studentId, entry]) => ({
+            student_id: studentId,
+            subject_id: subjectId,
+            class_id: classId,
+            theory_marks: parseFloat(entry.theory_marks) || 0,
+            practical_marks: parseFloat(entry.practical_marks) || 0,
+            full_marks: totalFullMarks,
+            pass_marks: totalPassMarks,
+          }));
+      }
       const res = await api.post(`/exams/${examId}/marks`, {
         subject_id: subjectId,
         marks: entries,
@@ -189,7 +248,13 @@ function MarksContent() {
       toast.success(`Marks saved! (${data?.data?.new || 0} new, ${data?.data?.updated || 0} updated)`);
       queryClient.invalidateQueries({ queryKey: ["marks", "existing-marks"] });
     },
-    onError: () => toast.error("Failed to save marks"),
+    onError: (err) => {
+      const msg =
+        (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+      toast.error(
+        typeof msg === "string" ? msg : "Failed to save marks",
+      );
+    },
   });
 
   const updateMark = useCallback((studentId: string, field: "theory_marks" | "practical_marks", value: string) => {
@@ -204,6 +269,40 @@ function MarksContent() {
       },
     }));
   }, []);
+
+  const updateComponentScore = useCallback((studentId: string, componentId: string, value: string) => {
+    setMarks((prev) => {
+      const entry = prev[studentId] || {
+        student_id: studentId,
+        theory_marks: "",
+        practical_marks: "",
+      };
+      return {
+        ...prev,
+        [studentId]: {
+          ...entry,
+          student_id: studentId,
+          components: { ...(entry.components || {}), [componentId]: value },
+        },
+      };
+    });
+  }, []);
+
+  /** Component-mode helpers: obtained total + pass/fail for one student. */
+  const componentTotals = (entry: MarkEntry | undefined) => {
+    let total = 0;
+    let any = false;
+    let failing = false;
+    for (const c of components) {
+      const raw = entry?.components?.[c.id];
+      if (raw === undefined || raw === "") continue;
+      any = true;
+      const score = parseFloat(raw) || 0;
+      total += score;
+      if (c.pass_mark != null && score < Number(c.pass_mark)) failing = true;
+    }
+    return { total, any, failing };
+  };
 
   // Stats
   const studentList: Student[] = students || [];
@@ -248,12 +347,21 @@ function MarksContent() {
           },
         }
       : null;
-  const entered = Object.values(marks).filter((m: any) => m.theory_marks || m.practical_marks).length;
-  const passCount = Object.values(marks).filter((m: any) => {
-    const theory = parseFloat(m.theory_marks) || 0;
-    const practical = parseFloat(m.practical_marks) || 0;
-    return isPassingResolvedMarksConfig(marksConfig, theory, practical);
-  }).length;
+  const entered = hasComponents
+    ? Object.values(marks).filter((m: any) => componentTotals(m).any).length
+    : Object.values(marks).filter((m: any) => m.theory_marks || m.practical_marks).length;
+  const passCount = hasComponents
+    ? Object.values(marks).filter((m: any) => {
+        const { total, any, failing } = componentTotals(m);
+        return any && !failing && total >= totalPassMarks;
+      }).length
+    : Object.values(marks).filter((m: any) => {
+        const theory = parseFloat(m.theory_marks) || 0;
+        const practical = parseFloat(m.practical_marks) || 0;
+        return isPassingResolvedMarksConfig(marksConfig, theory, practical);
+      }).length;
+  const effectiveFullMarks = hasComponents ? componentsFullMarks : totalFullMarks;
+  const effectivePassMarks = hasComponents ? componentsPassMarks : totalPassMarks;
 
   return (
     <div className="space-y-6">
@@ -273,6 +381,14 @@ function MarksContent() {
           <Link href="/dashboard/exams">
             <Button variant="outline">Manage Exams</Button>
           </Link>
+          {examId && subjectId && (
+            <Button variant="outline" onClick={() => setComponentsOpen(true)}>
+              <Layers className="h-4 w-4 mr-2" /> Components
+              {hasComponents && (
+                <Badge variant="secondary" className="ml-2">{components.length}</Badge>
+              )}
+            </Button>
+          )}
           {examId && classId && subjectId && (
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               <Save className="h-4 w-4 mr-2" /> {saveMutation.isPending ? "Saving..." : "Save All Marks"}
@@ -342,20 +458,22 @@ function MarksContent() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Full Marks</p>
-              <p className="text-sm font-medium">{totalFullMarks}</p>
+              <p className="text-sm font-medium">{effectiveFullMarks}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Pass Marks</p>
-              <p className="text-sm font-medium">{totalPassMarks}</p>
+              <p className="text-sm font-medium">{effectivePassMarks}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Practical</p>
+              <p className="text-xs text-muted-foreground">Components</p>
               <p className="text-sm font-medium">
-                {hasPractical ? `${theoryFullMarks} theory / ${practicalFullMarks} practical` : "No practical"}
+                {hasComponents
+                  ? components.map((c) => c.name).join(" + ")
+                  : "None (theory/practical)"}
               </p>
-              {hasPractical && usesSubjectPracticalConfig && (
+              {hasComponents && (
                 <p className="text-[10px] text-muted-foreground">
-                  Pass: {theoryPassMarks ?? 0} theory + {practicalPassMarks ?? 0} practical
+                  Σ {componentsFullMarks} of {effectiveFullMarks} full marks
                 </p>
               )}
             </div>
@@ -402,6 +520,95 @@ function MarksContent() {
               <PageLoader />
             ) : studentList.length === 0 ? (
               <p className="text-center py-12 text-muted-foreground">No students found in this class.</p>
+            ) : hasComponents ? (
+              /* Component mode (A-32): one input column per defined mark
+                 component — theory/practical are hidden; the total is the
+                 client-side sum of component scores. */
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">Roll</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    {components.map((c) => (
+                      <TableHead key={c.id} className="w-24">
+                        {c.name} ({c.max_mark})
+                        {c.pass_mark != null && (
+                          <span className="block text-[10px] font-normal text-muted-foreground">
+                            pass {c.pass_mark}
+                          </span>
+                        )}
+                      </TableHead>
+                    ))}
+                    <TableHead className="w-20">Total</TableHead>
+                    <TableHead className="w-16">%</TableHead>
+                    <TableHead className="w-20">Grade</TableHead>
+                    <TableHead className="w-16">GPA</TableHead>
+                    <TableHead className="w-16">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {studentList.map((s: Student) => {
+                    const m = marks[s.id];
+                    const { total, any, failing } = componentTotals(m);
+                    const pct = effectiveFullMarks > 0 ? (total / effectiveFullMarks) * 100 : 0;
+                    const gradePreview = pct > 0 ? nebGrade(pct) : null;
+                    const isPass = any && !failing && total >= effectivePassMarks;
+                    const g = any
+                      ? isPass && gradePreview
+                        ? gradePreview
+                        : { grade: "NG", gpa: 0.0, color: "text-red-700 bg-red-50" }
+                      : null;
+
+                    return (
+                      <TableRow key={s.id} className={!any ? "opacity-60" : ""}>
+                        <TableCell className="text-center font-mono text-xs">{s.roll_number}</TableCell>
+                        <TableCell>
+                          <p className="font-medium text-sm">{s.first_name} {s.last_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{s.student_id}</p>
+                        </TableCell>
+                        {components.map((c) => {
+                          const val = m?.components?.[c.id] ?? "";
+                          const over = val !== "" && (parseFloat(val) || 0) > Number(c.max_mark);
+                          const belowPass =
+                            c.pass_mark != null && val !== "" && (parseFloat(val) || 0) < Number(c.pass_mark);
+                          return (
+                            <TableCell key={c.id}>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={c.max_mark}
+                                value={val}
+                                onChange={(e) => updateComponentScore(s.id, c.id, e.target.value)}
+                                placeholder="0"
+                                className={`w-20 h-8 text-sm ${over || belowPass ? "border-red-400" : ""}`}
+                              />
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="font-semibold text-sm">{any ? total : "—"}</TableCell>
+                        <TableCell className="text-sm">{any ? `${pct.toFixed(1)}%` : "—"}</TableCell>
+                        <TableCell>
+                          {g ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${g.color}`}>
+                              {g.grade}
+                            </span>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">{g ? g.gpa.toFixed(1) : "—"}</TableCell>
+                        <TableCell>
+                          {any && (
+                            isPass ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-500" />
+                            )
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             ) : marksGridProps && MarksGrid ? (
               /* The exams plugin's marks_entry_grid: Enter/↓ navigation,
                  Excel-paste, per-cell validation and its own Save — replaces
@@ -496,6 +703,204 @@ function MarksContent() {
           </CardContent>
         </Card>
       )}
+
+      {/* Components manager — define/edit the mark distribution for this
+          exam+subject (name, max mark, pass mark, order). */}
+      <ComponentsManagerDialog
+        open={componentsOpen}
+        onOpenChange={setComponentsOpen}
+        examId={examId}
+        subjectId={subjectId}
+        subjectName={selectedSubject?.name || ""}
+        defs={components}
+        fallbackFullMarks={totalFullMarks}
+      />
     </div>
+  );
+}
+
+/** Editable distribution editor: Σ max marks vs the subject's full marks. */
+function ComponentsManagerDialog({
+  open,
+  onOpenChange,
+  examId,
+  subjectId,
+  subjectName,
+  defs,
+  fallbackFullMarks,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  examId: string;
+  subjectId: string;
+  subjectName: string;
+  defs: MarkComponentDef[];
+  fallbackFullMarks: number;
+}) {
+  const queryClient = useQueryClient();
+  const [rows, setRows] = useState<MarkComponentDef[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setRows(
+        defs.length
+          ? defs.map((c) => ({ ...c }))
+          : [{ id: "", name: "Theory", max_mark: fallbackFullMarks, pass_mark: null, seq: 1 }],
+      );
+    }
+  }, [open, defs, fallbackFullMarks]);
+
+  const sumMax = rows.reduce((s, r) => s + (parseFloat(String(r.max_mark)) || 0), 0);
+  const sumPass = rows.reduce(
+    (s, r) => s + (r.pass_mark != null ? parseFloat(String(r.pass_mark)) || 0 : 0),
+    0,
+  );
+  const overFull = sumMax > fallbackFullMarks + 0.01;
+
+  const updateRow = (idx: number, patch: Partial<MarkComponentDef>) => {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.put(`/exams/${examId}/components`, {
+        subject_id: subjectId,
+        components: rows.map((r, i) => ({
+          name: r.name.trim(),
+          max_mark: parseFloat(String(r.max_mark)) || 0,
+          pass_mark: r.pass_mark != null ? parseFloat(String(r.pass_mark)) : null,
+          seq: i + 1,
+        })),
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Component distribution saved");
+      queryClient.invalidateQueries({ queryKey: ["exam-components"] });
+      onOpenChange(false);
+    },
+    onError: (err) => {
+      // 409 = marks already entered against these components; 400 = validation.
+      const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+      toast.error(typeof msg === "string" ? msg : "Failed to save components");
+    },
+  });
+
+  const canSave =
+    rows.length > 0 &&
+    rows.every((r) => r.name.trim() && (parseFloat(String(r.max_mark)) || 0) > 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Mark Components{subjectName ? ` — ${subjectName}` : ""}</DialogTitle>
+          <DialogDescription>
+            Split the subject&apos;s marks into components (e.g. CQ, MCQ, Practical). The
+            marks grid gets one column per component and totals are summed automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          {rows.map((row, idx) => (
+            <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-4 space-y-1">
+                <Label className="text-xs">Name</Label>
+                <Input
+                  value={row.name}
+                  onChange={(e) => updateRow(idx, { name: e.target.value })}
+                  placeholder="e.g. CQ"
+                  className="h-8"
+                />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Max</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={String(row.max_mark)}
+                  onChange={(e) => updateRow(idx, { max_mark: parseFloat(e.target.value) || 0 })}
+                  className="h-8"
+                />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Pass</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={row.pass_mark != null ? String(row.pass_mark) : ""}
+                  onChange={(e) =>
+                    updateRow(idx, { pass_mark: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })
+                  }
+                  placeholder="—"
+                  className="h-8"
+                />
+              </div>
+              <div className="col-span-3 space-y-1">
+                <Label className="text-xs">Order</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={String(row.seq || idx + 1)}
+                  onChange={(e) => updateRow(idx, { seq: parseInt(e.target.value, 10) || idx + 1 })}
+                  className="h-8"
+                />
+              </div>
+              <div className="col-span-1 pb-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
+                  aria-label="Remove component"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setRows((prev) => [
+                ...prev,
+                { id: "", name: "", max_mark: 0, pass_mark: null, seq: prev.length + 1 },
+              ])
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add component
+          </Button>
+        </div>
+
+        <div
+          className={`rounded-md border px-3 py-2 text-sm ${
+            overFull
+              ? "border-red-300 bg-red-50 text-red-700 dark:bg-red-950/30"
+              : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
+          }`}
+        >
+          Σ component total: <span className="font-bold">{sumMax}</span> / full marks{" "}
+          {fallbackFullMarks}
+          {overFull
+            ? " — exceeds the subject's full marks; reduce a component."
+            : ` · pass total ${sumPass}`}
+          {sumMax === 0 && " — set max marks for each component."}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={!canSave || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? "Saving..." : "Save Distribution"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

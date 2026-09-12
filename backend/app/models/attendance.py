@@ -23,7 +23,13 @@ class Attendance(SchoolModel):
     date = Column(Date, nullable=False)
     date_bs = Column(String(10))
     status = Column(
-        Enum("present", "absent", "late", "half_day", "leave", name="attendance_status"),
+        # 'holiday' added by s_a2_exam_attendance (A-33): holiday days are
+        # recorded as register rows so monthly registers and absent-SMS
+        # digests never treat a holiday as an unexplained absence.
+        Enum(
+            "present", "absent", "late", "half_day", "leave", "holiday",
+            name="attendance_status",
+        ),
         nullable=False,
     )
     check_in_time = Column(Time)
@@ -75,3 +81,36 @@ class LeaveRequest(SchoolModel):
 
     user = relationship("User", foreign_keys=[user_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])
+
+
+class SubjectAttendance(SchoolModel):
+    """Subject/period-wise attendance register (S-A2, A-33) — InfixEdu's
+    sm_subject_attendances idea: one row per student × subject × date,
+    fed from the timetable; the absent-SMS digest reads THIS register (a
+    student absent only for the morning subjects is a different signal than
+    a full-day absence). Daily register stays in `Attendance`."""
+
+    __tablename__ = "subject_attendance"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id", "student_id", "subject_id", "date",
+            name="uq_subject_attendance_student_subject_date",
+        ),
+    )
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False)
+    section_id = Column(UUID(as_uuid=True), ForeignKey("sections.id"))
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    date_bs = Column(String(10))
+    status = Column(
+        Enum("present", "absent", "late", "half_day", "leave", name="attendance_status"),
+        nullable=False,
+    )
+    marked_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    remarks = Column(Text)
+
+    student = relationship("Student", backref="subject_attendance_records")
+    subject = relationship("Subject")
+    marked_by = relationship("User")

@@ -287,3 +287,27 @@ existing fees suites 9/9; plugin widgets + contract + S0 suites 36/36; drift gat
 `flutter analyze` 0 errors (shared/parent/student/teacher). Full-suite run per founder instruction:
 NOT run for this sprint (targeted suites only).
 
+## 2026-09-12 — S-A2: Exam & attendance integrity (branch `feat/sa2-exam-attendance`)
+
+Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A2 (A-05 online-exam hardening + A-32 marks
+depth + A-33 attendance depth + A-28 import UX).
+
+| ID | What landed | Files |
+|---|---|---|
+| A-05 (P0) | **Attempt integrity**: the duplicate-submit loophole closed — one attempt row per (school, exam, student) (partial unique index `uq_online_exam_attempts_one_per_student`, model mirror); new lifecycle `POST /online/<id>/start` (resume-or-409), `GET /online/<id>/take` (student-safe questions — answer key never leaves the server — + auto-start + server `remaining_seconds` clock), `PATCH /online/<id>/attempt` (per-question autosave merge, 409 when submitted); `submit` now 409s on already-submitted (with attempt id + score), merges late autosave deltas, scores in_progress or legacy-first submits inside the uniqueness guarantee (IntegrityError → 409 with the winner) | `backend/app/models/exam.py`, `backend/migrations/versions/s_a2_exam_attendance.py`, `backend/app/api/v1/exams.py` |
+| A-05 mobile | **Runner rebuild (eSchool benchmark)**: T&C gate sheet → start; one-question PageView + palette bottom sheet (answered/unanswered/current + counters + submit); debounced per-question autosave (1.6s, fire-and-forget, retry on next change, flush on dispose); server-clock countdown re-synced from autosave responses; wakelock; away>5s auto-submit; LaTeX via flutter_tex with plain-text fallback; multi-answer MCQ; result screen on 201 or 409-with-score | `flutter_student/lib/features/exams/runner/*` (6 new files), `aschool_shared/lib/{models/exam,repositories/exam_repository}.dart` |
+| A-32 | **Mark components**: `mark_components` (exam×subject N-way distribution w/ Σ≤full-marks + name-uniqueness validation; locked once marks exist); `marks.components` JSONB; marks entry accepts component maps (per-component bounds checked, obtained = Σ); components serialized on marks rows | `models/exam.py`, `api/v1/exams.py` (`/components` GET/PUT + marks POST), migration |
+| A-32 | **Per-school grade scales**: `grade_scales` (is_default scale replaces the hard-coded NEB table via `calculate_grade(grades=...)`); CRUD w/ validation (≥2 bands, strictly descending, 0% floor); `_build_subject_grade` resolves the school scale per request | `models/exam.py`, `utils/nepal_grading.py`, `api/v1/exams.py` |
+| A-32 | **Tabulation + merit + print twins**: `/exams/<id>/tabulation` (students × subjects grid, grade legend, totals) and `/merit-list` — merit ordered non-NG-first then GPA (any-absent→NG cannot top the list), competition ranks; `?format=print` printable HTML for both (A-04) | `api/v1/exams.py` |
+| A-33 | **Subject-wise attendance**: `subject_attendance` register (student×subject×date unique) + mark/list/report endpoints (teacher scope enforced, BS-first dates, explicit BS-vs-AD field resolution); **holiday** attendance status (ALTER TYPE + model) + idempotent `POST /attendance/holiday` bulk marking | `models/attendance.py`, `api/v1/attendance.py`, migration |
+| A-33 | **Absent-SMS digest**: per-school send window + template (School.settings `attendance_absent_sms`), reads the SUBJECT register (subject lists in the message), direct Sparrow SMS to the primary guardian, full-day absences not double-messaged | `backend/app/tasks/attendance_alerts.py` |
+| A-28 | **3-step attendance import**: `/import/preview` (validate → valid/error split, no writes) + `/import/commit` (upsert) — stateless server, 2000-row cap | `api/v1/attendance.py` |
+| A-32 web | Tabulation page (+merit tab, print twins), grade-scales manager, component-aware marks entry (+components dialog), subject attendance register page (+register print), attendance import wizard, holiday dialog | `frontend/app/dashboard/exams/{tabulation,grade-scales}/`, `exams/marks/page.tsx`, `frontend/app/dashboard/attendance/{subject,import}/`, `attendance/page.tsx`, `components/attendance/mark-holiday-dialog.tsx`, both manifests |
+
+**Verification:** `tests/test_sa2_exam_attendance.py` 8/8 (attempt lifecycle incl. duplicate 409 +
+legacy-single-submit, autosave-after-submit 409, component validation + component-scored marks,
+school scale overrides NEB (65% → B/3.0), tabulation/merit NG rule + print twins, subject
+attendance upsert + report, holiday idempotency, import preview/commit); S-A1 + plugin-contract
+suites 23/23 (regression); drift gate PASS (0 blocking / 483 allowlisted); `tsc --noEmit` clean;
+plugin_doctor 49/0/0; `flutter analyze` 0 errors (shared + student).
+
