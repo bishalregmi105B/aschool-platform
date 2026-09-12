@@ -3,6 +3,8 @@ from app.models.base import BaseModel, SchoolModel  # noqa: F401
 from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptCounter  # noqa: F401
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.user_access_log import UserAccessLog  # noqa: F401
+from app.models.monitoring import MobileCrashReport  # noqa: F401
 from app.models.student import Student, Guardian  # noqa: F401
 from app.models.student_transfer import StudentTransfer  # noqa: F401
 from app.models.academic import AcademicYear, Semester, Medium, Stream, Shift, Class, Section, Subject  # noqa: F401
@@ -59,7 +61,7 @@ from app.models.library import (  # noqa: F401
 )
 from app.models.lms import Course, Lesson, Topic, StudyMaterial, LiveClass, StudentProgress, Quiz, QuizAttempt, Enrollment  # noqa: F401
 from app.models.admission import AdmissionForm, AdmissionApplication, AdmissionLead, AdmissionInquiry  # noqa: F401
-from app.models.notification import SMSLog, WhatsAppMessage, PushNotification, NotificationTemplate, WhatsAppBotConfig  # noqa: F401
+from app.models.notification import SMSLog, WhatsAppMessage, PushNotification, NotificationTemplate, WhatsAppBotConfig, NotificationRule  # noqa: F401
 from app.models.gamification import Badge, StudentBadge, PointsLog, House, Reward  # noqa: F401
 from app.models.wellbeing import MoodCheckin, WellbeingSurvey, WellbeingSurveyResponse, CounselorSession, MoodEntry, CounselorNote  # noqa: F401
 from app.models.dismissal import AuthorizedPickup, DismissalRecord  # noqa: F401

@@ -15,6 +15,7 @@ events:
   emits:
   - gamification.points_awarded
   - gamification.badge_earned
+  - gamification.streak_milestone
   listens:
   - attendance.marked
   - assignment.submitted

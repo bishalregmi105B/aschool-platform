@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
+import 'coach_marks.dart';
+
 final teacherDashboardProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final resp = await ApiClient.instance.get('/teacher/dashboard');
@@ -31,6 +33,10 @@ class TeacherDashboard extends ConsumerWidget {
           final classes = safeMapList(data['today_classes']);
           final stats = safeMap(data['stats']);
           final notices = safeMapList(data['recent_notices']);
+
+          // A-30: one-time coach-mark tour over the quick actions; fires in
+          // a post-frame callback and is fully guarded (never blocks here).
+          CoachMarks.maybeStart();
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -582,40 +588,43 @@ class _TeacherActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withAlpha(18),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11.5,
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-                height: 1.1,
+    return CoachMarks.wrapTile(
+      label,
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: color.withAlpha(18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                icon,
+                color: color,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

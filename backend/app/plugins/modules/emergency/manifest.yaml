@@ -13,7 +13,6 @@ conflicts_with: []
 events:
   emits:
   - emergency.alert_triggered
-  - emergency.all_clear
   listens: []
 capabilities:
   api_blueprint: app.api.v1.emergency

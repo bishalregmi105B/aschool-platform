@@ -55,6 +55,11 @@ class _UserLoginApp extends ConsumerWidget {
       darkTheme: ASchoolTheme.dark,
       themeMode: themeMode,
       home: const _UserEntryFlow(),
+      // S-A3 (A-07): ops gate for the unified user app. The check needs a
+      // JWT, so pre-login it fail-opens; authed role branches (student /
+      // parent / teacher) run their own gates from their app widgets.
+      builder: (context, child) =>
+          OpsGate(appName: 'user', child: child ?? const SizedBox.shrink()),
     );
   }
 }

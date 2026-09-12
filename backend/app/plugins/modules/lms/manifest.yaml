@@ -15,9 +15,6 @@ depends_on:
 conflicts_with: []
 events:
   emits:
-  - lms.class_started
-  - lms.class_ended
-  - lms.course_completed
   listens:
   - attendance.marked
   - exams.result_published

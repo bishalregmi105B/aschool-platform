@@ -1,6 +1,7 @@
 """Users CRUD API."""
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
+from sqlalchemy.orm import joinedload
 
 from app.models.academic import Section, Subject
 from app.models.student import Guardian, Student
@@ -296,6 +297,8 @@ def reset_default_password(user_id):
 
     default_password = generate_default_password(user)
     user.set_password(default_password)
+    # A-37: a reset password is a known-to-admin password — force rotation.
+    user.must_change_password = True
     db.session.commit()
 
     if user.role == "student":
@@ -319,3 +322,114 @@ def reset_default_password(user_id):
             "scheme": scheme,
         }
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A3 — A-37 ops surfaces + A-19/O-04 roles-page backend
+# ══════════════════════════════════════════════════════════════════════════
+
+@users_bp.route("/stats", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin", "accountant")
+def users_stats():
+    """Per-role user counts (O-04/B-17: the roles page is real data, not a
+    hardcoded stub). Counts split active/inactive for the matrix view."""
+    from sqlalchemy import func
+
+    rows = (
+        db.session.query(
+            User.role,
+            func.count(User.id),
+            func.sum(func.cast(func.coalesce(User.is_active, False), db.Integer)),
+        )
+        .filter(User.school_id == g.school_id, User.is_deleted.is_(False))
+        .group_by(User.role)
+        .all()
+    )
+    roles = {}
+    for role, total, active in rows:
+        roles[role or "unknown"] = {
+            "total": int(total or 0),
+            "active": int(active or 0),
+        }
+    return success_response({"roles": roles, "total_users": sum(r["total"] for r in roles.values())})
+
+
+@users_bp.route("/access-logs", methods=["GET"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def access_logs():
+    """Authentication activity log (A-37): login / login_failed / logout /
+    password_changed events with IP + platform."""
+    from app.models.user_access_log import UserAccessLog
+
+    query = UserAccessLog.query.filter(
+        UserAccessLog.school_id == g.school_id,
+        UserAccessLog.is_deleted.is_(False),
+    ).options(joinedload(UserAccessLog.user))
+    user_id = request.args.get("user_id")
+    if user_id:
+        parsed = _coerce_uuid(user_id)
+        if parsed:
+            query = query.filter(UserAccessLog.user_id == parsed)
+    event = (request.args.get("event") or "").strip().lower()
+    if event in ("login", "login_failed", "logout", "password_changed", "locked_out"):
+        query = query.filter(UserAccessLog.event == event)
+    query = query.order_by(UserAccessLog.created_at.desc())
+    items, meta = paginate(query)
+    return success_response({
+        "logs": [
+            {
+                "id": str(row.id),
+                "user_id": str(row.user_id) if row.user_id else None,
+                "user_name": row.user.full_name if row.user else None,
+                "user_role": row.user.role if row.user else None,
+                "event": row.event,
+                "ip": row.ip,
+                "platform": row.platform,
+                "login_id": row.login_id,
+                "meta": row.meta,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in items
+        ],
+        "meta": meta,
+    })
+
+
+@users_bp.route("/<uuid:user_id>/force-password-change", methods=["POST"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def force_password_change(user_id):
+    """Set/clear the must-change-password flag (A-37). The apps read it off
+    the login payload and force a change-password screen first. Password
+    resets via reset-default-password set it automatically."""
+    user = User.query.filter_by(
+        id=user_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not user:
+        return error_response("User not found", 404)
+    data = request.get_json(silent=True) or {}
+    user.must_change_password = bool(data.get("enabled", True))
+    db.session.commit()
+    return success_response({
+        "user_id": str(user.id),
+        "must_change_password": bool(user.must_change_password),
+    })
+
+
+def _coerce_uuid(value):
+    """Coerce to UUID; None when absent/not a valid UUID."""
+    import uuid as _uuid
+
+    if isinstance(value, _uuid.UUID):
+        return value
+    if not value:
+        return None
+    try:
+        return _uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None

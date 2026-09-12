@@ -16,7 +16,6 @@ depends_on: []
 conflicts_with: []
 events:
   emits:
-  - health.record_updated
   listens: []
 capabilities:
   api_blueprint: app.api.v1.health_records

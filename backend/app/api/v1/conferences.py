@@ -295,6 +295,17 @@ def book_slot(slot_id):
     slot.parent_id = parent_id
     slot.student_id = student_id
     db.session.commit()
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school(
+            "conference.booked",
+            school_id=str(g.school_id),
+            slot_id=str(slot.id),
+            student_id=str(slot.student_id) if getattr(slot, "student_id", None) else None,
+        )
+    except Exception:
+        pass
     return success_response(_slot_dict(slot))
 
 

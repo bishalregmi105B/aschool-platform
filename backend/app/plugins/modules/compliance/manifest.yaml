@@ -12,7 +12,6 @@ depends_on: []
 conflicts_with: []
 events:
   emits:
-  - compliance.report_generated
   listens: []
 capabilities:
   api_blueprint: app.api.v1.compliance
