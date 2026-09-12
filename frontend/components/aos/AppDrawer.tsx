@@ -20,6 +20,7 @@ import {
 import { Search, X, Grid, Sparkles, Folder, ChevronLeft } from "lucide-react";
 import { SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins } from "@/lib/plugins";
+import { useI18n } from "@/lib/i18n";
 import { getAOSAppForModule, SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import type { ResolvedAOSDesktopFolder } from "@/lib/aos-launcher";
 
@@ -57,6 +58,7 @@ export default function AppDrawer({
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
 
   const { sidebarItems, installedPlugins } = useInstalledPlugins();
+  const { lang } = useI18n();
 
   const allApps: AppDrawerItem[] = useMemo(() => {
     const core: AppDrawerItem[] = [
@@ -219,9 +221,10 @@ export default function AppDrawer({
     // Add plugin sidebar items from useInstalledPlugins() — keyed with a
     // plugin- prefix: core apps above can share the same slug (e.g.
     // "timetable"), and React keys must stay unique across the merged list.
+    // Manifest Nepali labels render when the i18n language is "ne".
     const sidebarList: AppDrawerItem[] = (sidebarItems || []).map((s) => ({
       id: s.slug,
-      name: s.label,
+      name: lang === "ne" && s.label_nepali ? s.label_nepali : s.label,
       category: "academics" as const,
       icon: getAOSAppForModule(s, 52).icon,
       badge: "PLUGIN",
@@ -229,7 +232,7 @@ export default function AppDrawer({
     }));
 
     return [...core, ...pluginList, ...sidebarList];
-  }, [currentRole, plugins, sidebarItems]);
+  }, [currentRole, plugins, sidebarItems, lang]);
 
   const foldersViewEnabled = folders !== undefined;
 

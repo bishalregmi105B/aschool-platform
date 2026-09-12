@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import {
   Trash2,
   FolderPlus,
@@ -19,18 +19,33 @@ import {
   Plus,
   AppWindow,
   LayoutGrid,
+  GripHorizontal,
+  X,
+  Check,
 } from "lucide-react";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { getAOSAppForModule, SECTION_GRADIENTS, type AOSApp } from "@/lib/aos-app-adapter";
 import { useAOSNavigate } from "@/lib/aos-window-route";
 import { useAOSUserSettings } from "@/lib/aos-settings";
-import { getWidgetDefinition, normalizeHomeWidgets } from "@/components/aos/widgets/registry";
+import {
+  getWidgetDefinition,
+  normalizeHomeWidgets,
+  getAvailableWidgets,
+  defaultWidgetSize,
+  nextWidgetSize,
+  WIDGET_SIZE_WIDTHS,
+  type AOSWidgetDefinition,
+  type AOSWidgetSize,
+} from "@/components/aos/widgets/registry";
 import {
   createFolderId,
   generateUniqueFolderName,
   validateFolderName,
+  parseDesktopLayout,
   FOLDER_NAME_MAX_LENGTH,
   type AOSDesktopFolder,
+  type AOSDesktopIconPosition,
+  type AOSDesktopLayout,
   type ResolvedAOSDesktopFolder,
 } from "@/lib/aos-launcher";
 
@@ -49,6 +64,13 @@ interface DesktopProps {
   folders?: ResolvedAOSDesktopFolder[];
   /** Persist the next folder list (called only on explicit user edits). */
   onUpdateFolders?: (folders: AOSDesktopFolder[]) => void;
+  /**
+   * Raw persisted desktop_layout (settings.desktop_layout) — icon grid
+   * positions + widget sizes/order. Passed through parseDesktopLayout.
+   */
+  layout?: Record<string, unknown>;
+  /** Persist the next desktop layout (icon positions + widget arrangement). */
+  onUpdateLayout?: (layout: Record<string, unknown>) => void;
   children?: React.ReactNode;
 }
 
@@ -71,6 +93,22 @@ type FolderDialog =
 
 const CONTEXT_MENU_WIDTH = 240;
 
+// ── Icon canvas geometry ────────────────────────────────────────────────────
+/** Snap grid: one cell = 92px tile + 4px gap. */
+const GRID_STEP = 96;
+const TILE_SIZE = 92;
+/** Left margin of the icon canvas. */
+const CANVAS_LEFT = 16;
+/** Vertical margin below the menubar. */
+const CANVAS_TOP_WITH_BAR = 50;
+const CANVAS_TOP_WITHOUT_BAR = 16;
+/** Space reserved at the bottom for the dock. */
+const DOCK_RESERVE = 100;
+/** Right edge kept clear when the widget column is visible (column + margin). */
+const WIDGET_COLUMN_RESERVE = 336;
+/** Pointer travel (px) before a press becomes a drag. */
+const DRAG_THRESHOLD = 5;
+
 /** Acrylic flyout surface shared by the context menu, submenus and folder popup. */
 const acrylicSurfaceStyle: React.CSSProperties = {
   background: "var(--w11-surface-flyout, rgba(32, 32, 32, 0.85))",
@@ -81,15 +119,15 @@ const acrylicSurfaceStyle: React.CSSProperties = {
   color: "var(--w11-text-primary, #ffffff)",
 };
 
+/**
+ * Folder-dialog text input. Sizing only — borders, control background and the
+ * Fluent accent focus underline come from the element-level input styles, so
+ * they must not be overridden inline.
+ */
 const dialogInputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "7px 10px",
+  padding: "6px 10px",
   fontSize: "13px",
-  borderRadius: "6px",
-  background: "var(--w11-control-bg)",
-  border: "1px solid var(--w11-control-border)",
-  color: "var(--w11-text-primary)",
-  outline: "none",
   boxSizing: "border-box",
 };
 
@@ -98,7 +136,7 @@ function MenuDivider() {
     <div
       style={{
         height: "1px",
-        background: "var(--w11-control-border, rgba(255,255,255,0.08))",
+        background: "var(--w11-border-subtle, rgba(255,255,255,0.08))",
         margin: "4px 0",
       }}
     />
@@ -126,10 +164,11 @@ function DesktopMenuItem({
         alignItems: "center",
         gap: "10px",
         padding: "6px 10px",
-        borderRadius: "4px",
+        borderRadius: "var(--w11-radius-sm)",
         cursor: "pointer",
         color: danger ? "#c42b1c" : "inherit",
         userSelect: "none",
+        transition: "background var(--w11-transition-fast)",
       }}
       onMouseEnter={(e) =>
         (e.currentTarget.style.backgroundColor =
@@ -184,33 +223,62 @@ function DesktopIconTile({
   onClick,
   onDoubleClick,
   onContextMenu,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
   icon,
   label,
+  dragging,
+  style,
 }: {
   selected: boolean;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
   icon: React.ReactNode;
   label: string;
+  dragging?: boolean;
+  style?: React.CSSProperties;
 }) {
   return (
     <div
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
       style={{
-        width: "82px",
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: `${TILE_SIZE}px`,
         padding: "8px 4px",
+        boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        borderRadius: "8px",
+        borderRadius: "var(--w11-radius-lg)",
         cursor: "pointer",
-        border: selected ? "1px solid rgba(255, 255, 255, 0.4)" : "1px solid transparent",
+        border: selected
+          ? "1px solid rgba(255, 255, 255, 0.4)"
+          : "1px solid transparent",
         background: selected ? "rgba(255, 255, 255, 0.22)" : "transparent",
         backdropFilter: selected ? "blur(12px)" : "none",
-        transition: "all 0.1s ease",
+        transition: dragging ? "none" : "transform var(--w11-transition-fast)",
+        touchAction: "none",
+        ...(dragging
+          ? {
+              zIndex: 1000,
+              boxShadow: "0 18px 38px rgba(0, 0, 0, 0.45)",
+              background: "rgba(255, 255, 255, 0.28)",
+              backdropFilter: "blur(12px)",
+            }
+          : {}),
+        ...style,
       }}
       className="win11-desktop-icon"
     >
@@ -225,7 +293,7 @@ function DesktopIconTile({
           textShadow: "0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.8)",
           lineHeight: 1.2,
           wordBreak: "break-word",
-          maxWidth: "76px",
+          maxWidth: `${TILE_SIZE - 8}px`,
         }}
       >
         {label}
@@ -239,27 +307,167 @@ const WIDGETS_VISIBLE_KEY = "aos-desktop-widgets-visible";
 /** Wide-screen breakpoint: widgets default ON at/above this width. */
 const WIDGETS_DEFAULT_MIN_WIDTH = 1200;
 
+// ── Widget column helpers ───────────────────────────────────────────────────
+
+/** Size label for the resize cycle button. */
+const SIZE_LABELS: Record<AOSWidgetSize, string> = { s: "S", m: "M", l: "L" };
+
+interface WidgetColumnProps {
+  role: string;
+  /** Installed plugin slugs (installed plugins ∪ sidebar-visible plugins). */
+  installedSlugs: string[];
+  /** CSS top offset (below the menubar + toggle button). */
+  top: string;
+  /** Persisted widget arrangement (sizes + order). */
+  widgetLayout: AOSDesktopLayout["widgetLayout"];
+  /** Commit the next widget arrangement (icon positions are preserved by the host). */
+  onUpdateWidgetLayout: (widgetLayout: AOSDesktopLayout["widgetLayout"]) => void;
+}
+
 /**
  * macOS-style desktop widget column — the user's home_widgets board
  * (same list as the dashboard board → single config) rendered compact
  * along the right edge of the desktop. Widgets come from the registry so
- * role gating matches the board exactly; each fetches its own data.
+ * role + plugin gating matches the board exactly; each fetches its own
+ * data. Each widget can be reordered (drag handle), resized (S/M/L) or
+ * removed (X); the arrangement persists in desktop_layout.widgetLayout.
  */
 function DesktopWidgetColumn({
   role,
+  installedSlugs,
   top,
-}: {
-  role: string;
-  /** CSS top offset (below the menubar + toggle button). */
-  top: string;
-}) {
+  widgetLayout,
+  onUpdateWidgetLayout,
+}: WidgetColumnProps) {
   const navigate = useAOSNavigate();
-  const { settings } = useAOSUserSettings();
+  const { settings, updateSettings } = useAOSUserSettings();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  // Pointer reorder state: the dragged key + the insertion index among the
+  // other widgets (a placeholder line renders at that gap).
+  const [reorder, setReorder] = useState<{ key: string; overIndex: number } | null>(null);
+  const itemRefs = useRef(new Map<string, HTMLDivElement>());
 
   const board = useMemo(
-    () => normalizeHomeWidgets(settings.home_widgets, role),
-    [settings.home_widgets, role]
+    () => normalizeHomeWidgets(settings.home_widgets, role, installedSlugs),
+    [settings.home_widgets, role, installedSlugs]
   );
+
+  const availableWidgets = useMemo(
+    () => getAvailableWidgets({ role, installedSlugs }),
+    [role, installedSlugs]
+  );
+
+  const sizeFor = useCallback(
+    (key: string, definition: AOSWidgetDefinition): AOSWidgetSize =>
+      widgetLayout[key]?.size ?? defaultWidgetSize(definition),
+    [widgetLayout]
+  );
+
+  // Column order: explicit widgetLayout orders win; widgets without one keep
+  // their board (home_widgets) order underneath the customized ones.
+  const orderedBoard = useMemo(() => {
+    const indexed = board.map((key, index) => ({ key, index }));
+    indexed.sort((a, b) => {
+      const oa = widgetLayout[a.key]?.order;
+      const ob = widgetLayout[b.key]?.order;
+      const ra = oa ?? a.index + 10000;
+      const rb = ob ?? b.index + 10000;
+      return ra - rb;
+    });
+    return indexed.map((entry) => entry.key);
+  }, [board, widgetLayout]);
+
+  const commitWidgetLayout = useCallback(
+    (nextWidgetLayout: AOSDesktopLayout["widgetLayout"]) => {
+      onUpdateWidgetLayout(nextWidgetLayout);
+    },
+    [onUpdateWidgetLayout]
+  );
+
+  const setWidgetSize = (key: string, size: AOSWidgetSize) => {
+    const next = { ...widgetLayout };
+    const existing = next[key];
+    const order =
+      existing?.order ?? Math.max(-1, ...Object.values(next).map((e) => e.order)) + 1;
+    next[key] = { size, order };
+    commitWidgetLayout(next);
+  };
+
+  const removeWidget = (key: string) => {
+    updateSettings({ home_widgets: board.filter((k) => k !== key) });
+    if (widgetLayout[key]) {
+      const next = { ...widgetLayout };
+      delete next[key];
+      commitWidgetLayout(next);
+    }
+  };
+
+  const addWidget = (key: string) => {
+    updateSettings({ home_widgets: [...board, key] });
+  };
+
+  // ── Reorder drag (pointer-based, vertical) ────────────────────────────────
+  const handleReorderPointerDown = (e: React.PointerEvent, key: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setReorder({ key, overIndex: orderedBoard.indexOf(key) });
+  };
+
+  const handleReorderPointerMove = (e: React.PointerEvent) => {
+    if (!reorder) return;
+    const others = orderedBoard.filter((k) => k !== reorder.key);
+    let index = others.length;
+    for (let i = 0; i < others.length; i++) {
+      const el = itemRefs.current.get(others[i]);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        index = i;
+        break;
+      }
+    }
+    if (index !== reorder.overIndex) {
+      setReorder((prev) => (prev ? { ...prev, overIndex: index } : prev));
+    }
+  };
+
+  const handleReorderPointerUp = () => {
+    if (!reorder) return;
+    const others = orderedBoard.filter((k) => k !== reorder.key);
+    const nextOrder = [
+      ...others.slice(0, reorder.overIndex),
+      reorder.key,
+      ...others.slice(reorder.overIndex),
+    ];
+    const next = { ...widgetLayout };
+    nextOrder.forEach((key, index) => {
+      const definition = getWidgetDefinition(key);
+      next[key] = {
+        size: next[key]?.size ?? (definition ? defaultWidgetSize(definition) : "s"),
+        order: index,
+      };
+    });
+    commitWidgetLayout(next);
+    setReorder(null);
+  };
+
+  // Render list: the other widgets with a drop-indicator placeholder at the
+  // insertion gap; the dragged widget stays in place, dimmed.
+  const renderList: Array<{ key: string; placeholder: boolean }> = [];
+  if (reorder) {
+    const others = orderedBoard.filter((k) => k !== reorder.key);
+    others.forEach((key, i) => {
+      if (i === reorder.overIndex) renderList.push({ key: "", placeholder: true });
+      renderList.push({ key, placeholder: false });
+    });
+    if (reorder.overIndex >= others.length) renderList.push({ key: "", placeholder: true });
+  }
+
+  const columnWidth = WIDGET_SIZE_WIDTHS.l;
 
   return (
     <div
@@ -269,10 +477,10 @@ function DesktopWidgetColumn({
         top,
         right: "16px",
         bottom: "80px",
-        width: "300px",
-        maxWidth: "calc(100vw - 130px)",
+        width: `min(${columnWidth}px, calc(100vw - 130px))`,
         display: "flex",
         flexDirection: "column",
+        alignItems: "flex-end",
         gap: "12px",
         overflowY: "auto",
         pointerEvents: "auto",
@@ -280,15 +488,388 @@ function DesktopWidgetColumn({
         paddingBottom: "4px",
       }}
     >
-      {board.map((key) => {
-        const definition = getWidgetDefinition(key);
-        if (!definition) return null;
-        const Widget = definition.Component;
-        // In-process navigation: opens the route as an AOS window.
-        return <Widget key={key} compact onOpenRoute={navigate ?? undefined} />;
-      })}
+      {/* Column header: board count + "Add widgets" popover trigger */}
+      <div style={{ position: "relative", alignSelf: "flex-end", display: "flex", alignItems: "center", gap: "8px" }}>
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: "var(--w11-radius-full)",
+            ...acrylicSurfaceStyle,
+            color: "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+          }}
+        >
+          Widgets · {board.length}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPickerOpen((prev) => !prev);
+          }}
+          title="Add widgets"
+          aria-label="Add widgets"
+          aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "var(--w11-radius-full)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            ...acrylicSurfaceStyle,
+            color: "var(--w11-accent, #0078d4)",
+            transition:
+              "background var(--w11-transition-fast), transform var(--w11-transition-fast)",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor =
+              "var(--w11-control-hover, rgba(255,255,255,0.08))")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "")
+          }
+        >
+          <Plus size={14} />
+        </button>
+
+        {/* Add-widgets popover — every widget available to this role/plugins */}
+        {pickerOpen && (
+          <>
+            <div
+              style={{ position: "fixed", inset: 0, zIndex: 40 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPickerOpen(false);
+              }}
+            />
+            <div
+              role="dialog"
+              aria-label="Add widgets"
+              style={{
+                position: "absolute",
+                top: "34px",
+                right: 0,
+                width: "300px",
+                maxHeight: "420px",
+                overflowY: "auto",
+                ...acrylicSurfaceStyle,
+                borderRadius: "var(--w11-radius-lg)",
+                padding: "6px",
+                zIndex: 41,
+                fontSize: "12px",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  padding: "6px 8px 8px",
+                  fontSize: "11px",
+                  color: "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+                  borderBottom: "1px solid var(--w11-border-subtle, rgba(255,255,255,0.08))",
+                  marginBottom: "4px",
+                }}
+              >
+                Add widgets · {board.length} on your board
+              </div>
+              {availableWidgets.length === 0 && (
+                <div style={{ padding: "8px", color: "var(--w11-text-secondary)" }}>
+                  No widgets available for your role yet.
+                </div>
+              )}
+              {availableWidgets.map((widget) => {
+                const onBoard = board.includes(widget.key);
+                return (
+                  <div
+                    key={widget.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "6px 8px",
+                      borderRadius: "var(--w11-radius-sm)",
+                      cursor: "pointer",
+                      transition: "background var(--w11-transition-fast)",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onBoard) removeWidget(widget.key);
+                      else addWidget(widget.key);
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "var(--w11-control-hover, rgba(255,255,255,0.08))")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
+                  >
+                    <span style={{ display: "flex", flexShrink: 0 }}>{widget.icon}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {widget.title}
+                      </span>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "10px",
+                          color: "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {widget.description}
+                      </span>
+                    </span>
+                    <span
+                      title={onBoard ? "Remove from board" : "Add to board"}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "var(--w11-radius-sm)",
+                        background: onBoard
+                          ? "var(--w11-accent, #0078d4)"
+                          : "var(--w11-control-hover, rgba(255,255,255,0.08))",
+                        color: onBoard
+                          ? "var(--w11-accent-text, #ffffff)"
+                          : "var(--w11-text-primary, #ffffff)",
+                        transition: "background var(--w11-transition-fast)",
+                      }}
+                    >
+                      {onBoard ? <Check size={12} /> : <Plus size={12} />}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {(reorder ? renderList : orderedBoard.map((key) => ({ key, placeholder: false }))).map(
+        ({ key, placeholder }, index) => {
+          if (placeholder) {
+            return (
+              <div
+                key={`placeholder-${index}`}
+                style={{
+                  alignSelf: "stretch",
+                  height: "3px",
+                  borderRadius: "2px",
+                  background: "var(--w11-accent, #0078d4)",
+                  boxShadow: "0 0 8px var(--w11-accent, #0078d4)",
+                  margin: "-1px 0",
+                }}
+              />
+            );
+          }
+
+          const definition = getWidgetDefinition(key);
+          if (!definition) return null;
+          const Widget = definition.Component;
+          const size = sizeFor(key, definition);
+          const width = WIDGET_SIZE_WIDTHS[size];
+          const isDragged = reorder?.key === key;
+
+          return (
+            <div
+              key={key}
+              ref={(el) => {
+                if (el) itemRefs.current.set(key, el);
+                else itemRefs.current.delete(key);
+              }}
+              onMouseEnter={() => setHoveredKey(key)}
+              onMouseLeave={() => setHoveredKey((prev) => (prev === key ? null : prev))}
+              style={{
+                position: "relative",
+                width: `${width}px`,
+                maxWidth: "100%",
+                alignSelf: "flex-end",
+                display: "flex",
+                flexDirection: "column",
+                opacity: isDragged ? 0.35 : 1,
+                transition: "opacity 0.15s ease",
+              }}
+            >
+              {/* Drag handle — reorder within the column */}
+              <div
+                onPointerDown={(e) => handleReorderPointerDown(e, key)}
+                onPointerMove={handleReorderPointerMove}
+                onPointerUp={handleReorderPointerUp}
+                onPointerCancel={handleReorderPointerUp}
+                title="Drag to reorder"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "16px",
+                  cursor: "grab",
+                  touchAction: "none",
+                  color: "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+                }}
+              >
+                <GripHorizontal
+                  size={14}
+                  style={{ opacity: hoveredKey === key ? 0.9 : 0.4, transition: "opacity 0.15s ease" }}
+                />
+              </div>
+
+              <div style={{ position: "relative" }}>
+                {/* In-process navigation: opens the route as an AOS window. */}
+                <Widget compact onOpenRoute={navigate ?? undefined} />
+
+                {/* Remove — visible on hover */}
+                <button
+                  type="button"
+                  title={`Remove ${definition.title}`}
+                  aria-label={`Remove ${definition.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeWidget(key);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "var(--w11-radius-sm)",
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    ...acrylicSurfaceStyle,
+                    color: "var(--w11-text-primary, #ffffff)",
+                    opacity: hoveredKey === key ? 1 : 0,
+                    pointerEvents: hoveredKey === key ? "auto" : "none",
+                    transition: "opacity var(--w11-transition-fast)",
+                  }}
+                >
+                  <X size={12} />
+                </button>
+
+                {/* Resize — cycles S → M → L */}
+                <button
+                  type="button"
+                  title={`Resize (${SIZE_LABELS[size]} → ${SIZE_LABELS[nextWidgetSize(size)]})`}
+                  aria-label={`Resize widget, currently ${SIZE_LABELS[size]}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWidgetSize(key, nextWidgetSize(size));
+                  }}
+                  style={{
+                    position: "absolute",
+                    bottom: "10px",
+                    right: "10px",
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "var(--w11-radius-sm)",
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "nwse-resize",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    ...acrylicSurfaceStyle,
+                    color: "var(--w11-accent, #0078d4)",
+                    opacity: hoveredKey === key ? 1 : 0,
+                    pointerEvents: hoveredKey === key ? "auto" : "none",
+                    transition: "opacity var(--w11-transition-fast)",
+                  }}
+                >
+                  {SIZE_LABELS[size]}
+                </button>
+              </div>
+            </div>
+          );
+        }
+      )}
     </div>
   );
+}
+
+// ── Icon position resolution ────────────────────────────────────────────────
+
+/**
+ * Resolve a grid cell for every tile: stored positions win when they are
+ * in-bounds and collision-free; the rest auto-place column-major (macOS
+ * flow) into the first free cell.
+ */
+function resolveTilePositions(
+  ids: string[],
+  stored: Record<string, AOSDesktopIconPosition>,
+  maxCol: number,
+  maxRow: number
+): Record<string, AOSDesktopIconPosition> {
+  const taken = new Set<string>();
+  const out: Record<string, AOSDesktopIconPosition> = {};
+
+  for (const id of ids) {
+    const pos = stored[id];
+    if (!pos || pos.col > maxCol || pos.row > maxRow) continue;
+    const cellKey = `${pos.col},${pos.row}`;
+    if (taken.has(cellKey)) continue;
+    out[id] = pos;
+    taken.add(cellKey);
+  }
+
+  outer: for (const id of ids) {
+    if (out[id]) continue;
+    for (let col = 0; col <= maxCol; col++) {
+      for (let row = 0; row <= maxRow; row++) {
+        const cellKey = `${col},${row}`;
+        if (taken.has(cellKey)) continue;
+        out[id] = { col, row };
+        taken.add(cellKey);
+        continue outer;
+      }
+    }
+    // Grid completely full — stack at the origin (degenerate case).
+    out[id] = { col: 0, row: 0 };
+  }
+
+  return out;
+}
+
+/** Nearest free cell to (col,row) by expanding rings — used on drop collisions. */
+function nearestFreeCell(
+  col: number,
+  row: number,
+  taken: Set<string>,
+  maxCol: number,
+  maxRow: number
+): { col: number; row: number } | null {
+  for (let radius = 0; radius <= Math.max(maxCol, maxRow) + 1; radius++) {
+    for (let dc = -radius; dc <= radius; dc++) {
+      for (let dr = -radius; dr <= radius; dr++) {
+        if (Math.max(Math.abs(dc), Math.abs(dr)) !== radius) continue;
+        const c = col + dc;
+        const r = row + dr;
+        if (c < 0 || r < 0 || c > maxCol || r > maxRow) continue;
+        if (!taken.has(`${c},${r}`)) return { col: c, row: r };
+      }
+    }
+  }
+  return null;
 }
 
 export default function Desktop({
@@ -301,6 +882,8 @@ export default function Desktop({
   apps: externalApps,
   folders: resolvedFolders,
   onUpdateFolders,
+  layout: layoutProp,
+  onUpdateLayout,
   children,
 }: DesktopProps) {
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
@@ -328,12 +911,65 @@ export default function Desktop({
 
   const desktopRef = useRef<HTMLDivElement>(null);
 
+  // Live viewport (for grid clamping); corrected right after mount.
+  const [viewport, setViewport] = useState({ w: 1280, h: 800 });
+  useEffect(() => {
+    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // ── Desktop layout state (icon positions + widget arrangement) ───────────
+  // Local state leads (instant drags/resizes); the shell persists it via
+  // onUpdateLayout and the prop echo is skipped (lastEmitted guard).
+  const parsedLayout = useMemo(() => parseDesktopLayout(layoutProp), [layoutProp]);
+  const [liveLayout, setLiveLayout] = useState<AOSDesktopLayout>(parsedLayout);
+  const lastEmittedLayoutRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const incoming = JSON.stringify(parsedLayout);
+    if (lastEmittedLayoutRef.current === incoming) return;
+    lastEmittedLayoutRef.current = null;
+    setLiveLayout(parsedLayout);
+  }, [parsedLayout]);
+
+  const commitLayout = useCallback(
+    (next: AOSDesktopLayout) => {
+      const serialized = JSON.stringify(next);
+      lastEmittedLayoutRef.current = serialized;
+      setLiveLayout(next);
+      onUpdateLayout?.(next);
+    },
+    [onUpdateLayout]
+  );
+
+  /** Widget-column commits keep the live icon positions untouched. */
+  const commitWidgetLayout = useCallback(
+    (widgetLayout: AOSDesktopLayout["widgetLayout"]) => {
+      commitLayout({ iconPositions: liveLayout.iconPositions, widgetLayout });
+    },
+    [commitLayout, liveLayout.iconPositions]
+  );
+
   // Folder mode is active as soon as the resolved layout is provided; without
   // it the desktop behaves exactly as before (loose icons only).
   const folderMode = resolvedFolders !== undefined;
 
   // Dynamic apps from plugins if externalApps not passed
-  const { sidebarItems } = useInstalledPlugins();
+  const { sidebarItems, installedPlugins } = useInstalledPlugins();
+
+  // Installed plugin slugs: installed+active plugins ∪ sidebar-visible ones.
+  const installedSlugs = useMemo(() => {
+    const slugs = new Set<string>();
+    for (const plugin of installedPlugins) {
+      if (plugin.plugin_slug) slugs.add(plugin.plugin_slug);
+    }
+    for (const item of sidebarItems) {
+      if (item.slug) slugs.add(item.slug);
+    }
+    return Array.from(slugs);
+  }, [installedPlugins, sidebarItems]);
 
   const folderedAppIds = useMemo(() => {
     const ids = new Set<string>();
@@ -389,6 +1025,107 @@ export default function Desktop({
 
     return loose;
   }, [externalApps, sidebarItems, folderMode, folderedAppIds]);
+
+  // Tile order: folders first, then loose apps (recycle bin last).
+  const tileIds = useMemo(
+    () => [
+      ...(resolvedFolders ?? []).map((folder) => folder.id),
+      ...desktopIcons.map((item) => item.id),
+    ],
+    [resolvedFolders, desktopIcons]
+  );
+
+  // ── Grid geometry ─────────────────────────────────────────────────────────
+  const canvasTop = showTopBar ? CANVAS_TOP_WITH_BAR : CANVAS_TOP_WITHOUT_BAR;
+  const maxCol = Math.max(
+    0,
+    Math.floor(
+      (viewport.w - CANVAS_LEFT - (widgetsVisible ? WIDGET_COLUMN_RESERVE : 16) - TILE_SIZE) /
+        GRID_STEP
+    )
+  );
+  const maxRow = Math.max(
+    0,
+    Math.floor((viewport.h - DOCK_RESERVE - canvasTop - TILE_SIZE) / GRID_STEP)
+  );
+
+  const tilePositions = useMemo(
+    () => resolveTilePositions(tileIds, liveLayout.iconPositions, maxCol, maxRow),
+    [tileIds, liveLayout.iconPositions, maxCol, maxRow]
+  );
+
+  // ── Icon drag (pointer-based, snaps to the grid) ─────────────────────────
+  const [drag, setDrag] = useState<{
+    id: string;
+    startClientX: number;
+    startClientY: number;
+    originCol: number;
+    originRow: number;
+    dx: number;
+    dy: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  /** Target cell for the current drag offset (collision-resolved). */
+  const resolveDropCell = useCallback(
+    (id: string, dx: number, dy: number): AOSDesktopIconPosition => {
+      const origin = tilePositions[id] ?? { col: 0, row: 0 };
+      const col = Math.max(0, Math.min(maxCol, Math.round((origin.col * GRID_STEP + dx) / GRID_STEP)));
+      const row = Math.max(0, Math.min(maxRow, Math.round((origin.row * GRID_STEP + dy) / GRID_STEP)));
+      const taken = new Set<string>();
+      for (const [tileId, pos] of Object.entries(tilePositions)) {
+        if (tileId !== id) taken.add(`${pos.col},${pos.row}`);
+      }
+      if (!taken.has(`${col},${row}`)) return { col, row };
+      return nearestFreeCell(col, row, taken, maxCol, maxRow) ?? origin;
+    },
+    [tilePositions, maxCol, maxRow]
+  );
+
+  const handleTilePointerDown = (e: React.PointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    // A fresh press clears any stale drag-click suppression.
+    suppressClickRef.current = false;
+    const pos = tilePositions[id] ?? { col: 0, row: 0 };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({
+      id,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originCol: pos.col,
+      originRow: pos.row,
+      dx: 0,
+      dy: 0,
+      moved: false,
+    });
+  };
+
+  const handleTilePointerMove = (e: React.PointerEvent) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.startClientX;
+    const dy = e.clientY - drag.startClientY;
+    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    if (!drag.moved) suppressClickRef.current = true;
+    setDrag((prev) => (prev ? { ...prev, dx, dy, moved: true } : prev));
+  };
+
+  const handleTilePointerUp = () => {
+    if (!drag) return;
+    if (drag.moved) {
+      const cell = resolveDropCell(drag.id, drag.dx, drag.dy);
+      commitLayout({
+        iconPositions: { ...liveLayout.iconPositions, [drag.id]: cell },
+        widgetLayout: liveLayout.widgetLayout,
+      });
+    }
+    setDrag(null);
+  };
+
+  // Drop-target preview cell while dragging.
+  const dragPreviewCell =
+    drag && drag.moved ? resolveDropCell(drag.id, drag.dx, drag.dy) : null;
 
   const popupFolder = useMemo(
     () =>
@@ -627,6 +1364,7 @@ export default function Desktop({
     const x = Math.max(8, Math.min(e.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 16));
     const y = Math.max(8, Math.min(e.clientY, window.innerHeight - 360));
     setSubmenuOpen(false);
+    setFolderPopup(null);
     setContextMenu({ x, y, target: { kind: "desktop" } });
   };
 
@@ -654,7 +1392,7 @@ export default function Desktop({
         left: `${contextMenu!.x}px`,
         width: `${CONTEXT_MENU_WIDTH}px`,
         ...acrylicSurfaceStyle,
-        borderRadius: "8px",
+        borderRadius: "var(--w11-radius-lg)",
         padding: "6px",
         zIndex: 9999,
         fontSize: "12px",
@@ -751,7 +1489,7 @@ export default function Desktop({
                   ? { left: "calc(100% + 4px)" }
                   : { right: "calc(100% + 4px)" }),
                 ...acrylicSurfaceStyle,
-                borderRadius: "8px",
+                borderRadius: "var(--w11-radius-lg)",
                 padding: "6px",
                 fontSize: "12px",
                 boxShadow: "0 14px 35px rgba(0, 0, 0, 0.4)",
@@ -1005,8 +1743,9 @@ export default function Desktop({
                             alignItems: "center",
                             gap: "10px",
                             padding: "4px 8px",
-                            borderRadius: "6px",
+                            borderRadius: "var(--w11-radius-sm)",
                             cursor: "pointer",
+                            transition: "background var(--w11-transition-fast)",
                             background: checked
                               ? "var(--w11-accent-light, rgba(0, 120, 212, 0.12))"
                               : "transparent",
@@ -1023,7 +1762,6 @@ export default function Desktop({
                                   : [...dialog.selected, app.id],
                               })
                             }
-                            style={{ width: 16, height: 16, accentColor: "var(--w11-accent)" }}
                           />
                           {app.icon}
                           <span
@@ -1110,6 +1848,24 @@ export default function Desktop({
     );
   };
 
+  // Shared per-tile drag props (position via transform for smooth snapping).
+  const tilePointerHandlers = (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => handleTilePointerDown(e, id),
+    onPointerMove: handleTilePointerMove,
+    onPointerUp: handleTilePointerUp,
+    onPointerCancel: handleTilePointerUp,
+  });
+
+  const tileTransform = (id: string): React.CSSProperties => {
+    const pos = tilePositions[id] ?? { col: 0, row: 0 };
+    const isDragging = drag?.id === id && drag.moved;
+    const x = pos.col * GRID_STEP + (isDragging ? drag!.dx : 0);
+    const y = pos.row * GRID_STEP + (isDragging ? drag!.dy : 0);
+    return {
+      transform: `translate3d(${x}px, ${y}px, 0)${isDragging ? " scale(1.05)" : ""}`,
+    };
+  };
+
   return (
     <div
       ref={desktopRef}
@@ -1141,22 +1897,40 @@ export default function Desktop({
         }}
       />
 
-      {/* Desktop Shortcut Icons Container */}
+      {/* Desktop Shortcut Icons — absolutely positioned grid canvas.
+          The container is a zero-size origin point so it never intercepts
+          pointer events (marquee selection still starts on the desktop). */}
       <div
         style={{
           position: "absolute",
-          top: showTopBar ? "42px" : "16px",
-          left: "16px",
-          bottom: "100px",
-          maxHeight: showTopBar ? "calc(100vh - 146px)" : "calc(100vh - 116px)",
-          display: "flex",
-          flexDirection: "column",
-          flexWrap: "wrap",
-          alignContent: "flex-start",
-          gap: "8px 14px",
+          top: `${canvasTop}px`,
+          left: `${CANVAS_LEFT}px`,
+          width: 0,
+          height: 0,
           zIndex: 5,
         }}
       >
+        {/* Drop-target preview (snapped cell under the dragged tile) */}
+        {dragPreviewCell && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: `${TILE_SIZE}px`,
+              height: `${TILE_SIZE}px`,
+              borderRadius: "var(--w11-radius-lg)",
+              border: "2px solid var(--w11-accent, #0078d4)",
+              background: "color-mix(in srgb, var(--w11-accent, #0078d4) 18%, transparent)",
+              transform: `translate3d(${dragPreviewCell.col * GRID_STEP}px, ${
+                dragPreviewCell.row * GRID_STEP
+              }px, 0)`,
+              transition: "transform var(--w11-transition-fast)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
         {/* Folder icons render first, before loose apps */}
         {folderMode &&
           (resolvedFolders ?? []).map((folder) => (
@@ -1165,6 +1939,10 @@ export default function Desktop({
               selected={selectedIcon === folder.id}
               onClick={(e) => {
                 e.stopPropagation();
+                if (suppressClickRef.current) {
+                  suppressClickRef.current = false;
+                  return;
+                }
                 setSelectedIcon(folder.id);
                 setContextMenu(null);
               }}
@@ -1175,6 +1953,9 @@ export default function Desktop({
               onContextMenu={(e) => openContextMenu(e, { kind: "folder", folderId: folder.id })}
               icon={<FolderTile name={folder.name} />}
               label={folder.name}
+              dragging={drag?.id === folder.id && drag.moved}
+              style={tileTransform(folder.id)}
+              {...tilePointerHandlers(folder.id)}
             />
           ))}
 
@@ -1186,6 +1967,10 @@ export default function Desktop({
               selected={isSelected}
               onClick={(e) => {
                 e.stopPropagation();
+                if (suppressClickRef.current) {
+                  suppressClickRef.current = false;
+                  return;
+                }
                 setSelectedIcon(item.id);
                 setContextMenu(null);
               }}
@@ -1205,6 +1990,9 @@ export default function Desktop({
               }}
               icon={item.icon}
               label={item.name}
+              dragging={drag?.id === item.id && drag.moved}
+              style={tileTransform(item.id)}
+              {...tilePointerHandlers(item.id)}
             />
           );
         })}
@@ -1215,7 +2003,10 @@ export default function Desktop({
       {widgetsVisible && (
         <DesktopWidgetColumn
           role={currentRole}
+          installedSlugs={installedSlugs}
           top={showTopBar ? "94px" : "60px"}
+          widgetLayout={liveLayout.widgetLayout}
+          onUpdateWidgetLayout={commitWidgetLayout}
         />
       )}
 
@@ -1235,7 +2026,7 @@ export default function Desktop({
           right: "16px",
           width: "32px",
           height: "32px",
-          borderRadius: "50%",
+          borderRadius: "var(--w11-radius-full)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1244,7 +2035,14 @@ export default function Desktop({
           ...acrylicSurfaceStyle,
           boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
           color: widgetsVisible ? "var(--w11-accent, #0078d4)" : "var(--w11-text-secondary, rgba(255,255,255,0.65))",
+          transition:
+            "background var(--w11-transition-fast), color var(--w11-transition-fast)",
         }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor =
+            "var(--w11-control-hover, rgba(255,255,255,0.08))")
+        }
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
       >
         <LayoutGrid size={15} />
       </button>
@@ -1257,9 +2055,9 @@ export default function Desktop({
         <div
           style={{
             position: "absolute",
-            border: "1px solid rgba(0, 120, 212, 0.8)",
-            background: "rgba(0, 120, 212, 0.25)",
-            borderRadius: "2px",
+            border: "1px solid var(--w11-accent)",
+            background: "var(--w11-accent-light)",
+            borderRadius: "var(--w11-radius-sm)",
             pointerEvents: "none",
             zIndex: 900,
             ...getBoxStyles(),
@@ -1287,7 +2085,7 @@ export default function Desktop({
               width: "300px",
               maxWidth: "340px",
               ...acrylicSurfaceStyle,
-              borderRadius: "12px",
+              borderRadius: "var(--w11-radius-lg)",
               boxShadow: "0 18px 45px rgba(0, 0, 0, 0.4)",
               padding: "10px",
               zIndex: 10020,
@@ -1300,7 +2098,7 @@ export default function Desktop({
                 alignItems: "center",
                 gap: "10px",
                 padding: "2px 6px 10px",
-                borderBottom: "1px solid var(--w11-control-border, rgba(255,255,255,0.08))",
+                borderBottom: "1px solid var(--w11-border-subtle, rgba(255,255,255,0.08))",
                 marginBottom: "6px",
               }}
             >
@@ -1336,8 +2134,9 @@ export default function Desktop({
                     alignItems: "center",
                     gap: "10px",
                     padding: "4px 8px",
-                    borderRadius: "8px",
+                    borderRadius: "var(--w11-radius-sm)",
                     cursor: "pointer",
+                    transition: "background var(--w11-transition-fast)",
                   }}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.backgroundColor =
