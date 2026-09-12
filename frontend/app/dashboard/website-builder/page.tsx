@@ -7,7 +7,10 @@ import { PluginGate } from "@/lib/plugins";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteUrl } from "@/lib/site-domain";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, Rocket } from "lucide-react";
+import { Globe, ExternalLink, Rocket, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   AOSPage,
   AOSPageHeader,
@@ -17,6 +20,18 @@ import {
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+
+// Quick links — every website_builder manifest subitem plus the Custom
+// Domain surface (frontend route).
+const QUICK_LINKS = [
+  { label: "Themes", desc: "Browse 20 beautiful themes. 5 free, 15 pro.", icon: "Palette", href: "/dashboard/website-builder/themes" },
+  { label: "Pages", desc: "Add, edit, or rearrange your website pages.", icon: "FileText", href: "/dashboard/website-builder/pages" },
+  { label: "AI Builder", desc: "Describe your ideal website and AI builds it.", icon: "Sparkles", href: "/dashboard/website-builder/ai-builder" },
+  { label: "Section Editor", desc: "Drag & drop sections on each page.", icon: "Layers", href: "/dashboard/website-builder/editor" },
+  { label: "Custom Domain", desc: "Connect your own domain name.", icon: "Globe", href: "/dashboard/website-builder/domain" },
+  { label: "SEO Settings", desc: "Optimize your site for search engines.", icon: "TrendingUp", href: "/dashboard/website-builder/seo" },
+  { label: "Website Settings", desc: "Global site configuration.", icon: "Settings", href: "/dashboard/settings/website-design" },
+];
 
 interface WebsiteStatus {
   is_published: boolean;
@@ -153,74 +168,44 @@ function WebsiteBuilderContent() {
           <KpiCard label="Domain" value={status?.custom_domain || "Default"} icon={<span>🔗</span>} />
         </StatGrid>
 
-        {/* Navigation Cards */}
+        {/* Quick Links — every subpage, 44px gradient tile + label 13px/600 */}
         <h2 className="text-lg font-semibold mt-4 mb-3" style={{ color: "var(--w11-text-primary)" }}>
           Manage Your Website
         </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NavCard
-            href="/dashboard/website-builder/themes"
-            icon="🎨"
-            title="Themes"
-            description="Browse 20 beautiful themes. 5 free, 15 pro."
-          />
-          <NavCard
-            href="/dashboard/website-builder/pages"
-            icon="📄"
-            title="Pages"
-            description="Add, edit, or rearrange your website pages."
-          />
-          <NavCard
-            href="/dashboard/website-builder/ai-builder"
-            icon="🤖"
-            title="AI Builder"
-            description="Describe your ideal website and AI builds it."
-          />
-          <NavCard
-            href="/dashboard/website-builder/editor"
-            icon="✏️"
-            title="Section Editor"
-            description="Drag & drop sections on each page."
-          />
-          <NavCard
-            href="/dashboard/website-builder/domain"
-            icon="🌐"
-            title="Custom Domain"
-            description="Connect your own domain name."
-          />
-          <NavCard
-            href="/dashboard/website-builder/seo"
-            icon="🔍"
-            title="SEO Settings"
-            description="Optimize your site for search engines."
-          />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {QUICK_LINKS.map((l) => {
+            const Icon = ICON_MAP[l.icon] || ChevronRight;
+            return (
+              <Link key={l.href} href={l.href} className="block h-full">
+                <div
+                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                  style={{ cursor: "pointer", marginBottom: 0 }}
+                >
+                  <div
+                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: SECTION_GRADIENTS["Design & Web"],
+                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                      {l.label}
+                    </p>
+                    <p className="text-[11px] leading-snug" style={{ color: "var(--w11-text-secondary)" }}>
+                      {l.desc}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </AOSPageBody>
     </AOSPage>
-  );
-}
-
-function NavCard({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <a href={href} className="win11-card block hover:shadow-md transition-all group">
-      <span className="text-3xl">{icon}</span>
-      <h3
-        className="font-semibold mt-2 group-hover:underline"
-        style={{ color: "var(--w11-text-primary)" }}
-      >
-        {title}
-      </h3>
-      <p className="text-sm mt-1" style={{ color: "var(--w11-text-secondary)" }}>{description}</p>
-    </a>
   );
 }

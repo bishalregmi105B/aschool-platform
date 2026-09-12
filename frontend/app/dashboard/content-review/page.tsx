@@ -2,20 +2,32 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, CheckCircle2, Flag, Send } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Flag, Send, ChevronRight, Layers as LayersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   StatusChip,
 } from "@/components/aos/kit/page-kit";
+
+// Quick links — the AI surfaces that consume what this gate publishes.
+const QUICK_LINKS = [
+  { label: "AI Tools Hub", icon: "Sparkles", href: "/dashboard/ai-tools" },
+  { label: "AI Workbench", icon: "Layers", href: "/dashboard/ai-workbench" },
+  { label: "Teaching Content", icon: "BookOpen", href: "/dashboard/teaching-content" },
+];
 
 interface ContentSource {
   id: string;
@@ -152,6 +164,16 @@ export default function ContentReviewPage() {
     },
   ];
 
+  // KPIs — client-computed counts over the sources list this page loads.
+  const sourceList = sources ?? [];
+  const kpis = [
+    { label: "Sources", value: sourceList.length, color: "var(--w11-accent)", icon: <BookOpen className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> },
+    { label: "Published", value: sourceList.filter((s) => s.ingest_status === "published").length, color: "#107c10", icon: <CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} /> },
+    { label: "Awaiting Review", value: sourceList.filter((s) => s.ingest_status !== "published").length, color: "#d83b01", icon: <Flag className="h-4 w-4" style={{ color: "#d83b01" }} /> },
+    { label: "Units Staged", value: sourceList.reduce((a, s) => a + (s.unit_count || 0), 0), color: "var(--w11-text-primary)", icon: <LayersIcon className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+    { label: "Pages Ingested", value: sourceList.reduce((a, s) => a + (s.page_count || 0), 0), color: "var(--w11-text-primary)", icon: <Send className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+  ];
+
   return (
     <AOSPage>
       <AOSPageHeader
@@ -175,22 +197,61 @@ export default function ContentReviewPage() {
       />
       <AOSPageBody>
         {!selected && (
-          <DataPanel bodyClassName="p-0 pt-0">
-            {isLoading ? (
-              <div className="p-4"><PageLoader /></div>
-            ) : (
-              <DataTable
-                columns={columns}
-                rows={sources ?? []}
-                rowKey={(s) => s.id}
-                empty={{
-                  icon: BookOpen,
-                  title: "Nothing ingested yet",
-                  body: "Run the content loader on a staged book folder to see it here.",
-                }}
-              />
-            )}
-          </DataPanel>
+          <>
+            {/* Dashboard — KPI stat grid */}
+            <StatGrid>
+              {kpis.map((k) => (
+                <KpiCard key={k.label} label={k.label} value={k.value} color={k.color} icon={k.icon} />
+              ))}
+            </StatGrid>
+
+            {/* Quick links — 44px gradient icon tile + label, as next/link */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              {QUICK_LINKS.map((l) => {
+                const Icon = ICON_MAP[l.icon] || ChevronRight;
+                return (
+                  <Link key={l.href} href={l.href} className="block h-full">
+                    <div
+                      className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                      style={{ cursor: "pointer", marginBottom: 0 }}
+                    >
+                      <div
+                        className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          background: SECTION_GRADIENTS.Insights,
+                          boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                        }}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                        {l.label}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <DataPanel bodyClassName="p-0 pt-0">
+              {isLoading ? (
+                <div className="p-4"><PageLoader /></div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  rows={sources ?? []}
+                  rowKey={(s) => s.id}
+                  empty={{
+                    icon: BookOpen,
+                    title: "Nothing ingested yet",
+                    body: "Run the content loader on a staged book folder to see it here.",
+                  }}
+                />
+              )}
+            </DataPanel>
+          </>
         )}
 
         {selected && detail && (

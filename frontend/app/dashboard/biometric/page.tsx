@@ -14,6 +14,7 @@ import {
   AOSEmptyState,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { Fingerprint, Monitor, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
 
@@ -72,6 +73,15 @@ function BiometricContent() {
             <KpiCard key={s.label} label={s.label} value={s.value} icon={s.icon} color={s.color} />
           ))}
         </StatGrid>
+
+        {/* Quick links — every biometric subpage from the plugin manifest */}
+        <QuickLinks
+          section="Operations"
+          links={[
+            { label: "Devices", href: "/dashboard/biometric/devices", icon: "Fingerprint" },
+            { label: "Sync Logs", href: "/dashboard/biometric/logs", icon: "Database" },
+          ]}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {devices.length === 0 ? (

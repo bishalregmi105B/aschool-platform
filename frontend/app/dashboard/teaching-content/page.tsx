@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Plus } from "lucide-react";
+import { ArrowLeft, BookOpen, ClipboardCheck, Layers, PenTool, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,8 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   StatusChip,
 } from "@/components/aos/kit/page-kit";
@@ -176,6 +178,32 @@ export default function TeachingContentPage() {
         }
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real counts from the data this page already loads */}
+        <StatGrid>
+          <KpiCard
+            label="Sections"
+            value={sections?.length ?? "—"}
+            icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Published"
+            value={sections ? sections.filter((s) => s.published_version_no).length : "—"}
+            color="#107c10"
+            icon={<ClipboardCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Drafts"
+            value={sections ? sections.filter((s) => !s.published_version_no).length : "—"}
+            color="#d83b01"
+            icon={<PenTool className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+          <KpiCard
+            label="Curriculum Units"
+            value={units?.length ?? "—"}
+            icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+        </StatGrid>
+
         <DataPanel bodyClassName="p-0 pt-0">
           {isLoading ? (
             <PageLoader />

@@ -33,8 +33,13 @@ import {
   Users,
   BarChart3,
   CalendarOff,
+  Layers,
+  TrendingUp,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { MarkHolidayDialog } from "@/components/attendance/mark-holiday-dialog";
 import {
@@ -47,6 +52,16 @@ import {
   DataPanel,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+
+/** Module dashboard quick links — mirrors the attendance plugin manifest
+ * (backend/app/plugins/modules/attendance/manifest.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "Leave Requests", href: "/dashboard/attendance/leave-requests", icon: "ClipboardList" },
+  { label: "Subject Attendance", href: "/dashboard/attendance/subject", icon: "BookOpenCheck" },
+  { label: "Import Attendance", href: "/dashboard/attendance/import", icon: "Upload" },
+  { label: "Monthly Report", href: "/dashboard/attendance/reports", icon: "BarChart3" },
+  { label: "Holiday List", href: "/dashboard/attendance/holidays", icon: "CalendarDays" },
+];
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type AttendanceStatus = "present" | "absent" | "late" | "leave";
@@ -129,6 +144,18 @@ function AttendanceContent() {
 
   const selectedClass = (classes || []).find((c: any) => c.id === classId);
   const sections: any[] = selectedClass?.sections || [];
+
+  // ── School-wide overview (admins) — today/week/month rates for the KPI row
+  const { data: overview } = useQuery({
+    queryKey: ["attendance", "school-overview"],
+    queryFn: async () => {
+      const r = await api.get("/attendance/school-overview");
+      return r.data?.data;
+    },
+    enabled: isAdmin,
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   // ── Students ──────────────────────────────────────────────────────────────
   const { data: students, isLoading: studentsLoading } = useQuery({
@@ -305,6 +332,82 @@ function AttendanceContent() {
         }
       />
       <AOSPageBody>
+        {/* ── Module dashboard — school-wide KPIs + quick links ──────────── */}
+        <StatGrid min={170}>
+          <KpiCard
+            label={isTeacher ? "My Classes" : "Classes"}
+            value={(classes || []).length}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Sections"
+            value={(classes || []).reduce((sum: number, c: any) => sum + (c.sections?.length ?? 0), 0)}
+            color="var(--w11-text-primary)"
+            icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          {isAdmin && (
+            <>
+              <KpiCard
+                label="Attendance Today"
+                value={overview?.summary?.today_pct != null ? `${overview.summary.today_pct}%` : "—"}
+                color={
+                  overview?.summary?.today_pct == null ? "var(--w11-text-primary)"
+                    : overview.summary.today_pct >= 80 ? "#107c10"
+                    : overview.summary.today_pct >= 60 ? "#d83b01" : "#c42b1c"
+                }
+                icon={<CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              />
+              <KpiCard
+                label="This Week"
+                value={overview?.summary?.week_pct != null ? `${overview.summary.week_pct}%` : "—"}
+                color="var(--w11-text-primary)"
+                icon={<BarChart3 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              />
+              <KpiCard
+                label="This Month"
+                value={overview?.summary?.month_pct != null ? `${overview.summary.month_pct}%` : "—"}
+                color="var(--w11-text-primary)"
+                icon={<TrendingUp className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              />
+            </>
+          )}
+        </StatGrid>
+
+        <DataPanel title="Attendance Quick Links" bodyClassName="p-3" className="mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", margin: 0 }}
+                  >
+                    <div
+                      className="flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        background: SECTION_GRADIENTS.Academics,
+                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon size={22} strokeWidth={2.2} />
+                    </div>
+                    <span
+                      className="text-[13px] font-semibold leading-tight"
+                      style={{ color: "var(--w11-text-primary)" }}
+                    >
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </DataPanel>
+
         {/* ── Filter Row ─────────────────────────────────────────────────── */}
         <FilterCommandBar>
           <div className="space-y-1">

@@ -13,6 +13,7 @@ import { PluginGate } from "@/lib/plugins";
 import { AiResultView } from "@/components/ai/ai-result-view";
 import { api, type ApiResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Sparkles,
   ShieldCheck,
@@ -23,13 +24,18 @@ import {
   GraduationCap,
   FlaskConical,
   Layers3,
+  ChevronRight,
 } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 
 interface WorkbenchTool {
   tool_key: string;
@@ -282,8 +288,27 @@ function Catalog({ onOpen }: { onOpen: (t: WorkbenchTool) => void }) {
   );
 }
 
+// Quick links — the ai_suite manifest subitems (Analytics, Benchmarking,
+// Reports) plus the parent AI Tools hub.
+const QUICK_LINKS = [
+  { label: "AI Tools Hub", icon: "Sparkles", href: "/dashboard/ai-tools" },
+  { label: "Analytics", icon: "BarChart3", href: "/dashboard/analytics" },
+  { label: "Benchmarking", icon: "TrendingUp", href: "/dashboard/benchmarking" },
+  { label: "Reports", icon: "FileBarChart2", href: "/dashboard/reports" },
+];
+
 function WorkbenchContent() {
   const [active, setActive] = useState<WorkbenchTool | null>(null);
+
+  // Hub KPIs — same query the Catalog renders (react-query dedupes).
+  const { data: catalog } = useQuery({
+    queryKey: ["ai-workbench-catalog"],
+    queryFn: () =>
+      api
+        .get<ApiResponse<{ tools: WorkbenchTool[] }>>("/ai/tools")
+        .then((r) => r.data.data),
+  });
+  const tools = (catalog?.tools ?? []).filter((t) => !t.is_fixture);
 
   return (
     <AOSPage>
@@ -296,7 +321,66 @@ function WorkbenchContent() {
         {active ? (
           <ToolRunner tool={active} onBack={() => setActive(null)} />
         ) : (
-          <Catalog onOpen={setActive} />
+          <>
+            {/* Dashboard — KPI stat grid from the live catalog */}
+            <StatGrid>
+              <KpiCard
+                label="Tools"
+                value={tools.length}
+                icon={<Sparkles className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+              />
+              <KpiCard
+                label="Generally Available"
+                value={tools.filter((t) => t.status === "ga").length}
+                color="#107c10"
+                icon={<ShieldCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
+              />
+              <KpiCard
+                label="Enabled"
+                value={tools.filter((t) => t.enabled).length}
+                color="var(--w11-text-primary)"
+                icon={<BookOpenCheck className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              />
+              <KpiCard
+                label="AI Suite Only"
+                value={tools.filter((t) => t.min_plan_tier !== "free").length}
+                color="#7c3aed"
+                icon={<FlaskConical className="h-4 w-4" style={{ color: "#7c3aed" }} />}
+              />
+            </StatGrid>
+
+            {/* Quick links — 44px gradient icon tile + label, as next/link */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {QUICK_LINKS.map((l) => {
+                const Icon = ICON_MAP[l.icon] || ChevronRight;
+                return (
+                  <Link key={l.href} href={l.href} className="block h-full">
+                    <div
+                      className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                      style={{ cursor: "pointer", marginBottom: 0 }}
+                    >
+                      <div
+                        className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          background: SECTION_GRADIENTS.Insights,
+                          boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                        }}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                        {l.label}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <Catalog onOpen={setActive} />
+          </>
         )}
       </AOSPageBody>
     </AOSPage>

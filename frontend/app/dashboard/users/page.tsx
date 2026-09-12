@@ -22,10 +22,12 @@ import {
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  StatGrid,
+  KpiCard,
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Plus, Users } from "lucide-react";
+import { Plus, UserCheck, UserX, Users } from "lucide-react";
 
 interface User {
   id: string;
@@ -56,6 +58,24 @@ export default function UsersPage() {
       return res.data;
     },
     retry: 1,
+  });
+
+  // Cheap count queries for the KPI row — per_page=1 so only the pagination
+  // totals are read, never the rows (unfiltered, so counts stay stable while
+  // the list below is searched/filtered).
+  const { data: totalCount } = useQuery({
+    queryKey: ["users", "count"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/users?per_page=1");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
+  });
+  const { data: activeCount } = useQuery({
+    queryKey: ["users", "count", "active"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/users?per_page=1&is_active=true");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
   });
 
   const toggleMutation = useMutation({
@@ -151,6 +171,28 @@ export default function UsersPage() {
         }
       />
       <AOSPageBody>
+        {/* Module dashboard — KPI row above the accounts table */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Total Accounts"
+            value={totalCount ?? "—"}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Active"
+            value={activeCount ?? "—"}
+            denominator={totalCount != null ? `/ ${totalCount}` : undefined}
+            color="#107c10"
+            icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Inactive"
+            value={totalCount != null && activeCount != null ? totalCount - activeCount : "—"}
+            color="#d83b01"
+            icon={<UserX className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+        </StatGrid>
+
         <DataPanel bodyClassName="p-0">
           <DataTable<User>
             columns={USER_COLUMNS}

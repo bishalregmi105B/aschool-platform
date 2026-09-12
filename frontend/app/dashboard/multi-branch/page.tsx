@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, TrendingUp, MapPin } from "lucide-react";
+import { Building2, Users, TrendingUp, MapPin, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   AOSPage,
   AOSPageHeader,
@@ -17,6 +19,14 @@ import {
   AOSModuleLoadingState,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+
+// Quick links — the multi_branch manifest subitems mapped to their
+// frontend routes.
+const QUICK_LINKS = [
+  { label: "Branches", desc: "Add and manage chain branches", icon: "Building2", href: "/dashboard/multi-branch/branches" },
+  { label: "Unified Dashboard", desc: "Cross-school overview in one place", icon: "LayoutDashboard", href: "/dashboard/multi-branch/dashboard" },
+  { label: "Chain Analytics", desc: "Compare performance across branches", icon: "BarChart3", href: "/dashboard/multi-branch/analytics" },
+];
 
 export default function MultiBranchPage() {
   return <PluginGate slug="multi_branch"><MultiBranchContent /></PluginGate>;
@@ -87,6 +97,41 @@ function MultiBranchContent() {
             icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
           />
         </StatGrid>
+
+        {/* Quick links — 44px gradient icon tile + label, as next/link */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          {QUICK_LINKS.map((l) => {
+            const Icon = ICON_MAP[l.icon] || ChevronRight;
+            return (
+              <Link key={l.href} href={l.href} className="block h-full">
+                <div
+                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                  style={{ cursor: "pointer", marginBottom: 0 }}
+                >
+                  <div
+                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: SECTION_GRADIENTS.Admin,
+                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                      {l.label}
+                    </p>
+                    <p className="text-[11px] leading-snug" style={{ color: "var(--w11-text-secondary)" }}>
+                      {l.desc}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {branches.length === 0 ? (

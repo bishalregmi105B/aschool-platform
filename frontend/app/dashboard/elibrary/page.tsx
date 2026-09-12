@@ -21,6 +21,7 @@ import {
   StatGrid,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 
 export default function ELibraryPage() {
   return <PluginGate slug="elibrary"><ELibraryContent /></PluginGate>;
@@ -114,6 +115,15 @@ function ELibraryContent() {
           <KpiCard label="E-Books" value={stats.ebooks || 0} />
           <KpiCard label="Journals" value={stats.journals || 0} />
         </StatGrid>
+
+        {/* Quick links — every e-library subpage from the plugin manifest */}
+        <QuickLinks
+          section="Learning"
+          links={[
+            { label: "Past Papers", href: "/dashboard/elibrary/past-papers", icon: "FileText" },
+            { label: "Upload", href: "/dashboard/elibrary/upload", icon: "Upload" },
+          ]}
+        />
 
         <DataPanel bodyClassName="p-0 pt-0">
           <DataTable

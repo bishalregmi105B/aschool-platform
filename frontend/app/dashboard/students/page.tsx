@@ -34,6 +34,8 @@ import {
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  StatGrid,
+  KpiCard,
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
@@ -44,7 +46,28 @@ import {
   Upload,
   ImagePlus,
   Users,
+  UserCheck,
+  BookOpen,
+  Layers,
+  ChevronRight,
 } from "lucide-react";
+import Link from "next/link";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+
+/** Module dashboard quick links — mirrors the students plugin manifest
+ * (backend/app/plugins/manifests/students.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "Add Student", href: "/dashboard/students/new", icon: "UserPlus" },
+  { label: "Bulk Import", href: "/dashboard/students/bulk-import", icon: "Upload" },
+  { label: "Parents & Guardians", href: "/dashboard/parents", icon: "Users" },
+  { label: "Admission Inquiries", href: "/dashboard/admission", icon: "ClipboardList" },
+  { label: "Assign Roll Numbers", href: "/dashboard/students/roll-numbers", icon: "ListOrdered" },
+  { label: "Upload Profile Images", href: "/dashboard/students/profile-images", icon: "ImagePlus" },
+  { label: "Transfer Student", href: "/dashboard/students/transfers", icon: "ArrowRightLeft" },
+  { label: "Promote Students", href: "/dashboard/students/promote", icon: "TrendingUp" },
+  { label: "Reset Password", href: "/dashboard/students/reset-password", icon: "KeyRound" },
+];
 
 const GRADES = [
   "ECD",
@@ -142,6 +165,23 @@ export default function StudentsPage() {
   }> = classesData || [];
   const selectedClass = classes.find((c) => c.id === filterClassId);
   const sections = selectedClass?.sections || [];
+
+  // Cheap count queries for the KPI row — per_page=1 so only the pagination
+  // totals are read, never the rows.
+  const { data: totalCount } = useQuery({
+    queryKey: ["students", "count"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/students?per_page=1");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
+  });
+  const { data: activeCount } = useQuery({
+    queryKey: ["students", "count", "active"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/students?per_page=1&status=active");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
+  });
 
   const {
     data,
@@ -381,6 +421,69 @@ export default function StudentsPage() {
         }
       />
       <AOSPageBody>
+        {/* Module dashboard — KPIs + quick links before the list */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Total Students"
+            value={totalCount ?? "—"}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Active"
+            value={activeCount ?? "—"}
+            denominator={totalCount != null ? `/ ${totalCount}` : undefined}
+            color="#107c10"
+            icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Classes"
+            value={classes.length}
+            icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+          <KpiCard
+            label="Sections"
+            value={classes.reduce((sum, c) => sum + (c.sections?.length ?? 0), 0)}
+            icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+        </StatGrid>
+
+        <DataPanel title="Students Quick Links" bodyClassName="p-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", margin: 0 }}
+                  >
+                    <div
+                      className="flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        background: SECTION_GRADIENTS.Core,
+                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon size={22} strokeWidth={2.2} />
+                    </div>
+                    <span
+                      className="text-[13px] font-semibold leading-tight"
+                      style={{ color: "var(--w11-text-primary)" }}
+                    >
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </DataPanel>
+
         {/* Students table — one component for selection, sort, pagination,
             export; row click opens the detail drawer (no full-page hop). */}
         <DataPanel bodyClassName="p-0">

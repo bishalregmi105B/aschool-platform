@@ -40,6 +40,8 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
@@ -52,6 +54,7 @@ import {
   History,
   Eye,
   Download,
+  ChevronRight,
 } from "lucide-react";
 import { FilePicker } from "@/components/files/FilePicker";
 import {
@@ -59,6 +62,9 @@ import {
   type ManagedFile,
 } from "@/lib/services/files.service";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -75,6 +81,13 @@ const FORMAT_LABELS: Record<string, string> = {
   school_level: "School Level Report",
 };
 
+// Quick links — the iemis_importer manifest ui.nav.subitems.
+const QUICK_LINKS = [
+  { label: "Import Students", desc: "Student Name-wise Report", icon: "Users", href: "/dashboard/iemis-import?format=student_namewise" },
+  { label: "Import School Data", desc: "School Level Report", icon: "Building2", href: "/dashboard/iemis-import?format=school_level" },
+  { label: "Import History", desc: "Every past import run", icon: "History", href: "/dashboard/iemis-import/history" },
+];
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function IemisImportPage() {
@@ -86,7 +99,11 @@ export default function IemisImportPage() {
 }
 
 function IemisImportContent() {
-  const [selectedFormat, setSelectedFormat] = useState<string>("");
+  const searchParams = useSearchParams();
+  const initialFormat = searchParams.get("format") || "";
+  const [selectedFormat, setSelectedFormat] = useState<string>(
+    initialFormat === "student_namewise" || initialFormat === "school_level" ? initialFormat : "",
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
@@ -191,6 +208,68 @@ function IemisImportContent() {
       />
       <AOSPageBody>
         <div className="max-w-5xl w-full mx-auto">
+          {/* Dashboard — KPI stat grid from the import history this page loads */}
+          <StatGrid>
+            <KpiCard
+              label="Imports Run"
+              value={(historyData || []).length}
+              icon={<FileSpreadsheet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+            />
+            <KpiCard
+              label="Completed"
+              value={(historyData || []).filter((l) => l.status === "completed").length}
+              color="#107c10"
+              icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
+            />
+            <KpiCard
+              label="Needs Attention"
+              value={(historyData || []).filter((l) => l.status === "failed" || l.status === "partial" || l.status === "processing").length}
+              color="#d83b01"
+              icon={<AlertTriangle className="h-4 w-4" style={{ color: "#d83b01" }} />}
+            />
+            <KpiCard
+              label="Rows Imported"
+              value={(historyData || []).reduce((a, l) => a + (l.imported_rows || 0), 0)}
+              color="var(--w11-text-primary)"
+              icon={<Upload className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            />
+          </StatGrid>
+
+          {/* Quick links — 44px gradient icon tile + label, as next/link */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] || ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", marginBottom: 0 }}
+                  >
+                    <div
+                      className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        background: SECTION_GRADIENTS.Operations,
+                        boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                        {l.label}
+                      </p>
+                      <p className="text-[11px] leading-snug" style={{ color: "var(--w11-text-secondary)" }}>
+                        {l.desc}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
           <Tabs defaultValue="import">
             <TabsList>
               <TabsTrigger value="import">Import Data</TabsTrigger>

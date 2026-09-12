@@ -14,11 +14,13 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   AOSEmptyState,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { AlertTriangle, Send, Siren, Shield, Phone } from "lucide-react";
+import { AlertTriangle, Layers, MapPin, Send, Siren, Shield, Phone } from "lucide-react";
 
 export default function EmergencyPage() {
   return <PluginGate slug="emergency"><EmergencyContent /></PluginGate>;
@@ -85,6 +87,31 @@ function EmergencyContent() {
         subtitle={`${plans.length} evacuation ${plans.length === 1 ? "plan" : "plans"} · emergency alerts and disaster preparedness`}
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real counts from the loaded evacuation plans */}
+        <StatGrid>
+          <KpiCard
+            label="Evacuation Plans"
+            value={plans.length}
+            color="#c42b1c"
+            icon={<Siren className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+          />
+          <KpiCard
+            label="Emergency Types"
+            value={new Set(plans.map((p: any) => p.emergency_type).filter(Boolean)).size}
+            icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Assembly Points"
+            value={plans.reduce(
+              (n: number, p: any) =>
+                n + (Array.isArray(p.assembly_points) ? p.assembly_points.length : p.assembly_points ? 1 : 0),
+              0,
+            )}
+            color="#107c10"
+            icon={<MapPin className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+        </StatGrid>
+
         <DataPanel
           className="mb-4"
           title={

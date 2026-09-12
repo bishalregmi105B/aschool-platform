@@ -47,10 +47,15 @@ import {
   AOSPageBody,
   DataPanel,
   FormSection,
+  StatGrid,
+  KpiCard,
 } from "@/components/aos/kit/page-kit";
 import {
   BookMarked,
   BookOpen,
+  CalendarRange,
+  ChevronRight,
+  Layers,
   Link2,
   Pencil,
   Plus,
@@ -58,6 +63,17 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+
+/** Module dashboard quick links — mirrors the academics plugin manifest
+ * (backend/app/plugins/modules/academics/manifest.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "Classes", href: "/dashboard/academics/classes", icon: "Users" },
+  { label: "Class Sections", href: "/dashboard/academics/class-sections", icon: "Layers" },
+  { label: "Subjects", href: "/dashboard/academics/subjects", icon: "BookMarked" },
+  { label: "Academic Year", href: "/dashboard/academics/year", icon: "CalendarRange" },
+];
 
 type AcademicsTab = "years" | "classes" | "subjects";
 
@@ -194,14 +210,99 @@ export default function AcademicsPage() {
     setTab(getDefaultTab(pathname));
   }, [pathname]);
 
+  // Dashboard KPI queries — same query keys as the tabs below, so the counts
+  // double as pre-warmed tab data (no extra fetches beyond what tabs load).
+  const { data: yearsData, isLoading: yearsLoading } = useQuery({
+    queryKey: ["academic-years"],
+    queryFn: fetchAcademicYears,
+  });
+  const { data: classesData, isLoading: classesLoading } = useQuery({
+    queryKey: ["classes"],
+    queryFn: fetchClasses,
+  });
+  const { data: subjectsData, isLoading: subjectsLoading } = useQuery({
+    queryKey: ["subjects"],
+    queryFn: fetchSubjects,
+  });
+
+  const years = yearsData || [];
+  const classes = classesData || [];
+  const subjects = subjectsData || [];
+  const currentYear = years.find((y) => y.is_current);
+  const sectionsCount = classes.reduce((sum, c) => sum + (c.sections?.length ?? 0), 0);
+
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Academics"
-        subtitle="Manage academic years, classes, sections, subjects, and assignments"
+        subtitle={`${classes.length} classes · ${sectionsCount} sections · ${subjects.length} subjects · ${years.length} academic years`}
       />
       <AOSPageBody>
+        {/* Module dashboard — KPIs + quick links before the tabs */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Academic Years"
+            value={yearsLoading ? "—" : years.length}
+            icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Current Year"
+            value={currentYear?.name ?? "—"}
+            footnote={currentYear ? "set as current" : "none marked current"}
+            icon={<CalendarRange className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+          <KpiCard
+            label="Classes"
+            value={classesLoading ? "—" : classes.length}
+            denominator={`/ ${sectionsCount} sections`}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+          <KpiCard
+            label="Subjects"
+            value={subjectsLoading ? "—" : subjects.length}
+            icon={<BookMarked className="h-4 w-4" style={{ color: "#107c10" }} />}
+            color="#107c10"
+          />
+        </StatGrid>
+
+        <DataPanel title="Academics Quick Links" bodyClassName="p-3" className="mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", margin: 0 }}
+                  >
+                    <div
+                      className="flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        background: SECTION_GRADIENTS.Academics,
+                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon size={22} strokeWidth={2.2} />
+                    </div>
+                    <span
+                      className="text-[13px] font-semibold leading-tight"
+                      style={{ color: "var(--w11-text-primary)" }}
+                    >
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </DataPanel>
+
         {/* Fluent pivot tabs */}
         <div className="flex gap-1 mb-4 border-b border-[var(--w11-border-subtle)]">
           {[

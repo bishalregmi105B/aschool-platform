@@ -23,10 +23,14 @@ import {
   FilterCommandBar,
   DataPanel,
   FormSection,
+  StatGrid,
+  KpiCard,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
-import { Calendar, Wand2, Plus, Trash2 } from "lucide-react";
+import { Calendar, CalendarDays, Clock, Layers, Wand2, Plus, Trash2, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 
 interface TimetableSlot {
   id: string;
@@ -43,6 +47,12 @@ interface TimetableSlot {
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+/** Module dashboard quick links — mirrors the timetable plugin manifest
+ * (backend/app/plugins/modules/timetable/manifest.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "AI Generate", href: "/dashboard/timetable/generate", icon: "Sparkles" },
+];
 
 export default function TimetablePage() {
   return (
@@ -100,6 +110,16 @@ function TimetableContent() {
 
   const maxPeriods = Math.max(8, ...Object.values(grouped).map((arr: any) => arr.length));
 
+  // Dashboard KPIs — derived from the queries this page already runs
+  // (classes list + the selected class's slots).
+  const classesCount = classes?.length ?? 0;
+  const sectionsCount = (classes || []).reduce((sum, c) => sum + (c.sections?.length ?? 0), 0);
+  // Saturday (6) sits outside the six-day school week — no periods today.
+  const todayName = new Date().getDay() < DAYS.length ? DAYS[new Date().getDay()] : null;
+  const periodsToday = todayName
+    ? (slots?.filter((s: any) => s.day_of_week === todayName).length ?? 0)
+    : 0;
+
   return (
     <AOSPage>
       <AOSPageHeader
@@ -120,6 +140,70 @@ function TimetableContent() {
         }
       />
       <AOSPageBody>
+        {/* Module dashboard — KPIs + quick links before the timetable grid */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Classes"
+            value={classesCount}
+            icon={<Calendar className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Sections"
+            value={sectionsCount}
+            color="var(--w11-text-primary)"
+            icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          <KpiCard
+            label="Weekly Slots"
+            value={!classId ? "—" : slots ? slots.length : "—"}
+            footnote={classId ? `${selectedClass?.name ?? "Class"}${sectionId ? ` · ${selectedClass?.sections?.find((s: any) => s.id === sectionId)?.name ?? ""}` : " · all sections"}` : "select a class below"}
+            icon={<Clock className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+          <KpiCard
+            label="Periods Today"
+            value={classId && slots ? periodsToday : "—"}
+            footnote={todayName ?? "Saturday — school closed"}
+            icon={<CalendarDays className="h-4 w-4" style={{ color: "#107c10" }} />}
+            color="#107c10"
+          />
+        </StatGrid>
+
+        <DataPanel title="Timetable Quick Links" bodyClassName="p-3" className="mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", margin: 0 }}
+                  >
+                    <div
+                      className="flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        background: SECTION_GRADIENTS.Academics,
+                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon size={22} strokeWidth={2.2} />
+                    </div>
+                    <span
+                      className="text-[13px] font-semibold leading-tight"
+                      style={{ color: "var(--w11-text-primary)" }}
+                    >
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </DataPanel>
+
         <FilterCommandBar>
           <Select value={classId} onValueChange={(v) => { setClassId(v); setSectionId(""); }}>
             <SelectTrigger className="w-48"><SelectValue placeholder="Select Class" /></SelectTrigger>

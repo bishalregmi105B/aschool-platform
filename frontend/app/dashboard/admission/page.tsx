@@ -29,7 +29,17 @@ import {
   KpiCard,
   FormSection,
 } from "@/components/aos/kit/page-kit";
-import { PlusCircle, UserPlus, BarChart3, Eye, LayoutDashboard } from "lucide-react";
+import { PlusCircle, UserPlus, BarChart3, Eye, LayoutDashboard, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+
+/** Module dashboard quick links — mirrors the admission plugin manifest
+ * (backend/app/plugins/modules/admission/manifest.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "Online Applications", href: "/dashboard/admission/registrations", icon: "FileText" },
+  { label: "Seat Caps", href: "/dashboard/admission/seats", icon: "ListOrdered" },
+];
 
 interface Inquiry {
   id: string;
@@ -515,6 +525,42 @@ function AdmissionContent() {
                 />
               ))}
             </StatGrid>
+
+            {/* Module dashboard quick links */}
+            <DataPanel title="Admission Quick Links" bodyClassName="p-3" className="mb-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {QUICK_LINKS.map((l) => {
+                  const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+                  return (
+                    <Link key={l.href} href={l.href} className="block h-full">
+                      <div
+                        className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                        style={{ cursor: "pointer", margin: 0 }}
+                      >
+                        <div
+                          className="flex items-center justify-center text-white shrink-0"
+                          style={{
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "10px",
+                            background: SECTION_GRADIENTS.Money,
+                            boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                          }}
+                        >
+                          <Icon size={22} strokeWidth={2.2} />
+                        </div>
+                        <span
+                          className="text-[13px] font-semibold leading-tight"
+                          style={{ color: "var(--w11-text-primary)" }}
+                        >
+                          {l.label}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </DataPanel>
           </div>
         )}
 

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Award, BadgeCheck, Plus, Search, Star, Trophy, Loader2, X } from "lucide-react";
+import { Award, BadgeCheck, Plus, Search, Star, Trophy, Users, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
@@ -13,6 +13,8 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   FilterCommandBar,
   DataPanel,
   AOSEmptyState,
@@ -209,6 +211,32 @@ function PortfolioContent() {
         }
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real counts from the data this page already loads */}
+        <StatGrid>
+          <KpiCard
+            label="Students"
+            value={students?.length ?? "—"}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Achievements"
+            value={selectedStudentId ? (items?.length ?? "—") : "—"}
+            footnote={selectedStudent ? `for ${selectedStudent.first_name} ${selectedStudent.last_name}` : "select a student"}
+            color="#107c10"
+            icon={<Trophy className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Micro-credentials"
+            value={selectedStudentId ? (credentials?.length ?? "—") : "—"}
+            icon={<BadgeCheck className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Categories"
+            value={selectedStudentId && items ? Object.keys(grouped).length : "—"}
+            icon={<Star className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+        </StatGrid>
+
         {/* Student selector + Search */}
         <FilterCommandBar>
           <AdvancedSelect

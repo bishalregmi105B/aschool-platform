@@ -14,7 +14,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Shield, AlertTriangle, Map, Calendar, Bell } from "lucide-react";
-import Link from "next/link";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function DisasterPage() {
@@ -56,49 +56,45 @@ function DisasterContent() {
         subtitle={`Earthquake alerts, evacuation plans, and drill scheduling · readiness ${stats.readiness_score ?? "—"}/100`}
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real numbers from the /emergency/disaster/overview stats */}
         <StatGrid>
-          <div className="win11-card" style={{ borderTop: "2px solid #d83b01" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <Map className="h-6 w-6" style={{ color: "#d83b01" }} />
-              <div>
-                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Evacuation Plans</p>
-                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.total_plans ?? "—"}</p>
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/plans">Manage Plans</Link></Button>
-          </div>
-          <div className="win11-card" style={{ borderTop: "2px solid var(--w11-accent)" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <Calendar className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
-              <div>
-                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Drills This Year</p>
-                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.drills_this_year ?? "—"}</p>
-                {stats.last_drill_at && <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>Last: {displayBS(stats.last_drill_at)}</p>}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/drills">Schedule Drills</Link></Button>
-          </div>
-          <div className="win11-card" style={{ borderTop: "2px solid #c42b1c" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <Bell className="h-6 w-6" style={{ color: "#c42b1c" }} />
-              <div>
-                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Active Alerts</p>
-                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.active_alerts ?? "—"}</p>
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="w-full" asChild><Link href="/dashboard/disaster/alerts">View Alerts</Link></Button>
-          </div>
-          <div className="win11-card" style={{ borderTop: "2px solid #107c10" }}>
-            <div className="flex items-center gap-3 mb-3">
-              <Shield className="h-6 w-6" style={{ color: "#107c10" }} />
-              <div>
-                <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Readiness Score</p>
-                <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{stats.readiness_score ?? "—"}<span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>/100</span></p>
-              </div>
-            </div>
-            <p className="text-xs mt-3" style={{ color: "var(--w11-text-secondary)" }}>Drill recency, frequency, evacuation plans &amp; alert hygiene</p>
-          </div>
+          <KpiCard
+            label="Evacuation Plans"
+            value={stats.total_plans ?? "—"}
+            color="#d83b01"
+            icon={<Map className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+          <KpiCard
+            label="Drills This Year"
+            value={stats.drills_this_year ?? "—"}
+            icon={<Calendar className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+            footnote={stats.last_drill_at ? `Last: ${displayBS(stats.last_drill_at)}` : undefined}
+          />
+          <KpiCard
+            label="Active Alerts"
+            value={stats.active_alerts ?? "—"}
+            color="#c42b1c"
+            icon={<Bell className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+          />
+          <KpiCard
+            label="Readiness Score"
+            value={stats.readiness_score ?? "—"}
+            denominator="/100"
+            color="#107c10"
+            icon={<Shield className="h-4 w-4" style={{ color: "#107c10" }} />}
+            footnote="Drill recency, frequency, evacuation plans & alert hygiene"
+          />
         </StatGrid>
+
+        {/* Quick links — every disaster subpage from the plugin manifest */}
+        <QuickLinks
+          section="Safety & Compliance"
+          links={[
+            { label: "Evacuation Plans", href: "/dashboard/disaster/plans", icon: "MapPin" },
+            { label: "Drill Schedule", href: "/dashboard/disaster/drills", icon: "CalendarDays" },
+            { label: "Seismic Alerts", href: "/dashboard/disaster/alerts", icon: "Siren" },
+          ]}
+        />
 
         {stats.upcoming_drills > 0 && (
           <DataPanel

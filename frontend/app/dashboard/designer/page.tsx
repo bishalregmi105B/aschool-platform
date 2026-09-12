@@ -21,10 +21,24 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   FilterCommandBar,
   DataPanel,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
+import { ChevronRight } from "lucide-react";
+
+// Quick links — the design_studio manifest subitems plus the Writer surface.
+const QUICK_LINKS = [
+  { label: "Templates", icon: "Layers", href: "/dashboard/designer/templates" },
+  { label: "Canvas Editor", icon: "Palette", href: "/dashboard/designer/editor" },
+  { label: "Document Writer", icon: "FileText", href: "/dashboard/designer/writer" },
+  { label: "Bulk ID Cards", icon: "Image", href: "/dashboard/designer/bulk" },
+  { label: "Certificates", icon: "Award", href: "/dashboard/certificates" },
+];
 
 const CATEGORIES = [
   { id: "all",           label: "All" },
@@ -142,6 +156,63 @@ export default function DesignerPage() {
         subtitle="Create school documents, certificates, ID cards, and more."
       />
       <AOSPageBody>
+        {/* Dashboard — KPI stat grid from the queries the page already runs */}
+        <StatGrid>
+          <KpiCard
+            label="Templates"
+            value={(templates as any[]).length}
+            icon={<LayoutTemplate className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="My Designs"
+            value={(myDocs as any[]).length}
+            color="var(--w11-text-primary)"
+            icon={<Palette className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          <KpiCard
+            label="Certificate Templates"
+            value={(templates as any[]).filter((t: any) => t.category === "certificates").length}
+            color="#107c10"
+            icon={<FileText className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="ID Card Templates"
+            value={(templates as any[]).filter((t: any) => t.category === "id_cards").length}
+            color="#d83b01"
+            icon={<ImageIcon className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+        </StatGrid>
+
+        {/* Quick links — 44px gradient icon tile + label, as next/link */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+          {QUICK_LINKS.map((l) => {
+            const Icon = ICON_MAP[l.icon] || ChevronRight;
+            return (
+              <Link key={l.href} href={l.href} className="block h-full">
+                <div
+                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                  style={{ cursor: "pointer", marginBottom: 0 }}
+                >
+                  <div
+                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: SECTION_GRADIENTS["Design & Web"],
+                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                    {l.label}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Hero / Quick Start */}
         <div className="mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
