@@ -36,6 +36,8 @@ class Attendance(SchoolModel):
     check_out_time = Column(Time)
     marked_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     remarks = Column(Text)
+    # A-31: yearly-ledger anchor (nullable; backfilled opportunistically)
+    enrollment_id = Column(UUID(as_uuid=True), ForeignKey("student_enrollments.id"))
 
     student = relationship("Student", backref="attendance_records")
     marked_by = relationship("User")

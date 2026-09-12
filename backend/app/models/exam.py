@@ -124,6 +124,8 @@ class Marks(SchoolModel):
     # Rankings
     rank_in_class = Column(Integer)
     rank_in_section = Column(Integer)
+    # A-31: yearly-ledger anchor (nullable; backfilled opportunistically)
+    enrollment_id = Column(UUID(as_uuid=True), ForeignKey("student_enrollments.id"))
 
     # Status
     remarks = Column(Text)

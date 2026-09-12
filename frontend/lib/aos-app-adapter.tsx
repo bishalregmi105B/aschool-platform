@@ -1,5 +1,5 @@
 import React from "react";
-import { ICON_MAP } from "@/components/layout/sidebar";
+import { ICON_MAP } from "@/lib/icon-map";
 import * as AOSIcons from "@/components/aos/AOSIcons";
 import { type PluginSidebarItem } from "@/lib/plugins";
 

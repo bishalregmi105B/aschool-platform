@@ -15,6 +15,7 @@ import {
 import { SchoolRole } from "@/components/aos/types";
 import { useServerTime } from "@/lib/use-server-time";
 import { useAuth } from "@/lib/auth-context";
+import { LanguageToggle } from "@/components/aos/LanguageToggle";
 
 interface TopMenuBarProps {
   currentRole?: SchoolRole;
@@ -259,6 +260,9 @@ export default function TopMenuBar({
 
       {/* Right Area: Status Pills & Tray Controls */}
       <div className="menubar-right">
+        {/* Language Switcher */}
+        <LanguageToggle />
+
         {/* User Role Badge */}
         <div
           className="menubar-pill role-badge"

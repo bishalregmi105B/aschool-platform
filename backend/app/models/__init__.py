@@ -5,6 +5,8 @@ from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_access_log import UserAccessLog  # noqa: F401
 from app.models.student_enrollment import StudentEnrollment, PromotionRecord  # noqa: F401
+from app.models.custom_field import CustomFieldDef  # noqa: F401
+from app.models.exit_document import StudentExitDocument  # noqa: F401
 from app.models.monitoring import MobileCrashReport  # noqa: F401
 from app.models.student import Student, Guardian  # noqa: F401
 from app.models.student_transfer import StudentTransfer  # noqa: F401
@@ -72,7 +74,14 @@ from app.models.library import (  # noqa: F401
     StocktakeSession,
 )
 from app.models.lms import Course, Lesson, Topic, StudyMaterial, LiveClass, StudentProgress, Quiz, QuizAttempt, Enrollment  # noqa: F401
-from app.models.admission import AdmissionForm, AdmissionApplication, AdmissionLead, AdmissionInquiry  # noqa: F401
+from app.models.admission import (  # noqa: F401
+    AdmissionForm,
+    AdmissionApplication,
+    AdmissionLead,
+    AdmissionInquiry,
+    EnrollmentSeatCap,
+    AdmissionRegistration,
+)
 from app.models.notification import SMSLog, WhatsAppMessage, PushNotification, NotificationTemplate, WhatsAppBotConfig, NotificationRule  # noqa: F401
 from app.models.gamification import Badge, StudentBadge, PointsLog, House, Reward  # noqa: F401
 from app.models.wellbeing import MoodCheckin, WellbeingSurvey, WellbeingSurveyResponse, CounselorSession, MoodEntry, CounselorNote  # noqa: F401

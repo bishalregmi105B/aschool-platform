@@ -7,7 +7,6 @@ import { AuthProvider } from "@/lib/auth-context";
 import { PluginProvider } from "@/lib/plugins";
 import { I18nProvider } from "@/lib/i18n";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
-import { ViewModeProvider } from "@/lib/view-mode-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -26,14 +25,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <I18nProvider>
-          <ViewModeProvider>
-            <PluginProvider>
-              {/* ConfirmProvider hosts the single destructive-action dialog;
-                  useConfirm() refuses (returns false) when it is absent, so it
-                  must wrap everything that can delete. */}
-              <ConfirmProvider>{children}</ConfirmProvider>
-            </PluginProvider>
-          </ViewModeProvider>
+          <PluginProvider>
+            {/* ConfirmProvider hosts the single destructive-action dialog;
+                useConfirm() refuses (returns false) when it is absent, so it
+                must wrap everything that can delete. */}
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </PluginProvider>
         </I18nProvider>
         <Toaster position="top-right" richColors />
       </AuthProvider>

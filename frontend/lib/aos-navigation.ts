@@ -1,5 +1,6 @@
 export const AOS_ROUTE_WINDOW_PREFIX = "route:";
 export const AOS_THEME_STORAGE_KEY = "aschool_aos_theme";
+export const AOS_EMBED_QUERY_KEY = "aos_embed";
 
 function normalizePath(pathname: string): string {
   const cleaned = pathname.replace(/\/+$/g, "");
@@ -68,12 +69,11 @@ export function routeToAOSAppPath(rawRoute: string): string | null {
   if (!normalized) return null;
 
   const { path, search } = splitRoute(normalized);
-  if (path === "/dashboard") {
-    return `/aos/apps${search}`;
-  }
+  const params = new URLSearchParams(search.replace(/^\?/, ""));
+  params.set(AOS_EMBED_QUERY_KEY, "1");
 
-  const suffix = path.replace(/^\/dashboard\//, "");
-  return `/aos/apps/${suffix}${search}`;
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
 }
 
 export function extractAOSModuleSlug(rawRoute: string): string | null {

@@ -2,6 +2,9 @@
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
+from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
+
 from app.models.admission import AdmissionInquiry, AdmissionApplication
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
@@ -381,3 +384,244 @@ def _app_detail_dict(a):
         }
     )
     return data
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A5 — A-09 admission funnel: staging queue → review → convert w/
+# FOR-UPDATE seat caps; A-22 admission-fee linkage.
+# ══════════════════════════════════════════════════════════════════════════
+
+def _registration_dict(r):
+    student = r.student
+    return {
+        "id": str(r.id),
+        "registration_number": r.registration_number,
+        "status": r.status,
+        "student_name": f"{r.student_first_name} {r.student_last_name or ''}".strip(),
+        "student_first_name": r.student_first_name,
+        "student_dob_bs": r.student_dob_bs,
+        "gender": r.gender,
+        "guardian_name": r.guardian_name,
+        "guardian_relation": r.guardian_relation,
+        "guardian_phone": r.guardian_phone,
+        "guardian_email": r.guardian_email,
+        "previous_school": r.previous_school,
+        "applied_class_id": str(r.applied_class_id) if r.applied_class_id else None,
+        "class_name": r.applied_class.name if r.applied_class else None,
+        "documents": r.documents or [],
+        "dynamic_fields": r.dynamic_fields or {},
+        "source": r.source,
+        "review_notes": r.review_notes,
+        "student_id": str(r.student_id) if r.student_id else None,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
+@admission_bp.route("/registrations", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin", "teacher")
+def list_registrations():
+    from app.models.admission import AdmissionRegistration
+
+    query = AdmissionRegistration.query.filter(
+        AdmissionRegistration.school_id == g.school_id,
+        AdmissionRegistration.is_deleted.is_(False),
+    ).options(joinedload(AdmissionRegistration.applied_class))
+    status = (request.args.get("status") or "").strip().lower()
+    if status in ("submitted", "under_review", "approved", "rejected", "converted"):
+        query = query.filter(AdmissionRegistration.status == status)
+    search = (request.args.get("search") or "").strip()
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(
+                AdmissionRegistration.student_first_name.ilike(like),
+                AdmissionRegistration.student_last_name.ilike(like),
+                AdmissionRegistration.guardian_name.ilike(like),
+                AdmissionRegistration.guardian_phone.ilike(like),
+                AdmissionRegistration.registration_number.ilike(like),
+            )
+        )
+    items, meta = paginate(query.order_by(AdmissionRegistration.created_at.desc()))
+    return success_response({
+        "registrations": [_registration_dict(r) for r in items], "meta": meta
+    })
+
+
+@admission_bp.route("/registrations/<uuid:registration_id>/review", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin")
+def review_registration(registration_id):
+    from app.models.admission import AdmissionRegistration
+
+    reg = AdmissionRegistration.query.filter_by(
+        id=registration_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if reg is None:
+        return error_response("Registration not found", 404)
+    data = request.get_json(silent=True) or {}
+    decision = str(data.get("decision") or "").strip().lower()
+    if decision not in ("under_review", "approved", "rejected"):
+        return error_response("decision must be under_review|approved|rejected", 400)
+    reg.status = decision
+    reg.review_notes = str(data.get("review_notes") or "")[:1000] or None
+    reg.reviewed_by_id = g.user_id
+    db.session.commit()
+    return success_response(_registration_dict(reg))
+
+
+@admission_bp.route("/registrations/<uuid:registration_id>/convert", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin")
+def convert_registration_route(registration_id):
+    """Approve → provision in ONE transaction, gated by the class's
+    FOR-UPDATE seat cap. Over-cap → 409 with the counts."""
+    from app.models.admission import AdmissionRegistration
+    from app.services import admission_funnel
+    from app.services.admission_funnel import SeatCapExceededError
+
+    reg = AdmissionRegistration.query.filter_by(
+        id=registration_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if reg is None:
+        return error_response("Registration not found", 404)
+    if reg.status == "converted":
+        return error_response("Registration already converted", 409)
+    data = request.get_json(silent=True) or {}
+
+    from app.models.school import School
+
+    school = School.query.get(g.school_id)
+    try:
+        result = admission_funnel.convert_registration(
+            school, reg, g.user_id, section_id=data.get("section_id")
+        )
+        db.session.commit()
+    except SeatCapExceededError as exc:
+        db.session.rollback()
+        return error_response(
+            {
+                "message": f"Seat cap reached for the applied class "
+                           f"({exc.booked}/{exc.max_seat})",
+                "booked": exc.booked,
+                "max_seat": exc.max_seat,
+            },
+            409,
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        return error_response(str(exc), 400)
+
+    # Admission-fee linkage (A-22 bridge): when the fees plugin is active,
+    # raise the admission-fee bill so the office can collect or the family
+    # can pay from the public flow.
+    fee_collection_id = None
+    try:
+        from app.models.fee import FeeCollection
+
+        installed = set(getattr(g, "installed_plugins", None) or [])
+        if "fees" in installed and reg.applied_class_id:
+            amount = data.get("admission_fee_amount")
+            if amount:
+                bill = FeeCollection(
+                    school_id=g.school_id,
+                    student_id=reg.student_id,
+                    fee_item_name="Admission Fee",
+                    amount=_admission_fee_amount(amount),
+                    academic_year=reg.applied_class.academic_year_id
+                    and str(reg.applied_class.academic_year_id)[:4]
+                    or None,
+                    payment_status="pending",
+                    notes=f"[admission_fee:{reg.registration_number}]",
+                )
+                db.session.add(bill)
+                db.session.commit()
+                fee_collection_id = str(bill.id)
+    except Exception:  # noqa: BLE001 — fee linkage must not break provisioning
+        db.session.rollback()
+
+    return success_response({**result, "fee_collection_id": fee_collection_id})
+
+
+def _admission_fee_amount(value):
+    try:
+        return round(max(float(value), 0.0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@admission_bp.route("/seats", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin", "teacher")
+def list_seats():
+    from app.models.academic import Class
+    from app.models.student import Student
+    from app.models.admission import EnrollmentSeatCap
+
+    caps = EnrollmentSeatCap.query.filter(
+        EnrollmentSeatCap.school_id == g.school_id,
+        EnrollmentSeatCap.is_deleted.is_(False),
+    ).all()
+    out = []
+    for cap in caps:
+        booked = Student.query.filter(
+            Student.school_id == g.school_id,
+            Student.class_id == cap.class_id,
+            Student.is_deleted.is_(False),
+            Student.status == "active",
+        ).count()
+        out.append({
+            "id": str(cap.id),
+            "class_id": str(cap.class_id),
+            "class_name": cap.klass.name if cap.klass else None,
+            "academic_year_id": str(cap.academic_year_id) if cap.academic_year_id else None,
+            "max_seat": cap.max_seat,
+            "booked": booked,
+            "remaining": max(cap.max_seat - booked, 0),
+        })
+    return success_response({"seats": out})
+
+
+@admission_bp.route("/seats", methods=["PUT"])
+@jwt_required()
+@school_required
+@plugin_required("admission")
+@role_required("superadmin", "school_admin")
+def upsert_seat():
+    from app.models.academic import Class
+    from app.models.admission import EnrollmentSeatCap
+
+    data = request.get_json(silent=True) or {}
+    class_id = _parse_uuid(data.get("class_id"))
+    if not class_id:
+        return error_response("class_id is required", 400)
+    if Class.query.filter_by(id=class_id, school_id=g.school_id, is_deleted=False).first() is None:
+        return error_response("class_id does not match this school", 404)
+    try:
+        max_seat = int(data.get("max_seat"))
+    except (TypeError, ValueError):
+        return error_response("max_seat must be an integer", 400)
+    if max_seat < 1 or max_seat > 500:
+        return error_response("max_seat must be 1–500", 400)
+    year_id = _parse_uuid(data.get("academic_year_id"))
+    cap = EnrollmentSeatCap.query.filter(
+        EnrollmentSeatCap.school_id == g.school_id,
+        EnrollmentSeatCap.class_id == class_id,
+        EnrollmentSeatCap.academic_year_id == year_id,
+        EnrollmentSeatCap.is_deleted.is_(False),
+    ).first()
+    if cap is None:
+        cap = EnrollmentSeatCap(school_id=g.school_id, class_id=class_id,
+                                academic_year_id=year_id)
+        db.session.add(cap)
+    cap.max_seat = max_seat
+    db.session.commit()
+    return success_response({"id": str(cap.id), "max_seat": cap.max_seat})

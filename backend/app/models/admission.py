@@ -6,9 +6,11 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -114,3 +116,58 @@ class AdmissionInquiry(SchoolModel):
     notes = Column(Text)
     follow_up_date = Column(DateTime)
     assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+
+
+class EnrollmentSeatCap(SchoolModel):
+    """A-09 seat caps per class+year — ENFORCED with SELECT … FOR UPDATE at
+    conversion time (InstiKit shipped the table but never enforced it)."""
+
+    __tablename__ = "enrollment_seats"
+
+    class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"), nullable=False, index=True)
+    academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"))
+    max_seat = Column(Integer, nullable=False)
+
+    klass = relationship("Class")
+
+    __table_args__ = (
+        Index(
+            "uq_enrollment_seats_class_year",
+            "school_id", "class_id", "academic_year_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+
+class AdmissionRegistration(SchoolModel):
+    """A-09 public funnel staging row: submitted from the school's public
+    site (no account created), reviewed by the office, converted into a
+    guardian account + student + application in one transaction."""
+
+    __tablename__ = "admission_registrations"
+
+    student_first_name = Column(String(120), nullable=False)
+    student_last_name = Column(String(120))
+    student_dob_bs = Column(String(10))
+    gender = Column(String(20))
+    guardian_name = Column(String(200), nullable=False)
+    guardian_relation = Column(String(30))
+    guardian_phone = Column(String(20), nullable=False, index=True)
+    guardian_email = Column(String(200))
+    previous_school = Column(String(200))
+    applied_class_id = Column(UUID(as_uuid=True), ForeignKey("classes.id"))
+    documents = Column(JSONB, default=list)
+    dynamic_fields = Column(JSONB, default=dict)
+    status = Column(String(20), nullable=False, server_default="submitted", index=True)
+    registration_number = Column(String(50))
+    verification_token = Column(String(100), index=True)
+    source = Column(String(30))
+    reviewed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    review_notes = Column(Text)
+    application_id = Column(UUID(as_uuid=True), ForeignKey("admission_applications.id"))
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"))
+
+    applied_class = relationship("Class")
+    reviewed_by = relationship("User")
+    student = relationship("Student")
