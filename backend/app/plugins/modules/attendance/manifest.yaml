@@ -40,6 +40,8 @@ ui:
       route: /dashboard/attendance/reports
     - label: Holiday List
       route: /dashboard/attendance/holidays
+  aos:
+    about: "Track daily student and teacher attendance with bulk marking, QR check-in, leave requests, and monthly reports."
 mobile:
   admin:
     feature_folder: attendance

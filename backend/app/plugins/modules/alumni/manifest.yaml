@@ -21,6 +21,8 @@ ui:
     icon: GraduationCap
     visible_to:
     - school_admin
+  aos:
+    about: "Keep graduates connected with an alumni directory, mentoring, events, and donation tracking."
 mobile:
   admin:
     feature_folder: alumni

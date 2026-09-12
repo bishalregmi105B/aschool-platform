@@ -39,6 +39,8 @@ ui:
     icon: ClipboardList
     visible_to:
     - school_admin
+  aos:
+    about: "Run admissions end to end — online applications, seat caps, entrance tests, merit lists, and AI lead scoring to grow enrollment."
 mobile:
   admin:
     feature_folder: admission

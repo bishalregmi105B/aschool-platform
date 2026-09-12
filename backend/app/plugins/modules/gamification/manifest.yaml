@@ -42,6 +42,8 @@ ui:
       route: /dashboard/gamification/houses
     - label: Rewards
       route: /dashboard/gamification/rewards
+  aos:
+    about: "Make school life motivating with points, badges, streaks, leaderboards, houses, and rewards for attendance, grades, and behavior."
 mobile:
   admin:
     feature_folder: gamification

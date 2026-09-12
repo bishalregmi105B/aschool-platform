@@ -31,6 +31,8 @@ ui:
       route: /disaster/drills
     - label: Seismic Alerts
       route: /disaster/alerts
+  aos:
+    about: "Prepare for earthquakes and other disasters with live seismic alerts, evacuation plans, and drill scheduling."
 mobile:
   admin:
     feature_folder: disaster

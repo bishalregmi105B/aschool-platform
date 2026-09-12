@@ -50,6 +50,8 @@ ui:
     visible_to:
     - school_admin
     - teacher
+  aos:
+    about: "Author and publish bilingual chapter content on the CDC/NEB curriculum — teaching notes, worked examples, exam tips, glossaries, and a typed exercise bank."
 mobile:
   student:
     feature_folder: chapter_reader

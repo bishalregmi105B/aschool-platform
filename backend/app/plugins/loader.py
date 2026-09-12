@@ -736,6 +736,12 @@ class PluginLoader:
                     }
                 )
 
+            # AOS chrome metadata (app About dialogs): prefer the curated
+            # `ui.aos.about` blurb, falling back to the raw manifest
+            # description for manifests that predate the key.
+            aos = (manifest.get("ui") or {}).get("aos") or {}
+            about = aos.get("about") or manifest.get("description")
+
             sidebar.append(
                 {
                     "slug": slug,
@@ -745,6 +751,7 @@ class PluginLoader:
                     "section": section,
                     "route": route,
                     "subitems": subitems,
+                    "about": about,
                 }
             )
 

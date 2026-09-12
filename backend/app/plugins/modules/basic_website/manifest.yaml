@@ -24,6 +24,8 @@ ui:
     label: School Website
     label_nepali: विद्यालय वेबसाइट
     icon: Globe
+  aos:
+    about: "Publish a simple, responsive public website for the school with info pages and a contact form."
 mobile:
   admin:
     feature_folder: website

@@ -232,7 +232,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="text"
-                    placeholder="admin@yourschool.edu.np"
+                    placeholder="you@yourschool.edu.np"
                     className="pl-10 h-11 rounded-xl text-sm"
                     {...passwordForm.register("email")}
                   />

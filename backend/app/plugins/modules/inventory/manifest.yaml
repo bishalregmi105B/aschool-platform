@@ -22,6 +22,8 @@ ui:
     visible_to:
     - school_admin
     - staff
+  aos:
+    about: "Track school assets and stock with QR asset tracking, procurement, and depreciation."
 mobile:
   admin:
     feature_folder: inventory

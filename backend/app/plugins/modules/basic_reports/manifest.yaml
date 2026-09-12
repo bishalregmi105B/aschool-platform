@@ -34,6 +34,8 @@ ui:
       route: /dashboard/reports/expense
     - label: Teacher Reports
       route: /dashboard/reports/teacher
+  aos:
+    about: "Generate everyday school reports — attendance summaries, fee collection overviews, and student counts."
 mobile:
   admin:
     feature_folder: reports

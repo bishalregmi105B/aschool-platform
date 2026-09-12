@@ -111,6 +111,8 @@ ui:
       route: /dashboard/iemis-import?format=school_level
     - label: Import History
       route: /dashboard/iemis-import/history
+  aos:
+    about: "Import Nepal Ministry of Education IEMIS exports into ASchool, automatically mapping students, parents, classes, and school metadata."
 mobile:
   admin:
     feature_folder: iemis_import

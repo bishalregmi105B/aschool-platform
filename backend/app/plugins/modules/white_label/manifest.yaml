@@ -30,6 +30,8 @@ ui:
       route: /white-label/domain
     - label: Theme
       route: /white-label/theme
+  aos:
+    about: "Make ASchool yours — custom branding, your own domain, and removal of ASchool branding."
 mobile:
   admin:
     feature_folder: white_label

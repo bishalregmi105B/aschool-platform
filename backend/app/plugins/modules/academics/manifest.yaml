@@ -33,6 +33,8 @@ ui:
       route: /dashboard/academics/subjects
     - label: Academic Year
       route: /dashboard/academics/year
+  aos:
+    about: "Set up the school's academic structure — classes, sections, subjects, and academic years — that every other module builds on."
 mobile:
   admin:
     feature_folder: academics

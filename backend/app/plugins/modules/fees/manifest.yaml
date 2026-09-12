@@ -58,6 +58,8 @@ ui:
       route: /dashboard/fees/scholarships
     - label: Reports
       route: /dashboard/fees/reports
+  aos:
+    about: "Handle all money coming into the school — fee structures, collection and receipts, eSewa/Khalti payments, defaulter tracking, and automatic reminders."
 mobile:
   admin:
     feature_folder: fees

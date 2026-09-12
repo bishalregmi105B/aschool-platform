@@ -28,6 +28,8 @@ ui:
       route: /multi-branch/dashboard
     - label: Chain Analytics
       route: /multi-branch/analytics
+  aos:
+    about: "Run a school chain from one place with a cross-branch unified dashboard and chain analytics."
 mobile:
   admin:
     feature_folder: multi_branch

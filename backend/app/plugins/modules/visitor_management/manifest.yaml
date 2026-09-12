@@ -22,6 +22,8 @@ ui:
     visible_to:
     - school_admin
     - staff
+  aos:
+    about: "Log and manage campus visitors with check-ins, appointments, and ID verification."
 mobile:
   admin:
     feature_folder: visitors

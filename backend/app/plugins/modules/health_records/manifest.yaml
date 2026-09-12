@@ -36,6 +36,8 @@ ui:
       route: /dashboard/health-records/vaccinations
     - label: Allergies
       route: /dashboard/health-records/allergies
+  aos:
+    about: "Keep student health in one place — medical records, vaccination tracking, allergy alerts, and health checkup logs."
 mobile:
   admin:
     feature_folder: health

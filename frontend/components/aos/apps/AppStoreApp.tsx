@@ -1,28 +1,56 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles,
   Download,
-  Check,
   Shield,
-  Search,
-  Play,
-  Lock,
+  Check,
   Zap,
+  Crown,
+  ShoppingCart,
+  Layers,
   Trash2,
   Clock,
-  ExternalLink,
-  ShieldCheck,
-  AlertCircle,
+  Plug,
+  PowerOff,
+  ChevronLeft,
+  Loader2,
 } from "lucide-react";
 import { api, type ApiResponse } from "@/lib/api";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
-import { SchoolRole } from "../RoleSwitcherModal";
+import { SubscribeDialog } from "@/components/plugins/subscribe-dialog";
+import { formatCurrency } from "@/lib/utils";
+import {
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
+import type { SchoolRole } from "../RoleSwitcherModal";
 
+/**
+ * AOS App Store — the unified, REAL store.
+ *
+ * A tabbed shell (220px sidebar) built around the live dashboard pages:
+ *   • Store                → embeds /dashboard/marketplace (search, cards,
+ *                            SaaS packages, checkout)
+ *   • Installed            → embeds /dashboard/plugins (installed management)
+ *   • Permissions (admin)  → role-access overview; actual role management
+ *                            lives in Settings → Roles (real school roles).
+ *
+ * Sidebar category pills come from the REAL catalog categories and filter an
+ * in-shell plugin grid backed by the same install / trial / activate /
+ * deactivate / uninstall endpoints the marketplace uses. No demo plugins,
+ * no fake purchases, no local role matrices.
+ */
+
+// ── Legacy type exports (call sites import these from AppStoreApp) ──────────
+
+/** Legacy plugin card shape — kept exported because WindowManager types against it. */
 export interface EducationalPlugin {
   id: string;
   name: string;
@@ -48,6 +76,7 @@ export interface EducationalPlugin {
 export interface AppStoreAppProps {
   currentRole?: SchoolRole;
   accentColor?: string;
+  /** Legacy props kept for call-site compatibility — unused by the real store. */
   plugins?: EducationalPlugin[];
   onToggleInstall?: (pluginId: string) => void;
   onToggleActive?: (pluginId: string) => void;
@@ -56,10 +85,11 @@ export interface AppStoreAppProps {
   onLaunchPluginDemo?: (pluginId: string) => void;
 }
 
+// ── Live catalog types (raw /plugins/marketplace payload) ────────────────────
+
 interface RawMarketplacePlugin {
   slug: string;
   name: string;
-  name_nepali?: string;
   description: string;
   category: string;
   price_monthly?: number;
@@ -68,48 +98,390 @@ interface RawMarketplacePlugin {
   is_free?: boolean;
   installed?: boolean;
   install_state?: "not_installed" | "active" | "inactive";
-  is_deactivated?: boolean;
   is_trial?: boolean;
   trial_days_left?: number | null;
   version?: string;
   coming_soon?: boolean;
 }
 
-type RawMarketplaceResponse = Record<string, RawMarketplacePlugin[]> | RawMarketplacePlugin[];
+type RawMarketplaceResponse =
+  | Record<string, RawMarketplacePlugin[]>
+  | RawMarketplacePlugin[];
 
-const CATEGORY_ACCENTS: Record<string, string> = {
-  core: "#0ea5e9",
-  starter: "#10b981",
-  growth: "#8b5cf6",
-  premium: "#f59e0b",
-  "STEM & Science": "#8b5cf6",
-  "School Operations": "#10b981",
-  "AI & Tutoring": "#06b6d4",
-  "Campus Life": "#f59e0b",
-  Assessments: "#ef4444",
+/** Category presentation mirrors the marketplace page (real catalog tiers). */
+const CATEGORY_LABELS: Record<string, string> = {
+  core: "Core (Free)",
+  starter: "Starter",
+  growth: "Growth",
+  premium: "Premium",
 };
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  core: Check,
+  starter: Zap,
+  growth: ShoppingCart,
+  premium: Crown,
+};
+
+const ADMIN_ROLES = new Set(["admin", "school_admin", "superadmin"]);
+
+function categoryLabel(id: string): string {
+  return (
+    CATEGORY_LABELS[id] ||
+    id.charAt(0).toUpperCase() + id.slice(1).replace(/[_-]+/g, " ")
+  );
+}
+
+function pluginState(
+  p: RawMarketplacePlugin
+): "not_installed" | "active" | "inactive" {
+  return p.install_state || (p.installed ? "active" : "not_installed");
+}
+
+// ── Live dashboard page embeds ────────────────────────────────────────────────
+
+const MarketplaceEmbed = dynamic(() => import("@/app/dashboard/marketplace/page"), {
+  loading: () => <AOSModuleLoadingState label="Loading marketplace…" />,
+});
+
+const InstalledPluginsEmbed = dynamic(() => import("@/app/dashboard/plugins/page"), {
+  loading: () => <AOSModuleLoadingState label="Loading installed plugins…" />,
+});
+
+// ── Real-data plugin card (used by the sidebar category filter) ─────────────
+
+function CategoryPluginCard({
+  plugin,
+  busy,
+  isAdmin,
+  onInstall,
+  onActivate,
+  onDeactivate,
+  onUninstall,
+  onSubscribe,
+}: {
+  plugin: RawMarketplacePlugin;
+  busy: boolean;
+  isAdmin: boolean;
+  onInstall: () => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onUninstall: () => void;
+  onSubscribe: () => void;
+}) {
+  const state = pluginState(plugin);
+  const isActive = state === "active";
+  const isInactive = state === "inactive";
+  const isPaid = !plugin.is_free && (plugin.price_monthly ?? 0) > 0;
+  const onTrial = isActive && plugin.is_trial === true;
+  const isComingSoon = plugin.coming_soon === true;
+  // Core plugins are provisioned for every school and cannot be turned off.
+  const isCore = plugin.category === "core";
+
+  return (
+    <div
+      className="win11-card"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        padding: "14px",
+        borderColor: isActive ? "var(--w11-accent)" : undefined,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+        <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--w11-text-primary)", lineHeight: 1.25 }}>
+          {plugin.name}
+        </span>
+        {isPaid ? (
+          <span
+            className="win11-chip"
+            style={{ flexShrink: 0, fontSize: "10px", fontWeight: 700 }}
+          >
+            {formatCurrency(plugin.price_monthly ?? 0)}/mo
+          </span>
+        ) : (
+          <span className="win11-chip success" style={{ flexShrink: 0, fontSize: "10px", fontWeight: 700 }}>
+            Free
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
+        {categoryLabel(plugin.category)} • v{plugin.version || "1.0.0"}
+      </div>
+
+      <div
+        style={{
+          fontSize: "12px",
+          color: "var(--w11-text-secondary)",
+          lineHeight: 1.4,
+          minHeight: "34px",
+        }}
+      >
+        {plugin.description || "School productivity extension."}
+      </div>
+
+      {/* Live status */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minHeight: "22px" }}>
+        {isActive && (
+          <span className="win11-chip success" style={{ fontSize: "10px", fontWeight: 700 }}>
+            <Check size={11} /> Active
+          </span>
+        )}
+        {isInactive && (
+          <span className="win11-chip warning" style={{ fontSize: "10px", fontWeight: 700 }}>
+            Inactive
+          </span>
+        )}
+        {onTrial && (
+          <span className="win11-chip accent" style={{ fontSize: "10px", fontWeight: 700 }}>
+            <Clock size={11} />
+            {typeof plugin.trial_days_left === "number"
+              ? `Trial · ${plugin.trial_days_left}d left`
+              : "Trial active"}
+          </span>
+        )}
+        {isComingSoon && (
+          <span className="win11-chip" style={{ fontSize: "10px", fontWeight: 700 }}>
+            Coming Soon
+          </span>
+        )}
+      </div>
+
+      {/* Action bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          paddingTop: "10px",
+          borderTop: "1px solid var(--w11-border-subtle)",
+          marginTop: "auto",
+        }}
+      >
+        {!isAdmin ? (
+          <span style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
+            {isActive ? "Enabled for your school" : "Managed by your school"}
+          </span>
+        ) : isComingSoon ? (
+          <button className="subtle" disabled title="In final testing — releasing soon" style={{ fontSize: "12px", flex: 1 }}>
+            Coming Soon
+          </button>
+        ) : isCore && isActive ? (
+          <button className="subtle" disabled style={{ fontSize: "12px", flex: 1 }}>
+            <Check size={13} style={{ marginRight: "4px" }} /> Included with your plan
+          </button>
+        ) : state === "not_installed" ? (
+          <button className="accent" onClick={onInstall} disabled={busy} style={{ fontSize: "12px", flex: 1 }}>
+            {busy ? <Loader2 size={13} className="animate-spin" /> : isPaid ? `Start ${plugin.trial_days || 14}-Day Free Trial` : "Install"}
+          </button>
+        ) : isInactive ? (
+          <>
+            <button className="accent" onClick={onActivate} disabled={busy} style={{ fontSize: "12px", flex: 1 }}>
+              {busy ? <Loader2 size={13} className="animate-spin" /> : "Activate"}
+            </button>
+            <button
+              className="subtle"
+              onClick={onUninstall}
+              disabled={busy}
+              title="Uninstall (plugin data is preserved)"
+              style={{ fontSize: "12px", color: "#ef4444", flexShrink: 0 }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </>
+        ) : onTrial ? (
+          <>
+            <button className="accent" onClick={onSubscribe} disabled={busy} style={{ fontSize: "12px", flex: 1 }}>
+              Subscribe
+            </button>
+            <button
+              className="subtle"
+              onClick={onUninstall}
+              disabled={busy}
+              title="Uninstall (plugin data is preserved)"
+              style={{ fontSize: "12px", color: "#ef4444", flexShrink: 0 }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </>
+        ) : isPaid ? (
+          <>
+            <Link
+              href={`/dashboard/plugins/${plugin.slug}/settings`}
+              className="subtle"
+              style={{
+                fontSize: "12px",
+                flex: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+                textDecoration: "none",
+              }}
+            >
+              Manage
+            </Link>
+            <button
+              className="subtle"
+              onClick={onUninstall}
+              disabled={busy}
+              title="Uninstall (plugin data is preserved)"
+              style={{ fontSize: "12px", color: "#ef4444", flexShrink: 0 }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </>
+        ) : (
+          <button className="subtle" onClick={onDeactivate} disabled={busy} style={{ fontSize: "12px", flex: 1 }}>
+            <PowerOff size={13} style={{ marginRight: "4px" }} /> Deactivate
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Admin role-access overview (real data; management lives in Settings) ─────
+
+function PermissionsPanel({
+  installed,
+  isCatalogLoading,
+}: {
+  installed: RawMarketplacePlugin[];
+  isCatalogLoading: boolean;
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        padding: "24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+      }}
+    >
+      <div>
+        <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--w11-text-primary)" }}>
+          Role Access &amp; Permissions
+        </h2>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--w11-text-secondary)",
+            marginTop: "4px",
+            maxWidth: "560px",
+            lineHeight: 1.5,
+          }}
+        >
+          Plugin visibility across the AOS desktop, dock, and mobile springboard
+          follows your school&apos;s real role assignments — each account sees the
+          modules its role allows. There is no per-device role switching.
+        </p>
+      </div>
+
+      <div>
+        <Link
+          href="/dashboard/settings/roles"
+          className="accent"
+          style={{
+            fontSize: "12px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            textDecoration: "none",
+            padding: "6px 14px",
+            borderRadius: "var(--w11-radius-md, 6px)",
+            color: "var(--w11-accent-text, #fff)",
+          }}
+        >
+          <Shield size={14} /> Manage School Roles
+        </Link>
+      </div>
+
+      <div
+        className="win11-card"
+        style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}
+      >
+        <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--w11-text-primary)" }}>
+          Installed plugins &amp; station status
+        </div>
+        {isCatalogLoading ? (
+          <AOSModuleLoadingState label="Loading plugins…" />
+        ) : installed.length === 0 ? (
+          <AOSEmptyState
+            icon={<Plug size={34} />}
+            title="No plugins installed yet"
+            description="Browse the Store tab to install plugins for your school."
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {installed.map((p) => {
+              const isActive = pluginState(p) === "active";
+              return (
+                <div
+                  key={p.slug}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    padding: "9px 12px",
+                    borderRadius: "8px",
+                    background: "var(--w11-control-bg)",
+                    border: "1px solid var(--w11-border-subtle)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                    <Plug size={15} color="var(--w11-text-secondary)" style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--w11-text-primary)" }}>{p.name}</div>
+                      <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
+                        {categoryLabel(p.category)}
+                        {p.is_trial ? " • Trial" : p.is_free ? "" : ` • ${formatCurrency(p.price_monthly ?? 0)}/mo`}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`win11-chip ${isActive ? "success" : "warning"}`} style={{ fontSize: "10px", fontWeight: 700, flexShrink: 0 }}>
+                    {isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── The store shell ───────────────────────────────────────────────────────────
 
 export default function AppStoreApp({
   currentRole: propRole,
   accentColor = "#0ea5e9",
-  plugins: fallbackPlugins = [],
-  onLaunchPluginDemo,
 }: AppStoreAppProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { installedPlugins, refreshPlugins } = useInstalledPlugins();
+  const { refreshPlugins } = useInstalledPlugins();
 
   const currentRole: SchoolRole = propRole || (user?.role as SchoolRole) || "student";
-  const isAdmin = user?.role === "admin" || currentRole === "admin";
+  const isAdmin = ADMIN_ROLES.has(user?.role || "") || currentRole === "admin";
 
-  const [searchQuery, setSearchQuery] = useState("");
+  type StoreTab = "store" | "installed" | "permissions";
+  const [activeTab, setActiveTab] = useState<StoreTab>("store");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"store" | "installed" | "permissions">("store");
-  const [rolePermissions, setRolePermissions] = useState<Record<string, SchoolRole[]>>({});
+  const [subscribeSlug, setSubscribeSlug] = useState<string | null>(null);
 
-  // Fetch real catalog from /plugins/marketplace
-  const { data: marketplaceData, isLoading } = useQuery({
-    queryKey: ["aos-marketplace"],
+  // Real catalog — separate query key from the embedded pages' ["marketplace"]
+  // cache so the shell's metadata (categories/counts) never clashes with the
+  // page-level payloads.
+  const { data: catalog, isLoading: isCatalogLoading } = useQuery({
+    queryKey: ["aos-store-catalog"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<RawMarketplaceResponse>>("/plugins/marketplace");
       const raw = res.data.data;
@@ -130,14 +502,19 @@ export default function AppStoreApp({
     staleTime: 60_000,
   });
 
-  // Real backend mutations
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["aos-store-catalog"] });
+    queryClient.invalidateQueries({ queryKey: ["marketplace"] });
+    refreshPlugins();
+  };
+
+  // Real lifecycle mutations (same endpoints the marketplace page uses).
   const installMutation = useMutation({
     mutationFn: (slug: string) =>
       api.post("/plugins/install", { plugin_slug: slug, billing_cycle: "monthly" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aos-marketplace"] });
-      refreshPlugins();
-      toast.success("Plugin installed successfully");
+      invalidate();
+      toast.success("Plugin installed!");
     },
     onError: (err: unknown) => {
       const msg =
@@ -148,149 +525,121 @@ export default function AppStoreApp({
     },
   });
 
-  const trialMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/trial`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aos-marketplace"] });
-      refreshPlugins();
-      toast.success("Trial activated! 14-day access granted.");
-    },
-    onError: (err: unknown) => {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? ((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? "Trial activation failed")
-          : "Trial activation failed";
-      toast.error(typeof msg === "string" ? msg : "Trial activation failed");
-    },
-  });
-
   const activateMutation = useMutation({
     mutationFn: (slug: string) => api.post(`/plugins/${slug}/activate`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aos-marketplace"] });
-      refreshPlugins();
-      toast.success("Plugin activated on station");
+      invalidate();
+      toast.success("Plugin activated");
     },
-    onError: () => toast.error("Activation failed"),
+    onError: () => toast.error("Activate failed"),
   });
 
   const deactivateMutation = useMutation({
     mutationFn: (slug: string) => api.post(`/plugins/${slug}/deactivate`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aos-marketplace"] });
-      refreshPlugins();
+      invalidate();
       toast.success("Plugin deactivated");
     },
-    onError: () => toast.error("Deactivation failed"),
+    onError: () => toast.error("Deactivate failed"),
   });
 
   const uninstallMutation = useMutation({
     mutationFn: (slug: string) => api.post("/plugins/uninstall", { plugin_slug: slug }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aos-marketplace"] });
-      refreshPlugins();
-      toast.success("Plugin uninstalled");
+      invalidate();
+      toast.success("Plugin uninstalled — its data is preserved");
     },
-    onError: () => toast.error("Uninstall failed"),
+    onError: (err: unknown) => {
+      const msg =
+        err && typeof err === "object" && "response" in err
+          ? ((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? "Uninstall failed")
+          : "Uninstall failed";
+      toast.error(typeof msg === "string" ? msg : "Uninstall failed");
+    },
   });
 
-  // Merge live API data with fallback plugins for offline / demo safety
-  const allPlugins: EducationalPlugin[] = useMemo(() => {
-    if (marketplaceData && marketplaceData.length > 0) {
-      return marketplaceData.map((p) => {
-        const installedEntry = installedPlugins.find((ip) => ip.plugin_slug === p.slug);
-        const isInstalled = Boolean(installedEntry || p.installed || p.install_state === "active" || p.install_state === "inactive");
-        const isActive = installedEntry ? installedEntry.active : p.install_state === "active";
-        const isTrial = Boolean(installedEntry?.is_trial || p.is_trial);
+  const busy =
+    installMutation.isPending ||
+    activateMutation.isPending ||
+    deactivateMutation.isPending ||
+    uninstallMutation.isPending;
 
-        const accent =
-          CATEGORY_ACCENTS[p.category] ||
-          CATEGORY_ACCENTS[p.category.toLowerCase()] ||
-          "#0284c7";
-
-        const allowed = rolePermissions[p.slug] || ["student", "teacher", "admin", "accountant"];
-
-        return {
-          id: p.slug,
-          name: p.name,
-          category: p.category.charAt(0).toUpperCase() + p.category.slice(1),
-          description: p.description || "School productivity extension.",
-          tier: p.is_free ? "free" : "premium",
-          price: p.is_free ? "FREE" : p.price_monthly ? `$${p.price_monthly}/mo` : "$19/mo",
-          rating: 4.8,
-          downloads: "1.2k",
-          version: p.version || "1.0.0",
-          accent,
-          isInstalled,
-          isActive,
-          isPurchased: !p.is_free && isInstalled && !isTrial,
-          allowedRoles: allowed,
-          trialDays: p.trial_days || 14,
-          isTrial,
-          trialDaysLeft: p.trial_days_left,
-        };
-      });
+  // Real categories with counts, straight from the catalog.
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of catalog || []) {
+      counts.set(p.category, (counts.get(p.category) || 0) + 1);
     }
+    return [
+      { id: "all", label: "All Marketplace", count: (catalog || []).length },
+      ...Array.from(counts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([id, count]) => ({ id, label: categoryLabel(id), count })),
+    ];
+  }, [catalog]);
 
-    // Fallback preset demo plugins if backend is loading or unavailable
-    return fallbackPlugins.map((p) => ({
-      ...p,
-      allowedRoles: rolePermissions[p.id] || p.allowedRoles || ["student", "teacher", "admin", "accountant"],
-    }));
-  }, [marketplaceData, installedPlugins, fallbackPlugins, rolePermissions]);
+  const installedPlugins = useMemo(
+    () => (catalog || []).filter((p) => pluginState(p) !== "not_installed"),
+    [catalog]
+  );
 
-  const categories = [
-    { id: "all", label: "All Marketplace" },
-    { id: "core", label: "Core (Free)" },
-    { id: "starter", label: "Starter" },
-    { id: "growth", label: "Growth" },
-    { id: "premium", label: "Premium" },
-    { id: "stem", label: "STEM & Labs" },
-    { id: "operations", label: "Operations" },
-  ];
+  const activeCount = useMemo(
+    () => (catalog || []).filter((p) => pluginState(p) === "active").length,
+    [catalog]
+  );
 
-  const filteredPlugins = allPlugins.filter((p) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      p.name.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      p.id.toLowerCase().includes(q);
+  const categoryPlugins = useMemo(
+    () =>
+      selectedCategory === "all"
+        ? []
+        : (catalog || []).filter((p) => p.category === selectedCategory),
+    [catalog, selectedCategory]
+  );
 
-    const matchesCategory =
-      selectedCategory === "all" ||
-      p.category.toLowerCase().includes(selectedCategory.toLowerCase());
+  const subscribingPlugin = useMemo(
+    () => (catalog || []).find((p) => p.slug === subscribeSlug) || null,
+    [catalog, subscribeSlug]
+  );
 
-    const matchesTab =
-      activeTab === "store"
-        ? true
-        : activeTab === "installed"
-        ? p.isInstalled
-        : p.isInstalled && p.isActive;
-
-    return matchesSearch && matchesCategory && matchesTab;
-  });
-
-  const handleUpdateRoles = (id: string, roles: SchoolRole[]) => {
-    setRolePermissions((prev) => ({ ...prev, [id]: roles }));
-    toast.success("Role permissions updated");
+  const handleUninstall = (p: RawMarketplacePlugin) => {
+    if (window.confirm(`Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`)) {
+      uninstallMutation.mutate(p.slug);
+    }
   };
 
   return (
-    <div style={{ display: "flex", height: "100%", background: "var(--w11-window-bg)", color: "var(--w11-text-primary)" }}>
-      {/* Sidebar Navigation */}
+    <div
+      style={{
+        display: "flex",
+        height: "100%",
+        background: "var(--w11-window-bg)",
+        color: "var(--w11-text-primary)",
+      }}
+    >
+      {/* Sidebar */}
       <div
         style={{
           width: "220px",
+          flexShrink: 0,
           background: "var(--w11-control-bg)",
           borderRight: "1px solid var(--w11-border-subtle)",
           padding: "16px 10px",
           display: "flex",
           flexDirection: "column",
           gap: "6px",
-          flexShrink: 0,
+          overflowY: "auto",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "4px 8px 14px 8px", borderBottom: "1px solid var(--w11-border-subtle)" }}>
+        {/* Brand */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "4px 8px 14px 8px",
+            borderBottom: "1px solid var(--w11-border-subtle)",
+          }}
+        >
           <div
             style={{
               width: "32px",
@@ -302,18 +651,22 @@ export default function AppStoreApp({
               justifyContent: "center",
               color: "#fff",
               boxShadow: "0 4px 10px rgba(14, 165, 233, 0.35)",
+              flexShrink: 0,
             }}
           >
             <Sparkles size={18} />
           </div>
           <div>
             <div style={{ fontSize: "14px", fontWeight: 700, lineHeight: 1.2 }}>AOS Store</div>
-            <div style={{ fontSize: "10px", color: "var(--w11-text-secondary)" }}>Academic Plugin Hub</div>
+            <div style={{ fontSize: "10px", color: "var(--w11-text-secondary)" }}>
+              Academic Plugin Hub
+            </div>
           </div>
         </div>
 
+        {/* Tabs */}
         <div style={{ margin: "8px 0 4px 8px", fontSize: "10px", fontWeight: 700, color: "var(--w11-text-tertiary)", textTransform: "uppercase" }}>
-          Catalog
+          Store
         </div>
 
         <button
@@ -322,7 +675,7 @@ export default function AppStoreApp({
           style={{ justifyContent: "flex-start", gap: "8px", fontSize: "13px" }}
         >
           <Sparkles size={16} />
-          <span>Discover Extensions</span>
+          <span>Store</span>
         </button>
 
         <button
@@ -331,7 +684,7 @@ export default function AppStoreApp({
           style={{ justifyContent: "flex-start", gap: "8px", fontSize: "13px" }}
         >
           <Download size={16} />
-          <span>Installed ({allPlugins.filter((p) => p.isInstalled).length})</span>
+          <span>Installed{installedPlugins.length > 0 ? ` (${installedPlugins.length})` : ""}</span>
         </button>
 
         {isAdmin && (
@@ -341,354 +694,198 @@ export default function AppStoreApp({
             style={{ justifyContent: "flex-start", gap: "8px", fontSize: "13px" }}
           >
             <Shield size={16} />
-            <span>Role Permissions</span>
+            <span>Permissions</span>
           </button>
         )}
 
+        {/* Real catalog categories */}
         <div style={{ margin: "14px 0 4px 8px", fontSize: "10px", fontWeight: 700, color: "var(--w11-text-tertiary)", textTransform: "uppercase" }}>
           Categories
         </div>
 
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedCategory(c.id)}
-            className={selectedCategory === c.id ? "accent" : "subtle"}
-            style={{
-              justifyContent: "flex-start",
-              fontSize: "12px",
-              padding: "6px 10px",
-              fontWeight: selectedCategory === c.id ? 600 : 400,
-            }}
-          >
-            {c.label}
-          </button>
-        ))}
-
-        <div style={{ marginTop: "auto", padding: "10px", background: "rgba(0,120,212,0.08)", borderRadius: "8px", border: "1px solid rgba(0,120,212,0.2)" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: accentColor, marginBottom: "2px" }}>
-            {isAdmin ? "Admin Licensing Authority" : "Student / Faculty Mode"}
+        {isCatalogLoading ? (
+          <div style={{ padding: "8px 10px", fontSize: "11px", color: "var(--w11-text-secondary)" }}>
+            Loading catalog…
           </div>
-          <div style={{ fontSize: "10px", color: "var(--w11-text-secondary)", lineHeight: 1.3 }}>
-            {isAdmin
-              ? "Install plugins, start free trials, and grant permission matrices."
-              : "Extensions provisioned for your school station appear automatically."}
-          </div>
-        </div>
-      </div>
+        ) : (
+          categories.map((c) => {
+            const Icon = CATEGORY_ICONS[c.id] || Layers;
+            const isSelected = activeTab === "store" && selectedCategory === c.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setActiveTab("store");
+                  setSelectedCategory(c.id);
+                }}
+                className={isSelected ? "accent" : "subtle"}
+                style={{
+                  justifyContent: "flex-start",
+                  fontSize: "12px",
+                  padding: "6px 10px",
+                  gap: "8px",
+                  fontWeight: isSelected ? 600 : 400,
+                }}
+                title={`${c.label} — ${c.count} plugins`}
+              >
+                <Icon size={13} style={{ flexShrink: 0 }} />
+                <span
+                  style={{
+                    flex: 1,
+                    textAlign: "left",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {c.label}
+                </span>
+                <span style={{ fontSize: "10px", opacity: 0.7, flexShrink: 0 }}>{c.count}</span>
+              </button>
+            );
+          })
+        )}
 
-      {/* Main Content Area */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top Search Bar */}
+        {/* Licensing banner — real school context when available */}
         <div
           style={{
-            padding: "12px 18px",
-            borderBottom: "1px solid var(--w11-border-subtle)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            background: "var(--w11-control-bg)",
+            marginTop: "auto",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "var(--w11-control-hover)",
+            border: "1px solid var(--w11-border-subtle)",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "var(--w11-card-bg)",
-              border: "1px solid var(--w11-border-default)",
-              borderRadius: "8px",
-              padding: "6px 12px",
-              flex: 1,
-              maxWidth: "400px",
-            }}
-          >
-            <Search size={16} color="var(--w11-text-tertiary)" />
-            <input
-              type="text"
-              placeholder="Search plugins, AI simulators, tools..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ all: "unset", fontSize: "13px", color: "inherit", width: "100%" }}
-            />
+          <div style={{ fontSize: "11px", fontWeight: 700, color: accentColor, marginBottom: "2px" }}>
+            {isAdmin ? "School Licensing" : "Your School Plan"}
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "12px", color: "var(--w11-text-secondary)" }}>
-              {isLoading ? "Connecting catalog..." : `${filteredPlugins.length} Extensions Found`}
-            </span>
+          <div style={{ fontSize: "10px", color: "var(--w11-text-secondary)", lineHeight: 1.35 }}>
+            {isAdmin
+              ? "Core plugins are included for every school. Install plugins, start trials, and manage subscriptions for your school."
+              : "Plugins provisioned by your school appear automatically across your desktop, dock, and springboard."}
           </div>
-        </div>
-
-        {/* Content Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "18px" }}>
-          {activeTab === "permissions" ? (
-            /* Role Permission Matrix */
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div style={{ background: "var(--w11-card-bg)", padding: "16px", borderRadius: "12px", border: "1px solid var(--w11-border-subtle)" }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px" }}>
-                  School Role Access Restriction Matrix
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", marginBottom: "16px" }}>
-                  Control which school user roles can access and view each active educational plugin across Desktop, Dock, and Mobile Springboard.
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {allPlugins.filter((p) => p.isInstalled).map((plugin) => (
-                    <div
-                      key={plugin.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 16px",
-                        background: "var(--w11-control-bg)",
-                        borderRadius: "8px",
-                        border: "1px solid var(--w11-border-subtle)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: plugin.accent, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-                          <Zap size={18} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: "13px", fontWeight: 600 }}>{plugin.name}</div>
-                          <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
-                            Status: {plugin.isActive ? "🟢 Active on Station" : "⚪ Inactive"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Role Checkboxes */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                        {(["student", "teacher", "admin", "accountant"] as SchoolRole[]).map((role) => {
-                          const isChecked = plugin.allowedRoles.includes(role);
-                          return (
-                            <label
-                              key={role}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                fontSize: "12px",
-                                textTransform: "capitalize",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  const nextRoles = e.target.checked
-                                    ? [...plugin.allowedRoles, role]
-                                    : plugin.allowedRoles.filter((r) => r !== role);
-                                  handleUpdateRoles(plugin.id, nextRoles);
-                                }}
-                              />
-                              <span>{role}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Plugin Cards Grid */
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              {filteredPlugins.map((plugin) => {
-                const isPermitted = plugin.allowedRoles.includes(currentRole);
-                return (
-                  <div key={plugin.id} className="win11-card" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {/* Header */}
-                    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                      <div
-                        style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "12px",
-                          background: plugin.accent,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#ffffff",
-                          boxShadow: `0 6px 14px ${plugin.accent}40`,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Zap size={20} />
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                          <span style={{ fontSize: "14px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {plugin.name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              padding: "2px 6px",
-                              borderRadius: "6px",
-                              background: plugin.tier === "premium" ? "#f59e0b25" : "#10b98125",
-                              color: plugin.tier === "premium" ? "#d97706" : "#059669",
-                              border: `1px solid ${plugin.tier === "premium" ? "#f59e0b50" : "#10b98150"}`,
-                            }}
-                          >
-                            {plugin.tier === "premium" ? plugin.price : "FREE"}
-                          </span>
-                        </div>
-
-                        <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)", marginTop: "2px" }}>
-                          {plugin.category} • v{plugin.version}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div style={{ fontSize: "12px", color: "var(--w11-text-secondary)", lineHeight: 1.4, minHeight: "36px" }}>
-                      {plugin.description}
-                    </div>
-
-                    {/* Permission Status Pill */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        {isPermitted ? (
-                          <span style={{ color: "#10b981", display: "flex", alignItems: "center", gap: "3px" }}>
-                            <Check size={12} /> Active for {currentRole}
-                          </span>
-                        ) : (
-                          <span style={{ color: "#f59e0b", display: "flex", alignItems: "center", gap: "3px" }}>
-                            <Lock size={12} /> Restricted
-                          </span>
-                        )}
-                      </div>
-
-                      {plugin.isTrial && (
-                        <span style={{ color: "#0ea5e9", display: "flex", alignItems: "center", gap: "2px", fontWeight: 600 }}>
-                          <Clock size={11} />
-                          {plugin.trialDaysLeft !== null && plugin.trialDaysLeft !== undefined
-                            ? `${plugin.trialDaysLeft}d Trial`
-                            : "Active Trial"}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Action Bar */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        paddingTop: "10px",
-                        borderTop: "1px solid var(--w11-border-subtle)",
-                        marginTop: "auto",
-                        gap: "8px",
-                      }}
-                    >
-                      {isAdmin ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", justifyContent: "space-between" }}>
-                          {!plugin.isInstalled ? (
-                            <>
-                              {plugin.tier === "premium" ? (
-                                <button
-                                  className="accent"
-                                  onClick={() => trialMutation.mutate(plugin.id)}
-                                  disabled={trialMutation.isPending}
-                                  style={{ fontSize: "12px", padding: "5px 12px", flex: 1 }}
-                                >
-                                  Start {plugin.trialDays || 14}-Day Trial
-                                </button>
-                              ) : (
-                                <button
-                                  className="accent"
-                                  onClick={() => installMutation.mutate(plugin.id)}
-                                  disabled={installMutation.isPending}
-                                  style={{ fontSize: "12px", padding: "5px 12px", flex: 1 }}
-                                >
-                                  Install Free
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className={plugin.isActive ? "accent" : "subtle"}
-                                onClick={() => {
-                                  if (plugin.isActive) {
-                                    deactivateMutation.mutate(plugin.id);
-                                  } else {
-                                    activateMutation.mutate(plugin.id);
-                                  }
-                                }}
-                                style={{
-                                  fontSize: "11px",
-                                  padding: "5px 10px",
-                                  background: plugin.isActive ? "#10b981" : undefined,
-                                  color: plugin.isActive ? "#fff" : undefined,
-                                }}
-                              >
-                                {plugin.isActive ? "Active (Toggle Off)" : "Activate"}
-                              </button>
-
-                              <button
-                                className="subtle"
-                                onClick={() => uninstallMutation.mutate(plugin.id)}
-                                disabled={uninstallMutation.isPending}
-                                title="Uninstall Plugin"
-                                style={{ color: "#ef4444", fontSize: "11px", padding: "5px 8px" }}
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </>
-                          )}
-
-                          {onLaunchPluginDemo && (
-                            <button
-                              className="subtle"
-                              onClick={() => onLaunchPluginDemo(plugin.id)}
-                              title="Launch in Window"
-                              style={{ fontSize: "11px", padding: "5px 8px" }}
-                            >
-                              <Play size={12} style={{ marginRight: "3px" }} />
-                              Test
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                          <span style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
-                            {plugin.isInstalled ? "🟢 Station Enabled" : "⚪ Managed by Principal"}
-                          </span>
-                          {onLaunchPluginDemo && plugin.isInstalled && (
-                            <button
-                              className="accent"
-                              onClick={() => onLaunchPluginDemo(plugin.id)}
-                              style={{ fontSize: "11px", padding: "4px 10px" }}
-                            >
-                              <Play size={12} style={{ marginRight: "4px" }} />
-                              Open
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div style={{ fontSize: "10px", color: "var(--w11-text-tertiary)", marginTop: "4px" }}>
+            {user?.school_id
+              ? `Licensed school account • ${activeCount} plugin${activeCount === 1 ? "" : "s"} active`
+              : "Core plugins included with every ASchool plan"}
+          </div>
         </div>
       </div>
+
+      {/* Content area */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {activeTab === "store" &&
+          (selectedCategory === "all" ? (
+            /* Full real marketplace page (search, cards, packages, checkout) */
+            <div className="min-w-0" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <MarketplaceEmbed />
+            </div>
+          ) : (
+            /* Real-data grid filtered to the selected catalog category */
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  padding: "14px 18px 0 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  className="subtle"
+                  onClick={() => setSelectedCategory("all")}
+                  style={{ fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                >
+                  <ChevronLeft size={14} /> All Marketplace
+                </button>
+                <span style={{ fontSize: "15px", fontWeight: 700 }}>
+                  {categoryLabel(selectedCategory)}
+                </span>
+                <span style={{ fontSize: "12px", color: "var(--w11-text-secondary)" }}>
+                  {categoryPlugins.length} plugin{categoryPlugins.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
+                {isCatalogLoading ? (
+                  <AOSModuleLoadingState label="Loading catalog…" />
+                ) : categoryPlugins.length === 0 ? (
+                  <AOSEmptyState
+                    icon={<Layers size={36} />}
+                    title={`No plugins in ${categoryLabel(selectedCategory)}`}
+                    description="This category has no published plugins yet."
+                    action={
+                      <button className="subtle" onClick={() => setSelectedCategory("all")} style={{ fontSize: "12px" }}>
+                        Back to All Marketplace
+                      </button>
+                    }
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                      gap: "14px",
+                    }}
+                  >
+                    {categoryPlugins.map((plugin) => (
+                      <CategoryPluginCard
+                        key={plugin.slug}
+                        plugin={plugin}
+                        busy={busy}
+                        isAdmin={isAdmin}
+                        onInstall={() => installMutation.mutate(plugin.slug)}
+                        onActivate={() => activateMutation.mutate(plugin.slug)}
+                        onDeactivate={() => deactivateMutation.mutate(plugin.slug)}
+                        onUninstall={() => handleUninstall(plugin)}
+                        onSubscribe={() => setSubscribeSlug(plugin.slug)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+        {activeTab === "installed" && (
+          /* Real installed-plugins management page */
+          <div className="min-w-0" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <InstalledPluginsEmbed />
+          </div>
+        )}
+
+        {activeTab === "permissions" && isAdmin && (
+          <PermissionsPanel installed={installedPlugins} isCatalogLoading={isCatalogLoading} />
+        )}
+      </div>
+
+      {/* Real subscribe checkout (same dialog the marketplace uses) */}
+      <SubscribeDialog
+        plugin={
+          subscribingPlugin
+            ? {
+                slug: subscribingPlugin.slug,
+                name: subscribingPlugin.name,
+                price_monthly: subscribingPlugin.price_monthly ?? 0,
+                price_yearly: subscribingPlugin.price_yearly ?? 0,
+              }
+            : null
+        }
+        open={subscribingPlugin !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubscribeSlug(null);
+        }}
+        onSubscribed={invalidate}
+      />
     </div>
   );
 }

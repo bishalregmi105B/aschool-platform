@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,8 @@ import {
   Pin,
   PinOff,
   Sparkles,
+  School,
+  ShieldCheck,
 } from "lucide-react";
 import { SchoolRole, SCHOOL_PROFILES } from "../RoleSwitcherModal";
 import { AOSSettingsIcon } from "../AOSIcons";
@@ -41,6 +44,78 @@ const STORAGE_QUOTA_GB = 128;
 // Last-known storage usage for instant paint / offline fallback — mirrors the
 // localStorage cache pattern used by useAOSUserSettings.
 const STORAGE_CACHE_KEY = "aschool_aos_storage_cache";
+
+// ==========================================
+// Embedded school / platform settings pages
+// ==========================================
+// The Settings app is the one-stop UI for every school + platform setting: it
+// embeds the very same self-sufficient dashboard pages (react-query + api,
+// no shell props needed) that deep-linked route windows render standalone.
+// Lazy chunks keep the app light; deep links via AOSRouteTable still work.
+
+/** Fluent spinner shown while an embedded settings page chunk hydrates. */
+function EmbeddedPaneLoading({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "10px",
+        minHeight: "260px",
+        color: "var(--w11-text-secondary)",
+      }}
+    >
+      <div className="win11-spinner" />
+      <span style={{ fontSize: "12px" }}>{label}</span>
+    </div>
+  );
+}
+
+/** School profile / branding / metadata — /dashboard/settings. */
+const SchoolSettingsPage = dynamic(() => import("@/app/dashboard/settings/page"), {
+  loading: () => <EmbeddedPaneLoading label="Loading school settings…" />,
+});
+
+/** Platform & Access sub-sections — /dashboard/settings/* subpages. */
+type PlatformSectionId =
+  | "notifications"
+  | "backup"
+  | "custom-fields"
+  | "integrations"
+  | "access-logs"
+  | "roles";
+
+const PLATFORM_SECTIONS: { id: PlatformSectionId; label: string; desc: string }[] = [
+  { id: "notifications", label: "Notifications", desc: "Push, SMS & WhatsApp alerts" },
+  { id: "backup", label: "Backup", desc: "Database backup status" },
+  { id: "custom-fields", label: "Custom Fields", desc: "Registration form fields" },
+  { id: "integrations", label: "Integrations", desc: "Payments & connected apps" },
+  { id: "access-logs", label: "Access Logs", desc: "Login activity audit" },
+  { id: "roles", label: "Roles", desc: "Roles & user permissions" },
+];
+
+const PLATFORM_SECTION_COMPONENTS: Record<PlatformSectionId, React.ComponentType> = {
+  notifications: dynamic(() => import("@/app/dashboard/settings/notifications/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading notifications…" />,
+  }),
+  backup: dynamic(() => import("@/app/dashboard/settings/backup/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading backup…" />,
+  }),
+  "custom-fields": dynamic(() => import("@/app/dashboard/settings/custom-fields/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading custom fields…" />,
+  }),
+  integrations: dynamic(() => import("@/app/dashboard/settings/integrations/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading integrations…" />,
+  }),
+  "access-logs": dynamic(() => import("@/app/dashboard/settings/access-logs/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading access logs…" />,
+  }),
+  roles: dynamic(() => import("@/app/dashboard/settings/roles/page"), {
+    loading: () => <EmbeddedPaneLoading label="Loading roles…" />,
+  }),
+};
 
 interface PinnableApp {
   id: string;
@@ -77,12 +152,15 @@ interface SettingsAppProps {
 }
 
 export default function SettingsApp({
-  themeMode,
-  onToggleTheme,
-  accentColor,
-  onChangeAccent,
-  wallpaper,
-  onChangeWallpaper,
+  // Defaults keep the app renderable when the module registry mounts it
+  // without shell state (e.g. MobileExperience's zero-prop
+  // React.createElement) — the desktop shell always passes real values.
+  themeMode = "dark",
+  onToggleTheme = () => {},
+  accentColor = "#0078d4",
+  onChangeAccent = () => {},
+  wallpaper = "bloom-dark",
+  onChangeWallpaper = () => {},
   dockStyle = "mac",
   onChangeDockStyle,
   dockSize = "medium",
@@ -93,10 +171,10 @@ export default function SettingsApp({
   onChangeTopBarHeight,
   blurIntensity = 30,
   onChangeBlurIntensity,
-  taskbarAlign,
-  onToggleTaskbarAlign,
-  brightness,
-  onChangeBrightness,
+  taskbarAlign = "center",
+  onToggleTaskbarAlign = () => {},
+  brightness = 100,
+  onChangeBrightness = () => {},
   currentRole = "student",
   onOpenRoleSwitcher,
   pinnedAppIds = [],
@@ -106,6 +184,7 @@ export default function SettingsApp({
   const { sidebarItems } = useInstalledPlugins();
   const [activeCategory, setActiveCategory] = useState("personalization");
   const [mobileActiveSection, setMobileActiveSection] = useState<string | null>(null);
+  const [platformSection, setPlatformSection] = useState<PlatformSectionId>("notifications");
   const [examMode, setExamMode] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState("");
   const [isMobileScreen, setIsMobileScreen] = useState(false);
@@ -249,6 +328,8 @@ export default function SettingsApp({
   const categories = [
     { id: "personalization", label: "Themes & Wallpapers", icon: <Palette size={16} />, desc: "Mica blur, dark mode, 8 wallpapers" },
     { id: "dock", label: "Dock, Taskbar & Top Bar", icon: <Layout size={16} />, desc: "Top bar height, dock style, pin apps" },
+    { id: "school", label: "School Settings", icon: <School size={16} />, desc: "School profile, branding & metadata" },
+    { id: "platform", label: "Platform & Access", icon: <ShieldCheck size={16} />, desc: "Notifications, backup, roles & integrations" },
     { id: "profile", label: "User Account & Role", icon: <User size={16} />, desc: `${profile.name} (${profile.roleLabel})` },
     { id: "storage", label: "Cloud Vault Storage", icon: <HardDrive size={16} />, desc: storageDesc },
     { id: "exammode", label: "Exam & Focus Mode", icon: <Shield size={16} />, desc: examMode ? "Lockdown active" : "Normal mode" },
@@ -823,6 +904,49 @@ export default function SettingsApp({
             </div>
           </div>
         );
+
+      case "school":
+        return (
+          <div className="min-w-0">
+            {/* Self-sufficient dashboard page (react-query + api). Its
+                AOSPageHeader doubles as the section header inside the pane. */}
+            <SchoolSettingsPage />
+          </div>
+        );
+
+      case "platform": {
+        const ActivePlatformSection = PLATFORM_SECTION_COMPONENTS[platformSection];
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>Platform & Access</h2>
+
+            {/* Sub-section pill nav */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {PLATFORM_SECTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  className={platformSection === s.id ? "accent" : "subtle"}
+                  onClick={() => setPlatformSection(s.id)}
+                  title={s.desc}
+                  style={{
+                    fontSize: "12px",
+                    padding: "5px 14px",
+                    borderRadius: "var(--w11-radius-full)",
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Active sub-section — same self-sufficient dashboard pages as
+                the deep-linked route windows. */}
+            <div className="min-w-0">
+              <ActivePlatformSection />
+            </div>
+          </div>
+        );
+      }
 
       case "profile":
         return (

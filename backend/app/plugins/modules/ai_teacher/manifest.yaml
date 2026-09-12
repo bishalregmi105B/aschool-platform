@@ -58,6 +58,8 @@ ui:
     subitems:
     - label: Usage & Cost
       route: /dashboard/analytics/ai-usage
+  aos:
+    about: "A live AI teacher that speaks and hand-writes on an animated whiteboard, teaching chapter by chapter from your school's published curriculum and answering student questions."
 mobile:
   admin:
     feature_folder: ai_teacher
