@@ -16,7 +16,8 @@
  *   canvas_state:{type:"writer2", doc, config}} (autosave every 15s when dirty).
  *
  * Legacy support: opens old {type:"writer", html} docs and seeded
- * writer_json templates (via writerBlocksToHTML).
+ * writer_json templates (converted to a writer2 doc via
+ * writerJsonToWriterDoc — writerBlocksToHTML is kept for other callers).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TextSelection } from "@tiptap/pm/state";
@@ -39,19 +40,20 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { useWin11Scope } from "@/lib/win11-scope";
-import { writerBlocksToHTML } from "@/lib/designer/writer-blocks";
+import { writerJsonToWriterDoc } from "@/lib/designer/writer-doc-convert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  ArrowLeft, Save, Download, ChevronDown, FileOutput, FileText, Braces, Loader2, BookOpen,
+  ArrowLeft, Save, Download, ChevronDown, FileOutput, FileText, Braces, Loader2, BookOpen, LayoutTemplate,
 } from "lucide-react";
 
 import { Ribbon } from "@/components/writer/ribbon";
 import { FindReplaceDialog, WordArtDialog, HeaderFooterDialog } from "@/components/writer/dialogs";
 import { WriterRuler, StatusBar } from "@/components/writer/chrome";
+import { WriterTemplatesDialog, type WriterTemplate } from "@/components/writer/TemplatesDialog";
 import { WriterSidePanel, type WriterCitation } from "@/components/writer/ResearchPanel";
 import type { WriterCtx, WordCounts } from "@/components/writer/context";
 import { FindReplaceExtension, setFindState } from "@/lib/writer/findReplace";
@@ -197,6 +199,8 @@ function WriterContent() {
   const [findShowReplace, setFindShowReplace] = useState(false);
   const [wordArtOpen, setWordArtOpen] = useState(false);
   const [hfOpen, setHfOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [activeTemplateKey, setActiveTemplateKey] = useState<string | null>(null);
   const [sidePanel, setSidePanel] = useState<"none" | "research">("none");
   const [citations, setCitations] = useState<WriterCitation[]>([]);
   const [trackChanges, setTrackChanges] = useState(false);
@@ -320,14 +324,59 @@ function WriterContent() {
       return;
     }
     if (templateId && templates.length) {
-      const tpl = templates.find((t: any) => t.id === templateId);
+      const tpl = templates.find((t: any) => t.id === templateId || t.template_key === templateId);
       if (!tpl) return;
       loadedRef.current = true;
       setDocName(tpl.name || "Document");
-      if (tpl.writer_json?.config) setSettings(mergeSettings(tpl.writer_json.config));
-      editor.commands.setContent(writerBlocksToHTML(tpl.writer_json || {}));
+      setActiveTemplateKey(tpl.template_key || tpl.id);
+
+      const state = tpl.canvas_state;
+      if (state?.type === "writer2" && state.doc) {
+        // saved writer2 template — native format
+        if (state.config) setSettings(mergeSettings(state.config));
+        editor.commands.setContent(state.doc);
+      } else if (state?.type === "writer" && state.html) {
+        // legacy saved writer doc (raw HTML) — TipTap parses the HTML subset
+        if (state.config) setSettings(mergeSettings(state.config));
+        editor.commands.setContent(state.html);
+        toast.info("Legacy document loaded — saving will upgrade it to the new format");
+      } else {
+        // seeded writer_json template (legacy block format) — convert blocks
+        // to a writer2 ProseMirror doc + settings so the opened document
+        // matches its thumbnail (colors, tables, fonts, page setup).
+        const writerData = tpl.writer_json || state?.writer_json || state || {};
+        const { doc, settings: tplSettings } = writerJsonToWriterDoc(writerData);
+        setSettings(mergeSettings(tplSettings));
+        editor.commands.setContent(doc);
+      }
+      setDirty(true);
     }
   }, [editor, docData, templateId, templates]);
+
+  // ── templates gallery: load a picked template into the editor ──────
+  // Same flow as the ?template= param: doc content from the template's
+  // canvas_state / writer_json, docName from the template name, dirty.
+  const applyTemplate = useCallback((tpl: WriterTemplate) => {
+    if (!editor) return;
+    setDocName(tpl.name || "Document");
+    setActiveTemplateKey(tpl.template_key || tpl.id);
+    const state = (tpl as any).canvas_state;
+    if (state?.type === "writer2" && state.doc) {
+      if (state.config) setSettings(mergeSettings(state.config));
+      editor.commands.setContent(state.doc);
+    } else if (state?.type === "writer" && state.html) {
+      if (state.config) setSettings(mergeSettings(state.config));
+      editor.commands.setContent(state.html);
+      toast.info("Legacy template loaded — saving will upgrade it to the new format");
+    } else {
+      const writerData = (tpl as any).writer_json || state?.writer_json || state || {};
+      const { doc, settings: tplSettings } = writerJsonToWriterDoc(writerData);
+      setSettings(mergeSettings(tplSettings));
+      editor.commands.setContent(doc);
+    }
+    setDirty(true);
+    toast.success(`Template loaded: ${tpl.name}`);
+  }, [editor]);
 
   // keep editor base font in sync with settings
   useEffect(() => {
@@ -834,6 +883,14 @@ function WriterContent() {
             variant="ghost"
             size="sm"
             className="h-8 text-xs gap-1.5 font-medium"
+            onClick={() => setTemplatesOpen(true)}
+          >
+            <LayoutTemplate className="h-3.5 w-3.5 text-emerald-600" /> Templates
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-medium"
             onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}
           >
             <BookOpen className="h-3.5 w-3.5 text-violet-500" /> Research &amp; AI
@@ -1083,6 +1140,12 @@ function WriterContent() {
         onInsert={doInsertWordArt}
       />
       <HeaderFooterDialog ctx={ctx} open={hfOpen} onClose={() => setHfOpen(false)} />
+      <WriterTemplatesDialog
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        onPick={applyTemplate}
+        activeTemplateId={activeTemplateKey}
+      />
     </div>
   );
 }
