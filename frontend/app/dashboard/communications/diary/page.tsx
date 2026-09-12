@@ -12,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BookMarked, Plus, Folder } from "lucide-react";
+import { BookMarked, Plus, Folder, FolderOpen, X } from "lucide-react";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
 import Link from "next/link";
 import {
   AOSPage,
@@ -57,6 +59,8 @@ function DiaryContent() {
   const queryClient = useQueryClient();
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [categoryId, setCategoryId] = useState("none");
+  const [attachmentFiles, setAttachmentFiles] = useState<ManagedFile[]>([]);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [classId, setClassId] = useState("none");
 
   const { data: entries = [], isLoading: entriesLoading } = useQuery({
@@ -88,10 +92,7 @@ function DiaryContent() {
       const title = String(formData.get("title") || "").trim();
       const content = String(formData.get("content") || "").trim();
       const entryDate = String(formData.get("entry_date") || "").trim();
-      const attachmentText = String(formData.get("attachment_urls") || "").trim();
-      const attachmentUrls = attachmentText
-        ? attachmentText.split(",").map((value) => value.trim()).filter(Boolean)
-        : [];
+      const attachmentUrls = attachmentFiles.map((f) => f.url).filter(Boolean);
 
       if (!title || !content) {
         throw new Error("Title and content are required");
@@ -112,6 +113,7 @@ function DiaryContent() {
       setShowAddEntry(false);
       setCategoryId("none");
       setClassId("none");
+      setAttachmentFiles([]);
       toast.success("Diary entry created");
     },
     onError: (err: any) => {
@@ -236,8 +238,46 @@ function DiaryContent() {
                 <Textarea name="content" required rows={5} placeholder="Write the diary note for students or guardians." />
               </div>
               <div className="space-y-2">
-                <Label>Attachment URLs</Label>
-                <Input name="attachment_urls" placeholder="https://example.com/file.pdf, https://example.com/image.jpg" />
+                <Label>Attachments</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAttachmentPicker(true)}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    Choose from Vault
+                  </Button>
+                  {attachmentFiles.map((file) => (
+                    <span
+                      key={file.id}
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                      style={{ borderColor: "var(--w11-border-default)", background: "var(--w11-control-bg)" }}
+                    >
+                      <span className="max-w-[160px] truncate">{file.original_name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachmentFiles((prev) => prev.filter((f) => f.id !== file.id))}
+                        style={{ all: "unset", cursor: "pointer", display: "flex" }}
+                        title="Remove"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <FilePicker
+                  open={showAttachmentPicker}
+                  onOpenChange={setShowAttachmentPicker}
+                  multiple
+                  preselectedIds={attachmentFiles.map((f) => f.id)}
+                  title="Select diary attachments"
+                  onSelect={(files) => {
+                    setAttachmentFiles(files);
+                    setShowAttachmentPicker(false);
+                  }}
+                />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowAddEntry(false)}>Cancel</Button>

@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import {
   AOSPage,
   AOSPageHeader,
@@ -202,8 +203,12 @@ function SlidersContent() {
                 <Textarea rows={3} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input value={form.image_url} onChange={(event) => setForm({ ...form, image_url: event.target.value })} />
+                <Label>Image</Label>
+                <VaultImageField
+                  value={form.image_url || null}
+                  onChange={(url) => setForm({ ...form, image_url: url ?? "" })}
+                  label="Slider image"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Link URL</Label>

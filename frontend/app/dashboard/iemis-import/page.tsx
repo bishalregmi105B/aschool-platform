@@ -54,7 +54,10 @@ import {
   Download,
 } from "lucide-react";
 import { FilePicker } from "@/components/files/FilePicker";
-import type { ManagedFile } from "@/lib/services/files.service";
+import {
+  fetchManagedFileAsFile,
+  type ManagedFile,
+} from "@/lib/services/files.service";
 import Link from "next/link";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -140,14 +143,14 @@ function IemisImportContent() {
   const handleManagedFileSelect = async (files: ManagedFile[]) => {
     const mf = files[0];
     try {
-      const res = await fetch(mf.url);
-      const blob = await res.blob();
-      const file = new File([blob], mf.original_name, { type: blob.type });
+      // Fetch the picked vault file's bytes back as a native File so the
+      // existing validate/import multipart flow keeps working unchanged.
+      const file = await fetchManagedFileAsFile(mf);
       setSelectedFile(file);
       setPreview(null);
       setStep("upload");
     } catch {
-      toast.error("Failed to load file from file manager");
+      toast.error("Failed to load file from the file manager");
     }
   };
 
@@ -259,28 +262,6 @@ function IemisImportContent() {
                       )}
                       <p className="text-xs mt-1 mb-3" style={{ color: "var(--w11-text-secondary)" }}>Supports .xlsx and .xls — max 20 MB</p>
                       <div className="flex flex-wrap items-center justify-center gap-2">
-                        <label
-                          className="inline-flex items-center gap-1.5 text-sm border rounded-lg px-3 py-1.5 cursor-pointer"
-                          style={{
-                            borderColor: "var(--w11-control-border)",
-                            color: "var(--w11-text-primary)",
-                          }}
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Choose Local File
-                          <input
-                            type="file"
-                            accept=".xlsx,.xls"
-                            className="hidden"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0] || null;
-                              setSelectedFile(f);
-                              setPreview(null);
-                              setStep("upload");
-                              e.target.value = "";
-                            }}
-                          />
-                        </label>
                         <Button variant="outline" size="sm" onClick={() => setShowFilePicker(true)}>
                           <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
                           Choose from File Manager

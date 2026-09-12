@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { ColorField } from "@/components/ui/color-field";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import { AlertCircle, Palette, Save } from "lucide-react";
 import {
   AOSPage,
@@ -162,13 +163,17 @@ function BrandingContent() {
                   {form.logo_url ? <img src={form.logo_url} alt="Logo" className="h-full w-full object-contain rounded-lg" /> : "No logo"}
                 </div>
                 <div className="flex-1 space-y-2">
-                  <Label>Logo URL</Label>
-                  <div className="flex gap-2">
-                    <Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="https://... (PNG/SVG, max 2MB)" />
+                  <Label>Logo</Label>
+                  <div className="flex items-center gap-2">
+                    <VaultImageField
+                      value={form.logo_url || null}
+                      onChange={(url) => setForm({ ...form, logo_url: url ?? "" })}
+                      label="Logo"
+                    />
                     <Button variant="outline" onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? <Spinner /> : "Save"}</Button>
                   </div>
                   <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-                    Paste a hosted logo URL (transparent background recommended). It is applied to your website and public profile.
+                    Pick a logo from your school vault, or upload one inside the picker (transparent background recommended). It is applied to your website and public profile.
                   </p>
                 </div>
               </div>

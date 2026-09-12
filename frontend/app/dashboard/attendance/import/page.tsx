@@ -1,12 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FilePicker } from "@/components/files/FilePicker";
+import {
+  fetchManagedFileAsFile,
+  type ManagedFile,
+} from "@/lib/services/files.service";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -22,7 +27,7 @@ import {
 } from "@/components/aos/kit/page-kit";
 import {
   Upload, FileSpreadsheet, FileCheck2, CloudUpload, AlertTriangle,
-  CheckCircle2, ArrowLeft, XCircle, Download,
+  CheckCircle2, ArrowLeft, XCircle, Download, FolderOpen,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -156,7 +161,8 @@ function ImportContent() {
   const [rawCsv, setRawCsv] = useState("");
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [commitResult, setCommitResult] = useState<{ applied: number; skipped_invalid: number } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
 
   const parsed = useMemo(() => parseEntries(rawCsv), [rawCsv]);
 
@@ -166,7 +172,6 @@ function ImportContent() {
     setRawCsv("");
     setPreview(null);
     setCommitResult(null);
-    if (fileRef.current) fileRef.current.value = "";
   };
 
   const onFile = async (file: File | undefined) => {
@@ -181,6 +186,21 @@ function ImportContent() {
     setPreview(null);
     setCommitResult(null);
     setStep(2);
+  };
+
+  /** Vault pick → fetch the file's bytes back → run the existing CSV parse. */
+  const handleManagedFileSelect = async (files: ManagedFile[]) => {
+    const mf = files[0];
+    if (!mf) return;
+    setLoadingFile(true);
+    try {
+      const fileObj = await fetchManagedFileAsFile(mf);
+      await onFile(fileObj);
+    } catch {
+      toast.error("Failed to load file from the file manager");
+    } finally {
+      setLoadingFile(false);
+    }
   };
 
   const previewMutation = useMutation({
@@ -272,27 +292,18 @@ function ImportContent() {
         {step === 1 && (
           <DataPanel title="1. Choose a CSV file">
             <div className="space-y-4">
-              <label
+              <div
                 className="flex flex-col items-center justify-center gap-2 rounded-[var(--w11-radius-lg)] border-2 border-dashed border-[var(--w11-border-default)] py-12 cursor-pointer hover:bg-[var(--w11-control-hover)] transition-colors"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  onFile(e.dataTransfer.files?.[0]);
-                }}
+                onClick={() => setShowFilePicker(true)}
               >
-                <Upload className="h-10 w-10 text-[color:var(--w11-text-secondary)] opacity-40" />
-                <p className="font-medium">Drop a CSV here or click to browse</p>
+                <FolderOpen className="h-10 w-10 text-[color:var(--w11-text-secondary)] opacity-40" />
+                <p className="font-medium">
+                  {loadingFile ? "Loading file from the vault…" : "Choose a CSV from the file manager"}
+                </p>
                 <p className="text-xs text-[color:var(--w11-text-secondary)]">
                   Columns: student_id, date_bs (or date), status, remarks — .csv / .txt
                 </p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv,.txt"
-                  className="hidden"
-                  onChange={(e) => onFile(e.target.files?.[0])}
-                />
-              </label>
+              </div>
               <p className="text-xs text-[color:var(--w11-text-secondary)]">
                 Spreadsheets (XLSX) are not parsed in-browser — export the sheet as CSV
                 first. Statuses: present, absent, late, half_day, leave, holiday.
@@ -553,6 +564,13 @@ function ImportContent() {
           </DataPanel>
         )}
       </AOSPageBody>
+
+      <FilePicker
+        open={showFilePicker}
+        onOpenChange={setShowFilePicker}
+        onSelect={handleManagedFileSelect}
+        title="Select Attendance CSV"
+      />
     </AOSPage>
   );
 }

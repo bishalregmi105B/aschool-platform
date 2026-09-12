@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Image as ImageIcon, UploadCloud, CheckCircle2, XCircle, AlertCircle, FileArchive } from "lucide-react";
+import { FilePicker } from "@/components/files/FilePicker";
+import {
+  fetchManagedFileAsFile,
+  type ManagedFile,
+} from "@/lib/services/files.service";
+import { Image as ImageIcon, FolderOpen, CheckCircle2, XCircle, AlertCircle, FileArchive } from "lucide-react";
 
 interface UploadDetail {
   filename: string;
@@ -25,20 +30,32 @@ interface UploadResult {
 }
 
 export default function StudentProfileImagesPage() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
 
-  function handleFileSelect(file: File) {
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      toast.error("Please select a .zip file");
-      return;
+  async function handleFileSelect(files: ManagedFile[]) {
+    const mf = files[0];
+    if (!mf) return;
+    setLoadingFile(true);
+    try {
+      // Fetch the picked vault file's bytes back as a native File so the
+      // existing bulk-upload flow (multipart POST) keeps working unchanged.
+      const fileObj = await fetchManagedFileAsFile(mf);
+      if (!fileObj.name.toLowerCase().endsWith(".zip")) {
+        toast.error("Please select a .zip file");
+        return;
+      }
+      setSelectedFile(fileObj);
+      setResult(null);
+    } catch {
+      toast.error("Failed to load file from the file manager");
+    } finally {
+      setLoadingFile(false);
     }
-    setSelectedFile(file);
-    setResult(null);
   }
 
   async function handleUpload() {
@@ -87,22 +104,16 @@ export default function StudentProfileImagesPage() {
         <CardContent className="space-y-4">
           <div
             className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-              isDragOver ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-            } ${selectedFile ? "border-green-400 bg-green-50 dark:bg-green-950/20" : ""}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragOver(true);
-            }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-              const file = e.dataTransfer.files[0];
-              if (file) handleFileSelect(file);
-            }}
+              selectedFile ? "border-green-400 bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
+            }`}
+            onClick={() => setShowFilePicker(true)}
           >
-            {selectedFile ? (
+            {loadingFile ? (
+              <>
+                <FileArchive className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
+                <h3 className="font-semibold text-lg mb-1">Loading file from the vault…</h3>
+              </>
+            ) : selectedFile ? (
               <>
                 <FileArchive className="h-12 w-12 text-green-500 mx-auto mb-4" />
                 <h3 className="font-semibold text-lg mb-1 text-green-700 dark:text-green-400">
@@ -114,26 +125,15 @@ export default function StudentProfileImagesPage() {
               </>
             ) : (
               <>
-                <UploadCloud className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-1">Drag and drop a .zip file</h3>
-                <p className="text-sm text-muted-foreground mb-4">or click to browse from your computer</p>
+                <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-semibold text-lg mb-1">Choose a .zip file</h3>
+                <p className="text-sm text-muted-foreground mb-4">Pick from the school file manager — upload it there first if needed</p>
               </>
             )}
             <Button type="button" variant={selectedFile ? "secondary" : "default"}>
-              {selectedFile ? "Change ZIP Archive" : "Select ZIP Archive"}
+              {selectedFile ? "Change ZIP Archive" : "Browse Vault"}
             </Button>
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileSelect(file);
-            }}
-          />
 
           {uploading && (
             <div className="space-y-2">
@@ -144,7 +144,7 @@ export default function StudentProfileImagesPage() {
 
           {selectedFile && !uploading && (
             <Button onClick={handleUpload} className="w-full" size="lg">
-              <UploadCloud className="h-4 w-4 mr-2" /> Upload &amp; Match Student Photos
+              <FolderOpen className="h-4 w-4 mr-2" /> Upload &amp; Match Student Photos
             </Button>
           )}
         </CardContent>
@@ -233,6 +233,13 @@ export default function StudentProfileImagesPage() {
           <p>5. Images that don&apos;t match any student will be reported as &quot;Not Found&quot;.</p>
         </CardContent>
       </Card>
+
+      <FilePicker
+        open={showFilePicker}
+        onOpenChange={setShowFilePicker}
+        onSelect={handleFileSelect}
+        title="Select ZIP Archive"
+      />
     </div>
   );
 }

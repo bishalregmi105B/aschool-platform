@@ -27,12 +27,20 @@ import {
 } from "@/components/aos/kit/page-kit";
 
 const CATEGORIES = [
-  { id: "all",          label: "All" },
-  { id: "id_cards",     label: "ID Cards" },
-  { id: "certificates", label: "Certificates" },
-  { id: "admit_cards",  label: "Admit Cards" },
-  { id: "reports",      label: "Reports" },
-  { id: "calendars",    label: "Calendar" },
+  { id: "all",           label: "All" },
+  { id: "id_cards",      label: "ID Cards" },
+  { id: "certificates",  label: "Certificates" },
+  { id: "admit_cards",   label: "Admit Cards" },
+  { id: "reports",       label: "Reports" },
+  { id: "notices",       label: "Notices" },
+  { id: "letters",       label: "Letters" },
+  { id: "lesson_plans",  label: "Lesson Plans" },
+  { id: "letterheads",   label: "Letterheads" },
+  { id: "calendars",     label: "Calendar" },
+  { id: "banners",       label: "Banners" },
+  { id: "posters",       label: "Posters" },
+  { id: "registers",     label: "Registers" },
+  { id: "forms",         label: "Forms" },
 ];
 
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
@@ -41,6 +49,14 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
   reports:      <FileText className="h-4 w-4" />,
   certificates: <FileText className="h-4 w-4" />,
   admit_cards:  <WalletCards className="h-4 w-4" />,
+  notices:      <FileText className="h-4 w-4" />,
+  letters:      <FileText className="h-4 w-4" />,
+  lesson_plans: <LayoutTemplate className="h-4 w-4" />,
+  letterheads:  <FileText className="h-4 w-4" />,
+  banners:      <LayoutTemplate className="h-4 w-4" />,
+  posters:      <LayoutTemplate className="h-4 w-4" />,
+  registers:    <FileText className="h-4 w-4" />,
+  forms:        <FileText className="h-4 w-4" />,
 };
 
 export default function DesignerPage() {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { Upload, FileText, CheckCircle } from "lucide-react";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
+import { Upload, FileText, CheckCircle, FolderOpen } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
@@ -25,22 +27,31 @@ export default function UploadResourcesPage() {
 
 function UploadContent() {
   const [form, setForm] = useState({ title: "", type: "past_paper", subject: "", class_name: "", year: "", exam_type: "final", description: "" });
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<ManagedFile | null>(null);
   const [uploaded, setUploaded] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+
+  const handleFileSelect = (files: ManagedFile[]) => {
+    if (files[0]) {
+      setFile(files[0]);
+      // Prefill the title from the filename if the user hasn't typed one yet.
+      if (!form.title) {
+        setForm((prev) => ({
+          ...prev,
+          title: files[0].original_name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "),
+        }));
+      }
+    }
+  };
 
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("No file selected");
-      // Two-step contract (backend stores bytes centrally, metadata per type):
-      // 1) POST /files/upload (multipart) → {url}
-      // 2) POST /elibrary/books | /elibrary/papers | /elibrary/resources with that URL
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "elibrary");
-      const uploaded = (await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } })).data;
-      const fileUrl = uploaded?.data?.url || uploaded?.url;
-      if (!fileUrl) throw new Error("Upload did not return a file URL");
+      // The file already lives in the school vault (picked via the file
+      // manager), so we only register its metadata:
+      // POST /elibrary/books | /elibrary/papers | /elibrary/resources with the
+      // vault URL.
+      const fileUrl = file.url;
       const meta = {
         title: form.title,
         description: form.description || undefined,
@@ -54,7 +65,7 @@ function UploadContent() {
       }
       // ebook / worksheet / notes → stored as a digital book (the only other
       // backend-backed elibrary entity)
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
+      const ext = file.extension?.toLowerCase() || "pdf";
       return (await api.post("/elibrary/books", {
         title: form.title,
         author: form.subject || undefined,
@@ -62,11 +73,11 @@ function UploadContent() {
         file_type: ext === "epub" ? "epub" : "pdf",
       })).data;
     },
-    onSuccess: () => { toast.success("Resource uploaded successfully"); setUploaded(true); setFile(null); setForm({ title: "", type: "past_paper", subject: "", class_name: "", year: "", exam_type: "final", description: "" }); },
+    onSuccess: () => { toast.success("Resource published successfully"); setUploaded(true); setFile(null); setForm({ title: "", type: "past_paper", subject: "", class_name: "", year: "", exam_type: "final", description: "" }); },
     onError: (e: any) => {
       // surface the backend's actionable message (e.g. "Install this plugin
       // from the marketplace." when file_management is not installed)
-      toast.error(e?.response?.data?.error || e?.message || "Upload failed");
+      toast.error(e?.response?.data?.error || e?.message || "Publish failed");
     },
   });
 
@@ -117,33 +128,39 @@ function UploadContent() {
             </div>
           </FormSection>
 
-          <FormSection title="File Upload">
+          <FormSection title="Resource File">
             <div
               className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors"
               style={{ borderColor: "var(--w11-border-default)" }}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setShowFilePicker(true)}
             >
               {file ? (
                 <div className="flex items-center justify-center gap-3">
                   <FileText className="h-8 w-8" style={{ color: "var(--w11-accent)" }} />
-                  <div className="text-left"><p className="font-medium">{file.name}</p><p className="text-sm text-[color:var(--w11-text-secondary)]">{(file.size / 1024 / 1024).toFixed(2)} MB</p></div>
+                  <div className="text-left"><p className="font-medium">{file.original_name}</p><p className="text-sm text-[color:var(--w11-text-secondary)]">{(file.size_bytes / 1024 / 1024).toFixed(2)} MB</p></div>
                 </div>
               ) : (
                 <>
-                  <Upload className="h-10 w-10 mx-auto mb-3 text-[color:var(--w11-text-secondary)]" />
-                  <p className="font-medium">Click to select file</p>
-                  <p className="text-sm mt-1 text-[color:var(--w11-text-secondary)]">PDF, DOCX, images — max 20MB</p>
+                  <FolderOpen className="h-10 w-10 mx-auto mb-3" style={{ color: "var(--w11-accent)" }} />
+                  <p className="font-medium">Choose from the file manager</p>
+                  <p className="text-sm mt-1 text-[color:var(--w11-text-secondary)]">Pick an existing vault file or upload a new one — PDF, DOCX, images</p>
                 </>
               )}
             </div>
-            <input ref={fileRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </FormSection>
 
           <Button className="w-full" onClick={() => upload.mutate()} disabled={upload.isPending || !file || !form.title}>
-            {upload.isPending ? <Spinner /> : <><Upload className="h-4 w-4 mr-2" />Upload Resource</>}
+            {upload.isPending ? <Spinner /> : <><Upload className="h-4 w-4 mr-2" />Publish Resource</>}
           </Button>
         </div>
       </AOSPageBody>
+
+      <FilePicker
+        open={showFilePicker}
+        onOpenChange={setShowFilePicker}
+        onSelect={handleFileSelect}
+        title="Select Resource File"
+      />
     </AOSPage>
   );
 }

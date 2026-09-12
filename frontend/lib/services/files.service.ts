@@ -189,6 +189,24 @@ export async function uploadFiles(files: File[]): Promise<ManagedFile[]> {
   return uploadFilesToFolder(files, null);
 }
 
+/**
+ * Fetch a managed file's bytes from its URL and wrap them in a native File
+ * object — for pages that need to parse/process file content locally
+ * (e.g. CSV/ZIP imports) after picking a file from the vault.
+ */
+export async function fetchManagedFileAsFile(file: ManagedFile): Promise<File> {
+  const res = await fetch(file.url);
+  if (!res.ok) {
+    throw new Error(
+      `Could not download "${file.original_name}" (HTTP ${res.status})`,
+    );
+  }
+  const blob = await res.blob();
+  return new File([blob], file.original_name, {
+    type: blob.type || file.mime_type,
+  });
+}
+
 export async function updateFile(
   id: string,
   payload: FileUpdatePayload,
