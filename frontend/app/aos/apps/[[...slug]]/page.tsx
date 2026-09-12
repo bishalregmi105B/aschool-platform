@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 interface LegacyAOSAppsRedirectProps {
   params: { slug?: string[] };
   searchParams?: Record<string, string | string[] | undefined>;
