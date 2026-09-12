@@ -41,6 +41,8 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  UserCheck,
+  UserX,
   Users,
 } from "lucide-react";
 
@@ -120,6 +122,23 @@ export default function ParentsPage() {
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
     enabled: showAdd,
+  });
+
+  // Cheap count queries for the KPI row — per_page=1 on the same parent list
+  // endpoint (role=parent), so only the pagination totals are read.
+  const { data: parentTotal } = useQuery({
+    queryKey: ["parents", "count"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/users?role=parent&per_page=1");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
+  });
+  const { data: activeParentCount } = useQuery({
+    queryKey: ["parents", "count", "active"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse>("/users?role=parent&per_page=1&is_active=true");
+      return res.data?.meta?.pagination?.total as number | undefined;
+    },
   });
 
   const createParentMutation = useMutation({
@@ -418,12 +437,28 @@ export default function ParentsPage() {
         }
       />
       <AOSPageBody>
-        {pagination?.total != null && (
-          <StatGrid min={170}>
-            <KpiCard label="Parent Accounts" value={pagination.total} />
-            <KpiCard label="Showing" value={parents.length} denominator={`/ ${pagination.total}`} color="#107c10" footnote={`Page ${pagination.page} of ${pagination.pages}`} />
-          </StatGrid>
-        )}
+        {/* Module dashboard — KPI row above the parent accounts table */}
+        <StatGrid min={170}>
+          <KpiCard
+            label="Parent Accounts"
+            value={parentTotal ?? pagination?.total ?? "—"}
+            footnote={pagination ? `Page ${pagination.page} of ${pagination.pages}` : undefined}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Active"
+            value={activeParentCount ?? "—"}
+            denominator={parentTotal != null ? `/ ${parentTotal}` : undefined}
+            color="#107c10"
+            icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Inactive"
+            value={parentTotal != null && activeParentCount != null ? parentTotal - activeParentCount : "—"}
+            color="#d83b01"
+            icon={<UserX className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+        </StatGrid>
 
         <FilterCommandBar>
           <div className="relative flex-1 min-w-[220px]">

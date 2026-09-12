@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, ChevronRight, ListOrdered } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -9,8 +10,12 @@ import {
   AOSPageBody,
   FilterCommandBar,
   DataPanel,
+  KpiCard,
+  StatGrid,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -22,6 +27,15 @@ import {
   NOTIFICATION_CATEGORIES,
   type InAppNotification,
 } from "@/lib/services/notifications.service";
+
+// Quick links — the notification surfaces from the settings_core manifest
+// (Notification Matrix) plus the sibling Communication apps.
+const QUICK_LINKS = [
+  { label: "Notification Matrix", icon: "ListOrdered", href: "/dashboard/notifications/matrix" },
+  { label: "Notification Settings", icon: "Settings", href: "/dashboard/settings/notifications" },
+  { label: "Communications", icon: "MessageSquare", href: "/dashboard/communications" },
+  { label: "SMS", icon: "MessageSquare", href: "/dashboard/sms" },
+];
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -101,6 +115,64 @@ export default function NotificationsPage() {
       />
       <AOSPageBody>
         <div className="max-w-4xl mx-auto space-y-4">
+          {/* Dashboard — KPIs computed from the notifications already loaded */}
+          <StatGrid>
+            <KpiCard
+              label="Unread"
+              value={unreadCount}
+              icon={<Bell className="h-4 w-4" style={{ color: unreadCount > 0 ? "#d83b01" : "var(--w11-text-secondary)" }} />}
+              color={unreadCount > 0 ? "#d83b01" : "var(--w11-accent)"}
+            />
+            <KpiCard
+              label="Loaded"
+              value={notifications.length}
+              icon={<CheckCheck className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              color="var(--w11-text-primary)"
+            />
+            <KpiCard
+              label="High Priority"
+              value={notifications.filter((n) => n.priority === "high" || n.priority === "urgent").length}
+              icon={<Bell className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+              color="#c42b1c"
+            />
+            <KpiCard
+              label="Categories"
+              value={NOTIFICATION_CATEGORIES.length}
+              icon={<ListOrdered className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+              color="var(--w11-text-primary)"
+            />
+          </StatGrid>
+
+          {/* Quick links — 44px gradient icon tile + label, as next/link */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] || ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", marginBottom: 0 }}
+                  >
+                    <div
+                      className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        background: SECTION_GRADIENTS.Communication,
+                        boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
           {/* Category Filters */}
           <FilterCommandBar>
             {NOTIFICATION_CATEGORIES.map((cat) => (

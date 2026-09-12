@@ -20,6 +20,7 @@ import {
   DataPanel,
   FormSection,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 
 interface MoodEntry {
   id: string;
@@ -132,6 +133,28 @@ function WellbeingContent() {
         subtitle="Mood tracking, counselor notes, and wellbeing surveys"
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — 7-day mood distribution from /wellbeing/mood/summary */}
+        <StatGrid min={140}>
+          {Object.entries(moodIcons).map(([mood, icon]) => (
+            <KpiCard key={mood} label={mood} value={distribution[mood] || 0} icon={icon} />
+          ))}
+          <KpiCard
+            label="Check-ins (7d)"
+            value={summary?.total_entries ?? "—"}
+            icon={<TrendingUp className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+        </StatGrid>
+
+        {/* Quick links — every wellbeing subpage from the plugin manifest */}
+        <QuickLinks
+          section="Student Life"
+          links={[
+            { label: "Mood Trends", href: "/dashboard/wellbeing/moods", icon: "TrendingUp" },
+            { label: "Counselor", href: "/dashboard/wellbeing/counselor", icon: "Heart" },
+            { label: "Surveys", href: "/dashboard/wellbeing/surveys", icon: "ClipboardList" },
+          ]}
+        />
+
         <div className="flex gap-2 mb-4">
           {(["overview", "check-in", "entries"] as const).map((t: any) => (
             <Button key={t} variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
@@ -143,19 +166,12 @@ function WellbeingContent() {
         </div>
 
         {tab === "overview" && (
-          <div className="space-y-4">
-            <StatGrid min={140}>
-              {Object.entries(moodIcons).map(([mood, icon]) => (
-                <KpiCard key={mood} label={mood} value={distribution[mood] || 0} icon={icon} />
-              ))}
-            </StatGrid>
-            <DataPanel title="7-Day Summary">
-              <p className="text-[color:var(--w11-text-secondary)]">Total check-ins: <strong>{summary?.total_entries || 0}</strong></p>
-              {summary?.total_entries === 0 && (
-                <p className="mt-2 text-sm text-[color:var(--w11-text-secondary)]">No mood entries yet. Encourage students to do daily check-ins.</p>
-              )}
-            </DataPanel>
-          </div>
+          <DataPanel title="7-Day Summary">
+            <p className="text-[color:var(--w11-text-secondary)]">Total check-ins: <strong>{summary?.total_entries || 0}</strong></p>
+            {summary?.total_entries === 0 && (
+              <p className="mt-2 text-sm text-[color:var(--w11-text-secondary)]">No mood entries yet. Encourage students to do daily check-ins.</p>
+            )}
+          </DataPanel>
         )}
 
         {tab === "check-in" && <MoodCheckIn onSubmit={(data) => submitMoodMut.mutate(data)} loading={submitMoodMut.isPending} />}

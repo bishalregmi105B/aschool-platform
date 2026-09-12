@@ -24,7 +24,7 @@ import {
   AOSEmptyState,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { GraduationCap, Plus, Mail, Phone, MapPin } from "lucide-react";
+import { GraduationCap, CalendarDays, UserCheck, Building2, Plus, Mail, Phone, MapPin } from "lucide-react";
 
 export default function AlumniPage() {
   return <PluginGate slug="alumni"><AlumniContent /></PluginGate>;
@@ -103,8 +103,13 @@ function AlumniContent() {
       />
       <AOSPageBody>
         <StatGrid>
-          {[{ label: "Total Alumni", val: stats.total || alumni.length }, { label: "This Year Batch", val: stats.this_year || 0 }, { label: "Active Network", val: stats.active || 0, color: "#107c10" }, { label: "Organizations", val: stats.organizations || 0 }].map((s) => (
-            <KpiCard key={s.label} label={s.label} value={s.val} color={s.color} />
+          {([
+            { label: "Total Alumni", val: stats.total || alumni.length, color: undefined as string | undefined, icon: <GraduationCap className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> },
+            { label: "This Year Batch", val: stats.this_year || 0, color: undefined as string | undefined, icon: <CalendarDays className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+            { label: "Active Network", val: stats.active || 0, color: "#107c10", icon: <UserCheck className="h-4 w-4" style={{ color: "#107c10" }} /> },
+            { label: "Organizations", val: stats.organizations || 0, color: undefined as string | undefined, icon: <Building2 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+          ]).map((s) => (
+            <KpiCard key={s.label} label={s.label} value={s.val} color={s.color} icon={s.icon} />
           ))}
         </StatGrid>
 

@@ -34,6 +34,7 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { Bus, MapPin, Plus, Route } from "lucide-react";
 
 interface TransportRoute {
@@ -119,6 +120,23 @@ function TransportContent() {
             icon={<MapPin className="h-4 w-4" style={{ color: "#c42b1c" }} />}
           />
         </StatGrid>
+
+        {/* Quick links — every transport subpage from the plugin manifest */}
+        <QuickLinks
+          section="Operations"
+          links={[
+            { label: "Live Map", href: "/dashboard/transport/map", icon: "MapPin" },
+            { label: "Routes", href: "/dashboard/transport/routes", icon: "Route" },
+            { label: "Buses", href: "/dashboard/transport/buses", icon: "Bus" },
+            { label: "Stops", href: "/dashboard/transport/stops", icon: "ListOrdered" },
+            { label: "Trips", href: "/dashboard/transport/trips", icon: "ArrowRightLeft" },
+            { label: "Monitor", href: "/dashboard/transport/monitor", icon: "Monitor" },
+            { label: "GPS Logs", href: "/dashboard/transport/logs", icon: "Database" },
+            { label: "Reports", href: "/dashboard/transport/reports", icon: "BarChart3" },
+            { label: "Pickup Points", href: "/dashboard/transport/pickup-points", icon: "Tag" },
+            { label: "Transport Allocation", href: "/dashboard/transport/allocation", icon: "UserCheck" },
+          ]}
+        />
 
         {/* Tabs */}
         <FilterCommandBar>

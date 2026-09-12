@@ -17,11 +17,13 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Plus, AlertCircle } from "lucide-react";
+import { Plus, AlertCircle, AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function IncidentsPage() {
@@ -97,6 +99,33 @@ function IncidentsContent() {
         }
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real counts from the loaded incident list */}
+        <StatGrid>
+          <KpiCard
+            label="Total Incidents"
+            value={incidents.length}
+            icon={<AlertCircle className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Open"
+            value={incidents.filter((i: any) => (i.status ?? "open") !== "resolved").length}
+            color="#d83b01"
+            icon={<ShieldAlert className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+          <KpiCard
+            label="High Severity"
+            value={incidents.filter((i: any) => i.severity === "high").length}
+            color="#c42b1c"
+            icon={<AlertTriangle className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+          />
+          <KpiCard
+            label="Resolved"
+            value={incidents.filter((i: any) => i.status === "resolved").length}
+            color="#107c10"
+            icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+        </StatGrid>
+
         <DataPanel bodyClassName="p-0">
           <DataTable
             columns={INCIDENT_COLUMNS}

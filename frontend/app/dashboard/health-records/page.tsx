@@ -16,11 +16,14 @@ import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
+  KpiCard,
+  StatGrid,
   DataPanel,
   FilterCommandBar,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { HeartPulse, Syringe, Stethoscope, PlusCircle } from "lucide-react";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { HeartPulse, ShieldCheck, Syringe, Stethoscope, Users, PlusCircle, AlertTriangle } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { displayBS } from "@/lib/nepali_date";
@@ -57,13 +60,14 @@ function HealthRecordsContent() {
   const [showVisit, setShowVisit] = useState(false);
   const queryClient = useQueryClient();
 
+  // Both lists load up front — the KPI hub above the tabs summarizes them
+  // (previously each query was tab-gated and only fetched on its own tab).
   const { isError, refetch, data: visits, isLoading } = useQuery<any>({
     queryKey: ["health-visits"],
     queryFn: async () => {
       const res = await api.get<ApiResponse>("/health-records/visits");
       return (res.data.data as MedicalVisit[]) || [];
     },
-    enabled: tab === "visits",
   });
 
   const { data: immunizations } = useQuery<any>({
@@ -72,7 +76,6 @@ function HealthRecordsContent() {
       const res = await api.get<ApiResponse>("/health-records/immunizations");
       return (res.data.data as Array<{ id: string; student_id: string; vaccine_name: string; dose_number: number; date_administered: string }>) || [];
     },
-    enabled: tab === "immunizations",
   });
 
   const createVisitMut = useMutation({
@@ -152,6 +155,42 @@ function HealthRecordsContent() {
         }
       />
       <AOSPageBody>
+        {/* Dashboard KPIs — real counts from the data this page already loads */}
+        <StatGrid>
+          <KpiCard
+            label="Medical Visits"
+            value={visits?.length ?? "—"}
+            icon={<Stethoscope className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Immunizations"
+            value={immunizations?.length ?? "—"}
+            color="#107c10"
+            icon={<Syringe className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Students Seen"
+            value={visits ? new Set(visits.map((v: any) => v.student_id)).size : "—"}
+            icon={<Users className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+          <KpiCard
+            label="Vaccines"
+            value={immunizations ? new Set(immunizations.map((i: any) => i.vaccine_name)).size : "—"}
+            color="#d83b01"
+            icon={<ShieldCheck className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+        </StatGrid>
+
+        {/* Quick links — every health-records subpage from the plugin manifest */}
+        <QuickLinks
+          section="Student Life"
+          links={[
+            { label: "Records", href: "/dashboard/health-records/records", icon: "FileText" },
+            { label: "Vaccinations", href: "/dashboard/health-records/vaccinations", icon: "ShieldCheck" },
+            { label: "Allergies", href: "/dashboard/health-records/allergies", icon: "AlertTriangle" },
+          ]}
+        />
+
         <FilterCommandBar>
           <Button variant={tab === "visits" ? "default" : "outline"} onClick={() => setTab("visits")}>
             <Stethoscope className="h-4 w-4 mr-2" /> Medical Visits

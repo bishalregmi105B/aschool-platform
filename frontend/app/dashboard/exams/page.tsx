@@ -21,8 +21,9 @@ import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
   DataPanel, StatusChip, AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import {
-  Plus, FileText, BarChart3, ClipboardList, Calendar, GraduationCap,
+  Plus, BarChart3, ClipboardList, Calendar, GraduationCap,
   MoreHorizontal, Pencil, Trash2, Eye, BookOpen, Trophy, Printer,
 } from "lucide-react";
 import { formatNepaliDate, displayBS } from "@/lib/nepali_date";
@@ -469,13 +470,6 @@ function ExamsContent() {
     },
   ];
 
-  const QUICK_LINKS = [
-    { href: "/dashboard/exams/marks", icon: ClipboardList, title: "Marks Entry", note: "Enter subject marks" },
-    { href: "/dashboard/exams/results", icon: BarChart3, title: "View Results", note: "NEB graded results" },
-    { href: "/dashboard/exams/report-cards", icon: FileText, title: "Report Cards", note: "AI-generated reports" },
-    { href: "/dashboard/exams/schedule", icon: Calendar, title: "Exam Schedule", note: "Subject-wise timetable" },
-  ];
-
   // NEB grade tiles painted with the Fluent status palette (the same
   // bg/border/text recipe the 11.css win11-chip tones use).
   const NEB_GRADES = [
@@ -513,20 +507,22 @@ function ExamsContent() {
           <KpiCard label="Completed" value={stats.completed} icon={<Trophy className="h-5 w-5" style={{ color: W11_SUCCESS }} />} color={W11_SUCCESS} />
         </StatGrid>
 
-        {/* Quick Links */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {QUICK_LINKS.map((l) => (
-            <Link key={l.href} href={l.href}>
-              <div className="win11-card p-4 flex items-center gap-3 cursor-pointer transition-colors hover:border-[var(--w11-accent)]">
-                <l.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
-                <div>
-                  <p className="text-sm font-medium">{l.title}</p>
-                  <p className="text-[10px] text-[color:var(--w11-text-secondary)]">{l.note}</p>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {/* Quick Links — every exams subpage from the plugin manifest */}
+        <QuickLinks
+          section="Learning"
+          links={[
+            { label: "Schedule", href: "/dashboard/exams/schedule", icon: "Calendar" },
+            { label: "Enter Marks", href: "/dashboard/exams/marks", icon: "ClipboardList" },
+            { label: "Tabulation Sheet", href: "/dashboard/exams/tabulation", icon: "FileSpreadsheet" },
+            { label: "Grade Scales", href: "/dashboard/exams/grade-scales", icon: "Settings" },
+            { label: "Results", href: "/dashboard/exams/results", icon: "BarChart3" },
+            { label: "Report Cards", href: "/dashboard/exams/report-cards", icon: "FileText" },
+            { label: "AI Paper Generator", href: "/dashboard/ai-tools/question-paper", icon: "Sparkles" },
+            { label: "Online Exams", href: "/dashboard/exams/online", icon: "MonitorPlay" },
+            { label: "Online Question Bank", href: "/dashboard/exams/online/questions", icon: "Database" },
+            { label: "Grade Table", href: "/dashboard/exams/grades", icon: "GraduationCap" },
+          ]}
+        />
 
         {/* Filters + Exam List — DataTable owns search/filters/actions */}
         <DataPanel title={`All Exams (${filtered.length})`}>

@@ -32,8 +32,16 @@ import {
   KpiCard,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Plus, UserCog, Mail, Phone, Upload, Pencil, Trash2 } from "lucide-react";
+import { Plus, UserCog, UserCheck, UserX, Mail, Phone, Upload, Pencil, Trash2, Layers, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { ICON_MAP } from "@/lib/icon-map";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+
+/** Module dashboard quick links — mirrors the teachers plugin manifest
+ * (backend/app/plugins/manifests/teachers.yaml ui.nav.subitems). */
+const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
+  { label: "Bulk Upload", href: "/dashboard/teachers/bulk-upload", icon: "Upload" },
+];
 
 type Teacher = TeacherDto;
 
@@ -252,11 +260,47 @@ export default function TeachersPage() {
       />
       <AOSPageBody>
         <StatGrid min={170}>
-          <KpiCard label="Total Teachers" value={stats.total} />
-          <KpiCard label="Active" value={stats.active} denominator={`/ ${stats.total}`} color="#107c10" />
-          <KpiCard label="Inactive" value={stats.inactive} color="#d83b01" />
-          <KpiCard label="Class Sections" value={stats.classSections} color="var(--w11-accent)" />
+          <KpiCard label="Total Teachers" value={stats.total} icon={<UserCog className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Active" value={stats.active} denominator={`/ ${stats.total}`} color="#107c10" icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />} />
+          <KpiCard label="Inactive" value={stats.inactive} color="#d83b01" icon={<UserX className="h-4 w-4" style={{ color: "#d83b01" }} />} />
+          <KpiCard label="Class Sections" value={stats.classSections} color="var(--w11-text-primary)" icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />} />
         </StatGrid>
+
+        {/* Module dashboard quick links */}
+        <DataPanel title="Teachers Quick Links" bodyClassName="p-3" className="mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {QUICK_LINKS.map((l) => {
+              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
+              return (
+                <Link key={l.href} href={l.href} className="block h-full">
+                  <div
+                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
+                    style={{ cursor: "pointer", margin: 0 }}
+                  >
+                    <div
+                      className="flex items-center justify-center text-white shrink-0"
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "10px",
+                        background: SECTION_GRADIENTS.Core,
+                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <Icon size={22} strokeWidth={2.2} />
+                    </div>
+                    <span
+                      className="text-[13px] font-semibold leading-tight"
+                      style={{ color: "var(--w11-text-primary)" }}
+                    >
+                      {l.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </DataPanel>
 
         <DataPanel bodyClassName="p-0">
           <DataTable<Teacher>

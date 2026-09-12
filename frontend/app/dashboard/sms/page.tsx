@@ -4,10 +4,13 @@ import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
 import { displayBS } from "@/lib/nepali_date";
+import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { ICON_MAP } from "@/lib/icon-map";
 import {
   AOSPage,
   AOSPageHeader,
@@ -28,6 +31,7 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  ChevronRight,
 } from "lucide-react";
 
 const inputStyle = {
@@ -75,6 +79,16 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+// ── Quick Links (sms_notifications manifest ui.nav.subitems) ────────────────
+const QUICK_LINKS = [
+  { label: "Announcements", icon: "Megaphone", href: "/dashboard/communications/announcements" },
+  { label: "Broadcast", icon: "Send", href: "/dashboard/communications/broadcast" },
+  { label: "Diary", icon: "BookOpen", href: "/dashboard/communications/diary" },
+  { label: "Gallery", icon: "Image", href: "/dashboard/communications/gallery" },
+  { label: "Home Sliders", icon: "Layers", href: "/dashboard/communications/sliders" },
+  { label: "Message Templates", icon: "FileText", href: "/dashboard/communications/templates" },
+];
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function SmsPage() {
   return (
@@ -89,6 +103,25 @@ function SmsPageContent() {
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
+  // Hub KPIs — same queryKeys/endpoints the tabs already use (react-query
+  // dedupes, so opening a tab never refetches what's shown here).
+  const { data: stats } = useQuery({
+    queryKey: ["sms-stats"],
+    queryFn: async () => {
+      const res = await api.get<{ success: boolean; data: SmsStats }>("/sms/stats");
+      return res.data.data;
+    },
+    retry: 1,
+  });
+
+  const { data: templates } = useQuery({
+    queryKey: ["sms-templates"],
+    queryFn: async () => {
+      const res = await api.get<{ success: boolean; data: SmsTemplate[] }>("/sms/templates");
+      return res.data.data || [];
+    },
+  });
+
   return (
     <AOSPage>
       <AOSPageHeader
@@ -101,6 +134,69 @@ function SmsPageContent() {
         subtitle="Send SMS to parents, students and staff via Sparrow SMS"
       />
       <AOSPageBody>
+        {/* Dashboard — KPI stat grid */}
+        <StatGrid>
+          <KpiCard
+            label="Credits Available"
+            value={stats?.credits_available ?? "—"}
+            icon={<Wallet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Sent This Month"
+            value={stats?.this_month_sent ?? "—"}
+            icon={<Send className="h-4 w-4" style={{ color: "#107c10" }} />}
+            color="#107c10"
+          />
+          <KpiCard
+            label="Total Sent"
+            value={stats?.total_sent ?? "—"}
+            icon={<CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+          <KpiCard
+            label="Total Failed"
+            value={stats?.total_failed ?? "—"}
+            icon={<XCircle className="h-4 w-4" style={{ color: (stats?.total_failed ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-secondary)" }} />}
+            color={(stats?.total_failed ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-secondary)"}
+          />
+          <KpiCard
+            label="Templates"
+            value={templates?.length ?? 0}
+            icon={<FileText className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
+            color="var(--w11-text-primary)"
+          />
+        </StatGrid>
+
+        {/* Quick links — 44px gradient icon tile + label, as next/link */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+          {QUICK_LINKS.map((l) => {
+            const Icon = ICON_MAP[l.icon] || ChevronRight;
+            return (
+              <Link key={l.href} href={l.href} className="block h-full">
+                <div
+                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
+                  style={{ cursor: "pointer", marginBottom: 0 }}
+                >
+                  <div
+                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      background: SECTION_GRADIENTS.Communication,
+                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
+                    {l.label}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Tabs */}
         <div className="border-b border-[color:var(--w11-border-subtle)] mb-4">
           <nav className="-mb-px flex gap-0">
