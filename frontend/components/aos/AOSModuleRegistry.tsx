@@ -48,6 +48,10 @@ function AOSModuleFallback({ slug }: { slug?: string }) {
  * Dynamic registry mapping all 58 ASchool dashboard modules to lazy-loaded client components.
  */
 export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
+  // ── Home (dashboard root — the widget board) ─────────────────────────────
+  home: dynamic(() => import("@/app/dashboard/page"), { loading: AOSModuleLoading }),
+  dashboard: dynamic(() => import("@/app/dashboard/page"), { loading: AOSModuleLoading }),
+
   // ── Core Academics ────────────────────────────────────────────────────────
   students: dynamic(() => import("@/app/dashboard/students/page"), { loading: AOSModuleLoading }),
   teachers: dynamic(() => import("@/app/dashboard/teachers/page"), { loading: AOSModuleLoading }),
@@ -132,6 +136,7 @@ export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   appstore: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
   "plugin-runner": dynamic(() => import("./apps/PluginRunnerApp"), { loading: AOSModuleLoading }),
   "aos-settings": dynamic(() => import("./apps/SettingsApp"), { loading: AOSModuleLoading }),
+  filemanager: dynamic(() => import("./apps/FileManagerApp"), { loading: AOSModuleLoading }),
 };
 
 /**
@@ -146,7 +151,11 @@ const MODULE_ALIASES: Record<string, string> = {
   "timetable-management": "timetable",
   file_management: "files",
   "file-management": "files",
-  filemanager: "files",
+  // "filemanager" resolves directly to the AOS native FileManager app above;
+  // these aliases route the Vault naming onto it. Note "files" itself stays a
+  // direct registry entry pointing at the dashboard files page.
+  file_manager: "filemanager",
+  vault: "filemanager",
   campus: "transport",
   notebook: "assignments",
   lab: "ai-workbench",
@@ -239,7 +248,10 @@ export function resolveModuleComponent(slug: string): React.ComponentType<any> {
   }
 
   if (slug.startsWith("route:")) {
-    return AOSRouteFrame;
+    // Delegate to route-aware resolution: inline component when registered,
+    // iframe only as a last resort.
+    const route = parseAOSRouteWindowId(slug) || slug.slice("route:".length);
+    return resolveRouteWindowComponent(route);
   }
 
   const normalized = normalizeModuleSlug(slug);
@@ -283,5 +295,28 @@ export function resolveModuleComponent(slug: string): React.ComponentType<any> {
 
   // 5. Fallback safe placeholder
   return createFallbackComponent(normalized || slug);
+}
+
+/**
+ * Route windows prefer inline rendering: resolve the route's module segment
+ * against the registry so most subroutes open as real components. Only
+ * genuinely unregistered routes fall back to the aos_embed iframe — iframes
+ * are the last resort because proxy/redirect edge cases can make them fail
+ * to load ("refused connection" class of bug documented in files.py).
+ */
+export function resolveRouteWindowComponent(route: string): React.ComponentType<any> {
+  const path = route.split("?")[0].replace(/\/+$/, "");
+  const segments = path.split("/").filter(Boolean); // ["dashboard", "fees", "collect"]
+  const moduleSegment = segments[1]; // segment after /dashboard
+  if (!moduleSegment) {
+    return AOSRouteFrame;
+  }
+  const resolved = resolveModuleComponent(moduleSegment);
+  // resolveModuleComponent returns a fallback for unknown slugs — detect by
+  // displayName convention used in createFallbackComponent.
+  if (resolved && typeof resolved === "function" && !String(resolved.displayName || "").startsWith("AOSModuleFallback")) {
+    return resolved;
+  }
+  return AOSRouteFrame;
 }
 

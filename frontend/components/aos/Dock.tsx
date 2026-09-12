@@ -20,6 +20,7 @@ import {
 import { Trash2, LayoutGrid, Layers, Sparkles, Box } from "lucide-react";
 import { WindowInstance, SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins, PluginSidebarItem } from "@/lib/plugins";
+import { normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 
 interface DynamicDockApp {
   id: string;
@@ -122,6 +123,9 @@ export default function Dock({
       ),
     },
     settings: { id: "settings", title: "AOS Settings & Personalization", icon: <AOSSettingsIcon size={iconPx} /> },
+    // Native AOS settings app id (used by the shell chrome and the pinned
+    // apps list) — same app as "settings" above, opened under its module id.
+    "aos-settings": { id: "aos-settings", title: "AOS Settings & Personalization", icon: <AOSSettingsIcon size={iconPx} /> },
     admin: { id: "admin", title: "Institutional Command Center", icon: <AOSAdminIcon size={iconPx} /> },
     finance: { id: "finance", title: "Tuition & Bursar Ledger", icon: <AOSFinanceIcon size={iconPx} /> },
   };
@@ -158,31 +162,39 @@ export default function Dock({
     appCatalog[d.id] = d;
   });
 
-  // Add sidebar items dynamically from YAML manifests
+  // Add sidebar items dynamically from YAML manifests. Entries are indexed by
+  // both the raw slug and the normalized AOS module id — the pinning manager
+  // and default pinned set reference normalized module ids.
+  const seenSidebarApps = new Set<string>();
   effectiveSidebar.forEach((sb) => {
-    if (!appCatalog[sb.slug]) {
-      appCatalog[sb.slug] = {
-        id: sb.slug,
-        title: sb.label,
-        icon: (
-          <div
-            style={{
-              width: `${iconPx}px`,
-              height: `${iconPx}px`,
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #10b981, #059669)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              boxShadow: "0 4px 10px rgba(16, 185, 129, 0.4)",
-            }}
-          >
-            <Box size={Math.round(iconPx * 0.52)} />
-          </div>
-        ),
-      };
-    }
+    const moduleId = normalizeAOSModuleId(sb.slug, sb.route) || sb.slug;
+    if (seenSidebarApps.has(moduleId)) return;
+    seenSidebarApps.add(moduleId);
+
+    const entry = {
+      id: moduleId,
+      title: sb.label,
+      icon: (
+        <div
+          style={{
+            width: `${iconPx}px`,
+            height: `${iconPx}px`,
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #10b981, #059669)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            boxShadow: "0 4px 10px rgba(16, 185, 129, 0.4)",
+          }}
+        >
+          <Box size={Math.round(iconPx * 0.52)} />
+        </div>
+      ),
+    };
+
+    if (!appCatalog[moduleId]) appCatalog[moduleId] = entry;
+    if (sb.slug !== moduleId && !appCatalog[sb.slug]) appCatalog[sb.slug] = entry;
   });
 
   // Filter pinned apps that exist and are authorized
