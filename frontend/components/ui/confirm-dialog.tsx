@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
 import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
+import { cn } from "@/lib/utils";
 
 /**
  * ConfirmDialog + useConfirm + undoableDelete.
@@ -80,12 +82,23 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       <Dialog open={state.open} onOpenChange={(open) => !open && settle(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{state.title}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2.5">
+              <AlertTriangle
+                aria-hidden="true"
+                className={cn(
+                  "h-5 w-5 shrink-0",
+                  state.tone === "danger"
+                    ? "text-[#c42b1c]"
+                    : "text-[var(--w11-accent,#0067c0)]"
+                )}
+              />
+              {state.title}
+            </DialogTitle>
             {state.body && <DialogDescription>{state.body}</DialogDescription>}
           </DialogHeader>
 
           {state.requireText && (
-            <div className="space-y-1.5">
+            <div className="dialog-body space-y-1.5">
               <Label htmlFor="confirm-text" className="text-[11px]">
                 Type <span className="font-semibold">{state.requireText}</span> to
                 confirm

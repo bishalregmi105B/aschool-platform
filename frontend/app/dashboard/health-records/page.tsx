@@ -6,15 +6,20 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { HeartPulse, Syringe, Stethoscope, PlusCircle } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -93,64 +98,71 @@ function HealthRecordsContent() {
   const HUB_IMMUNIZATION_COLUMNS: Column<any>[] = [
     { key: "student_name", label: "Student", sortable: true, value: (i) => i.student_name ?? "", render: (i) => i.student_name || i.student_id },
     { key: "vaccine_name", label: "Vaccine", sortable: true, value: (i) => i.vaccine_name ?? "", render: (i) => <span className="font-medium">{i.vaccine_name}</span> },
-    { key: "dose_number", label: "Dose", align: "center", sortable: true, value: (i) => i.dose_number ?? 0, render: (i) => <Badge variant="outline">Dose {i.dose_number}</Badge> },
+    { key: "dose_number", label: "Dose", align: "center", sortable: true, value: (i) => i.dose_number ?? 0, render: (i) => <span className="win11-chip subtle">Dose {i.dose_number}</span> },
     { key: "date_administered", label: "Date", sortable: true, value: (i) => i.date_administered ?? "" },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading health records…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Health Records" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Health Records</h1>
-          <p className="text-muted-foreground">Student health profiles, medical visits, immunizations</p>
-        </div>
-        <Dialog open={showVisit} onOpenChange={setShowVisit}>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="h-4 w-4 mr-2" /> Record Visit</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Record Medical Visit</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              createVisitMut.mutate(Object.fromEntries(fd) as Record<string, string>);
-            }} className="space-y-4">
-              <Input name="student_id" placeholder="Student ID" required />
-              <BSDateInput name="visit_date" required />
-              <Input name="reason" placeholder="Reason for visit" required />
-              <Textarea name="diagnosis" placeholder="Diagnosis" rows={2} />
-              <Textarea name="treatment" placeholder="Treatment given" rows={2} />
-              <Button type="submit" disabled={createVisitMut.isPending} className="w-full">
-                {createVisitMut.isPending ? "Saving..." : "Save Visit"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<HeartPulse className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Health Records"
+        subtitle={`Student health profiles, medical visits, immunizations · ${tab === "visits" ? `${visits?.length ?? 0} visits` : `${immunizations?.length ?? 0} immunizations`}`}
+        actions={
+          <Dialog open={showVisit} onOpenChange={setShowVisit}>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="h-4 w-4 mr-2" /> Record Visit</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Record Medical Visit</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                createVisitMut.mutate(Object.fromEntries(fd) as Record<string, string>);
+              }} className="space-y-4">
+                <Input name="student_id" placeholder="Student ID" required />
+                <BSDateInput name="visit_date" required />
+                <Input name="reason" placeholder="Reason for visit" required />
+                <Textarea name="diagnosis" placeholder="Diagnosis" rows={2} />
+                <Textarea name="treatment" placeholder="Treatment given" rows={2} />
+                <Button type="submit" disabled={createVisitMut.isPending} className="w-full">
+                  {createVisitMut.isPending ? "Saving..." : "Save Visit"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <Button variant={tab === "visits" ? "default" : "outline"} onClick={() => setTab("visits")}>
+            <Stethoscope className="h-4 w-4 mr-2" /> Medical Visits
+          </Button>
+          <Button variant={tab === "immunizations" ? "default" : "outline"} onClick={() => setTab("immunizations")}>
+            <Syringe className="h-4 w-4 mr-2" /> Immunizations
+          </Button>
+        </FilterCommandBar>
 
-      <div className="flex gap-2">
-        <Button variant={tab === "visits" ? "default" : "outline"} onClick={() => setTab("visits")}>
-          <Stethoscope className="h-4 w-4 mr-2" /> Medical Visits
-        </Button>
-        <Button variant={tab === "immunizations" ? "default" : "outline"} onClick={() => setTab("immunizations")}>
-          <Syringe className="h-4 w-4 mr-2" /> Immunizations
-        </Button>
-      </div>
-
-      {tab === "visits" && (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "visits" && (
+          <DataPanel bodyClassName="p-0">
             <DataTable
               columns={HUB_VISIT_COLUMNS}
               rows={visits ?? []}
@@ -159,13 +171,11 @@ function HealthRecordsContent() {
               searchPlaceholder="Search visits…"
               exportFileName="health-visits"
             />
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {tab === "immunizations" && (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "immunizations" && (
+          <DataPanel bodyClassName="p-0">
             <DataTable
               columns={HUB_IMMUNIZATION_COLUMNS}
               rows={immunizations ?? []}
@@ -174,9 +184,9 @@ function HealthRecordsContent() {
               searchPlaceholder="Search immunizations…"
               exportFileName="immunizations"
             />
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -385,7 +385,9 @@ def upgrade():
 
     # teaching_misconceptions.version_id index: migration named it
     # ix_tm_version, the model emits ix_teaching_misconceptions_version_id.
-    op.drop_index("ix_tm_version", table_name="teaching_misconceptions")
+    # Guarded: some databases already have one or both index names.
+    op.execute("DROP INDEX IF EXISTS ix_tm_version")
+    op.execute("DROP INDEX IF EXISTS ix_teaching_misconceptions_version_id")
     op.create_index(
         op.f("ix_teaching_misconceptions_version_id"),
         "teaching_misconceptions",

@@ -1,6 +1,8 @@
 export const AOS_ROUTE_WINDOW_PREFIX = "route:";
 export const AOS_THEME_STORAGE_KEY = "aschool_aos_theme";
 export const AOS_EMBED_QUERY_KEY = "aos_embed";
+// Manual desktop/iOS mode override ("desktop" | "mobile"); absence = follow viewport.
+export const AOS_MODE_STORAGE_KEY = "aschool_aos_mode";
 
 function normalizePath(pathname: string): string {
   const cleaned = pathname.replace(/\/+$/g, "");

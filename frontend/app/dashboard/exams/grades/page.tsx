@@ -3,11 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Star } from "lucide-react";
 
 /** Shape returned by GET /exams/grade-table (static NEB reference). */
@@ -43,35 +44,34 @@ function ExamGradesContent() {
     retry: 1,
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading grade table…" /></AOSPage>;
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load the grade table. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          title="Exam Grades"
+          subtitle="Nepal NEB grading scale — used automatically for marks entry, results and report cards"
+        />
+        <AOSPageBody>
+          <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <p className="text-sm text-[#c42b1c]">Failed to load the grade table. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </div>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Star className="h-6 w-6" /> Exam Grades</h1>
-        <p className="text-muted-foreground">
-          Nepal NEB grading scale — used automatically for marks entry, results and report cards
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">
-            NEB Grading Scale (Letter Grade Directive 2078)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Star className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Exam Grades"
+        subtitle={`${(data || []).length} grades · Nepal NEB grading scale — used automatically for marks entry, results and report cards`}
+      />
+      <AOSPageBody className="space-y-4">
+        <DataPanel title="NEB Grading Scale (Letter Grade Directive 2078)">
           <DataTable<Grade>
             columns={GRADE_COLUMNS}
             rows={data || []}
@@ -81,13 +81,13 @@ function ExamGradesContent() {
             exportFileName="neb-grade-scale"
             empty={{ icon: Star, title: "Grade table unavailable", body: "The backend grade reference returned nothing." }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <p className="text-xs text-muted-foreground">
-        Grades and GPA are computed with this scale automatically — theory marks must be ≥ the
-        pass threshold and practical marks ≥ 40% where a practical component exists.
-      </p>
-    </div>
+        <p className="text-xs text-[color:var(--w11-text-secondary)]">
+          Grades and GPA are computed with this scale automatically — theory marks must be ≥ the
+          pass threshold and practical marks ≥ 40% where a practical component exists.
+        </p>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

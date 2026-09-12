@@ -3,18 +3,25 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, Plus, Save, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FormSection,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 type AutoReply = {
   keyword: string;
@@ -87,7 +94,7 @@ function WhatsAppSettingsContent() {
     setLocalConfig(updater(current));
   };
 
-  if (isLoading || !config) return <PageLoader />;
+  if (isLoading || !config) return <AOSModuleLoadingState label="Loading WhatsApp settings…" />;
 
   const addReply = () => {
     if (!draftReply.keyword.trim() || !draftReply.response.trim()) {
@@ -121,152 +128,158 @@ function WhatsAppSettingsContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/communications">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+    <AOSPage>
+      <AOSPageHeader
+        icon={<MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="WhatsApp Bot"
+        subtitle="Configure automated replies and parent-facing notifications."
+        actions={
+          <Button onClick={() => saveMutation.mutate(localConfig ?? config)} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Changes
           </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">WhatsApp Bot</h1>
-          <p className="text-muted-foreground">
-            Configure automated replies and parent-facing notifications.
-          </p>
-        </div>
-        <Button onClick={() => saveMutation.mutate(localConfig ?? config)} disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? <Spinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Changes
-        </Button>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Bot Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-medium">Enable WhatsApp bot</p>
-                <p className="text-sm text-muted-foreground">
-                  Allow parents to receive automated replies and outbound updates.
-                </p>
-              </div>
-              <Switch
-                checked={config.enabled}
-                onCheckedChange={(checked) =>
-                  setConfig((current) => ({ ...current, enabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Welcome Message</Label>
-              <Textarea
-                rows={4}
-                value={config.welcome_message}
-                onChange={(e) =>
-                  setConfig((current) => ({
-                    ...current,
-                    welcome_message: e.target.value,
-                  }))
-                }
-                placeholder="Namaste! How can we help today?"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <Label>Notification Types</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {NOTIFICATION_OPTIONS.map((option) => {
-                  const active = config.notification_types.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => toggleNotification(option.value)}
-                      className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                        active ? "border-primary bg-primary/5" : "hover:bg-muted"
-                      }`}
-                    >
-                      <div className="font-medium">{option.label}</div>
-                      <div className="text-muted-foreground">
-                        {active ? "Enabled" : "Disabled"}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Auto Replies</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="space-y-2">
-                <Label>Keyword</Label>
-                <Input
-                  value={draftReply.keyword}
-                  onChange={(e) =>
-                    setDraftReply((current) => ({ ...current, keyword: e.target.value }))
-                  }
-                  placeholder="fees"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Response</Label>
-                <Textarea
-                  rows={3}
-                  value={draftReply.response}
-                  onChange={(e) =>
-                    setDraftReply((current) => ({ ...current, response: e.target.value }))
-                  }
-                  placeholder="Please send your ward's admission number to check fee status."
-                />
-              </div>
-              <Button type="button" variant="outline" onClick={addReply}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Rule
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {config.auto_replies.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                  No auto-reply rules configured yet.
+        }
+      />
+      <AOSPageBody>
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
+                Bot Settings
+              </span>
+            }
+          >
+            <div className="space-y-6">
+              <div className="flex items-center justify-between rounded-lg border border-[var(--w11-border-subtle)] p-4">
+                <div>
+                  <p className="font-medium" style={{ color: "var(--w11-text-primary)" }}>Enable WhatsApp bot</p>
+                  <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                    Allow parents to receive automated replies and outbound updates.
+                  </p>
                 </div>
-              ) : (
-                config.auto_replies.map((reply, index) => (
-                  <div key={`${reply.keyword}-${index}`} className="rounded-lg border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{reply.keyword}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{reply.response}</p>
-                      </div>
-                      <Button
+                <Switch
+                  checked={config.enabled}
+                  onCheckedChange={(checked) =>
+                    setConfig((current) => ({ ...current, enabled: checked }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Welcome Message</Label>
+                <Textarea
+                  rows={4}
+                  value={config.welcome_message}
+                  onChange={(e) =>
+                    setConfig((current) => ({
+                      ...current,
+                      welcome_message: e.target.value,
+                    }))
+                  }
+                  placeholder="Namaste! How can we help today?"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Notification Types</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {NOTIFICATION_OPTIONS.map((option) => {
+                    const active = config.notification_types.includes(option.value);
+                    return (
+                      <button
+                        key={option.value}
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeReply(index)}
+                        onClick={() => toggleNotification(option.value)}
+                        className="rounded-lg border px-4 py-3 text-left text-sm transition-colors"
+                        style={
+                          active
+                            ? {
+                                borderColor: "var(--w11-accent)",
+                                background: "var(--w11-accent-light)",
+                              }
+                            : {
+                                borderColor: "var(--w11-border-default)",
+                              }
+                        }
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
+                        <div className="font-medium" style={{ color: active ? "var(--w11-accent)" : "var(--w11-text-primary)" }}>{option.label}</div>
+                        <div style={{ color: "var(--w11-text-secondary)" }}>
+                          {active ? "Enabled" : "Disabled"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+
+          <DataPanel title="Auto Replies">
+            <div className="space-y-4">
+              <FormSection>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Keyword</Label>
+                    <Input
+                      value={draftReply.keyword}
+                      onChange={(e) =>
+                        setDraftReply((current) => ({ ...current, keyword: e.target.value }))
+                      }
+                      placeholder="fees"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Response</Label>
+                    <Textarea
+                      rows={3}
+                      value={draftReply.response}
+                      onChange={(e) =>
+                        setDraftReply((current) => ({ ...current, response: e.target.value }))
+                      }
+                      placeholder="Please send your ward's admission number to check fee status."
+                    />
+                  </div>
+                  <Button type="button" variant="outline" onClick={addReply}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Rule
+                  </Button>
+                </div>
+              </FormSection>
+
+              <div className="space-y-3">
+                {config.auto_replies.length === 0 ? (
+                  <div
+                    className="rounded-lg border border-dashed border-[var(--w11-border-default)] p-6 text-sm"
+                    style={{ color: "var(--w11-text-secondary)" }}
+                  >
+                    No auto-reply rules configured yet.
+                  </div>
+                ) : (
+                  config.auto_replies.map((reply, index) => (
+                    <div key={`${reply.keyword}-${index}`} className="rounded-lg border border-[var(--w11-border-subtle)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{reply.keyword}</p>
+                          <p className="mt-1 text-sm" style={{ color: "var(--w11-text-secondary)" }}>{reply.response}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeReply(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

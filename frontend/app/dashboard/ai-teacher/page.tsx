@@ -1,10 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
@@ -13,6 +10,16 @@ import { api, type ApiResponse } from "@/lib/api";
 import { GraduationCap, History, Play, ShieldAlert, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  FormSection,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 
 type SectionSummary = {
   id: string;
@@ -169,13 +176,16 @@ function CreateLessonForm() {
               <Play className="h-4 w-4 mr-2" />
               {create.isPending ? "Preparing lesson…" : "Start lesson"}
             </Button>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm" style={{ color: "#c42b1c" }}>{error}</p>}
           </div>
           {started && (
-            <Card className="md:col-span-2 border-primary/30 bg-primary/5">
-              <CardContent className="py-4 space-y-2">
+            <div
+              className="md:col-span-2 win11-card"
+              style={{ borderColor: "var(--w11-accent)" }}
+            >
+              <div className="py-2 space-y-2">
                 <p className="text-sm font-medium">Lesson is ready.</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
                   Estimated cost before start: NPR {started.estimated_cost_npr}
                   {started.grounded ? " • grounded in published content" : " • free topic"}
                 </p>
@@ -184,13 +194,13 @@ function CreateLessonForm() {
                     <Button size="sm">Open the AI Teacher player</Button>
                   </a>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-[color:var(--w11-text-secondary)]">
                     The lesson player URL appears once the school finishes service setup.
                     Lesson state still records in history.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -217,23 +227,17 @@ function LessonHistory() {
   return (
     <div className="space-y-2">
       {lessons.map((l) => (
-        <div key={l.id} className="flex items-center justify-between border-b py-2 last:border-0">
+        <div key={l.id} className="flex items-center justify-between border-b border-[color:var(--w11-border-subtle)] py-2 last:border-0">
           <div>
             <p className="text-sm font-medium">{l.topic}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[color:var(--w11-text-secondary)]">
               {l.persona_slug} • {l.language.toUpperCase()} •{" "}
               {l.chapters_completed} chapters
               {l.duration_seconds ? ` • ${Math.round(l.duration_seconds / 60)} min` : ""}
               {l.cost_npr ? ` • NPR ${l.cost_npr}` : ""}
             </p>
           </div>
-          <Badge
-            variant={
-              l.status === "ended" ? "success" : l.status === "failed" ? "destructive" : "default"
-            }
-          >
-            {l.status}
-          </Badge>
+          <StatusChip status={l.status} />
         </div>
       ))}
     </div>
@@ -259,72 +263,55 @@ function MasterySnapshot() {
   if (isLoading || isError) return null;
   if (!data) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="h-4 w-4" />Usage this month
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-4 text-center">
-        <div>
-          <p className="text-xl font-bold">{data.lessons_this_month}</p>
-          <p className="text-xs text-muted-foreground">Lessons</p>
+    <div>
+      <StatGrid min={160}>
+        <KpiCard
+          label="Lessons"
+          value={data.lessons_this_month}
+          icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        />
+        <KpiCard label="Minutes" value={data.minutes_this_month} />
+        <KpiCard
+          label="of ceiling"
+          value={data.ceiling_used_pct != null ? `${data.ceiling_used_pct}%` : `NPR ${data.cost_npr_this_month}`}
+          footnote={data.ceiling_used_pct != null && `(NPR ${data.cost_npr_this_month})`}
+        />
+      </StatGrid>
+      {data.alert && (
+        <div className="win11-infobar warning flex items-center gap-2 px-3 py-2 text-xs">
+          <ShieldAlert className="h-4 w-4" /> Cost ceiling alert — review the AI Teacher budget.
         </div>
-        <div>
-          <p className="text-xl font-bold">{data.minutes_this_month}</p>
-          <p className="text-xs text-muted-foreground">Minutes</p>
-        </div>
-        <div>
-          <p className="text-xl font-bold">
-            {data.ceiling_used_pct != null ? `${data.ceiling_used_pct}%` : `NPR ${data.cost_npr_this_month}`}
-          </p>
-          <p className="text-xs text-muted-foreground">of ceiling {data.ceiling_used_pct != null && `(NPR ${data.cost_npr_this_month})`}</p>
-        </div>
-        {data.alert && (
-          <p className="col-span-3 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <ShieldAlert className="h-4 w-4" /> Cost ceiling alert — review the AI Teacher budget.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
 export default function AiTeacherPage() {
   return (
     <PluginGate slug="ai_teacher">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <GraduationCap className="h-6 w-6" />AI Teacher
-            </h1>
-            <p className="text-muted-foreground">
-              A live AI teacher that speaks and writes on a whiteboard — grounded strictly in
-              your published curriculum.
-            </p>
-          </div>
-          <Link href="/dashboard/ai-teacher/content" className="text-sm text-primary hover:underline">
-            Teaching Content →
-          </Link>
-        </div>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Start a lesson</CardTitle></CardHeader>
-          <CardContent>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="AI Teacher"
+          subtitle="A live AI teacher that speaks and writes on a whiteboard — grounded strictly in your published curriculum."
+          actions={
+            <Link href="/dashboard/ai-teacher/content">
+              <Button variant="outline" size="sm">Teaching Content →</Button>
+            </Link>
+          }
+        />
+        <AOSPageBody>
+          <FormSection title="Start a lesson">
             <CreateLessonForm />
-          </CardContent>
-        </Card>
+          </FormSection>
 
-        <MasterySnapshot />
+          <MasterySnapshot />
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Lesson history</CardTitle></CardHeader>
-          <CardContent>
+          <DataPanel title="Lesson history">
             <LessonHistory />
-          </CardContent>
-        </Card>
-      </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     </PluginGate>
   );
 }

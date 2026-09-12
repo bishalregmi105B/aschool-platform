@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { useAuth } from "@/lib/auth-context";
@@ -265,10 +268,13 @@ function DayClosureContent() {
         <span
           className={
             r.difference === 0
-              ? "text-muted-foreground"
-              : r.difference > 0
-                ? "font-semibold text-green-700"
-                : "font-semibold text-red-600"
+              ? "text-[color:var(--w11-text-secondary)]"
+              : "font-semibold"
+          }
+          style={
+            r.difference !== 0
+              ? { color: r.difference > 0 ? "#107c10" : "#c42b1c" }
+              : undefined
           }
         >
           {r.difference === 0
@@ -282,7 +288,7 @@ function DayClosureContent() {
       label: "Notes",
       hidden: true,
       value: (r) => r.notes ?? "",
-      render: (r) => <span className="text-xs text-muted-foreground">{r.notes || "—"}</span>,
+      render: (r) => <span className="text-xs text-[color:var(--w11-text-secondary)]">{r.notes || "—"}</span>,
     },
     {
       key: "actions",
@@ -306,30 +312,15 @@ function DayClosureContent() {
     },
   ];
 
-  if (dayBook.isLoading) return <PageLoader />;
+  if (dayBook.isLoading) return <AOSPage><AOSModuleLoadingState label="Loading day book…" /></AOSPage>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Day Book & Closure</h1>
-          <p className="text-muted-foreground">
-            The counter&apos;s take for one BS date — then lock it with a closure
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Date (BS)</Label>
-            <BSDateInput
-              value={dateBS}
-              onChange={(v) => {
-                setDateBS(v);
-                setClosuresPage(1);
-              }}
-              emit="bs"
-              className="w-44"
-            />
-          </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Banknote className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Day Book & Closure"
+        subtitle={`The counter's take for one BS date — then lock it with a closure${dayIsClosed ? " · day is closed" : ""}`}
+        actions={
           <Button
             onClick={() => setShowCloseDialog(true)}
             disabled={dayIsClosed || dayBook.isFetching}
@@ -344,78 +335,67 @@ function DayClosureContent() {
               </>
             )}
           </Button>
-        </div>
-      </div>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
+          <div className="space-y-1">
+            <Label className="text-xs">Date (BS)</Label>
+            <BSDateInput
+              value={dateBS}
+              onChange={(v) => {
+                setDateBS(v);
+                setClosuresPage(1);
+              }}
+              emit="bs"
+              className="w-44"
+            />
+          </div>
+        </FilterCommandBar>
 
-      {dayBook.isError ? (
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load the day book. Please try again.</p>
+        {dayBook.isError ? (
+          <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <p className="text-sm text-[#c42b1c]">Failed to load the day book. Please try again.</p>
             <Button variant="outline" size="sm" onClick={() => dayBook.refetch()}>
               Retry
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Day summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-5">
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Grand Total
-                </p>
-                <p className="text-xl font-bold mt-1 text-primary">
-                  {formatNepaliCurrency(book?.grand_total || 0)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {book?.collections_count ?? 0} collection(s) on {book?.date_bs || dateBS} BS
-                </p>
-              </CardContent>
-            </Card>
-            {(book?.by_method ?? []).slice(0, 3).map((m) => (
-              <Card key={m.method}>
-                <CardContent className="pt-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                        {formatMethod(m.method)}
-                      </p>
-                      <p className="text-xl font-bold mt-1">
-                        {formatNepaliCurrency(m.amount || 0)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{m.count} payment(s)</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-muted">
-                      <Wallet className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {(book?.by_method?.length ?? 0) === 0 && (
-              <Card className="md:col-span-3">
-                <CardContent className="pt-5 flex items-center justify-center py-8 text-sm text-muted-foreground">
-                  No payments recorded for this date yet.
-                </CardContent>
-              </Card>
-            )}
           </div>
+        ) : (
+          <>
+            {/* Day summary */}
+            <StatGrid className="mb-0" min={200}>
+              <KpiCard
+                label="Grand Total"
+                value={formatNepaliCurrency(book?.grand_total || 0)}
+                icon={<Wallet className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+                footnote={`${book?.collections_count ?? 0} collection(s) on ${book?.date_bs || dateBS} BS`}
+              />
+              {(book?.by_method ?? []).slice(0, 3).map((m) => (
+                <KpiCard
+                  key={m.method}
+                  label={formatMethod(m.method)}
+                  value={formatNepaliCurrency(m.amount || 0)}
+                  color="var(--w11-text-primary)"
+                  footnote={`${m.count} payment(s)`}
+                />
+              ))}
+              {(book?.by_method?.length ?? 0) === 0 && (
+                <div className="win11-card md:col-span-3 flex items-center justify-center py-8 text-sm text-[color:var(--w11-text-secondary)]">
+                  No payments recorded for this date yet.
+                </div>
+              )}
+            </StatGrid>
 
-          {/* Collector breakdown + closure state */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">By Collector</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Collector breakdown + closure state */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DataPanel title="By Collector">
                 {(book?.by_user ?? []).length ? (
-                  <div className="divide-y">
+                  <div className="divide-y divide-[var(--w11-border-subtle)]">
                     {book!.by_user.map((u) => (
                       <div key={u.user_id || "unknown"} className="py-2.5 flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">{u.user_name}</p>
-                          <p className="text-xs text-muted-foreground">{u.count} payment(s)</p>
+                          <p className="text-xs text-[color:var(--w11-text-secondary)]">{u.count} payment(s)</p>
                         </div>
                         <p className="text-sm font-bold">
                           {formatNepaliCurrency(u.amount || 0)}
@@ -424,42 +404,40 @@ function DayClosureContent() {
                     ))}
                   </div>
                 ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
+                  <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
                     No collections recorded for this date.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </DataPanel>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  Closure State
-                  {dayIsClosed && <Badge variant="success">Closed</Badge>}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+              <DataPanel
+                title={
+                  <span className="flex items-center gap-2">
+                    Closure State
+                    {dayIsClosed && <Badge variant="success">Closed</Badge>}
+                  </span>
+                }
+              >
                 {activeClosures.length ? (
-                  <div className="divide-y">
+                  <div className="divide-y divide-[var(--w11-border-subtle)]">
                     {activeClosures.map((c) => (
                       <div key={c.id} className="py-2.5 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">
                             {c.status === "closed" ? "Closed" : "Open"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-[color:var(--w11-text-secondary)]">
                             Counted {formatNepaliCurrency(c.counted_total || 0)} / Expected{" "}
                             {formatNepaliCurrency(c.expected_total || 0)}
                           </p>
                         </div>
                         <p
-                          className={`text-sm font-bold ${
+                          className="text-sm font-bold"
+                          style={
                             c.difference === 0
-                              ? "text-muted-foreground"
-                              : c.difference > 0
-                                ? "text-green-700"
-                                : "text-red-600"
-                          }`}
+                              ? { color: "var(--w11-text-secondary)" }
+                              : { color: c.difference > 0 ? "#107c10" : "#c42b1c" }
+                          }
                         >
                           {c.difference === 0
                             ? "Balanced"
@@ -469,20 +447,15 @@ function DayClosureContent() {
                     ))}
                   </div>
                 ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
+                  <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
                     This day has not been closed yet.
                   </p>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </DataPanel>
+            </div>
 
-          {/* Closures history for this date */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Closures for {formatNepaliDate(dateBS)}</CardTitle>
-            </CardHeader>
-            <CardContent>
+            {/* Closures history for this date */}
+            <DataPanel title={`Closures for ${formatNepaliDate(dateBS)}`}>
               <DataTable<ClosureListRow>
                 columns={CLOSURE_COLUMNS}
                 rows={closures.data?.closures ?? []}
@@ -510,139 +483,142 @@ function DayClosureContent() {
                   body: "Use “Close Day” to count the till and lock the date.",
                 }}
               />
-            </CardContent>
-          </Card>
-        </>
-      )}
+            </DataPanel>
+          </>
+        )}
 
-      {/* Close-day dialog */}
-      <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Close Day — {formatNepaliDate(dateBS)}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Enter the note/coin counts. The counted total is compared against the
-              day-book take for the selected collector. While closed, new cash,
-              cheque and bank entries for this collector and date are refused.
-            </p>
-            <div className="space-y-1">
-              <Label className="text-xs">Collector (optional — defaults to you)</Label>
-              <AdvancedSelect
-                value={collectorId}
-                onChange={(v) => setCollectorId(v)}
-                clearable
-                placeholder="Myself"
-                options={(book?.by_user ?? [])
-                  .filter((u) => u.user_id)
-                  .map((u) => ({ value: u.user_id as string, label: u.user_name }))}
-              />
-            </div>
-
-            <div className="rounded-lg border p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Denominations
+        {/* Close-day dialog */}
+        <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Close Day — {formatNepaliDate(dateBS)}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                Enter the note/coin counts. The counted total is compared against the
+                day-book take for the selected collector. While closed, new cash,
+                cheque and bank entries for this collector and date are refused.
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {allDenomKeys.map((denom) => (
-                  <div key={denom} className="flex items-center gap-1.5">
-                    <span className="w-14 shrink-0 text-right text-[13px] tabular-nums text-muted-foreground">
-                      Rs. {denom}
-                    </span>
+              <div className="space-y-1">
+                <Label className="text-xs">Collector (optional — defaults to you)</Label>
+                <AdvancedSelect
+                  value={collectorId}
+                  onChange={(v) => setCollectorId(v)}
+                  clearable
+                  placeholder="Myself"
+                  options={(book?.by_user ?? [])
+                    .filter((u) => u.user_id)
+                    .map((u) => ({ value: u.user_id as string, label: u.user_name }))}
+                />
+              </div>
+
+              <div className="rounded-lg border border-[var(--w11-border-subtle)] p-3 space-y-2">
+                <p className="text-xs font-medium text-[color:var(--w11-text-secondary)] uppercase tracking-wide">
+                  Denominations
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {allDenomKeys.map((denom) => (
+                    <div key={denom} className="flex items-center gap-1.5">
+                      <span className="w-14 shrink-0 text-right text-[13px] tabular-nums text-[color:var(--w11-text-secondary)]">
+                        Rs. {denom}
+                      </span>
+                      <Input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        className="h-8"
+                        value={denoms[denom] ?? ""}
+                        onChange={(e) =>
+                          setDenoms((prev) => ({ ...prev, [denom]: e.target.value }))
+                        }
+                        placeholder="0"
+                        aria-label={`Count of Rs. ${denom} notes`}
+                      />
+                      {Number(denom) !== 1 && !DEFAULT_DENOMS.includes(denom) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0"
+                          aria-label={`Remove Rs. ${denom} denomination`}
+                          onClick={() =>
+                            setDenoms((prev) => {
+                              const next = { ...prev };
+                              delete next[denom];
+                              return next;
+                            })
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-end gap-2 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Custom denomination</Label>
                     <Input
                       type="number"
-                      min="0"
-                      inputMode="numeric"
-                      className="h-8"
-                      value={denoms[denom] ?? ""}
-                      onChange={(e) =>
-                        setDenoms((prev) => ({ ...prev, [denom]: e.target.value }))
-                      }
-                      placeholder="0"
-                      aria-label={`Count of Rs. ${denom} notes`}
+                      min="1"
+                      className="h-8 w-32"
+                      value={customDenom}
+                      onChange={(e) => setCustomDenom(e.target.value)}
+                      placeholder="e.g. 25"
                     />
-                    {Number(denom) !== 1 && !DEFAULT_DENOMS.includes(denom) && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0"
-                        aria-label={`Remove Rs. ${denom} denomination`}
-                        onClick={() =>
-                          setDenoms((prev) => {
-                            const next = { ...prev };
-                            delete next[denom];
-                            return next;
-                          })
-                        }
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                      </Button>
-                    )}
                   </div>
-                ))}
-              </div>
-              <div className="flex items-end gap-2 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Custom denomination</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    className="h-8 w-32"
-                    value={customDenom}
-                    onChange={(e) => setCustomDenom(e.target.value)}
-                    placeholder="e.g. 25"
-                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!customDenom || Number(customDenom) <= 0}
+                    onClick={() => {
+                      setDenoms((prev) => ({ ...prev, [customDenom]: prev[customDenom] ?? "0" }));
+                      setCustomDenom("");
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!customDenom || Number(customDenom) <= 0}
-                  onClick={() => {
-                    setDenoms((prev) => ({ ...prev, [customDenom]: prev[customDenom] ?? "0" }));
-                    setCustomDenom("");
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                </Button>
+              </div>
+
+              <div
+                className="flex items-center justify-between rounded-lg px-3 py-2"
+                style={{ background: "var(--w11-control-hover)" }}
+              >
+                <span className="text-sm font-medium">Counted Total</span>
+                <span className="text-lg font-bold tabular-nums">
+                  {formatNepaliCurrency(countedTotal)}
+                </span>
+              </div>
+              {book && (
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                  Day-book reference total (all collectors):{" "}
+                  {formatNepaliCurrency(book.grand_total || 0)}. The exact expected
+                  total is computed on save per collector (cash, cheque, bank and QR
+                  payments only).
+                </p>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Notes (optional)</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Rs. 200 shortage covered by petty cash"
+                />
               </div>
             </div>
-
-            <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2">
-              <span className="text-sm font-medium">Counted Total</span>
-              <span className="text-lg font-bold tabular-nums">
-                {formatNepaliCurrency(countedTotal)}
-              </span>
-            </div>
-            {book && (
-              <p className="text-xs text-muted-foreground">
-                Day-book reference total (all collectors):{" "}
-                {formatNepaliCurrency(book.grand_total || 0)}. The exact expected
-                total is computed on save per collector (cash, cheque, bank and QR
-                payments only).
-              </p>
-            )}
-            <div className="space-y-1">
-              <Label className="text-xs">Notes (optional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                placeholder="e.g. Rs. 200 shortage covered by petty cash"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCloseDialog(false)} disabled={closeDay.isPending}>
-              Cancel
-            </Button>
-            <Button onClick={() => closeDay.mutate()} disabled={closeDay.isPending}>
-              {closeDay.isPending ? <Spinner className="mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
-              Close Day
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCloseDialog(false)} disabled={closeDay.isPending}>
+                Cancel
+              </Button>
+              <Button onClick={() => closeDay.mutate()} disabled={closeDay.isPending}>
+                {closeDay.isPending ? <Spinner className="mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
+                Close Day
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

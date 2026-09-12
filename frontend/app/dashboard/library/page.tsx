@@ -8,15 +8,23 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import type { PaginationMeta } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   AlertTriangle, BookOpen, BookmarkCheck, Banknote, PlusCircle,
   RotateCcw, ScanLine, BarChart3,
@@ -135,15 +143,20 @@ function LibraryContent() {
     onError: (e: any) => toast.error(e?.response?.data?.error || "Failed to process return"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading library…" />;
   if (isError) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load library overview. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Library" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load library overview. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -152,7 +165,7 @@ function LibraryContent() {
   const BOOK_COLUMNS: Column<Book>[] = [
     { key: "title", label: "Title", sortable: true, value: (b) => b.title, render: (b) => <span className="font-medium">{b.title}</span> },
     { key: "author", label: "Author", sortable: true, value: (b) => b.author },
-    { key: "category", label: "Category", sortable: true, value: (b) => b.category, render: (b) => <Badge variant="outline">{b.category}</Badge> },
+    { key: "category", label: "Category", sortable: true, value: (b) => b.category, render: (b) => <span className="win11-chip subtle">{b.category}</span> },
     { key: "available", label: "Available", align: "right", sortable: true, value: (b) => b.available_copies, render: (b) => <>{b.available_copies}/{b.total_copies}</> },
     { key: "shelf_location", label: "Location", value: (b) => b.shelf_location },
   ];
@@ -167,7 +180,7 @@ function LibraryContent() {
       label: "Status",
       sortable: true,
       value: (i) => i.status,
-      render: (i) => <Badge variant={i.status === "returned" ? "default" : "destructive"}>{i.status}</Badge>,
+      render: (i) => <StatusChip status={i.status} className="capitalize" />,
     },
     {
       key: "actions",
@@ -194,68 +207,78 @@ function LibraryContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Library</h1>
-          <p className="text-muted-foreground">Catalog, circulation, holds, fines and stock</p>
-        </div>
-        <Dialog open={showAddBook} onOpenChange={setShowAddBook}>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="h-4 w-4 mr-2" /> Add Book</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add New Book</DialogTitle></DialogHeader>
-            <AddBookForm onSubmit={(data) => addBookMut.mutate(data)} loading={addBookMut.isPending} />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* KPI cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={BookOpen} label="Titles / Copies"
-          value={`${stats?.titles ?? "—"} / ${stats?.total_copies ?? "—"}`} />
-        <KpiCard icon={BookOpen} label="Available now"
-          value={stats?.available_copies ?? "—"} />
-        <KpiCard icon={AlertTriangle} label="Overdue"
-          value={overdueTotal || 0}
-          tone={overdueTotal > 0 ? "destructive" : "default"} />
-        <Link href="/dashboard/library/reservations">
-          <Card className="hover:bg-muted/40 transition-colors">
-            <CardContent className="pt-6">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Library"
+        subtitle={`${bookMeta?.total ?? books?.length ?? 0} titles · ${stats?.available_copies ?? 0} available · ${overdueTotal} overdue`}
+        actions={
+          <Dialog open={showAddBook} onOpenChange={setShowAddBook}>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="h-4 w-4 mr-2" /> Add Book</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add New Book</DialogTitle></DialogHeader>
+              <AddBookForm onSubmit={(data) => addBookMut.mutate(data)} loading={addBookMut.isPending} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      <AOSPageBody>
+        {/* KPI cards */}
+        <StatGrid>
+          <KpiCard
+            icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+            label="Titles / Copies"
+            value={`${stats?.titles ?? "—"} / ${stats?.total_copies ?? "—"}`}
+          />
+          <KpiCard
+            icon={<BookOpen className="h-4 w-4" style={{ color: "#107c10" }} />}
+            label="Available now"
+            value={stats?.available_copies ?? "—"}
+            color="#107c10"
+          />
+          <KpiCard
+            icon={<AlertTriangle className="h-4 w-4" style={{ color: overdueTotal > 0 ? "#c42b1c" : "var(--w11-text-secondary)" }} />}
+            label="Overdue"
+            value={overdueTotal || 0}
+            color={overdueTotal > 0 ? "#c42b1c" : "var(--w11-accent)"}
+          />
+          <Link href="/dashboard/library/reservations" className="block">
+            <div className="win11-card h-full transition-colors hover:bg-[var(--w11-control-hover)]" style={{ cursor: "pointer" }}>
               <div className="flex items-center gap-3">
-                <div className="rounded-md p-2 bg-muted"><BookmarkCheck className="h-4 w-4" /></div>
+                <div className="rounded-md p-2" style={{ background: "var(--w11-control-hover)" }}>
+                  <BookmarkCheck className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
+                </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Holds &amp; fines</p>
-                  <p className="text-sm font-medium underline">Manage queue →</p>
+                  <p className="text-[11px] font-semibold uppercase" style={{ color: "var(--w11-text-secondary)" }}>Holds &amp; fines</p>
+                  <p className="text-sm font-medium underline" style={{ color: "var(--w11-accent)" }}>Manage queue →</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+            </div>
+          </Link>
+        </StatGrid>
 
-      {/* Quick links */}
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline"><Link href="/dashboard/library/checkout"><ScanLine className="h-4 w-4 mr-2" /> Circulation desk</Link></Button>
-        <Button asChild variant="outline"><Link href="/dashboard/library/reservations"><BookmarkCheck className="h-4 w-4 mr-2" /> Holds</Link></Button>
-        <Button asChild variant="outline"><Link href="/dashboard/library/fines"><Banknote className="h-4 w-4 mr-2" /> Fines</Link></Button>
-        <Button asChild variant="outline"><Link href="/dashboard/library/stocktake"><ScanLine className="h-4 w-4 mr-2" /> Stock-take</Link></Button>
-        <Button asChild variant="outline"><Link href="/dashboard/library/reports"><BarChart3 className="h-4 w-4 mr-2" /> Reports</Link></Button>
-      </div>
+        {/* Quick links */}
+        <FilterCommandBar>
+          <Button asChild variant="outline"><Link href="/dashboard/library/checkout"><ScanLine className="h-4 w-4 mr-2" /> Circulation desk</Link></Button>
+          <Button asChild variant="outline"><Link href="/dashboard/library/reservations"><BookmarkCheck className="h-4 w-4 mr-2" /> Holds</Link></Button>
+          <Button asChild variant="outline"><Link href="/dashboard/library/fines"><Banknote className="h-4 w-4 mr-2" /> Fines</Link></Button>
+          <Button asChild variant="outline"><Link href="/dashboard/library/stocktake"><ScanLine className="h-4 w-4 mr-2" /> Stock-take</Link></Button>
+          <Button asChild variant="outline"><Link href="/dashboard/library/reports"><BarChart3 className="h-4 w-4 mr-2" /> Reports</Link></Button>
+        </FilterCommandBar>
 
-      <div className="flex gap-2">
-        <Button variant={tab === "books" ? "default" : "outline"} onClick={() => setTab("books")}>
-          <BookOpen className="h-4 w-4 mr-2" /> Books ({bookMeta?.total ?? books?.length ?? 0})
-        </Button>
-        <Button variant={tab === "issues" ? "default" : "outline"} onClick={() => setTab("issues")}>
-          <RotateCcw className="h-4 w-4 mr-2" /> Issues{issueMeta ? ` (${issueMeta.total})` : ""}
-        </Button>
-      </div>
+        <FilterCommandBar>
+          <Button variant={tab === "books" ? "default" : "outline"} onClick={() => setTab("books")}>
+            <BookOpen className="h-4 w-4 mr-2" /> Books ({bookMeta?.total ?? books?.length ?? 0})
+          </Button>
+          <Button variant={tab === "issues" ? "default" : "outline"} onClick={() => setTab("issues")}>
+            <RotateCcw className="h-4 w-4 mr-2" /> Issues{issueMeta ? ` (${issueMeta.total})` : ""}
+          </Button>
+        </FilterCommandBar>
 
-      {tab === "books" && (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "books" && (
+          <DataPanel bodyClassName="p-0">
             <DataTable<Book>
               columns={BOOK_COLUMNS}
               rows={books ?? []}
@@ -268,13 +291,11 @@ function LibraryContent() {
               pagination={bookMeta}
               onPageChange={setBookPage}
             />
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {tab === "issues" && (
-        <Card>
-          <CardContent className="p-0">
+        {tab === "issues" && (
+          <DataPanel bodyClassName="p-0">
             <DataTable<BookIssue>
               columns={ISSUE_COLUMNS}
               rows={issues ?? []}
@@ -285,28 +306,10 @@ function LibraryContent() {
               pagination={issueMeta}
               onPageChange={setIssuePage}
             />
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, tone }: any) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-3">
-          <div className={`rounded-md p-2 ${tone === "destructive" ? "bg-red-100 text-red-700" : "bg-muted"}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-xl font-bold">{value}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 

@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -18,7 +17,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column, type BulkAction } from "@/components/ui/data-table";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid, DataPanel,
+} from "@/components/aos/kit/page-kit";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
@@ -164,7 +166,7 @@ function CarryForwardContent() {
       render: (s) => (
         <div>
           <p className="font-medium">{s.student_name}</p>
-          <p className="text-xs text-muted-foreground">{s.class_name || "—"}</p>
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.class_name || "—"}</p>
         </div>
       ),
     },
@@ -186,7 +188,7 @@ function CarryForwardContent() {
       sortable: true,
       value: (s) => s.signed_balance,
       render: (s) => (
-        <span className={s.signed_balance > 0 ? "text-red-600" : "text-green-700"}>
+        <span style={{ color: s.signed_balance > 0 ? "#c42b1c" : "#107c10" }}>
           {formatNepaliCurrency(s.signed_balance || 0)}
         </span>
       ),
@@ -231,7 +233,7 @@ function CarryForwardContent() {
       sortable: true,
       value: (r) => r.balance,
       render: (r) => (
-        <span className={r.balance_type === "due" ? "text-red-600" : "text-green-700"}>
+        <span style={{ color: r.balance_type === "due" ? "#c42b1c" : "#107c10" }}>
           {formatNepaliCurrency(r.balance || 0)}
         </span>
       ),
@@ -250,7 +252,7 @@ function CarryForwardContent() {
       key: "detail",
       label: "Detail",
       value: (r) => r.detail ?? "",
-      render: (r) => <span className="text-xs text-muted-foreground">{r.detail || "—"}</span>,
+      render: (r) => <span className="text-xs text-[color:var(--w11-text-secondary)]">{r.detail || "—"}</span>,
     },
     {
       key: "created_at",
@@ -262,130 +264,109 @@ function CarryForwardContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Carry Forward</h1>
-        <p className="text-muted-foreground">
-          Roll last year&apos;s due/credit balances into the new academic year
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ArrowRightLeft className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Carry Forward"
+        subtitle="Roll last year's due/credit balances into the new academic year"
+      />
+      <AOSPageBody>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="wizard" className="gap-1">
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Carry Forward
+            </TabsTrigger>
+            <TabsTrigger value="log" className="gap-1">
+              <History className="h-3.5 w-3.5" /> Log
+            </TabsTrigger>
+          </TabsList>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="wizard" className="gap-1">
-            <ArrowRightLeft className="h-3.5 w-3.5" /> Carry Forward
-          </TabsTrigger>
-          <TabsTrigger value="log" className="gap-1">
-            <History className="h-3.5 w-3.5" /> Log
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="wizard" className="space-y-6 mt-4">
-          {/* Step 1: pick years */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">1. Pick Academic Years (BS)</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs">From Year (BS)</Label>
-                <AdvancedSelect
-                  value={fromYear}
-                  onChange={(v) => {
-                    setFromYear(v);
-                    setPreview(null);
-                  }}
-                  options={YEARS.map((y) => ({ value: String(y), label: `${y}` }))}
-                  className="w-36"
-                />
-              </div>
-              <ArrowRightLeft className="h-4 w-4 mb-2 text-muted-foreground" />
-              <div className="space-y-1">
-                <Label className="text-xs">To Year (BS)</Label>
-                <AdvancedSelect
-                  value={toYear}
-                  onChange={(v) => setToYear(v)}
-                  options={YEARS.map((y) => ({ value: String(y), label: `${y}` }))}
-                  className="w-36"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Class (optional)</Label>
-                <AdvancedSelect
-                  value={classId}
-                  onChange={(v) => {
-                    setClassId(v);
-                    setPreview(null);
-                  }}
-                  clearable
-                  placeholder="All Classes"
-                  className="w-44"
-                  options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                />
-              </div>
-              <Button
-                onClick={() => runPreview.mutate()}
-                disabled={runPreview.isPending || !fromYear || !toYear}
-              >
-                {runPreview.isPending ? (
-                  <Spinner className="mr-2" />
-                ) : (
-                  <PlayCircle className="h-4 w-4 mr-2" />
+          <TabsContent value="wizard" className="space-y-4 mt-4">
+            {/* Step 1: pick years */}
+            <DataPanel title="1. Pick Academic Years (BS)">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">From Year (BS)</Label>
+                  <AdvancedSelect
+                    value={fromYear}
+                    onChange={(v) => {
+                      setFromYear(v);
+                      setPreview(null);
+                    }}
+                    options={YEARS.map((y) => ({ value: String(y), label: `${y}` }))}
+                    className="w-36"
+                  />
+                </div>
+                <ArrowRightLeft className="h-4 w-4 mb-2 text-[color:var(--w11-text-secondary)]" />
+                <div className="space-y-1">
+                  <Label className="text-xs">To Year (BS)</Label>
+                  <AdvancedSelect
+                    value={toYear}
+                    onChange={(v) => setToYear(v)}
+                    options={YEARS.map((y) => ({ value: String(y), label: `${y}` }))}
+                    className="w-36"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Class (optional)</Label>
+                  <AdvancedSelect
+                    value={classId}
+                    onChange={(v) => {
+                      setClassId(v);
+                      setPreview(null);
+                    }}
+                    clearable
+                    placeholder="All Classes"
+                    className="w-44"
+                    options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
+                  />
+                </div>
+                <Button
+                  onClick={() => runPreview.mutate()}
+                  disabled={runPreview.isPending || !fromYear || !toYear}
+                >
+                  {runPreview.isPending ? (
+                    <Spinner className="mr-2" />
+                  ) : (
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Load Preview
+                </Button>
+                {fromYear === toYear && (
+                  <p className="text-xs mb-1" style={{ color: "#c42b1c" }}>
+                    From and to years must differ.
+                  </p>
                 )}
-                Load Preview
-              </Button>
-              {fromYear === toYear && (
-                <p className="text-xs text-destructive mb-1">
-                  From and to years must differ.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Step 2: preview + selection */}
-          {preview && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-5">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Total Due to Carry
-                    </p>
-                    <p className="text-xl font-bold text-red-600 mt-1">
-                      {formatNepaliCurrency(preview.total_due || 0)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-5">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Total Credit to Carry
-                    </p>
-                    <p className="text-xl font-bold text-green-700 mt-1">
-                      {formatNepaliCurrency(preview.total_credit || 0)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-5">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Students with Balances
-                    </p>
-                    <p className="text-xl font-bold mt-1">{preview.students.length}</p>
-                  </CardContent>
-                </Card>
               </div>
+            </DataPanel>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    2. Select Students
-                    <span className="text-xs font-normal text-muted-foreground">
-                      Balances for {preview.from_year_bs} BS
+            {/* Step 2: preview + selection */}
+            {preview && (
+              <>
+                <StatGrid className="mb-0" min={200}>
+                  <KpiCard
+                    label="Total Due to Carry"
+                    value={formatNepaliCurrency(preview.total_due || 0)}
+                    color="#c42b1c"
+                  />
+                  <KpiCard
+                    label="Total Credit to Carry"
+                    value={formatNepaliCurrency(preview.total_credit || 0)}
+                    color="#107c10"
+                  />
+                  <KpiCard label="Students with Balances" value={preview.students.length} />
+                </StatGrid>
+
+                <DataPanel
+                  title={
+                    <span className="flex items-center gap-2">
+                      2. Select Students
+                      <span className="text-xs font-normal text-[color:var(--w11-text-secondary)]">
+                        Balances for {preview.from_year_bs} BS
+                      </span>
                     </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+                  }
+                >
                   <DataTable<CarryStudent>
                     columns={CARRY_COLUMNS}
                     rows={preview.students}
@@ -401,18 +382,13 @@ function CarryForwardContent() {
                       body: `No student has a non-zero balance for ${preview.from_year_bs} BS.`,
                     }}
                   />
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </TabsContent>
+                </DataPanel>
+              </>
+            )}
+          </TabsContent>
 
-        <TabsContent value="log" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Carry-Forward History</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <TabsContent value="log" className="mt-4">
+            <DataPanel title="Carry-Forward History">
               <DataTable<CarryLogRow>
                 columns={LOG_COLUMNS}
                 rows={logQuery.data?.log ?? []}
@@ -441,66 +417,66 @@ function CarryForwardContent() {
                   body: "Applied carry-forwards will be logged here.",
                 }}
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </DataPanel>
+          </TabsContent>
+        </Tabs>
 
-      {/* Apply confirmation dialog */}
-      <Dialog
-        open={Boolean(applyTarget)}
-        onOpenChange={(open) => !open && setApplyTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Apply Carry-Forward</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Roll <strong>{applyTarget?.length ?? 0}</strong> selected student balance(s)
-              from <strong>{fromYear}</strong> into <strong>{toYear}</strong> BS. Due
-              balances become a pending bill in the new year; credits become a
-              self-settling credit line. Already-applied students are skipped.
-            </p>
-            <div className="flex gap-4 text-sm">
-              <span className="flex items-center gap-1 text-red-600">
-                <TrendingDown className="h-4 w-4" />
-                Due:{" "}
-                {formatNepaliCurrency(
-                  applyTarget?.reduce((s, r) => s + (r.balance_type === "due" ? r.balance : 0), 0) || 0,
-                )}
-              </span>
-              <span className="flex items-center gap-1 text-green-700">
-                <TrendingUp className="h-4 w-4" />
-                Credit:{" "}
-                {formatNepaliCurrency(
-                  applyTarget?.reduce((s, r) => s + (r.balance_type === "credit" ? r.balance : 0), 0) || 0,
-                )}
-              </span>
+        {/* Apply confirmation dialog */}
+        <Dialog
+          open={Boolean(applyTarget)}
+          onOpenChange={(open) => !open && setApplyTarget(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Apply Carry-Forward</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                Roll <strong>{applyTarget?.length ?? 0}</strong> selected student balance(s)
+                from <strong>{fromYear}</strong> into <strong>{toYear}</strong> BS. Due
+                balances become a pending bill in the new year; credits become a
+                self-settling credit line. Already-applied students are skipped.
+              </p>
+              <div className="flex gap-4 text-sm">
+                <span className="flex items-center gap-1" style={{ color: "#c42b1c" }}>
+                  <TrendingDown className="h-4 w-4" />
+                  Due:{" "}
+                  {formatNepaliCurrency(
+                    applyTarget?.reduce((s, r) => s + (r.balance_type === "due" ? r.balance : 0), 0) || 0,
+                  )}
+                </span>
+                <span className="flex items-center gap-1" style={{ color: "#107c10" }}>
+                  <TrendingUp className="h-4 w-4" />
+                  Credit:{" "}
+                  {formatNepaliCurrency(
+                    applyTarget?.reduce((s, r) => s + (r.balance_type === "credit" ? r.balance : 0), 0) || 0,
+                  )}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Due Date for the new bill (BS, optional)</Label>
+                <BSDateInput value={dueDateBS} onChange={(v) => setDueDateBS(v)} emit="bs" className="w-56" />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Due Date for the new bill (BS, optional)</Label>
-              <BSDateInput value={dueDateBS} onChange={(v) => setDueDateBS(v)} emit="bs" className="w-56" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApplyTarget(null)} disabled={apply.isPending}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => apply.mutate((applyTarget || []).map((s) => s.student_id))}
-              disabled={apply.isPending || !applyTarget?.length || fromYear === toYear}
-            >
-              {apply.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ArrowRightLeft className="h-4 w-4 mr-2" />
-              )}
-              Apply to {applyTarget?.length ?? 0} Student(s)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setApplyTarget(null)} disabled={apply.isPending}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => apply.mutate((applyTarget || []).map((s) => s.student_id))}
+                disabled={apply.isPending || !applyTarget?.length || fromYear === toYear}
+              >
+                {apply.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                )}
+                Apply to {applyTarget?.length ?? 0} Student(s)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

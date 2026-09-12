@@ -7,11 +7,9 @@ import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import {
@@ -29,6 +27,15 @@ import {
   Clock, Users, Trash2, Eye, Pencil, Upload,
 } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+} from "@/components/aos/kit/page-kit";
 
 interface Assignment {
   id: string;
@@ -261,18 +268,21 @@ function AssignmentsContent() {
 
   if (isError)
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Assignments</h1>
-          <p className="text-muted-foreground">Create, distribute, and grade student assignments</p>
-        </div>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-destructive mb-4">Failed to load assignments.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Assignments"
+          subtitle="Create, distribute, and grade student assignments"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-12 text-center space-y-3">
+              <p style={{ color: "#c42b1c" }}>Failed to load assignments.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
 
   const allAssignments = assignments || [];
@@ -283,58 +293,34 @@ function AssignmentsContent() {
   };
 
   return (
-    <div className="space-y-6">
+    <AOSPage>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Assignments</h1>
-          <p className="text-muted-foreground">Create, distribute, and grade student assignments</p>
-        </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setEditAssignment(null);
-            setShowCreate(true);
-          }}
-        >
-          <PlusCircle className="h-4 w-4 mr-2" /> New Assignment
-        </Button>
-      </div>
+      <AOSPageHeader
+        icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Assignments"
+        subtitle="Create, distribute, and grade student assignments"
+        actions={
+          <Button
+            onClick={() => {
+              resetForm();
+              setEditAssignment(null);
+              setShowCreate(true);
+            }}
+          >
+            <PlusCircle className="h-4 w-4 mr-2" /> New Assignment
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        {/* Stats */}
+        <StatGrid min={180}>
+          <KpiCard label="Total" value={stats.total} icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label="Active" value={stats.active} color="#9d5d00" icon={<Clock className="h-5 w-5" style={{ color: "#9d5d00" }} />} />
+          <KpiCard label="Closed / Graded" value={stats.closed} icon={<CheckCircle2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+        </StatGrid>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <FileText className="h-8 w-8 text-blue-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <Clock className="h-8 w-8 text-amber-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Active</p>
-              <p className="text-2xl font-bold">{stats.active}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <CheckCircle2 className="h-8 w-8 text-green-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Closed / Graded</p>
-              <p className="text-2xl font-bold">{stats.closed}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Assignments Table */}
-      <Card>
-        <CardContent className="p-0">
+        {/* Assignments Table */}
+        <DataPanel bodyClassName="p-0 pt-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -350,7 +336,7 @@ function AssignmentsContent() {
             <TableBody>
               {allAssignments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-12 text-[color:var(--w11-text-secondary)]">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No assignments yet. Create your first assignment.
                   </TableCell>
@@ -362,12 +348,12 @@ function AssignmentsContent() {
                       <div>
                         <p className="font-medium">{a.title}</p>
                         {a.description && (
-                          <p className="text-xs text-muted-foreground truncate max-w-xs">{a.description}</p>
+                          <p className="text-xs text-[color:var(--w11-text-secondary)] truncate max-w-xs">{a.description}</p>
                         )}
                         {a.attachment_urls && a.attachment_urls.length > 0 && (
                           <div className="flex items-center gap-1 mt-1">
-                            <Paperclip className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">{a.attachment_urls.length} file(s)</span>
+                            <Paperclip className="h-3 w-3 text-[color:var(--w11-text-secondary)]" />
+                            <span className="text-xs text-[color:var(--w11-text-secondary)]">{a.attachment_urls.length} file(s)</span>
                           </div>
                         )}
                       </div>
@@ -375,15 +361,13 @@ function AssignmentsContent() {
                     <TableCell>
                       <p className="text-sm">{a.class_name || "—"}</p>
                       {a.subject_name && (
-                        <p className="text-xs text-muted-foreground">{a.subject_name}</p>
+                        <p className="text-xs text-[color:var(--w11-text-secondary)]">{a.subject_name}</p>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">{displayDate(a.due_date_bs, a.due_date)}</TableCell>
                     <TableCell className="text-sm">{a.total_marks}</TableCell>
                     <TableCell>
-                      <Badge variant={a.status === "active" ? "default" : a.status === "graded" ? "success" : "secondary"}>
-                        {a.status}
-                      </Badge>
+                      <StatusChip status={a.status === "graded" ? "completed" : a.status} />
                     </TableCell>
                     <TableCell>
                       <Button
@@ -404,7 +388,7 @@ function AssignmentsContent() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-7 w-7 text-destructive"
+                          className="h-7 w-7 text-[#c42b1c]"
                           onClick={() => {
                             void (async () => {
                               const ok = await confirm({
@@ -428,8 +412,7 @@ function AssignmentsContent() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
       {/* ── Create / Edit Dialog ── */}
       <Dialog
@@ -522,9 +505,9 @@ function AssignmentsContent() {
               {form.attachment_urls.length > 0 && (
                 <div className="space-y-1">
                   {form.attachment_urls.map((url, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm p-2 bg-muted rounded">
-                      <Paperclip className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      <a href={url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-primary hover:underline text-xs">
+                    <div key={i} className="flex items-center gap-2 text-sm p-2 rounded" style={{ background: "var(--w11-control-bg)" }}>
+                      <Paperclip className="h-3 w-3 text-[color:var(--w11-text-secondary)] flex-shrink-0" />
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline text-xs" style={{ color: "var(--w11-accent)" }}>
                         {url.split("/").pop() || url}
                       </a>
                       <Button
@@ -600,26 +583,26 @@ function AssignmentsContent() {
             {loadingSubmissions ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : !submissions || submissions.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-[color:var(--w11-text-secondary)]">
                 <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p>No submissions yet</p>
               </div>
             ) : (
               submissions.map((sub) => (
-                <Card key={sub.id} className="border">
-                  <CardContent className="p-4 space-y-2">
+                <div key={sub.id} className="win11-card" style={{ marginBottom: 0 }}>
+                  <div className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-sm">{sub.student_name || "Student"}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-[color:var(--w11-text-secondary)]">
                           Submitted: {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : "—"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {sub.marks !== null && sub.marks !== undefined ? (
-                          <Badge variant="default">{sub.marks} / {submissionsFor?.total_marks}</Badge>
+                          <span className="win11-chip accent">{sub.marks} / {submissionsFor?.total_marks}</span>
                         ) : (
-                          <Badge variant="secondary">Not graded</Badge>
+                          <span className="win11-chip warning">Not graded</span>
                         )}
                         <Button
                           size="sm"
@@ -649,7 +632,7 @@ function AssignmentsContent() {
                     </div>
 
                     {sub.content && (
-                      <p className="text-sm text-muted-foreground bg-muted p-2 rounded text-xs">
+                      <p className="text-sm p-2 rounded text-xs text-[color:var(--w11-text-secondary)]" style={{ background: "var(--w11-control-bg)" }}>
                         {sub.content}
                       </p>
                     )}
@@ -662,7 +645,8 @@ function AssignmentsContent() {
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-primary hover:underline bg-primary/5 px-2 py-1 rounded border border-primary/20"
+                            className="flex items-center gap-1 text-xs hover:underline px-2 py-1 rounded border border-[color:var(--w11-border-subtle)]"
+                            style={{ color: "var(--w11-accent)" }}
                           >
                             <Download className="h-3 w-3" />
                             {url.split("/").pop() || `File ${i + 1}`}
@@ -672,12 +656,12 @@ function AssignmentsContent() {
                     )}
 
                     {sub.feedback && (
-                      <p className="text-xs text-muted-foreground italic border-l-2 border-primary/40 pl-2">
+                      <p className="text-xs italic border-l-2 border-[color:var(--w11-border-strong)] pl-2 text-[color:var(--w11-text-secondary)]">
                         {sub.feedback}
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -693,12 +677,12 @@ function AssignmentsContent() {
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium">{gradeModal?.sub.student_name}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">
                 Max marks: {gradeModal?.assignment.total_marks}
               </p>
             </div>
             {gradeModal?.sub.content && (
-              <div className="p-3 bg-muted rounded text-xs max-h-28 overflow-y-auto">
+              <div className="p-3 rounded text-xs max-h-28 overflow-y-auto" style={{ background: "var(--w11-control-bg)" }}>
                 {gradeModal.sub.content}
               </div>
             )}
@@ -710,7 +694,8 @@ function AssignmentsContent() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    className="flex items-center gap-1 text-xs hover:underline"
+                    style={{ color: "var(--w11-accent)" }}
                   >
                     <Eye className="h-3 w-3" /> View File {i + 1}
                   </a>
@@ -749,6 +734,7 @@ function AssignmentsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

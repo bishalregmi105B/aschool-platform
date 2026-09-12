@@ -6,12 +6,10 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { PluginGate, type PluginSidebarItem } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Sheet,
   SheetContent,
@@ -25,6 +23,15 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 /**
  * Roles & Permissions — B-17 rewrite. Live per-role counts from
@@ -107,103 +114,105 @@ function RolesContent() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-6 w-6" />
-            Roles &amp; Permissions
-          </h1>
-          <p className="text-muted-foreground">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Shield className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Roles & Permissions"
+        subtitle={
+          <>
             Who uses the school, and what each role can reach
             {stats ? ` — ${stats.total_users} users total` : ""}
-          </p>
-        </div>
-      </div>
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="roles" className="mt-4 space-y-4">
-          {isLoading ? (
-            <PageLoader />
-          ) : isError ? (
-            <Card>
-              <CardContent className="py-10 text-center space-y-3">
-                <p className="text-sm text-destructive">
-                  Failed to load role statistics. Please try again.
-                </p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                  Retry
-                </Button>
-              </CardContent>
-            </Card>
-          ) : roleEntries.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-                <p className="text-muted-foreground">
-                  No users yet — add staff accounts from the Users page.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {roleEntries.map(([role, counts]) => (
-                <Card
-                  key={role}
-                  className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary/70"
-                  onClick={() => setOpenRole(role)}
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <Badge className="bg-primary text-primary-foreground">
-                          {roleLabel(role)}
-                        </Badge>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {counts.active} active
-                          {counts.total - counts.active > 0
-                            ? `, ${counts.total - counts.active} inactive`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span className="text-xl font-semibold">{counts.total}</span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-4 w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenRole(role);
-                      }}
-                    >
-                      View users
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="permissions" className="mt-4">
-          <PermissionsMatrix />
-        </TabsContent>
-      </Tabs>
-
-      <RoleUsersSheet
-        role={openRole}
-        onClose={() => setOpenRole(null)}
+          </>
+        }
       />
-    </div>
+      <AOSPageBody>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="roles">Roles</TabsTrigger>
+            <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="roles" className="mt-4 space-y-4">
+            {isLoading ? (
+              <AOSModuleLoadingState label="Loading role statistics…" />
+            ) : isError ? (
+              <DataPanel className="max-w-2xl mx-auto">
+                <div className="py-10 text-center space-y-3">
+                  <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>
+                    Failed to load role statistics. Please try again.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => refetch()}>
+                    Retry
+                  </Button>
+                </div>
+              </DataPanel>
+            ) : roleEntries.length === 0 ? (
+              <DataPanel>
+                <AOSEmptyState
+                  icon={<Users className="h-12 w-12" />}
+                  title="No users yet"
+                  description="Add staff accounts from the Users page."
+                />
+              </DataPanel>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {roleEntries.map(([role, counts]) => (
+                  <div
+                    key={role}
+                    className="win11-card cursor-pointer transition-shadow"
+                    style={{ borderLeft: "4px solid var(--w11-accent)" }}
+                    onClick={() => setOpenRole(role)}
+                  >
+                    <div className="pt-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="win11-chip accent">{roleLabel(role)}</span>
+                          <p className="mt-2 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                            {counts.active} active
+                            {counts.total - counts.active > 0
+                              ? `, ${counts.total - counts.active} inactive`
+                              : ""}
+                          </p>
+                        </div>
+                        <div
+                          className="flex items-center gap-1"
+                          style={{ color: "var(--w11-text-secondary)" }}
+                        >
+                          <Users className="h-4 w-4" />
+                          <span className="text-xl font-semibold" style={{ color: "var(--w11-text-primary)" }}>
+                            {counts.total}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4 w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenRole(role);
+                        }}
+                      >
+                        View users
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="permissions" className="mt-4">
+            <PermissionsMatrix />
+          </TabsContent>
+        </Tabs>
+
+        <RoleUsersSheet
+          role={openRole}
+          onClose={() => setOpenRole(null)}
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -314,9 +323,10 @@ function RoleUsersSheet({ role, onClose }: { role: string | null; onClose: () =>
       sortable: true,
       value: (u) => (u.is_active ? "active" : "inactive"),
       render: (u) => (
-        <Badge variant={u.is_active ? "success" : "destructive"}>
-          {u.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <StatusChip
+          status={u.is_active ? "active" : "inactive"}
+          label={u.is_active ? "Active" : "Inactive"}
+        />
       ),
     },
     {
@@ -442,20 +452,20 @@ function PermissionsMatrix() {
     return [...map.entries()];
   }, [items]);
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading permissions…" />;
 
   if (isError) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">
+      <DataPanel className="max-w-2xl mx-auto">
+        <div className="py-10 text-center space-y-3">
+          <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>
             Failed to load navigation visibility. Please try again.
           </p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Retry
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </DataPanel>
     );
   }
 
@@ -465,14 +475,14 @@ function PermissionsMatrix() {
   // honest about that and show the current role's visibility read-only.
   return (
     <div className="space-y-4">
-      <Card className="border-l-4 border-l-primary/70">
-        <CardContent className="pt-6 flex items-start gap-3">
-          <Info className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+      <div className="win11-card" style={{ borderLeft: "4px solid var(--w11-accent)" }}>
+        <div className="pt-5 flex items-start gap-3">
+          <Info className="h-5 w-5 mt-0.5 shrink-0" style={{ color: "var(--w11-accent)" }} />
           <div className="space-y-1 text-sm">
-            <p className="font-medium">
+            <p className="font-medium" style={{ color: "var(--w11-text-primary)" }}>
               Per-role section visibility isn&rsquo;t available yet
             </p>
-            <p className="text-muted-foreground">
+            <p style={{ color: "var(--w11-text-secondary)" }}>
               The sidebar API returns only what the signed-in role can see —
               it doesn&rsquo;t expose other roles&rsquo; visibility or the
               manifests&rsquo; declared permissions, so a full role-by-section
@@ -480,48 +490,46 @@ function PermissionsMatrix() {
               {user ? ` (${roleLabel(user.role)})` : ""} can reach, read-only.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {sections.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Shield className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="text-muted-foreground">
-              No plugin navigation visible for your role.
-            </p>
-          </CardContent>
-        </Card>
+        <DataPanel>
+          <AOSEmptyState
+            icon={<Shield className="h-12 w-12" />}
+            title="No plugin navigation visible for your role."
+          />
+        </DataPanel>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {sections.map(([section, sectionItems]) => (
-            <Card key={section}>
-              <CardContent className="pt-6">
-                <p className="text-sm font-semibold mb-3">{section}</p>
-                <ul className="space-y-2">
-                  {sectionItems.map((item) => (
-                    <li
-                      key={item.slug}
-                      className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {item.label}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground font-mono">
-                          {item.route}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0">
-                        {item.subitems.length > 0
-                          ? `${item.subitems.length} pages`
-                          : "page"}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+            <DataPanel key={section} title={section}>
+              <ul className="space-y-2">
+                {sectionItems.map((item) => (
+                  <li
+                    key={item.slug}
+                    className="flex items-center justify-between gap-2 rounded-md border border-[var(--w11-border-subtle)] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>
+                        {item.label}
+                      </p>
+                      <p
+                        className="truncate text-xs font-mono"
+                        style={{ color: "var(--w11-text-tertiary)" }}
+                      >
+                        {item.route}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">
+                      {item.subitems.length > 0
+                        ? `${item.subitems.length} pages`
+                        : "page"}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </DataPanel>
           ))}
         </div>
       )}

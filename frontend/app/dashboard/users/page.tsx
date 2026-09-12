@@ -6,7 +6,6 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog,
@@ -16,16 +15,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Plus, Users } from "lucide-react";
 
 interface User {
@@ -80,24 +79,25 @@ export default function UsersPage() {
       render: (u) => (
         <div>
           <div className="text-sm">{u.phone}</div>
-          {u.email && <div className="text-xs text-muted-foreground">{u.email}</div>}
-          <div className="mt-2 text-[11px] text-muted-foreground bg-muted/50 p-1.5 rounded">
+          {u.email && <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{u.email}</div>}
+          <div
+            className="mt-2 text-[11px] p-1.5 rounded-[var(--w11-radius-sm)]"
+            style={{ color: "var(--w11-text-secondary)", background: "var(--w11-surface)" }}
+          >
             <span className="font-semibold block mb-0.5">Login Credentials:</span>
-            ID: <span className="font-mono text-primary">{u.login_id || u.email || u.phone}</span>
+            ID: <span className="font-mono" style={{ color: "var(--w11-accent)" }}>{u.login_id || u.email || u.phone}</span>
           </div>
         </div>
       ),
     },
-    { key: "role", label: "Role", sortable: true, value: (u) => u.role, render: (u) => <Badge variant="outline" className="capitalize">{u.role.replace("_", " ")}</Badge> },
+    { key: "role", label: "Role", sortable: true, value: (u) => u.role, render: (u) => <StatusChip status="user" label={u.role.replace("_", " ")} className="capitalize" /> },
     {
       key: "is_active",
       label: "Status",
       sortable: true,
       value: (u) => (u.is_active ? "active" : "inactive"),
       render: (u) => (
-        <Badge variant={u.is_active ? "success" : "destructive"}>
-          {u.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <StatusChip status={u.is_active ? "active" : "inactive"} label={u.is_active ? "Active" : "Inactive"} />
       ),
     },
     {
@@ -116,31 +116,42 @@ export default function UsersPage() {
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading users…" />;
 
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load users. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Users" subtitle="Manage school staff and user accounts" />
+        <AOSPageBody>
+          <DataPanel>
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load users. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Users</h1>
-          <p className="text-muted-foreground">Manage school staff and user accounts</p>
-        </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Add User
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Users"
+        subtitle={
+          pagination?.total != null
+            ? `${pagination.total} accounts · Manage school staff and user accounts`
+            : "Manage school staff and user accounts"
+        }
+        actions={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add User
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable<User>
             columns={USER_COLUMNS}
             rows={users}
@@ -177,11 +188,11 @@ export default function UsersPage() {
             onPageChange={setPage}
             empty={{ icon: Users, title: "No users found", body: "Add staff accounts so people can sign in.", action: { label: "Add User", onClick: () => setShowAdd(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <AddUserDialog open={showAdd} onOpenChange={setShowAdd} />
-    </div>
+        <AddUserDialog open={showAdd} onOpenChange={setShowAdd} />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -249,7 +260,7 @@ function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             <div className="space-y-2">
               <Label>Password</Label>
               <Input name="password" type="password" placeholder="Leave empty for auto-generation" minLength={6} />
-              <p className="text-xs text-muted-foreground">Default: {"{first}.{last4}"} (e.g. sita.4821)</p>
+              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Default: {"{first}.{last4}"} (e.g. sita.4821)</p>
             </div>
           </div>
           <DialogFooter>

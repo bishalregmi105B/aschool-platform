@@ -7,14 +7,19 @@ import { api, type ApiResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Plus, BookOpen, Pencil, Trash2, Tag } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 interface DiaryCategory {
   id: string;
@@ -25,13 +30,13 @@ interface DiaryCategory {
 
 const colors = ["red", "blue", "green", "yellow", "purple", "gray"] as const;
 
-const colorClass: Record<string, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
-  yellow: "bg-yellow-500",
-  purple: "bg-purple-500",
-  gray: "bg-gray-500",
+const colorHex: Record<string, string> = {
+  red: "#c42b1c",
+  blue: "#0067c0",
+  green: "#107c10",
+  yellow: "#ffb900",
+  purple: "#8764b8",
+  gray: "#5d5d5d",
 };
 
 export default function DiaryCategoriesPage() {
@@ -103,7 +108,7 @@ export default function DiaryCategoriesPage() {
       value: (c) => c.name,
       render: (c) => (
         <span className="font-medium flex items-center gap-2">
-          <Tag className="h-4 w-4 text-muted-foreground" /> {c.name}
+          <Tag className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> {c.name}
         </span>
       ),
     },
@@ -111,7 +116,7 @@ export default function DiaryCategoriesPage() {
       key: "color",
       label: "Color Tag",
       value: (c) => c.color,
-      render: (c) => <div className={`w-4 h-4 rounded-full ${colorClass[c.color] ?? colorClass.blue}`} />,
+      render: (c) => <div className="w-4 h-4 rounded-full" style={{ background: colorHex[c.color] ?? colorHex.blue }} />,
     },
     {
       key: "active",
@@ -119,9 +124,7 @@ export default function DiaryCategoriesPage() {
       sortable: true,
       value: (c) => (c.active ? "active" : "inactive"),
       render: (c) => (
-        <Badge variant={c.active ? "success" : "secondary"}>
-          {c.active ? "Active" : "Inactive"}
-        </Badge>
+        <StatusChip status={c.active ? "active" : "inactive"} />
       ),
     },
     {
@@ -139,31 +142,29 @@ export default function DiaryCategoriesPage() {
             onClick={(e) => { e.stopPropagation(); deleteCategory.mutate(c.id); }}
             disabled={deleteCategory.isPending}
           >
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading diary categories…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6" /> Diary Categories
-          </h1>
-          <p className="text-muted-foreground">Manage categories for student diary remarks</p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> Add Category
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Diary Categories"
+        subtitle={`${categories.length} ${categories.length === 1 ? "category" : "categories"} for student diary remarks`}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" /> Add Category
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <DataTable<DiaryCategory>
             columns={CATEGORY_COLUMNS}
             rows={categories}
@@ -180,44 +181,46 @@ export default function DiaryCategoriesPage() {
               action: { label: "Add Category", onClick: openCreate },
             }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Category" : "Add Category"}</DialogTitle>
-          </DialogHeader>
-          <form action={(formData) => saveCategory.mutate(formData)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Category Name</Label>
-              <Input name="name" required defaultValue={editItem?.name} placeholder="e.g. Health Issue" />
-            </div>
-            <div className="space-y-2">
-              <Label>Color Code</Label>
-              <div className="flex gap-2">
-                {colors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={`Use ${color}`}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full ${colorClass[color]} border-2 ${
-                      selectedColor === color ? "border-foreground" : "border-transparent"
-                    }`}
-                  />
-                ))}
+        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editItem ? "Edit Category" : "Add Category"}</DialogTitle>
+            </DialogHeader>
+            <form action={(formData) => saveCategory.mutate(formData)} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Category Name</Label>
+                <Input name="name" required defaultValue={editItem?.name} placeholder="e.g. Health Issue" />
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button type="submit" disabled={saveCategory.isPending}>
-                {saveCategory.isPending ? "Saving..." : "Save"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <div className="space-y-2">
+                <Label>Color Code</Label>
+                <div className="flex gap-2">
+                  {colors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Use ${color}`}
+                      onClick={() => setSelectedColor(color)}
+                      className="w-8 h-8 rounded-full border-2"
+                      style={{
+                        background: colorHex[color],
+                        borderColor: selectedColor === color ? "var(--w11-text-primary)" : "transparent",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+                <Button type="submit" disabled={saveCategory.isPending}>
+                  {saveCategory.isPending ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,12 +5,18 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import type { PaginationMeta } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  AOSModuleLoadingState,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { AlertCircle, BookOpen, RotateCcw } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -48,13 +54,20 @@ function OverdueContent() {
     onError: () => toast.error("Failed to process return"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading overdue books…" />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load overdue books. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Overdue Books" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load overdue books. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
@@ -64,7 +77,7 @@ function OverdueContent() {
   const OVERDUE_COLUMNS: Column<any>[] = [
     { key: "book", label: "Book", sortable: true, value: (i) => i.book_title ?? "", render: (i) => (
       <div className="flex items-center gap-2 font-medium">
-        <BookOpen className="h-4 w-4 text-muted-foreground" />
+        <BookOpen className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
         {i.book_title || i.book_id}
       </div>
     ) },
@@ -79,7 +92,7 @@ function OverdueContent() {
       value: (i) => Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000),
       render: (i) => {
         const daysOverdue = Math.floor((Date.now() - new Date(i.due_date).getTime()) / (1000 * 60 * 60 * 24));
-        return <Badge variant="destructive">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""}</Badge>;
+        return <StatusChip status="overdue" label={`${daysOverdue} day${daysOverdue !== 1 ? "s" : ""}`} />;
       },
     },
     {
@@ -95,36 +108,36 @@ function OverdueContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <AlertCircle className="h-6 w-6 text-destructive" /> Overdue Books
-          </h1>
-          <p className="text-muted-foreground">Books past their due date — {meta?.total ?? overdue.length} overdue</p>
-        </div>
-      </div>
-
-      {overdue.length === 0 ? (
-        <Card><CardContent className="py-16 text-center text-muted-foreground">
-          <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No overdue books</p>
-          <p className="text-sm">All borrowed books are within their due date.</p>
-        </CardContent></Card>
-      ) : (
-        <Card><CardContent className="pt-6">
-          <DataTable
-            columns={OVERDUE_COLUMNS}
-            rows={overdue}
-            rowKey={(i: any) => i.id}
-            searchable
-            searchPlaceholder="Search books or students…"
-            exportFileName="library-overdue"
-            pagination={meta}
-            onPageChange={setPage}
-          />
-        </CardContent></Card>
-      )}
-    </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<AlertCircle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+        title="Overdue Books"
+        subtitle={`Books past their due date — ${meta?.total ?? overdue.length} overdue`}
+      />
+      <AOSPageBody>
+        {overdue.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<BookOpen className="h-12 w-12" />}
+              title="No overdue books"
+              description="All borrowed books are within their due date."
+            />
+          </DataPanel>
+        ) : (
+          <DataPanel bodyClassName="p-0">
+            <DataTable
+              columns={OVERDUE_COLUMNS}
+              rows={overdue}
+              rowKey={(i: any) => i.id}
+              searchable
+              searchPlaceholder="Search books or students…"
+              exportFileName="library-overdue"
+              pagination={meta}
+              onPageChange={setPage}
+            />
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -1,0 +1,103 @@
+/**
+ * 11.css - Fluent DataGrid & Tables
+ * Windows 11 Rich Data Presentation (Student Rosters, Gradebooks, Timetables)
+ */
+
+.win11-datagrid-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--w11-radius-md);
+  border: 1px solid var(--w11-border-default);
+  background: var(--w11-surface-solid);
+  box-shadow: var(--w11-elevation-card);
+}
+
+table.win11-datagrid {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--w11-font-family);
+  font-size: 13px;
+  color: var(--w11-text-primary);
+  text-align: left;
+  user-select: none;
+
+  thead {
+    position: sticky;
+    top: 0;
+    background: var(--w11-surface-solid);
+    z-index: 2;
+
+    th {
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--w11-text-secondary);
+      border-bottom: 2px solid var(--w11-border-default);
+      white-space: nowrap;
+      transition: background var(--w11-transition-fast), color var(--w11-transition-fast);
+
+      &.sortable {
+        cursor: pointer;
+        &:hover {
+          background: var(--w11-control-hover);
+          color: var(--w11-text-primary);
+        }
+      }
+
+      .sort-icon {
+        display: inline-block;
+        margin-left: 6px;
+        font-size: 10px;
+        transition: transform var(--w11-transition-fast);
+      }
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid var(--w11-border-subtle);
+      transition: background var(--w11-transition-fast);
+      position: relative;
+
+      td {
+        padding: 9px 14px;
+        vertical-align: middle;
+      }
+
+      &:hover {
+        background: var(--w11-control-hover);
+      }
+
+      &.selected {
+        background: var(--w11-control-active);
+        font-weight: 500;
+
+        & td:first-child::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: var(--w11-accent);
+          border-radius: var(--w11-radius-full);
+        }
+      }
+    }
+  }
+
+  /* Striped Variant */
+  &.striped tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  [data-theme="dark"] &.striped tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  /* Compact Variant */
+  &.compact {
+    font-size: 12px;
+    thead th { padding: 6px 10px; }
+    tbody td { padding: 5px 10px; }
+  }
+}

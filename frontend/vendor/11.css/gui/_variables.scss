@@ -1,0 +1,99 @@
+/**
+ * 11.css - Fluent Design System Tokens
+ * Windows 11 Variables & Color Palettes
+ */
+
+:root {
+  /* Font Families */
+  --w11-font-family: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  --w11-font-mono: 'Cascadia Code', 'Consolas', monospace;
+  --w11-font-size-base: 14px;
+  --w11-font: var(--w11-font-size-base) var(--w11-font-family);
+
+  /* Windows 11 Default Accent Color (Blue) */
+  --w11-accent: #0067c0;
+  --w11-accent-hover: #1873c4;
+  --w11-accent-active: #005fb8;
+  --w11-accent-text: #ffffff;
+  --w11-accent-light: rgba(0, 103, 192, 0.12);
+
+  /* Light Theme Surfaces & Backgrounds */
+  --w11-mica-bg: rgba(243, 243, 243, 0.85);
+  --w11-mica-alt: rgba(249, 249, 249, 0.85);
+  --w11-acrylic-bg: rgba(255, 255, 255, 0.72);
+  --w11-surface: rgba(255, 255, 255, 0.7);
+  --w11-surface-solid: #f3f3f3;
+  --w11-window-bg: #f9f9f9;
+  --w11-card-bg: rgba(255, 255, 255, 0.7);
+  --w11-control-bg: rgba(255, 255, 255, 0.7);
+  --w11-control-hover: rgba(0, 0, 0, 0.05);
+  --w11-control-active: rgba(0, 0, 0, 0.08);
+
+  /* Light Theme Borders */
+  --w11-border-subtle: rgba(0, 0, 0, 0.06);
+  --w11-border-default: rgba(0, 0, 0, 0.12);
+  --w11-border-strong: rgba(0, 0, 0, 0.35);
+  --w11-window-border: rgba(0, 0, 0, 0.14);
+
+  /* Light Theme Typography */
+  --w11-text-primary: #1b1b1b;
+  --w11-text-secondary: #5d5d5d;
+  --w11-text-tertiary: #8c8c8c;
+  --w11-text-disabled: #a0a0a0;
+
+  /* Corner Radii */
+  --w11-radius-sm: 4px;
+  --w11-radius-md: 6px;
+  --w11-radius-lg: 8px;
+  --w11-radius-xl: 12px;
+  --w11-radius-full: 9999px;
+
+  /* Elevation & Shadows */
+  --w11-elevation-card: 0 2px 4px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.08);
+  --w11-elevation-flyout: 0 8px 20px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.1);
+  --w11-elevation-window: 0 24px 48px rgba(0, 0, 0, 0.22), 0 0 1px rgba(0, 0, 0, 0.2);
+  --w11-elevation-active: 0 32px 64px rgba(0, 0, 0, 0.28), 0 0 2px rgba(0, 0, 0, 0.25);
+
+  /* Transitions */
+  --w11-ease-spring: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --w11-transition-fast: 120ms cubic-bezier(0.1, 0.9, 0.2, 1);
+  --w11-transition-normal: 200ms cubic-bezier(0.1, 0.9, 0.2, 1);
+  --w11-transition-slow: 350ms cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"],
+.dark,
+body.dark {
+  --w11-accent: #60cdff;
+  --w11-accent-hover: #70d2ff;
+  --w11-accent-active: #50c8ff;
+  --w11-accent-text: #000000;
+  --w11-accent-light: rgba(96, 205, 255, 0.15);
+
+  --w11-mica-bg: rgba(32, 32, 32, 0.88);
+  --w11-mica-alt: rgba(40, 40, 40, 0.88);
+  --w11-acrylic-bg: rgba(36, 36, 36, 0.78);
+  --w11-surface: rgba(255, 255, 255, 0.05);
+  --w11-surface-solid: #202020;
+  --w11-window-bg: #202020;
+  --w11-card-bg: rgba(255, 255, 255, 0.05);
+  --w11-control-bg: rgba(255, 255, 255, 0.06);
+  --w11-control-hover: rgba(255, 255, 255, 0.09);
+  --w11-control-active: rgba(255, 255, 255, 0.04);
+
+  --w11-border-subtle: rgba(255, 255, 255, 0.07);
+  --w11-border-default: rgba(255, 255, 255, 0.09);
+  --w11-border-strong: rgba(255, 255, 255, 0.4);
+  --w11-window-border: rgba(255, 255, 255, 0.12);
+
+  --w11-text-primary: #ffffff;
+  --w11-text-secondary: #d1d1d1;
+  --w11-text-tertiary: #9d9d9d;
+  --w11-text-disabled: #5d5d5d;
+
+  --w11-elevation-card: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 1px rgba(0, 0, 0, 0.4);
+  --w11-elevation-flyout: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 2px rgba(255, 255, 255, 0.1);
+  --w11-elevation-window: 0 28px 56px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.15);
+  --w11-elevation-active: 0 36px 72px rgba(0, 0, 0, 0.7), 0 0 2px rgba(255, 255, 255, 0.2);
+}

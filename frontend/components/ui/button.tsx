@@ -3,23 +3,32 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * Fluent/11.css button. Inside a `win11` scope the raw <button> element
+ * already carries the Fluent control styling (control bg, 1px border, hover,
+ * active scale, focus-visible accent outline, disabled state); the variant
+ * classes below only switch between the 11.css variants:
+ *   default → `accent` (accent fill), ghost → `subtle`, secondary/outline →
+ *   the plain element style. `destructive`/`link` need `!` utilities because
+ *   the scoped element selectors outweigh plain Tailwind classes.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        default: "accent",
+        destructive: "!bg-red-600 !text-white hover:!bg-red-700",
+        outline: "",
+        secondary: "",
+        ghost: "subtle",
+        link: "!text-primary !bg-transparent !border-0 !shadow-none !px-0 !min-h-0 underline-offset-4 hover:underline",
       },
       size: {
         default: "h-8 px-3 py-1.5",
         sm: "h-7 rounded-md px-2.5 text-xs",
         lg: "h-9 rounded-md px-6",
-        icon: "h-8 w-8",
+        icon: "icon-button h-8 w-8",
       },
     },
     defaultVariants: {

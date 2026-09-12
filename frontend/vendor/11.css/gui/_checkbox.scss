@@ -1,0 +1,77 @@
+/**
+ * 11.css - Fluent Checkboxes
+ * Windows 11 Checkbox Control
+ */
+
+input[type="checkbox"]:not([role="switch"]) {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--w11-control-bg);
+  border: 1px solid var(--w11-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  vertical-align: middle;
+  margin: 0 8px 0 0;
+  outline: none;
+  transition: all var(--w11-transition-fast);
+  position: relative;
+
+  &:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-accent);
+  }
+
+  &:checked {
+    background: var(--w11-accent);
+    border-color: var(--w11-accent);
+
+    &::after {
+      content: "";
+      position: absolute;
+      width: 4px;
+      height: 8px;
+      border: solid #ffffff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) translate(-1px, -1px);
+    }
+  }
+
+  &:indeterminate {
+    background: var(--w11-accent);
+    border-color: var(--w11-accent);
+
+    &::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 2px;
+      background: #ffffff;
+      border-radius: 1px;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--w11-accent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+label:has(input[type="checkbox"]) {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: var(--w11-text-primary);
+}

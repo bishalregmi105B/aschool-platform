@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateTimeField } from "@/components/ui/datetime-field";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  DataPanel, StatusChip, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 import { Monitor, Plus, Play, Clock, CheckCircle2, Sparkles } from "lucide-react";
 import Link from "next/link";
 
@@ -33,11 +36,12 @@ interface OnlineExam {
   instructions: string | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  upcoming: "bg-blue-100 text-blue-800",
-  active: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  draft: "bg-yellow-100 text-yellow-800",
+/** Online-exam status → StatusChip tone key ("accent" renders the raw chip). */
+const STATUS_TONE: Record<string, string> = {
+  upcoming: "accent",
+  active: "active",
+  completed: "completed",
+  draft: "draft",
 };
 
 const EMPTY_FORM = {
@@ -119,7 +123,7 @@ function OnlineExamContent() {
       sortable: true,
       value: (e) => e.start_date ?? "",
       render: (e) => (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
+        <span className="text-xs text-[color:var(--w11-text-secondary)] whitespace-nowrap">
           {e.start_date ? new Date(e.start_date).toLocaleString() : "—"}
           {e.end_date ? ` → ${new Date(e.end_date).toLocaleString()}` : ""}
         </span>
@@ -130,149 +134,142 @@ function OnlineExamContent() {
       label: "Status",
       sortable: true,
       value: (e) => e.status ?? "",
-      render: (e) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[e.status] ?? "bg-gray-100 text-gray-800"}`}>
-          {e.status}
-        </span>
-      ),
+      render: (e) => {
+        const tone = STATUS_TONE[e.status];
+        if (tone === "accent") {
+          return <span className="win11-chip accent capitalize">{e.status}</span>;
+        }
+        return <StatusChip status={tone ?? e.status} label={e.status} className="capitalize" />;
+      },
     },
   ];
 
+  const loadingValue = (
+    <div className="h-8 w-12 rounded animate-pulse" style={{ background: "var(--w11-control-hover)" }} />
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Monitor className="h-6 w-6" /> Online Exams
-          </h1>
-          <p className="text-muted-foreground">Create and manage online examinations with auto-grading</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/exams/online/questions">
-              <Sparkles className="h-4 w-4 mr-2 text-purple-600" /> AI Question Generator
-            </Link>
-          </Button>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Create Online Exam</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create Online Exam</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <Label>Title *</Label>
-                  <Input
-                    required
-                    value={form.title}
-                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                    placeholder="e.g. Chapter 3 Quiz"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Monitor className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Online Exams"
+        subtitle={`${exams.length} exams · Create and manage online examinations with auto-grading`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/exams/online/questions">
+                <Sparkles className="h-4 w-4 mr-2" style={{ color: "var(--w11-accent)" }} /> AI Question Generator
+              </Link>
+            </Button>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-2" /> Create Online Exam</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Create Online Exam</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreate} className="space-y-4">
                   <div>
-                    <Label>Class</Label>
-                    <Select value={form.class_id} onValueChange={v => setForm(f => ({ ...f, class_id: v, subject_id: "" }))}>
-                      <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                      <SelectContent>
-                        {classes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label>Title *</Label>
+                    <Input
+                      required
+                      value={form.title}
+                      onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                      placeholder="e.g. Chapter 3 Quiz"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Class</Label>
+                      <Select value={form.class_id} onValueChange={v => setForm(f => ({ ...f, class_id: v, subject_id: "" }))}>
+                        <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                        <SelectContent>
+                          {classes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Subject</Label>
+                      <Select value={form.subject_id} onValueChange={v => setForm(f => ({ ...f, subject_id: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                        <SelectContent>
+                          {subjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Duration (mins)</Label>
+                      <Input type="number" min="5" value={form.duration_minutes} onChange={e => setForm(f => ({ ...f, duration_minutes: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Total Marks</Label>
+                      <Input type="number" min="1" value={form.total_marks} onChange={e => setForm(f => ({ ...f, total_marks: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Start Date/Time</Label>
+                      <DateTimeField value={form.start_at} onChange={v => setForm(f => ({ ...f, start_at: v }))} />
+                    </div>
+                    <div>
+                      <Label>End Date/Time</Label>
+                      <DateTimeField value={form.end_at} onChange={v => setForm(f => ({ ...f, end_at: v }))} />
+                    </div>
                   </div>
                   <div>
-                    <Label>Subject</Label>
-                    <Select value={form.subject_id} onValueChange={v => setForm(f => ({ ...f, subject_id: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
-                      <SelectContent>
-                        {subjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label>Instructions</Label>
+                    <Textarea
+                      value={form.instructions}
+                      onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))}
+                      placeholder="Shown to students before they start..."
+                      rows={2}
+                    />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Duration (mins)</Label>
-                    <Input type="number" min="5" value={form.duration_minutes} onChange={e => setForm(f => ({ ...f, duration_minutes: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Total Marks</Label>
-                    <Input type="number" min="1" value={form.total_marks} onChange={e => setForm(f => ({ ...f, total_marks: e.target.value }))} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Start Date/Time</Label>
-                    <DateTimeField value={form.start_at} onChange={v => setForm(f => ({ ...f, start_at: v }))} />
-                  </div>
-                  <div>
-                    <Label>End Date/Time</Label>
-                    <DateTimeField value={form.end_at} onChange={v => setForm(f => ({ ...f, end_at: v }))} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Instructions</Label>
-                  <Textarea
-                    value={form.instructions}
-                    onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))}
-                    placeholder="Shown to students before they start..."
-                    rows={2}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={createMut.isPending}>
-                    {createMut.isPending ? <Spinner /> : "Create Exam"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={createMut.isPending}>
+                      {createMut.isPending ? <Spinner /> : "Create Exam"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <StatGrid className="mb-0" min={180}>
+          <KpiCard
+            label="Upcoming"
+            value={isLoading ? loadingValue : upcoming}
+            icon={<Clock className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Active Now"
+            value={isLoading ? loadingValue : active}
+            color="#107c10"
+            icon={<Play className="h-5 w-5" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Completed"
+            value={isLoading ? loadingValue : completed}
+            color="var(--w11-text-primary)"
+            icon={<CheckCircle2 className="h-5 w-5" style={{ color: "var(--w11-text-secondary)" }} />}
+          />
+        </StatGrid>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Clock className="h-6 w-6 text-blue-600" />
-            </div>
-            {isLoading ? <div className="h-8 bg-muted rounded animate-pulse mx-auto w-12 mb-1" /> : <p className="text-2xl font-bold">{upcoming}</p>}
-            <p className="text-sm text-muted-foreground">Upcoming</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Play className="h-6 w-6 text-green-600" />
-            </div>
-            {isLoading ? <div className="h-8 bg-muted rounded animate-pulse mx-auto w-12 mb-1" /> : <p className="text-2xl font-bold">{active}</p>}
-            <p className="text-sm text-muted-foreground">Active Now</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="h-6 w-6 text-purple-600" />
-            </div>
-            {isLoading ? <div className="h-8 bg-muted rounded animate-pulse mx-auto w-12 mb-1" /> : <p className="text-2xl font-bold">{completed}</p>}
-            <p className="text-sm text-muted-foreground">Completed</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">All Online Exams</CardTitle></CardHeader>
-        <CardContent>
+        <DataPanel title={`All Online Exams (${exams.length})`}>
           {isLoading ? (
             <div className="flex justify-center py-12"><Spinner /></div>
           ) : exams.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Monitor className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No online exams yet</p>
-              <p className="text-sm mt-1">Create your first online exam to get started with auto-grading</p>
-            </div>
+            <AOSEmptyState
+              icon={<Monitor className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
+              title="No online exams yet"
+              description="Create your first online exam to get started with auto-grading"
+            />
           ) : (
             <DataTable
               columns={ONLINE_EXAM_COLUMNS}
@@ -283,8 +280,8 @@ function OnlineExamContent() {
               exportFileName="online-exams"
             />
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

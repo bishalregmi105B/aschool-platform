@@ -6,9 +6,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,6 +21,16 @@ import { BSDateInput, BSMonthInput } from "@/components/ui/bs-date-input";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { MarkHolidayDialog } from "@/components/attendance/mark-holiday-dialog";
 import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  StatGrid,
+  KpiCard,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
+import {
   BookOpen, Save, Printer, CalendarOff, Loader2, CheckCheck,
 } from "lucide-react";
 
@@ -33,33 +41,28 @@ const STATUS_OPTIONS: Array<{
   value: SubjectStatus;
   short: string;
   label: string;
-  cls: string;
-  btn: string;
+  hex: string;
+  chip: string;
 }> = [
   {
     value: "present", short: "P", label: "Present",
-    cls: "bg-emerald-100 text-emerald-800",
-    btn: "bg-emerald-500 text-white hover:bg-emerald-600",
+    hex: "#107c10", chip: "success",
   },
   {
     value: "absent", short: "A", label: "Absent",
-    cls: "bg-red-100 text-red-800",
-    btn: "bg-red-500 text-white hover:bg-red-600",
+    hex: "#c42b1c", chip: "error",
   },
   {
     value: "late", short: "L", label: "Late",
-    cls: "bg-amber-100 text-amber-800",
-    btn: "bg-amber-500 text-white hover:bg-amber-600",
+    hex: "#d83b01", chip: "warning",
   },
   {
     value: "half_day", short: "H", label: "Half Day",
-    cls: "bg-orange-100 text-orange-800",
-    btn: "bg-orange-500 text-white hover:bg-orange-600",
+    hex: "#986f0b", chip: "warning",
   },
   {
     value: "leave", short: "Leave", label: "Leave",
-    cls: "bg-teal-100 text-teal-800",
-    btn: "bg-teal-500 text-white hover:bg-teal-600",
+    hex: "#0067c0", chip: "accent",
   },
 ];
 
@@ -250,43 +253,38 @@ function SubjectAttendanceContent() {
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6" /> Subject Attendance
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Mark period-wise attendance per class, subject and date
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button variant="outline" onClick={() => setHolidayOpen(true)}>
-              <CalendarOff className="h-4 w-4 mr-2" /> Mark Holiday
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            disabled={!classId || printing}
-            onClick={openRegisterPrint}
-          >
-            {printing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4 mr-2" />
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Subject Attendance"
+        subtitle="Mark period-wise attendance per class, subject and date"
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setHolidayOpen(true)}>
+                <CalendarOff className="h-4 w-4 mr-2" /> Mark Holiday
+              </Button>
             )}
-            Register Print
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <Card>
-        <CardContent className="pt-4 pb-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Button
+              variant="outline"
+              disabled={!classId || printing}
+              onClick={openRegisterPrint}
+            >
+              {printing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4 mr-2" />
+              )}
+              Register Print
+            </Button>
+          </>
+        }
+      />
+      <AOSPageBody>
+        {/* ── Filters ───────────────────────────────────────────────────────── */}
+        <FilterCommandBar>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground font-medium">Date</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Date</Label>
             <BSDateInput
               value={date}
               onChange={(v) => {
@@ -296,7 +294,7 @@ function SubjectAttendanceContent() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground font-medium">Class</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Class</Label>
             <Select
               value={classId}
               onValueChange={(v) => {
@@ -316,7 +314,7 @@ function SubjectAttendanceContent() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground font-medium">Section</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Section</Label>
             <Select
               value={sectionId}
               onValueChange={setSectionId}
@@ -334,7 +332,7 @@ function SubjectAttendanceContent() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground font-medium">Subject</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId} disabled={!classId}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Select subject…" />
@@ -349,7 +347,7 @@ function SubjectAttendanceContent() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground font-medium">
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">
               Register month (print)
             </Label>
             <BSMonthInput
@@ -357,46 +355,39 @@ function SubjectAttendanceContent() {
               onChange={setRegisterMonth}
             />
           </div>
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {!classId || !subjectId ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="font-medium">Select a class and subject</p>
-            <p className="text-sm mt-1">
-              {subjectsLoading ? "Loading subjects…" : "Choose a class, subject and date to mark attendance"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Summary strip */}
-          {studentList.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {[
-                { label: "Total", value: studentList.length, cls: "" },
-                { label: "Present", value: count("present"), cls: "text-emerald-700" },
-                { label: "Absent", value: count("absent"), cls: "text-red-600" },
-                { label: "Late", value: count("late"), cls: "text-amber-600" },
-                { label: "Half Day", value: count("half_day"), cls: "text-orange-600" },
-                {
-                  label: "Unmarked",
-                  value: unmarkedCount,
-                  cls: unmarkedCount > 0 ? "text-amber-600" : "text-muted-foreground",
-                },
-              ].map((s) => (
-                <div key={s.label} className="bg-muted/40 rounded-lg px-3 py-2 text-center">
-                  <p className={`text-xl font-bold ${s.cls}`}>{s.value}</p>
-                  <p className="text-[11px] text-muted-foreground">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          )}
+        {!classId || !subjectId ? (
+          <div className="win11-card">
+            <AOSEmptyState
+              icon={<BookOpen className="h-12 w-12" />}
+              title="Select a class and subject"
+              description={
+                subjectsLoading
+                  ? "Loading subjects…"
+                  : "Choose a class, subject and date to mark attendance"
+              }
+            />
+          </div>
+        ) : (
+          <>
+            {/* Summary strip */}
+            {studentList.length > 0 && (
+              <StatGrid min={110}>
+                <KpiCard label="Total" value={studentList.length} />
+                <KpiCard label="Present" value={count("present")} color="#107c10" />
+                <KpiCard label="Absent" value={count("absent")} color="#c42b1c" />
+                <KpiCard label="Late" value={count("late")} color="#d83b01" />
+                <KpiCard label="Half Day" value={count("half_day")} color="#986f0b" />
+                <KpiCard
+                  label="Unmarked"
+                  value={unmarkedCount}
+                  color={unmarkedCount > 0 ? "#d83b01" : "var(--w11-text-tertiary)"}
+                />
+              </StatGrid>
+            )}
 
-          <Card>
-            <CardContent className="p-0">
+            <DataPanel bodyClassName="p-0">
               {studentsLoading ? (
                 <PageLoader />
               ) : existing.isError ? (
@@ -414,7 +405,7 @@ function SubjectAttendanceContent() {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/30">
+                    <TableRow>
                       <TableHead className="w-14">Roll</TableHead>
                       <TableHead>Student Name</TableHead>
                       <TableHead className="w-[340px]">Status</TableHead>
@@ -427,9 +418,9 @@ function SubjectAttendanceContent() {
                       return (
                         <TableRow
                           key={s.id}
-                          className={!status ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}
+                          style={!status ? { background: "rgba(216,59,1,0.05)" } : undefined}
                         >
-                          <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                          <TableCell className="text-center font-mono text-xs text-[color:var(--w11-text-secondary)]">
                             {s.roll_number || "—"}
                           </TableCell>
                           <TableCell>
@@ -437,7 +428,7 @@ function SubjectAttendanceContent() {
                               {s.first_name} {s.last_name}
                             </p>
                             {s.student_id && (
-                              <p className="text-xs text-muted-foreground">{s.student_id}</p>
+                              <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.student_id}</p>
                             )}
                           </TableCell>
                           <TableCell>
@@ -447,11 +438,12 @@ function SubjectAttendanceContent() {
                                   key={opt.value}
                                   onClick={() => setStatus(s.id, opt.value)}
                                   title={opt.label}
-                                  className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                  className={`flex-1 py-1.5 rounded-[var(--w11-radius-md)] text-xs font-medium border transition-all ${
                                     status === opt.value
-                                      ? opt.btn + " shadow-sm scale-[1.02]"
-                                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                                      ? "text-white shadow-sm scale-[1.02] border-transparent"
+                                      : "border-[var(--w11-border-default)] text-[color:var(--w11-text-secondary)] hover:bg-[var(--w11-control-hover)]"
                                   }`}
+                                  style={status === opt.value ? { background: opt.hex } : undefined}
                                 >
                                   {opt.short}
                                 </button>
@@ -475,57 +467,60 @@ function SubjectAttendanceContent() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </DataPanel>
 
-          {/* Save bar */}
-          {studentList.length > 0 && (
-            <div className="sticky bottom-4 flex flex-wrap gap-3 justify-between items-center bg-background border rounded-xl shadow-lg px-4 py-3">
-              <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                {STATUS_OPTIONS.map((opt) => (
-                  <Badge key={opt.value} variant="outline" className={`${opt.cls} border-transparent`}>
-                    {opt.short}: {count(opt.value)}
-                  </Badge>
-                ))}
-                {unmarkedCount > 0 && (
-                  <span className="font-medium text-amber-600">
-                    · {unmarkedCount} unmarked (saved as-is)
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => markAll("present")}
-                  disabled={!studentList.length}
-                >
-                  <CheckCheck className="h-4 w-4 mr-1.5" /> All Present
-                </Button>
-                <Button
-                  onClick={() =>
-                    confirm({
-                      title: "Save subject attendance?",
-                      body: `${marked.length} of ${studentList.length} students have a status. Unmarked students keep any previously saved status.`,
-                      confirmLabel: "Save",
-                    }).then((ok) => {
-                      if (ok) saveMutation.mutate();
-                    })
-                  }
-                  disabled={saveMutation.isPending || marked.length === 0 || !hasChanges}
-                >
-                  {saveMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
+            {/* Save bar */}
+            {studentList.length > 0 && (
+              <div
+                className="win11-card sticky bottom-4 flex flex-wrap gap-3 justify-between items-center px-4 py-3 mt-4"
+                style={{ boxShadow: "var(--w11-elevation-flyout)" }}
+              >
+                <div className="flex items-center gap-2 flex-wrap text-sm text-[color:var(--w11-text-secondary)]">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <span key={opt.value} className={`win11-chip ${opt.chip}`}>
+                      {opt.short}: {count(opt.value)}
+                    </span>
+                  ))}
+                  {unmarkedCount > 0 && (
+                    <span className="font-medium" style={{ color: "#d83b01" }}>
+                      · {unmarkedCount} unmarked (saved as-is)
+                    </span>
                   )}
-                  Save Attendance
-                </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => markAll("present")}
+                    disabled={!studentList.length}
+                  >
+                    <CheckCheck className="h-4 w-4 mr-1.5" /> All Present
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      confirm({
+                        title: "Save subject attendance?",
+                        body: `${marked.length} of ${studentList.length} students have a status. Unmarked students keep any previously saved status.`,
+                        confirmLabel: "Save",
+                      }).then((ok) => {
+                        if (ok) saveMutation.mutate();
+                      })
+                    }
+                    disabled={saveMutation.isPending || marked.length === 0 || !hasChanges}
+                  >
+                    {saveMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Attendance
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </AOSPageBody>
 
       {/* ── Mark holiday dialog (A-33) ────────────────────────────────────── */}
       <MarkHolidayDialog
@@ -533,7 +528,6 @@ function SubjectAttendanceContent() {
         onOpenChange={setHolidayOpen}
         defaultClassId={classId}
       />
-    </div>
+    </AOSPage>
   );
 }
-

@@ -5,12 +5,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { AlertCircle, Palette, Save } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 
 const DEFAULT_FORM = {
   mode: "light",
@@ -56,28 +62,50 @@ function ThemeContent() {
     onError: (err: any) => toast.error(err?.response?.data?.error || "Failed to save theme"),
   });
 
-  if (isLoading || (isError && !form)) return <PageLoader />;
+  if (isLoading || (isError && !form)) return <AOSModuleLoadingState label="Loading theme settings…" />;
 
   if (isError) {
     return (
-      <Card className="border-destructive/40">
-        <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <p className="text-sm text-muted-foreground">Failed to load theme settings. Please try again.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent>
-      </Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Palette className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Theme Settings"
+          subtitle="Customize the admin app appearance"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="flex flex-col items-center gap-3 pt-6 text-center">
+              <AlertCircle className="h-8 w-8" style={{ color: "var(--w11-accent)" }} />
+              <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                Failed to load theme settings. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
-  if (!form) return <PageLoader />;
+  if (!form) return <AOSModuleLoadingState label="Loading theme settings…" />;
 
   const ColorField = ({ label, field }: { label: string; field: string }) => (
     <div className="space-y-2">
       <Label>{label}</Label>
       <div className="flex gap-2">
-        <input type="color" value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} className="w-12 h-10 rounded border cursor-pointer" />
-        <span className="flex items-center text-sm font-mono text-muted-foreground">{form[field]}</span>
+        <input
+          type="color"
+          value={form[field]}
+          onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+          className="w-12 h-10 rounded cursor-pointer"
+          style={{ border: "1px solid var(--w11-control-border)", borderRadius: "var(--w11-radius-sm)" }}
+        />
+        <span
+          className="flex items-center text-sm"
+          style={{ color: "var(--w11-text-secondary)", fontFamily: "var(--w11-font-mono)" }}
+        >
+          {form[field]}
+        </span>
       </div>
     </div>
   );
@@ -91,51 +119,55 @@ function ThemeContent() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><Palette className="h-6 w-6 text-pink-600" /><div><h1 className="text-2xl font-bold">Theme Settings</h1><p className="text-muted-foreground">Customize the admin app appearance</p></div></div>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? <Spinner /> : <><Save className="h-4 w-4 mr-2" />Save Theme</>}</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Palette className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Theme Settings"
+        subtitle="Customize the admin app appearance"
+        actions={
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? <Spinner /> : <><Save className="h-4 w-4 mr-2" />Save Theme</>}
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <DataPanel title="Appearance">
+            <div className="space-y-4">
+              <SelectField label="Color Mode" field="mode" options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "Follow System" }]} />
+              <SelectField label="Sidebar Style" field="sidebar_style" options={[{ value: "default", label: "Default" }, { value: "compact", label: "Compact" }, { value: "icon-only", label: "Icon Only" }]} />
+              <SelectField label="Card Style" field="card_style" options={[{ value: "rounded", label: "Rounded" }, { value: "sharp", label: "Sharp" }, { value: "flat", label: "Flat" }]} />
+              <SelectField label="UI Density" field="density" options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }, { value: "spacious", label: "Spacious" }]} />
+            </div>
+          </DataPanel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader><CardTitle>Appearance</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <SelectField label="Color Mode" field="mode" options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "Follow System" }]} />
-            <SelectField label="Sidebar Style" field="sidebar_style" options={[{ value: "default", label: "Default" }, { value: "compact", label: "Compact" }, { value: "icon-only", label: "Icon Only" }]} />
-            <SelectField label="Card Style" field="card_style" options={[{ value: "rounded", label: "Rounded" }, { value: "sharp", label: "Sharp" }, { value: "flat", label: "Flat" }]} />
-            <SelectField label="UI Density" field="density" options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }, { value: "spacious", label: "Spacious" }]} />
-          </CardContent>
-        </Card>
+          <DataPanel title="Colors">
+            <div className="space-y-4">
+              <ColorField label="Accent Color" field="accent_color" />
+              <ColorField label="Sidebar Background" field="sidebar_color" />
+              <ColorField label="Sidebar Text" field="sidebar_text_color" />
+            </div>
+          </DataPanel>
 
-        <Card>
-          <CardHeader><CardTitle>Colors</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <ColorField label="Accent Color" field="accent_color" />
-            <ColorField label="Sidebar Background" field="sidebar_color" />
-            <ColorField label="Sidebar Text" field="sidebar_text_color" />
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Preview</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex h-32 rounded-lg overflow-hidden border">
+          <DataPanel className="lg:col-span-2" title="Preview">
+            <div
+              className="flex h-32 rounded-lg overflow-hidden border border-[var(--w11-border-default)]"
+            >
               <div className="w-48 h-full flex flex-col p-3 gap-2" style={{ backgroundColor: form.sidebar_color, color: form.sidebar_text_color }}>
                 <div className="text-xs font-bold opacity-80">Sidebar</div>
                 {["Dashboard", "Students", "Exams"].map((item) => (
                   <div key={item} className="text-xs px-2 py-1 rounded" style={{ backgroundColor: `${form.accent_color}22` }}>{item}</div>
                 ))}
               </div>
-              <div className="flex-1 p-4 bg-background">
+              <div className="flex-1 p-4" style={{ background: "var(--w11-card-bg)" }}>
                 <div className="h-4 w-24 rounded mb-2" style={{ backgroundColor: form.accent_color }} />
-                <div className="h-3 w-48 bg-muted rounded mb-1" />
-                <div className="h-3 w-36 bg-muted rounded" />
+                <div className="h-3 w-48 rounded mb-1" style={{ background: "var(--w11-control-hover)" }} />
+                <div className="h-3 w-36 rounded" style={{ background: "var(--w11-control-hover)" }} />
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

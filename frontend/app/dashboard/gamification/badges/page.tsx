@@ -5,16 +5,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { Award, Plus, Pencil } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 export default function BadgesPage() {
   return <PluginGate slug="gamification"><BadgesContent /></PluginGate>;
@@ -64,9 +68,9 @@ function BadgesContent() {
         </div>
       ),
     },
-    { key: "description", label: "Description", value: (b) => b.description ?? "", render: (b) => <span className="text-sm text-muted-foreground max-w-xs truncate block">{b.description || "—"}</span> },
+    { key: "description", label: "Description", value: (b) => b.description ?? "", render: (b) => <span className="text-sm text-[color:var(--w11-text-secondary)] max-w-xs truncate block">{b.description || "—"}</span> },
     { key: "criteria", label: "Criteria", value: (b) => b.criteria ?? "", render: (b) => <span className="text-sm">{b.criteria || "—"}</span> },
-    { key: "points_value", label: "Points", align: "right", sortable: true, value: (b) => b.points_value ?? 0, render: (b) => <Badge variant="outline">{b.points_value} pts</Badge> },
+    { key: "points_value", label: "Points", align: "right", sortable: true, value: (b) => b.points_value ?? 0, render: (b) => <span className="win11-chip">{b.points_value} pts</span> },
     {
       key: "actions",
       label: "Actions",
@@ -80,34 +84,44 @@ function BadgesContent() {
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load badges. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Award className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Badges"
+          subtitle="Define achievement badges awarded to students"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load badges. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Award className="h-6 w-6" /> Badges</h1>
-          <p className="text-muted-foreground">Define achievement badges awarded to students</p>
-        </div>
-        <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> New Badge</Button>
-      </div>
-
-      <Card><CardContent className="pt-6">
-        <DataTable
-          columns={BADGE_COLUMNS}
-          rows={badges}
-          rowKey={(b: any) => b.id}
-          searchable
-          searchPlaceholder="Search badges…"
-          exportFileName="badges"
-          empty={{ icon: Award, title: "No badges created yet", body: "Badges motivate students — create your first one.", action: { label: "New Badge", onClick: openAdd } }}
-        />
-      </CardContent></Card>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Award className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Badges"
+        subtitle="Define achievement badges awarded to students"
+        actions={<Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> New Badge</Button>}
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0 pt-0">
+          <DataTable
+            columns={BADGE_COLUMNS}
+            rows={badges}
+            rowKey={(b: any) => b.id}
+            searchable
+            searchPlaceholder="Search badges…"
+            exportFileName="badges"
+            empty={{ icon: Award, title: "No badges created yet", body: "Badges motivate students — create your first one.", action: { label: "New Badge", onClick: openAdd } }}
+          />
+        </DataPanel>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
@@ -128,6 +142,7 @@ function BadgesContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

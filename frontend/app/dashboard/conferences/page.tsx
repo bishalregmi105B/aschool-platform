@@ -3,9 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,10 +15,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSEmptyState,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Calendar, Clock, Users, Video, Plus, Search } from "lucide-react";
+import { Calendar, Clock, Users, Video, Plus } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Conference {
@@ -99,18 +108,21 @@ function ConferencesContent() {
     onError: () => toast.error("Failed to schedule conference"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading conferences…" />;
 
   if (isError)
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-destructive mb-4">Failed to load conferences.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Parent-Teacher Conferences" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-12 text-center">
+              <p className="mb-4" style={{ color: "#c42b1c" }}>Failed to load conferences.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
 
   const list = conferences || [];
@@ -131,142 +143,146 @@ function ConferencesContent() {
     : list;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Parent-Teacher Conferences</h1>
-          <p className="text-muted-foreground">Schedule and manage PT meetings</p>
-        </div>
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Schedule Conference</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Schedule Conference</DialogTitle>
-            </DialogHeader>
-            <form
-              className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                createConference.mutate();
-              }}
-            >
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="e.g. Mid-Term Parent Teacher Meeting"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={3}
-                  placeholder="Purpose and guidance for parents"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Parent-Teacher Conferences"
+        subtitle={`${filtered.length} ${filtered.length === 1 ? "conference" : "conferences"} · ${filtered.filter((c: Conference) => getStatus(c) === "scheduled").length} upcoming`}
+        actions={
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Schedule Conference</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Schedule Conference</DialogTitle>
+              </DialogHeader>
+              <form
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  createConference.mutate();
+                }}
+              >
                 <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <BSDateInput
-                    value={form.start_date}
-                    onChange={(v) => setForm({ ...form, start_date: v })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <BSDateInput
-                    value={form.end_date}
-                    onChange={(v) => setForm({ ...form, end_date: v })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Mode</Label>
-                <Select value={form.mode} onValueChange={(v) => setForm({ ...form, mode: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_person">In Person</SelectItem>
-                    <SelectItem value="online">Online</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.mode === "online" && (
-                <div className="space-y-2">
-                  <Label>Meeting Link</Label>
+                  <Label>Title</Label>
                   <Input
-                    value={form.meeting_link}
-                    onChange={(e) => setForm({ ...form, meeting_link: e.target.value })}
-                    placeholder="https://meet.google.com/..."
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="e.g. Mid-Term Parent Teacher Meeting"
+                    required
                   />
                 </div>
-              )}
-              <Button type="submit" className="w-full" disabled={createConference.isPending || !form.title}>
-                {createConference.isPending ? "Saving..." : "Save Conference"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={3}
+                    placeholder="Purpose and guidance for parents"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <BSDateInput
+                      value={form.start_date}
+                      onChange={(v) => setForm({ ...form, start_date: v })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <BSDateInput
+                      value={form.end_date}
+                      onChange={(v) => setForm({ ...form, end_date: v })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Mode</Label>
+                  <Select value={form.mode} onValueChange={(v) => setForm({ ...form, mode: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_person">In Person</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.mode === "online" && (
+                  <div className="space-y-2">
+                    <Label>Meeting Link</Label>
+                    <Input
+                      value={form.meeting_link}
+                      onChange={(e) => setForm({ ...form, meeting_link: e.target.value })}
+                      placeholder="https://meet.google.com/..."
+                    />
+                  </div>
+                )}
+                <Button type="submit" className="w-full" disabled={createConference.isPending || !form.title}>
+                  {createConference.isPending ? "Saving..." : "Save Conference"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid>
+          {[
+            { label: "Upcoming", value: filtered.filter((c: Conference) => getStatus(c) === "scheduled").length, icon: <Calendar className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />, color: "var(--w11-accent)" },
+            { label: "Completed", value: filtered.filter((c: Conference) => getStatus(c) === "completed").length, icon: <Users className="h-4 w-4" style={{ color: "#107c10" }} />, color: "#107c10" },
+            { label: "Ongoing", value: filtered.filter((c: Conference) => getStatus(c) === "ongoing").length, icon: <Clock className="h-4 w-4" style={{ color: "#d83b01" }} />, color: "#d83b01" },
+            { label: "Virtual", value: filtered.filter((c: Conference) => c.is_virtual).length, icon: <Video className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
+          ].map((stat) => (
+            <KpiCard key={stat.label} label={stat.label} value={stat.value} icon={stat.icon} color={stat.color} />
+          ))}
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Upcoming", value: filtered.filter((c: Conference) => getStatus(c) === "scheduled").length, icon: Calendar, color: "text-blue-500" },
-          { label: "Completed", value: filtered.filter((c: Conference) => getStatus(c) === "completed").length, icon: Users, color: "text-green-500" },
-          { label: "Ongoing", value: filtered.filter((c: Conference) => getStatus(c) === "ongoing").length, icon: Clock, color: "text-orange-500" },
-          { label: "Virtual", value: filtered.filter((c: Conference) => c.is_virtual).length, icon: Video, color: "text-purple-500" },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="pt-6 flex items-center gap-4">
-              <stat.icon className={`h-8 w-8 ${stat.color}`} />
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
+        <FilterCommandBar>
+          <div className="relative max-w-md">
+            <Input placeholder="Search conferences..." className="w-72" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </FilterCommandBar>
+
+        <div className="space-y-3">
+          {filtered.length === 0 ? (
+            <DataPanel>
+              <AOSEmptyState
+                title="No conferences scheduled"
+                description={'Click "Schedule Conference" to create one.'}
+              />
+            </DataPanel>
+          ) : (
+            filtered.map((conf: Conference) => (
+              <div key={conf.id} className="win11-card hover:shadow-md transition-shadow">
+                <div className="py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-lg flex items-center justify-center"
+                      style={{ background: "var(--w11-accent-light)" }}
+                    >
+                      <Calendar className="h-6 w-6" style={{ color: "var(--w11-accent)" }} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold" style={{ color: "var(--w11-text-primary)" }}>{conf.title || "PT Conference"}</h3>
+                      <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{displayConferenceDate(conf.start_date_bs, conf.start_date)} to {displayConferenceDate(conf.end_date_bs, conf.end_date)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusChip
+                      status={getStatus(conf) === "scheduled" ? "pending" : getStatus(conf) === "completed" ? "completed" : "active"}
+                      label={getStatus(conf)}
+                    />
+                    <span className="win11-chip subtle">{conf.is_virtual ? "online" : "in-person"}</span>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search conferences..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
-
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <Card><CardContent className="py-12 text-center text-muted-foreground">No conferences scheduled. Click &quot;Schedule Conference&quot; to create one.</CardContent></Card>
-        ) : (
-          filtered.map((conf: Conference) => (
-            <Card key={conf.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{conf.title || "PT Conference"}</h3>
-                    <p className="text-sm text-muted-foreground">{displayConferenceDate(conf.start_date_bs, conf.start_date)} to {displayConferenceDate(conf.end_date_bs, conf.end_date)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant={getStatus(conf) === "scheduled" ? "outline" : getStatus(conf) === "completed" ? "success" : "default"}>
-                    {getStatus(conf)}
-                  </Badge>
-                  <Badge variant="outline">{conf.is_virtual ? "online" : "in-person"}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
+            ))
+          )}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -83,12 +83,12 @@ function formatBytes(bytes: number): string {
 function fileIcon(file: ManagedFile, large = false) {
   const cls = large ? "h-10 w-10" : "h-7 w-7";
   switch (file.file_type) {
-    case "image": return <Image className={`${cls} text-blue-400`} />;
-    case "document": return <FileText className={`${cls} text-red-400`} />;
-    case "video": return <Film className={`${cls} text-purple-400`} />;
-    case "audio": return <Music className={`${cls} text-green-400`} />;
-    case "spreadsheet": return <Table2 className={`${cls} text-emerald-500`} />;
-    default: return <File className={`${cls} text-muted-foreground/50`} />;
+    case "image": return <Image className={`${cls}`} style={{ color: "#0f6cbd" }} />;
+    case "document": return <FileText className={`${cls}`} style={{ color: "#c42b1c" }} />;
+    case "video": return <Film className={`${cls}`} style={{ color: "#8b5cf6" }} />;
+    case "audio": return <Music className={`${cls}`} style={{ color: "#0f7b0f" }} />;
+    case "spreadsheet": return <Table2 className={`${cls}`} style={{ color: "#0f7b0f" }} />;
+    default: return <File className={`${cls}`} style={{ color: "var(--w11-text-tertiary)" }} />;
   }
 }
 
@@ -303,14 +303,14 @@ function FilesContent() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
       {/* ── Tab switcher ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b bg-background shrink-0">
+      <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b bg-[color:var(--w11-card-bg)] shrink-0">
         <button
           type="button"
           onClick={() => setActiveTab("files")}
           className={`px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
             activeTab === "files"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "border-[color:var(--w11-accent)] text-[color:var(--w11-accent)]"
+              : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
           }`}
         >
           <span className="flex items-center gap-1.5"><HardDrive className="h-3.5 w-3.5" /> My Files</span>
@@ -320,8 +320,8 @@ function FilesContent() {
           onClick={() => setActiveTab("designs")}
           className={`px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
             activeTab === "designs"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "border-[color:var(--w11-accent)] text-[color:var(--w11-accent)]"
+              : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
           }`}
         >
           <span className="flex items-center gap-1.5"><Palette className="h-3.5 w-3.5" /> My Designs</span>
@@ -334,10 +334,10 @@ function FilesContent() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold">My Designs</h2>
-              <p className="text-sm text-muted-foreground">Canvas documents saved in Docs &amp; Designer</p>
+              <p className="text-sm text-[color:var(--w11-text-secondary)]">Canvas documents saved in Docs &amp; Designer</p>
             </div>
             <Link href="/dashboard/designer/editor">
-              <button type="button" className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
+              <button type="button" className="flex items-center gap-2 px-4 py-2 bg-[color:var(--w11-accent)] text-[color:var(--w11-accent-text)] rounded-lg text-sm font-medium hover:opacity-90">
                 <PenLine className="h-4 w-4" /> New Design
               </button>
             </Link>
@@ -345,15 +345,15 @@ function FilesContent() {
 
           {designsLoading ? (
             <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
             </div>
           ) : designDocs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+            <div className="flex flex-col items-center justify-center py-24 text-[color:var(--w11-text-secondary)] gap-3">
               <Palette className="h-14 w-14 opacity-20" />
               <p className="text-sm font-medium">No designs saved yet</p>
               <p className="text-xs opacity-70">Create a document in Docs &amp; Designer and save it</p>
               <Link href="/dashboard/designer/editor">
-                <button type="button" className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
+                <button type="button" className="mt-2 px-4 py-2 bg-[color:var(--w11-accent)] text-[color:var(--w11-accent-text)] rounded-lg text-sm font-medium hover:opacity-90">
                   Open Designer
                 </button>
               </Link>
@@ -361,20 +361,20 @@ function FilesContent() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {designDocs.map((doc: any) => (
-                <div key={doc.id} className="group rounded-xl border bg-card overflow-hidden hover:shadow-lg transition-shadow">
+                <div key={doc.id} className="group rounded-xl border bg-[color:var(--w11-card-bg)] overflow-hidden hover:shadow-lg transition-shadow">
                   {/* Thumbnail */}
-                  <div className="aspect-[3/4] bg-muted flex items-center justify-center relative">
+                  <div className="aspect-[3/4] bg-[color:var(--w11-control-bg)] flex items-center justify-center relative">
                     {doc.thumbnail_url ? (
                       <img src={doc.thumbnail_url} alt={doc.name} className="w-full h-full object-cover" />
                     ) : (
-                      <Palette className="h-12 w-12 text-muted-foreground/30" />
+                      <Palette className="h-12 w-12 text-[color:var(--w11-text-secondary)]/30" />
                     )}
                     {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2" style={{ background: "rgba(0,0,0,.4)" }}>
                       <Link href={doc.template_type === 'writer_doc'
                         ? `/dashboard/designer/writer?doc=${doc.id}`
                         : `/dashboard/designer/editor?doc=${doc.id}`}>
-                        <button type="button" className="px-3 py-1.5 bg-white text-black rounded-md text-xs font-medium hover:bg-gray-100">
+                        <button type="button" className="px-3 py-1.5 rounded-md text-xs font-medium" style={{ background: "var(--w11-surface-solid)", color: "var(--w11-text-primary)" }}>
                           {doc.template_type === 'writer_doc' ? '📝 Open Writer' : '🎨 Open Canvas'}
                         </button>
                       </Link>
@@ -385,12 +385,12 @@ function FilesContent() {
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                         doc.template_type === 'writer_doc'
-                          ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          ? "win11-chip accent"
+                          : "win11-chip"
                       }`}>{doc.template_type === 'writer_doc' ? 'Writer Doc' : 'Canvas Design'}</span>
                     </div>
                     {doc.updated_at && (
-                      <p className="text-xs text-muted-foreground/60 mt-1">
+                      <p className="text-xs text-[color:var(--w11-text-secondary)]/60 mt-1">
                         {displayBS(doc.updated_at)}
                       </p>
                     )}
@@ -402,12 +402,12 @@ function FilesContent() {
         </div>
       )}
       {activeTab === "files" && <>
-      <div className="flex items-center gap-2 px-4 py-3 border-b bg-background flex-wrap shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b bg-[color:var(--w11-card-bg)] flex-wrap shrink-0">
         {/* Breadcrumb */}
         <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
           {breadcrumb.map((node, idx) => (
             <div key={`${node.id ?? "root"}-${idx}`} className="flex items-center gap-0.5 shrink-0">
-              {idx > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+              {idx > 0 && <ChevronRight className="h-3.5 w-3.5 text-[color:var(--w11-text-secondary)] shrink-0" />}
               <button
                 type="button"
                 onClick={() => {
@@ -428,8 +428,8 @@ function FilesContent() {
                 }}
                 className={`rounded px-2 py-1 text-sm transition-colors shrink-0 ${
                   idx === breadcrumb.length - 1
-                    ? "bg-muted text-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-[color:var(--w11-control-bg)] text-[color:var(--w11-text-primary)] font-medium"
+                    : "text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] hover:bg-[color:var(--w11-control-bg)]"
                 }`}
               >
                 {node.name}
@@ -440,7 +440,7 @@ function FilesContent() {
 
         {/* Search */}
         <div className="relative w-48">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[color:var(--w11-text-secondary)]" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -470,8 +470,8 @@ function FilesContent() {
           onClick={() => setOpenOnSingleClick((v) => !v)}
           className={`flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors ${
             openOnSingleClick
-              ? "bg-primary/10 border-primary/30 text-primary"
-              : "border-border text-muted-foreground"
+              ? "bg-[color:var(--w11-accent-light)] border-[color:var(--w11-accent)] text-[color:var(--w11-accent)]"
+              : "border-[color:var(--w11-border-default)] text-[color:var(--w11-text-secondary)]"
           }`}
           title="Toggle single-click folder open"
         >
@@ -484,14 +484,14 @@ function FilesContent() {
           <button
             type="button"
             onClick={() => setViewMode("grid")}
-            className={`px-2 py-1.5 transition-colors ${viewMode === "grid" ? "bg-muted" : "hover:bg-muted/50"}`}
+            className={`px-2 py-1.5 transition-colors ${viewMode === "grid" ? "bg-[color:var(--w11-control-bg)]" : "hover:bg-[color:var(--w11-control-hover)]"}`}
           >
             <Grid3X3 className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => setViewMode("list")}
-            className={`px-2 py-1.5 transition-colors ${viewMode === "list" ? "bg-muted" : "hover:bg-muted/50"}`}
+            className={`px-2 py-1.5 transition-colors ${viewMode === "list" ? "bg-[color:var(--w11-control-bg)]" : "hover:bg-[color:var(--w11-control-hover)]"}`}
           >
             <LayoutList className="h-3.5 w-3.5" />
           </button>
@@ -550,16 +550,16 @@ function FilesContent() {
 
       {/* Storage usage bar */}
       {usageData && (
-        <div className="flex items-center gap-4 px-4 py-2 border-b bg-muted/30 text-xs text-muted-foreground shrink-0 flex-wrap">
+        <div className="flex items-center gap-4 px-4 py-2 border-b bg-[color:var(--w11-control-hover)] text-xs text-[color:var(--w11-text-secondary)] shrink-0 flex-wrap">
           <span className="flex items-center gap-1.5">
             <HardDrive className="h-3.5 w-3.5" />
-            <span className="font-medium text-foreground">{usageData.total_mb} MB</span> used
+            <span className="font-medium text-[color:var(--w11-text-primary)]">{usageData.total_mb} MB</span> used
             &middot;
-            <span className="font-medium text-foreground">{usageData.total_files}</span> files
+            <span className="font-medium text-[color:var(--w11-text-primary)]">{usageData.total_files}</span> files
           </span>
           {usageData.breakdown.map((b) => (
             <span key={b.file_type}>
-              {b.file_type}: <span className="font-medium text-foreground">{b.count}</span>
+              {b.file_type}: <span className="font-medium text-[color:var(--w11-text-primary)]">{b.count}</span>
             </span>
           ))}
         </div>
@@ -569,7 +569,7 @@ function FilesContent() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Main content + drag-drop */}
         <div
-          className={`flex-1 overflow-y-auto p-4 transition-colors ${dragOver ? "bg-primary/5 ring-2 ring-primary ring-inset" : ""}`}
+          className={`flex-1 overflow-y-auto p-4 transition-colors ${dragOver ? "ring-2 ring-[color:var(--w11-accent)] ring-inset bg-[color:var(--w11-accent-light)]" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={(e) => {
             // Only clear if leaving the container entirely
@@ -578,17 +578,17 @@ function FilesContent() {
           onDrop={handleDrop}
         >
           {dragOver && (
-            <div className="flex items-center justify-center py-10 text-primary font-medium text-sm">
+            <div className="flex items-center justify-center py-10 text-[color:var(--w11-accent)] font-medium text-sm">
               <Upload className="h-6 w-6 mr-2" /> Drop files here to upload
             </div>
           )}
 
           {filesLoading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
             </div>
           ) : isRootOrEmpty ? (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-24 text-[color:var(--w11-text-secondary)]">
               <FolderOpen className="h-14 w-14 mb-3 opacity-20" />
               <p className="text-sm font-medium">No files yet</p>
               <p className="text-xs mt-1 opacity-70">Upload files or create a folder to get started</p>
@@ -598,7 +598,7 @@ function FilesContent() {
               {/* Folders section */}
               {folders.length > 0 && (
                 <section>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--w11-text-secondary)] mb-2">
                     Folders
                   </p>
                   {viewMode === "grid" ? (
@@ -644,7 +644,7 @@ function FilesContent() {
               {/* Files section */}
               {files.length > 0 && (
                 <section>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--w11-text-secondary)] mb-2">
                     Files
                   </p>
                   {viewMode === "grid" ? (
@@ -678,10 +678,10 @@ function FilesContent() {
 
         {/* ── Detail panel ─────────────────────────────────────────────── */}
         {selectedFile && (
-          <aside className="w-72 shrink-0 border-l flex flex-col bg-background overflow-y-auto">
+          <aside className="w-72 shrink-0 border-l flex flex-col bg-[color:var(--w11-card-bg)] overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <h3 className="text-sm font-medium truncate pr-2">{selectedFile.original_name}</h3>
-              <button type="button" onClick={() => setSelectedFile(null)} className="text-muted-foreground hover:text-foreground shrink-0">
+              <button type="button" onClick={() => setSelectedFile(null)} className="text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -692,7 +692,7 @@ function FilesContent() {
                 <img
                   src={selectedFile.url}
                   alt={selectedFile.original_name}
-                  className="w-full rounded-lg object-cover max-h-40 bg-muted"
+                  className="w-full rounded-lg object-cover max-h-40 bg-[color:var(--w11-control-bg)]"
                 />
               ) : (
                 <div className="flex justify-center py-6">
@@ -892,7 +892,7 @@ function StockImageSearch({
       {/* Controls */}
       <div className="flex gap-2 shrink-0">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[color:var(--w11-text-secondary)]" />
           <Input
             className="pl-8 h-8 text-sm"
             placeholder="Search photos…"
@@ -906,7 +906,7 @@ function StockImageSearch({
               key={s}
               type="button"
               onClick={() => setSource(s)}
-              className={`px-3 text-xs font-medium transition-colors ${source === s ? "bg-primary text-primary-foreground" : "hover:bg-muted/50"}`}
+              className={`px-3 text-xs font-medium transition-colors ${source === s ? "bg-[color:var(--w11-accent)] text-[color:var(--w11-accent-text)]" : "hover:bg-[color:var(--w11-control-hover)]"}`}
             >
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
@@ -918,16 +918,16 @@ function StockImageSearch({
       <div className="flex-1 overflow-y-auto">
         {isSearching && page === 1 ? (
           <div className="flex justify-center py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
           </div>
         ) : results.length === 0 ? (
-          <div className="flex flex-col items-center py-10 text-muted-foreground gap-2">
+          <div className="flex flex-col items-center py-10 text-[color:var(--w11-text-secondary)] gap-2">
             <Globe className="h-8 w-8" />
             <p className="text-sm">{query.trim() ? "No results found" : "Search for free stock photos"}</p>
           </div>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground mb-2">{total.toLocaleString()} results · {selectedIds.size} selected</p>
+            <p className="text-xs text-[color:var(--w11-text-secondary)] mb-2">{total.toLocaleString()} results · {selectedIds.size} selected</p>
             <div className="grid grid-cols-4 gap-2">
               {results.map((photo) => (
                 <button
@@ -935,7 +935,7 @@ function StockImageSearch({
                   type="button"
                   onClick={() => toggleSelect(photo.id)}
                   className={`relative aspect-square overflow-hidden rounded-md border-2 transition-all focus-visible:outline-none ${
-                    selectedIds.has(photo.id) ? "border-primary ring-2 ring-primary/40" : "border-transparent hover:border-primary/40"
+                    selectedIds.has(photo.id) ? "border-[color:var(--w11-accent)] ring-2 ring-[color:var(--w11-accent)]" : "border-transparent hover:border-[color:var(--w11-accent)]"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -946,12 +946,12 @@ function StockImageSearch({
                     loading="lazy"
                   />
                   {selectedIds.has(photo.id) && (
-                    <div className="absolute inset-0 bg-primary/20 flex items-end p-1">
-                      <span className="text-[10px] text-white bg-primary/80 rounded px-1">✓</span>
+                    <div className="absolute inset-0 bg-[color:var(--w11-accent-light)] flex items-end p-1">
+                      <span className="text-[10px] rounded px-1" style={{ background: "var(--w11-accent)", color: "var(--w11-accent-text)" }}>✓</span>
                     </div>
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-1 opacity-0 hover:opacity-100 transition-opacity">
-                    <p className="text-[10px] text-white truncate">{photo.author}</p>
+                  <div className="absolute bottom-0 left-0 right-0 p-1 opacity-0 hover:opacity-100 transition-opacity" style={{ background: "linear-gradient(to top, rgba(0,0,0,.5), transparent)" }}>
+                    <p className="text-[10px] truncate" style={{ color: "#fff" }}>{photo.author}</p>
                   </div>
                 </button>
               ))}
@@ -979,7 +979,7 @@ function StockImageSearch({
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t shrink-0">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-[color:var(--w11-text-secondary)]">
           Images provided by {source === "unsplash" ? "Unsplash" : "Pexels"} — free to use
         </p>
         <Button
@@ -1019,27 +1019,27 @@ function FolderCard({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={(e) => e.key === "Enter" && onDoubleClick()}
-      className={`group relative border rounded-lg p-3 cursor-pointer transition-all hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        focused ? "ring-2 ring-primary/60" : ""
+      className={`group relative border rounded-lg p-3 cursor-pointer transition-all hover:ring-2 hover:ring-[color:var(--w11-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--w11-accent)] ${
+        focused ? "ring-2 ring-[color:var(--w11-accent)]" : ""
       }`}
     >
-      <div className="aspect-square bg-muted rounded-md flex items-center justify-center mb-2">
-        <FolderOpen className="h-9 w-9 text-yellow-500/80" />
+      <div className="aspect-square bg-[color:var(--w11-control-bg)] rounded-md flex items-center justify-center mb-2">
+        <FolderOpen className="h-9 w-9" style={{ color: "var(--w11-accent)" }} />
       </div>
       <p className="text-xs font-medium truncate">{folder.name}</p>
-      <p className="text-[11px] text-muted-foreground">{folder.file_count} files</p>
+      <p className="text-[11px] text-[color:var(--w11-text-secondary)]">{folder.file_count} files</p>
 
       {/* Delete on hover */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="absolute top-1.5 right-1.5 p-1 rounded opacity-0 group-hover:opacity-100 bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-all"
+        className="absolute top-1.5 right-1.5 p-1 rounded opacity-0 group-hover:opacity-100 bg-[color:var(--w11-card-bg)]/80 hover:bg-[#c42b1c] hover:text-white transition-all"
         title="Delete folder"
       >
         <Trash2 className="h-3 w-3" />
       </button>
 
-      <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+      <p className="text-[10px] text-[color:var(--w11-text-secondary)]/60 mt-0.5">
         {openOnSingleClick ? "Click to open" : "Double-click to open"}
       </p>
     </div>
@@ -1068,17 +1068,17 @@ function FolderRow({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={(e) => e.key === "Enter" && onDoubleClick()}
-      className={`group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
-        focused ? "bg-primary/5" : ""
+      className={`group flex items-center gap-3 px-4 py-2.5 hover:bg-[color:var(--w11-control-hover)] cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
+        focused ? "bg-[color:var(--w11-accent-light)]" : ""
       }`}
     >
-      <FolderOpen className="h-4 w-4 text-yellow-500/80 shrink-0" />
+      <FolderOpen className="h-4 w-4 shrink-0" style={{ color: "var(--w11-accent)" }} />
       <span className="text-sm flex-1 truncate">{folder.name}</span>
-      <span className="text-xs text-muted-foreground shrink-0">{folder.file_count} files</span>
+      <span className="text-xs text-[color:var(--w11-text-secondary)] shrink-0">{folder.file_count} files</span>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground transition-all"
+        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-[#c42b1c] hover:text-white transition-all"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -1101,13 +1101,13 @@ function FileCard({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
-      className={`group relative border rounded-lg overflow-hidden cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`group relative border rounded-lg overflow-hidden cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--w11-accent)] ${
         selected
-          ? "ring-2 ring-primary border-primary"
-          : "hover:ring-2 hover:ring-primary/40"
+          ? "ring-2 ring-[color:var(--w11-accent)] border-[color:var(--w11-accent)]"
+          : "hover:ring-2 hover:ring-[color:var(--w11-accent)]"
       }`}
     >
-      <div className="aspect-square bg-muted flex items-center justify-center">
+      <div className="aspect-square bg-[color:var(--w11-control-bg)] flex items-center justify-center">
         {file.file_type === "image" && file.url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -1122,7 +1122,7 @@ function FileCard({
       </div>
       <div className="p-2">
         <p className="text-xs font-medium truncate">{file.original_name}</p>
-        <p className="text-[11px] text-muted-foreground">{formatBytes(file.size_bytes)}</p>
+        <p className="text-[11px] text-[color:var(--w11-text-secondary)]">{formatBytes(file.size_bytes)}</p>
       </div>
     </div>
   );
@@ -1143,8 +1143,8 @@ function FileRow({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
-      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
-        selected ? "bg-primary/5" : ""
+      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-[color:var(--w11-control-hover)] cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
+        selected ? "bg-[color:var(--w11-accent-light)]" : ""
       }`}
     >
       <div className="w-7 h-7 shrink-0 flex items-center justify-center">
@@ -1156,8 +1156,8 @@ function FileRow({
         )}
       </div>
       <span className="text-sm flex-1 truncate">{file.original_name}</span>
-      <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size_bytes)}</span>
-      <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
+      <span className="text-xs text-[color:var(--w11-text-secondary)] shrink-0">{formatBytes(file.size_bytes)}</span>
+      <span className="text-xs text-[color:var(--w11-text-secondary)] shrink-0 w-16 text-right">
         {displayBS(file.created_at)}
       </span>
     </div>
@@ -1167,7 +1167,7 @@ function FileRow({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-[color:var(--w11-text-secondary)]">{label}</p>
       <p className="text-sm break-all">{value}</p>
     </div>
   );

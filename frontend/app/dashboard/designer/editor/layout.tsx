@@ -8,8 +8,8 @@
 export default function EditorLayout({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-50 bg-background overflow-hidden"
-      style={{ isolation: "isolate" }}
+      className="win11 fixed inset-0 z-50 overflow-hidden"
+      style={{ isolation: "isolate", background: "var(--w11-window-bg)" }}
     >
       {children}
     </div>

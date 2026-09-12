@@ -5,11 +5,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { BookmarkCheck } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
@@ -58,7 +64,7 @@ function ReservationsContent() {
     onError: (e: any) => toast.error(e?.response?.data?.error || "Action failed"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading holds…" />;
   const rows = data || [];
 
   const COLUMNS: Column<Reservation>[] = [
@@ -68,9 +74,7 @@ function ReservationsContent() {
     ) },
     { key: "student", label: "Student", sortable: true, value: (r) => r.student_name, render: (r) => r.student_name },
     { key: "status", label: "Status", sortable: true, value: (r) => r.status, render: (r) => (
-      <Badge variant={r.status === "ready" ? "default" : r.status === "requested" ? "secondary" : "outline"}>
-        {r.status}
-      </Badge>
+      <StatusChip status={r.status} className="capitalize" />
     ) },
     { key: "requested_at", label: "Requested", value: (r) => r.requested_at ?? "", render: (r) =>
       r.requested_at ? <span className="text-sm">{displayBS(r.requested_at.slice(0, 10))}</span> : "—" },
@@ -101,39 +105,43 @@ function ReservationsContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Holds &amp; Reservations</h1>
-          <p className="text-muted-foreground">Queue of members waiting for a title</p>
-        </div>
-        <div className="flex gap-2">
-          {["requested", "ready"].map((s) => (
-            <Button key={s} size="sm" variant={status === s ? "default" : "outline"} onClick={() => setStatus(s)}>
-              {s === "requested" ? "Waiting" : "Ready for pickup"}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {isError ? (
-        <Card><CardContent className="py-10 text-center space-y-3">
-          <p className="text-sm text-destructive">Failed to load reservations.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-        </CardContent></Card>
-      ) : (
-        <Card><CardContent className="p-0">
-          <DataTable<Reservation>
-            columns={COLUMNS}
-            rows={rows}
-            rowKey={(r) => r.id}
-            searchable
-            searchPlaceholder="Search book or student…"
-            exportFileName="library-reservations"
-            empty={{ icon: BookmarkCheck, title: "No holds in this state" }}
-          />
-        </CardContent></Card>
-      )}
-    </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<BookmarkCheck className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Holds &amp; Reservations"
+        subtitle={`${rows.length} ${status === "requested" ? "waiting in queue" : "ready for pickup"}`}
+        actions={
+          <div className="flex gap-2">
+            {["requested", "ready"].map((s) => (
+              <Button key={s} size="sm" variant={status === s ? "default" : "outline"} onClick={() => setStatus(s)}>
+                {s === "requested" ? "Waiting" : "Ready for pickup"}
+              </Button>
+            ))}
+          </div>
+        }
+      />
+      <AOSPageBody>
+        {isError ? (
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load reservations.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        ) : (
+          <DataPanel bodyClassName="p-0">
+            <DataTable<Reservation>
+              columns={COLUMNS}
+              rows={rows}
+              rowKey={(r) => r.id}
+              searchable
+              searchPlaceholder="Search book or student…"
+              exportFileName="library-reservations"
+              empty={{ icon: BookmarkCheck, title: "No holds in this state" }}
+            />
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

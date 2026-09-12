@@ -118,7 +118,7 @@ function FilterBar({
     language === "ne" && f.labelNepali ? f.labelNepali : f.label;
 
   return (
-    <div className={cn("flex flex-wrap items-end gap-2", className)}>
+    <div className={cn("win11-commandbar flex flex-wrap items-end gap-2 !border-b-0 !py-1", className)}>
       {filters.map((f) => {
         const value = values[f.key] ?? "";
         const id = `filter-${f.key}`;
@@ -126,7 +126,7 @@ function FilterBar({
           <div key={f.key} className="flex flex-col gap-1">
             <label
               htmlFor={id}
-              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="text-[10px] font-medium uppercase tracking-wide text-[var(--w11-text-secondary)]"
             >
               {label(f)}
             </label>
@@ -146,22 +146,27 @@ function FilterBar({
               <BSDateInput
                 value={value}
                 onChange={(next) => onChange({ [f.key]: next })}
-                className="h-8 w-[150px]"
+                className="h-8 w-[150px] rounded-[var(--w11-radius-sm)] border-[var(--w11-border-default)] bg-[var(--w11-control-bg)] text-[var(--w11-text-primary)]"
               />
+            ) : f.type === "text" ? (
+              <div className="win11-searchbox w-[180px]">
+                <Input
+                  id={id}
+                  type="text"
+                  value={value}
+                  placeholder={f.placeholder}
+                  onChange={(e) => onChange({ [f.key]: e.target.value })}
+                  className="h-8 border-transparent bg-transparent px-3 text-[12px] focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
             ) : (
               <Input
                 id={id}
-                type={
-                  f.type === "date"
-                    ? "date"
-                    : f.type === "number"
-                      ? "number"
-                      : "text"
-                }
+                type={f.type === "date" ? "date" : "number"}
                 value={value}
                 placeholder={f.placeholder}
                 onChange={(e) => onChange({ [f.key]: e.target.value })}
-                className={cn("h-8", f.type === "text" ? "w-[180px]" : "w-[150px]")}
+                className="h-8 w-[150px] rounded-[var(--w11-radius-sm)] border-[var(--w11-border-default)] bg-[var(--w11-control-bg)] text-[var(--w11-text-primary)] focus-visible:ring-1 focus-visible:ring-[var(--w11-accent)]"
               />
             )}
           </div>
@@ -169,7 +174,12 @@ function FilterBar({
       })}
 
       {activeCount > 0 && (
-        <Button variant="ghost" size="sm" className="h-8" onClick={onClear}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="commandbar-button h-8 !bg-transparent text-[12px] font-normal hover:!bg-[var(--w11-control-hover)]"
+          onClick={onClear}
+        >
           Clear ({activeCount})
         </Button>
       )}

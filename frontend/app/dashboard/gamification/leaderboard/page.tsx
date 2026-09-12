@@ -3,18 +3,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/spinner";
 import { Trophy, Medal, Star } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 const rankIcon = (rank: number) => {
-  if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-500" />;
-  if (rank === 2) return <Medal className="h-5 w-5 text-slate-400" />;
-  if (rank === 3) return <Medal className="h-5 w-5 text-amber-600" />;
-  return <span className="text-sm font-bold text-muted-foreground w-5 text-center">{rank}</span>;
+  if (rank === 1) return <Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />;
+  if (rank === 2) return <Medal className="h-5 w-5 text-[color:var(--w11-text-secondary)]" />;
+  if (rank === 3) return <Medal className="h-5 w-5" style={{ color: "#9d5d00" }} />;
+  return <span className="text-sm font-bold w-5 text-center text-[color:var(--w11-text-secondary)]">{rank}</span>;
 };
 
 export default function LeaderboardPage() {
@@ -38,7 +43,7 @@ function LeaderboardContent() {
       render: (e, i) => <div className="flex justify-center">{rankIcon(e.rank || (i ?? 0) + 1)}</div>,
     },
     { key: "student_name", label: "Student", sortable: true, value: (e) => e.student_name ?? "", render: (e) => <span className="font-medium">{e.student_name || e.student_id}</span> },
-    { key: "class_name", label: "Class", sortable: true, value: (e) => e.class_name ?? "", render: (e) => <span className="text-sm text-muted-foreground">{e.class_name || "—"}</span> },
+    { key: "class_name", label: "Class", sortable: true, value: (e) => e.class_name ?? "", render: (e) => <span className="text-sm text-[color:var(--w11-text-secondary)]">{e.class_name || "—"}</span> },
     {
       key: "total_points",
       label: "Total Points",
@@ -46,9 +51,9 @@ function LeaderboardContent() {
       sortable: true,
       value: (e) => e.total_points ?? 0,
       render: (e, i) => (
-        <Badge variant={(i ?? 0) === 0 ? "default" : "outline"} className="font-mono">
+        <span className={`win11-chip font-mono ${(i ?? 0) === 0 ? "accent" : ""}`}>
           {e.total_points?.toLocaleString() || 0} XP
-        </Badge>
+        </span>
       ),
     },
   ];
@@ -56,39 +61,54 @@ function LeaderboardContent() {
   if (isLoading) return <PageLoader />;
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader
+          icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          title="Leaderboard"
+          subtitle="Top students ranked by total XP points"
+        />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Trophy className="h-6 w-6 text-yellow-500" /> Leaderboard</h1>
-        <p className="text-muted-foreground">Top students ranked by total XP points</p>
-      </div>
-
-      {entries.length === 0 ? (
-        <Card><CardContent className="py-16 text-center text-muted-foreground">
-          <Star className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No rankings yet</p>
-          <p className="text-sm">Award points to students to populate the leaderboard.</p>
-        </CardContent></Card>
-      ) : (
-        <Card><CardContent className="pt-6">
-          <DataTable
-            columns={LEADERBOARD_COLUMNS}
-            rows={entries}
-            rowKey={(e: any) => e.student_id || `rank-${e.rank}`}
-            searchable
-            searchPlaceholder="Search students…"
-            exportFileName="leaderboard"
-            dense
-          />
-        </CardContent></Card>
-      )}
-    </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Leaderboard"
+        subtitle="Top students ranked by total XP points"
+      />
+      <AOSPageBody>
+        {entries.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Star className="h-12 w-12" />}
+              title="No rankings yet"
+              description="Award points to students to populate the leaderboard."
+            />
+          </DataPanel>
+        ) : (
+          <DataPanel bodyClassName="p-0 pt-0">
+            <DataTable
+              columns={LEADERBOARD_COLUMNS}
+              rows={entries}
+              rowKey={(e: any) => e.student_id || `rank-${e.rank}`}
+              searchable
+              searchPlaceholder="Search students…"
+              exportFileName="leaderboard"
+              dense
+            />
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

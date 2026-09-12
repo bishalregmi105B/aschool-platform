@@ -6,10 +6,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +23,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  FilterCommandBar,
+  StatusChip,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Bus, MapPin, Plus, Route } from "lucide-react";
 
 interface TransportRoute {
@@ -75,82 +83,57 @@ function TransportContent() {
   });
 
   const isLoading = routesLoading || busesLoading;
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading transport…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Transport & GPS</h1>
-          <p className="text-muted-foreground">Routes, buses, and live tracking</p>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Bus className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Transport & GPS"
+        subtitle={`${routes?.length || 0} routes · ${buses?.filter((b) => b.is_active).length || 0} active of ${buses?.length || 0} buses`}
+      />
+      <AOSPageBody>
+        {/* Stats */}
+        <StatGrid>
+          <KpiCard
+            label="Routes"
+            value={routes?.length || 0}
+            icon={<Route className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
+          />
+          <KpiCard
+            label="Buses"
+            value={buses?.length || 0}
+            color="#107c10"
+            icon={<Bus className="h-4 w-4" style={{ color: "#107c10" }} />}
+          />
+          <KpiCard
+            label="Active Buses"
+            value={buses?.filter((b) => b.is_active).length || 0}
+            color="#d83b01"
+            icon={<Bus className="h-4 w-4" style={{ color: "#d83b01" }} />}
+          />
+          <KpiCard
+            label="GPS Tracked"
+            value={buses?.filter((b) => b.gps_device_id).length || 0}
+            color="#c42b1c"
+            icon={<MapPin className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+          />
+        </StatGrid>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Route className="h-8 w-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{routes?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Routes</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Bus className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">{buses?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Buses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Bus className="h-8 w-8 text-orange-600" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {buses?.filter((b) => b.is_active).length || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">Active Buses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <MapPin className="h-8 w-8 text-red-600" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {buses?.filter((b) => b.gps_device_id).length || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">GPS Tracked</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Tabs */}
+        <FilterCommandBar>
+          <Button variant={tab === "routes" ? "default" : "outline"} size="sm" onClick={() => setTab("routes")}>
+            Routes
+          </Button>
+          <Button variant={tab === "buses" ? "default" : "outline"} size="sm" onClick={() => setTab("buses")}>
+            Buses
+          </Button>
+        </FilterCommandBar>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <Button variant={tab === "routes" ? "default" : "ghost"} size="sm" onClick={() => setTab("routes")}>
-          Routes
-        </Button>
-        <Button variant={tab === "buses" ? "default" : "ghost"} size="sm" onClick={() => setTab("buses")}>
-          Buses
-        </Button>
-      </div>
-
-      {tab === "routes" && <RoutesTab routes={routes || []} />}
-      {tab === "buses" && <BusesTab buses={buses || []} routes={routes || []} />}
-    </div>
+        {tab === "routes" && <RoutesTab routes={routes || []} />}
+        {tab === "buses" && <BusesTab buses={buses || []} routes={routes || []} />}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -201,7 +184,7 @@ function RoutesTab({ routes }: { routes: TransportRoute[] }) {
         </Dialog>
       </div>
 
-      <Card>
+      <DataPanel bodyClassName="p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -212,19 +195,19 @@ function RoutesTab({ routes }: { routes: TransportRoute[] }) {
           </TableHeader>
           <TableBody>
             {routes.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No routes yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>No routes yet</TableCell></TableRow>
             ) : (
               routes.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell>{r.description || "—"}</TableCell>
-                  <TableCell><Badge variant={r.is_active ? "default" : "secondary"}>{r.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                  <TableCell><StatusChip status={r.is_active ? "active" : "inactive"} /></TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </Card>
+      </DataPanel>
     </div>
   );
 }
@@ -290,7 +273,7 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
         </Dialog>
       </div>
 
-      <Card>
+      <DataPanel bodyClassName="p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -302,7 +285,7 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
           </TableHeader>
           <TableBody>
             {buses.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No buses yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>No buses yet</TableCell></TableRow>
             ) : (
               buses.map((b) => (
                 <TableRow key={b.id}>
@@ -310,18 +293,18 @@ function BusesTab({ buses, routes }: { buses: BusItem[]; routes: TransportRoute[
                   <TableCell>{b.capacity}</TableCell>
                   <TableCell>
                     {b.gps_device_id ? (
-                      <Badge variant="default" className="bg-green-600">Tracked</Badge>
+                      <span className="win11-chip success">Tracked</span>
                     ) : (
-                      <Badge variant="secondary">No GPS</Badge>
+                      <span className="win11-chip subtle">No GPS</span>
                     )}
                   </TableCell>
-                  <TableCell><Badge variant={b.is_active ? "default" : "secondary"}>{b.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                  <TableCell><StatusChip status={b.is_active ? "active" : "inactive"} /></TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </Card>
+      </DataPanel>
     </div>
   );
 }

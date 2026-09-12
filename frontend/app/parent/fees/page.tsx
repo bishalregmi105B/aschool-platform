@@ -4,10 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageLoader } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type FeeDue = {
   id: string;
@@ -31,7 +31,7 @@ export default function ParentFeesPage() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading…" />;
   if (isError)
     return <ErrorState title="Couldn't load fees" onRetry={() => refetch()} />;
 

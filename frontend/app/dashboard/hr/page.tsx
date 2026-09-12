@@ -3,9 +3,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 import {
   Users,
   DollarSign,
@@ -37,51 +43,63 @@ function HRContent() {
 
   if (isError) {
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load HR dashboard. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="HR & Payroll" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load HR dashboard. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   const s = data || {};
 
-  // KPI Cards
+  // KPI values — straight from /hr/stats, never invented.
   const kpis = [
     {
       label: "Total Staff",
       value: s.total_staff ?? "—",
-      icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      icon: <Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />,
+      color: "var(--w11-accent)",
     },
     {
       label: "Monthly Payroll",
       value: s.monthly_payroll
         ? `Rs. ${Math.round(s.monthly_payroll / 1000)}K`
         : "—",
-      icon: DollarSign,
-      color: "text-green-600",
-      bg: "bg-green-50",
+      icon: <DollarSign className="h-4 w-4" style={{ color: "#107c10" }} />,
+      color: "#107c10",
     },
     {
       label: "Pending Leaves",
       value: s.pending_leaves ?? "—",
-      icon: Calendar,
-      color: s.pending_leaves > 0 ? "text-amber-600" : "text-muted-foreground",
-      bg: s.pending_leaves > 0 ? "bg-amber-50" : "bg-muted",
-      alert: (s.pending_leaves ?? 0) > 0,
+      icon: (
+        <Calendar
+          className="h-4 w-4"
+          style={{ color: (s.pending_leaves ?? 0) > 0 ? "#d83b01" : "var(--w11-text-tertiary)" }}
+        />
+      ),
+      color: (s.pending_leaves ?? 0) > 0 ? "#d83b01" : "var(--w11-text-secondary)",
     },
     {
       label: "Pending Payroll",
       value: s.pending_payroll ?? "—",
-      icon: ClipboardList,
-      color: s.pending_payroll > 0 ? "text-red-600" : "text-muted-foreground",
-      bg: s.pending_payroll > 0 ? "bg-red-50" : "bg-muted",
+      icon: (
+        <ClipboardList
+          className="h-4 w-4"
+          style={{ color: (s.pending_payroll ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-tertiary)" }}
+        />
+      ),
+      color: (s.pending_payroll ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-secondary)",
     },
   ];
 
@@ -94,7 +112,7 @@ function HRContent() {
       icon: DollarSign,
       badge:
         (s.pending_payroll ?? 0) > 0 ? `${s.pending_payroll} pending` : null,
-      badgeColor: "destructive" as const,
+      badgeTone: (s.pending_payroll ?? 0) > 0 ? "error" : "subtle",
       primary: true,
     },
     {
@@ -103,7 +121,7 @@ function HRContent() {
       href: "/dashboard/hr/leaves",
       icon: Calendar,
       badge: (s.pending_leaves ?? 0) > 0 ? `${s.pending_leaves} pending` : null,
-      badgeColor: "warning" as const,
+      badgeTone: "warning",
       primary: false,
     },
     {
@@ -112,7 +130,7 @@ function HRContent() {
       href: "/dashboard/hr/staff-attendance",
       icon: ClipboardList,
       badge: null,
-      badgeColor: "secondary" as const,
+      badgeTone: "subtle",
       primary: false,
     },
     {
@@ -121,7 +139,7 @@ function HRContent() {
       href: "/dashboard/hr/expenses",
       icon: DollarSign,
       badge: null,
-      badgeColor: "secondary" as const,
+      badgeTone: "subtle",
       primary: false,
     },
     {
@@ -130,7 +148,7 @@ function HRContent() {
       href: "/dashboard/hr/appraisal",
       icon: Star,
       badge: null,
-      badgeColor: "secondary" as const,
+      badgeTone: "subtle",
       primary: false,
     },
     {
@@ -139,128 +157,131 @@ function HRContent() {
       href: "/dashboard/hr/payroll/settings",
       icon: Settings,
       badge: null,
-      badgeColor: "secondary" as const,
+      badgeTone: "subtle",
       primary: false,
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">HR & Payroll</h1>
-        <p className="text-muted-foreground">
-          Manage staff salaries, leaves, attendance, and performance
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="HR & Payroll"
+        subtitle={
+          isLoading
+            ? "Manage staff salaries, leaves, attendance, and performance"
+            : `${s.total_staff ?? 0} staff · ${s.pending_leaves ?? 0} pending leaves · ${s.pending_payroll ?? 0} pending payroll`
+        }
+        actions={
+          <Link href="/dashboard/hr/payroll">
+            <Button>
+              <DollarSign className="h-4 w-4 mr-2" /> Open Payroll
+            </Button>
+          </Link>
+        }
+      />
+      <AOSPageBody>
+        {/* KPI cards */}
+        <StatGrid min={180}>
+          {kpis.map((k) => (
+            <KpiCard
+              key={k.label}
+              label={k.label}
+              value={isLoading ? "—" : k.value}
+              color={k.color}
+              icon={k.icon}
+              className={isLoading ? "animate-pulse" : undefined}
+            />
+          ))}
+        </StatGrid>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map((k) => (
-          <Card key={k.label}>
-            <CardContent className="pt-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                    {k.label}
-                  </p>
-                  <p
-                    className={`text-xl font-bold mt-1 ${k.color} ${isLoading ? "animate-pulse" : ""}`}
-                  >
-                    {isLoading ? "—" : k.value}
-                  </p>
-                </div>
-                <div className={`p-2 rounded-lg ${k.bg}`}>
-                  <k.icon className={`h-4 w-4 ${k.color}`} />
-                </div>
+        {/* Alerts for pending items */}
+        {((s.pending_leaves ?? 0) > 0 || (s.pending_payroll ?? 0) > 0) && (
+          <div className="space-y-2 mb-4">
+            {(s.pending_leaves ?? 0) > 0 && (
+              <div
+                className="win11-infobar warning flex items-center justify-between gap-3"
+                role="status"
+              >
+                <p className="text-sm font-medium">
+                  {s.pending_leaves} leave request
+                  {s.pending_leaves > 1 ? "s" : ""} waiting for approval
+                </p>
+                <Link href="/dashboard/hr/leaves">
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
+                    Review <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            )}
+            {(s.pending_payroll ?? 0) > 0 && (
+              <div
+                className="win11-infobar error flex items-center justify-between gap-3"
+                role="status"
+              >
+                <p className="text-sm font-medium">
+                  {s.pending_payroll} payroll record
+                  {s.pending_payroll > 1 ? "s" : ""} need attention
+                </p>
+                <Link href="/dashboard/hr/payroll">
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
+                    Process <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Alerts for pending items */}
-      {((s.pending_leaves ?? 0) > 0 || (s.pending_payroll ?? 0) > 0) && (
-        <div className="space-y-2">
-          {(s.pending_leaves ?? 0) > 0 && (
-            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              <p className="text-sm font-medium text-amber-800">
-                {s.pending_leaves} leave request
-                {s.pending_leaves > 1 ? "s" : ""} waiting for approval
-              </p>
-              <Link href="/dashboard/hr/leaves">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1 h-7 text-xs border-amber-300"
-                >
-                  Review <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          )}
-          {(s.pending_payroll ?? 0) > 0 && (
-            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-              <p className="text-sm font-medium text-red-800">
-                {s.pending_payroll} payroll record
-                {s.pending_payroll > 1 ? "s" : ""} need attention
-              </p>
-              <Link href="/dashboard/hr/payroll">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1 h-7 text-xs border-red-300"
-                >
-                  Process <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Module Navigation Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {modules.map((m) => (
-          <Link key={m.href} href={m.href}>
-            <Card
-              className={`hover:shadow-md transition-all cursor-pointer h-full ${
-                m.primary ? "border-primary/30 bg-primary/5" : ""
-              }`}
-            >
-              <CardContent className="pt-5 pb-5">
+        {/* Module navigation grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {modules.map((m) => (
+            <Link key={m.href} href={m.href} className="block h-full">
+              <div
+                className={`win11-card h-full transition-all hover:-translate-y-0.5 ${m.primary ? "border-[var(--w11-accent)]" : ""}`}
+                style={{ cursor: "pointer" }}
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div
-                    className={`p-2 rounded-lg ${
-                      m.primary ? "bg-primary/10" : "bg-muted"
-                    }`}
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: m.primary
+                        ? "var(--w11-accent-light)"
+                        : "var(--w11-control-hover)",
+                    }}
                   >
                     <m.icon
-                      className={`h-5 w-5 ${m.primary ? "text-primary" : "text-muted-foreground"}`}
+                      className="h-5 w-5"
+                      style={{
+                        color: m.primary
+                          ? "var(--w11-accent)"
+                          : "var(--w11-text-secondary)",
+                      }}
                     />
                   </div>
                   {m.badge && (
-                    <Badge
-                      variant={
-                        m.badgeColor === "destructive"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                      className="text-xs"
-                    >
+                    <span className={`win11-chip ${m.badgeTone} text-xs`}>
                       {m.badge}
-                    </Badge>
+                    </span>
                   )}
                 </div>
-                <h3 className="font-semibold text-sm">{m.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                <h3
+                  className="font-semibold text-sm"
+                  style={{ color: "var(--w11-text-primary)" }}
+                >
+                  {m.title}
+                </h3>
+                <p
+                  className="text-xs mt-1 leading-relaxed"
+                  style={{ color: "var(--w11-text-secondary)" }}
+                >
                   {m.desc}
                 </p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

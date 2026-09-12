@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -22,6 +20,16 @@ import {
 } from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { HelpCircle, Plus, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  KpiCard,
+  StatGrid,
+  DataPanel,
+  StatusChip,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
 
 interface FAQ {
   id: string;
@@ -107,70 +115,49 @@ export default function FAQsPage() {
   const uncategorized = (faqs ?? []).filter((f) => !FAQ_CATEGORIES.includes(f.category));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <HelpCircle className="h-6 w-6" /> FAQ Management
-          </h1>
-          <p className="text-muted-foreground">
-            Manage frequently asked questions shown on the school website
-          </p>
-        </div>
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4 mr-2" /> Add FAQ
-        </Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<HelpCircle className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="FAQ Management"
+        subtitle="Manage frequently asked questions shown on the school website"
+        actions={
+          <Button onClick={openAdd}>
+            <Plus className="h-4 w-4 mr-2" /> Add FAQ
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        {/* Stats */}
+        <StatGrid>
+          <KpiCard label="Total FAQs" value={faqs?.length ?? 0} />
+          <KpiCard label="Active" value={faqs?.filter((f) => f.is_active).length ?? 0} />
+          <KpiCard label="Categories" value={Object.keys(grouped).length + (uncategorized.length ? 1 : 0)} />
+          <KpiCard label="Inactive" value={faqs?.filter((f) => !f.is_active).length ?? 0} />
+        </StatGrid>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-2xl font-bold">{faqs?.length ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Total FAQs</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-2xl font-bold">{faqs?.filter((f) => f.is_active).length ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Active</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-2xl font-bold">{Object.keys(grouped).length + (uncategorized.length ? 1 : 0)}</p>
-            <p className="text-sm text-muted-foreground">Categories</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-2xl font-bold">{faqs?.filter((f) => !f.is_active).length ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Inactive</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* FAQ list by category */}
-      {faqs?.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <HelpCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No FAQs yet</p>
-            <p className="text-sm mt-1">Add your first FAQ to help students and parents</p>
-            <Button className="mt-4" onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add FAQ</Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(grouped).map(([cat, items]) => (
-            <Card key={cat}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  {cat}
-                  <Badge variant="secondary">{items.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
+        {/* FAQ list by category */}
+        {faqs?.length === 0 ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<HelpCircle className="h-10 w-10" />}
+              title="No FAQs yet"
+              description="Add your first FAQ to help students and parents"
+              action={<Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add FAQ</Button>}
+            />
+          </DataPanel>
+        ) : (
+          <div className="space-y-4">
+            {Object.entries(grouped).map(([cat, items]) => (
+              <DataPanel
+                key={cat}
+                title={
+                  <span className="flex items-center gap-2">
+                    {cat}
+                    <span className="win11-chip">{items.length}</span>
+                  </span>
+                }
+                bodyClassName="p-0 pt-0"
+              >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -183,11 +170,12 @@ export default function FAQsPage() {
                   <TableBody>
                     {items.map((faq, idx) => (
                       <>
-                        <TableRow key={faq.id} className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                        <TableRow key={faq.id} className="cursor-pointer">
+                          <TableCell className="text-xs text-[color:var(--w11-text-secondary)]">{idx + 1}</TableCell>
                           <TableCell>
                             <button
-                              className="text-left w-full font-medium text-sm hover:text-primary"
+                              className="text-left w-full font-medium text-sm"
+                              style={{ color: "var(--w11-text-primary)" }}
                               onClick={() => setExpandedId(expandedId === faq.id ? null : faq.id)}
                             >
                               <span className="flex items-center gap-2">
@@ -198,13 +186,11 @@ export default function FAQsPage() {
                               </span>
                             </button>
                             {expandedId === faq.id && (
-                              <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">{faq.answer}</p>
+                              <p className="text-xs mt-2 whitespace-pre-wrap text-[color:var(--w11-text-secondary)]">{faq.answer}</p>
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={faq.is_active ? "default" : "secondary"}>
-                              {faq.is_active ? "Active" : "Inactive"}
-                            </Badge>
+                            <StatusChip status={faq.is_active ? "active" : "inactive"} label={faq.is_active ? "Active" : "Inactive"} />
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -212,7 +198,7 @@ export default function FAQsPage() {
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
                               <Button
-                                size="icon" variant="ghost" className="h-7 w-7 text-destructive"
+                                size="icon" variant="ghost" className="h-7 w-7 text-[#c42b1c]"
                                 onClick={() => deleteMutation.mutate(faq.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -224,11 +210,10 @@ export default function FAQsPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </DataPanel>
+            ))}
+          </div>
+        )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -290,6 +275,7 @@ export default function FAQsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

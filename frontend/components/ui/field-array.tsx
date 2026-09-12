@@ -63,7 +63,7 @@ export function FieldArray({
       {value.length > 0 && (
         <div className="hidden gap-2 px-1 sm:grid" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr)) 72px` }}>
           {columns.map((c) => (
-            <span key={c.key} className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span key={c.key} className="text-tertiary text-[10px] font-medium uppercase tracking-wide">
               {c.ne ? t(c.label, c.ne) : c.label}
             </span>
           ))}
@@ -73,7 +73,7 @@ export function FieldArray({
       {value.map((row, idx) => (
         <div
           key={idx}
-          className="grid items-center gap-2 rounded-md border bg-muted/30 p-2 sm:border-0 sm:bg-transparent sm:p-0"
+          className="grid items-center gap-2 border border-[var(--w11-border-subtle)] bg-[var(--w11-control-hover)] p-2 rounded-[var(--w11-radius-md)] sm:border-0 sm:bg-transparent sm:p-0"
           style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr)) 72px` }}
         >
           {columns.map((c) => (
@@ -83,7 +83,7 @@ export function FieldArray({
               value={row[c.key] ?? ""}
               placeholder={c.placeholder}
               onChange={(e) => update(idx, c.key, e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-[13px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 w-full px-2.5 text-[13px]"
             />
           ))}
           <div className="flex items-center justify-end gap-0.5">
@@ -91,7 +91,7 @@ export function FieldArray({
               type="button"
               onClick={() => move(idx, -1)}
               disabled={idx === 0}
-              className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30"
+              className="!h-7 !w-7 !min-h-0 !min-w-0 !rounded-sm !border-0 !bg-transparent !p-0 !shadow-none !text-[var(--w11-text-secondary)] hover:!bg-[var(--w11-control-hover)] disabled:!opacity-30"
               aria-label={t("Move up", "माथि सार्नुहोस्")}
             >
               <ChevronUp className="h-3.5 w-3.5" />
@@ -100,7 +100,7 @@ export function FieldArray({
               type="button"
               onClick={() => move(idx, 1)}
               disabled={idx === value.length - 1}
-              className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30"
+              className="!h-7 !w-7 !min-h-0 !min-w-0 !rounded-sm !border-0 !bg-transparent !p-0 !shadow-none !text-[var(--w11-text-secondary)] hover:!bg-[var(--w11-control-hover)] disabled:!opacity-30"
               aria-label={t("Move down", "तल सार्नुहोस्")}
             >
               <ChevronDown className="h-3.5 w-3.5" />
@@ -108,7 +108,7 @@ export function FieldArray({
             <button
               type="button"
               onClick={() => remove(idx)}
-              className="rounded p-1 text-destructive hover:bg-destructive/10"
+              className="!h-7 !w-7 !min-h-0 !min-w-0 !rounded-sm !border-0 !bg-transparent !p-0 !shadow-none !text-red-600 hover:!bg-red-600/10"
               aria-label={t("Remove", "हटाउनुहोस्")}
             >
               <Trash2 className="h-3.5 w-3.5" />

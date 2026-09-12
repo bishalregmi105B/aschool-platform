@@ -6,11 +6,16 @@ import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner, PageLoader } from "@/components/ui/spinner";
 import { CreditCard as IdCard, Printer, Search, Users, CheckSquare, Square } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
 
 interface StaffRecord {
   id: string;
@@ -142,15 +147,13 @@ export default function StaffIdCardsPage() {
   if (isStaffLoading || isTemplatesLoading) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IdCard className="h-6 w-6" /> Staff ID Cards
-          </h1>
-          <p className="text-muted-foreground">Select teachers and staff to generate printable ID cards</p>
-        </div>
-        <div className="flex items-end gap-2">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<IdCard className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Staff ID Cards"
+        subtitle="Select teachers and staff to generate printable ID cards"
+        actions={
+          <div className="flex items-end gap-2">
           <div className="space-y-1 min-w-[220px]">
             <Label className="text-xs">Template</Label>
             <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
@@ -171,28 +174,32 @@ export default function StaffIdCardsPage() {
             {renderMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
             Generate ({selectedStaffIds.size}) Cards
           </Button>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 h-fit bg-muted/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" /> Instructions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-4">
+          </div>
+        }
+      />
+      <AOSPageBody>
+        <div className="grid md:grid-cols-3 gap-4">
+        <DataPanel
+          className="md:col-span-1 h-fit"
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Users className="h-4 w-4" /> Instructions
+            </span>
+          }
+        >
+          <div className="text-sm space-y-4" style={{ color: "var(--w11-text-secondary)" }}>
             <p>1. Search for specific staff members or select them from the list.</p>
             <p>2. You can select multiple staff members to batch print their ID cards simultaneously.</p>
             <p>3. Once selected, click the &quot;Generate&quot; button. A new tab will open with a print-ready grid containing the standard vertical ID cards (54x86mm).</p>
-          </CardContent>
-        </Card>
+          </div>
+        </DataPanel>
 
-        <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>Staff List</CardTitle>
+        <DataPanel
+          className="md:col-span-2"
+          title="Staff List"
+          actions={
             <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--w11-text-tertiary)" }} />
               <Input
                 placeholder="Search staff..."
                 className="pl-10 h-9"
@@ -200,9 +207,10 @@ export default function StaffIdCardsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center mb-4 pb-2 border-b">
+          }
+        >
+          <div>
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-[var(--w11-border-subtle)]">
               <Button variant="ghost" size="sm" onClick={toggleAll}>
                 {staffList && selectedStaffIds.size === staffList.length ? (
                   <><CheckSquare className="h-4 w-4 mr-2 text-primary" /> Deselect All</>
@@ -210,14 +218,14 @@ export default function StaffIdCardsPage() {
                   <><Square className="h-4 w-4 mr-2" /> Select All</>
                 )}
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
                 {selectedStaffIds.size} / {staffList?.length || 0} selected
               </span>
             </div>
 
             {isStaffError ? (
               <div className="text-center py-10 space-y-3">
-                <p className="text-sm text-destructive">Failed to load staff list. Please try again.</p>
+                <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>Failed to load staff list. Please try again.</p>
                 <Button variant="outline" size="sm" onClick={() => refetchStaff()}>Retry</Button>
               </div>
             ) : (
@@ -229,29 +237,35 @@ export default function StaffIdCardsPage() {
                   <div
                     key={staff.id}
                     onClick={() => toggleStaff(staff.id)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${
-                      isSelected ? "bg-primary/10 border-primary" : "hover:bg-muted"
-                    }`}
+                    className="p-3 border rounded-lg cursor-pointer transition-colors flex items-center gap-3"
+                    style={
+                      isSelected
+                        ? { background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)" }
+                        : { borderColor: "var(--w11-border-default)" }
+                    }
                   >
-                    {isSelected ? <CheckSquare className="h-5 w-5 text-primary" /> : <Square className="h-5 w-5 text-muted-foreground" />}
+                    {isSelected
+                      ? <CheckSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
+                      : <Square className="h-5 w-5" style={{ color: "var(--w11-text-tertiary)" }} />}
                     <div>
-                      <div className="font-medium">{staff.label}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{staff.subtitle.replace("_", " ")}</div>
+                      <div className="font-medium" style={{ color: "var(--w11-text-primary)" }}>{staff.label}</div>
+                      <div className="text-xs capitalize" style={{ color: "var(--w11-text-secondary)" }}>{staff.subtitle.replace("_", " ")}</div>
                     </div>
                   </div>
                 );
               })}
               {staffList?.length === 0 && (
-                <div className="col-span-2 text-center text-sm text-muted-foreground py-8">
+                <div className="col-span-2 text-center text-sm py-8" style={{ color: "var(--w11-text-secondary)" }}>
                   No staff members found matching your search.
                 </div>
               )}
             </div>
             </>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </DataPanel>
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

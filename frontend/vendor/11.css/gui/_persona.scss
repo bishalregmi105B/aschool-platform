@@ -1,0 +1,111 @@
+/**
+ * 11.css - Fluent Persona & Badges
+ * Windows 11 Avatars, Presence Indicators & Status Chips
+ */
+
+.win11-persona {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--w11-font-family);
+
+  .persona-avatar {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--w11-accent);
+    color: var(--w11-accent-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+    flex-shrink: 0;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Presence Badge */
+    .presence-badge {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--w11-surface-solid);
+
+      &.online { background: #107c10; }
+      &.busy { background: #c42b1c; }
+      &.away { background: #ffaa44; }
+      &.offline { background: #8a8886; }
+    }
+  }
+
+  .persona-details {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+
+    .persona-primary {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--w11-text-primary);
+    }
+
+    .persona-secondary {
+      font-size: 11px;
+      color: var(--w11-text-secondary);
+    }
+  }
+
+  /* Size Modifiers */
+  &.sm .persona-avatar { width: 28px; height: 28px; font-size: 12px; }
+  &.lg .persona-avatar { width: 48px; height: 48px; font-size: 18px; }
+}
+
+/* Status Chips / Badges */
+.win11-chip,
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--w11-radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--w11-border-default);
+  background: var(--w11-control-bg);
+  color: var(--w11-text-primary);
+  user-select: none;
+  transition: all var(--w11-transition-fast);
+
+  &.success {
+    background: rgba(16, 124, 16, 0.12);
+    border-color: rgba(16, 124, 16, 0.3);
+    color: #107c10;
+  }
+
+  &.warning {
+    background: rgba(216, 59, 1, 0.12);
+    border-color: rgba(216, 59, 1, 0.3);
+    color: #d83b01;
+  }
+
+  &.error {
+    background: rgba(196, 43, 28, 0.12);
+    border-color: rgba(196, 43, 28, 0.3);
+    color: #c42b1c;
+  }
+
+  &.accent {
+    background: var(--w11-accent-light);
+    border-color: var(--w11-accent);
+    color: var(--w11-accent);
+  }
+}

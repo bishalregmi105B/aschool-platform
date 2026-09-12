@@ -32,7 +32,7 @@ export function ColorField({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <label
-        className="relative h-9 w-12 shrink-0 overflow-hidden rounded-md border cursor-pointer"
+        className="relative h-9 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[var(--w11-radius-sm)] border border-[var(--w11-control-border)]"
         title={valid ? draft : "Pick a color"}
       >
         <span
@@ -60,7 +60,7 @@ export function ColorField({
           setDraft(v);
           if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) onChange?.(v);
         }}
-        className={cn("w-28 font-mono text-[12px]", !valid && "border-destructive")}
+        className={cn("w-28 font-mono text-[12px]", !valid && "!border-red-600")}
         placeholder="#22577A"
       />
     </div>

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +16,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  FormSection,
+} from "@/components/aos/kit/page-kit";
 import { CalendarOff, Plus, Pencil, Trash2 } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -86,8 +92,8 @@ function HolidaysContent() {
   if (isLoading) return <PageLoader />;
   if (isError)
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-3">
-        <p className="text-sm text-destructive">Failed to load holidays. Please try again.</p>
+      <div className="win11-card p-6 text-center space-y-3">
+        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load holidays. Please try again.</p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     );
@@ -113,17 +119,19 @@ function HolidaysContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarOff className="h-6 w-6" /> Holiday List</h1>
-          <p className="text-muted-foreground">Manage school holidays and vacation days</p>
-        </div>
-        <Button onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-2" /> Add Holiday</Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<CalendarOff className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Holiday List"
+        subtitle="Manage school holidays and vacation days"
+        actions={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Holiday
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -161,49 +169,53 @@ function HolidaysContent() {
                             deleteMutation.mutate(h.id);
                         }}
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
               {holidays.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No holidays added yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-[color:var(--w11-text-secondary)]">No holidays added yet.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showAdd || !!editing} onOpenChange={(open) => { if (!open) { setShowAdd(false); setEditing(null); } }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Edit Holiday" : "Add Holiday"}</DialogTitle></DialogHeader>
-          <form key={editing?.id || "new-holiday"} onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2"><Label>Title</Label><Input name="title" required placeholder="Holiday name" defaultValue={editing?.title} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Date</Label><BSDateInput name="date" required value={editing?.start_date || undefined} /></div>
-              <div className="space-y-2"><Label>Type</Label>
-                <AdvancedSelect
-                  name="type"
-                  defaultValue={editing?.event_type || "holiday"}
-                  options={[
-                    { value: "holiday", label: "Holiday" },
-                    { value: "vacation", label: "Vacation" },
-                    { value: "festival", label: "Festival" },
-                  ]}
-                />
-              </div>
-            </div>
-            <div className="space-y-2"><Label>Description</Label><Input name="description" placeholder="Optional description" defaultValue={editing?.description} /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditing(null); }}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner className="mr-2" /> : editing ? "Update" : "Add"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={showAdd || !!editing} onOpenChange={(open) => { if (!open) { setShowAdd(false); setEditing(null); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{editing ? "Edit Holiday" : "Add Holiday"}</DialogTitle></DialogHeader>
+            <form key={editing?.id || "new-holiday"} onSubmit={handleSubmit} className="space-y-4">
+              <FormSection title="Holiday Details">
+                <div className="space-y-4">
+                  <div className="space-y-2"><Label>Title</Label><Input name="title" required placeholder="Holiday name" defaultValue={editing?.title} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Date</Label><BSDateInput name="date" required value={editing?.start_date || undefined} /></div>
+                    <div className="space-y-2"><Label>Type</Label>
+                      <AdvancedSelect
+                        name="type"
+                        defaultValue={editing?.event_type || "holiday"}
+                        options={[
+                          { value: "holiday", label: "Holiday" },
+                          { value: "vacation", label: "Vacation" },
+                          { value: "festival", label: "Festival" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2"><Label>Description</Label><Input name="description" placeholder="Optional description" defaultValue={editing?.description} /></div>
+                </div>
+              </FormSection>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditing(null); }}>Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {createMutation.isPending || updateMutation.isPending ? <Spinner className="mr-2" /> : editing ? "Update" : "Add"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
