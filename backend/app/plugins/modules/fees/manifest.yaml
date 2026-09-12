@@ -42,8 +42,18 @@ ui:
       route: /dashboard/fees/structure
     - label: Collect Fees
       route: /dashboard/fees/collect
+    - label: Invoices
+      route: /dashboard/fees/invoices
+    - label: Slip Approvals
+      route: /dashboard/fees/approvals
     - label: Defaulters
       route: /dashboard/fees/defaulters
+    - label: AR Aging
+      route: /dashboard/fees/aging
+    - label: Carry Forward
+      route: /dashboard/fees/carry-forward
+    - label: Day Closure
+      route: /dashboard/fees/day-closure
     - label: Scholarships
       route: /dashboard/fees/scholarships
     - label: Reports

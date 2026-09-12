@@ -371,6 +371,20 @@ def create_app(config_name: str | None = None) -> Flask:
                 "task": "ai_teacher_purge_transcripts",
                 "schedule": crontab(hour=3, minute=40),
             },
+            # ── S-A1 fees depth: stale gateway initiations (hourly) ───
+            # Every gateway session expires inside an hour; leaving the row
+            # 'initiated' forever makes dues lie and invites double-payments.
+            "sweep-pending-fee-initiations": {
+                "task": "sweep_pending_fee_initiations",
+                "schedule": crontab(minute=15),
+            },
+            # ── S-A1 fees depth: daily late-fine accrual (00:35 NST ≈
+            # 18:50 UTC) — schools without a fine policy are skipped inside
+            # the task.
+            "fee-fines-accrual-daily": {
+                "task": "accrue_fee_fines_daily",
+                "schedule": crontab(hour=18, minute=50),
+            },
         },
     )
 

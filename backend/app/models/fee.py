@@ -86,9 +86,22 @@ class FeeCollection(SchoolModel):
     # P-01(c): reminder dedupe — beat restarts/retries must not spam
     # guardians; send_fee_reminders skips fees reminded within 72h.
     last_reminder_sent_at = Column(DateTime)
+    # ── S-A1 (A-01): explicit BS due date + grouping ──────────────────
+    # due_date_bs replaces parsing "[due_day:N]" out of notes for aging and
+    # fine accrual; the notes marker stays for dedupe and legacy rows.
+    due_date_bs = Column(String(20))
+    # The parent bill document this line belongs to (NULL for legacy rows —
+    # they keep working; _group_collections_into_invoices backfills lazily).
+    invoice_id = Column(UUID(as_uuid=True), ForeignKey("fee_invoices.id"), index=True)
+    # Set when the bill was generated from a structure's installment schedule.
+    installment_id = Column(UUID(as_uuid=True), ForeignKey("fee_installments.id"))
+    # Last BS date a late fine was accrued on (fine-accrual idempotency stamp).
+    fine_accrued_on_bs = Column(String(20))
 
     student = relationship("Student", backref="fee_collections")
     collected_by = relationship("User")
+    invoice = relationship("FeeInvoice", backref="collections", foreign_keys=[invoice_id])
+    installment = relationship("FeeInstallment")
 
 
 class FeeReceipt(SchoolModel):
@@ -206,3 +219,177 @@ class StudentScholarship(SchoolModel):
     is_active = Column(Boolean, default=True)
 
     student = relationship("Student", backref="scholarships")
+
+
+# ── S-A1 (A-01/A-24): invoices, installments, carry-forward, offline
+#    slips, day closure. Money stays on FeeCollection/FeeReceipt — every
+#    model below is either a grouping document (invoice), a schedule
+#    (installment), a workflow row (carry-forward, offline submission) or a
+#    control row (day closure). Totals are always computed from the lines;
+#    no stored balances (the MSP divergence lesson).
+class FeeInvoice(SchoolModel):
+    """One bill document per student per billing period.
+
+    Lines are FeeCollection rows (invoice_id). status is maintained by
+    _recompute_invoice_status() on every line mutation — it is a cache of
+    the line sums, never an independent source of truth.
+    """
+
+    __tablename__ = "fee_invoices"
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
+    academic_year = Column(String(10))
+    title = Column(String(200), nullable=False)
+    # BS period key of the bill group ("2083-01" month, "2083-Q1", or the
+    # annual year) — mirrors the cycle keys the generators already use.
+    period_key = Column(String(20), index=True)
+    due_date_bs = Column(String(20))
+    status = Column(
+        Enum("pending", "partial", "paid", "waived", name="fee_invoice_status"),
+        default="pending",
+        index=True,
+    )
+    notes = Column(Text)
+
+    student = relationship("Student", backref="fee_invoices")
+
+
+class FeeInstallment(SchoolModel):
+    """One row of a structure's installment schedule (e.g. 3 terms).
+
+    Validated so the schedule's amounts sum to the structure total before it
+    can be applied; applying generates one FeeCollection per installment with
+    the explicit BS due date.
+    """
+
+    __tablename__ = "fee_installments"
+    __table_args__ = (
+        Index("uq_fee_installments_structure_seq", "structure_id", "seq",
+              unique=True, postgresql_where=text("is_deleted = false")),
+    )
+
+    structure_id = Column(
+        UUID(as_uuid=True), ForeignKey("fee_structures.id"), nullable=False, index=True
+    )
+    seq = Column(Integer, nullable=False)
+    label = Column(String(100), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    due_date_bs = Column(String(20))
+    is_generated = Column(Boolean, default=False)
+
+
+class FeeCarryForward(SchoolModel):
+    """A student's signed balance rolled from one academic year into the next.
+
+    balance > 0 with balance_type='due'      → the student owes (a bill is
+                                                 created in the new year on
+                                                 apply).
+    balance < 0 with balance_type='credit'   → the student overpaid/has
+                                                 advance; on apply this is
+                                                 stored as a self-settled
+                                                 (waived) bill line so reports
+                                                 show the credit.
+    """
+
+    __tablename__ = "fee_carry_forwards"
+    __table_args__ = (
+        Index("uq_fee_carry_forward_student_year", "student_id", "from_year_bs", "to_year_bs",
+              unique=True, postgresql_where=text("is_deleted = false")),
+    )
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
+    from_year_bs = Column(String(10), nullable=False)
+    to_year_bs = Column(String(10), nullable=False)
+    balance = Column(Numeric(12, 2), nullable=False)  # always stored positive
+    balance_type = Column(Enum("due", "credit", name="carry_forward_type"), nullable=False)
+    due_date_bs = Column(String(20))
+    status = Column(
+        Enum("pending", "applied", "reversed", name="carry_forward_status"),
+        default="pending",
+    )
+    applied_collection_id = Column(UUID(as_uuid=True), ForeignKey("fee_collections.id"))
+    notes = Column(Text)
+
+
+class FeeCarryForwardLog(SchoolModel):
+    """Immutable audit trail of every carry-forward action (InfixEdu's log
+    viewer is the one part of their carry-forward worth copying verbatim)."""
+
+    __tablename__ = "fee_carry_forward_logs"
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
+    action = Column(String(20), nullable=False)  # preview|apply|reverse
+    balance = Column(Numeric(12, 2))
+    balance_type = Column(String(10))
+    from_year_bs = Column(String(10))
+    to_year_bs = Column(String(10))
+    actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    detail = Column(JSONB, default=dict)
+
+
+class FeeOfflineSubmission(SchoolModel):
+    """Bank-transfer / cheque slip awaiting admin approval (InfixEdu's
+    bank-payment-slip queue — how most Nepali schools actually collect).
+
+    The parent/student uploads evidence + the bills it settles; approval
+    records the payments through the SAME record-payment core (receipts,
+    invoice status, events) as a desk collection. Money moves only on
+    approval, and only once (status transition guards)."""
+
+    __tablename__ = "fee_offline_submissions"
+
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
+    amount = Column(Numeric(12, 2), nullable=False)
+    method = Column(
+        Enum("bank", "cheque", name="offline_method"), nullable=False
+    )
+    bank_name = Column(String(200))
+    reference_no = Column(String(200))
+    paid_on_bs = Column(String(20))
+    slip_file_id = Column(UUID(as_uuid=True), ForeignKey("managed_files.id"))
+    collection_ids = Column(JSONB, default=list)  # bills this submission settles
+    status = Column(
+        Enum("pending", "approved", "rejected", name="offline_submission_status"),
+        default="pending",
+        index=True,
+    )
+    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), index=True)
+    reviewed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    review_notes = Column(Text)
+    receipt_ids = Column(JSONB, default=list)  # receipts written on approval
+
+    student = relationship("Student")
+    slip_file = relationship("ManagedFile")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
+
+
+class FeeDayClosure(SchoolModel):
+    """Counter accountability (InstiKit day-closure, BS-first).
+
+    When a collector closes their day, record_payment refuses further cash/
+    cheque entries for that collector+date until an admin reopens — the till
+    lock. expected_total is computed from the day book at close time;
+    counted_total is what the counter physically counted (denominations)."""
+
+    __tablename__ = "fee_day_closures"
+    __table_args__ = (
+        Index("uq_fee_day_closures_date_user", "closure_date_bs", "collected_by_id",
+              unique=True, postgresql_where=text("is_deleted = false")),
+    )
+
+    closure_date_bs = Column(String(20), nullable=False, index=True)
+    closure_date_ad = Column(DateTime)
+    collected_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(Enum("closed", "open", name="day_closure_status"), default="closed")
+    denominations = Column(JSONB, default=dict)  # {"1000": 3, "500": 2, ...}
+    expected_total = Column(Numeric(12, 2), default=0)
+    counted_total = Column(Numeric(12, 2), default=0)
+    difference = Column(Numeric(12, 2), default=0)
+    closed_at = Column(DateTime)
+    closed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    reopened_at = Column(DateTime)
+    reopened_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    notes = Column(Text)
+
+    collected_by = relationship("User", foreign_keys=[collected_by_id])

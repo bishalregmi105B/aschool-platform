@@ -260,3 +260,30 @@ adoption sprints → S13..S20 AI waves → S21+), extended do-not-adopt list, 10
 No product code changed in this wave (docs only; the S12 red-team log append in
 `backend/audits/ai_redteam/known_failure_modes.md` rides along).
 
+## 2026-09-12 — S-A1: Fees depth (branch `feat/sa1-fees-depth`)
+
+Plan: `docs/MASTER_EXECUTION_PLAN_2026-09-12.md` S-A1 (A-01 fees installments/carry-forward/
+aging/fines-waivers/offline slips/receipt config + A-08 native-pay UX pieces + A-24 day closure).
+
+| ID | What landed | Files |
+|---|---|---|
+| A-01 | **Invoices**: `fee_invoices` (per student × period grouping document; totals always computed from lines) + `_group_collections_into_invoices` wired into the manual apply, installments apply, carry-forward AND the monthly cron; status recompute (pending→partial→paid/waived) on every line mutation (pay/update/refund) | `backend/app/models/fee.py`, `backend/app/api/v1/fees.py`, `backend/app/tasks/fee_reminders.py` |
+| A-01 | **Installments**: `fee_installments` schedule per structure (validated sum == structure total), apply endpoint generating one bill per installment with explicit `due_date_bs` — and RETIRES the structure's unpaid full bills (conversion, not double-billing) | `fees.py` (`/structures/<id>/installments` GET/PUT + `/apply`) |
+| A-01 | **Carry-forward**: `fee_carry_forwards` + log table; signed-balance preview (due/credit) and apply (due → pending bill in new year; credit → self-settled waived line; per-year idempotent) | `fees.py` (`/carry-forward/preview|apply|log`) |
+| A-01 | **AR aging**: `/receivables/aging` — 30/60/90 buckets by BS due date (converted for arithmetic), by class + top by-student | `fees.py` |
+| A-01 | **Fines + waivers**: `fees_fine_policy` in School.settings (none/fixed_once/daily_percent + grace + cap); idempotent accrual via `fine_accrued_on_bs` (daily_percent RECOMPUTES — never compounds); fines/waivers reports by class/month; fines settings endpoint | `fees.py`, beat task `accrue_fee_fines_daily` |
+| A-01 | **Offline bank-slip/cheque queue**: `fee_offline_submissions` (parent/student submit w/ slip file + referenced bills; tenant+own-child scoped) → admin approve (records payments through the same core: receipts, invoice status, fee.paid event, in-app notification) / reject (notifies) | `models/fee.py`, `fees.py` (`/offline-submissions*`) |
+| A-01 | **Receipt numbering config**: per-school prefix + pad via School.settings `fee_receipt_numbering` (sequence stays in the FOR UPDATE counter) | `fees.py` (`/receipt-numbering` GET/PUT) |
+| A-08 | **Pending sweeper**: stale gateway PaymentInitiations (initiated >1h) → failed; hourly beat + manual endpoint. **Nudge**: student "ask parents to pay" → in-app notification to linked guardian accounts. Receipt download/verification screen shipped on mobile (below) | `backend/app/tasks/fees_depth.py` (new), `fees.py`, beat entries in `app/__init__.py` |
+| A-24 | **Day closure / day book**: `fee_day_closures` (BS-first, denomination matrix, expected vs counted vs difference); till lock — `record_payment` refuses cash/cheque/bank for a closed collector+date (423) until admin reopen (audited); `/day-book` grouped by method + collector. Also fixed: `record_payment` never stamped `collected_by_id` before (day book showed "unknown") | `models/fee.py`, `fees.py` |
+| A-01 web | 7 pages: invoices (+detail sheet), slip approvals, AR aging, carry-forward wizard+log, day closure (+denomination dialog, reopen), reports (Collection/Fines/Waivers tabs + policy dialog), installment editor on structures; hub quick-actions + manifest nav subitems | `frontend/app/dashboard/fees/**`, `modules/fees/manifest.yaml` |
+| A-08 mobile | Parent: bank-deposit submission flow (FileUploadService slip), submissions list, invoices list+detail w/ receipt download, payment-verification screen (3-state) after gateway return; Student: "ask parents to pay" nudge; shared FeeRepository methods + models | `aschool_shared/lib/{models/fee,repositories/fee_repository}.dart`, `flutter_parent/lib/features/fees/**` (5 new screens + router), `flutter_student/.../student_fees_screen.dart` |
+
+**Verification:** `tests/test_sa1_fees_depth.py` 13/13 (installments+conversion, invoice status
+recompute, carry-forward due+credit, aging buckets, fine idempotency fixed_once + daily_percent,
+reports, offline approve/reject, till lock + day book + reopen, receipt config, sweeper, nudge);
+existing fees suites 9/9; plugin widgets + contract + S0 suites 36/36; drift gate PASS (0 blocking,
+477 allowlisted — new tables match BaseModel exactly); `tsc --noEmit` clean; plugin_doctor 49/0/0;
+`flutter analyze` 0 errors (shared/parent/student/teacher). Full-suite run per founder instruction:
+NOT run for this sprint (targeted suites only).
+

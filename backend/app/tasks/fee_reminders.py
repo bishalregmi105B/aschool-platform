@@ -471,6 +471,7 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
 
     created_total = 0
     skipped_total = 0
+    new_collections = []
 
     for structure in structures:
         fee_items = structure.fee_items or []
@@ -549,10 +550,28 @@ def _generate_monthly_fees_for_school(school_id: str, month_bs: str, year_bs: st
                     payment_status="pending",
                     notes=f"{marker} [auto_generated]",
                 )
+                # S-A1: explicit BS due date (item due_day anchored to the
+                # bill month) so aging + fine accrual work for cron bills too.
+                due_day = item.get("due_day") or None
+                if due_day:
+                    try:
+                        import nepali_datetime
+
+                        collection.due_date_bs = nepali_datetime.date(
+                            int(year_bs), int(month_bs.split("-")[1]), int(due_day)
+                        ).isoformat()
+                    except Exception:
+                        collection.due_date_bs = None
+                new_collections.append(collection)
                 db.session.add(collection)
                 created_total += 1
 
     if created_total:
+        # S-A1: group the cron's fresh bills into per-student invoices —
+        # identical to what the manual apply path does.
+        from app.api.v1.fees import _group_collections_into_invoices
+
+        _group_collections_into_invoices(school_id, new_collections)
         db.session.commit()
     else:
         db.session.rollback()
