@@ -44,12 +44,13 @@ function TableGrid({ onPick }: { onPick: (r: number, c: number) => void }) {
               type="button"
               onMouseEnter={() => setHover({ r, c })}
               onClick={() => onPick(r, c)}
-              className={`w-4 h-4 rounded-[2px] border ${on ? "border-blue-500 bg-blue-200" : "border-slate-300 bg-white"}`}
+              className="!h-4 !w-4 !min-h-0 !p-0 !shadow-none rounded-[2px] border border-[var(--w11-border-default)]"
+              style={on ? { background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)" } : undefined}
             />
           );
         })}
       </div>
-      <div className="text-[10px] text-slate-500 mt-1 text-center">
+      <div className="text-[10px] text-[var(--w11-text-secondary)] mt-1 text-center">
         {hover.c ? `${hover.c} x ${hover.r} table` : "Insert table"}
       </div>
     </div>
@@ -87,7 +88,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
       <RibbonGroup label="Tables">
         <Popover>
           <PopoverTrigger asChild>
-            <button type="button" className="h-[52px] w-[52px] rounded hover:bg-slate-100 flex flex-col items-center justify-center gap-0.5 text-slate-700" title="Insert table">
+            <button type="button" className="h-[52px] w-[52px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)] flex flex-col items-center justify-center gap-0.5 text-[var(--w11-text-primary)]" title="Insert table">
               <TableIcon className="h-5 w-5" />
               <span className="text-[9px]">Table</span>
             </button>
@@ -119,7 +120,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
           <RBtn icon={<ImageIcon className="h-4 w-4" />} label="Picture" title="Insert picture from file" onClick={pickImage} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" title="Insert image from URL" className="h-7 min-w-[52px] rounded px-1 flex items-center justify-center gap-1 text-[10px] text-slate-700 hover:bg-slate-100">
+              <button type="button" title="Insert image from URL" className="h-7 min-w-[52px] rounded-[var(--w11-radius-sm)] px-1 flex items-center justify-center gap-1 text-[10px] text-[var(--w11-text-primary)] hover:bg-[var(--w11-control-hover)]" style={{ transition: "background var(--w11-transition-fast)" }}>
                 <Link2 className="h-3.5 w-3.5" /> URL
               </button>
             </DropdownMenuTrigger>
@@ -133,7 +134,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="h-[52px] w-[52px] rounded hover:bg-slate-100 flex flex-col items-center justify-center gap-0.5 text-slate-700" title="Insert shape">
+            <button type="button" className="h-[52px] w-[52px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)] flex flex-col items-center justify-center gap-0.5 text-[var(--w11-text-primary)]" title="Insert shape">
               <Square className="h-5 w-5" />
               <span className="text-[9px]">Shapes</span>
             </button>
@@ -153,7 +154,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
       <RibbonGroup label="Links">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="h-[52px] w-[52px] rounded hover:bg-slate-100 flex flex-col items-center justify-center gap-0.5 text-slate-700" title="Insert link">
+            <button type="button" className="h-[52px] w-[52px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)] flex flex-col items-center justify-center gap-0.5 text-[var(--w11-text-primary)]" title="Insert link">
               <Link2 className="h-5 w-5" />
               <span className="text-[9px]">Link</span>
             </button>
@@ -182,7 +183,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
         </BtnCol>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="h-[52px] w-[52px] rounded hover:bg-slate-100 flex flex-col items-center justify-center gap-0.5 text-slate-700" title="Page numbers">
+            <button type="button" className="h-[52px] w-[52px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)] flex flex-col items-center justify-center gap-0.5 text-[var(--w11-text-primary)]" title="Page numbers">
               <Hash className="h-5 w-5" />
               <span className="text-[9px]">Page №</span>
             </button>
@@ -201,7 +202,7 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
       <RibbonGroup label="Symbols">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="h-[52px] w-[52px] rounded hover:bg-slate-100 flex flex-col items-center justify-center gap-0.5 text-slate-700" title="Insert symbol">
+            <button type="button" className="h-[52px] w-[52px] rounded-[var(--w11-radius-md)] hover:bg-[var(--w11-control-hover)] flex flex-col items-center justify-center gap-0.5 text-[var(--w11-text-primary)]" title="Insert symbol">
               <Sigma className="h-5 w-5" />
               <span className="text-[9px]">Symbol</span>
             </button>
@@ -209,14 +210,14 @@ export function InsertTab({ ctx }: { ctx: WriterCtx }) {
           <DropdownMenuContent className="max-h-80 overflow-auto p-1 w-64">
             {SYMBOL_SETS.map((set) => (
               <div key={set.name} className="mb-1">
-                <div className="text-[9px] uppercase tracking-wide text-slate-400 px-1">{set.name}</div>
+                <div className="text-[9px] uppercase tracking-wide text-[var(--w11-text-tertiary)] px-1">{set.name}</div>
                 <div className="grid grid-cols-8 gap-0.5">
                   {set.chars.map((c, i) => (
                     <button
                       key={`${set.name}-${i}`}
                       type="button"
                       onClick={() => ctx.insertSymbol(c)}
-                      className="h-6 w-6 rounded text-sm hover:bg-blue-100"
+                      className="!h-6 !w-6 !min-h-0 !p-0 !shadow-none !bg-transparent !border-transparent rounded-[var(--w11-radius-sm)] text-sm hover:!bg-[var(--w11-control-hover)]"
                     >
                       {c}
                     </button>

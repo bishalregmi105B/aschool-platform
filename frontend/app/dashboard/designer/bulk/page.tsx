@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -65,7 +65,7 @@ export default function BulkPage() {
 }
 
 function BulkContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const router = useAOSRouterNavigate();
   const [type, setType] = useState<BulkType>((searchParams.get("type") as BulkType) || "id_cards");
   const [classId, setClassId] = useState("");
@@ -446,7 +446,7 @@ function BulkContent() {
           <DataPanel title="What gets generated">
             <div className="space-y-4">
               <div
-                className="p-4 rounded-lg space-y-2"
+                className="p-4 rounded-[var(--w11-radius-lg)] space-y-2"
                 style={{ background: "var(--w11-control-hover)" }}
               >
                 {type === "id_cards" && (

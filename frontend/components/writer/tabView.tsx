@@ -22,7 +22,7 @@ export function ViewTab({ ctx }: { ctx: WriterCtx }) {
       <RibbonGroup label="Zoom" className="min-w-[200px]">
         <div className="flex flex-col justify-center gap-1 h-[52px] w-[200px]">
           <div className="flex items-center gap-2">
-            <ZoomIn className="h-3.5 w-3.5 text-slate-500" />
+            <ZoomIn className="h-3.5 w-3.5 text-[var(--w11-text-secondary)]" />
             <Slider
               value={[zoom]}
               min={50}
@@ -31,7 +31,7 @@ export function ViewTab({ ctx }: { ctx: WriterCtx }) {
               onValueChange={(v) => setZoom(v[0] ?? 100)}
               className="flex-1"
             />
-            <span className="text-[11px] w-10 text-right text-slate-600">{Math.round(zoom)}%</span>
+            <span className="text-[11px] w-10 text-right text-[var(--w11-text-primary)]">{Math.round(zoom)}%</span>
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant="outline" className="h-5 text-[10px] px-2" onClick={() => setZoom(100)}>100%</Button>
