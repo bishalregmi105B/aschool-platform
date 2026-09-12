@@ -11,6 +11,242 @@
 
 ---
 
+## Deep re-audit (v2) — implementation-level (2026-09-12)
+
+- **v2 status**: covered Accounting GL (schema, all 5 voucher types line-by-line, opening balances, all 11 reports), Payroll→GL + advance/due/return lifecycle, Fees engine (heads→map→amount/date config→collections→waivers→3 fine types→quick collection→reports), Exam→result engine (configs, mark input, GPA, grand-final), QuestionBank 15-taxonomy + quiz delivery, route census re-verified (19 modules), Flutter structure (api_client headers, feature layout), security re-verification at line level + 14 new V2 findings, accounting mini-design for plugin A-23; remaining: line-by-line reading of all remaining controller bodies (Academic/Elearning/Frontend/Parent/Hostel CRUD verified only at route+model level), Flutter screen-widget internals, Gateways webhook handlers per gateway.
+
+Path abbreviations used below (all relative to the repo root `/home/bishal-regmi/Desktop/ASchool/`):
+- **MSP-API** = `Other Projects/Mighty School Pro v1.6/Mighty School Pro v1.6/codecanyon-57385565-mighty-school-pro-school-management-system-erp-multibranch-saas-all-in-one/install-api-code-v1.6_x`
+- **MSP-UPD** = same root `/updated-api-code-v1.6_x`
+- **MSP-FL** = same root `/web-app-desktop-code-v1.6_x/web-app-desktop-code-v1.6`
+
+### V2.1 Route coverage — implementation notes beyond the v1 census
+
+Counts re-verified per module (`grep -c "Route::" MSP-API/Modules/*/routes/api.php`): Academic 65, Student 49, Authentication 47, Elearning 39, Frontend 32, Finance 31, Accounting 31, ParentModule 28, QuestionBank 23, Examination 21, Payroll 21, Teacher 17, SystemConfiguration 10, Hostel 10, SMS 9, Gateways 8 (+55 web), Library 7 (+23 web), Transport 6, LayoutCert 2. Validation/side-effect notes per group:
+
+| Route group (module) | Controller@method | Validation | Tables | Side effects / notes |
+|---|---|---|---|---|
+| `account-transactions` (Accounting) | `APIAccountManagementController::accountTransaction` | FormRequest: only payment_method_id/fund_id/date/type required; **no validation of ledger_ids/amounts arrays** (`MSP-API/Modules/Accounting/app/Http/Requests/AccountTransactionCreateRequest.php:23-33`) | account_transactions + account_transaction_details + ledger/fund balance mutation | 1 journal line per target ledger; cash ledger gets NO journal line (balance mutated only); insufficient-balance check only for `payment` (controller line 60) |
+| `account-contra-transfer` | `accountContraTransfer` | none (manual intval/floatval) | 2 detail lines | `category_id` stores a **ledger id** (line 180), `fund_id` hardcoded `1` (line 181), voucher = random 16-digit w/o uniqueness (line 179) |
+| `account-journal-transfer` | `accountJournalTransfer` | none | 1 cash line + N lines | debit/credit columns **inverted** vs contra path (lines 290/313 vs 205/223); balance updates both ledger + fund (lines 295-296, 343-344) |
+| `account-fund-transfer` | `accountFundTransfer` | none | 2 detail lines | both lines post to **hardcoded `ledger_id = 1`** (lines 414, 431); `category_id = 1` (line 395) |
+| `salary-payment-create` (Payroll) | `PayslipSalaryService::processSalaryPayment` | none at route (raw arrays user_id/payable/paid_amount) | payslip_salaries, user_payrolls, payments + GL 1-line voucher | due→advance overflow math lines 65-72; GL via `prepareForAccTransAndDetails` (trait) |
+| `advance/due/return-salary-payment` (Payroll) | `PaymentService::processPayment` | `dueSalaryPay` validates; `advanceSalaryPay`/`returnSalaryPay` **do not** (controller `MSP-API/Modules/Payroll/app/Http/Controllers/API/PayrollController.php:281-289, 364-372`) | payments, user_payrolls + GL | user_payroll.current_advance / current_due arithmetic (PaymentService lines 80-107) |
+| `quick-collection` (Finance) | `APIQuickCollectionController::store` → `StudentCollectionTrait::createCollectionApi` | `StudentCollectionCreateRequest` (arrays of fee_heads) | student_collections / _details / _details_sub_heads + attendance_fines + GL receipt | **DB transaction commented out** (trait lines 498-499, 713-719); FIFO sub-head split (lines 589-618); TC collection auto-disables the student (lines 694-711); SMS notification inline (controller lines 90-138) |
+| `exam-assign-store`, `general-exam-store`, `grand-final-exam-store`, `mark-store-section-wise`, `exam-results` (Examination) | `ExamMarkInputController` (details in V2.5) | validates class/group/subject/exam ids; marks numeric min 0 | class_exams, mark_config_exam_codes, mark_configs, grand_final_class_exams, exam_marks | examResult query **not school-scoped** (V2-09) |
+| `quizzes` / `quiz-test` (QuestionBank) | `QuizController`, `QuizTestController`, `QuizAttemptController` (details in V2.6) | quiz_id/attempt_id/answers | quizzes, quiz_attempts, quiz_results, quiz_topics | attemptsAllowed + timer enforcement; `is_passed` write silently dropped (V2-12) |
+| `sms-send` (SMS) | `SmsController::send` | basic | sms_logs, phone_books | balance deducted via SmsPurchase rows; 14 gateways in `MSP-UPD/app/Traits/SmsGatewayForMessage.php` |
+| `digital-payment` (Gateways API) | `PaymentController::payment` | payment_method/type/amount/currency/phone required | payment_requests | builds redirect URL per gateway (`generatePaymentUrl`, lines 143-164); **`success_hook`/`failure_hook` taken from the request** and later `call_user_func`-ed by web controllers (`MSP-API/Modules/Gateways/app/Http/Controllers/WEB/StripePaymentController.php:100-108`) — see V2-14 |
+
+Flutter-side conventions (verified): `MSP-FL/lib/api_handle/api_client.dart:36-44` sends `Authorization: Bearer`, `X-Domain` (tenant host), `Accept`, `Content-Type: application/json`, `Access-Control-Allow-Origin: *` on every call; token logged in debug mode (line 27). Feature folders at `MSP-FL/lib/feature/` (46 dirs; accounting feature is `account_management`, exam is `exam_management`, payroll is `hrm`+`payroll_management`). Per-sub-feature layout is a triad but **inconsistently named**: `fees_management/fees_head/{controller,domain,presentation}` (uses `controller/`, not `logic/` as v1 stated — mixed convention across features). `route_helper.dart` registers 197 `customPage(...)` routes; menu gating keys = Spatie permission names via `profileController.hasPermission(...)` in `MSP-FL/lib/feature/sidebar/controller/side_menu_bar_controller.dart` (cosmetic only — API enforces separately).
+
+### V2.2 Trace A — Double-entry accounting (deepest gap; blueprint for plugin A-23)
+
+**Schema** (`MSP-API/Modules/Accounting/database/migrations/`):
+- `accounting_categories`: id, institute_id, branch_id, name, code, type, nature; unique(institute,branch,name). Seeded 7 categories: Cash & Cash Equivalence / Current Liabilities / Non-Current Liabilities / Owner's Equity / Fees Related Income / Others Income / General Expenses (`database/seeders/AccountingCategoryTableSeeder.php`).
+- `accounting_groups`: accounting_category_id nullable + name; 24 seeded groups (Cash, Digital Payment, Accounts Payable, Long Term Loan, Opening Balance Equity, Income From Fees, Income From Fine, … Payroll Expenses).
+- `accounting_ledgers`: ledger_name, category_id, group_id, **`balance decimal(10,2)` stored column**, `type enum('payment','default')`; ~50 seeded ledgers incl. per-fee-head collection ledgers ("Tuition Fees Collection" seeded balance 27000, "Admission Fees Collection" 75000) and 11 fine ledgers.
+- `accounting_funds`: serial, name, **cash_in, cash_out, balance** stored; 1 seeded "General Fund" (balance 102000).
+- `account_transactions`: voucher_id (int, random), category_id, fund_id, fund_to_id, payment_method_id, payment_method_to_id, transaction_date, **type enum('payment','receipt','contra','fund_transfer','journal')**, reference, description, created_by.
+- `account_transaction_details`: account_transactions_id, ledger_id, fund_id, fund_to_id, payment_method_id(+_to), transaction_date, **debit, credit** (both decimal, default 0). No CHECK constraints, no balanced-entry enforcement anywhere.
+
+All CoA seeders are hardcoded `institute_id=1, branch_id=1` — **new tenants get no chart of accounts at all** (V2-08).
+
+**Exact posting rules** (`MSP-API/Modules/Accounting/app/Http/Controllers/API/APIAccountManagementController.php`):
+
+| Voucher | Endpoint | Journal lines written | Balance mutations (stored columns) |
+|---|---|---|---|
+| Payment (`accountTransaction` type=payment) | lines 51-163 | **One** detail line per target ledger: `debit = amount, credit = 0` (lines 88, 97-98). The cash/bank ("payment method") ledger gets **no journal line**. | payment-method ledger.balance **-** amount (105-107); target ledger.balance **-** amount (110-115) — i.e. *debits decrease every ledger balance regardless of nature*; fund.balance **-** amount (117-122). Insufficient-balance check vs payment-method ledger only (line 60). |
+| Receipt (type=receipt) | same method | Same single line per ledger but `credit = amount` (line 89). | payment-method ledger.balance **+** (127-131); target ledger.balance **+** (140-145); fund.balance **+** (133-138). |
+| Contra (`accountContraTransfer`, lines 165-242) | — | Two lines: from-ledger `debit = amount` (line 205), to-ledger `credit = amount` (line 223). Proper 2-line entry (only voucher type that is). | from.balance **-**, to.balance **+** (193-197, 210-215). Bug: `category_id` = from **ledger** id (line 180), `fund_id = 1` hardcoded (line 181). |
+| Journal (`accountJournalTransfer`, lines 244-380) | — | Two modes. Cash-credit mode (cash out): cash line gets `debit = sum(other debits)` (line 290) and each other line gets `credit = its debit amount` (line 313 — variable named `$debit` written into the **credit** column). Cash-debit mode: cash line `credit = sum(credits)` (line 338), others `debit = credit` (line 362). **The debit/credit columns are inverted relative to the contra path.** | cash ledger.balance ∓, fund.balance ∓ (295-296, 343-344); other ledgers.balance ± (304-305, 353-354). Balance check vs cash ledger + fund (268). |
+| Fund transfer (`accountFundTransfer`, lines 382-453) | — | Two lines, **both on hardcoded `ledger_id = 1`** (lines 414, 431), one with fund_id=fund_from, one with fund_id=fund_to; `category_id = 1` hardcoded (line 395). | fund_from.balance **-**, fund_to.balance **+** (407-411, 424-429). No ledger balance change. |
+
+Voucher ids: `generateVoucherId()` (`MSP-UPD/app/Traits/AccountingCalculationTrait.php`) retries `mt_rand(1000000000000000, 9999999999999999)` until unique — but contra/journal/fund-transfer/service paths use unchecked `sprintf('%016d', rand(...))` (controller lines 179, 275, 323, 394; `AccountTransactionService.php` line 71). 16-digit ints risk precision loss in JS clients.
+
+**Opening balances**: there is no opening-balance transaction UI. `getAccountingOpeningBalance($date)` (`AccountingCalculationTrait.php`) computes it as `SUM(debit - credit)` over **all details from hardcoded `'2023-01-01'` to $date** — a hardcoded epoch, not a fiscal-year start, and it sums across all natures as one scalar. Meanwhile ledger rows carry seeded balances (75000/27000/102000) that double as de-facto opening balances. **Two competing balance models coexist**: (1) stored `accounting_ledgers.balance` / `accounting_funds.balance` mutated by the voucher controllers, (2) computed SUM over journal lines. They diverge immediately: the trait's `createAccountTransactionDetail` has its balance-mutation code **commented out** (lines ~96-117), so anything posted via `createAccountingTransaction` (fee collections, payroll) updates stored balances via separate ad-hoc `increment()` calls or not at all.
+
+**Fee→GL sync** (`StudentCollectionTrait::syncAccountingTransaction`, `MSP-UPD/app/Traits/StudentCollectionTrait.php:785-866`): per collection detail, creates ONE voucher of type `receipt` with ONE detail line on the fee-head's ledger (`debit: 0, credit: total_paid`, lines 813-824); `voucher_id = invoice_id` (a `YYYYMM####` string forced into the int voucher_id column, line 805); then `increment('balance')` on the receive ledger (or fallback `AccountingLedger::where('ledger_name','Cash')->where('id',1)`, lines 832-842) and on the fund (fallback id 1, lines 844-855). Cash side never gets a journal line. Same single-line pattern for payroll (V2.3).
+
+**The 11 reports** (`MSP-API/Modules/Accounting/app/Http/Controllers/API/AccountReportController.php`):
+
+| Report | Method/lines | Computation |
+|---|---|---|
+| balance-sheet | `getBalanceSheet` 16-38 | `SELECT ledger_id, ledger_name, SUM(debit), SUM(credit) FROM account_transaction_details JOIN accounting_ledgers WHERE institute/branch + date-between GROUP BY ledger` — no asset/liability classification, no nature sign, no opening equity. **Identical query to trial balance** (50-72). |
+| balance-sheet-details / trial-balance-details | 40-48 | `AccountTransactionDetail::where('ledger_id', $request->ledger_id)` — **no institute scoping** (V2-07). |
+| income-statement | `getIncomeStatement` 346-390 | Same grouped SUM, then **income = ledgers where credit>0 AND debit==0; expense = debit>0 AND credit==0** (lines 374-380) — any two-sided ledger vanishes from both. |
+| income-statement-details | 392-404 | Detail rows per ledger (scoped). |
+| trial-balance | 50-72 | Same grouped SUM as balance sheet. |
+| cash-flow-statement | 74-139 | Monthly `SUM(debit)`, `SUM(credit)` on all vouchers of the year — no operating/investing/financing split. |
+| cash-flow-statement-monthly | 187-247 | Same, per-day for a month. |
+| cash-flow-details | 319-344 | Detail rows with fund/fundTo/ledger/paymentMethod relations for a month. |
+| cash-book-account | 249-284 | Raw transaction+detail rows joined to payment_methods and ledgers, date-ranged, scoped. |
+| ledger-book-account | 286-317 | Same filtered by one `ledger_id` (scoped via account_transactions columns). |
+| voucher-wise / journal-wise | 544-569 / 571-592 | Transactions (optionally by type) joined to details+ledgers. |
+| user-wise | 443-462 | Same but `created_by = Auth::id()` — "user-wise" means *my own* vouchers only. |
+| fund-wise / fund-summary(-monthly) | 484-542 | Transactions joined to funds. |
+| cash-summary | 406-441 | Like income-statement but filters on **`created_at`** not `transaction_date` (line 422). |
+| get-monthly-fee-collections | 141-185 | Joins `student_collections`+`student_collection_details`, monthly SUM(total_paid)/SUM(total_due) — the only report that bridges fees and accounting (and it bypasses the GL). |
+
+Classification by account nature never happens server-side; the Flutter screens map ledger→category→type client-side.
+
+**Mini-design for ASchool `accounting` plugin (A-23)** — adopt the shape, fix the defects:
+1. Tables: `accounting_categories(school_id, branch_id, name, code, type ∈ {asset,liability,equity,income,expense}, nature ∈ {debit,credit})`; `accounting_groups(category_id, name)`; `accounting_ledgers(name, category_id, group_id, is_cash, is_bank)` — **no stored balance column**; `accounting_funds(name, serial)` (fund = analytical tag, not a balance holder); `accounting_vouchers(school_id, branch_id, voucher_no UNIQUE(school_id, voucher_no), voucher_type ∈ {journal,receipt,payment,contra,fund_transfer}, txn_date, fund_id, fund_to_id, payment_method_ledger_id, reference, description, source ∈ {manual,fees,payroll,inventory,sms}, source_ref_id, created_by)`; `accounting_voucher_lines(voucher_id, ledger_id, debit, credit, fund_id, CHECK (debit>=0 AND credit>=0 AND debit*credit=0))`.
+2. Posting rules (fix MSP's core flaw — two-sided entries): receipt = Dr cash/bank ledger, Cr fee-head-mapped income ledger (from a `fee_head_map(fee_head_id, ledger_id)` table — MSP's `fee_maps.ledger_id` is the right idea, `MSP-API/Modules/Finance/database/migrations/2023_11_07_133106_create_fee_maps_table.php`); payment = Dr expense ledger, Cr cash/bank; contra = Dr bank, Cr cash (or reverse); journal = arbitrary but must balance; fund_transfer = two lines on the SAME cash ledger differing by fund_id/fund_to_id (never a hardcoded ledger).
+3. Enforce `SUM(debit) = SUM(credit)` per voucher in a service layer + DB constraint view; reject unbalanced posts. MSP never checks this.
+4. Balances: `balance(ledger, date) = SUM(debit) - SUM(credit)` (signed) × nature direction, computed in SQL; cache in a materialized/summary table keyed (ledger_id, month) if needed. Never mutate a balance column inside CRUD paths (MSP's dual-model divergence is the cautionary tale).
+5. Opening balances: one dated journal per ledger against an "Opening Balance Equity" ledger at fiscal-year start (Nepali FY 208x/07/01) — replaces MSP's hardcoded 2023-01-01 sum.
+6. Report SQL shape (all 11 reports reduce to variants): `SELECT l.id, l.name, c.type, c.nature, SUM(d.debit) deb, SUM(d.credit) cr FROM accounting_voucher_lines d JOIN accounting_vouchers v ON v.id=d.voucher_id JOIN accounting_ledgers l … JOIN accounting_categories c … WHERE v.school_id=:s AND v.branch_id=:b AND v.txn_date BETWEEN :from AND :to GROUP BY l.id, c.type, c.nature` — then classify server-side: trial balance (net by nature), income statement (income/expense for period), balance sheet (asset/liability/equity + period net income into retained earnings), cash flow (vouchers where either line's ledger is cash/bank), fund summary (group by fund_id). Seed the same 7-category/24-group skeleton (it is genuinely a good school CoA) with fees-ledger auto-provisioning per fee head.
+7. Multi-tenant: every query `school_id`-scoped (MSP's report detail endpoints forgot this — V2-07).
+
+### V2.3 Trace B — Payroll → GL posting + advance-salary lifecycle
+
+**Model chain** (`MSP-API/Modules/Payroll/app/Models/`): `SalaryHead{name, type ∈ Addition|Deduction}` → `SalaryHeadUserPayroll{user_payroll_id, salary_head_id, amount}` (per-staff config) → `UserPayroll{user_id, net_salary, current_due, current_advance}` (net = Σ additions − Σ deductions, recomputed on head removal, `PayrollController::removeSalaryHead` lines 151-163) → monthly `PayslipSalary{user_id, year, month, paid_amount, is_paid, payment_date}` + head snapshot `PayslipSalaryHead{user_payroll_id, salary_head_id, amount}` → `Payment{user_id, year, month, amount, type ∈ salary|advanced|due|advanced_return, payment_method_id, paid_by}`. GL bridge: `PayrollAccountingMapping{institute_id, branch_id, ledger_id, fund_id}` — a **single row** (`mappingStore` does `PayrollAccountingMapping::first()` then updates it, `PayrollController.php:384-411` — no institute scoping, V2-06).
+
+**Flow**: `staff-salary-config` (assign heads per staff) → `salary-create-store` (`UserPayrollService::createPayslipSalariesAndHeadsAPI` snapshots heads per user/month) → `salary-payment-process` (preview: `payable = net_salary + current_due − current_advance`, `PayrollController.php:209-214`) → `salary-payment-create` (`PayslipSalaryService::processSalaryPayment`):
+- per user: `paid_amount` saved, `is_paid = paid > 0`; `dueAmount = payable − paid`; if >0 → `current_due = dueAmount, current_advance = 0`, else `current_advance = abs(dueAmount)` (lines 65-72).
+- GL: salary payment posts `prepareForAccTransAndDetails(data, 'debit')` (type `payment`); shortfall posts `(data, 'credit')` (type receipt). Lines 56, 85, 102.
+
+**GL posting shape** (`AccountTransactionService::prepareForAccTransAndDetails`, `MSP-API/Modules/Accounting/Services/AccountTransactionService.php:63-79`): `PayrollAccountingMapping::first()` (unscoped!) → ONE `account_transactions` row (type payment/receipt, `category_id = 1` hardcoded, **`fund_to_id = user_id`** — a user id stored in a fund column) + ONE detail line on the mapped ledger with the amount in debit OR credit. No cash-side line, no ledger/fund balance update (those lines are commented out in the trait). So "payroll posts into the GL" = a one-sided memo row.
+
+**Advance/due/return** (`PaymentService::processPayment`, lines 56-124; GL at `handlePayment` lines 144-151):
+- `advanced` (pay staff in advance): `current_advance += amount`; GL type `payment`/`debit` (cash out).
+- `due` (recover advance from pay): if `amount >= current_due` → overflow `current_advance += (amount − current_due)`, `current_due = 0`; else `current_due -= amount`; GL type `receipt`/`credit` (cash in).
+- `advanced_return` (staff repays advance): `current_advance -= amount`, overflow adds to `current_due`; GL `receipt`/`credit`.
+- **Validation gap**: `advanceSalaryPay` and `returnSalaryPay` pass the raw request to `processPayment` with no FormRequest validation (`PayrollController.php:281-289, 364-372`) — negative amounts are not blocked there (`dueSalaryPay` at least validates `min:1`).
+
+**Payslip structure**: `PayslipInvoice{invoice_id, payslip_salary_id}` + `payslip_invoice/{id}` print route; payslip PDF = invoice_id + per-head PayslipSalaryHead amounts + paid/due/advance summary.
+
+### V2.4 Trace C — Fees engine
+
+**Config chain** (`MSP-API/Modules/Finance/`): `FeeHead{name}` → `FeeSubHead{fee_head_id, name}` (installments/mois) → `FeeMap{fee_head_id, ledger_id, fund, type ∈ fee|fee_fine}` + `fee_map_fee_sub_head` + `fee_map_fund` (attaches heads to classes and GL ledgers) → `fees` (amount config; one row per class×section×session×student_category×fee_head with `fee_amount`, `fine_amount`, `fund_id`) → `fee_date_configs{fee_sub_head_id, payable_date_start, payable_date_end}` (installment window per sub-head, no class scoping).
+
+**Collection math** (`MSP-UPD/app/Traits/StudentCollectionTrait.php::getCollectionAmountsByFeeHeadAndSubHeads`, lines 53-183):
+- fee row looked up by (class, section, session, student_category, fee_head) — 5-dimensional pricing incl. student-category differential.
+- `feePayable = fee_amount × selected_sub_head_count` (line 123) — each sub-head is priced at the full head amount.
+- `waiver = StudentWaiverConfig{student_id, fee_head_id, waiver_id, amount}.amount × subHeadCount` (126-132).
+- fine: per selected sub-head, if `now > fee_date_configs.payable_date_end` → `+= fee.fine_amount` (flat once, **not per-day**) (138-144).
+- `grossPayable = feePayable + fines`; `previousPaid = Σ sub-head paid_amount`; `netPayable = max(0, grossPayable − previousPaid − waiver)` (147-160). `total_paid` is UI-suggested = netPayable.
+
+**Collections**: `createCollectionApi` (lines 494-720) writes `student_collections` (invoice `YYYYMM####` via **unscoped** LIKE query → global sequence + race, lines 29-51; header totals incl. tc_amount + 3 fine columns; `ledger_id` = first tenant ledger, `receive_ledger_id` from frontend) → `student_collection_details` per fee head (payable/paid/waiver/fine splits, `fee_and_fine_paid = total_paid − waiver`) → `student_collection_details_sub_heads` with **FIFO allocation** of `total_paid` across sub-heads after subtracting previous paid (lines 589-637). Attendance/quiz/lab fine payments persist `attendance_fines{student_id, fine_amount, type ∈ attendance_absent_fine|attendance_quiz_fine|attendance_lab_fine}` (lines 658-687). Paying `tc_amount == settings.tc_amount` **auto-disables the student** (`status='0'`, lines 694-711). Then `syncAccountingTransaction` (V2.2). **The API path's DB transaction is commented out** (lines 498-499, 713-719) — a mid-loop failure leaves orphaned headers.
+
+**Waivers**: `Waiver{name}` (catalog) → `StudentWaiverConfig{student_id, fee_head_id nullable, waiver_id, amount}` (per-student per-head flat amount) + `AttendanceWaiver{student_id, attendance_fine, quiz_fine, lab_fine, total_waiver}` (fine-specific waivers).
+
+**Fines math** (`MSP-API/Modules/Finance/app/Http/Controllers/API/APIQuickCollectionController.php`):
+- attendance (267-313): `absent_count(period_id=1, year) × absent_fines.fee_amount(class, period) − Σ already-paid attendance_fines(type) − attendance_waivers.attendance_fine` (line 307). Quiz/lab identical with `period_id=2/3` — "quiz" and "lab" fines are just extra attendance periods, not quiz-app events.
+- TC amount from settings (`getTcAmount`, 384-392).
+
+**Quick/bulk collection**: `index` lists a class-section roster (35-80); `search` finds student by roll; `show` (146-222) returns per-head remaining sub-heads (hides fully paid ones, 187-213) + cash ledgers (category_id=1) for the receive ledger picker; `getCollectionAmounts` (232-253) recomputes per head/sub-head server-side; `student-collection-sub-head-wise-calculation`; invoice endpoint for print. `getUnpaidReports` (424-525) loops students in PHP (N+1 per student×head×sub-head) and reports heads with any unpaid sub-head.
+
+**Reports** (`FeeManagementReportController.php`): paid-reports (collections with details), unpaid-summery, monthly-paid-info, class-wise-payment-summary, payment-ratio-info, head-wise-payment, head-wise-due (sub-head-wise), payment-fee-info, paid-invoice. All aggregate over `student_collections(_details)` — fees and the GL are never reconciled except the one-way sync (V2.2).
+
+### V2.5 Trace D — Exam → result engine
+
+**Config chain** (`MSP-API/Modules/Examination/database/migrations/`):
+- `exams` (Academic module) → `class_exams{class_id, exam_id, merit_process_type_id}` (`exam-assign-store` bulk-inserts new pairs, `ExamMarkInputController.php:505-553`).
+- `short_codes{short_code_title, total_mark, accept_percent, pass_mark}` — reusable mark-scheme codes.
+- `mark_config_exam_codes{subject_id, title, total_marks=100, pass_mark=33, acceptance=1.00, unique(title, subject_id)}` — per-subject named components (MCQ/Written/practical); `mark_configs{class_id, group_id, subject_id, exam_id, mark_config_exam_code_id}` — attaches components to class+group+subject+exam (`generalExamStore` triple-loop updateOrCreate, lines 122-199).
+- `grades{grade_name, grade_point, grade_range, number_low/high, point_low/high, priority, session_id}`; `exam_grades` = per-class grade-set copy.
+- `remark_configs{remark_title, remarks}`; `merit_process_types{type, serial, session_id}`.
+- `grand_final_class_exams{class_id, exam_id, percentage, serial_no}` (`grandFinalExamStore` lines 201-233) — declares each exam's weight toward a grand-final result per class.
+- `exam_marks{student_id, class_id, group_id, subject_id, exam_id, mark1..mark6 (fixed 6 columns), total_marks, grade_point, grade}`.
+
+**Mark input** (`markStoreSectionWise`, lines 266-377): bulk per section; accepts `mark_1..mark_n` keys mapped onto mark1..mark6 columns; `totalMarks = Σ` then **hardcoded cap `total > 100` throws** (lines 320-324) regardless of the component `total_marks` config; grade assigned by `Grade::where number_low <= total <= number_high ->first()` — **no institute scoping on the Grade lookup** (lines 326-328, V2-10). `ExamMark::updateOrCreate` upserts per student×subject×exam.
+
+**Result computation** (`examResult`, lines 379-503): load `StudentSession` by class (+section/group/search) with exam marks; per student: `gpa = round(Σ grade_point / subject_count, 2)`, final grade from `point_low <= gpa <= point_high`, `status = Fail` if any subject grade == 'F', summary pass/fail counts. **No merit ordering is computed anywhere** — `merit_process_types` only tags class-exam assignments; the Flutter UI sorts client-side. `grandFinalMarkPercentage/{class_id}` returns the weight rows; weighted aggregation happens client-side. The `examResult` query is **not institute/branch-scoped** (lines 390-397, V2-09).
+
+**Result cards / admit cards / seat plans**: `ResultCard.php`, `ExamAttendance.php`, `ExamSchedule.php` (Academic module) + print routes in root `routes/web.php` + Flutter `exam_management` marksheet screens.
+
+### V2.6 Trace E — Question bank 15-dimension taxonomy + quiz delivery
+
+**Taxonomy** (`MSP-API/Modules/QuestionBank/database/migrations/`, `2025_04_20_*`): classes → groups (per class) → subjects (class+group+question_category) → chapters (subject, chapter_no) → topics (chapter); plus independent single-table dims: `question_bank_types{type_name, default_mark}`, `_levels{level_name}`, `_difficulty_levels`, `_sources{source_name}`, `_sub_sources`, `_tags`, `_sessions`, `_years`, `_boards`, `_tests`. Multi-valued dims attach via pivot tables `question_{test,type,level,topic,source,sub_source,tag,session}`; year is a JSON column `questions.question_year`. All taxonomy tables are **global** (no institute_id) — a shared bank across tenants; `questions.institute_id` is nullable. `questions` row: 3 question types only (`enum('true_false','multiple_choice','multiple_true_false')`), options as longText, `correct_answer` JSON, marks + negative_marks (+fixed|percentage), price, `language default 'bn'`, status draft default. Question create derives `question_category_id` from the subject and flattens years (`QuestionController.php:189-234`).
+
+**Quiz** (`quizzes` migration): `question_ids` JSON (explicit selection) OR `quiz_topics{quiz_id, subject/chapter/category, question_limit}` random-pull; timing (`start/end_time`, `has_time_limit`, `time_limit_value` + unit, `on_expiry ∈ auto_submit|prevent_submit|grace_time`); grading (`marks_per_question`, `negative_marks_per_wrong_answer`, `pass_mark`, `enable_negative_marking`); `attempts_allowed` (null = unlimited); `result_visibility ∈ immediate|after_review|never`; layout (pages, shuffle questions/options); security (`access_type none|password|public`, `access_password`); type ∈ practice|mock|quick_test|exam.
+
+**Delivery** (`QuizAttemptController.php`): `startQuiz` (24-86) enforces attempts (count of submitted) and resumes an unexpired `started` attempt; **expiry math ignores `time_limit_unit` — always `addMinutes(time_limit_value)`** (lines 58, 84). `quizDetails` (88-119) hides `correct_answer`/`explanation` unless visibility=after_review. `quizSubmit` (121-291): per question — `multiple_true_false` scored **per-option** (`marks_per_question / optionCount`, negative proportional, lines 189-209); other types sorted-array equality (220-229); result row written with correct/incorrect/skipped counts and **global re-ranking of every submitted attempt O(n) per submit** (257-267). Note: the `is_passed` key passed to `QuizAttempt::update()` is not fillable (`QuizAttempt::$fillable` lacks it) and not a column — silently dropped, dead code. `quizResults` (293-453) returns per-question option-level breakdown, highest score, position; blocks on `never` visibility until `end_time`. The "quiz fine" in Finance is unrelated (attendance period 2 absence, V2.4).
+
+### V2.7 Comparison tables (competitor → ASchool)
+
+**A. Accounting / GL**
+
+| MSP behavior (file:line) | ASchool behavior (file:line) | Delta | Verdict |
+|---|---|---|---|
+| Full CoA (category→group→ledger) + funds + 5 voucher types (`MSP-API/Modules/Accounting/routes/api.php`) | No accounting plugin at all (`backend/app/plugins/modules/` has no `accounting/`; only fees/hr_payroll/inventory ledgers of record) | ASchool has no GL; fee income and salary expense never meet in one balance sheet | **Adopt** — build A-23 on the schema shape in V2.2 (7 categories / 24 groups seed is a good school CoA) |
+| One-sided postings; cash side balance-mutated, never journalled (`APIAccountManagementController.php:88-146`) | n/a | MSP's "double entry" is 1-line for 3 of 5 voucher types | **Reject the mechanism**; enforce two-sided balanced entries in the plugin |
+| Stored `ledgers.balance` mutated ad hoc + computed SUMs diverge (`AccountingCalculationTrait.php` commented-out mutations) | n/a | Two sources of truth | **Reject** — compute balances from lines (V2.2 item 4) |
+| 11 reports = one GROUP-BY-SUM query re-labelled (`AccountReportController.php:16-72`) | n/a | No nature-aware classification anywhere | **Adapt** — same SQL skeleton, classify by `category.type/nature` server-side |
+| Payroll→GL via single mapping row `PayrollAccountingMapping::first()` (`AccountTransactionService.php:64`) | `backend/app/api/v1/hr_payroll.py` posts nothing to any ledger | ASchool has no auto-posting; MSP has a broken one | **Adapt** — per-school mapping table keyed (source domain → ledger), school-scoped |
+
+**B. Payroll**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| SalaryHead Addition/Deduction per staff; monthly payslip snapshot (`Modules/Payroll/Models/SalaryHead*.php, PayslipSalary*.php`) | `StaffPayroll{basic, allowances JSONB, deductions JSONB, net}` per month (`backend/app/models/hr_payroll.py:9-24`); component defaults from settings (`_components_from_settings`, hr_payroll.py:1263) | MSP has a reusable head catalog + per-staff overrides; ASchool's JSONB is simpler but no catalog/reuse | **Adapt** — add salary-head catalog if HR wants structured payslips; JSONB fine otherwise |
+| advance/due/return-advance state machine on `user_payrolls.current_due/current_advance` (`PaymentService.php:80-107`) | No advance/due concept (`hr_payroll.py` has draft→approved→paid only) | Nepal salary-advance practice is real; MSP models it (with validation gaps) | **Adopt** (flow) with server-side validation ASchool already does elsewhere |
+| GL posting 1-line memos (V2.3) | none | none-vs-broken | **Adapt** when A-23 exists: Dr salary ledger / Cr bank |
+| No leave/appraisal/expense modules in Payroll module | `StaffLeave`, `StaffAppraisal`, `Expense{Category}` + 21 endpoints (`hr_payroll.py:637-1209`) | ASchool broader | ASchool wins |
+| Payslip PDF invoice + statement report | `download_payslip` (hr_payroll.py:386) | parity | tie |
+
+**C. Fees**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| Head→SubHead→ClassMap(+GL ledger)→amount config (class×section×session×category)→date windows per sub-head (`Modules/Finance/*` + trait) | `FeeType` + `FeeStructure{class, year, fee_items JSONB}` + `FeeCollection` per item (`backend/app/models/fee.py:21-92`) | MSP models installments as first-class sub-heads with due dates + per-sub-head paid tracking; ASchool's fee_items JSONB has no per-installment ledger of paid amounts | **Adopt** the sub-head/installment entity + `fee_date_configs` window + per-sub-head allocation (FIFO) |
+| Waiver catalog + per-student per-head waiver + attendance-fine waivers (`StudentWaiverConfig`, `AttendanceWaiver`) | `discount_amount`, `is_scholarship` flags on collection (`fee.py:72-73`); scholarships endpoints (`fees.py:803-935`) | ASchool has scholarships at collection level; no per-head waiver config reusable across months | **Adapt** — add student×fee-head waiver config |
+| 3 attendance-period fines w/ paid-offset math (`APIQuickCollectionController.php:267-382`) | `late_fine_amount` per collection only | MSP's absent/quiz/lab fine accrual doesn't exist in ASchool | **Adopt** concept (absent fine per period) — matches Nepali school practice; implement as a fees-plugin submodule |
+| Quick collection bulk flow + TC auto-disable + unpaid reports (`APIQuickCollectionController.php`) | `batch-monthly` (`fees.py:751`), defaulters + remind (`fees.py:1126-1218`), refund (`fees.py:1906`) | ASchool has bulk generation + dunning + refunds that MSP lacks; MSP has in-loop collection + unpaid drill-down ASchool lacks | both — keep ours, add unpaid sub-head drill-down |
+| BS/AD: AD only, USD | `month_bs`/`year_bs` on collections (`fee.py:51-52`), eSewa/Khalti/FonePay initiation (`PaymentInitiation`, `fee.py:155-182`; `backend/app/services/payments/`) | Nepal-native vs Dhaka/USD | ASchool wins |
+| Receipt idempotency: invoice `YYYYMM####` unscoped race (`StudentCollectionTrait.php:29-51`) | `FeeReceipt.idempotency_key UNIQUE` + `verified_hash` (`fee.py:109, 111`) | ASchool strictly safer | ASchool wins |
+
+**D. Exam → result**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| Per-subject mark components (MCQ/Written) w/ total/pass/acceptance + per class-group-exam attach (`mark_config_exam_codes`, `mark_configs`) | Single marks POST per exam+student (`backend/app/api/v1/exams.py:638`); no component model | SEE/NEB grading needs component-level (practical/theory) marks | **Adopt** — component configs are the right model for Nepal; note MSP's hardcoded 100-mark cap is the anti-pattern to avoid (`ExamMarkInputController.php:320-324`) |
+| Grade ranges dual-keyed (marks and GPA points) + per-class exam_grades copy (`grades`, `exam_grades`) | `grade-table` endpoint (`exams.py:205`) + grade sheet | ASchool has SEE/NEB tables natively; MSP's is generic | keep ours; borrow per-class override idea if needed |
+| Grand-final weighted exams (`grand_final_class_exams.percentage/serial_no`) | No cross-exam weighting (`exams.py` results are per exam) | Needed for annual GPA composition (Nepali schools weight terminals + finals) | **Adopt** |
+| Merit process types (tag only, no math) | n/a | MSP's merit is a label | **Adapt** — implement merit ranking server-side properly |
+| Result publish state, mark unlock, designer marksheet, bulk PDFs (`exams.py` — ASchool) | MSP: result cards + client-side print | ASchool has publish/unlock workflow + designer; MSP has admit/seat-plan/certificates | both; ASchool wins on workflow, MSP wins on document variety (already in v1 §4.4) |
+
+**E. Question bank + quiz**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| 15 taxonomy dimensions incl. board/source/year/session (exam-paper provenance) (`Modules/QuestionBank/database/migrations/2025_04_20_*`) | `QuestionBankItem{subject, class, topic, difficulty, bloom_level, bilingual, composite stimulus, AI metadata, dedup hash}` (`backend/app/models/question_bank.py:16-58`) + `PaperBlueprint`/`GeneratedPaper` | Orthogonal strengths: MSP = exam-paper provenance taxonomy; ASchool = pedagogy + AI pipeline | **Adopt** board/year/source dims as a lightweight `question_provenance` JSONB or tags on QuestionBankItem for SEE/NEB past-paper mode |
+| Quiz runtime: attempts, timer, negative marking per-option, result visibility, access password, shuffle, per-topic random pull (`QuizAttemptController.php`) | Online exam create/submit (`exams.py:291-457`) | MSP's runtime is far richer (attempts, visibility, access control) | **Adopt** attempt-limit + result-visibility + access-password flags into online exams |
+| Quiz `startQuiz` timer ignores unit (line 58); global re-rank per submit (257-267) | n/a | bugs to avoid | **Reject** those mechanics |
+
+**F. SMS**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| 9 endpoints: templates w/ short-codes, phone books + categories, prepaid balance purchase, sent report, bulk absent notify (`Modules/SMS/routes/api.php`; balance `Models/SmsBalance.php`, `SmsPurchase.php`) | 5 endpoints: send/history/templates/stats (`backend/app/api/v1/sms.py:15-149`), Sparrow (`sms_notifications` plugin) | No balance/quota accounting, no phone books, no template merge fields in ASchool | **Adopt**: prepaid balance ledger (maps neatly onto Sparrow's own prepaid model), phone books, `{{name}}`-style merge fields, auto-absent bulk send hook from attendance plugin |
+
+**G. Flutter app structure (single app) vs ASchool (5 apps)**
+
+| MSP | ASchool | Delta | Verdict |
+|---|---|---|---|
+| One codebase, 46 feature dirs, 197 routes; `api_client.dart:36-44` central headers incl. tenant `X-Domain`; menu = 1,000-line hardcoded builder gated by `hasPermission()` (`side_menu_bar_controller.dart`) | `flutter_admin/flutter_teacher/flutter_student/flutter_parent` + `aschool_shared`; manifest-driven Next.js sidebar; role-native shells | MSP proves single-app multi-role is shippable but pays in giant files, commented-out features (absent fine, return advance menus), `ResponsiveHelper` branching; ASchool's split scales better | **Adopt**: central header/interceptor + permission-key constants shared per feature (aschool_shared already does); **Reject**: single-app-for-all-roles |
+
+### V2.8 V2 findings (new; each verified at file:line)
+
+1. **V2-01 (HIGH, functional)**: `system:reset` runs `migrate:fresh --force` + `db:seed` **every minute** — confirmed at `MSP-API/app/Console/Kernel.php` (`$schedule->command('system:reset')->everyMinute();`; the `dailyAt('02:00')` variant is the commented one) and `app/Console/Commands/ResetSystemData.php:24,33` (also writes license marker `storage/mightySchool`, line 77).
+2. **V2-02 (HIGH, IDOR→hijack)**: `BranchController::update` does `Branch::find($id)` then **overwrites `institute_id` with the caller's** (`BranchController.php:55-66`) — i.e. a tenant admin doesn't just rename another tenant's branch, they *steal it*; `destroy` (68-77) deletes unscoped.
+3. **V2-03 (HIGH)**: `changeBranch` sets the auth user's `branch_id` to any id without ownership check (`UtilityController.php:34-49`); `backupDatabase` string-concats SQL with `addslashes` (line 78) writing `uploads/backup/DB-BACKUP-*.sql` (line 88); `dropDatabase` route exists (line 137).
+4. **V2-04 (HIGH)**: trial provisioning hardcodes `'institute_id' => 1, 'plan_id' => 1` (`OnboardingsController.php:133-137`, comment "Create a subscription for institute_id = 1"); `$plan` is undefined there so `?? 30` silently defaults duration.
+5. **V2-05 (HIGH, IDOR)**: `AccountReportController::getBalanceSheetDetails` fetches journal lines by bare `ledger_id` with no institute/branch scope (`AccountReportController.php:40-48`) — cross-tenant GL read.
+6. **V2-06 (HIGH, cross-tenant write)**: `PayrollAccountingMapping::first()` in `AccountTransactionService::prepareForAccTransAndDetails` (line 64) and in `PayrollController::mappingStore` (line 386) — every tenant's payroll posts through, and every admin can reconfigure, the *first* mapping row in the table regardless of institute.
+7. **V2-07 (HIGH)**: `APIAccountManagementController::getLedgerAccountBalance` (lines 23-34) and `cartOfAccounts` (36-49) have no institute/branch scoping — cross-tenant ledger balances and CoA enumeration.
+8. **V2-08 (MEDIUM)**: all Accounting seeders hardcode `institute_id=1/branch_id=1` (`AccountingCategoryTableSeeder.php` etc.) — provisioned tenants start with an empty CoA; combined with V2-07 tenant 1's CoA leaks to everyone.
+9. **V2-09 (HIGH, IDOR)**: `ExamMarkInputController::examResult` queries `StudentSession` by `class_id` only — no institute/branch filter (lines 390-397) — cross-tenant student results disclosure.
+10. **V2-10 (MEDIUM)**: `markStoreSectionWise` grade lookup `Grade::where(number_low..number_high)->first()` unscoped (lines 326-328); and the total-marks cap is hardcoded 100 ignoring `mark_config_exam_codes.total_marks` (320-324).
+11. **V2-11 (MEDIUM, integrity)**: `createCollectionApi` runs with `DB::beginTransaction/commit` commented out (`MSP-UPD/app/Traits/StudentCollectionTrait.php:498-499, 713-719`) — collection header/details/sub-heads/GL sync can half-commit; `generateCollectionInvoiceNo` is unscoped + race-prone (lines 29-51).
+12. **V2-12 (LOW, dead code)**: `QuizAttempt::update(['is_passed' => …])` — attribute is neither a column (`create_quiz_attempts_table`) nor fillable — silently discarded; pass/fail lives only on `quiz_results`.
+13. **V2-13 (LOW)**: `startQuiz` computes expiry as `addMinutes(time_limit_value)` ignoring `time_limit_unit` (`QuizAttemptController.php:58, 84`); `question-bank-tags` apiResource registered twice — first to `QuestionBankYearController` (`Modules/QuestionBank/routes/api.php` lines ~33 vs ~36), shadowing the tag controller.
+14. **V2-14 (HIGH, unsafe dynamic call)**: gateway web controllers execute `call_user_func($data->success_hook, $data)` where `success_hook`/`failure_hook` are taken verbatim from the authenticated API request (`PaymentController::payment` line 121; invoked in `StripePaymentController.php:100-108`, same pattern across the 13 gateway controllers). Function-name injection into `call_user_func` behind `function_exists` — unsafe pattern even if one-arg exploitation is constrained.
+
+---
+
 ## 0. Verdict in 10 bullets
 
 1. **Architecture surprise**: there is *no* Blade admin panel and no Next.js. The entire UI — public marketing site, admin panel, student/parent portals — is **one Flutter (GetX) app** (1,858 dart files, 197 routes) deployed as web + Windows/macOS/Linux desktop + Android/iOS from a single codebase (`web-app-desktop-code-v1.6_x/.../lib/`). The Laravel side is a pure JSON API (19 nwidart modules, 456 API routes) plus payment-gateway host pages.
