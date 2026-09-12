@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
@@ -65,7 +66,7 @@ export default function BulkPage() {
 
 function BulkContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const [type, setType] = useState<BulkType>((searchParams.get("type") as BulkType) || "id_cards");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -161,7 +162,7 @@ function BulkContent() {
           console.warn("Storage quota exceeded. Relying on transient window state.");
         }
         setProgress(null);
-        router.push(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
+        router(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
         return;
       }
 
@@ -213,7 +214,7 @@ function BulkContent() {
           }));
           const bulkSessionId = Date.now().toString();
           (window as any).__bulkSessionData = { version: "multi-page", pages: pagesData };
-          router.push(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
+          router(`/dashboard/designer/editor?bulk_session=${bulkSessionId}`);
         }
         setProgress(null);
         return;

@@ -20,7 +20,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TextSelection } from "@tiptap/pm/state";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
@@ -146,7 +147,7 @@ export default function WriterPage() {
 }
 
 function WriterContent() {
-  const router = useRouter();
+  const router = useAOSRouterNavigate();
   const searchParams = useSearchParams();
   const docId = searchParams.get("doc");
   const templateId = searchParams.get("template");
@@ -345,7 +346,7 @@ function WriterContent() {
     onSuccess: (data) => {
       setDirty(false);
       toast.success("Document saved");
-      if (!docId && data?.id) router.replace(`/dashboard/designer/writer?doc=${data.id}`);
+      if (!docId && data?.id) router(`/dashboard/designer/writer?doc=${data.id}`);
     },
     onError: () => toast.error("Failed to save"),
   });
@@ -771,7 +772,7 @@ function WriterContent() {
           borderBottom: "1px solid var(--w11-border-default)",
         }}
       >
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/dashboard/designer")}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router("/dashboard/designer")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Input value={docName} onChange={(e) => { setDocName(e.target.value); setDirty(true); }} className="w-52 h-7 text-sm font-medium" />
