@@ -8,6 +8,7 @@ import { FormCheckbox } from "@/components/ui/form-checkbox";
 import { toast } from "sonner";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteHost, schoolSiteUrl } from "@/lib/site-domain";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import { Search } from "lucide-react";
 import {
   AOSPage,
@@ -201,15 +202,12 @@ export default function SeoPage() {
                   className="block text-sm font-medium mb-1"
                   style={{ color: "var(--w11-text-primary)" }}
                 >
-                  OG Image URL
+                  OG Image
                 </label>
-                <input
-                  type="url"
-                  value={form.og_image}
-                  onChange={(e) => updateField("og_image", e.target.value)}
-                  placeholder="https://..."
-                  className="w-full text-sm"
-                  style={inputStyle}
+                <VaultImageField
+                  value={form.og_image || null}
+                  onChange={(url) => updateField("og_image", url ?? "")}
+                  label="OG image"
                 />
                 <p className="text-xs mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
                   Image shown when your website is shared on social media (1200x630px recommended)

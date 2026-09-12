@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -24,7 +26,7 @@ import {
 
 import {
   PlusCircle, FileText, Brain, Paperclip, X, Download, CheckCircle2,
-  Clock, Users, Trash2, Eye, Pencil, Upload,
+  Clock, Users, Trash2, Eye, Pencil, FolderOpen,
 } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import {
@@ -84,7 +86,7 @@ function AssignmentsContent() {
   const confirm = useConfirm();
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFilePicker, setShowFilePicker] = useState(false);
 
   // Dialog states
   const [showCreate, setShowCreate] = useState(false);
@@ -103,8 +105,6 @@ function AssignmentsContent() {
     total_marks: "10",
     attachment_urls: [] as string[],
   });
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-
   // Grade form
   const [gradeForm, setGradeForm] = useState({ marks: "", feedback: "" });
 
@@ -242,21 +242,11 @@ function AssignmentsContent() {
     setShowCreate(true);
   }
 
-  async function handleAttachmentUpload(file: File) {
-    setUploadingAttachment(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "assignments");
-      const res = await api.post("/files/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const url = res.data?.data?.url || res.data?.url;
-      if (url) setForm((prev) => ({ ...prev, attachment_urls: [...prev.attachment_urls, url] }));
-    } catch {
-      toast.error("File upload failed");
-    } finally {
-      setUploadingAttachment(false);
+  function handleAttachmentSelect(files: ManagedFile[]) {
+    const urls = files.map((f) => f.url).filter(Boolean);
+    if (urls.length > 0) {
+      setForm((prev) => ({ ...prev, attachment_urls: [...prev.attachment_urls, ...urls] }));
+      toast.success(`${urls.length} file${urls.length === 1 ? "" : "s"} attached from the vault`);
     }
   }
 
@@ -528,26 +518,11 @@ function AssignmentsContent() {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAttachment}
+                onClick={() => setShowFilePicker(true)}
               >
-                {uploadingAttachment ? (
-                  <Spinner className="mr-2" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                {uploadingAttachment ? "Uploading…" : "Attach File"}
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Browse Vault
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleAttachmentUpload(file);
-                  e.target.value = "";
-                }}
-              />
             </div>
           </div>
           <DialogFooter>
@@ -734,6 +709,14 @@ function AssignmentsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FilePicker
+        open={showFilePicker}
+        onOpenChange={setShowFilePicker}
+        onSelect={handleAttachmentSelect}
+        multiple
+        title="Select Attachment Files"
+      />
       </AOSPageBody>
     </AOSPage>
   );

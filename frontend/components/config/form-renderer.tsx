@@ -37,10 +37,13 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FolderOpen,
   Loader2,
   Plus,
   Trash2,
 } from "lucide-react";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
 
 /**
  * FormRenderer — the config dialect v2 form (PTTA §3.2, 18 typed fields).
@@ -597,10 +600,21 @@ function ListControl({ field, id, value, disabled, onChange, renderSubField }: C
 }
 
 function FileControl({ field, id, value, disabled, onChange }: ControlProps) {
+  const [showPicker, setShowPicker] = React.useState(false);
   const ref =
     value && typeof value === "object"
       ? (value as { id?: string; name?: string; url?: string })
       : null;
+
+  const handleSelect = (files: ManagedFile[]) => {
+    const selected = files[0];
+    if (!selected) return;
+    // The value travels as a plain JSON-serializable ManagedFile reference —
+    // the file itself already lives in the school vault (uploaded via the
+    // picker), so no local File object is needed on submit.
+    onChange({ id: selected.id, name: selected.original_name, size: selected.size_bytes, url: selected.url });
+  };
+
   return (
     <div className="space-y-1.5">
       {ref?.id ? (
@@ -620,16 +634,25 @@ function FileControl({ field, id, value, disabled, onChange }: ControlProps) {
           )}
         </div>
       ) : (
-        <Input
-          id={id}
-          type="file"
-          accept={(field.accept || []).join(",")}
-          disabled={disabled}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onChange({ id: null, name: file.name, size: file.size, url: null, _pending: file });
-          }}
-        />
+        <>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={() => setShowPicker(true)}
+          >
+            <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+            Browse Vault
+          </Button>
+          <FilePicker
+            open={showPicker}
+            onOpenChange={setShowPicker}
+            onSelect={handleSelect}
+            title="Select File"
+          />
+        </>
       )}
       {field.max_size_mb && (
         <p className="text-muted-foreground text-xs">Up to {field.max_size_mb} MB.</p>

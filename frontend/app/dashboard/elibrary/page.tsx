@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import { BookOpen, Search, Download, Plus } from "lucide-react";
 import {
   AOSPage,
@@ -135,9 +136,14 @@ function ELibraryContent() {
               <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
               <div className="space-y-2"><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} /></div>
               <div className="space-y-2">
-                <Label>File URL / Link</Label>
-                <Input value={form.file_url} onChange={(e) => setForm({ ...form, file_url: e.target.value })} placeholder="https://… or /uploads/… (upload files from the Upload Resources page)" />
-                <p className="text-xs text-[color:var(--w11-text-secondary)]">To attach a real file, use Upload Resources — it stores the file and fills this URL for you.</p>
+                <Label>File / Link</Label>
+                <VaultImageField
+                  value={form.file_url || null}
+                  onChange={(url) => setForm({ ...form, file_url: url ?? "" })}
+                  label="Resource file"
+                  fileType=""
+                />
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">Pick a file from your school vault, or upload one inside the picker — the URL is filled in for you.</p>
               </div>
             </div>
             <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add</Button></DialogFooter>
