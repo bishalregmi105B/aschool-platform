@@ -94,17 +94,17 @@ export default function Desktop({
       case "bloom-light":
         return "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 40%, #7dd3fc 80%, #38bdf8 100%)";
       case "sonoma":
-        return "linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 70%, #064e3b 100%)";
+        return "linear-gradient(135deg, #f6d365 0%, #fda085 100%)";
       case "ventura":
-        return "linear-gradient(135deg, #f97316 0%, #ea580c 30%, #c2410c 60%, #451a03 100%)";
+        return "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)";
       case "blueprint":
-        return "linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0284c7 100%)";
+        return "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #93c5fd 100%)";
       case "nebula":
-        return "linear-gradient(135deg, #09090b 0%, #3b0764 40%, #701a75 70%, #030712 100%)";
+        return "radial-gradient(ellipse at top, #312e81, #0c0a09)";
       case "forest":
-        return "linear-gradient(135deg, #022c22 0%, #064e3b 40%, #065f46 70%, #0f172a 100%)";
+        return "linear-gradient(135deg, #14532d 0%, #166534 50%, #052e16 100%)";
       case "minimal":
-        return "linear-gradient(135deg, #18181b 0%, #27272a 50%, #09090b 100%)";
+        return "linear-gradient(135deg, #f5f5f5, #e5e5e5)";
       default:
         return themeMode === "dark"
           ? "linear-gradient(135deg, #0b192c 0%, #1e3a8a 50%, #0f172a 100%)"
