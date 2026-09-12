@@ -5,9 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -18,10 +16,12 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PageLoader } from "@/components/ui/spinner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
-import { ScrollText, Plus, Pencil, Star, Trash2 } from "lucide-react";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { ScrollText, Plus, Star, Trash2 } from "lucide-react";
 
 // ── Types (GET/POST /exams/grade-scales) ────────────────────────────────────
 interface GradeScaleRow {
@@ -91,26 +91,21 @@ function GradeScalesContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ScrollText className="h-6 w-6" /> Grade Scales
-          </h1>
-          <p className="text-muted-foreground">
-            School grading scales (NEB, SEE or custom) used for results, report
-            cards and the tabulation sheet
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> New Scale
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Grade Scales"
+        subtitle={`${scales.length} scales · School grading scales (NEB, SEE or custom) used for results, report cards and the tabulation sheet`}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" /> New Scale
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel>
           {isLoading ? (
-            <PageLoader />
+            <AOSModuleLoadingState label="Loading grade scales…" />
           ) : isError ? (
             <ErrorState
               body="Failed to load grade scales. Please try again."
@@ -135,16 +130,16 @@ function GradeScalesContent() {
               empty={{ icon: ScrollText, title: "No scales" }}
             />
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <GradeScaleDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editing={editing}
-        onSaved={() => queryClient.invalidateQueries({ queryKey: ["grade-scales"] })}
-      />
-    </div>
+        <GradeScaleDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          editing={editing}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["grade-scales"] })}
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -158,9 +153,9 @@ const SCALE_COLUMNS: Column<GradeScale>[] = [
       <span className="inline-flex items-center gap-2 font-medium">
         {s.name}
         {s.is_default && (
-          <Badge className="bg-amber-100 text-amber-700">
-            <Star className="h-3 w-3 mr-1" /> Default
-          </Badge>
+          <span className="win11-chip warning">
+            <Star className="h-3 w-3" /> Default
+          </span>
         )}
       </span>
     ),
@@ -320,7 +315,7 @@ function GradeScaleDialog({
             <Label>Default scale</Label>
             <div className="flex h-9 items-center gap-2">
               <Switch checked={isDefault} onCheckedChange={setIsDefault} />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-[color:var(--w11-text-secondary)]">
                 Use this scale for results and report cards
               </span>
             </div>
@@ -328,10 +323,10 @@ function GradeScaleDialog({
         </div>
 
         {/* Row editor */}
-        <div className="rounded-lg border overflow-hidden">
+        <div className="rounded-lg border border-[var(--w11-border-subtle)] overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
+              <TableRow style={{ background: "var(--w11-control-hover)" }}>
                 <TableHead className="w-32">Grade</TableHead>
                 <TableHead className="w-24">GPA</TableHead>
                 <TableHead className="w-24">From %</TableHead>
@@ -384,7 +379,7 @@ function GradeScaleDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 text-[color:var(--w11-text-secondary)] hover:!text-[#c42b1c]"
                       onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
                       aria-label="Remove band"
                     >
@@ -407,14 +402,21 @@ function GradeScaleDialog({
           >
             <Plus className="h-4 w-4 mr-1" /> Add band
           </Button>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-[color:var(--w11-text-secondary)]">
             Bands are stored top-down; from-% must strictly descend to 0%.
           </p>
         </div>
 
         {/* Validation hints */}
         {hints.length > 0 && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 space-y-0.5">
+          <div
+            className="rounded-md border px-3 py-2 text-xs space-y-0.5"
+            style={{
+              background: "rgba(216,59,1,.08)",
+              borderColor: "rgba(216,59,1,.3)",
+              color: "#d83b01",
+            }}
+          >
             {hints.slice(0, 5).map((h, i) => (
               <p key={i}>• {h}</p>
             ))}

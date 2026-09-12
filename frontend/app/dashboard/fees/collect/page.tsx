@@ -5,13 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BSMonthInput } from "@/components/ui/bs-date-input";
@@ -20,13 +13,16 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel, AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import {
+} from "@/components/ui/select";import {
   Search,
   X,
   DollarSign,
@@ -130,33 +126,35 @@ interface StudentAccountSummary {
   due_amount: number;
 }
 
+/** Fee status → chip paint using the Fluent status palette (the 11.css
+ *  win11-chip tone recipe). */
 const STATUS_CONFIG: Record<
   FeeStatus,
-  { label: string; cls: string; icon: typeof CheckCircle2 }
+  { label: string; style: React.CSSProperties; icon: typeof CheckCircle2 }
 > = {
   paid: {
     label: "Paid",
-    cls: "bg-green-100 text-green-800",
+    style: { background: "rgba(16,124,16,.12)", color: "#107c10" },
     icon: CheckCircle2,
   },
   partial: {
     label: "Partial",
-    cls: "bg-yellow-100 text-yellow-800",
+    style: { background: "rgba(216,59,1,.12)", color: "#d83b01" },
     icon: Clock,
   },
   pending: {
     label: "Pending",
-    cls: "bg-gray-100 text-gray-700",
+    style: { background: "var(--w11-control-hover)", color: "var(--w11-text-secondary)" },
     icon: Clock,
   },
   overdue: {
     label: "Overdue",
-    cls: "bg-red-100 text-red-800",
+    style: { background: "rgba(196,43,28,.12)", color: "#c42b1c" },
     icon: AlertTriangle,
   },
   waived: {
     label: "Waived",
-    cls: "bg-blue-100 text-blue-700",
+    style: { background: "var(--w11-accent-light)", color: "var(--w11-accent)" },
     icon: CheckCircle2,
   },
 };
@@ -455,165 +453,131 @@ function CollectContent() {
     statusFilter !== "all";
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Collect Fees</h1>
-        <p className="text-muted-foreground text-sm">
-          Search a student, review the full fee ledger, and collect payment
-          from one accountant workspace.
-        </p>
-      </div>
-
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div className="md:col-span-2 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Search by student name, admission number, or ID"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <Select
-              value={classId}
-              onValueChange={(v) => {
-                setClassId(v);
-                setSectionId("all");
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Classes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {(classes || []).map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sectionId}
-              onValueChange={setSectionId}
-              disabled={classId === "all" || !sections.length}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Sections" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sections</SelectItem>
-                {sections.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="partial">Partially Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="waived">Waived</SelectItem>
-              </SelectContent>
-            </Select>
+    <AOSPage>
+      <AOSPageHeader
+        title="Collect Fees"
+        subtitle="Search a student, review the full fee ledger, and collect payment from one accountant workspace."
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
+          <div className="md:col-span-2 relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--w11-text-secondary)]" />
+            <Input
+              className="pl-9"
+              placeholder="Search by student name, admission number, or ID"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
+
+          <Select
+            value={classId}
+            onValueChange={(v) => {
+              setClassId(v);
+              setSectionId("all");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {(classes || []).map((c: any) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={sectionId}
+            onValueChange={setSectionId}
+            disabled={classId === "all" || !sections.length}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Sections" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sections</SelectItem>
+              {sections.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="partial">Partially Paid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="waived">Waived</SelectItem>
+            </SelectContent>
+          </Select>
 
           {hasFilters && (
             <button
               onClick={clearFilters}
-              className="mt-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              className="text-xs text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] flex items-center gap-1"
             >
               <X className="h-3 w-3" /> Clear filters
             </button>
           )}
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        {[
-          { label: "Students", value: summary.students, cls: "" },
-          {
-            label: "Fee Bills",
-            value: summary.feeRecords,
-            cls: "",
-          },
-          {
-            label: "Open Bills",
-            value: summary.pending,
-            cls: "text-amber-600",
-          },
-          {
-            label: "Overdue",
-            value: summary.overdue,
-            cls: "text-red-600",
-          },
-          {
-            label: "Total Collected",
-            value: formatCurrency(summary.totalCollected),
-            cls: "text-green-700",
-          },
-          {
-            label: "Outstanding",
-            value: formatCurrency(summary.totalDue),
-            cls: summary.totalDue > 0 ? "text-red-600" : "",
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-muted/40 rounded-lg px-3 py-2 text-center"
+        <StatGrid className="mb-0" min={140}>
+          <KpiCard label="Students" value={isFetching ? "…" : summary.students} color="var(--w11-text-primary)" />
+          <KpiCard label="Fee Bills" value={isFetching ? "…" : summary.feeRecords} color="var(--w11-text-primary)" />
+          <KpiCard label="Open Bills" value={isFetching ? "…" : summary.pending} color="#d83b01" />
+          <KpiCard label="Overdue" value={isFetching ? "…" : summary.overdue} color="#c42b1c" />
+          <KpiCard label="Total Collected" value={isFetching ? "…" : formatCurrency(summary.totalCollected)} color="#107c10" />
+          <KpiCard
+            label="Outstanding"
+            value={isFetching ? "…" : formatCurrency(summary.totalDue)}
+            color={summary.totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)"}
+          />
+        </StatGrid>
+
+        <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Student Accounts
+              </span>
+            }
+            bodyClassName="px-3 pb-3 pt-0"
           >
-            <p className={`text-lg font-bold ${s.cls}`}>
-              {isFetching ? "…" : s.value}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="h-4 w-4" />
-              Student Accounts
-            </CardTitle>
-            <CardDescription>
+            <p className="text-xs text-[color:var(--w11-text-secondary)] pt-3 pb-2">
               Pick a student to keep pending dues, full history, and payment
               actions in one place.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0">
+            </p>
             {isError ? (
               <div className="flex flex-col items-center py-12 space-y-3">
-                <p className="text-sm text-destructive">Failed to load student ledgers. Please try again.</p>
+                <p className="text-sm text-[#c42b1c]">Failed to load student ledgers. Please try again.</p>
                 <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
               </div>
             ) : isLoading ? (
               <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
               </div>
             ) : studentAccounts.length === 0 ? (
-              <div className="py-16 text-center text-muted-foreground">
-                <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No student accounts found</p>
-                <p className="text-sm mt-1">
-                  {hasFilters
+              <AOSEmptyState
+                icon={<AlertCircle className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
+                title="No student accounts found"
+                description={
+                  hasFilters
                     ? "Try changing your filters to bring a student ledger into view."
-                    : "Student ledgers will appear here once fee structures are applied or bills are created manually."}
-                </p>
-              </div>
+                    : "Student ledgers will appear here once fee structures are applied or bills are created manually."
+                }
+              />
             ) : (
               <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
                 {studentAccounts.map((account) => {
@@ -625,22 +589,23 @@ function CollectContent() {
                       onClick={() => setSelectedStudentId(account.student_id)}
                       className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                         isSelected
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "hover:bg-muted/40"
+                          ? "border-[var(--w11-accent)] shadow-sm"
+                          : "border-transparent hover:bg-[color:var(--w11-control-hover)]"
                       }`}
+                      style={isSelected ? { background: "var(--w11-accent-light)" } : undefined}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">
                             {account.student_name}
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-[color:var(--w11-text-secondary)]">
                             {formatStudentMeta(account)}
                           </p>
                         </div>
                         <ChevronRight
-                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                            isSelected ? "translate-x-0.5 text-foreground" : ""
+                          className={`h-4 w-4 shrink-0 text-[color:var(--w11-text-secondary)] transition-transform ${
+                            isSelected ? "translate-x-0.5 text-[color:var(--w11-text-primary)]" : ""
                           }`}
                         />
                       </div>
@@ -648,25 +613,22 @@ function CollectContent() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Badge variant="outline">{account.fee_count} bills</Badge>
                         {account.pending_count > 0 ? (
-                          <Badge className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
+                          <span className="win11-chip warning">
                             {account.pending_count} open
-                          </Badge>
+                          </span>
                         ) : null}
                         {account.overdue_count > 0 ? (
-                          <Badge className="border-red-200 bg-red-50 text-red-700 hover:bg-red-50">
+                          <span className="win11-chip error">
                             {account.overdue_count} overdue
-                          </Badge>
+                          </span>
                         ) : null}
                       </div>
 
                       <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Outstanding</span>
+                        <span className="text-[color:var(--w11-text-secondary)]">Outstanding</span>
                         <span
-                          className={`font-semibold ${
-                            account.due_amount > 0
-                              ? "text-red-600"
-                              : "text-foreground"
-                          }`}
+                          className="font-semibold"
+                          style={{ color: account.due_amount > 0 ? "#c42b1c" : "var(--w11-text-primary)" }}
                         >
                           {formatCurrency(account.due_amount)}
                         </span>
@@ -676,19 +638,19 @@ function CollectContent() {
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </DataPanel>
 
-        <StudentAccountWorkbench
-          account={selectedAccount}
-          classId={classId}
-          sectionId={sectionId}
-          onDownloadReceipt={downloadReceipt}
-          onPrintStatement={printStatement}
-          onStudentFocus={setSelectedStudentId}
-        />
-      </div>
-    </div>
+          <StudentAccountWorkbench
+            account={selectedAccount}
+            classId={classId}
+            sectionId={sectionId}
+            onDownloadReceipt={downloadReceipt}
+            onPrintStatement={printStatement}
+            onStudentFocus={setSelectedStudentId}
+          />
+        </div>
+      </AOSPageBody>
+    </AOSPage>
   );
 }
 
@@ -1013,67 +975,64 @@ function StudentAccountWorkbench({
 
   if (!account) {
     return (
-      <>
-        <Card>
-          <CardContent className="flex min-h-[420px] flex-col items-center justify-center text-center text-muted-foreground">
-            <Users className="mb-3 h-10 w-10 opacity-30" />
-            <p className="font-medium text-foreground">Choose a student account</p>
-            <p className="mt-1 max-w-md text-sm">
-              Start from the left panel to open one student ledger, review dues,
-              and collect payment without switching pages.
-            </p>
-            <div className="mt-5 w-full max-w-md text-left space-y-2">
-              <Label>Find student for bill creation</Label>
-              <Input
-                value={studentSearch}
-                onChange={(event) => {
-                  setStudentSearch(event.target.value);
-                  setStudentMenuOpen(true);
-                }}
-                onFocus={() => setStudentMenuOpen(true)}
-                placeholder="Search by name, ID, or admission number"
-              />
-              {studentMenuOpen && studentSearch.trim().length >= 2 ? (
-                <div className="max-h-60 overflow-y-auto rounded-xl border bg-background shadow-sm">
-                  {(studentSearchResults || []).length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-muted-foreground">
-                      No matching students found.
-                    </div>
-                  ) : (
-                    (studentSearchResults || []).map((student) => (
-                      <button
-                        key={student.id}
-                        type="button"
-                        onClick={() => {
-                          onStudentFocus(student.id);
-                          setStudentSearch("");
-                          setStudentMenuOpen(false);
-                        }}
-                        className="flex w-full flex-col gap-1 border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/40"
-                      >
-                        <span className="font-medium text-foreground">{student.full_name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatStudentMeta(student)}
-                        </span>
-                      </button>
-                    ))
-                  )}
+      <div className="win11-card flex min-h-[420px] flex-col items-center justify-center text-center text-[color:var(--w11-text-secondary)] p-6">
+        <Users className="mb-3 h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />
+        <p className="font-medium text-[color:var(--w11-text-primary)]">Choose a student account</p>
+        <p className="mt-1 max-w-md text-sm">
+          Start from the left panel to open one student ledger, review dues,
+          and collect payment without switching pages.
+        </p>
+        <div className="mt-5 w-full max-w-md text-left space-y-2">
+          <Label>Find student for bill creation</Label>
+          <Input
+            value={studentSearch}
+            onChange={(event) => {
+              setStudentSearch(event.target.value);
+              setStudentMenuOpen(true);
+            }}
+            onFocus={() => setStudentMenuOpen(true)}
+            placeholder="Search by name, ID, or admission number"
+          />
+          {studentMenuOpen && studentSearch.trim().length >= 2 ? (
+            <div
+              className="max-h-60 overflow-y-auto rounded-xl border border-[var(--w11-border-subtle)] shadow-sm"
+              style={{ background: "var(--w11-card-bg)" }}
+            >
+              {(studentSearchResults || []).length === 0 ? (
+                <div className="px-4 py-3 text-sm text-[color:var(--w11-text-secondary)]">
+                  No matching students found.
                 </div>
-              ) : null}
+              ) : (
+                (studentSearchResults || []).map((student) => (
+                  <button
+                    key={student.id}
+                    type="button"
+                    onClick={() => {
+                      onStudentFocus(student.id);
+                      setStudentSearch("");
+                      setStudentMenuOpen(false);
+                    }}
+                    className="flex w-full flex-col gap-1 border-b border-[var(--w11-border-subtle)] px-4 py-3 text-left last:border-b-0 hover:bg-[color:var(--w11-control-hover)]"
+                  >
+                    <span className="font-medium text-[color:var(--w11-text-primary)]">{student.full_name}</span>
+                    <span className="text-xs text-[color:var(--w11-text-secondary)]">
+                      {formatStudentMeta(student)}
+                    </span>
+                  </button>
+                ))
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex min-h-[420px] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="win11-card flex min-h-[420px] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+      </div>
     );
   }
 
@@ -1084,96 +1043,94 @@ function StudentAccountWorkbench({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">{account.student_name}</CardTitle>
-              <CardDescription>{formatStudentMeta(account)}</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : null}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1"
-                onClick={() => openBillDialog("create")}
-              >
-                <Plus className="h-3 w-3" />
-                New Bill
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 gap-1"
-                disabled={!selectedFee}
-                onClick={() => openBillDialog("adjust")}
-              >
-                Adjust Bill
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1"
-                disabled={statementPending}
-                onClick={() => {
-                  setStatementPending(true);
-                  Promise.resolve(onPrintStatement(account)).finally(() =>
-                    setStatementPending(false),
-                  );
-                }}
-              >
-                {statementPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Printer className="h-3 w-3" />
-                )}
-                Print Statement
-              </Button>
-            </div>
+      <DataPanel
+        title={account.student_name}
+        actions={
+          <div className="flex items-center gap-2">
+            {isFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin text-[color:var(--w11-text-secondary)]" />
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1"
+              onClick={() => openBillDialog("create")}
+            >
+              <Plus className="h-3 w-3" />
+              New Bill
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1"
+              disabled={!selectedFee}
+              onClick={() => openBillDialog("adjust")}
+            >
+              Adjust Bill
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1"
+              disabled={statementPending}
+              onClick={() => {
+                setStatementPending(true);
+                Promise.resolve(onPrintStatement(account)).finally(() =>
+                  setStatementPending(false),
+                );
+              }}
+            >
+              {statementPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Printer className="h-3 w-3" />
+              )}
+              Print Statement
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-4">
-            {[
-              { label: "Outstanding", value: formatCurrency(totalDue), cls: totalDue > 0 ? "text-red-600" : "" },
-              { label: "Collected", value: formatCurrency(totalPaid), cls: "text-green-700" },
-              { label: "Open Bills", value: openBillCount, cls: openBillCount > 0 ? "text-amber-600" : "" },
-              { label: "Receipts", value: receiptCount, cls: "" },
-            ].map((item) => (
-              <div key={item.label} className="rounded-xl bg-muted/40 px-4 py-3">
-                <p className={`text-lg font-semibold ${item.cls}`}>{item.value}</p>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        }
+      >
+        <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-3">
+          {formatStudentMeta(account)}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-4">
+          {[
+            { label: "Outstanding", value: formatCurrency(totalDue), color: totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)" },
+            { label: "Collected", value: formatCurrency(totalPaid), color: "#107c10" },
+            { label: "Open Bills", value: String(openBillCount), color: openBillCount > 0 ? "#d83b01" : "var(--w11-text-primary)" },
+            { label: "Receipts", value: String(receiptCount), color: "var(--w11-text-primary)" },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl px-4 py-3" style={{ background: "var(--w11-control-hover)" }}>
+              <p className="text-lg font-semibold" style={{ color: item.color }}>{item.value}</p>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </DataPanel>
 
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Account History
-            </CardTitle>
-            <CardDescription>
-              Every bill, receipt, and remaining balance for the selected
-              student.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {fees.length === 0 ? (
-              <div className="rounded-xl border border-dashed px-4 py-10 text-center text-muted-foreground">
-                No fee records found for this student yet.
-              </div>
-            ) : (
-              fees.map((fee) => {
+            </span>
+          }
+        >
+          <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-3">
+            Every bill, receipt, and remaining balance for the selected
+            student.
+          </p>
+          {fees.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--w11-border-default)] px-4 py-10 text-center text-[color:var(--w11-text-secondary)]">
+              No fee records found for this student yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {fees.map((fee) => {
                 const status =
                   STATUS_CONFIG[fee.payment_status] || STATUS_CONFIG.pending;
                 const StatusIcon = status.icon;
@@ -1197,16 +1154,18 @@ function StudentAccountWorkbench({
                     }}
                     className={`w-full rounded-xl border px-4 py-4 text-left transition cursor-pointer ${
                       isSelected
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "hover:bg-muted/30"
+                        ? "border-[var(--w11-accent)] shadow-sm"
+                        : "border-transparent hover:bg-[color:var(--w11-control-hover)]"
                     }`}
+                    style={isSelected ? { background: "var(--w11-accent-light)" } : undefined}
                   >
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-sm">{fee.fee_type}</p>
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${status.cls}`}
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                            style={status.style}
                           >
                             <StatusIcon className="h-3 w-3" />
                             {status.label}
@@ -1215,7 +1174,7 @@ function StudentAccountWorkbench({
                             <Badge variant="outline">Selected</Badge>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs text-[color:var(--w11-text-secondary)]">
                           {fee.receipt_number
                             ? `Receipt #${fee.receipt_number}`
                             : "No receipt generated yet"}
@@ -1228,34 +1187,35 @@ function StudentAccountWorkbench({
                       </div>
 
                       <div className="grid grid-cols-5 gap-2 text-xs xl:min-w-[380px]">
-                        <div className="rounded-lg bg-muted/40 px-3 py-2">
-                          <p className="text-muted-foreground">Period</p>
+                        <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
+                          <p className="text-[color:var(--w11-text-secondary)]">Period</p>
                           <p className="font-semibold">{formatBSMonth(fee.month_bs, fee.year_bs)}</p>
                         </div>
-                        <div className="rounded-lg bg-muted/40 px-3 py-2">
-                          <p className="text-muted-foreground">Total</p>
+                        <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
+                          <p className="text-[color:var(--w11-text-secondary)]">Total</p>
                           <p className="font-semibold">{formatCurrency(fee.amount || 0)}</p>
                         </div>
-                        <div className="rounded-lg bg-green-50 px-3 py-2 text-green-700">
-                          <p className="text-green-700/70">Paid</p>
+                        <div className="rounded-lg px-3 py-2" style={{ background: "rgba(16,124,16,.08)", color: "#107c10" }}>
+                          <p style={{ opacity: 0.7 }}>Paid</p>
                           <p className="font-semibold">
                             {formatCurrency(fee.paid_amount || 0)}
                           </p>
                         </div>
                         <div
-                          className={`rounded-lg px-3 py-2 ${
+                          className="rounded-lg px-3 py-2"
+                          style={
                             hasOutstandingBalance(fee)
-                              ? "bg-red-50 text-red-700"
-                              : "bg-muted/40"
-                          }`}
+                              ? { background: "rgba(196,43,28,.08)", color: "#c42b1c" }
+                              : { background: "var(--w11-control-hover)" }
+                          }
                         >
-                          <p className="text-current/70">Due</p>
+                          <p style={{ opacity: 0.7 }}>Due</p>
                           <p className="font-semibold">
                             {formatCurrency(fee.due_amount || 0)}
                           </p>
                         </div>
-                        <div className="rounded-lg bg-muted/40 px-3 py-2">
-                          <p className="text-muted-foreground">Due Date</p>
+                        <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
+                          <p className="text-[color:var(--w11-text-secondary)]">Due Date</p>
                           <p className="font-semibold">{fee.due_date ? displayBS(fee.due_date) : "—"}</p>
                         </div>
                       </div>
@@ -1263,9 +1223,9 @@ function StudentAccountWorkbench({
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       {hasOutstandingBalance(fee) ? (
-                        <Badge className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
+                        <span className="win11-chip warning">
                           Ready to collect
-                        </Badge>
+                        </span>
                       ) : null}
                       {fee.receipt_id ? (
                         <Button
@@ -1285,232 +1245,255 @@ function StudentAccountWorkbench({
                     </div>
                   </div>
                 );
-              })
-            )}
-          </CardContent>
-        </Card>
+              })}
+            </div>
+          )}
+        </DataPanel>
 
-        <Card className="h-fit 2xl:sticky 2xl:top-4">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+        <DataPanel
+          className="h-fit 2xl:sticky 2xl:top-4"
+          title={
+            <span className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
               Quick Collection
-            </CardTitle>
-            <CardDescription>
-              Select an open bill from the ledger and collect it from this same
-              screen.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selectedFee ? (
-              <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                Select a fee record to start collecting payment.
-              </div>
-            ) : (
-              <>
-                <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">{selectedFee.fee_type}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedFee.receipt_number
-                          ? `Latest receipt #${selectedFee.receipt_number}`
-                          : "No receipt issued yet"}
-                      </p>
-                    </div>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        STATUS_CONFIG[selectedFee.payment_status]?.cls ||
-                        STATUS_CONFIG.pending.cls
-                      }`}
-                    >
-                      {STATUS_CONFIG[selectedFee.payment_status]?.label || "Pending"}
-                    </span>
+            </span>
+          }
+        >
+          <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-4">
+            Select an open bill from the ledger and collect it from this same
+            screen.
+          </p>
+          {!selectedFee ? (
+            <div className="rounded-xl border border-dashed border-[var(--w11-border-default)] px-4 py-8 text-center text-sm text-[color:var(--w11-text-secondary)]">
+              Select a fee record to start collecting payment.
+            </div>
+          ) : (
+            <>
+              <div
+                className="rounded-xl border border-[var(--w11-border-subtle)] p-4 space-y-2 mb-4"
+                style={{ background: "var(--w11-control-hover)" }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{selectedFee.fee_type}</p>
+                    <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                      {selectedFee.receipt_number
+                        ? `Latest receipt #${selectedFee.receipt_number}`
+                        : "No receipt issued yet"}
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="rounded-lg bg-background px-3 py-2">
-                      <p className="text-muted-foreground">Period</p>
-                      <p className="font-semibold">{formatBSMonth(selectedFee.month_bs, selectedFee.year_bs)}</p>
-                    </div>
-                    <div className="rounded-lg bg-background px-3 py-2">
-                      <p className="text-muted-foreground">Total</p>
-                      <p className="font-semibold">
-                        {formatCurrency(selectedFee.amount || 0)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-background px-3 py-2 text-green-700">
-                      <p className="text-green-700/70">Paid</p>
-                      <p className="font-semibold">
-                        {formatCurrency(selectedFee.paid_amount || 0)}
-                      </p>
-                    </div>
-                    <div
-                      className={`rounded-lg px-3 py-2 ${
-                        hasOutstandingBalance(selectedFee)
-                          ? "bg-red-50 text-red-700"
-                          : "bg-background"
-                      }`}
-                    >
-                      <p className="text-current/70">Due</p>
-                      <p className="font-semibold">
-                        {formatCurrency(selectedFee.due_amount || 0)}
-                      </p>
-                    </div>
-                  </div>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={
+                      STATUS_CONFIG[selectedFee.payment_status]?.style ||
+                      STATUS_CONFIG.pending.style
+                    }
+                  >
+                    {STATUS_CONFIG[selectedFee.payment_status]?.label || "Pending"}
+                  </span>
                 </div>
 
-                {hasOutstandingBalance(selectedFee) ? (
-                  <>
-                    {enabledPaymentMethods.length === 0 ? (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                        No payment methods are configured for this school. Update them in Integrations before collecting payment.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label>Payment Method</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {enabledPaymentMethods.map((option) => (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => setMethod(option.key)}
-                              className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-                                method === option.key
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "hover:bg-muted"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)" }}>
+                    <p className="text-[color:var(--w11-text-secondary)]">Period</p>
+                    <p className="font-semibold">{formatBSMonth(selectedFee.month_bs, selectedFee.year_bs)}</p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)" }}>
+                    <p className="text-[color:var(--w11-text-secondary)]">Total</p>
+                    <p className="font-semibold">
+                      {formatCurrency(selectedFee.amount || 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)", color: "#107c10" }}>
+                    <p style={{ opacity: 0.7 }}>Paid</p>
+                    <p className="font-semibold">
+                      {formatCurrency(selectedFee.paid_amount || 0)}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-lg px-3 py-2"
+                    style={
+                      hasOutstandingBalance(selectedFee)
+                        ? { background: "rgba(196,43,28,.08)", color: "#c42b1c" }
+                        : { background: "var(--w11-card-bg)" }
+                    }
+                  >
+                    <p style={{ opacity: 0.7 }}>Due</p>
+                    <p className="font-semibold">
+                      {formatCurrency(selectedFee.due_amount || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                    {selectedMethod?.mode === "online" ? (
-                      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                        The payer will be redirected to {selectedMethod?.label || "online gateway"} to complete {formatCurrency(selectedFee.due_amount || 0)}.
+              {hasOutstandingBalance(selectedFee) ? (
+                <>
+                  {enabledPaymentMethods.length === 0 ? (
+                    <div
+                      className="rounded-xl border px-4 py-3 text-sm mb-4"
+                      style={{ background: "rgba(216,59,1,.08)", borderColor: "rgba(216,59,1,.3)", color: "#d83b01" }}
+                    >
+                      No payment methods are configured for this school. Update them in Integrations before collecting payment.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 mb-4">
+                      <Label>Payment Method</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {enabledPaymentMethods.map((option) => (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => setMethod(option.key)}
+                            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                              method === option.key
+                                ? "border-[var(--w11-accent)]"
+                                : "border-[var(--w11-border-default)] hover:bg-[color:var(--w11-control-hover)]"
+                            }`}
+                            style={
+                              method === option.key
+                                ? { background: "var(--w11-accent)", color: "var(--w11-accent-text)" }
+                                : undefined
+                            }
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                       </div>
-                    ) : (
-                      <>
-                        <div className="space-y-1.5">
+                    </div>
+                  )}
+
+                  {selectedMethod?.mode === "online" ? (
+                    <div
+                      className="rounded-xl border px-4 py-3 text-sm mb-4"
+                      style={{ background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)", color: "var(--w11-accent)" }}
+                    >
+                      The payer will be redirected to {selectedMethod?.label || "online gateway"} to complete {formatCurrency(selectedFee.due_amount || 0)}.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5 mb-4">
+                        <Label>
+                          Amount (NPR)
+                          <span className="ml-1 text-xs font-normal text-[color:var(--w11-text-secondary)]">
+                            max {formatCurrency(selectedFee.due_amount || 0)}
+                          </span>
+                        </Label>
+                        <Input
+                          type="number"
+                          value={amount}
+                          min={1}
+                          max={selectedFee.due_amount}
+                          onChange={(event) => setAmount(event.target.value)}
+                        />
+                        {Number.parseFloat(amount) > 0 &&
+                        Number.parseFloat(amount) < (selectedFee.due_amount || 0) ? (
+                          <p className="text-xs" style={{ color: "#d83b01" }}>
+                            Partial collection will leave {formatCurrency((selectedFee.due_amount || 0) - Number.parseFloat(amount))} still outstanding.
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="space-y-1.5 mb-4">
+                        <Label>Payment Date</Label>
+                        <BSDateInput
+                          value={payDate}
+                          onChange={setPayDate}
+                        />
+                      </div>
+
+                      {selectedMethod?.requires_reference ? (
+                        <div className="space-y-1.5 mb-4">
                           <Label>
-                            Amount (NPR)
-                            <span className="ml-1 text-xs font-normal text-muted-foreground">
-                              max {formatCurrency(selectedFee.due_amount || 0)}
+                            Transaction ID / Reference
+                            <span className="ml-1 text-xs font-normal text-[color:var(--w11-text-secondary)]">
+                              optional
                             </span>
                           </Label>
                           <Input
-                            type="number"
-                            value={amount}
-                            min={1}
-                            max={selectedFee.due_amount}
-                            onChange={(event) => setAmount(event.target.value)}
+                            value={reference}
+                            onChange={(event) => setReference(event.target.value)}
+                            placeholder="Bank ref, cheque no., QR settlement ID"
                           />
-                          {Number.parseFloat(amount) > 0 &&
-                          Number.parseFloat(amount) < (selectedFee.due_amount || 0) ? (
-                            <p className="text-xs text-amber-600">
-                              Partial collection will leave {formatCurrency((selectedFee.due_amount || 0) - Number.parseFloat(amount))} still outstanding.
+                        </div>
+                      ) : null}
+
+                      {selectedMethod?.supports_qr &&
+                      (selectedMethod.qr_image_url ||
+                        selectedMethod.qr_payload ||
+                        selectedMethod.instructions) ? (
+                        <div
+                          className="rounded-xl border px-4 py-3 text-sm space-y-2 mb-4"
+                          style={{ background: "rgba(16,124,16,.06)", borderColor: "rgba(16,124,16,.3)", color: "#107c10" }}
+                        >
+                          <p className="font-medium">{selectedMethod.label} QR Payment</p>
+                          {selectedMethod.qr_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={selectedMethod.qr_image_url}
+                              alt={`${selectedMethod.label} QR`}
+                              className="h-36 w-36 rounded border p-1"
+                              style={{ borderColor: "var(--w11-border-default)", background: "#fff" }}
+                            />
+                          ) : null}
+                          {selectedMethod.qr_payload ? (
+                            <p className="text-xs break-all" style={{ opacity: 0.8 }}>
+                              QR ID: {selectedMethod.qr_payload}
+                            </p>
+                          ) : null}
+                          {selectedMethod.instructions ? (
+                            <p className="text-xs" style={{ opacity: 0.8 }}>
+                              {selectedMethod.instructions}
                             </p>
                           ) : null}
                         </div>
+                      ) : null}
+                    </>
+                  )}
 
-                        <div className="space-y-1.5">
-                          <Label>Payment Date</Label>
-                          <BSDateInput
-                            value={payDate}
-                            onChange={setPayDate}
-                          />
-                        </div>
-
-                        {selectedMethod?.requires_reference ? (
-                          <div className="space-y-1.5">
-                            <Label>
-                              Transaction ID / Reference
-                              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                optional
-                              </span>
-                            </Label>
-                            <Input
-                              value={reference}
-                              onChange={(event) => setReference(event.target.value)}
-                              placeholder="Bank ref, cheque no., QR settlement ID"
-                            />
-                          </div>
-                        ) : null}
-
-                        {selectedMethod?.supports_qr &&
-                        (selectedMethod.qr_image_url ||
-                          selectedMethod.qr_payload ||
-                          selectedMethod.instructions) ? (
-                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 space-y-2">
-                            <p className="font-medium">{selectedMethod.label} QR Payment</p>
-                            {selectedMethod.qr_image_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={selectedMethod.qr_image_url}
-                                alt={`${selectedMethod.label} QR`}
-                                className="h-36 w-36 rounded border bg-white p-1"
-                              />
-                            ) : null}
-                            {selectedMethod.qr_payload ? (
-                              <p className="text-xs text-emerald-900/80 break-all">
-                                QR ID: {selectedMethod.qr_payload}
-                              </p>
-                            ) : null}
-                            {selectedMethod.instructions ? (
-                              <p className="text-xs text-emerald-900/80">
-                                {selectedMethod.instructions}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-
-                    <Button
-                      className="w-full gap-2"
-                      onClick={() => payMutation.mutate()}
-                      disabled={
-                        payMutation.isPending ||
-                        !selectedMethod ||
-                        ((selectedMethod?.mode !== "online") &&
-                          (!amount || Number.parseFloat(amount) <= 0))
-                      }
-                    >
-                      {payMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <DollarSign className="h-4 w-4" />
-                      )}
-                      {selectedMethod?.mode === "online"
-                        ? `Pay via ${selectedMethod?.label || "Gateway"}`
-                        : "Record Payment & Print Receipt"}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                    This fee record has no outstanding balance. Select another
-                    bill if you need to collect more.
-                  </div>
-                )}
-
-                {selectedFee.receipt_id ? (
                   <Button
-                    type="button"
-                    variant="outline"
                     className="w-full gap-2"
-                    onClick={() => onDownloadReceipt(selectedFee)}
+                    onClick={() => payMutation.mutate()}
+                    disabled={
+                      payMutation.isPending ||
+                      !selectedMethod ||
+                      ((selectedMethod?.mode !== "online") &&
+                        (!amount || Number.parseFloat(amount) <= 0))
+                    }
                   >
-                    <Receipt className="h-4 w-4" />
-                    Download Latest Receipt
+                    {payMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <DollarSign className="h-4 w-4" />
+                    )}
+                    {selectedMethod?.mode === "online"
+                      ? `Pay via ${selectedMethod?.label || "Gateway"}`
+                      : "Record Payment & Print Receipt"}
                   </Button>
-                ) : null}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </>
+              ) : (
+                <div
+                  className="rounded-xl border px-4 py-3 text-sm"
+                  style={{ background: "rgba(16,124,16,.08)", borderColor: "rgba(16,124,16,.3)", color: "#107c10" }}
+                >
+                  This fee record has no outstanding balance. Select another
+                  bill if you need to collect more.
+                </div>
+              )}
+
+              {selectedFee.receipt_id ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 mt-2"
+                  onClick={() => onDownloadReceipt(selectedFee)}
+                >
+                  <Receipt className="h-4 w-4" />
+                  Download Latest Receipt
+                </Button>
+              ) : null}
+            </>
+          )}
+        </DataPanel>
 
         <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
           <DialogContent>
@@ -1600,7 +1583,7 @@ function StudentAccountWorkbench({
                   </Select>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">
                 Billing cycle: {formatBSMonth(billForm.monthBs, billForm.yearBs)}
               </p>
               <div className="flex items-center gap-2">

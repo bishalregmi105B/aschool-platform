@@ -6,15 +6,23 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { Plus, Search, Users, Mail, Phone, Pencil, Trash2, Upload, Shield } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  StatGrid,
+  KpiCard,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Plus, Users, Mail, Phone, Pencil, Trash2, Upload, Shield } from "lucide-react";
 import Link from "next/link";
 
 type StaffRole = "teacher" | "staff" | "accountant" | "school_admin";
@@ -136,7 +144,7 @@ export default function StaffPage() {
 
   const STAFF_COLUMNS: Column<any>[] = [
     { key: "full_name", label: "Name", sortable: true, value: (st) => st.full_name ?? "", render: (st) => <span className="font-medium">{st.full_name}</span> },
-    { key: "role", label: "Role", sortable: true, value: (st) => st.role ?? "", render: (st) => <Badge variant="outline">{st.role}</Badge> },
+    { key: "role", label: "Role", sortable: true, value: (st) => st.role ?? "", render: (st) => <StatusChip status="user" label={st.role} className="capitalize" /> },
     {
       key: "contact",
       label: "Contact",
@@ -146,7 +154,7 @@ export default function StaffPage() {
           <div className="flex items-center gap-1">
             <Mail className="h-3 w-3" /> {st.email || "—"}
           </div>
-          {st.phone ? <div className="flex items-center gap-1 text-muted-foreground"><Phone className="h-3 w-3" /> {st.phone}</div> : null}
+          {st.phone ? <div className="flex items-center gap-1" style={{ color: "var(--w11-text-secondary)" }}><Phone className="h-3 w-3" /> {st.phone}</div> : null}
         </div>
       ),
     },
@@ -155,7 +163,7 @@ export default function StaffPage() {
       label: "Status",
       sortable: true,
       value: (st) => (st.is_active ? "active" : "inactive"),
-      render: (st) => <Badge variant={st.is_active ? "success" : "secondary"}>{st.is_active ? "Active" : "Inactive"}</Badge>,
+      render: (st) => <StatusChip status={st.is_active ? "active" : "inactive"} label={st.is_active ? "Active" : "Inactive"} />,
     },
     {
       key: "actions",
@@ -193,52 +201,58 @@ export default function StaffPage() {
             }}
             disabled={deleteMutation.isPending}
           >
-            <Trash2 className="h-4 w-4 text-red-500" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading staff…" />;
 
   if (isError) {
     return (
-      <Card><CardContent className="py-10 text-center space-y-3">
-        <p className="text-sm text-destructive">Failed to load staff. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </CardContent></Card>
+      <AOSPage>
+        <AOSPageHeader title="Staff Management" subtitle="Manage staff records, jump to roles, and handle bulk onboarding from one page." />
+        <AOSPageBody>
+          <DataPanel>
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load staff. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div><h1 className="text-2xl font-bold">Staff Management</h1><p className="text-muted-foreground">Manage staff records, jump to roles, and handle bulk onboarding from one page.</p></div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/settings/roles"><Shield className="h-4 w-4 mr-2" /> Roles & Permissions</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/staff/bulk-upload"><Upload className="h-4 w-4 mr-2" /> Bulk Upload</Link>
-          </Button>
-          <Button onClick={openCreateDialog}><Plus className="h-4 w-4 mr-2" /> Add Staff</Button>
-        </div>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Staff Management"
+        subtitle={`${stats.total} staff members · ${stats.active} active`}
+        actions={
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/settings/roles"><Shield className="h-4 w-4 mr-2" /> Roles & Permissions</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/staff/bulk-upload"><Upload className="h-4 w-4 mr-2" /> Bulk Upload</Link>
+            </Button>
+            <Button onClick={openCreateDialog}><Plus className="h-4 w-4 mr-2" /> Add Staff</Button>
+          </>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid min={170}>
+          <KpiCard label="Total Staff" value={stats.total} icon={<Users className="h-4 w-4" style={{ color: "var(--w11-text-tertiary)" }} />} />
+          <KpiCard label="Teachers" value={stats.teachers} color="#107c10" />
+          <KpiCard label="Support Staff" value={stats.support} color="#d83b01" />
+          <KpiCard label="Active" value={stats.active} denominator={`/ ${stats.total}`} color="var(--w11-accent)" />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Staff", value: stats.total, icon: Users },
-          { label: "Teachers", value: stats.teachers, icon: Users },
-          { label: "Support Staff", value: stats.support, icon: Users },
-          { label: "Active", value: stats.active, icon: Users },
-        ].map((s, i) => (
-          <Card key={i}><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{s.label}</p><p className="text-2xl font-bold">{s.value}</p></div><s.icon className="h-8 w-8 text-muted-foreground" /></div></CardContent></Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
+        <DataPanel bodyClassName="p-0">
           <DataTable
             columns={STAFF_COLUMNS}
             rows={staff}
@@ -249,42 +263,42 @@ export default function StaffPage() {
             dense
             empty={{ icon: Users, title: "No staff found", body: "Add staff members or bulk-upload them.", action: { label: "Add Staff", onClick: openCreateDialog } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog open={showDialog} onOpenChange={(open) => {
-        setShowDialog(open);
-        if (!open) {
-          setEditingStaff(null);
-          setForm(EMPTY_FORM);
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingStaff ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Full Name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select value={form.role} onValueChange={(v: StaffRole) => setForm({ ...form, role: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STAFF_ROLE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <Dialog open={showDialog} onOpenChange={(open) => {
+          setShowDialog(open);
+          if (!open) {
+            setEditingStaff(null);
+            setForm(EMPTY_FORM);
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{editingStaff ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2"><Label>Full Name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={form.role} onValueChange={(v: StaffRole) => setForm({ ...form, role: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STAFF_ROLE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {!editingStaff ? (
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  New staff accounts get a default password automatically if you do not create them through the dedicated teacher flow.
+                </p>
+              ) : null}
             </div>
-            {!editingStaff ? (
-              <p className="text-xs text-muted-foreground">
-                New staff accounts get a default password automatically if you do not create them through the dedicated teacher flow.
-              </p>
-            ) : null}
-          </div>
-          <DialogFooter><Button onClick={() => saveMutation.mutate()} disabled={!form.full_name || !form.phone || saveMutation.isPending}>{saveMutation.isPending ? <Spinner className="mr-2" /> : null} {editingStaff ? "Update Staff" : "Add Staff"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter><Button onClick={() => saveMutation.mutate()} disabled={!form.full_name || !form.phone || saveMutation.isPending}>{saveMutation.isPending ? <Spinner className="mr-2" /> : null} {editingStaff ? "Update Staff" : "Add Staff"}</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

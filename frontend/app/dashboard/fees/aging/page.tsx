@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Label } from "@/components/ui/label";
@@ -42,7 +44,7 @@ interface AgingPayload {
 }
 
 const money = (n: number | null | undefined) =>
-  n ? formatNepaliCurrency(n) : <span className="text-muted-foreground">—</span>;
+  n ? formatNepaliCurrency(n) : <span className="text-[color:var(--w11-text-secondary)]">—</span>;
 
 export default function FeeAgingPage() {
   return (
@@ -128,7 +130,7 @@ function AgingContent() {
       sortable: true,
       value: (r) => r.b90_plus,
       render: (r) => (
-        <span className={r.b90_plus > 0 ? "font-semibold text-red-600" : ""}>
+        <span className={r.b90_plus > 0 ? "font-semibold" : ""} style={r.b90_plus > 0 ? { color: "#c42b1c" } : undefined}>
           {money(r.b90_plus)}
         </span>
       ),
@@ -179,22 +181,25 @@ function AgingContent() {
       align: "right",
       sortable: true,
       value: (s) => s.total,
-      render: (s) => <span className="font-bold text-red-600">{formatNepaliCurrency(s.total || 0)}</span>,
+      render: (s) => <span className="font-bold" style={{ color: "#c42b1c" }}>{formatNepaliCurrency(s.total || 0)}</span>,
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading aging report…" /></AOSPage>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Accounts Receivable Aging</h1>
-          <p className="text-muted-foreground">
-            Outstanding balances bucketed by days past the BS due date
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
+    <AOSPage>
+      <AOSPageHeader
+        title="Accounts Receivable Aging"
+        subtitle="Outstanding balances bucketed by days past the BS due date"
+        actions={
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
           <div className="space-y-1">
             <Label className="text-xs">As of (BS)</Label>
             <BSDateInput
@@ -215,94 +220,48 @@ function AgingContent() {
               options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
             />
           </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            {isFetching ? "Refreshing…" : "Refresh"}
-          </Button>
-        </div>
-      </div>
+        </FilterCommandBar>
 
-      {isError ? (
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load the aging report. Please try again.</p>
+        {isError ? (
+          <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <p className="text-sm text-[#c42b1c]">Failed to load the aging report. Please try again.</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               Retry
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Total Receivable
-                    </p>
-                    <p className="text-xl font-bold mt-1">
-                      {formatNepaliCurrency(grandTotal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      as of {data?.as_of_bs || asOfBS} BS
-                    </p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-red-50">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            {[
-              {
-                label: "Current / ≤30 days",
-                value: byClass.reduce((s, r) => s + (r.current_or_30 || 0), 0),
-                icon: Timer,
-                cls: "text-green-600",
-                bg: "bg-green-50",
-              },
-              {
-                label: "31–90 days",
-                value: byClass.reduce((s, r) => s + (r.b31_60 || 0) + (r.b61_90 || 0), 0),
-                icon: Clock,
-                cls: "text-amber-600",
-                bg: "bg-amber-50",
-              },
-              {
-                label: "90+ days",
-                value: byClass.reduce((s, r) => s + (r.b90_plus || 0), 0),
-                icon: Hourglass,
-                cls: "text-red-600",
-                bg: "bg-red-50",
-              },
-            ].map((stat) => (
-              <Card key={stat.label}>
-                <CardContent className="pt-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                        {stat.label}
-                      </p>
-                      <p className={`text-xl font-bold mt-1 ${stat.cls}`}>
-                        {formatNepaliCurrency(stat.value)}
-                      </p>
-                    </div>
-                    <div className={`p-2 rounded-lg ${stat.bg}`}>
-                      <stat.icon className={`h-4 w-4 ${stat.cls}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
+        ) : (
+          <>
+            {/* Summary cards */}
+            <StatGrid className="mb-0" min={200}>
+              <KpiCard
+                label="Total Receivable"
+                value={formatNepaliCurrency(grandTotal)}
+                color="#c42b1c"
+                icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+                footnote={`as of ${data?.as_of_bs || asOfBS} BS`}
+              />
+              <KpiCard
+                label="Current / ≤30 days"
+                value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.current_or_30 || 0), 0))}
+                color="#107c10"
+                icon={<Timer className="h-5 w-5" style={{ color: "#107c10" }} />}
+              />
+              <KpiCard
+                label="31–90 days"
+                value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.b31_60 || 0) + (r.b61_90 || 0), 0))}
+                color="#d83b01"
+                icon={<Clock className="h-5 w-5" style={{ color: "#d83b01" }} />}
+              />
+              <KpiCard
+                label="90+ days"
+                value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.b90_plus || 0), 0))}
+                color="#c42b1c"
+                icon={<Hourglass className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+              />
+            </StatGrid>
 
-          {/* By class */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Aging by Class</CardTitle>
-            </CardHeader>
-            <CardContent>
+            {/* By class */}
+            <DataPanel title="Aging by Class">
               <DataTable<AgingClassRow>
                 columns={CLASS_COLUMNS}
                 rows={byClass}
@@ -316,22 +275,21 @@ function AgingContent() {
                   body: "Every pending bill falls inside the selected window, or there is nothing due.",
                 }}
               />
-            </CardContent>
-          </Card>
+            </DataPanel>
 
-          {/* By student (top list) */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                Top Outstanding Students
-                {oldest30 > 0 && (
-                  <Badge variant="warning" className="ml-2">
-                    {oldest30} past 30 days
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            {/* By student (top list) */}
+            <DataPanel
+              title={
+                <span className="flex items-center">
+                  Top Outstanding Students
+                  {oldest30 > 0 && (
+                    <Badge variant="warning" className="ml-2">
+                      {oldest30} past 30 days
+                    </Badge>
+                  )}
+                </span>
+              }
+            >
               <DataTable<AgingStudentRow>
                 columns={STUDENT_COLUMNS}
                 rows={byStudent}
@@ -348,14 +306,14 @@ function AgingContent() {
                 }}
               />
               {(data?.by_student?.length ?? 0) > 25 && (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-xs text-[color:var(--w11-text-secondary)]">
                   Showing the 25 most overdue of {data!.by_student.length} students with balances.
                 </p>
               )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
+            </DataPanel>
+          </>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

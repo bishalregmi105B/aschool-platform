@@ -5,9 +5,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { AlertTriangle, Loader2, Phone, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { displayBS } from "@/lib/nepali_date";
@@ -60,7 +62,7 @@ function DefaultersContent() {
   const DEFAULTER_COLUMNS: Column<any>[] = [
     { key: "student_name", label: "Student", sortable: true, value: (d) => d.student_name || "", render: (d) => <span className="font-medium">{d.student_name}</span> },
     { key: "class_name", label: "Class", sortable: true, value: (d) => d.class_name ?? "", render: (d) => d.class_name || "—" },
-    { key: "total_due", label: "Due Amount", align: "right", sortable: true, value: (d) => d.total_due || 0, render: (d) => <span className="font-bold text-red-600">Rs. {d.total_due?.toLocaleString()}</span> },
+    { key: "total_due", label: "Due Amount", align: "right", sortable: true, value: (d) => d.total_due || 0, render: (d) => <span className="font-bold" style={{ color: "#c42b1c" }}>Rs. {d.total_due?.toLocaleString()}</span> },
     { key: "overdue_since", label: "Overdue Since", sortable: true, value: (d) => d.overdue_since ?? "", render: (d) => (d.overdue_since ? displayBS(d.overdue_since) : "—") },
     {
       key: "contact",
@@ -99,31 +101,46 @@ function DefaultersContent() {
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading defaulters…" /></AOSPage>;
     if (isError) {
       return (
-        <div className="max-w-2xl mx-auto p-6">
-          <Card><CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load defaulters list. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent></Card>
-        </div>
+        <AOSPage>
+          <AOSPageHeader title="Fee Defaulters" subtitle="Students with overdue fee payments" />
+          <AOSPageBody className="max-w-2xl mx-auto">
+            <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <p className="text-sm text-[#c42b1c]">Failed to load defaulters list. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          </AOSPageBody>
+        </AOSPage>
       );
     }
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Fee Defaulters</h1><p className="text-muted-foreground">Students with overdue fee payments</p></div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
+        title="Fee Defaulters"
+        subtitle="Students with overdue fee payments"
+      />
+      <AOSPageBody className="space-y-4">
+        <StatGrid className="mb-0" min={180}>
+          <KpiCard label="Total Defaulters" value={defaulters.length} color="#c42b1c" />
+          <KpiCard label="Total Outstanding" value={`Rs. ${totalDue.toLocaleString()}`} color="var(--w11-text-primary)" />
+          <KpiCard
+            label="Average Due"
+            value={defaulters.length ? `Rs. ${Math.round(totalDue / defaulters.length).toLocaleString()}` : "Rs. 0"}
+            color="var(--w11-text-primary)"
+          />
+        </StatGrid>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Total Defaulters</p><p className="text-2xl font-bold text-red-600">{defaulters.length}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Total Outstanding</p><p className="text-2xl font-bold">Rs. {totalDue.toLocaleString()}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Average Due</p><p className="text-2xl font-bold">Rs. {defaulters.length ? Math.round(totalDue / defaulters.length).toLocaleString() : 0}</p></CardContent></Card>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> Defaulters List</CardTitle></CardHeader>
-        <CardContent>
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} /> Defaulters List
+            </span>
+          }
+        >
           <DataTable
             columns={DEFAULTER_COLUMNS}
             rows={defaulters}
@@ -133,8 +150,8 @@ function DefaultersContent() {
             exportFileName="fee-defaulters"
             empty={{ icon: AlertTriangle, title: "No defaulters — great!", body: "Every student is up to date on fees." }}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </DataPanel>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +12,13 @@ import { BSMonthInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel,
+  StatusChip, AOSEmptyState, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { Plus, Trash2, Pencil, GraduationCap } from "lucide-react";
 
 interface Scholarship {
@@ -162,7 +165,7 @@ function ScholarshipsContent() {
       render: (sc) => (
         <div>
           <p className="font-medium">{sc.student_name}</p>
-          {sc.roll_number && <p className="text-xs text-muted-foreground">#{sc.roll_number}</p>}
+          {sc.roll_number && <p className="text-xs text-[color:var(--w11-text-secondary)]">#{sc.roll_number}</p>}
         </div>
       ),
     },
@@ -175,7 +178,7 @@ function ScholarshipsContent() {
       sortable: true,
       value: (sc) => sc.discount_value ?? 0,
       render: (sc) => (
-        <span className="font-semibold text-emerald-700">
+        <span className="font-semibold" style={{ color: "#107c10" }}>
           {sc.discount_type === "percent" ? `${sc.discount_value}%` : `Rs. ${sc.discount_value.toLocaleString()}`}
         </span>
       ),
@@ -193,7 +196,7 @@ function ScholarshipsContent() {
       label: "Status",
       sortable: true,
       value: (sc) => (sc.is_active ? "active" : "inactive"),
-      render: (sc) => <Badge variant={sc.is_active ? "success" : "secondary"}>{sc.is_active ? "Active" : "Inactive"}</Badge>,
+      render: (sc) => <StatusChip status={sc.is_active ? "active" : "inactive"} />,
     },
     {
       key: "actions",
@@ -205,41 +208,37 @@ function ScholarshipsContent() {
             <Pencil className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(sc.id); }} disabled={remove.isPending}>
-            <Trash2 className="h-4 w-4 text-red-500" />
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
       ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading scholarships…" /></AOSPage>;
 
   const isMutating = create.isPending || update.isPending;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <GraduationCap className="h-6 w-6 text-emerald-600" />
-            Scholarships & Discounts
-          </h1>
-          <p className="text-muted-foreground">
-            Per-student fee discounts automatically applied during fee generation.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> Add Scholarship
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="pt-4">
+    <AOSPage>
+      <AOSPageHeader
+        icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Scholarships & Discounts"
+        subtitle={`${scholarships.length} defined · Per-student fee discounts automatically applied during fee generation.`}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" /> Add Scholarship
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel>
           {scholarships.length === 0 ? (
-            <div className="flex flex-col items-center py-12 gap-3 text-muted-foreground">
-              <GraduationCap className="h-10 w-10 opacity-40" />
-              <p>No scholarships defined. Add one to auto-discount student fees.</p>
-            </div>
+            <AOSEmptyState
+              icon={<GraduationCap className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
+              title="No scholarships defined."
+              description="Add one to auto-discount student fees."
+            />
           ) : (
             <DataTable
               columns={SCHOLARSHIP_COLUMNS}
@@ -250,150 +249,150 @@ function ScholarshipsContent() {
               exportFileName="scholarships"
             />
           )}
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Add / Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editTarget ? "Edit Scholarship" : "Add Scholarship / Discount"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Student search */}
-            <div className="space-y-2">
-              <Label>Student</Label>
-              <Input
-                placeholder="Search student by name or enrollment…"
-                value={studentSearch}
-                onChange={(e) => {
-                  setStudentSearch(e.target.value);
-                  if (!editTarget) setForm({ ...form, student_id: "" });
-                }}
-                disabled={!!editTarget}
-              />
-              {!editTarget && studentSearch.trim().length >= 2 && (
-                <div className="border rounded-md max-h-36 overflow-y-auto divide-y">
-                  {(studentsData || []).map((s: any) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-                      onClick={() => {
-                        setForm({ ...form, student_id: s.id });
-                        setStudentSearch(s.full_name || `${s.first_name} ${s.last_name || ""}`);
-                      }}
-                    >
-                      <span className="font-medium">{s.full_name || `${s.first_name} ${s.last_name || ""}`}</span>
-                      {s.class_name && (
-                        <span className="text-muted-foreground ml-2">{s.class_name}</span>
-                      )}
-                    </button>
-                  ))}
-                  {studentsData?.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-muted-foreground">No students found</p>
-                  )}
-                </div>
-              )}
-              {!editTarget && form.student_id && (
-                <p className="text-xs text-emerald-600">✓ Student selected</p>
-              )}
-            </div>
-
-            {/* Fee Type */}
-            <div className="space-y-2">
-              <Label>Fee Type (leave blank to apply to all)</Label>
-              <Input
-                placeholder="e.g. Tuition Fee (blank = all types)"
-                value={form.fee_type}
-                onChange={(e) => setForm({ ...form, fee_type: e.target.value })}
-              />
-            </div>
-
-            {/* Discount */}
-            <div className="grid grid-cols-2 gap-4">
+        {/* Add / Edit Dialog */}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editTarget ? "Edit Scholarship" : "Add Scholarship / Discount"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Student search */}
               <div className="space-y-2">
-                <Label>Discount Type</Label>
-                <AdvancedSelect
-                  value={form.discount_type}
-                  onChange={(v) => setForm({ ...form, discount_type: v as "percent" | "fixed" })}
-                  options={[
-                    { value: "percent", label: "Percentage (%)" },
-                    { value: "fixed", label: "Fixed Amount (Rs.)" },
-                  ]}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  {form.discount_type === "percent" ? "Discount %" : "Amount (Rs.)"}
-                </Label>
+                <Label>Student</Label>
                 <Input
-                  type="number"
-                  value={form.discount_value}
-                  onChange={(e) =>
-                    setForm({ ...form, discount_value: e.target.value })
-                  }
-                  min="0"
-                  max={form.discount_type === "percent" ? "100" : undefined}
+                  placeholder="Search student by name or enrollment…"
+                  value={studentSearch}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    if (!editTarget) setForm({ ...form, student_id: "" });
+                  }}
+                  disabled={!!editTarget}
                 />
+                {!editTarget && studentSearch.trim().length >= 2 && (
+                  <div className="border border-[var(--w11-border-subtle)] rounded-md max-h-36 overflow-y-auto divide-y divide-[var(--w11-border-subtle)]">
+                    {(studentsData || []).map((s: any) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--w11-control-hover)] transition-colors"
+                        onClick={() => {
+                          setForm({ ...form, student_id: s.id });
+                          setStudentSearch(s.full_name || `${s.first_name} ${s.last_name || ""}`);
+                        }}
+                      >
+                        <span className="font-medium">{s.full_name || `${s.first_name} ${s.last_name || ""}`}</span>
+                        {s.class_name && (
+                          <span className="text-[color:var(--w11-text-secondary)] ml-2">{s.class_name}</span>
+                        )}
+                      </button>
+                    ))}
+                    {studentsData?.length === 0 && (
+                      <p className="px-3 py-2 text-sm text-[color:var(--w11-text-secondary)]">No students found</p>
+                    )}
+                  </div>
+                )}
+                {!editTarget && form.student_id && (
+                  <p className="text-xs" style={{ color: "#107c10" }}>✓ Student selected</p>
+                )}
               </div>
-            </div>
 
-            {/* Reason */}
-            <div className="space-y-2">
-              <Label>Reason</Label>
-              <Input
-                placeholder="e.g. Merit scholarship, Financial aid…"
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-              />
-            </div>
-
-            {/* Validity */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* Fee Type */}
               <div className="space-y-2">
-                <Label>Valid From (BS)</Label>
-                <BSMonthInput
-                  value={form.valid_from_bs}
-                  onChange={(v) => setForm({ ...form, valid_from_bs: v })}
+                <Label>Fee Type (leave blank to apply to all)</Label>
+                <Input
+                  placeholder="e.g. Tuition Fee (blank = all types)"
+                  value={form.fee_type}
+                  onChange={(e) => setForm({ ...form, fee_type: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Valid Until (BS, blank = open-ended)</Label>
-                <BSMonthInput
-                  value={form.valid_until_bs}
-                  onChange={(v) => setForm({ ...form, valid_until_bs: v })}
-                />
-              </div>
-            </div>
 
-            <FormCheckbox
+              {/* Discount */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Discount Type</Label>
+                  <AdvancedSelect
+                    value={form.discount_type}
+                    onChange={(v) => setForm({ ...form, discount_type: v as "percent" | "fixed" })}
+                    options={[
+                      { value: "percent", label: "Percentage (%)" },
+                      { value: "fixed", label: "Fixed Amount (Rs.)" },
+                    ]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {form.discount_type === "percent" ? "Discount %" : "Amount (Rs.)"}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.discount_value}
+                    onChange={(e) =>
+                      setForm({ ...form, discount_value: e.target.value })
+                    }
+                    min="0"
+                    max={form.discount_type === "percent" ? "100" : undefined}
+                  />
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-2">
+                <Label>Reason</Label>
+                <Input
+                  placeholder="e.g. Merit scholarship, Financial aid…"
+                  value={form.reason}
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                />
+              </div>
+
+              {/* Validity */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Valid From (BS)</Label>
+                  <BSMonthInput
+                    value={form.valid_from_bs}
+                    onChange={(v) => setForm({ ...form, valid_from_bs: v })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valid Until (BS, blank = open-ended)</Label>
+                  <BSMonthInput
+                    value={form.valid_until_bs}
+                    onChange={(v) => setForm({ ...form, valid_until_bs: v })}
+                  />
+                </div>
+              </div>
+
+              <FormCheckbox
                 label="Scholarship active"
                 description="Will be auto-applied during fee generation"
                 checked={form.is_active}
                 onCheckedChange={(v) => setForm({ ...form, is_active: v })}
               />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => (editTarget ? update.mutate() : create.mutate())}
-              disabled={
-                isMutating ||
-                (!editTarget && !form.student_id) ||
-                !form.discount_value
-              }
-            >
-              {isMutating ? <Spinner className="mr-2" /> : null}
-              {editTarget ? "Save Changes" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => (editTarget ? update.mutate() : create.mutate())}
+                disabled={
+                  isMutating ||
+                  (!editTarget && !form.student_id) ||
+                  !form.discount_value
+                }
+              >
+                {isMutating ? <Spinner className="mr-2" /> : null}
+                {editTarget ? "Save Changes" : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

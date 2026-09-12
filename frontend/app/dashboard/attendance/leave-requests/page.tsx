@@ -5,8 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
@@ -21,7 +19,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { CheckCircle2, XCircle, Clock, CalendarDays } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+} from "@/components/aos/kit/page-kit";
+import { CheckCircle2, XCircle, Clock, CalendarDays, CalendarClock } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface LeaveRequest {
@@ -133,29 +138,29 @@ function LeaveRequestsInner() {
             <Button
               size="sm"
               variant="outline"
-              className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+              className="gap-1"
               disabled={approve.isPending}
               onClick={(e) => { e.stopPropagation(); approve.mutate(lr.id); }}
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
+              <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#107c10" }} />
               Approve
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="gap-1 border-red-300 text-red-700 hover:bg-red-50"
+              className="gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setRejecting(lr);
                 setRejectionReason("");
               }}
             >
-              <XCircle className="h-3.5 w-3.5" />
+              <XCircle className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
               Reject
             </Button>
           </div>
         ) : (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-[color:var(--w11-text-secondary)] text-xs">
             {lr.status === "rejected" && lr.rejection_reason ? lr.rejection_reason : "—"}
           </span>
         ),
@@ -163,55 +168,60 @@ function LeaveRequestsInner() {
   ];
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <AOSPage>
+      <AOSPageHeader
+        icon={<CalendarClock className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Leave Requests"
-        titleNepali="बिदा अनुरोध"
-        description="Approve or reject staff leave requests. Approved leaves are written to the teacher attendance register."
-        actions={[{ label: "Refresh", onClick: () => refetch() }]}
-      >
-        <div className="flex items-center gap-1.5">
-          {(["pending", "approved", "rejected", "all"] as const).map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={statusFilter === s ? "default" : "outline"}
-              onClick={() => setStatusFilter(s)}
-              className="capitalize"
-            >
-              {s === "pending" && (
-                <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
-              )}
-              {s}
-            </Button>
-          ))}
-        </div>
-      </PageHeader>
+        subtitle="बिदा अनुरोध · Approve or reject staff leave requests. Approved leaves are written to the teacher attendance register."
+        actions={
+          <Button variant="outline" onClick={() => refetch()}>
+            Refresh
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
+          <div className="flex items-center gap-1.5">
+            {(["pending", "approved", "rejected", "all"] as const).map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? "default" : "outline"}
+                onClick={() => setStatusFilter(s)}
+                className="capitalize"
+              >
+                {s === "pending" && (
+                  <Clock className="mr-1 h-3.5 w-3.5" style={{ color: "#d83b01" }} />
+                )}
+                {s}
+              </Button>
+            ))}
+          </div>
+        </FilterCommandBar>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full" />
-          ))}
-        </div>
-      ) : isError ? (
-        <ErrorState
-          title="Couldn't load leave requests"
-          onRetry={() => refetch()}
-        />
-      ) : requests.length === 0 ? (
-        <EmptyState
-          icon={CalendarDays}
-          title={
-            statusFilter === "pending"
-              ? "No pending leave requests"
-              : `No ${statusFilter === "all" ? "" : statusFilter} leave requests`
-          }
-          body="Staff-submitted leave requests appear here for approval."
-        />
-      ) : (
-        <Card>
-          <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : isError ? (
+          <ErrorState
+            title="Couldn't load leave requests"
+            onRetry={() => refetch()}
+          />
+        ) : requests.length === 0 ? (
+          <EmptyState
+            icon={CalendarDays}
+            title={
+              statusFilter === "pending"
+                ? "No pending leave requests"
+                : `No ${statusFilter === "all" ? "" : statusFilter} leave requests`
+            }
+            body="Staff-submitted leave requests appear here for approval."
+          />
+        ) : (
+          <DataPanel bodyClassName="p-0">
             <DataTable
               columns={REQUEST_COLUMNS}
               rows={requests}
@@ -221,63 +231,63 @@ function LeaveRequestsInner() {
               exportFileName="leave-requests"
               dense
             />
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {pendingCount > 0 && statusFilter === "pending" && (
-        <p className="text-muted-foreground text-sm">
-          {pendingCount} request{pendingCount === 1 ? "" : "s"} awaiting review
-        </p>
-      )}
+        {pendingCount > 0 && statusFilter === "pending" && (
+          <p className="text-[color:var(--w11-text-secondary)] text-sm mt-4">
+            {pendingCount} request{pendingCount === 1 ? "" : "s"} awaiting review
+          </p>
+        )}
 
-      <Dialog
-        open={rejecting !== null}
-        onOpenChange={(open) => {
-          if (!open) setRejecting(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reject this leave request?</DialogTitle>
-            <DialogDescription>
-              {rejecting?.staff_name &&
-                `${rejecting.staff_name} · ${rejecting?.start_date} → ${rejecting?.end_date}. `}
-              The requester will see the rejection and your note. They can
-              submit a new request afterwards.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            placeholder="Reason (shown to the requester)"
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            rows={3}
-          />
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRejecting(null)}
-            >
-              Keep pending
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={reject.isPending}
-              onClick={() => {
-                if (!rejecting) return;
-                reject.mutate({
-                  id: rejecting.id,
-                  reason: rejectionReason.trim(),
-                });
-              }}
-            >
-              Reject request
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog
+          open={rejecting !== null}
+          onOpenChange={(open) => {
+            if (!open) setRejecting(null);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reject this leave request?</DialogTitle>
+              <DialogDescription>
+                {rejecting?.staff_name &&
+                  `${rejecting.staff_name} · ${rejecting?.start_date} → ${rejecting?.end_date}. `}
+                The requester will see the rejection and your note. They can
+                submit a new request afterwards.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="Reason (shown to the requester)"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={3}
+            />
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRejecting(null)}
+              >
+                Keep pending
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={reject.isPending}
+                onClick={() => {
+                  if (!rejecting) return;
+                  reject.mutate({
+                    id: rejecting.id,
+                    reason: rejectionReason.trim(),
+                  });
+                }}
+              >
+                Reject request
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -18,7 +17,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, FilterCommandBar,
+  DataPanel, StatusChip, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import {
   CheckCircle2,
   ExternalLink,
@@ -179,8 +181,8 @@ function ApprovalsContent() {
       render: (s) => (
         <div className="text-sm">
           {s.bank_name && <p>{s.bank_name}</p>}
-          {s.reference_no && <p className="text-xs text-muted-foreground">Ref: {s.reference_no}</p>}
-          {!s.bank_name && !s.reference_no && <span className="text-muted-foreground">—</span>}
+          {s.reference_no && <p className="text-xs text-[color:var(--w11-text-secondary)]">Ref: {s.reference_no}</p>}
+          {!s.bank_name && !s.reference_no && <span className="text-[color:var(--w11-text-secondary)]">—</span>}
         </div>
       ),
     },
@@ -196,20 +198,14 @@ function ApprovalsContent() {
       label: "Status",
       sortable: true,
       value: (s) => s.status,
-      render: (s) => (
-        <Badge
-          variant={s.status === "approved" ? "success" : s.status === "rejected" ? "destructive" : "warning"}
-        >
-          {s.status}
-        </Badge>
-      ),
+      render: (s) => <StatusChip status={s.status} />,
     },
     {
       key: "notes",
       label: "Review Notes",
       hidden: true,
       value: (s) => s.review_notes ?? "",
-      render: (s) => <span className="text-xs text-muted-foreground">{s.review_notes || "—"}</span>,
+      render: (s) => <span className="text-xs text-[color:var(--w11-text-secondary)]">{s.review_notes || "—"}</span>,
     },
     {
       key: "slip",
@@ -219,7 +215,7 @@ function ApprovalsContent() {
         s.slip_file_id ? (
           <SlipLink fileId={s.slip_file_id} />
         ) : (
-          <span className="text-xs text-muted-foreground">No file</span>
+          <span className="text-xs text-[color:var(--w11-text-secondary)]">No file</span>
         ),
     },
     {
@@ -254,50 +250,56 @@ function ApprovalsContent() {
             </Button>
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-[color:var(--w11-text-secondary)]">
             {s.status === "approved" ? `${s.receipt_ids?.length || 0} receipt(s)` : "—"}
           </span>
         ),
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading submissions…" /></AOSPage>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Slip Approvals</h1>
-        <p className="text-muted-foreground">
-          Review offline bank-transfer and cheque submissions before money is applied
-        </p>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<FileCheck2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Slip Approvals"
+        subtitle={
+          pendingCount !== undefined && pendingCount > 0
+            ? `${pendingCount} awaiting review · Review offline bank-transfer and cheque submissions before money is applied`
+            : "Review offline bank-transfer and cheque submissions before money is applied"
+        }
+      />
+      <AOSPageBody className="space-y-4">
+        <FilterCommandBar>
+          <div className="flex flex-wrap gap-1">
+            {STATUS_FILTERS.map((f) => (
+              <Button
+                key={f.value}
+                size="sm"
+                variant={status === f.value ? "default" : "outline"}
+                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  setStatus(f.value);
+                  setPage(1);
+                }}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </FilterCommandBar>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            <FileCheck2 className="h-4 w-4 text-primary" /> Submission Queue
-            {pendingCount !== undefined && pendingCount > 0 && (
-              <Badge variant="warning">{pendingCount} awaiting review</Badge>
-            )}
-            <div className="ml-auto flex flex-wrap gap-1">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f.value}
-                  size="sm"
-                  variant={status === f.value ? "default" : "outline"}
-                  className="h-7 px-3 text-xs"
-                  onClick={() => {
-                    setStatus(f.value);
-                    setPage(1);
-                  }}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <DataPanel
+          title={
+            <span className="flex items-center gap-2">
+              <FileCheck2 className="h-4 w-4" /> Submission Queue
+              {pendingCount !== undefined && pendingCount > 0 && (
+                <Badge variant="warning">{pendingCount} awaiting review</Badge>
+              )}
+            </span>
+          }
+        >
           <DataTable<OfflineSubmission>
             columns={COLUMNS}
             rows={submissions}
@@ -326,80 +328,83 @@ function ApprovalsContent() {
               body: "Offline slips submitted by parents and students will appear here.",
             }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      <Dialog
-        open={Boolean(reviewTarget)}
-        onOpenChange={(open) => !open && setReviewTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {reviewTarget?.mode === "approve" ? "Approve Submission" : "Reject Submission"}
-            </DialogTitle>
-          </DialogHeader>
-          {reviewTarget && (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-                <p className="font-medium">{reviewTarget.sub.student_name}</p>
-                <p className="text-muted-foreground">
-                  {formatNepaliCurrency(reviewTarget.sub.amount || 0)} •{" "}
-                  {reviewTarget.sub.method === "bank" ? "Bank Transfer" : "Cheque"}
-                  {reviewTarget.sub.paid_on_bs
-                    ? ` • Paid ${formatNepaliDate(reviewTarget.sub.paid_on_bs)}`
-                    : ""}
-                  {reviewTarget.sub.reference_no ? ` • Ref ${reviewTarget.sub.reference_no}` : ""}
-                </p>
+        <Dialog
+          open={Boolean(reviewTarget)}
+          onOpenChange={(open) => !open && setReviewTarget(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {reviewTarget?.mode === "approve" ? "Approve Submission" : "Reject Submission"}
+              </DialogTitle>
+            </DialogHeader>
+            {reviewTarget && (
+              <div className="space-y-4">
+                <div
+                  className="rounded-lg border border-[var(--w11-border-subtle)] px-3 py-2 text-sm"
+                  style={{ background: "var(--w11-control-hover)" }}
+                >
+                  <p className="font-medium">{reviewTarget.sub.student_name}</p>
+                  <p className="text-[color:var(--w11-text-secondary)]">
+                    {formatNepaliCurrency(reviewTarget.sub.amount || 0)} •{" "}
+                    {reviewTarget.sub.method === "bank" ? "Bank Transfer" : "Cheque"}
+                    {reviewTarget.sub.paid_on_bs
+                      ? ` • Paid ${formatNepaliDate(reviewTarget.sub.paid_on_bs)}`
+                      : ""}
+                    {reviewTarget.sub.reference_no ? ` • Ref ${reviewTarget.sub.reference_no}` : ""}
+                  </p>
+                </div>
+                {reviewTarget.mode === "approve" && (
+                  <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                    Approving records the payment through the standard collection flow —
+                    receipts are issued and the referenced bills are settled FIFO.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label>Review Notes (optional)</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={
+                      reviewTarget.mode === "approve"
+                        ? "e.g. Verified against bank statement"
+                        : "e.g. Reference number not found in bank statement"
+                    }
+                    rows={3}
+                  />
+                </div>
               </div>
-              {reviewTarget.mode === "approve" && (
-                <p className="text-sm text-muted-foreground">
-                  Approving records the payment through the standard collection flow —
-                  receipts are issued and the referenced bills are settled FIFO.
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label>Review Notes (optional)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={
-                    reviewTarget.mode === "approve"
-                      ? "e.g. Verified against bank statement"
-                      : "e.g. Reference number not found in bank statement"
-                  }
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewTarget(null)} disabled={review.isPending}>
-              Cancel
-            </Button>
-            {reviewTarget?.mode === "approve" ? (
-              <Button
-                onClick={() => review.mutate({ sub: reviewTarget.sub, mode: "approve", reviewNotes: notes })}
-                disabled={review.isPending}
-              >
-                {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                Approve & Record Payment
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReviewTarget(null)} disabled={review.isPending}>
+                Cancel
               </Button>
-            ) : (
-              reviewTarget && (
+              {reviewTarget?.mode === "approve" ? (
                 <Button
-                  variant="destructive"
-                  onClick={() => review.mutate({ sub: reviewTarget.sub, mode: "reject", reviewNotes: notes })}
+                  onClick={() => review.mutate({ sub: reviewTarget.sub, mode: "approve", reviewNotes: notes })}
                   disabled={review.isPending}
                 >
-                  {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
-                  Reject Submission
+                  {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                  Approve & Record Payment
                 </Button>
-              )
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              ) : (
+                reviewTarget && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => review.mutate({ sub: reviewTarget.sub, mode: "reject", reviewNotes: notes })}
+                    disabled={review.isPending}
+                  >
+                    {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+                    Reject Submission
+                  </Button>
+                )
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

@@ -6,8 +6,11 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
+  FilterCommandBar, DataPanel, AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -85,89 +88,92 @@ function ReportsContent() {
     }
   };
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading fee reports…" /></AOSPage>;
 
   return (
-    <Tabs value={reportTab} onValueChange={setReportTab} className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Fee Reports</h1>
-          <p className="text-muted-foreground">
-            Financial overview, fines and waivers analytics
-          </p>
-        </div>
-        <TabsList>
-          <TabsTrigger value="collection">Collection</TabsTrigger>
-          <TabsTrigger value="fines">Fines</TabsTrigger>
-          <TabsTrigger value="waivers">Waivers</TabsTrigger>
-        </TabsList>
-      </div>
+    <AOSPage>
+      <Tabs value={reportTab} onValueChange={setReportTab} className="flex flex-col h-full">
+        <AOSPageHeader
+          title="Fee Reports"
+          subtitle="Financial overview, fines and waivers analytics"
+          actions={
+            <TabsList>
+              <TabsTrigger value="collection">Collection</TabsTrigger>
+              <TabsTrigger value="fines">Fines</TabsTrigger>
+              <TabsTrigger value="waivers">Waivers</TabsTrigger>
+            </TabsList>
+          }
+        />
+        <AOSPageBody className="space-y-4">
+          <TabsContent value="collection" className="mt-0 space-y-4">
+            {isError || !data ? (
+              <DataPanel>
+                <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                  Unable to load fee report data.
+                </p>
+              </DataPanel>
+            ) : (
+              <>
+                <FilterCommandBar>
+                  <div className="ml-auto flex items-center gap-2">
+                    <AdvancedSelect
+                      className="w-40"
+                      value={period}
+                      onChange={(v) => setPeriod(v as FeeReportPeriod)}
+                      options={[
+                        { value: "monthly", label: "This Month" },
+                        { value: "quarterly", label: "This Quarter" },
+                        { value: "yearly", label: "This Year" },
+                      ]}
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={exportingCsv}
+                      onClick={exportCollectionsCsv}
+                    >
+                      {exportingCsv ? "Exporting…" : "Export CSV"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const range = getFeeReportRange(period);
+                          const res = await api.get("/reports/fees/collection/pdf", {
+                            params: range,
+                            responseType: "blob",
+                          });
+                          const url = URL.createObjectURL(res.data as Blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "fee_collection_report.pdf";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          toast.error("PDF export unavailable");
+                        }
+                      }}
+                    >
+                      Export PDF
+                    </Button>
+                  </div>
+                </FilterCommandBar>
 
-      <TabsContent value="collection" className="mt-0 space-y-6">
-        {isError || !data ? (
-          <Card>
-            <CardContent className="pt-6 text-sm text-muted-foreground">
-              Unable to load fee report data.
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <div className="flex items-center justify-end gap-2">
-              <AdvancedSelect
-                className="w-40"
-                value={period}
-                onChange={(v) => setPeriod(v as FeeReportPeriod)}
-                options={[
-                  { value: "monthly", label: "This Month" },
-                  { value: "quarterly", label: "This Quarter" },
-                  { value: "yearly", label: "This Year" },
-                ]}
-              />
-              <Button
-                variant="outline"
-                disabled={exportingCsv}
-                onClick={exportCollectionsCsv}
-              >
-                {exportingCsv ? "Exporting…" : "Export CSV"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const range = getFeeReportRange(period);
-                    const res = await api.get("/reports/fees/collection/pdf", {
-                      params: range,
-                      responseType: "blob",
-                    });
-                    const url = URL.createObjectURL(res.data as Blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "fee_collection_report.pdf";
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch {
-                    toast.error("PDF export unavailable");
-                  }
-                }}
-              >
-                Export PDF
-              </Button>
-            </div>
+                <CollectionStats data={data} />
+                <CollectionDetails data={data} />
+              </>
+            )}
+          </TabsContent>
 
-            <CollectionStats data={data} />
-            <CollectionDetails data={data} />
-          </>
-        )}
-      </TabsContent>
+          <TabsContent value="fines" className="mt-0">
+            <FinesContent />
+          </TabsContent>
 
-      <TabsContent value="fines" className="mt-0">
-        <FinesContent />
-      </TabsContent>
-
-      <TabsContent value="waivers" className="mt-0">
-        <WaiversContent />
-      </TabsContent>
-    </Tabs>
+          <TabsContent value="waivers" className="mt-0">
+            <WaiversContent />
+          </TabsContent>
+        </AOSPageBody>
+      </Tabs>
+    </AOSPage>
   );
 }
 
@@ -182,48 +188,44 @@ function CollectionStats({ data }: { data: FeeReportsData }) {
       label: "Total Expected",
       value: overview.totalExpected,
       icon: DollarSign,
-      color: "text-blue-600",
+      color: "var(--w11-accent)",
     },
     {
       label: "Total Collected",
       value: overview.totalCollected,
       icon: TrendingUp,
-      color: "text-green-600",
+      color: "#107c10",
     },
     {
       label: "Outstanding",
       value: overview.totalOutstanding,
       icon: TrendingDown,
-      color: "text-red-600",
+      color: "#c42b1c",
     },
     {
       label: "Collection Rate",
       value: `${overview.collectionRate}%`,
       icon: PieChart,
-      color: "text-primary",
+      color: "var(--w11-accent)",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <StatGrid className="mb-0" min={180}>
       {stats.map((s, i) => (
-        <Card key={i}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{s.label}</p>
-                <p className={`text-2xl font-bold ${s.color}`}>
-                  {typeof s.value === "number"
-                    ? `Rs. ${s.value.toLocaleString()}`
-                    : s.value}
-                </p>
-              </div>
-              <s.icon className={`h-8 w-8 ${s.color} opacity-50`} />
-            </div>
-          </CardContent>
-        </Card>
+        <KpiCard
+          key={i}
+          label={s.label}
+          value={
+            typeof s.value === "number"
+              ? `Rs. ${s.value.toLocaleString()}`
+              : s.value
+          }
+          color={s.color}
+          icon={<s.icon className="h-5 w-5" style={{ color: s.color, opacity: 0.6 }} />}
+        />
       ))}
-    </div>
+    </StatGrid>
   );
 }
 
@@ -233,126 +235,111 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Selected Period</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date Range
-                </span>
-                <span className="font-medium">
-                  {data.period.start} to {data.period.end}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Collected In Period
-                </span>
-                <span className="font-medium text-green-700">
-                  {data.hasPeriodAnalytics &&
-                  data.selectedPeriodCollected !== null
-                    ? `Rs. ${data.selectedPeriodCollected.toLocaleString()}`
-                    : "Unavailable"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Receipt className="h-4 w-4" />
-                  Payments Recorded
-                </span>
-                <span className="font-medium">
-                  {data.hasPeriodAnalytics &&
-                  data.selectedPeriodPaymentsCount !== null
-                    ? data.selectedPeriodPaymentsCount
-                    : "Unavailable"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Active Students
-                </span>
-                <span className="font-medium">{data.totalStudents}</span>
-              </div>
-              {!data.hasPeriodAnalytics && (
-                <p className="text-xs text-muted-foreground">
-                  Detailed date-range analytics are unavailable for this school
-                  configuration. Overall fee totals below are still live.
-                </p>
-              )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <DataPanel title="Selected Period">
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Date Range
+              </span>
+              <span className="font-medium">
+                {data.period.start} to {data.period.end}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Collected In Period
+              </span>
+              <span className="font-medium" style={{ color: "#107c10" }}>
+                {data.hasPeriodAnalytics &&
+                data.selectedPeriodCollected !== null
+                  ? `Rs. ${data.selectedPeriodCollected.toLocaleString()}`
+                  : "Unavailable"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Payments Recorded
+              </span>
+              <span className="font-medium">
+                {data.hasPeriodAnalytics &&
+                data.selectedPeriodPaymentsCount !== null
+                  ? data.selectedPeriodPaymentsCount
+                  : "Unavailable"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Active Students
+              </span>
+              <span className="font-medium">{data.totalStudents}</span>
+            </div>
+            {!data.hasPeriodAnalytics && (
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                Detailed date-range analytics are unavailable for this school
+                configuration. Overall fee totals below are still live.
+              </p>
+            )}
+          </div>
+        </DataPanel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Collection by Class</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {byClass.length > 0 ? (
-              <div className="space-y-3">
-                {byClass.map((c, i) => (
-                  <div key={`${c.class_name}-${i}`}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>{c.class_name}</span>
-                      <span>{c.rate}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-600 h-2 rounded-full"
-                        style={{ width: `${Math.min(100, c.rate)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-center text-muted-foreground py-8">No data available</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Payments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentPayments.length > 0 ? (
+        <DataPanel title="Collection by Class">
+          {byClass.length > 0 ? (
             <div className="space-y-3">
-              {recentPayments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between gap-4 border-b last:border-b-0 pb-3 last:pb-0"
-                >
-                  <div>
-                    <p className="font-medium">{payment.student_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {payment.fee_type}
-                    </p>
+              {byClass.map((c, i) => (
+                <div key={`${c.class_name}-${i}`}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>{c.class_name}</span>
+                    <span>{c.rate}%</span>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-green-700">
-                      Rs. {payment.amount.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {payment.receipt_number}
-                    </p>
+                  <div className="w-full rounded-full h-2" style={{ background: "var(--w11-control-hover)" }}>
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, c.rate)}%`, background: "#107c10" }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">
-              No recent payments available
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          ) : <p className="text-center text-[color:var(--w11-text-secondary)] py-8">No data available</p>}
+        </DataPanel>
+      </div>
+
+      <DataPanel title="Recent Payments">
+        {recentPayments.length > 0 ? (
+          <div className="space-y-3">
+            {recentPayments.map((payment) => (
+              <div
+                key={payment.id}
+                className="flex items-center justify-between gap-4 border-b border-[var(--w11-border-subtle)] last:border-b-0 pb-3 last:pb-0"
+              >
+                <div>
+                  <p className="font-medium">{payment.student_name}</p>
+                  <p className="text-sm text-[color:var(--w11-text-secondary)]">
+                    {payment.fee_type}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium" style={{ color: "#107c10" }}>
+                    Rs. {payment.amount.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                    {payment.receipt_number}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-[color:var(--w11-text-secondary)] py-8">
+            No recent payments available
+          </p>
+        )}
+      </DataPanel>
     </>
   );
 }
@@ -406,13 +393,13 @@ function FinesContent() {
       toast.error(e?.response?.data?.error || e?.message || "Fine accrual failed"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading fines report…" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Gavel className="h-4 w-4 text-primary" />
+        <div className="flex items-center gap-2 text-sm text-[color:var(--w11-text-secondary)]">
+          <Gavel className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
           Late fines accrued, grouped by class and BS month
         </div>
         <div className="flex items-center gap-2">
@@ -440,75 +427,62 @@ function FinesContent() {
       </div>
 
       {isError ? (
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load the fines report. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+          <p className="text-sm text-[#c42b1c]">Failed to load the fines report. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </div>
       ) : (
         <>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Grand Total Fines</p>
-              <p className="text-2xl font-bold text-red-600">
-                {formatNepaliCurrency(data?.grand_total || 0)}
-              </p>
-            </CardContent>
-          </Card>
+          <StatGrid className="mb-0" min={200}>
+            <KpiCard
+              label="Grand Total Fines"
+              value={formatNepaliCurrency(data?.grand_total || 0)}
+              color="#c42b1c"
+            />
+          </StatGrid>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Fines by Class</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data?.by_class?.length ? (
-                  <div className="divide-y">
-                    {data.by_class.map((r) => (
-                      <div key={r.class_name} className="py-2.5 flex items-center justify-between">
-                        <span className="text-sm font-medium">{r.class_name}</span>
-                        <span className="text-sm font-bold text-red-600">
-                          {formatNepaliCurrency(r.fine_total || 0)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No fines accrued yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DataPanel title="Fines by Class">
+              {data?.by_class?.length ? (
+                <div className="divide-y divide-[var(--w11-border-subtle)]">
+                  {data.by_class.map((r) => (
+                    <div key={r.class_name} className="py-2.5 flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.class_name}</span>
+                      <span className="text-sm font-bold" style={{ color: "#c42b1c" }}>
+                        {formatNepaliCurrency(r.fine_total || 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
+                  No fines accrued yet.
+                </p>
+              )}
+            </DataPanel>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Fines by Month (BS)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data?.by_month?.length ? (
-                  <div className="divide-y">
-                    {data.by_month.map((r) => (
-                      <div key={r.month_bs} className="py-2.5 flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {formatBSMonth(r.month_bs)}
-                        </span>
-                        <span className="text-sm font-bold text-red-600">
-                          {formatNepaliCurrency(r.fine_total || 0)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No fines accrued yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <DataPanel title="Fines by Month (BS)">
+              {data?.by_month?.length ? (
+                <div className="divide-y divide-[var(--w11-border-subtle)]">
+                  {data.by_month.map((r) => (
+                    <div key={r.month_bs} className="py-2.5 flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {formatBSMonth(r.month_bs)}
+                      </span>
+                      <span className="text-sm font-bold" style={{ color: "#c42b1c" }}>
+                        {formatNepaliCurrency(r.fine_total || 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
+                  No fines accrued yet.
+                </p>
+              )}
+            </DataPanel>
           </div>
         </>
       )}
@@ -578,7 +552,7 @@ function FinePolicyDialog({
           <DialogTitle>Fine Policy</DialogTitle>
         </DialogHeader>
         {isLoading && !data ? (
-          <PageLoader />
+          <AOSModuleLoadingState />
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -614,7 +588,7 @@ function FinePolicyDialog({
                 </div>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[color:var(--w11-text-secondary)]">
               Fines are applied to overdue bills when you press “Accrue Fines Now”
               (or on schedule, if configured). Bills already fully paid or waived
               are never fined.
@@ -652,83 +626,69 @@ function WaiversContent() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading waivers report…" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <HandCoins className="h-4 w-4 text-primary" />
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-sm text-[color:var(--w11-text-secondary)]">
+        <HandCoins className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
         Every rupee waived (scholarships + credits) — the accountability view
       </div>
 
       {isError ? (
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">Failed to load the waivers report. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
+          <p className="text-sm text-[#c42b1c]">Failed to load the waivers report. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </div>
       ) : (
         <>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Grand Total Waived</p>
-              <p className="text-2xl font-bold">
-                {formatNepaliCurrency(data?.grand_total || 0)}
-              </p>
-            </CardContent>
-          </Card>
+          <StatGrid className="mb-0" min={200}>
+            <KpiCard
+              label="Grand Total Waived"
+              value={formatNepaliCurrency(data?.grand_total || 0)}
+            />
+          </StatGrid>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Waivers by Class</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data?.by_class?.length ? (
-                  <div className="divide-y">
-                    {data.by_class.map((r) => (
-                      <div key={r.class_name} className="py-2.5 flex items-center justify-between">
-                        <span className="text-sm font-medium">{r.class_name}</span>
-                        <span className="text-sm font-bold">
-                          {formatNepaliCurrency(r.waiver_total || 0)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No waivers recorded yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DataPanel title="Waivers by Class">
+              {data?.by_class?.length ? (
+                <div className="divide-y divide-[var(--w11-border-subtle)]">
+                  {data.by_class.map((r) => (
+                    <div key={r.class_name} className="py-2.5 flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.class_name}</span>
+                      <span className="text-sm font-bold">
+                        {formatNepaliCurrency(r.waiver_total || 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
+                  No waivers recorded yet.
+                </p>
+              )}
+            </DataPanel>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Waivers by Fee Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data?.by_fee_type?.length ? (
-                  <div className="divide-y">
-                    {data.by_fee_type.map((r) => (
-                      <div key={r.fee_type} className="py-2.5 flex items-center justify-between">
-                        <span className="text-sm font-medium">{r.fee_type}</span>
-                        <span className="text-sm font-bold">
-                          {formatNepaliCurrency(r.waiver_total || 0)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No waivers recorded yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <DataPanel title="Waivers by Fee Type">
+              {data?.by_fee_type?.length ? (
+                <div className="divide-y divide-[var(--w11-border-subtle)]">
+                  {data.by_fee_type.map((r) => (
+                    <div key={r.fee_type} className="py-2.5 flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.fee_type}</span>
+                      <span className="text-sm font-bold">
+                        {formatNepaliCurrency(r.waiver_total || 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
+                  No waivers recorded yet.
+                </p>
+              )}
+            </DataPanel>
           </div>
         </>
       )}

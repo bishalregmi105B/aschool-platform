@@ -210,7 +210,9 @@ export default function AppDrawer({
         desc: p.description,
       }));
 
-    // Add plugin sidebar items from useInstalledPlugins()
+    // Add plugin sidebar items from useInstalledPlugins() — keyed with a
+    // plugin- prefix: core apps above can share the same slug (e.g.
+    // "timetable"), and React keys must stay unique across the merged list.
     const sidebarList: AppDrawerItem[] = (sidebarItems || []).map((s) => ({
       id: s.slug,
       name: s.label,
@@ -397,7 +399,7 @@ export default function AppDrawer({
         <div className="aos-drawer-grid">
           {filteredApps.map((app) => (
             <div
-              key={app.id}
+              key={`drawer-${app.id}`}
               className="aos-drawer-card aos-haptic-click"
               onClick={() => {
                 onOpenApp(app.id);

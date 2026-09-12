@@ -10,12 +10,18 @@ import {
   updateSubject,
 } from "@/lib/services/dashboard/academics.service";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { Users, UserCog, Layers } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  FilterCommandBar,
+  DataPanel,
+  FormSection,
+  AOSEmptyState,
+} from "@/components/aos/kit/page-kit";
+import { Users, UserCog, Layers, BookOpen } from "lucide-react";
 
 export default function ClassSectionsTeachersPage() {
   const queryClient = useQueryClient();
@@ -70,21 +76,14 @@ export default function ClassSectionsTeachersPage() {
   const selectedClassData = (classes || []).find((c: any) => c.id === selectedClass);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="h-6 w-6" /> Class Section & Teachers
-        </h1>
-        <p className="text-muted-foreground">
-          Assign class teachers and subject teachers to sections
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Select Class</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Class Section & Teachers"
+        subtitle="Assign class teachers and subject teachers to sections"
+      />
+      <AOSPageBody>
+        <FilterCommandBar>
           <AdvancedSelect
             className="max-w-xs"
             value={selectedClass}
@@ -93,21 +92,21 @@ export default function ClassSectionsTeachersPage() {
             placeholder="Choose a class..."
             options={(classes || []).map((cls: any) => ({ value: cls.id, label: cls.name }))}
           />
-        </CardContent>
-      </Card>
+        </FilterCommandBar>
 
-      {selectedClassData && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(selectedClassData.sections || []).map((section: any) => (
-            <Card key={section.id}>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Layers className="h-4 w-4" />
-                  {selectedClassData.name} - {section.name}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">Capacity: {section.capacity} students</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        {selectedClassData && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-4">
+            {(selectedClassData.sections || []).map((section: any) => (
+              <FormSection key={section.id}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Layers className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                  <span className="text-[15px] font-semibold">
+                    {selectedClassData.name} - {section.name}
+                  </span>
+                </div>
+                <p className="text-sm text-[color:var(--w11-text-secondary)] mb-4">
+                  Capacity: {section.capacity} students
+                </p>
                 {/* Class Teacher */}
                 <div>
                   <p className="text-sm font-medium mb-1.5">Class Teacher</p>
@@ -127,40 +126,50 @@ export default function ClassSectionsTeachersPage() {
                 </div>
 
                 {/* Subject Teachers */}
-                <div>
+                <div className="mt-4">
                   <p className="text-sm font-medium mb-1.5">Subject Teachers</p>
                   <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground border rounded-md p-3">
+                    <div
+                      className="text-sm text-[color:var(--w11-text-secondary)] border border-[var(--w11-border-subtle)] rounded-[var(--w11-radius-md)] p-3"
+                    >
                       Subject teachers are assigned at class level. Use the table below to map each subject to a teacher.
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-          {(!selectedClassData.sections || selectedClassData.sections.length === 0) && (
-            <p className="text-muted-foreground col-span-3 text-center py-8">
-              No sections found. Add sections in Academics → Classes & Sections.
-            </p>
-          )}
-        </div>
-      )}
+              </FormSection>
+            ))}
+            {(!selectedClassData.sections || selectedClassData.sections.length === 0) && (
+              <div className="col-span-3">
+                <AOSEmptyState
+                  icon={<UserCog className="h-10 w-10" />}
+                  title="No sections found"
+                  description="Add sections in Academics → Classes &amp; Sections."
+                />
+              </div>
+            )}
+          </div>
+        )}
 
-      {selectedClass && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Subject Teachers</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {selectedClass && (
+          <DataPanel
+            title={
+              <span className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Subject Teachers
+              </span>
+            }
+          >
             {loadingSubjects ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : (
               <div className="space-y-3">
                 {(classSubjects || []).map((subject: any) => (
-                  <div key={subject.id} className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between">
+                  <div
+                    key={subject.id}
+                    className="flex flex-col gap-3 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)] p-3 md:flex-row md:items-center md:justify-between"
+                  >
                     <div>
                       <div className="font-medium">{subject.name}</div>
-                      <div className="text-sm text-muted-foreground">{subject.code || "No code"}</div>
+                      <div className="text-sm text-[color:var(--w11-text-secondary)]">{subject.code || "No code"}</div>
                     </div>
                     <AdvancedSelect
                       className="w-full md:w-64"
@@ -179,13 +188,16 @@ export default function ClassSectionsTeachersPage() {
                   </div>
                 ))}
                 {(classSubjects || []).length === 0 && (
-                  <p className="py-4 text-center text-muted-foreground">Assign subjects to this class first.</p>
+                  <AOSEmptyState
+                    title="No subjects assigned"
+                    description="Assign subjects to this class first."
+                  />
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }

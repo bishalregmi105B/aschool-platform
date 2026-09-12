@@ -14,16 +14,25 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
-import { Plus, UserCog, Mail, Phone, Search, Upload, Pencil, Trash2 } from "lucide-react";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatusChip,
+  StatGrid,
+  KpiCard,
+  AOSModuleLoadingState,
+} from "@/components/aos/kit/page-kit";
+import { Plus, UserCog, Mail, Phone, Upload, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 type Teacher = TeacherDto;
@@ -83,22 +92,40 @@ export default function TeachersPage() {
     onError: () => toast.error("Failed to update teacher status"),
   });
 
-  if (isLoading) return <PageLoader />;
+  const teachers = (data || []).filter((t: Teacher) =>
+    t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.email?.toLowerCase().includes(search.toLowerCase()) ||
+    t.phone?.includes(search)
+  );
+
+  const stats = {
+    total: (data || []).length,
+    active: (data || []).filter((t: Teacher) => t.is_active).length,
+    inactive: (data || []).filter((t: Teacher) => !t.is_active).length,
+    classSections: new Set(
+      (data || []).flatMap((t: Teacher) => t.class_sections || []),
+    ).size,
+  };
+
+  if (isLoading) return <AOSModuleLoadingState label="Loading teachers…" />;
 
   if (isError)
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardContent className="py-10 text-center space-y-3">
-            <p className="text-sm text-destructive">
-              Failed to load teachers. Please try again.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Teachers" subtitle="Manage school teaching staff" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "#c42b1c" }}>
+                Failed to load teachers. Please try again.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
 
   const TEACHER_COLUMNS: Column<Teacher>[] = [
@@ -115,7 +142,7 @@ export default function TeachersPage() {
             </div>
           )}
           {t.email && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               <Mail className="h-3 w-3" /> {t.email}
             </div>
           )}
@@ -132,7 +159,7 @@ export default function TeachersPage() {
             <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
           ))}
           {(!t.subjects || t.subjects.length === 0) && (
-            <span className="text-muted-foreground text-sm">—</span>
+            <span className="text-sm" style={{ color: "var(--w11-text-tertiary)" }}>—</span>
           )}
         </div>
       ),
@@ -144,10 +171,10 @@ export default function TeachersPage() {
       render: (t) => (
         <div className="flex flex-wrap gap-1">
           {(t.class_sections || []).map((section) => (
-            <Badge key={section} variant="outline" className="text-xs">{section}</Badge>
+            <StatusChip key={section} status="user" label={section} />
           ))}
           {(!t.class_sections || t.class_sections.length === 0) && (
-            <span className="text-muted-foreground text-sm">—</span>
+            <span className="text-sm" style={{ color: "var(--w11-text-tertiary)" }}>—</span>
           )}
         </div>
       ),
@@ -158,9 +185,7 @@ export default function TeachersPage() {
       sortable: true,
       value: (t) => (t.is_active ? "active" : "inactive"),
       render: (t) => (
-        <Badge variant={t.is_active ? "success" : "destructive"}>
-          {t.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <StatusChip status={t.is_active ? "active" : "inactive"} label={t.is_active ? "Active" : "Inactive"} />
       ),
     },
     {
@@ -183,7 +208,7 @@ export default function TeachersPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-destructive"
+            className="text-[#c42b1c]"
             onClick={(e) => {
               e.stopPropagation();
               void (async () => {
@@ -206,35 +231,34 @@ export default function TeachersPage() {
     },
   ];
 
-  const teachers = (data || []).filter((t: Teacher) =>
-    t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.email?.toLowerCase().includes(search.toLowerCase()) ||
-    t.phone?.includes(search)
-  );
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <UserCog className="h-6 w-6" /> Teachers
-          </h1>
-          <p className="text-muted-foreground">Manage school teaching staff</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/dashboard/teachers/bulk-upload">
-            <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+    <AOSPage>
+      <AOSPageHeader
+        icon={<UserCog className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Teachers"
+        subtitle={`${stats.total} teachers · ${stats.active} active · Manage school teaching staff`}
+        actions={
+          <>
+            <Link href="/dashboard/teachers/bulk-upload">
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+              </Button>
+            </Link>
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Add Teacher
             </Button>
-          </Link>
-          <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Add Teacher
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
+      <AOSPageBody>
+        <StatGrid min={170}>
+          <KpiCard label="Total Teachers" value={stats.total} />
+          <KpiCard label="Active" value={stats.active} denominator={`/ ${stats.total}`} color="#107c10" />
+          <KpiCard label="Inactive" value={stats.inactive} color="#d83b01" />
+          <KpiCard label="Class Sections" value={stats.classSections} color="var(--w11-accent)" />
+        </StatGrid>
 
-      <Card>
-        <CardContent className="p-0">
+        <DataPanel bodyClassName="p-0">
           <DataTable<Teacher>
             columns={TEACHER_COLUMNS}
             rows={teachers}
@@ -246,81 +270,81 @@ export default function TeachersPage() {
             exportFileName="teachers"
             empty={{ icon: UserCog, title: "No teachers found", body: "Add teachers or bulk-upload your staff list.", action: { label: "Add Teacher", onClick: () => setShowAdd(true) } }}
           />
-        </CardContent>
-      </Card>
+        </DataPanel>
 
-      {/* Add Teacher Dialog */}
-      <Dialog
-        open={showAdd || !!editItem}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowAdd(false);
-            setEditItem(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Teacher" : "Add Teacher"}</DialogTitle>
-          </DialogHeader>
-          <form
-            key={editItem?.id || "new-teacher"}
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const payload = {
-                full_name: fd.get("full_name"),
-                email: fd.get("email") || undefined,
-                phone: fd.get("phone"),
-                is_active: fd.get("is_active") === "on",
-                password: fd.get("password") || undefined,
-              };
+        {/* Add Teacher Dialog */}
+        <Dialog
+          open={showAdd || !!editItem}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowAdd(false);
+              setEditItem(null);
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editItem ? "Edit Teacher" : "Add Teacher"}</DialogTitle>
+            </DialogHeader>
+            <form
+              key={editItem?.id || "new-teacher"}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const payload = {
+                  full_name: fd.get("full_name"),
+                  email: fd.get("email") || undefined,
+                  phone: fd.get("phone"),
+                  is_active: fd.get("is_active") === "on",
+                  password: fd.get("password") || undefined,
+                };
 
-              if (editItem) {
-                updateMutation.mutate(payload);
-              } else {
-                createMutation.mutate(payload);
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input name="full_name" required defaultValue={editItem?.full_name} placeholder="Teacher full name" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+                if (editItem) {
+                  updateMutation.mutate(payload);
+                } else {
+                  createMutation.mutate(payload);
+                }
+              }}
+              className="space-y-4"
+            >
               <div className="space-y-2">
-                <Label>Phone Number</Label>
-                <Input name="phone" required defaultValue={editItem?.phone} placeholder="+977..." />
+                <Label>Full Name</Label>
+                <Input name="full_name" required defaultValue={editItem?.full_name} placeholder="Teacher full name" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input name="phone" required defaultValue={editItem?.phone} placeholder="+977..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email (optional)</Label>
+                  <Input name="email" type="email" defaultValue={editItem?.email} placeholder="teacher@school.edu.np" />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Email (optional)</Label>
-                <Input name="email" type="email" defaultValue={editItem?.email} placeholder="teacher@school.edu.np" />
+                <Label>{editItem ? "Update Password" : "Password"}</Label>
+                <Input
+                  name="password"
+                  type="password"
+                  required={!editItem}
+                  placeholder={editItem ? "Leave blank to keep current password" : "Initial password"}
+                />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>{editItem ? "Update Password" : "Password"}</Label>
-              <Input
-                name="password"
-                type="password"
-                required={!editItem}
-                placeholder={editItem ? "Leave blank to keep current password" : "Initial password"}
-              />
-            </div>
-            <FormCheckbox
+              <FormCheckbox
                 label="Active teacher account"
                 name="is_active"
                 defaultChecked={editItem ? editItem.is_active : true}
               />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? "Save Changes" : "Add Teacher"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? "Save Changes" : "Add Teacher"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

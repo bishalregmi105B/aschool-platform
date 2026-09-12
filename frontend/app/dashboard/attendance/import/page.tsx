@@ -5,15 +5,21 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+  DataPanel,
+  StatGrid,
+  KpiCard,
+} from "@/components/aos/kit/page-kit";
 import {
   Upload, FileSpreadsheet, FileCheck2, CloudUpload, AlertTriangle,
   CheckCircle2, ArrowLeft, XCircle, Download,
@@ -229,94 +235,86 @@ function ImportContent() {
   ];
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Upload className="h-6 w-6" /> Import Attendance
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Bulk-load register rows from a CSV — validated first, nothing is
-            written until you commit
-          </p>
-        </div>
-        <Button variant="outline" onClick={downloadTemplate}>
-          <Download className="h-4 w-4 mr-2" /> CSV template
-        </Button>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {STEPS.map((s, i) => (
-          <div key={s.id} className="flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                step === s.id
-                  ? "border-primary bg-primary/5 text-primary font-medium"
-                  : step > s.id
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
-                    : "border-border text-muted-foreground"
-              }`}
-            >
-              {step > s.id ? <CheckCircle2 className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
-              {s.id}. {s.label}
+    <AOSPage>
+      <AOSPageHeader
+        icon={<Upload className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Import Attendance"
+        subtitle="Bulk-load register rows from a CSV — validated first, nothing is written until you commit"
+        actions={
+          <Button variant="outline" onClick={downloadTemplate}>
+            <Download className="h-4 w-4 mr-2" /> CSV template
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        {/* Stepper */}
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-2">
+              <div
+                className={`flex items-center gap-2 rounded-[var(--w11-radius-full)] border px-3 py-1.5 text-sm ${
+                  step === s.id
+                    ? "border-[var(--w11-accent)] bg-[var(--w11-accent-light)] text-[color:var(--w11-accent)] font-medium"
+                    : step > s.id
+                      ? "border-[#107c10] bg-[rgba(16,124,16,0.12)] text-[#107c10]"
+                      : "border-[var(--w11-border-default)] text-[color:var(--w11-text-secondary)]"
+                }`}
+              >
+                {step > s.id ? <CheckCircle2 className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
+                {s.id}. {s.label}
+              </div>
+              {i < STEPS.length - 1 && <span className="text-[color:var(--w11-text-secondary)]">→</span>}
             </div>
-            {i < STEPS.length - 1 && <span className="text-muted-foreground">→</span>}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* ── Step 1: choose file ───────────────────────────────────────────── */}
-      {step === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">1. Choose a CSV file</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-12 cursor-pointer hover:bg-muted/40 transition-colors"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                onFile(e.dataTransfer.files?.[0]);
-              }}
-            >
-              <Upload className="h-10 w-10 text-muted-foreground opacity-40" />
-              <p className="font-medium">Drop a CSV here or click to browse</p>
-              <p className="text-xs text-muted-foreground">
-                Columns: student_id, date_bs (or date), status, remarks — .csv / .txt
+        {/* ── Step 1: choose file ───────────────────────────────────────────── */}
+        {step === 1 && (
+          <DataPanel title="1. Choose a CSV file">
+            <div className="space-y-4">
+              <label
+                className="flex flex-col items-center justify-center gap-2 rounded-[var(--w11-radius-lg)] border-2 border-dashed border-[var(--w11-border-default)] py-12 cursor-pointer hover:bg-[var(--w11-control-hover)] transition-colors"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  onFile(e.dataTransfer.files?.[0]);
+                }}
+              >
+                <Upload className="h-10 w-10 text-[color:var(--w11-text-secondary)] opacity-40" />
+                <p className="font-medium">Drop a CSV here or click to browse</p>
+                <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                  Columns: student_id, date_bs (or date), status, remarks — .csv / .txt
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  onChange={(e) => onFile(e.target.files?.[0])}
+                />
+              </label>
+              <p className="text-xs text-[color:var(--w11-text-secondary)]">
+                Spreadsheets (XLSX) are not parsed in-browser — export the sheet as CSV
+                first. Statuses: present, absent, late, half_day, leave, holiday.
               </p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,.txt"
-                className="hidden"
-                onChange={(e) => onFile(e.target.files?.[0])}
-              />
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Spreadsheets (XLSX) are not parsed in-browser — export the sheet as CSV
-              first. Statuses: present, absent, late, half_day, leave, holiday.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          </DataPanel>
+        )}
 
-      {/* ── Step 2: client-side parse ─────────────────────────────────────── */}
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center justify-between gap-2">
+        {/* ── Step 2: client-side parse ─────────────────────────────────────── */}
+        {step === 2 && (
+          <DataPanel
+            title={
               <span className="flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> 2. Parsed {fileName}
               </span>
+            }
+            actions={
               <Button variant="ghost" size="sm" onClick={reset}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Start over
               </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            }
+          >
             {parsed.entries.length === 0 && parsed.parseErrors.length === 0 ? (
               <EmptyState
                 size="sm"
@@ -326,38 +324,36 @@ function ImportContent() {
               />
             ) : (
               <>
-                <div className="flex flex-wrap gap-3">
-                  <div className="rounded-lg border px-4 py-2">
-                    <p className="text-xl font-bold">{parsed.entries.length}</p>
-                    <p className="text-[11px] text-muted-foreground">rows parsed</p>
-                  </div>
+                <StatGrid min={140}>
+                  <KpiCard label="Rows parsed" value={parsed.entries.length} />
                   {(parsed.parseErrors.length > 0 || parsed.entries.length === 0) && (
-                    <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-2">
-                      <p className="text-xl font-bold text-amber-700">{parsed.parseErrors.length}</p>
-                      <p className="text-[11px] text-amber-700">local parse issues</p>
-                    </div>
+                    <KpiCard
+                      label="Local parse issues"
+                      value={parsed.parseErrors.length}
+                      color="#d83b01"
+                    />
                   )}
-                  <div className="ml-auto flex items-end">
-                    <Button
-                      onClick={() => previewMutation.mutate()}
-                      disabled={parsed.entries.length === 0 || previewMutation.isPending}
-                    >
-                      {previewMutation.isPending ? (
-                        <Spinner className="h-4 w-4 mr-2" />
-                      ) : (
-                        <FileCheck2 className="h-4 w-4 mr-2" />
-                      )}
-                      Validate against the school
-                    </Button>
-                  </div>
+                </StatGrid>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => previewMutation.mutate()}
+                    disabled={parsed.entries.length === 0 || previewMutation.isPending}
+                  >
+                    {previewMutation.isPending ? (
+                      <Spinner className="h-4 w-4 mr-2" />
+                    ) : (
+                      <FileCheck2 className="h-4 w-4 mr-2" />
+                    )}
+                    Validate against the school
+                  </Button>
                 </div>
 
                 {/* Sample of parsed rows */}
                 {parsed.entries.length > 0 && (
-                  <div className="rounded-lg border overflow-auto max-h-64">
+                  <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-64 mt-4">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/30">
+                        <TableRow>
                           <TableHead className="w-14">Row</TableHead>
                           <TableHead>Student ID</TableHead>
                           <TableHead>Date</TableHead>
@@ -380,7 +376,7 @@ function ImportContent() {
                       </TableBody>
                     </Table>
                     {parsed.entries.length > 20 && (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">
+                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
                         Showing first 20 of {parsed.entries.length} rows.
                       </p>
                     )}
@@ -389,7 +385,14 @@ function ImportContent() {
 
                 {/* Local parse errors */}
                 {parsed.parseErrors.length > 0 && (
-                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 space-y-0.5">
+                  <div
+                    className="rounded-[var(--w11-radius-md)] border px-3 py-2 text-xs space-y-0.5 mt-4"
+                    style={{
+                      borderColor: "rgba(216,59,1,0.3)",
+                      background: "rgba(216,59,1,0.08)",
+                      color: "#d83b01",
+                    }}
+                  >
                     <p className="font-medium">Some rows were skipped while parsing:</p>
                     {parsed.parseErrors.slice(0, 5).map((e, i) => (
                       <p key={i}>• {e}</p>
@@ -401,31 +404,37 @@ function ImportContent() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </DataPanel>
+        )}
 
-      {/* ── Step 3: server preview + commit ───────────────────────────────── */}
-      {step === 3 && preview && (        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center justify-between gap-2">
+        {/* ── Step 3: server preview + commit ───────────────────────────────── */}
+        {step === 3 && preview && (
+          <DataPanel
+            title={
               <span className="flex items-center gap-2">
-                <CloudUpload className="h-4 w-4" /> 3. Preview & import
+                <CloudUpload className="h-4 w-4" /> 3. Preview &amp; import
               </span>
+            }
+            actions={
               <Button variant="ghost" size="sm" onClick={reset}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Start over
               </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            }
+          >
             {commitResult ? (
-              <div className="rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-6 text-center">
-                <CheckCircle2 className="h-10 w-10 mx-auto text-emerald-600 mb-2" />
-                <p className="text-lg font-bold text-emerald-700">
+              <div
+                className="rounded-[var(--w11-radius-lg)] border px-4 py-6 text-center"
+                style={{
+                  borderColor: "rgba(16,124,16,0.3)",
+                  background: "rgba(16,124,16,0.08)",
+                }}
+              >
+                <CheckCircle2 className="h-10 w-10 mx-auto mb-2" style={{ color: "#107c10" }} />
+                <p className="text-lg font-bold" style={{ color: "#107c10" }}>
                   {commitResult.applied} rows applied
                 </p>
                 {commitResult.skipped_invalid > 0 && (
-                  <p className="text-sm text-amber-700">
+                  <p className="text-sm" style={{ color: "#d83b01" }}>
                     {commitResult.skipped_invalid} invalid rows were skipped.
                   </p>
                 )}
@@ -435,23 +444,25 @@ function ImportContent() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-3 max-w-sm">
-                  <div className="rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2">
-                    <p className="text-xl font-bold text-emerald-700">{preview.valid_count}</p>
-                    <p className="text-[11px] text-emerald-700">valid rows</p>
-                  </div>
-                  <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/30 px-4 py-2">
-                    <p className="text-xl font-bold text-red-700">{preview.error_count}</p>
-                    <p className="text-[11px] text-red-700">rows with errors</p>
-                  </div>
-                </div>
+                <StatGrid min={140} className="max-w-sm">
+                  <KpiCard
+                    label="Valid rows"
+                    value={preview.valid_count}
+                    color="#107c10"
+                  />
+                  <KpiCard
+                    label="Rows with errors"
+                    value={preview.error_count}
+                    color="#c42b1c"
+                  />
+                </StatGrid>
 
                 {/* Per-row errors */}
                 {preview.errors.length > 0 && (
-                  <div className="rounded-lg border border-red-200 overflow-auto max-h-56">
+                  <div className="rounded-[var(--w11-radius-lg)] border border-[rgba(196,43,28,0.3)] overflow-auto max-h-56">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-red-50 dark:bg-red-950/20">
+                        <TableRow>
                           <TableHead className="w-16">Row</TableHead>
                           <TableHead>Error</TableHead>
                         </TableRow>
@@ -460,7 +471,7 @@ function ImportContent() {
                         {preview.errors.map((e, i) => (
                           <TableRow key={i}>
                             <TableCell className="text-center font-mono text-xs">{e.row}</TableCell>
-                            <TableCell className="text-sm text-red-700">
+                            <TableCell className="text-sm" style={{ color: "#c42b1c" }}>
                               <span className="inline-flex items-center gap-1.5">
                                 <XCircle className="h-3.5 w-3.5" /> {e.error}
                               </span>
@@ -470,7 +481,7 @@ function ImportContent() {
                       </TableBody>
                     </Table>
                     {preview.error_count > preview.errors.length && (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">
+                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
                         Showing first {preview.errors.length} of {preview.error_count} errors.
                       </p>
                     )}
@@ -479,10 +490,10 @@ function ImportContent() {
 
                 {/* Valid preview rows */}
                 {preview.preview.length > 0 && (
-                  <div className="rounded-lg border overflow-auto max-h-72">
+                  <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-72 mt-4">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/30">
+                        <TableRow>
                           <TableHead>Student</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Status</TableHead>
@@ -503,7 +514,7 @@ function ImportContent() {
                       </TableBody>
                     </Table>
                     {preview.valid_count > preview.preview.length && (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">
+                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
                         Showing first {preview.preview.length} of {preview.valid_count} valid rows.
                       </p>
                     )}
@@ -511,12 +522,19 @@ function ImportContent() {
                 )}
 
                 {preview.valid_count === 0 ? (
-                  <div className="flex items-center gap-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-sm text-red-700">
+                  <div
+                    className="flex items-center gap-2 rounded-[var(--w11-radius-md)] border px-3 py-2 text-sm mt-4"
+                    style={{
+                      borderColor: "rgba(196,43,28,0.3)",
+                      background: "rgba(196,43,28,0.08)",
+                      color: "#c42b1c",
+                    }}
+                  >
                     <AlertTriangle className="h-4 w-4" /> No valid rows to import — fix the
                     errors and upload again.
                   </div>
                 ) : (
-                  <div className="flex justify-end">
+                  <div className="flex justify-end mt-4">
                     <Button
                       onClick={() => commitMutation.mutate()}
                       disabled={commitMutation.isPending || preview.valid_count === 0}
@@ -532,10 +550,9 @@ function ImportContent() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-    </div>
+          </DataPanel>
+        )}
+      </AOSPageBody>
+    </AOSPage>
   );
 }
