@@ -1,0 +1,85 @@
+/**
+ * 11.css - Fluent Progress Bar
+ * Windows 11 Progress Control
+ */
+
+progress,
+.win11-progressbar {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--w11-border-default);
+  border-radius: var(--w11-radius-full);
+  overflow: hidden;
+  border: none;
+  display: block;
+
+  /* WebKit Value */
+  &::-webkit-progress-bar {
+    background: var(--w11-border-default);
+    border-radius: var(--w11-radius-full);
+  }
+
+  &::-webkit-progress-value {
+    background: var(--w11-accent);
+    border-radius: var(--w11-radius-full);
+    transition: width var(--w11-transition-normal);
+  }
+
+  /* Firefox */
+  &::-moz-progress-bar {
+    background: var(--w11-accent);
+    border-radius: var(--w11-radius-full);
+  }
+
+  /* Indeterminate Progress Bar */
+  &:not([value]),
+  &.indeterminate {
+    position: relative;
+    background: var(--w11-border-default);
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 30%;
+      background: var(--w11-accent);
+      border-radius: var(--w11-radius-full);
+      animation: w11-progress-indeterminate 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  }
+
+  /* Error State */
+  &.error::-webkit-progress-value {
+    background: #c42b1c;
+  }
+  &.error::-moz-progress-bar {
+    background: #c42b1c;
+  }
+
+  /* Paused State */
+  &.paused::-webkit-progress-value {
+    background: #9d5d00;
+  }
+  &.paused::-moz-progress-bar {
+    background: #9d5d00;
+  }
+}
+
+@keyframes w11-progress-indeterminate {
+  0% {
+    left: -35%;
+    width: 30%;
+  }
+  50% {
+    left: 25%;
+    width: 60%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
+}

@@ -5,6 +5,9 @@ __pycache__/
 *.so
 *.egg-info/
 dist/
+# Vendored 11.css ships its compiled dist with the package
+!frontend/vendor/11.css/dist/
+!frontend/vendor/11.css/dist/**
 build/
 .eggs/
 *.egg

@@ -1,0 +1,31 @@
+/**
+ * 11.css - Fluent Cards & Settings Sections
+ * Windows 11 Card Container
+ */
+
+fieldset,
+.win11-card,
+.card {
+  box-sizing: border-box;
+  background: var(--w11-card-bg);
+  border: 1px solid var(--w11-border-default);
+  border-radius: var(--w11-radius-md);
+  padding: 16px;
+  margin: 0 0 12px 0;
+  box-shadow: var(--w11-elevation-card);
+  transition: all var(--w11-transition-fast);
+
+  legend {
+    font-family: var(--w11-font-family);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--w11-text-primary);
+    padding: 0 6px;
+  }
+
+  &.interactive:hover {
+    background: var(--w11-control-hover);
+    border-color: var(--w11-border-strong);
+    cursor: pointer;
+  }
+}

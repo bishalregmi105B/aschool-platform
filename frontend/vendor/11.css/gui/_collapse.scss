@@ -1,0 +1,61 @@
+/**
+ * 11.css - Fluent Expander
+ * Windows 11 Collapsible Settings Cards
+ */
+
+details.win11-expander,
+details.collapse {
+  box-sizing: border-box;
+  background: var(--w11-card-bg);
+  border: 1px solid var(--w11-border-default);
+  border-radius: var(--w11-radius-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: all var(--w11-transition-normal);
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    font-family: var(--w11-font-family);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--w11-text-primary);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    outline: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border: solid var(--w11-text-secondary);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      transition: transform var(--w11-transition-fast);
+      margin-left: 12px;
+    }
+
+    &:hover {
+      background: var(--w11-control-hover);
+    }
+  }
+
+  &[open] {
+    summary::after {
+      transform: rotate(-135deg);
+    }
+
+    .expander-content {
+      padding: 16px;
+      border-top: 1px solid var(--w11-border-subtle);
+      background: var(--w11-surface);
+    }
+  }
+}

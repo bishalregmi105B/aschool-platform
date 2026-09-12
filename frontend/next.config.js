@@ -25,6 +25,9 @@ const publicSiteCsp = [
 ].join("; ");
 
 const nextConfig = {
+  // Vendored 11.css (Win11 Fluent design system) is a local file: package;
+  // transpile it so its dist CSS resolves through package exports.
+  transpilePackages: ["11.css"],
   // Host builds (CI / local verify) use a separate distDir so they never
   // fight over .next with the root-owned dev container running on this
   // checkout (EACCES unlink errors during `next build`).

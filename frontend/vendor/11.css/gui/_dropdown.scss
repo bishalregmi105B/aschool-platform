@@ -1,0 +1,23 @@
+/**
+ * 11.css - Fluent Dropdown Flyouts
+ * Windows 11 Dropdown Popovers
+ */
+
+.win11-dropdown,
+.dropdown {
+  position: relative;
+  display: inline-block;
+
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1000;
+  }
+
+  &.is-open .dropdown-menu,
+  &:focus-within .dropdown-menu {
+    display: flex;
+  }
+}
