@@ -109,7 +109,7 @@ def create_notice():
 
     # Emit event
     from app.plugins.events import emit
-    emit("notice.created", school_id=str(g.school_id), notice_id=str(notice.id))
+    emit("notice.published", school_id=str(g.school_id), notice_id=str(notice.id))
 
     return created_response(_notice_dict(notice))
 

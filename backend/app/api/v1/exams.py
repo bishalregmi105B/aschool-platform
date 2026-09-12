@@ -391,6 +391,16 @@ def create_online_exam():
     )
     db.session.add(exam)
     db.session.commit()
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school(
+            "exams.scheduled",
+            school_id=str(g.school_id),
+            exam_id=str(exam.id),
+        )
+    except Exception:
+        pass
     return created_response(_online_exam_dict(exam, include_questions=True))
 
 
@@ -774,6 +784,12 @@ def create_exam():
         exam.total_marks = data["full_marks"]
     db.session.add(exam)
     db.session.commit()
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school("exams.scheduled", school_id=str(g.school_id), exam_id=str(exam.id))
+    except Exception:
+        pass
     return created_response(_exam_dict(exam))
 
 
@@ -1168,7 +1184,7 @@ def submit_marks(exam_id):
 
     from app.plugins.events import emit
 
-    emit("marks.submitted", school_id=str(g.school_id), exam_id=str(exam_id))
+    emit("exams.marks_entered", school_id=str(g.school_id), exam_id=str(exam_id))
 
     return success_response(
         {
@@ -1739,7 +1755,7 @@ def publish_results(exam_id):
 
     from app.plugins.events import emit
 
-    emit("results.published", school_id=str(g.school_id), exam_id=str(exam_id))
+    emit("exams.result_published", school_id=str(g.school_id), exam_id=str(exam_id))
 
     return success_response({"message": "Results published", "exam_id": str(exam_id)})
 

@@ -330,6 +330,15 @@ def return_book(issue_id):
         book.available_copies = (book.available_copies or 0) + 1
 
     db.session.commit()
+    try:
+        _events.emit_for_school(
+            "library.returned",
+            str(g.school_id),
+            issue_id=str(issue.id),
+            book_id=str(issue.book_id) if getattr(issue, "book_id", None) else None,
+        )
+    except Exception:
+        pass
     if hold:
         _events.emit_for_school("library.hold_ready", str(g.school_id), reservation_id=str(hold.id))
     if fine:

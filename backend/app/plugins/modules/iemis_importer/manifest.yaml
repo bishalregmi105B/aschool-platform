@@ -88,7 +88,6 @@ supported_formats:
 events:
   emits:
   - iemis.import_completed
-  - iemis.students_imported
   listens: []
 capabilities:
   api_blueprint: app.api.v1.iemis_importer

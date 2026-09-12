@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from flask import Blueprint, g, request
-from flask_jwt_extended import get_jwt, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required, verify_jwt_in_request
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.notice import Notice
@@ -54,10 +54,22 @@ def get_mobile_version():
         if min_version and _compare_versions(current_version, min_version) < 0:
             force_update = True
 
+    # A-07: per-app maintenance flag (School.settings["mobile_ops"]) — the
+    # ops twin of force_update; apps render a maintenance screen when set.
+    mobile_ops = {}
+    if isinstance(getattr(g.school, "settings", None), dict):
+        mobile_ops = g.school.settings.get("mobile_ops") or {}
+    maintenance_map = mobile_ops.get("maintenance") or {}
+    maintenance = bool(maintenance_map.get("all", False))
+    if app_name and isinstance(maintenance_map, dict):
+        maintenance = maintenance or bool(maintenance_map.get(app_name, False))
+
     return success_response(
         {
             **config,
             "force_update": force_update,
+            "maintenance": maintenance,
+            "maintenance_message": mobile_ops.get("maintenance_message"),
         }
     )
 
@@ -81,16 +93,36 @@ def update_mobile_version():
         "teacher_min_version",
         "parent_min_version",
         "admin_min_version",
+        "user_min_version",
         "student_store_url",
         "teacher_store_url",
         "parent_store_url",
         "admin_store_url",
+        "user_store_url",
     }
     for key in allowed:
         if key in data:
             current[key] = data[key]
 
     settings["mobile_version"] = current
+
+    # A-07: maintenance flags + message (per-app or global "all").
+    if "maintenance" in data or "maintenance_message" in data:
+        ops = dict(settings.get("mobile_ops") or {})
+        if "maintenance_message" in data:
+            ops["maintenance_message"] = str(data.get("maintenance_message") or "")[:300]
+        if "maintenance" in data:
+            value = data.get("maintenance")
+            if isinstance(value, dict):
+                ops["maintenance"] = {
+                    str(k): bool(v) for k, v in value.items() if k in (
+                        "all", "admin", "teacher", "student", "parent", "user"
+                    )
+                }
+            else:
+                ops["maintenance"] = {"all": bool(value)}
+        settings["mobile_ops"] = ops
+
     school.settings = settings
     flag_modified(school, "settings")
     db.session.commit()
@@ -507,3 +539,63 @@ def _version_parts(value: str) -> list[int]:
         digits = "".join(char for char in part if char.isdigit())
         parts.append(int(digits or 0))
     return parts
+
+
+# ── S-A3 (A-30): crash reporting from the five Flutter apps ──────────────
+
+@mobile_bp.route("/crash", methods=["POST"])
+def report_crash():
+    """Accept a crash report. Auth optional: a crash during token refresh or
+    on the launcher's school-lookup screen must still be reportable. PII
+    discipline: no tokens, no phone numbers — the client sends identifiers
+    it already holds (school slug / user id) and we cap the payload."""
+    from app.models.monitoring import MobileCrashReport
+    from app.models.school import School
+
+    data = request.get_json(silent=True) or {}
+    error = str(data.get("error") or "unknown error")[:500]
+    if not error:
+        return error_response("error is required", 400)
+
+    school_id = None
+    slug = data.get("school_slug")
+    if slug:
+        school = School.query.filter_by(slug=str(slug), is_active=True).first()
+        if school:
+            school_id = school.id
+
+    user_id = None
+    try:
+        from flask_jwt_extended import verify_jwt_in_request
+
+        verify_jwt_in_request(optional=True)
+        raw = get_jwt_identity()
+        if raw:
+            import uuid as _uuid
+
+            user_id = _uuid.UUID(str(raw))
+    except Exception:
+        user_id = None
+
+    stack = str(data.get("stack") or "")[:8000]
+    context = data.get("context") if isinstance(data.get("context"), dict) else {}
+    # Never persist tokens/passwords that drift into a context blob.
+    for key in list(context.keys()):
+        if any(s in key.lower() for s in ("token", "password", "secret", "otp")):
+            context[key] = "[redacted]"
+
+    row = MobileCrashReport(
+        school_id=school_id,
+        user_id=user_id,
+        app=str(data.get("app") or "unknown")[:20],
+        app_version=str(data.get("app_version") or "")[:30],
+        platform=str(data.get("platform") or "")[:20],
+        os_version=str(data.get("os_version") or "")[:60],
+        error=error,
+        stack=stack or None,
+        context=context,
+        handled=bool(data.get("handled", False)),
+    )
+    db.session.add(row)
+    db.session.commit()
+    return success_response({"id": str(row.id)})

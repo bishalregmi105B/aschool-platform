@@ -994,6 +994,13 @@ def publish_website():
     website.published_at = datetime.now(timezone.utc)
     db.session.commit()
 
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school("website.published", school_id=str(g.school_id), page="home")
+    except Exception:
+        pass
+
     _revalidate_public_site(school.slug)
 
     return success_response({"published": True, "published_at": str(website.published_at)})

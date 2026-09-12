@@ -13,7 +13,6 @@ conflicts_with: []
 events:
   emits:
   - incident.reported
-  - incident.resolved
   listens: []
 capabilities:
   api_blueprint: app.api.v1.incidents

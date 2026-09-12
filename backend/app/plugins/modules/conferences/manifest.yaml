@@ -14,7 +14,6 @@ conflicts_with: []
 events:
   emits:
   - conference.booked
-  - conference.completed
   listens: []
 capabilities:
   api_blueprint: app.api.v1.conferences

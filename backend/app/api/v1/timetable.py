@@ -74,6 +74,12 @@ def generate_timetable():
         period_duration=data.get("period_duration", 45),
         start_time=data.get("start_time", "10:00"),
     )
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school("timetable.generated", school_id=str(g.school_id))
+    except Exception:
+        pass
     return success_response(result)
 
 
@@ -107,6 +113,12 @@ def save_timetable():
         query.delete(synchronize_session=False)
     saved = TimetableSolverService.save_timetable(g.school_id, data)
     db.session.commit()
+    try:
+        from app.plugins.events import emit_for_school
+
+        emit_for_school("timetable.generated", school_id=str(g.school_id))
+    except Exception:
+        pass
     return success_response({"saved_slots": saved})
 
 

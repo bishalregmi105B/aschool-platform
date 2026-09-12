@@ -1532,7 +1532,7 @@ def record_payment(collection_id):
     from app.plugins.events import emit
 
     emit(
-        "fee.paid",
+        "fees.collected",
         school_id=str(g.school_id),
         student_id=str(fc.student_id),
         amount=amount,
@@ -4203,7 +4203,7 @@ def approve_offline_submission(submission_id):
     from app.plugins.events import emit
 
     emit(
-        "fee.paid",
+        "fees.collected",
         school_id=str(g.school_id),
         student_id=str(sub.student_id),
         amount=allocated,

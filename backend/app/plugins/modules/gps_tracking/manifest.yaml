@@ -13,9 +13,6 @@ depends_on: []
 conflicts_with: []
 events:
   emits:
-  - transport.bus_departed
-  - transport.bus_arrived
-  - transport.speed_alert
   listens: []
 capabilities:
   api_blueprint: app.api.v1.transport

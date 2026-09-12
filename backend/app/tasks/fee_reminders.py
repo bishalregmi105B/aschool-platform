@@ -228,7 +228,11 @@ def send_fee_reminders(school_id: str):
             continue
         period = " ".join(part for part in (fee.month_bs, fee.year_bs) if part) or "your billing period"
         guardian = Guardian.query.filter_by(student_id=student.id, is_primary=True).first()
-        if guardian and guardian.phone:
+        # A-02: the notification matrix can disable the reminder SMS per school.
+        from app.services.notification_rules import channel_enabled
+
+        reminder_sms_on = channel_enabled(str(school_id), "fees.overdue", "sms")
+        if reminder_sms_on and guardian and guardian.phone:
             msg = compose_fee_reminder_message(
                 f"{student.first_name or ''} {student.last_name or ''}".strip()
                 or "Student",
@@ -275,6 +279,23 @@ def send_fee_reminders(school_id: str):
         # P-01(c): stamp AFTER delivery attempts so a crash mid-loop retries
         # only the un-sent tail.
         fee.last_reminder_sent_at = datetime.now(timezone.utc)
+        try:
+            from app.plugins.events import emit_for_school
+
+            emit_for_school(
+                "fees.reminder_sent",
+                school_id=str(school_id),
+                student_id=str(student.id),
+                amount=pending_amount,
+            )
+            emit_for_school(
+                "fees.overdue",
+                school_id=str(school_id),
+                student_id=str(student.id),
+                amount=pending_amount,
+            )
+        except Exception:
+            pass
     from extensions import db
 
     db.session.commit()

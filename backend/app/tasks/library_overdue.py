@@ -40,7 +40,7 @@ def check_overdue_books():
 
             for issue in overdue:
                 emit_for_school(
-                    "library.book_overdue",
+                    "library.overdue",
                     school_id=str(school_id),
                     issue_id=str(issue.id),
                     student_id=str(issue.student_id) if issue.student_id else None,

@@ -23,7 +23,6 @@ depends_on:
 conflicts_with: []
 events:
   emits:
-  - curriculum.content_published
   listens: []
 owns_tables:
 - teaching_sections

@@ -57,7 +57,7 @@ def trigger_alert():
 
     from app.plugins.events import emit
     emit(
-        "emergency.alert_broadcast",
+        "emergency.alert_triggered",
         school_id=str(g.school_id),
         alert_id=str(alert.id),
         alert_type=alert.alert_type or "general",

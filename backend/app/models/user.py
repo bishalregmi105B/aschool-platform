@@ -58,6 +58,9 @@ class User(BaseModel):
 
     # Brute-force lockout (per-user, independent of IP-level rate limiting)
     failed_login_count = Column(Integer, default=0, nullable=False)
+    # A-37: set when an admin resets a password or policy demands rotation;
+    # the apps surface a change-password screen before anything else.
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default="false")
     locked_until = Column(DateTime, nullable=True)  # UTC; None means not locked
 
     # Tokens issued before this UTC timestamp are rejected by the blocklist
@@ -118,6 +121,7 @@ class User(BaseModel):
                 if not k.endswith("_secret")
             },
             "is_active": self.is_active,
+            "must_change_password": bool(self.must_change_password),
             "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
             "school_id": str(self.school_id) if self.school_id else None,
             "login_id": self.email or self.phone,

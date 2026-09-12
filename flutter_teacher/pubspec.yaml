@@ -8,6 +8,9 @@ environment:
   flutter: '>=3.16.0'
 
 dependencies:
+  package_info_plus: ^9.0.1
+  showcaseview: ^5.0.0
+  shared_preferences: ^2.5.3
   flutter:
     sdk: flutter
   aschool_shared:

@@ -9,7 +9,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.models.notification import InAppNotification
-from app.utils.decorators import school_required
+from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import error_response, success_response
 from extensions import db
@@ -187,3 +187,105 @@ def _notification_dict(n: InAppNotification) -> dict:
         "action_url": n.action_url,
         "created_at": n.created_at.isoformat() if n.created_at else None,
     }
+
+
+# ── S-A3 (A-02): per-event notification matrix ───────────────────────────
+
+@notifications_bp.route("/rules", methods=["GET"])
+@jwt_required()
+@school_required
+def list_notification_rules():
+    """The school's matrix: known events × channels with the effective
+    (default-on / disabled) state per channel."""
+    from app.models.notification import NotificationRule
+    from app.services.notification_rules import KNOWN_EVENTS, channels_for
+
+    rows = NotificationRule.query.filter(
+        NotificationRule.school_id == g.school_id,
+        NotificationRule.is_deleted.is_(False),
+    ).all()
+
+    catalog = []
+    for event_key in KNOWN_EVENTS:
+        effective = channels_for(g.school_id, event_key)
+        overrides = [
+            {
+                "id": str(r.id),
+                "channel": r.channel,
+                "audience_role": r.audience_role or None,
+                "enabled": bool(r.enabled),
+                "template_key": r.template_key,
+            }
+            for r in rows
+            if r.event_key == event_key
+        ]
+        catalog.append({
+            "event_key": event_key,
+            "channels": effective,
+            "overrides": overrides,
+        })
+    return success_response({"events": catalog, "channels": ["push", "sms", "email", "whatsapp"]})
+
+
+@notifications_bp.route("/rules", methods=["PUT"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def upsert_notification_rule():
+    """Set one matrix cell: {event_key, channel, audience_role?, enabled}."""
+    from app.models.notification import NotificationRule
+    from app.services.notification_rules import KNOWN_EVENTS
+
+    data = request.get_json(silent=True) or {}
+    event_key = str(data.get("event_key") or "").strip()
+    channel = str(data.get("channel") or "").strip().lower()
+    audience_role = str(data.get("audience_role") or "").strip().lower()
+    enabled = bool(data.get("enabled", False))
+    if event_key not in KNOWN_EVENTS:
+        return error_response(f"event_key must be one of the known events ({event_key!r})", 400)
+    if channel not in ("push", "sms", "email", "whatsapp"):
+        return error_response("channel must be push|sms|email|whatsapp", 400)
+
+    rule = NotificationRule.query.filter(
+        NotificationRule.school_id == g.school_id,
+        NotificationRule.event_key == event_key,
+        NotificationRule.channel == channel,
+        NotificationRule.audience_role == audience_role,
+        NotificationRule.is_deleted.is_(False),
+    ).first()
+    if rule is None:
+        rule = NotificationRule(
+            school_id=g.school_id,
+            event_key=event_key,
+            channel=channel,
+            audience_role=audience_role,
+            enabled=enabled,
+        )
+        db.session.add(rule)
+    else:
+        rule.enabled = enabled
+    db.session.commit()
+    return success_response({
+        "id": str(rule.id),
+        "event_key": rule.event_key,
+        "channel": rule.channel,
+        "audience_role": rule.audience_role or None,
+        "enabled": bool(rule.enabled),
+    })
+
+
+@notifications_bp.route("/rules/<uuid:rule_id>", methods=["DELETE"])
+@jwt_required()
+@school_required
+@role_required("superadmin", "school_admin")
+def delete_notification_rule(rule_id):
+    """Remove an override — the cell returns to default (enabled)."""
+    from app.models.notification import NotificationRule
+
+    rule = NotificationRule.query.filter_by(
+        id=rule_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if rule is None:
+        return error_response("Rule not found", 404)
+    rule.soft_delete()
+    return success_response({"deleted": True})
