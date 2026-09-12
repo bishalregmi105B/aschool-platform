@@ -32,6 +32,10 @@ ui:
     subitems:
     - label: Leave Requests
       route: /dashboard/attendance/leave-requests
+    - label: Subject Attendance
+      route: /dashboard/attendance/subject
+    - label: Import Attendance
+      route: /dashboard/attendance/import
     - label: Monthly Report
       route: /dashboard/attendance/reports
     - label: Holiday List

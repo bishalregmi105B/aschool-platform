@@ -40,6 +40,10 @@ ui:
       route: /dashboard/exams/schedule
     - label: Enter Marks
       route: /dashboard/exams/marks
+    - label: Tabulation Sheet
+      route: /dashboard/exams/tabulation
+    - label: Grade Scales
+      route: /dashboard/exams/grade-scales
     - label: Results
       route: /dashboard/exams/results
     - label: Report Cards

@@ -1,21 +1,21 @@
 """Exams plugin API — exams, marks, results, report cards (Nepal NEB grading)."""
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from uuid import UUID
 
-from flask import Blueprint, g, request, send_file
+from flask import Blueprint, Response, g, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.models.academic import Class, Section, Subject
-from app.models.exam import Exam, Marks, OnlineExam, OnlineExamAttempt, ReportCard
+from app.models.exam import Exam, Marks, OnlineExam, OnlineExamAttempt, ReportCard, MarkComponent, GradeScale
 from app.models.school import School
 from app.models.student import Guardian, Student
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.nepal_grading import GRADE_TABLE, calculate_gpa, calculate_subject_grade
+from app.utils.nepal_grading import GRADE_TABLE, calculate_gpa, calculate_grade, calculate_subject_grade
 from app.utils.pagination import paginate
 from app.utils.response import (
     created_response,
@@ -142,6 +142,27 @@ def _assign_competition_ranks(items, key="percentage", rank_field="rank"):
     return items
 
 
+def _school_grade_rows() -> list | None:
+    """A-32: the school's default GradeScale rows (per-school boundaries),
+    or None → the built-in NEB table. Cached per request."""
+    cached = getattr(g, "_grade_scale_rows", "__unset__")
+    if cached != "__unset__":
+        return cached
+    rows = None
+    try:
+        scale = GradeScale.query.filter(
+            GradeScale.school_id == g.school_id,
+            GradeScale.is_default.is_(True),
+            GradeScale.is_deleted.is_(False),
+        ).first()
+        if scale and isinstance(scale.rows, list) and scale.rows:
+            rows = scale.rows
+    except Exception:
+        rows = None
+    g._grade_scale_rows = rows
+    return rows
+
+
 def _build_subject_grade(
     theory_obtained,
     practical_obtained=0,
@@ -167,6 +188,7 @@ def _build_subject_grade(
         config["practical_full_marks"],
         theory_pass_marks=config["theory_pass_marks"],
         practical_pass_marks=config["practical_pass_marks"],
+        grades=_school_grade_rows(),
     )
     result.update(config)
     # Credit hours flow into calculate_gpa so the overall GPA is credit-weighted
@@ -390,6 +412,20 @@ def get_online_exam(online_exam_id):
 @school_required
 @plugin_required("exams")
 def submit_online_exam(online_exam_id):
+    """Submit an online-exam attempt (S-A2, A-05).
+
+    Attempt integrity (the eSchool/InfixEdu lesson set applied):
+      - exactly ONE attempt row per (exam, student) — DB-backed;
+      - an already-submitted attempt makes a second submit a 409 with the
+        existing attempt id (no rescore, no re-rank);
+      - an in-progress attempt (started via /start or /take, autosaved via
+        PATCH) is scored and closed;
+      - a first-time submit (legacy clients that never call /start) creates
+        the attempt atomically inside the same uniqueness guarantee.
+
+    The server returns `remaining_seconds` at /take; the client countdown is
+    UX, not authority — the exam window (start_at/end_at) is enforced here.
+    """
     exam = OnlineExam.query.filter_by(
         id=online_exam_id, school_id=g.school_id, is_deleted=False
     ).first()
@@ -430,19 +466,75 @@ def submit_online_exam(online_exam_id):
     if end_at and now > end_at:
         return error_response("This exam has already ended", 400)
 
-    answers = data.get("answers") or {}
+    # ── A-05: single-attempt resolution ──────────────────────────────────
+    existing = OnlineExamAttempt.query.filter(
+        OnlineExamAttempt.school_id == g.school_id,
+        OnlineExamAttempt.online_exam_id == exam.id,
+        OnlineExamAttempt.student_id == student_uuid,
+        OnlineExamAttempt.is_deleted.is_(False),
+    ).first()
+    if existing is not None and (existing.status or "submitted") == "submitted":
+        return error_response(
+            {
+                "message": "This exam has already been submitted",
+                "attempt_id": str(existing.id),
+                "score": float(existing.score or 0),
+            },
+            409,
+        )
+
+    # Merge any late autosave deltas sent along with the submit payload.
+    answers = dict(existing.answers or {}) if existing is not None else {}
+    answers.update(data.get("answers") or {})
     score = _score_online_exam(exam.questions or [], answers)
-    attempt = OnlineExamAttempt(
-        school_id=g.school_id,
-        online_exam_id=exam.id,
-        student_id=student_uuid,
-        answers=answers,
-        score=score,
-        status="submitted",
-        submitted_at=datetime.now(timezone.utc),
+
+    if existing is not None:
+        attempt = existing
+        attempt.answers = answers
+        attempt.score = score
+        attempt.status = "submitted"
+        attempt.submitted_at = now
+    else:
+        attempt = OnlineExamAttempt(
+            school_id=g.school_id,
+            online_exam_id=exam.id,
+            student_id=student_uuid,
+            answers=answers,
+            score=score,
+            status="submitted",
+            started_at=now,
+            submitted_at=now,
+        )
+        db.session.add(attempt)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # A concurrent submit won the unique index — report the winner.
+        db.session.rollback()
+        winner = OnlineExamAttempt.query.filter(
+            OnlineExamAttempt.school_id == g.school_id,
+            OnlineExamAttempt.online_exam_id == exam.id,
+            OnlineExamAttempt.student_id == student_uuid,
+            OnlineExamAttempt.is_deleted.is_(False),
+        ).first()
+        return error_response(
+            {
+                "message": "This exam has already been submitted",
+                "attempt_id": str(winner.id) if winner else None,
+                "score": float(winner.score or 0) if winner else 0,
+            },
+            409,
+        )
+
+    from app.plugins.events import emit
+
+    emit(
+        "online_exam.submitted",
+        school_id=str(g.school_id),
+        student_id=str(attempt.student_id),
+        exam_id=str(exam.id),
+        score=float(attempt.score or 0),
     )
-    db.session.add(attempt)
-    db.session.commit()
     return created_response(
         {
             "id": str(attempt.id),
@@ -453,6 +545,196 @@ def submit_online_exam(online_exam_id):
             "status": attempt.status,
         }
     )
+
+
+# ── A-05: attempt lifecycle (start / take / autosave) ────────────────────
+
+def _exam_remaining_seconds(exam, attempt) -> int:
+    """Server-authoritative remaining time: the lesser of the exam window's
+    end and the per-attempt duration clock (started_at + duration)."""
+    now = datetime.now(timezone.utc)
+    end_at = exam.end_at.replace(tzinfo=timezone.utc) if exam.end_at and exam.end_at.tzinfo is None else exam.end_at
+    remaining = None
+    if end_at is not None:
+        remaining = int((end_at - now).total_seconds())
+    if attempt is not None and attempt.started_at is not None and (exam.duration_minutes or 0) > 0:
+        started = attempt.started_at.replace(tzinfo=timezone.utc) if attempt.started_at.tzinfo is None else attempt.started_at
+        duration_left = int(
+            (started + timedelta(minutes=exam.duration_minutes) - now).total_seconds()
+        )
+        remaining = duration_left if remaining is None else min(remaining, duration_left)
+    if remaining is None:
+        return (exam.duration_minutes or 30) * 60
+    return max(remaining, 0)
+
+
+def _get_attempt(exam, student_uuid):
+    return OnlineExamAttempt.query.filter(
+        OnlineExamAttempt.school_id == g.school_id,
+        OnlineExamAttempt.online_exam_id == exam.id,
+        OnlineExamAttempt.student_id == student_uuid,
+        OnlineExamAttempt.is_deleted.is_(False),
+    ).first()
+
+
+@exams_bp.route("/online/<uuid:online_exam_id>/start", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def start_online_exam(online_exam_id):
+    """Open (or resume) the calling student's attempt.
+
+    - submitted attempt → 409 (single attempt, the retake question is a
+      per-exam policy decision, not a client retry);
+    - in-progress attempt → returned as-is (resume: answers + server clock);
+    - none → created (status in_progress, started_at now) — the row exists
+      BEFORE questions are served so the attempt is durable even if the
+      app dies immediately (eSchool's lesson: create-on-fetch burned the
+      attempt with no record of answers; ours records the start).
+    """
+    exam = OnlineExam.query.filter_by(
+        id=online_exam_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not exam:
+        return error_response("Online exam not found", 404)
+
+    student = _current_student()
+    if student is None:
+        return error_response("Only students take online exams", 403)
+
+    data = request.get_json(silent=True) or {}
+    if g.role == "student" and data.get("student_id") and str(data["student_id"]) != str(student.id):
+        return error_response("You can only start your own exam", 403)
+
+    now = datetime.now(timezone.utc)
+    start_at = exam.start_at.replace(tzinfo=timezone.utc) if exam.start_at and exam.start_at.tzinfo is None else exam.start_at
+    end_at = exam.end_at.replace(tzinfo=timezone.utc) if exam.end_at and exam.end_at.tzinfo is None else exam.end_at
+    if start_at and now < start_at:
+        return error_response("This exam has not started yet", 400)
+    if end_at and now > end_at:
+        return error_response("This exam has already ended", 400)
+
+    attempt = _get_attempt(exam, student.id)
+    if attempt is not None and (attempt.status or "") == "submitted":
+        return error_response(
+            {
+                "message": "You have already taken this exam",
+                "attempt_id": str(attempt.id),
+                "score": float(attempt.score or 0),
+            },
+            409,
+        )
+    if attempt is None:
+        attempt = OnlineExamAttempt(
+            school_id=g.school_id,
+            online_exam_id=exam.id,
+            student_id=student.id,
+            answers={},
+            status="in_progress",
+            started_at=now,
+        )
+        db.session.add(attempt)
+        db.session.commit()
+
+    return success_response({
+        "attempt_id": str(attempt.id),
+        "status": attempt.status,
+        "started_at": attempt.started_at.isoformat() if attempt.started_at else None,
+        "remaining_seconds": _exam_remaining_seconds(exam, attempt),
+        "saved_answers": attempt.answers or {},
+    })
+
+
+@exams_bp.route("/online/<uuid:online_exam_id>/attempt", methods=["PATCH"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def autosave_online_exam(online_exam_id):
+    """Per-question autosave: merge `answers` deltas into the in-progress
+    attempt. Answers recorded here survive an app kill and are scored at
+    submit (even if the client never gets to send them again)."""
+    exam = OnlineExam.query.filter_by(
+        id=online_exam_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not exam:
+        return error_response("Online exam not found", 404)
+    student = _current_student()
+    if student is None:
+        return error_response("Only students take online exams", 403)
+
+    attempt = _get_attempt(exam, student.id)
+    if attempt is None:
+        return error_response("No attempt started for this exam", 404)
+    if (attempt.status or "") == "submitted":
+        return error_response(
+            {"message": "Attempt already submitted", "attempt_id": str(attempt.id)}, 409
+        )
+
+    data = request.get_json(silent=True) or {}
+    deltas = data.get("answers") or {}
+    if not isinstance(deltas, dict) or not deltas:
+        return error_response("answers must be a non-empty object", 400)
+
+    merged = dict(attempt.answers or {})
+    merged.update(deltas)
+    attempt.answers = merged
+    db.session.commit()
+    return success_response({
+        "attempt_id": str(attempt.id),
+        "saved_question_count": len(merged),
+        "remaining_seconds": _exam_remaining_seconds(exam, attempt),
+    })
+
+
+@exams_bp.route("/online/<uuid:online_exam_id>/take", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def take_online_exam(online_exam_id):
+    """Student-facing exam paper: student-safe questions (the answer key
+    never leaves the server — V2-01 regression) + attempt state + server
+    clock. Auto-starts the attempt so take/submit always pairs with one."""
+    exam = OnlineExam.query.filter_by(
+        id=online_exam_id, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not exam:
+        return error_response("Online exam not found", 404)
+    student = _current_student()
+    if student is None:
+        return error_response("Only students take online exams", 403)
+
+    attempt = _get_attempt(exam, student.id)
+    if attempt is not None and (attempt.status or "") == "submitted":
+        return error_response(
+            {
+                "message": "You have already taken this exam",
+                "attempt_id": str(attempt.id),
+                "score": float(attempt.score or 0),
+            },
+            409,
+        )
+    if attempt is None:
+        now = datetime.now(timezone.utc)
+        attempt = OnlineExamAttempt(
+            school_id=g.school_id,
+            online_exam_id=exam.id,
+            student_id=student.id,
+            answers={},
+            status="in_progress",
+            started_at=now,
+        )
+        db.session.add(attempt)
+        db.session.commit()
+
+    payload = _online_exam_dict(exam, include_questions=True)
+    payload["questions"] = _student_safe_questions(exam.questions or [])
+    payload["attempt"] = {
+        "attempt_id": str(attempt.id),
+        "status": attempt.status,
+        "remaining_seconds": _exam_remaining_seconds(exam, attempt),
+        "saved_answers": attempt.answers or {},
+    }
+    return success_response(payload)
 
 
 @exams_bp.route("", methods=["POST"])
@@ -754,6 +1036,50 @@ def submit_marks(exam_id):
                 400,
             )
 
+        # A-32: component-level scores ({component_id: score}) — the N-way
+        # mark distribution (CQ/MCQ/practical/oral). Validated against the
+        # exam's MarkComponent definitions; the obtained total is their sum.
+        components_payload = rec.get("components")
+        components_json = None
+        if isinstance(components_payload, dict) and components_payload:
+            defs = {
+                str(c.id): c
+                for c in MarkComponent.query.filter(
+                    MarkComponent.school_id == g.school_id,
+                    MarkComponent.exam_id == exam_id,
+                    MarkComponent.subject_id == subj,
+                    MarkComponent.is_deleted.is_(False),
+                ).all()
+            }
+            total_components = 0.0
+            clean_components = {}
+            for comp_id, score in components_payload.items():
+                comp = defs.get(str(comp_id))
+                if comp is None:
+                    return error_response(
+                        f"records[{idx}]: component {comp_id} is not defined "
+                        f"for this exam/subject",
+                        400,
+                    )
+                try:
+                    score_f = float(score or 0)
+                except (TypeError, ValueError):
+                    return error_response(
+                        f"records[{idx}]: component {comp.name} score must be a number",
+                        400,
+                    )
+                if score_f < 0 or score_f > float(comp.max_mark or 0):
+                    return error_response(
+                        f"records[{idx}]: component '{comp.name}' score {score_f:g} "
+                        f"outside 0–{float(comp.max_mark or 0):g}",
+                        400,
+                    )
+                clean_components[str(comp.id)] = score_f
+                total_components += score_f
+            components_json = clean_components
+            theory = round(total_components, 2)
+            practical = 0.0
+
         grade_result = _build_subject_grade(
             theory,
             practical,
@@ -774,9 +1100,9 @@ def submit_marks(exam_id):
                 f"full marks ({float(full_marks):g}) for {subject.name}",
                 400,
             )
-        validated.append((rec, sid, subj, cls_id, subject, theory, practical, grade_result))
+        validated.append((rec, sid, subj, cls_id, subject, theory, practical, grade_result, components_json))
 
-    for rec, sid, subj, cls_id, subject, theory, practical, grade_result in validated:
+    for rec, sid, subj, cls_id, subject, theory, practical, grade_result, components_json in validated:
         total = theory + practical
 
         full_marks = grade_result["total_full_marks"]
@@ -795,6 +1121,7 @@ def submit_marks(exam_id):
             existing.practical_marks = practical
             existing.total_marks = total
             existing.obtained_marks = total
+            existing.components = components_json
             existing.full_marks = full_marks
             existing.pass_marks = pass_marks
             existing.grade = grade_result["grade"]
@@ -814,6 +1141,7 @@ def submit_marks(exam_id):
                 practical_marks=practical,
                 total_marks=total,
                 obtained_marks=total,
+                components=components_json,
                 full_marks=full_marks,
                 pass_marks=pass_marks,
                 grade=grade_result["grade"],
@@ -1899,6 +2227,7 @@ def _marks_dict(m):
         "pass_marks": float(m.pass_marks) if m.pass_marks else None,
         "grade": m.grade,
         "gpa": float(m.gpa) if m.gpa else None,
+        "components": m.components or {},
         "is_absent": getattr(m, "is_absent", False),
         "remarks": m.remarks,
     }
@@ -2043,3 +2372,485 @@ def _current_user_uuid():
         return UUID(str(value))
     except (TypeError, ValueError, AttributeError):
         return None
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# S-A2 — Exam & attendance depth (A-32): mark components, per-school grade
+# scales, tabulation sheet + merit list with print twins (A-04 discipline).
+# ══════════════════════════════════════════════════════════════════════════
+
+@exams_bp.route("/<uuid:exam_id>/components", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def list_mark_components(exam_id):
+    """Mark-distribution components per subject for the marks grid columns."""
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+    rows = MarkComponent.query.filter(
+        MarkComponent.school_id == g.school_id,
+        MarkComponent.exam_id == exam_id,
+        MarkComponent.is_deleted.is_(False),
+    ).order_by(MarkComponent.subject_id, MarkComponent.seq, MarkComponent.name)
+    subject_filter = _coerce_uuid(request.args.get("subject_id"))
+    if subject_filter:
+        rows = rows.filter(MarkComponent.subject_id == subject_filter)
+    return success_response({
+        "components": [
+            {
+                "id": str(c.id),
+                "exam_id": str(c.exam_id),
+                "subject_id": str(c.subject_id),
+                "name": c.name,
+                "max_mark": float(c.max_mark or 0),
+                "pass_mark": float(c.pass_mark) if c.pass_mark is not None else None,
+                "seq": c.seq or 0,
+            }
+            for c in rows.all()
+        ]
+    })
+
+
+@exams_bp.route("/<uuid:exam_id>/components", methods=["PUT"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+@role_required("school_admin", "teacher")
+def set_mark_components(exam_id):
+    """Replace one subject's component distribution for an exam.
+
+    Body: {"subject_id": "...", "components": [{"name": "CQ", "max_mark": 50,
+    "pass_mark": 17.5, "seq": 1}, ...]}.
+    InfixEdu's guard holds: Σ max_mark must not exceed the subject's full
+    marks; names are unique per exam+subject. Components cannot be redefined
+    once marks exist against them (scores are keyed by component id).
+    """
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+    data = request.get_json(silent=True) or {}
+    subject_uuid = _coerce_uuid(data.get("subject_id"))
+    if not subject_uuid:
+        return error_response("subject_id is required", 400)
+    subject = Subject.query.filter_by(
+        id=subject_uuid, school_id=g.school_id, is_deleted=False
+    ).first()
+    if not subject:
+        return error_response("Subject not found", 404)
+
+    rows = data.get("components")
+    if not isinstance(rows, list) or not rows:
+        return error_response("components must be a non-empty list", 400)
+    cleaned = []
+    for idx, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            return error_response(f"components[{idx}] must be an object", 400)
+        name = str(row.get("name") or "").strip()[:100]
+        if not name:
+            return error_response(f"components[{idx}].name is required", 400)
+        try:
+            max_mark = float(row.get("max_mark") or 0)
+        except (TypeError, ValueError):
+            return error_response(f"components[{idx}].max_mark must be a number", 400)
+        if max_mark <= 0:
+            return error_response(f"components[{idx}].max_mark must be > 0", 400)
+        pass_mark = row.get("pass_mark")
+        try:
+            pass_mark = float(pass_mark) if pass_mark is not None else None
+        except (TypeError, ValueError):
+            return error_response(f"components[{idx}].pass_mark must be a number", 400)
+        if pass_mark is not None and (pass_mark < 0 or pass_mark > max_mark):
+            return error_response(
+                f"components[{idx}].pass_mark must be within 0–max_mark", 400
+            )
+        cleaned.append({
+            "name": name,
+            "max_mark": max_mark,
+            "pass_mark": pass_mark,
+            "seq": int(row.get("seq") or idx),
+        })
+
+    names = [c["name"].lower() for c in cleaned]
+    if len(names) != len(set(names)):
+        return error_response("component names must be unique per subject", 400)
+
+    existing_rows = MarkComponent.query.filter(
+        MarkComponent.school_id == g.school_id,
+        MarkComponent.exam_id == exam_id,
+        MarkComponent.subject_id == subject_uuid,
+        MarkComponent.is_deleted.is_(False),
+    ).all()
+    if existing_rows:
+        referenced = Marks.query.filter(
+            Marks.school_id == g.school_id,
+            Marks.exam_id == exam_id,
+            Marks.subject_id == subject_uuid,
+            Marks.is_deleted.is_(False),
+        ).first()
+        if referenced is not None and referenced.components:
+            return error_response(
+                "Marks have already been entered against these components — "
+                "clear the marks before redefining the distribution", 409
+            )
+
+    full_marks = None
+    if exam.full_marks or exam.total_marks:
+        full_marks = float(exam.full_marks or exam.total_marks)
+    if getattr(subject, "full_marks", None):
+        full_marks = float(subject.full_marks)
+    scheduled_total = round(sum(c["max_mark"] for c in cleaned), 2)
+    if full_marks and scheduled_total > full_marks + 0.01:
+        return error_response(
+            f"Component total ({scheduled_total:g}) exceeds the subject's full "
+            f"marks ({full_marks:g})", 400
+        )
+
+    for old in existing_rows:
+        old.soft_delete()
+    for c in cleaned:
+        db.session.add(MarkComponent(
+            school_id=g.school_id,
+            exam_id=exam_id,
+            subject_id=subject_uuid,
+            name=c["name"],
+            max_mark=c["max_mark"],
+            pass_mark=c["pass_mark"],
+            seq=c["seq"],
+        ))
+    db.session.commit()
+    return success_response({"saved": len(cleaned), "scheduled_total": scheduled_total})
+
+
+@exams_bp.route("/grade-scales", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def list_grade_scales():
+    rows = GradeScale.query.filter(
+        GradeScale.school_id == g.school_id, GradeScale.is_deleted.is_(False)
+    ).order_by(GradeScale.is_default.desc(), GradeScale.name).all()
+    return success_response({
+        "scales": [
+            {
+                "id": str(s.id),
+                "name": s.name,
+                "board": s.board,
+                "is_default": bool(s.is_default),
+                "rows": s.rows or [],
+            }
+            for s in rows
+        ],
+        "fallback": "NEB built-in (A+ 4.0 @90% … NG 0.0 <35%)",
+    })
+
+
+@exams_bp.route("/grade-scales", methods=["POST"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+@role_required("school_admin", "superadmin")
+def create_grade_scale():
+    """Create/update a school grading scale. Body: {name, board?, is_default?,
+    rows: [{grade_name, gpa, percent_from, description?}]} — rows must cover
+    down to 0 and be strictly descending. SEE/NEB presets ship via the
+    seeder; schools adjust boundaries here without code."""
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name") or "").strip()[:120]
+    if not name:
+        return error_response("name is required", 400)
+    rows_in = data.get("rows")
+    if not isinstance(rows_in, list) or len(rows_in) < 2:
+        return error_response("rows must be a list of at least 2 grade bands", 400)
+    cleaned = []
+    for idx, row in enumerate(rows_in, 1):
+        if not isinstance(row, dict):
+            return error_response(f"rows[{idx}] must be an object", 400)
+        grade_name = str(row.get("grade_name") or row.get("grade") or "").strip()[:10]
+        try:
+            gpa = float(row.get("gpa") or 0)
+            percent_from = float(row.get("percent_from") or 0)
+        except (TypeError, ValueError):
+            return error_response(f"rows[{idx}]: gpa/percent_from must be numbers", 400)
+        if not grade_name or percent_from < 0 or percent_from > 100:
+            return error_response(f"rows[{idx}]: grade_name/percent_from invalid", 400)
+        cleaned.append({
+            "grade_name": grade_name,
+            "gpa": gpa,
+            "percent_from": percent_from,
+            "percent_upto": row.get("percent_upto"),
+            "description": str(row.get("description") or ""),
+        })
+    cleaned.sort(key=lambda r: -r["percent_from"])
+    if cleaned[-1]["percent_from"] > 0:
+        return error_response("the last band must include 0% (e.g. NG @ 0)", 400)
+    for a, b in zip(cleaned, cleaned[1:]):
+        if a["percent_from"] <= b["percent_from"]:
+            return error_response("percent_from values must be strictly descending", 400)
+
+    is_default = bool(data.get("is_default"))
+    existing = GradeScale.query.filter(
+        GradeScale.school_id == g.school_id,
+        GradeScale.name == name,
+        GradeScale.is_deleted.is_(False),
+    ).first()
+    if existing is None:
+        existing = GradeScale(school_id=g.school_id, name=name)
+        db.session.add(existing)
+    existing.board = data.get("board") or "custom"
+    existing.rows = cleaned
+    if is_default:
+        for other in GradeScale.query.filter(
+            GradeScale.school_id == g.school_id,
+            GradeScale.is_deleted.is_(False),
+            GradeScale.id != existing.id,
+        ).all():
+            other.is_default = False
+    existing.is_default = is_default
+    db.session.commit()
+    return created_response({
+        "id": str(existing.id), "name": existing.name,
+        "is_default": existing.is_default, "rows": existing.rows,
+    })
+
+
+def _tabulation_rows(exam, class_uuid, section_uuid=None):
+    """Shared assembly for the tabulation sheet and merit list:
+    rows per student × subject with grade/gpa + totals + rank."""
+    all_marks = Marks.query.filter(
+        Marks.school_id == g.school_id,
+        Marks.exam_id == exam.id,
+        Marks.class_id == class_uuid,
+        Marks.is_deleted.is_(False),
+    ).all()
+    if section_uuid:
+        students_q = Student.query.filter(
+            Student.school_id == g.school_id,
+            Student.class_id == class_uuid,
+            Student.section_id == section_uuid,
+            Student.is_deleted.is_(False),
+            Student.status == "active",
+        )
+    else:
+        students_q = Student.query.filter(
+            Student.school_id == g.school_id,
+            Student.class_id == class_uuid,
+            Student.is_deleted.is_(False),
+            Student.status == "active",
+        )
+    students = students_q.all()
+
+    subj_query = Subject.query.filter_by(school_id=g.school_id, is_deleted=False)
+    if exam.subject_ids:
+        subj_query = subj_query.filter(Subject.id.in_(exam.subject_ids))
+    else:
+        subj_query = subj_query.filter(Subject.class_ids.any(class_uuid))
+    subjects = subj_query.order_by(Subject.name).all()
+
+    marks_map = {}
+    for m in all_marks:
+        marks_map[(str(m.student_id), str(m.subject_id))] = m
+
+    grade_rows = _school_grade_rows()
+    results = []
+    for student in students:
+        subject_cells = []
+        total_obtained = 0.0
+        total_full = 0.0
+        gpa_points = []
+        has_ng = False
+        any_marks = False
+        for subject in subjects:
+            m = marks_map.get((str(student.id), str(subject.id)))
+            if m is None:
+                subject_cells.append({
+                    "subject_id": str(subject.id), "subject_name": subject.name,
+                    "obtained": None, "full_marks": None, "grade": None,
+                    "gpa": None, "entered": False,
+                })
+                continue
+            any_marks = True
+            obtained = float(m.total_marks or 0)
+            full = float(m.full_marks) if m.full_marks else None
+            if m.is_absent:
+                has_ng = True
+            gpa_points.append(float(m.gpa or 0))
+            if m.grade == "NG":
+                has_ng = True
+            if full:
+                total_obtained += obtained
+                total_full += full
+            subject_cells.append({
+                "subject_id": str(subject.id), "subject_name": subject.name,
+                "obtained": obtained, "full_marks": full,
+                "grade": m.grade, "gpa": float(m.gpa or 0),
+                "entered": True, "is_absent": bool(m.is_absent),
+            })
+        if not any_marks:
+            continue
+        gpa_avg = round(sum(gpa_points) / len(gpa_points), 2) if gpa_points else 0.0
+        pct = round((total_obtained / total_full * 100), 2) if total_full else 0.0
+        results.append({
+            "student_id": str(student.id),
+            "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip(),
+            "roll_number": student.roll_number,
+            "subjects": subject_cells,
+            "total_obtained": round(total_obtained, 2),
+            "total_full": round(total_full, 2),
+            "percentage": pct,
+            "gpa": gpa_avg,
+            "result": "NG" if has_ng else (calculate_grade(pct, grades=grade_rows)["grade"]),
+        })
+    # Merit order: non-NG students first (an absent student cannot top the
+    # merit list — the InfixEdu any-absent→F rule made ordering-safe), then
+    # GPA desc, percentage as tiebreak. Competition ranking on top.
+    results.sort(key=lambda r: (1 if r["result"] == "NG" else 0, -r["gpa"], -r["percentage"]))
+    _assign_competition_ranks(results, key="gpa", rank_field="merit_order")
+    return subjects, results
+
+
+@exams_bp.route("/<uuid:exam_id>/tabulation", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def exam_tabulation(exam_id):
+    """Tabulation sheet: students × subjects grid + grade legend + totals +
+    merit order. `?format=print` returns the HTML print twin."""
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+    class_uuid = _coerce_uuid(request.args.get("class_id"))
+    if not class_uuid:
+        return error_response("class_id is required", 400)
+    section_uuid = _coerce_uuid(request.args.get("section_id"))
+
+    subjects, results = _tabulation_rows(exam, class_uuid, section_uuid)
+    grade_rows = _school_grade_rows() or [
+        {"grade_name": g, "gpa": gpa, "percent_from": pf}
+        for pf, g, gpa, _d in (
+            (90, "A+", 4.0, "Outstanding"), (80, "A", 3.6, "Excellent"),
+            (70, "B+", 3.2, "Very Good"), (60, "B", 2.8, "Good"),
+            (50, "C+", 2.4, "Satisfactory"), (40, "C", 2.0, "Acceptable"),
+            (35, "D", 1.6, "Basic"), (0, "NG", 0.0, "Not Graded"),
+        )
+    ]
+    payload = {
+        "exam": {"id": str(exam.id), "name": exam.name, "exam_type": exam.exam_type},
+        "subjects": [{"id": str(s.id), "name": s.name} for s in subjects],
+        "rows": results,
+        "grade_chart": [
+            {"grade_name": r.get("grade_name"), "gpa": r.get("gpa"),
+             "percent_from": r.get("percent_from")}
+            for r in grade_rows
+        ],
+    }
+    if (request.args.get("format") or "").lower() == "print":
+        html = _tabulation_print_html(exam, payload)
+        return Response(html, mimetype="text/html")
+    return success_response(payload)
+
+
+@exams_bp.route("/<uuid:exam_id>/merit-list", methods=["GET"])
+@jwt_required()
+@school_required
+@plugin_required("exams")
+def exam_merit_list(exam_id):
+    """Merit list: students ordered by GPA (absent/NG anywhere → NG result,
+    the InfixEdu rule), with the printable HTML twin."""
+    exam = Exam.query.get(exam_id)
+    if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
+        return error_response("Exam not found", 404)
+    class_uuid = _coerce_uuid(request.args.get("class_id"))
+    if not class_uuid:
+        return error_response("class_id is required", 400)
+    section_uuid = _coerce_uuid(request.args.get("section_id"))
+
+    subjects, results = _tabulation_rows(exam, class_uuid, section_uuid)
+    merit = [
+        {
+            "merit_order": r["merit_order"],
+            "student_id": r["student_id"],
+            "student_name": r["student_name"],
+            "roll_number": r["roll_number"],
+            "gpa": r["gpa"],
+            "percentage": r["percentage"],
+            "total_obtained": r["total_obtained"],
+            "total_full": r["total_full"],
+            "result": r["result"],
+        }
+        for r in results
+    ]
+    payload = {
+        "exam": {"id": str(exam.id), "name": exam.name, "exam_type": exam.exam_type},
+        "rows": merit,
+    }
+    if (request.args.get("format") or "").lower() == "print":
+        return Response(_merit_print_html(exam, merit), mimetype="text/html")
+    return success_response(payload)
+
+
+def _tabulation_print_html(exam, payload):
+    """A-04 print twin: the tabulation sheet as a self-contained printable
+    HTML document (the browser print dialog makes the PDF)."""
+    from html import escape as e
+
+    grade_chart = payload["grade_chart"]
+    legend = " · ".join(
+        f"{e(str(c.get('grade_name')))} ({float(c.get('gpa') or 0):.1f}, ≥{float(c.get('percent_from') or 0):g}%)"
+        for c in grade_chart
+    )
+    head = "".join(f"<th>{e(s['name'])}</th>" for s in payload["subjects"])
+    body_rows = []
+    for row in payload["rows"]:
+        cells = "".join(
+            f"<td>{'—' if not c.get('entered') else (f'{c.get('obtained'):g}' if c.get('obtained') is not None else 'Abs')}</td>"
+            for c in row["subjects"]
+        )
+        body_rows.append(
+            f"<tr><td>{e(str(row['roll_number'] or ''))}</td>"
+            f"<td class='name'>{e(row['student_name'])}</td>{cells}"
+            f"<td>{row['total_obtained']:g}/{row['total_full']:g}</td>"
+            f"<td>{row['percentage']:g}%</td><td>{row['gpa']:.2f}</td>"
+            f"<td class='result'>{e(str(row['result']))}</td>"
+            f"<td>{row['merit_order']}</td></tr>"
+        )
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Tabulation — {e(exam.name)}</title><style>
+body{{font-family:'Noto Sans Devanagari',sans-serif;margin:24px;color:#0d1f14}}
+h1{{font-size:20px;color:#0e3b2e}} table{{border-collapse:collapse;width:100%;font-size:11px}}
+th,td{{border:1px solid #0e3b2e33;padding:4px 6px;text-align:center}}
+th{{background:#0e3b2e;color:#c5f4dd}} .name{{text-align:left}} .result{{font-weight:700}}
+.legend{{font-size:11px;margin:8px 0;color:#0d1f14aa}} @media print{{.noprint{{display:none}}}}
+</style></head><body>
+<h1>{e(exam.name)} — Tabulation Sheet</h1>
+<p class="legend">Grades: {legend}</p>
+<table><thead><tr><th>Roll</th><th>Student</th>{head}
+<th>Total</th><th>%</th><th>GPA</th><th>Result</th><th>Merit</th></tr></thead>
+<tbody>{''.join(body_rows)}</tbody></table>
+<p class="noprint"><button onclick="window.print()">Print</button></p>
+</body></html>"""
+
+
+def _merit_print_html(exam, rows):
+    from html import escape as e
+
+    body = "".join(
+        f"<tr><td>{r['merit_order']}</td><td class='name'>{e(r['student_name'])}</td>"
+        f"<td>{e(str(r['roll_number'] or ''))}</td><td>{r['gpa']:.2f}</td>"
+        f"<td>{r['percentage']:g}%</td><td>{r['total_obtained']:g}/{r['total_full']:g}</td>"
+        f"<td class='result'>{e(str(r['result']))}</td></tr>"
+        for r in sorted(rows, key=lambda x: x["merit_order"])
+    )
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Merit List — {e(exam.name)}</title><style>
+body{{font-family:'Noto Sans Devanagari',sans-serif;margin:24px;color:#0d1f14}}
+h1{{font-size:20px;color:#0e3b2e}} table{{border-collapse:collapse;width:70%;font-size:13px}}
+th,td{{border:1px solid #0e3b2e33;padding:6px 10px;text-align:center}}
+th{{background:#0e3b2e;color:#c5f4dd}} .name{{text-align:left}} .result{{font-weight:700}}
+@media print{{.noprint{{display:none}}}}
+</style></head><body>
+<h1>{e(exam.name)} — Merit List</h1>
+<table><thead><tr><th>Rank</th><th>Student</th><th>Roll</th><th>GPA</th>
+<th>%</th><th>Marks</th><th>Result</th></tr></thead><tbody>{body}</tbody></table>
+<p class="noprint"><button onclick="window.print()">Print</button></p>
+</body></html>"""

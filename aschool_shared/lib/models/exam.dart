@@ -205,6 +205,7 @@ class OnlineExam {
   final String? startDate;
   final String? endDate;
   final String status;
+  final String? instructions;
   final List<Question> questions;
 
   const OnlineExam({
@@ -218,6 +219,7 @@ class OnlineExam {
     this.startDate,
     this.endDate,
     this.status = 'upcoming',
+    this.instructions,
     this.questions = const [],
   });
 
@@ -230,7 +232,9 @@ class OnlineExam {
       title: safeString(json['title'], fallback: safeString(json['name'])),
       subjectId: safeStringOrNull(json['subject_id']),
       subjectName: safeStringOrNull(json['subject_name']),
-      duration: safeIntOrNull(json['duration']),
+      duration:
+          safeIntOrNull(json['duration']) ??
+          safeIntOrNull(json['duration_minutes']),
       totalQuestions: safeIntOrNull(json['total_questions']),
       totalMarks: safeIntOrNull(json['total_marks']),
       startDate: safeStringOrNull(json['start_date']),
@@ -238,6 +242,7 @@ class OnlineExam {
       status: safeStringOrNull(json['status']) ??
           safeStringOrNull(json['exam_status']) ??
           'upcoming',
+      instructions: safeStringOrNull(json['instructions']),
       questions:
           safeMapList(json['questions']).map(Question.fromJson).toList(),
     );
@@ -252,6 +257,14 @@ class Question {
   final List<AnswerOption> options;
   final List<String>? correctAnswers;
 
+  /// Raw `question_type` / `type` hint from the backend ('equation' etc.);
+  /// used to prefer the LaTeX renderer even before delimiter sniffing.
+  final String? questionType;
+
+  /// True when several options may be selected together (backend `multi` /
+  /// `is_multi` / `multiple` flag or a multi_answer type).
+  final bool multi;
+
   const Question({
     required this.id,
     required this.question,
@@ -259,9 +272,21 @@ class Question {
     this.marks = 1,
     this.options = const [],
     this.correctAnswers,
+    this.questionType,
+    this.multi = false,
   });
 
+  static const Set<String> _multiTypes = {
+    'multi',
+    'multiple',
+    'multi_answer',
+    'multi_select',
+    'multi_choice',
+  };
+
   factory Question.fromJson(Map<String, dynamic> json) {
+    final type = safeStringOrNull(json['question_type']) ??
+        safeStringOrNull(json['type']);
     return Question(
       id: safeString(json['id']),
       question: safeString(json['question']),
@@ -274,6 +299,11 @@ class Question {
               if (json['correct_answer'] != null)
                 safeString(json['correct_answer'])
             ],
+      questionType: type,
+      multi: safeBoolOrNull(json['multi']) ??
+              safeBoolOrNull(json['is_multi']) ??
+              safeBoolOrNull(json['multiple']) ??
+              _multiTypes.contains(type?.toLowerCase()),
     );
   }
 
@@ -304,4 +334,80 @@ class AnswerOption {
       image: safeStringOrNull(json['image']),
     );
   }
+}
+
+/// Server-side attempt state returned by /take, /start and PATCH /attempt
+/// (S-A2): single row per (exam, student), in_progress → submitted.
+class OnlineExamAttemptInfo {
+  final String attemptId;
+  final String status; // in_progress | submitted
+  final int remainingSeconds;
+  final Map<String, dynamic> savedAnswers;
+
+  const OnlineExamAttemptInfo({
+    required this.attemptId,
+    this.status = 'in_progress',
+    this.remainingSeconds = 0,
+    this.savedAnswers = const {},
+  });
+
+  bool get isSubmitted => status == 'submitted';
+
+  factory OnlineExamAttemptInfo.fromJson(Map<String, dynamic> json) {
+    final rawSaved = json['saved_answers'];
+    return OnlineExamAttemptInfo(
+      attemptId: safeString(
+        json['attempt_id'],
+        fallback: safeString(json['id']),
+      ),
+      status: safeStringOrNull(json['status']) ?? 'in_progress',
+      remainingSeconds: safeInt(json['remaining_seconds']),
+      savedAnswers: rawSaved is Map
+          ? Map<String, dynamic>.from(rawSaved)
+          : const {},
+    );
+  }
+}
+
+/// Payload of GET /exams/online/<id>/take — the exam paper plus the
+/// caller's attempt (server clock + saved answers). The answer key is
+/// never included.
+class OnlineExamTakeData {
+  final OnlineExam exam;
+  final OnlineExamAttemptInfo? attempt;
+
+  const OnlineExamTakeData({required this.exam, this.attempt});
+}
+
+/// PATCH /exams/online/<id>/attempt response.
+class OnlineExamAutosaveResult {
+  final int savedQuestionCount;
+  final int remainingSeconds;
+  final bool alreadySubmitted;
+
+  const OnlineExamAutosaveResult({
+    required this.savedQuestionCount,
+    this.remainingSeconds = 0,
+    this.alreadySubmitted = false,
+  });
+}
+
+/// POST /exams/online/<id>/submit response — a 409 (already submitted) is
+/// reported as success with [alreadySubmitted] so the client can navigate
+/// to the result either way.
+class OnlineExamSubmitResult {
+  final double score;
+  final double totalMarks;
+  final String status;
+  final bool alreadySubmitted;
+
+  const OnlineExamSubmitResult({
+    this.score = 0,
+    this.totalMarks = 0,
+    this.status = 'submitted',
+    this.alreadySubmitted = false,
+  });
+
+  double get percentage =>
+      totalMarks > 0 ? (score / totalMarks * 100).clamp(0, 100) : 0;
 }

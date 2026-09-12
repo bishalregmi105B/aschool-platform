@@ -30,15 +30,35 @@ PASS_PERCENTAGE = 35
 PRACTICAL_PASS_PERCENTAGE = 40
 
 
-def calculate_grade(percentage: float) -> dict:
-    """Given a percentage, return NEB grade info."""
-    for min_pct, grade, gpa, desc in NEB_GRADES:
+def calculate_grade(percentage: float, grades: list | None = None) -> dict:
+    """Given a percentage, return grade info.
+
+    `grades` (A-32) optionally overrides the hard-coded NEB table with a
+    per-school scale — rows of {grade_name, gpa, percent_from, description}
+    (percent_from = minimum percentage for the grade, best first). Boundaries
+    become school-configurable without code changes while NEB remains the
+    built-in default."""
+    rows = []
+    if grades:
+        for row in grades:
+            try:
+                rows.append((
+                    float(row.get("percent_from", 0)),
+                    str(row.get("grade_name") or row.get("grade") or ""),
+                    float(row.get("gpa") or 0),
+                    str(row.get("description") or ""),
+                ))
+            except (TypeError, ValueError):
+                continue
+        rows.sort(key=lambda r: -r[0])
+    rows = rows or NEB_GRADES
+    for min_pct, grade, gpa, desc in rows:
         if percentage >= min_pct:
             return {
                 "grade": grade,
                 "gpa": gpa,
                 "description": desc,
-                "status": "pass" if grade != "NG" else "fail",
+                "status": "pass" if grade not in ("NG", "N") else "fail",
             }
     return {"grade": "NG", "gpa": 0.0, "description": "Not Graded", "status": "fail"}
 
@@ -50,6 +70,7 @@ def calculate_subject_grade(
     practical_full: float = 0,
     theory_pass_marks: float | None = None,
     practical_pass_marks: float | None = None,
+    grades: list | None = None,
 ) -> dict:
     """Calculate NEB grade for a subject with theory + practical split."""
     # Check individual component pass
@@ -60,7 +81,7 @@ def calculate_subject_grade(
     total_full = theory_full + practical_full
     overall_pct = (total_obtained / total_full * 100) if total_full > 0 else 0
 
-    result = calculate_grade(overall_pct)
+    result = calculate_grade(overall_pct, grades=grades)
 
     # NEB rule: must pass theory (35%) and practical (40%) separately
     theory_pass = (
