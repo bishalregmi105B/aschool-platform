@@ -13,6 +13,8 @@ import {
   Layers,
   Smartphone,
   Monitor,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 import { SchoolRole } from "@/components/aos/types";
 import { useServerTime } from "@/lib/use-server-time";
@@ -33,7 +35,11 @@ interface TopMenuBarProps {
   onToggleAppSwitcher?: () => void;
   systemMode?: "desktop" | "mobile";
   onToggleSystemMode?: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   topBarHeight?: "compact" | "standard" | "large";
+  /** Sidebar items from plugin manifests — drives the dynamic section menus. */
+  sidebarItems?: Array<{ slug: string; label: string; section?: string | null; route?: string | null }>;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -59,15 +65,35 @@ export default function TopMenuBar({
   onToggleAppSwitcher,
   systemMode = "desktop",
   onToggleSystemMode,
+  isFullscreen = false,
+  onToggleFullscreen,
   topBarHeight = "standard",
+  sidebarItems,
 }: TopMenuBarProps) {
   const [showAppleMenu, setShowAppleMenu] = useState(false);
+  const [openMenuSection, setOpenMenuSection] = useState<string | null>(null);
 
   // Authoritative server clock
   const serverTime = useServerTime();
 
   // Real user authentication
   const { user, logout } = useAuth();
+
+  // Dynamic section menus from plugin manifests — group sidebar modules by
+  // their manifest section; only sections with apps render.
+  const sectionMenus = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string }[]>();
+    for (const item of sidebarItems || []) {
+      const section = item.section;
+      if (!section || section === "bottom_nav") continue;
+      const list = groups.get(section) || [];
+      list.push({ id: item.slug, name: item.label });
+      groups.set(section, list);
+    }
+    return [...groups.entries()]
+      .map(([name, apps]) => ({ name, apps }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sidebarItems]);
 
   const heightPx = topBarHeight === "large" ? 38 : topBarHeight === "compact" ? 26 : 30;
   const fontSizePx = topBarHeight === "large" ? "14px" : topBarHeight === "compact" ? "12px" : "13px";
@@ -257,15 +283,80 @@ export default function TopMenuBar({
           </div>
         )}
 
+        {/* Dynamic section menus — one menubar item per plugin sidebar
+            section, each opening a dropdown of its module apps. */}
+        {sectionMenus.slice(0, 5).map((section) => (
+          <div
+            key={section.name}
+            className={`menubar-item ${openMenuSection === section.name ? "is-active" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenMenuSection(openMenuSection === section.name ? null : section.name);
+            }}
+            style={{ position: "relative", display: "flex", alignItems: "center", gap: "4px" }}
+            title={`${section.name} modules`}
+          >
+            <span>{section.name}</span>
+            {openMenuSection === section.name && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: `${heightPx + 2}px`,
+                  left: 0,
+                  minWidth: "200px",
+                  background: "var(--w11-surface-flyout)",
+                  backdropFilter: "blur(30px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(30px) saturate(180%)",
+                  border: "1px solid var(--w11-acrylic-border)",
+                  borderRadius: "8px",
+                  boxShadow: "0 14px 35px rgba(0,0,0,0.4)",
+                  padding: "5px",
+                  zIndex: 10002,
+                  fontSize: "12px",
+                  color: "var(--w11-text-primary)",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {section.apps.map((app) => (
+                  <div
+                    key={app.id}
+                    onClick={() => {
+                      onOpenApp(app.id);
+                      setOpenMenuSection(null);
+                    }}
+                    style={{ padding: "6px 10px", borderRadius: "4px", cursor: "pointer" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--w11-control-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  >
+                    {app.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
         <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onOpenApp("filemanager"); }}>Vault</span>
         <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onOpenApp("appstore"); }}>Store</span>
-        <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onOpenApp("notebook"); }}>Notes</span>
         <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onToggleWidgets(); }}>Widgets</span>
-        <span className="menubar-item" onClick={(e) => { e.stopPropagation(); onOpenApp("timetable"); }}>Schedule</span>
       </div>
 
       {/* Right Area: Status Pills & Tray Controls */}
       <div className="menubar-right">
+        {/* Fullscreen Toggle */}
+        {onToggleFullscreen && (
+          <div
+            className="menubar-action-icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFullscreen();
+            }}
+            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+          </div>
+        )}
+
         {/* Two-Mode Switcher Toggle Pill */}
         {onToggleSystemMode && (
           <div
