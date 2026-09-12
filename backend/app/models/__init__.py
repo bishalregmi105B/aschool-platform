@@ -4,6 +4,7 @@ from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptC
 from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_access_log import UserAccessLog  # noqa: F401
+from app.models.student_enrollment import StudentEnrollment, PromotionRecord  # noqa: F401
 from app.models.monitoring import MobileCrashReport  # noqa: F401
 from app.models.student import Student, Guardian  # noqa: F401
 from app.models.student_transfer import StudentTransfer  # noqa: F401
