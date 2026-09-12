@@ -74,7 +74,6 @@ export default function AppDrawer({
         name: "Gradebook & GPA",
         category: "academics",
         icon: <AOSGradebookIcon size={52} />,
-        badge: "3.98",
         desc: "Continuous assessment & transcript tracking",
       },
       {
@@ -250,61 +249,67 @@ export default function AppDrawer({
     return matchesSearch && matchesCat;
   });
 
-  return (
-    <>
-      {/* Dark Blurred Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          background: "rgba(0, 0, 0, 0.65)",
-          backdropFilter: "blur(25px) saturate(160%)",
-          WebkitBackdropFilter: "blur(25px) saturate(160%)",
-          zIndex: 10003,
-        }}
-      />
+  const categories = [
+    { id: "all", label: "All Apps" },
+    { id: "academics", label: "Academics & Vault" },
+    { id: "stem", label: "STEM & Science" },
+    { id: "campus", label: "Campus Life" },
+    ...(currentRole === "admin" || currentRole === "accountant"
+      ? [{ id: "admin", label: "Leadership & Finance" }]
+      : []),
+  ];
 
-      {/* Main Drawer Overlay Container */}
+  return (
+    <div className="aos-app-drawer-overlay" onClick={onClose}>
       <div
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: "860px",
-          maxWidth: "94vw",
-          height: "640px",
-          maxHeight: "88vh",
-          background: "var(--w11-surface-flyout)",
-          backdropFilter: "blur(40px) saturate(200%)",
-          WebkitBackdropFilter: "blur(40px) saturate(200%)",
-          border: "1px solid var(--w11-acrylic-border)",
-          borderRadius: "20px",
-          boxShadow: "0 30px 80px rgba(0, 0, 0, 0.5)",
-          padding: "24px 28px",
-          zIndex: 10004,
-          userSelect: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: "18px",
-          boxSizing: "border-box",
-        }}
+        className="aos-app-drawer-content"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* Top Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "20px",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <AOSLogo size={24} />
+            <AOSLogo size={32} />
             <div>
-              <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--w11-text-primary)", lineHeight: 1.1 }}>
-                AOS App Drawer & Academic Library
+              <div
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  color: "var(--w11-text-primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                AOS App Drawer & Library
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                    background: `${accentColor}33`,
+                    color: accentColor,
+                    border: `1px solid ${accentColor}55`,
+                  }}
+                >
+                  {allApps.length} APPS
+                </span>
               </div>
-              <div style={{ fontSize: "11px", color: "var(--w11-text-secondary)" }}>
-                Installed Modules, Plugins & Campus Tools
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "var(--w11-text-secondary)",
+                }}
+              >
+                Unified application drawer compatible with Desktop and Mobile
+                views
               </div>
             </div>
           </div>
@@ -313,228 +318,136 @@ export default function AppDrawer({
             onClick={onClose}
             style={{
               all: "unset",
-              cursor: "pointer",
-              width: "30px",
-              height: "30px",
+              width: "36px",
+              height: "36px",
               borderRadius: "50%",
-              background: "var(--w11-control-hover)",
+              background: "rgba(255,255,255,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "var(--w11-text-primary)",
+              cursor: "pointer",
+              transition: "background 0.15s ease",
             }}
+            title="Close Drawer (Esc)"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Filter Toolbar: Search + Category Pills */}
+        {/* Search Bar */}
+        <div className="aos-drawer-search-bar">
+          <Search size={18} color="var(--w11-text-secondary)" />
+          <input
+            type="text"
+            placeholder="Search academic applications, tools or services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
+            style={{
+              all: "unset",
+              flex: 1,
+              fontSize: "14px",
+              color: "inherit",
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                color: "var(--w11-text-secondary)",
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Category Pills Filter */}
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            flexWrap: "wrap",
+            gap: "8px",
+            overflowX: "auto",
+            paddingBottom: "8px",
+            marginBottom: "16px",
           }}
         >
-          {/* Search Box */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "var(--w11-control-bg)",
-              border: "1px solid var(--w11-control-border)",
-              borderRadius: "10px",
-              padding: "6px 12px",
-              width: "280px",
-            }}
-          >
-            <Search size={15} color="var(--w11-text-tertiary)" />
-            <input
-              type="text"
-              placeholder="Search apps, modules..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={activeCategory === cat.id ? "accent" : "subtle"}
               style={{
-                all: "unset",
-                fontSize: "13px",
-                color: "var(--w11-text-primary)",
-                width: "100%",
+                fontSize: "12px",
+                padding: "6px 14px",
+                borderRadius: "20px",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
               }}
-              autoFocus
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                style={{ all: "unset", cursor: "pointer", color: "var(--w11-text-tertiary)", display: "flex" }}
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* Category Tabs */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            {[
-              { id: "all", label: "All Apps" },
-              { id: "academics", label: "Academics" },
-              { id: "stem", label: "STEM & Labs" },
-              { id: "campus", label: "Campus Life" },
-              { id: "admin", label: "Operations" },
-            ].map((cat) => {
-              const active = activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  style={{
-                    all: "unset",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: active ? 600 : 500,
-                    padding: "5px 12px",
-                    borderRadius: "14px",
-                    background: active ? accentColor : "var(--w11-control-bg)",
-                    color: active ? "#ffffff" : "var(--w11-text-primary)",
-                    border: active ? `1px solid ${accentColor}` : "1px solid var(--w11-control-border)",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* Apps Grid */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(135px, 1fr))",
-            gap: "16px",
-            padding: "8px 4px 16px 4px",
-          }}
-        >
-          {filteredApps.length === 0 ? (
+        <div className="aos-drawer-grid">
+          {filteredApps.map((app) => (
             <div
-              style={{
-                gridColumn: "1 / -1",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "260px",
-                color: "var(--w11-text-secondary)",
-                gap: "8px",
+              key={app.id}
+              className="aos-drawer-card aos-haptic-click"
+              onClick={() => {
+                onOpenApp(app.id);
+                onClose();
               }}
             >
-              <Grid size={36} style={{ opacity: 0.4 }} />
-              <div style={{ fontSize: "14px", fontWeight: 600 }}>No applications found</div>
-              <div style={{ fontSize: "12px", color: "var(--w11-text-tertiary)" }}>
-                Try searching for something else
-              </div>
-            </div>
-          ) : (
-            filteredApps.map((app) => (
-              <div
-                key={app.id}
-                onClick={() => {
-                  onOpenApp(app.id);
-                  onClose();
-                }}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "16px 10px",
-                  borderRadius: "14px",
-                  cursor: "pointer",
-                  textAlign: "center",
-                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                  position: "relative",
-                  background: "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--w11-control-hover)";
-                  e.currentTarget.style.transform = "scale(1.04) translateY(-3px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.transform = "none";
-                }}
-              >
-                {/* Badge if present */}
+              <div style={{ position: "relative" }}>
+                {app.icon}
                 {app.badge && (
                   <span
                     style={{
                       position: "absolute",
-                      top: "8px",
-                      right: "12px",
+                      top: "-4px",
+                      right: "-6px",
+                      background: "#ef4444",
+                      color: "#ffffff",
                       fontSize: "9px",
-                      fontWeight: 800,
-                      background: accentColor,
-                      color: "#fff",
+                      fontWeight: 700,
                       padding: "1px 5px",
-                      borderRadius: "6px",
-                      boxShadow: `0 2px 6px ${accentColor}60`,
+                      borderRadius: "8px",
+                      border: "1.5px solid #ffffff",
                     }}
                   >
                     {app.badge}
                   </span>
                 )}
-
-                <div style={{ marginBottom: "10px" }}>{app.icon}</div>
-                <span
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "var(--w11-text-primary)",
-                    lineHeight: 1.2,
-                    marginBottom: "3px",
-                  }}
-                >
-                  {app.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    color: "var(--w11-text-secondary)",
-                    lineHeight: 1.2,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {app.desc}
-                </span>
               </div>
-            ))
-          )}
+              <span>{app.name}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Footer info */}
-        <div
-          style={{
-            borderTop: "1px solid var(--w11-border-subtle)",
-            paddingTop: "12px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: "11px",
-            color: "var(--w11-text-tertiary)",
-          }}
-        >
-          <div>Showing {filteredApps.length} workstations & plugins</div>
-          <div>Press ESC to close</div>
-        </div>
+        {filteredApps.length === 0 && (
+          <div
+            style={{
+              padding: "40px 0",
+              textAlign: "center",
+              color: "var(--w11-text-secondary)",
+            }}
+          >
+            <Grid size={40} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+            <div style={{ fontSize: "15px", fontWeight: 600 }}>
+              No applications match &quot;{searchQuery}&quot;
+            </div>
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              Try searching by subject, department, or keyword
+            </div>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

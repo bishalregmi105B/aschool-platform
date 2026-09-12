@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Sparkles } from "lucide-react";
 import {
   AOS_THEME_STORAGE_KEY,
+  AOS_MODE_STORAGE_KEY,
   extractAOSModuleSlug,
   formatAOSRouteTitle,
   isAOSRootModuleRoute,
@@ -97,6 +98,22 @@ export default function AOSDesktopShell() {
       // Ignore storage write issues
     }
   }, [themeMode]);
+
+  // Manual desktop/iOS mode override — persists across reloads; absence of a
+  // stored value keeps the viewport-based decision in dashboard-layout.
+  const handleToggleSystemMode = useCallback(() => {
+    try {
+      const current = localStorage.getItem(AOS_MODE_STORAGE_KEY);
+      const isMobileNow =
+        current === "mobile" ||
+        (current !== "desktop" && window.matchMedia("(max-width: 767px)").matches);
+      const next = isMobileNow ? "desktop" : "mobile";
+      localStorage.setItem(AOS_MODE_STORAGE_KEY, next);
+      window.location.reload();
+    } catch {
+      // Ignore storage access issues
+    }
+  }, []);
 
   // Flyout and modal toggles
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
@@ -503,6 +520,8 @@ export default function AOSDesktopShell() {
             closeAllFlyouts("switcher");
             setIsSwitcherOpen(next);
           }}
+          systemMode="desktop"
+          onToggleSystemMode={handleToggleSystemMode}
           unreadCount={0}
           topBarHeight={topBarHeight}
         />

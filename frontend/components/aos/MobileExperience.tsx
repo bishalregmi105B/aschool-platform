@@ -9,6 +9,7 @@ import {
   Sparkles,
   ArrowLeft,
   X,
+  Monitor,
 } from "lucide-react";
 import { useInstalledPlugins } from "@/lib/plugins";
 import {
@@ -22,6 +23,7 @@ import IOSNotificationCenter from "./IOSNotificationCenter";
 import { useAuth } from "@/lib/auth-context";
 import { useServerTime } from "@/lib/use-server-time";
 import {
+  AOS_MODE_STORAGE_KEY,
   buildAOSRouteWindowId,
   extractAOSModuleSlug,
   formatAOSRouteTitle,
@@ -401,7 +403,39 @@ export default function MobileExperience({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {/* Switch back to Desktop Mode */}
+          <button
+            onClick={() => {
+              try {
+                localStorage.setItem(AOS_MODE_STORAGE_KEY, "desktop");
+              } catch {
+                // Ignore storage write issues
+              }
+              window.location.reload();
+            }}
+            style={{
+              all: "unset",
+              background: "rgba(0, 0, 0, 0.4)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              padding: "5px 10px",
+              borderRadius: "20px",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Switch to Desktop Mode"
+          >
+            <Monitor size={13} />
+            <span>Desktop Mode</span>
+          </button>
+
           {/* Open Notifications */}
           <button
             onClick={() => setIsNotificationCenterOpen(true)}
@@ -458,8 +492,11 @@ export default function MobileExperience({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                position: "relative",
                 filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
+                transition: "transform 0.1s ease",
               }}
+              className="ios-app-icon"
             >
               {app.icon}
             </div>

@@ -11,6 +11,8 @@ import {
   ChevronDown,
   LayoutGrid,
   Layers,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import { SchoolRole } from "@/components/aos/types";
 import { useServerTime } from "@/lib/use-server-time";
@@ -29,6 +31,8 @@ interface TopMenuBarProps {
   unreadCount?: number;
   onToggleAppDrawer?: () => void;
   onToggleAppSwitcher?: () => void;
+  systemMode?: "desktop" | "mobile";
+  onToggleSystemMode?: () => void;
   topBarHeight?: "compact" | "standard" | "large";
 }
 
@@ -53,6 +57,8 @@ export default function TopMenuBar({
   unreadCount = 0,
   onToggleAppDrawer,
   onToggleAppSwitcher,
+  systemMode = "desktop",
+  onToggleSystemMode,
   topBarHeight = "standard",
 }: TopMenuBarProps) {
   const [showAppleMenu, setShowAppleMenu] = useState(false);
@@ -260,6 +266,21 @@ export default function TopMenuBar({
 
       {/* Right Area: Status Pills & Tray Controls */}
       <div className="menubar-right">
+        {/* Two-Mode Switcher Toggle Pill */}
+        {onToggleSystemMode && (
+          <div
+            className="aos-mode-switcher-pill"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSystemMode();
+            }}
+            title={`Current: ${systemMode.toUpperCase()} Mode. Click to switch to ${systemMode === "desktop" ? "Mobile (iOS)" : "Desktop"} mode`}
+          >
+            {systemMode === "desktop" ? <Smartphone size={12} /> : <Monitor size={12} />}
+            <span>{systemMode === "desktop" ? "iOS Mobile View" : "Desktop Mode"}</span>
+          </div>
+        )}
+
         {/* Language Switcher */}
         <LanguageToggle />
 

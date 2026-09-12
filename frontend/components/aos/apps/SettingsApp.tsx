@@ -607,6 +607,7 @@ export default function SettingsApp({
                 </div>
                 <input
                   type="range"
+                  className="win11-slider"
                   min="0"
                   max="50"
                   value={blurIntensity}
