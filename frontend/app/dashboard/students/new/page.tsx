@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FilePicker } from "@/components/files/FilePicker";
+import type { ManagedFile } from "@/lib/services/files.service";
 import {
   FormField,
   FormSection,
@@ -21,7 +23,7 @@ import {
   AiFormAssist,
   type AiFieldSchema,
 } from "@/components/ai/ai-form-assist";
-import { ArrowLeft, UserPlus, Upload, User, GraduationCap, Users } from "lucide-react";
+import { ArrowLeft, UserPlus, FolderOpen, User, GraduationCap, Users } from "lucide-react";
 import Link from "next/link";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useI18n } from "@/lib/i18n";
@@ -49,8 +51,7 @@ const AI_FIELDS: AiFieldSchema[] = [
 export default function NewStudentPage() {
   const router = useAOSRouterNavigate();
   const { t } = useI18n();
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -92,23 +93,13 @@ export default function NewStudentPage() {
 
   const selectedClass = (classes || []).find((c: { id: string }) => c.id === form.class_id);
 
-  async function handlePhotoUpload(file: File) {
-    setUploadingPhoto(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "student-photos");
-      const res = await api.post("/files/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const url = res.data?.data?.url || res.data?.url;
-      if (url) set("photo_url", url);
-    } catch {
-      toast.error("Photo upload failed");
-    } finally {
-      setUploadingPhoto(false);
+  const handlePhotoSelect = (files: ManagedFile[]) => {
+    const selected = files[0];
+    if (selected?.url) {
+      set("photo_url", selected.url);
+      toast.success("Photo selected from the file manager");
     }
-  }
+  };
 
   const create = useMutation({
     mutationFn: async () => {
@@ -207,24 +198,13 @@ export default function NewStudentPage() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => photoInputRef.current?.click()}
-              disabled={uploadingPhoto}
+              onClick={() => setShowPhotoPicker(true)}
             >
-              {uploadingPhoto ? <Spinner className="mr-2 h-3 w-3" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
-              {uploadingPhoto ? t("Uploading…", "अपलोड हुँदै…") : t("Photo", "फोटो")}
+              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+              {form.photo_url ? t("Change Photo", "फोटो फेर्नुहोस्") : t("Photo", "फोटो")}
             </Button>
           }
         >
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handlePhotoUpload(file);
-            }}
-          />
           <FormGrid cols={3}>
             <FormField label="First Name" ne="पहिलो नाम" required>
               <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
@@ -432,6 +412,14 @@ export default function NewStudentPage() {
           {t("Enroll Student", "विद्यार्थी भर्ना गर्नुहोस्")}
         </Button>
       </FormActions>
+
+      <FilePicker
+        open={showPhotoPicker}
+        onOpenChange={setShowPhotoPicker}
+        onSelect={handlePhotoSelect}
+        fileType="image"
+        title="Select Student Photo"
+      />
     </div>
   );
 }

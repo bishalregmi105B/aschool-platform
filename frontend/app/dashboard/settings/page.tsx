@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save, School, Clock, Calendar, Shield, Globe, PenTool, ExternalLink, Settings } from "lucide-react";
 import Link from "next/link";
 import { useInstalledPlugins } from "@/lib/plugins";
+import { VaultImageField } from "@/components/files/VaultImageField";
 import {
   AOSPage,
   AOSPageHeader,
@@ -210,12 +211,20 @@ export default function SettingsPage() {
           <FormSection title={<span className="inline-flex items-center gap-2"><Shield className="h-4 w-4" /> Branding</span>}>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-1 block" style={{ color: "var(--w11-text-primary)" }}>Logo URL</label>
-                <Input value={form.logo_url || ""} onChange={(e) => update("logo_url", e.target.value)} placeholder="https://..." />
+                <label className="text-sm font-medium mb-1 block" style={{ color: "var(--w11-text-primary)" }}>Logo</label>
+                <VaultImageField
+                  value={form.logo_url || null}
+                  onChange={(url) => update("logo_url", url ?? "")}
+                  label="Logo"
+                />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block" style={{ color: "var(--w11-text-primary)" }}>Banner URL</label>
-                <Input value={form.banner_url || ""} onChange={(e) => update("banner_url", e.target.value)} placeholder="https://..." />
+                <label className="text-sm font-medium mb-1 block" style={{ color: "var(--w11-text-primary)" }}>Banner</label>
+                <VaultImageField
+                  value={form.banner_url || null}
+                  onChange={(url) => update("banner_url", url ?? "")}
+                  label="Banner"
+                />
               </div>
             </div>
           </FormSection>
