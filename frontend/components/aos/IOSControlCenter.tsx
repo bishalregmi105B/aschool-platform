@@ -52,39 +52,8 @@ export default function IOSControlCenter({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10040,
-        background: "rgba(0, 0, 0, 0.4)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        display: "flex",
-        justifyContent: "flex-end",
-        padding: "12px",
-        userSelect: "none",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: "360px",
-          maxWidth: "95vw",
-          background: "rgba(30, 30, 32, 0.88)",
-          backdropFilter: "blur(35px) saturate(190%)",
-          WebkitBackdropFilter: "blur(35px) saturate(190%)",
-          border: "1px solid rgba(255, 255, 255, 0.18)",
-          borderRadius: "28px",
-          padding: "18px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "14px",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
-          color: "#ffffff",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="ios-control-center-overlay" onClick={onClose}>
+      <div className="ios-control-center-panel" onClick={(e) => e.stopPropagation()}>
         {/* Header with Close */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: 700 }}>
@@ -301,39 +270,17 @@ export default function IOSControlCenter({
           {/* Brightness Slider */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
             <div
+              className="ios-vertical-slider"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const clickY = e.clientY - rect.top;
                 const pct = Math.max(10, Math.min(100, Math.round((1 - clickY / rect.height) * 100)));
                 onChangeBrightness(pct);
               }}
-              style={{
-                height: "140px",
-                width: "68px",
-                background: "rgba(255, 255, 255, 0.18)",
-                borderRadius: "20px",
-                position: "relative",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                paddingBottom: "12px",
-                userSelect: "none",
-                cursor: "ns-resize",
-              }}
             >
               <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${brightness}%`,
-                  background: "#ffffff",
-                  borderRadius: "0 0 20px 20px",
-                  transition: "height 0.05s linear",
-                }}
+                className="ios-vertical-slider-fill"
+                style={{ height: `${brightness}%` }}
               />
               <Sun size={20} color="#000000" style={{ position: "relative", zIndex: 10 }} />
             </div>
@@ -343,39 +290,17 @@ export default function IOSControlCenter({
           {/* Volume Slider */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
             <div
+              className="ios-vertical-slider"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const clickY = e.clientY - rect.top;
                 const pct = Math.max(0, Math.min(100, Math.round((1 - clickY / rect.height) * 100)));
                 setVolume(pct);
               }}
-              style={{
-                height: "140px",
-                width: "68px",
-                background: "rgba(255, 255, 255, 0.18)",
-                borderRadius: "20px",
-                position: "relative",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                paddingBottom: "12px",
-                userSelect: "none",
-                cursor: "ns-resize",
-              }}
             >
               <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${volume}%`,
-                  background: "#ffffff",
-                  borderRadius: "0 0 20px 20px",
-                  transition: "height 0.05s linear",
-                }}
+                className="ios-vertical-slider-fill"
+                style={{ height: `${volume}%` }}
               />
               <Volume2 size={20} color="#000000" style={{ position: "relative", zIndex: 10 }} />
             </div>
