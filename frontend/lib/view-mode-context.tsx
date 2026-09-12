@@ -16,7 +16,6 @@ export type ViewMode = "aos";
 interface ViewModeContextType {
   mode: ViewMode;
   setMode: (mode: ViewMode) => void;
-  toggleMode: () => void;
   /** True when the viewport is mobile-width (< 768px) */
   isMobile: boolean;
   /** True when AOS is active and the viewport is desktop */
@@ -44,16 +43,11 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
     // AOS-only mode: setter kept for backward compatibility with existing callers.
   }, []);
 
-  const toggleMode = useCallback(() => {
-    // AOS-only mode: toggle intentionally disabled.
-  }, []);
-
   return (
     <ViewModeContext.Provider
       value={{
         mode,
         setMode,
-        toggleMode,
         isMobile,
         isAOSDesktop: !isMobile,
         isAOSMobile: isMobile,
