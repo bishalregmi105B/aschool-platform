@@ -207,3 +207,84 @@ export function createFolderId(
   while (existing.has(`${base}-${n}`)) n++;
   return `${base}-${n}`;
 }
+
+// ── Desktop layout (icon positions + widget arrangement) ───────────────────
+//
+// Persisted per-user via aos_settings.desktop_layout as:
+//   {
+//     iconPositions: { [appIdOrFolderId]: { col, row } },
+//     widgetLayout:  { [widgetKey]: { size: "s"|"m"|"l", order: number } }
+//   }
+
+/** Grid cell a desktop icon/folder tile snaps to. */
+export interface AOSDesktopIconPosition {
+  col: number;
+  row: number;
+}
+
+/** A widget's arrangement in the desktop column / board grid. */
+export interface AOSWidgetLayoutEntry {
+  size: "s" | "m" | "l";
+  order: number;
+}
+
+/**
+ * The persisted desktop layout. Declared as a type alias (not an interface)
+ * so it stays assignable to Record<string, unknown> — the settings API and
+ * the shell pass it around as a free-form record.
+ */
+export type AOSDesktopLayout = {
+  iconPositions: Record<string, AOSDesktopIconPosition>;
+  widgetLayout: Record<string, AOSWidgetLayoutEntry>;
+};
+
+export const EMPTY_DESKTOP_LAYOUT: AOSDesktopLayout = {
+  iconPositions: {},
+  widgetLayout: {},
+};
+
+const WIDGET_SIZES = new Set<string>(["s", "m", "l"]);
+
+/**
+ * Sanitize a persisted (or incoming) desktop_layout payload. Unknown keys and
+ * malformed entries are dropped so a corrupt payload can never break layout
+ * math; unknown top-level fields pass through untouched (forward compat).
+ */
+export function parseDesktopLayout(raw: unknown): AOSDesktopLayout {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { iconPositions: {}, widgetLayout: {} };
+  }
+  const source = raw as Record<string, unknown>;
+
+  const iconPositions: Record<string, AOSDesktopIconPosition> = {};
+  if (source.iconPositions && typeof source.iconPositions === "object") {
+    for (const [id, value] of Object.entries(source.iconPositions as Record<string, unknown>)) {
+      if (!id || !value || typeof value !== "object") continue;
+      const { col, row } = value as Record<string, unknown>;
+      const c = Number(col);
+      const r = Number(row);
+      if (!Number.isInteger(c) || !Number.isInteger(r) || c < 0 || r < 0 || c > 500 || r > 500) {
+        continue;
+      }
+      iconPositions[id] = { col: c, row: r };
+    }
+  }
+
+  const widgetLayout: Record<string, AOSWidgetLayoutEntry> = {};
+  if (source.widgetLayout && typeof source.widgetLayout === "object") {
+    for (const [key, value] of Object.entries(source.widgetLayout as Record<string, unknown>)) {
+      if (!key || !value || typeof value !== "object") continue;
+      const { size, order } = value as Record<string, unknown>;
+      const o = Number(order);
+      widgetLayout[key] = {
+        size:
+          typeof size === "string" && WIDGET_SIZES.has(size)
+            ? (size as AOSWidgetLayoutEntry["size"])
+            : "s",
+        order: Number.isInteger(o) && o >= 0 ? o : 0,
+      };
+    }
+  }
+
+  return { iconPositions, widgetLayout };
+}

@@ -42,6 +42,8 @@ class UserAOSSettings(BaseModel):
     desktop_folders = Column(JSONB, nullable=False, default=list)
     home_widgets = Column(JSONB, nullable=False, default=list)
     topbar_items = Column(JSONB, nullable=False, default=list)
+    # Free-form desktop arrangement: icon/folder positions + widget layout.
+    desktop_layout = Column(JSONB, nullable=False, default=dict)
 
     def to_dict(self):
         return {
@@ -60,4 +62,5 @@ class UserAOSSettings(BaseModel):
             "desktop_folders": self.desktop_folders or [],
             "home_widgets": self.home_widgets or [],
             "topbar_items": self.topbar_items or [],
+            "desktop_layout": self.desktop_layout or {},
         }

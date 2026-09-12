@@ -29,6 +29,7 @@ import {
   Music,
   CheckCircle2,
   XCircle,
+  ImagePlus,
 } from "lucide-react";
 import {
   createFolder,
@@ -48,6 +49,7 @@ import {
   type StockPhoto,
 } from "@/lib/services/files.service";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { setVaultDragData } from "@/components/files/dnd";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1059,10 +1061,16 @@ export default function FileManagerApp() {
       setPreviewFile(null);
       setIsMobileSidebarOpen(false);
     } else {
-      // Double-clicking a file opens it in the preview pane, by type.
+      // Files open in the preview pane, rendered by type.
       setSelectedItem(item);
       if (item.managed) setPreviewFile(item.managed);
     }
+  };
+
+  // Vault files are drag sources for cross-app drops (FilePicker, fields, …).
+  const handleItemDragStart = (e: React.DragEvent, item: DisplayItem) => {
+    if (item.kind !== "file" || !item.managed) return;
+    setVaultDragData(e, item.managed);
   };
 
   const navigateToBreadcrumb = (index: number) => {
@@ -1188,6 +1196,7 @@ export default function FileManagerApp() {
           display: "flex",
           flexDirection: "column",
           gap: "14px",
+          overflowY: "auto",
         }}
       >
         <div>
@@ -1224,6 +1233,81 @@ export default function FileManagerApp() {
                 <Folder size={15} color="#38bdf8" /> {folder.name}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* View: type filters + sorting */}
+        <div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--w11-text-secondary)", textTransform: "uppercase", padding: "0 8px 6px" }}>
+            View
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                className={typeFilter === f.value ? "accent" : "subtle"}
+                onClick={() => setTypeFilter(f.value)}
+                style={{ justifyContent: "flex-start", fontSize: "12px", padding: "6px 10px", borderRadius: "6px" }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "4px", marginTop: "8px" }}>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              title="Sort by"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                padding: "4px 6px",
+                fontSize: "11px",
+                borderRadius: "6px",
+                background: "var(--w11-control-bg)",
+                border: "1px solid var(--w11-control-border)",
+                color: "var(--w11-text-primary)",
+                outline: "none",
+                cursor: "pointer",
+              }}
+            >
+              <option value="name">Name</option>
+              <option value="date">Date</option>
+              <option value="size">Size</option>
+            </select>
+            <button
+              className="subtle"
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              style={{ padding: "4px 8px", display: "flex", alignItems: "center" }}
+              title={`Sort ${sortDir === "asc" ? "ascending" : "descending"}`}
+            >
+              {sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Tools: upload + stock media */}
+        <div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--w11-text-secondary)", textTransform: "uppercase", padding: "0 8px 6px" }}>
+            Tools
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <button
+              className="accent"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+              style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+            >
+              {uploadMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Upload
+            </button>
+            <button
+              className="subtle"
+              onClick={() => setShowStockDialog(true)}
+              style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+              title="Import free stock photos into this folder"
+            >
+              <ImagePlus size={14} /> Stock Media
+            </button>
           </div>
         </div>
 
@@ -1299,20 +1383,6 @@ export default function FileManagerApp() {
             ))}
           </div>
 
-          {/* Type filter pills (compact, after the breadcrumb) */}
-          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-            {TYPE_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                className={typeFilter === f.value ? "accent" : "subtle"}
-                onClick={() => setTypeFilter(f.value)}
-                style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "9999px", lineHeight: 1.4 }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
           {/* Search Box */}
           <div style={{ position: "relative", width: "180px" }}>
             <Search size={14} style={{ position: "absolute", left: "8px", top: "8px", color: "var(--w11-text-secondary)" }} />
@@ -1336,35 +1406,14 @@ export default function FileManagerApp() {
 
           {/* Action Buttons */}
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            {/* Sorting */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              title="Sort by"
-              style={{
-                padding: "4px 6px",
-                fontSize: "11px",
-                borderRadius: "6px",
-                background: "var(--w11-control-bg)",
-                border: "1px solid var(--w11-control-border)",
-                color: "var(--w11-text-primary)",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="name">Name</option>
-              <option value="date">Date</option>
-              <option value="size">Size</option>
-            </select>
             <button
               className="subtle"
-              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              style={{ padding: "4px 6px" }}
-              title={`Sort ${sortDir === "asc" ? "ascending" : "descending"}`}
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              style={{ padding: "4px 8px" }}
+              title="Toggle View"
             >
-              {sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+              {viewMode === "grid" ? <List size={15} /> : <Grid size={15} />}
             </button>
-
             <button
               className="subtle"
               onClick={() => {
@@ -1374,30 +1423,6 @@ export default function FileManagerApp() {
               style={{ padding: "4px 8px", fontSize: "12px" }}
             >
               <Plus size={14} /> New Folder
-            </button>
-            <button
-              className="subtle"
-              onClick={() => setShowStockDialog(true)}
-              style={{ padding: "4px 8px", fontSize: "12px" }}
-              title="Import free stock photos into this folder"
-            >
-              <Globe size={14} /> Stock
-            </button>
-            <button
-              className="subtle"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadMutation.isPending}
-              style={{ padding: "4px 8px", fontSize: "12px" }}
-            >
-              {uploadMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Upload
-            </button>
-            <button
-              className="subtle"
-              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-              style={{ padding: "4px 8px" }}
-              title="Toggle View"
-            >
-              {viewMode === "grid" ? <List size={15} /> : <Grid size={15} />}
             </button>
           </div>
         </div>
@@ -1476,11 +1501,6 @@ export default function FileManagerApp() {
                 <div style={{ fontSize: "13px" }}>
                   {searchQuery || typeFilter !== "all" ? "No matching files" : "This folder is empty"}
                 </div>
-                <div style={{ fontSize: "11px" }}>
-                  {searchQuery || typeFilter !== "all"
-                    ? `No results${searchQuery ? ` for "${searchQuery}"` : ""} — try a different filter.`
-                    : "Drop files here to upload, or use the Upload button."}
-                </div>
               </div>
             ) : viewMode === "grid" ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "12px" }}>
@@ -1491,6 +1511,8 @@ export default function FileManagerApp() {
                       key={item.id}
                       onClick={() => setSelectedItem(item)}
                       onDoubleClick={() => openItem(item)}
+                      draggable={item.kind === "file"}
+                      onDragStart={(e) => handleItemDragStart(e, item)}
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -1540,6 +1562,8 @@ export default function FileManagerApp() {
                       key={item.id}
                       onClick={() => setSelectedItem(item)}
                       onDoubleClick={() => openItem(item)}
+                      draggable={item.kind === "file"}
+                      onDragStart={(e) => handleItemDragStart(e, item)}
                       style={{ cursor: "pointer", background: selectedItem?.id === item.id ? "var(--w11-control-hover)" : undefined }}
                     >
                       <td style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1646,7 +1670,7 @@ export default function FileManagerApp() {
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {selectedItem.kind === "file" && (
                 <button
-                  className="subtle"
+                  className="accent"
                   onClick={() => selectedItem.managed && setPreviewFile(selectedItem.managed)}
                   style={{ padding: "4px 8px", fontSize: "11px" }}
                 >
@@ -1655,7 +1679,7 @@ export default function FileManagerApp() {
               )}
               {selectedItem.kind === "file" && (
                 <button
-                  className="accent"
+                  className="subtle"
                   onClick={() => handleDownload(selectedItem)}
                   style={{ padding: "4px 8px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
                 >
@@ -1691,8 +1715,8 @@ export default function FileManagerApp() {
         )}
       </div>
 
-      {/* Right Preview Pane (double-click a file to open) — full-height column
-          next to the sidebar + content, so all three share the flex row. */}
+      {/* Right Preview Pane — full-height column next to the sidebar +
+          content, so all three share the flex row. */}
       {previewFile && (
         <aside
           style={{

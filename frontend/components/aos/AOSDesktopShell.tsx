@@ -315,6 +315,33 @@ export default function AOSDesktopShell() {
     [updateAOSSettings]
   );
 
+  // Desktop layout (icon grid positions + widget sizes/order) — Desktop owns
+  // the optimistic state; commits are coalesced by a 500ms trailing debounce
+  // (rapid icon drops / widget resizes become one PUT; the settings hook adds
+  // its own network debounce). Pending changes flush on unmount.
+  const layoutCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingLayoutRef = useRef<Record<string, unknown> | null>(null);
+  const handleUpdateDesktopLayout = useCallback(
+    (next: Record<string, unknown>) => {
+      pendingLayoutRef.current = next;
+      if (layoutCommitTimerRef.current) clearTimeout(layoutCommitTimerRef.current);
+      layoutCommitTimerRef.current = setTimeout(() => {
+        pendingLayoutRef.current = null;
+        updateAOSSettings({ desktop_layout: next });
+      }, 500);
+    },
+    [updateAOSSettings]
+  );
+  useEffect(
+    () => () => {
+      if (layoutCommitTimerRef.current) clearTimeout(layoutCommitTimerRef.current);
+      if (pendingLayoutRef.current) {
+        updateAOSSettings({ desktop_layout: pendingLayoutRef.current });
+      }
+    },
+    [updateAOSSettings]
+  );
+
   // Window State Management
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
@@ -794,6 +821,8 @@ export default function AOSDesktopShell() {
         apps={allApps}
         folders={desktopLayout.folders}
         onUpdateFolders={handleUpdateDesktopFolders}
+        layout={aosSettings.desktop_layout}
+        onUpdateLayout={handleUpdateDesktopLayout}
         onOpenApp={openWindow}
       >
         {/* Multi-Window Manager Canvas */}

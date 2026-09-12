@@ -255,6 +255,21 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "white-label__branding": dynamic(() => import("@/app/dashboard/white-label/branding/page"), { loading: AOSModuleLoading }), // /dashboard/white-label/branding
   "white-label__domain": dynamic(() => import("@/app/dashboard/white-label/domain/page"), { loading: AOSModuleLoading }), // /dashboard/white-label/domain
   "white-label__theme": dynamic(() => import("@/app/dashboard/white-label/theme/page"), { loading: AOSModuleLoading }), // /dashboard/white-label/theme
+
+  // ── Redirect stubs — server pages that redirect; map straight to their
+  //    targets so in-process windows land on the right content. ──────────
+  "academics__classes": dynamic(() => import("@/app/dashboard/academics/class-sections/page"), { loading: AOSModuleLoading }), // → class-sections
+  "academics__year": dynamic(() => import("@/app/dashboard/academics/page"), { loading: AOSModuleLoading }), // → academics
+  "academics__years": dynamic(() => import("@/app/dashboard/academics/page"), { loading: AOSModuleLoading }), // → academics
+  "certificates__id-settings": dynamic(() => import("@/app/dashboard/designer/page"), { loading: AOSModuleLoading }), // → designer
+  "certificates__staff-id": dynamic(() => import("@/app/dashboard/certificates/staff/page"), { loading: AOSModuleLoading }), // → certificates/staff
+  "certificates__student-id": dynamic(() => import("@/app/dashboard/certificates/students/page"), { loading: AOSModuleLoading }), // → certificates/students
+  "certificates__templates": dynamic(() => import("@/app/dashboard/designer/templates/page"), { loading: AOSModuleLoading }), // → designer/templates
+  "library__transactions": dynamic(() => import("@/app/dashboard/library/page"), { loading: AOSModuleLoading }), // → library (issues tab)
+  "settings__website-design": dynamic(() => import("@/app/dashboard/website-builder/page"), { loading: AOSModuleLoading }), // → website-builder
+  "staff__bulk-upload": dynamic(() => import("@/app/dashboard/bulk-uploads/csv/page"), { loading: AOSModuleLoading }), // → bulk-uploads/csv
+  "students__guardians": dynamic(() => import("@/app/dashboard/parents/page"), { loading: AOSModuleLoading }), // → parents
+  "teachers__bulk-upload": dynamic(() => import("@/app/dashboard/bulk-uploads/csv/page"), { loading: AOSModuleLoading }), // → bulk-uploads/csv
 };
 
 /** Map a /dashboard route path to its route-table key. */
