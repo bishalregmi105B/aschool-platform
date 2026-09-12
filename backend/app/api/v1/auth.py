@@ -355,7 +355,13 @@ def update_aos_settings():
 
     for field, allowed in _AOS_STRING_FIELDS.items():
         if field in data:
-            value = str(data[field])
+            raw = data[field]
+            # Frontends may send booleans/numbers — normalize before the
+            # string whitelist so one bad field can't 400 the whole update
+            # (JSON true must become "true", not Python's "True").
+            if isinstance(raw, bool):
+                raw = "true" if raw else "false"
+            value = str(raw)
             if len(value) > 200:
                 return error_response(f"{field} too long", 400)
             if allowed is not None and value not in allowed:
@@ -366,8 +372,8 @@ def update_aos_settings():
         if field in data:
             value = data[field]
             if not isinstance(value, expected_type):
-                return error_response(f"{field} must be a list", 400)
-            if len(value) > 200:
+                return error_response(f"{field} has an invalid type", 400)
+            if isinstance(value, list) and len(value) > 200:
                 return error_response(f"{field} too long", 400)
             setattr(settings, field, value)
 

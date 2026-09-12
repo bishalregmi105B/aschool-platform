@@ -121,6 +121,12 @@ export default function WindowManager({
   const [resizingWindowId, setResizingWindowId] = useState<string | null>(null);
   const [resizingDirection, setResizingDirection] = useState<ResizeDirection | null>(null);
   const [snapHoverWindowId, setSnapHoverWindowId] = useState<string | null>(null);
+  const snapCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (snapCloseTimerRef.current) clearTimeout(snapCloseTimerRef.current);
+    };
+  }, []);
 
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const resizeStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number; initW: number; initH: number }>({
@@ -497,14 +503,20 @@ export default function WindowManager({
                   <Minus size={14} />
                 </button>
 
-                {/* Single hover container around the maximize button + snap
-                    menu: moving the cursor from the button toward the menu
-                    stays inside one hover zone, so the popover no longer
-                    dismisses mid-travel. */}
+                {/* Maximize button + snap menu hover zone. Closing is
+                    DELAYED (350ms grace): leaving the zone schedules a
+                    close, re-entering (button OR menu) cancels it — the
+                    cursor can always travel from button to options. */}
                 <div
                   style={{ position: "relative", display: "flex", alignItems: "center", height: "100%" }}
-                  onMouseEnter={() => setSnapHoverWindowId(win.id)}
-                  onMouseLeave={() => setSnapHoverWindowId(null)}
+                  onMouseEnter={() => {
+                    if (snapCloseTimerRef.current) clearTimeout(snapCloseTimerRef.current);
+                    setSnapHoverWindowId(win.id);
+                  }}
+                  onMouseLeave={() => {
+                    if (snapCloseTimerRef.current) clearTimeout(snapCloseTimerRef.current);
+                    snapCloseTimerRef.current = setTimeout(() => setSnapHoverWindowId(null), 350);
+                  }}
                 >
                   <button
                     aria-label={win.isMaximized ? "Restore" : "Maximize"}
@@ -521,8 +533,14 @@ export default function WindowManager({
                   {snapHoverWindowId === win.id && (
                     <div
                       className="win11-snap-menu"
-                      onMouseEnter={() => setSnapHoverWindowId(win.id)}
-                      onMouseLeave={() => setSnapHoverWindowId(null)}
+                      onMouseEnter={() => {
+                        if (snapCloseTimerRef.current) clearTimeout(snapCloseTimerRef.current);
+                        setSnapHoverWindowId(win.id);
+                      }}
+                      onMouseLeave={() => {
+                        if (snapCloseTimerRef.current) clearTimeout(snapCloseTimerRef.current);
+                        snapCloseTimerRef.current = setTimeout(() => setSnapHoverWindowId(null), 350);
+                      }}
                     >
                       {/* Layout 1: 50 / 50 Split */}
                       <div className="snap-layout-card" title="Split 50 / 50">

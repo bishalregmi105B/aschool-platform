@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
@@ -65,7 +65,7 @@ export default function LibraryPage() {
  * to the v2 surfaces (holds, fines, stock-take, reports) above the classic
  * books/issues tables. */
 function LibraryContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const [search, setSearch] = useState("");
   const [bookPage, setBookPage] = useState(1);
   const [issuePage, setIssuePage] = useState(1);

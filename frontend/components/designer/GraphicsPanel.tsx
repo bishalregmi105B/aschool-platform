@@ -9,6 +9,10 @@
  * bakes the accent color into the SVG string and hands it to onAddIcon,
  * which CanvasEditor wires to canvas.addSVG(svg, {}, color) — a colorable
  * fabric Group.
+ *
+ * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
+ * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
+ * win11 scope, so no scope of its own is needed.
  */
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,18 @@ interface Props {
   onAddIcon: (svg: string, color: string) => void;
 }
 
+/** Fluent section card: control surface + subtle border + soft radius. */
+function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] space-y-2 ${className}`}
+      style={{ background: "var(--w11-control-bg)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Canva-style swatch row: preset colors + native free color input. */
 function ColorRow({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   return (
@@ -39,14 +55,14 @@ function ColorRow({ color, onChange }: { color: string; onChange: (c: string) =>
           style={{ background: c }}
           className={`w-6 h-6 rounded-full border transition-transform hover:scale-110 ${
             color.toLowerCase() === c.toLowerCase()
-              ? "ring-2 ring-offset-1 ring-primary border-transparent"
-              : "border-border"
+              ? "ring-2 ring-[var(--w11-accent)] ring-offset-1 ring-offset-[var(--w11-surface-solid)] border-transparent"
+              : "border-[var(--w11-border-default)]"
           }`}
         />
       ))}
       <label
         title="Custom color"
-        className="w-6 h-6 rounded-full border border-border cursor-pointer relative overflow-hidden hover:scale-110 transition-transform"
+        className="w-6 h-6 rounded-full border border-[var(--w11-border-default)] cursor-pointer relative overflow-hidden hover:scale-110 transition-transform"
         style={{
           background:
             "conic-gradient(#ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ec4899, #ef4444)",
@@ -87,12 +103,12 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
   }, [query, activeCat]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-[var(--w11-text-primary)]">
       {/* QR Code Card */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2 shadow-xs">
+      <SectionCard className="p-3.5 space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-            <QrCode className="h-3.5 w-3.5 text-primary" /> QR Code Generator
+          <p className="text-[11px] font-semibold text-[var(--w11-text-primary)] flex items-center gap-1.5">
+            <QrCode className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} /> QR Code Generator
           </p>
         </div>
         <div className="flex gap-1.5">
@@ -101,31 +117,31 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
             value={qrValue}
             onChange={(e) => setQrValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && qrValue.trim()) { onAddQr(qrValue.trim()); setQrValue(""); }}}
-            className="h-8 text-xs bg-background/80 rounded-xl"
+            className="h-8 text-xs"
           />
-          <Button size="sm" className="h-8 px-3 text-xs rounded-xl shadow-xs shrink-0"
+          <Button size="sm" className="h-8 px-3 text-xs shrink-0"
             onClick={() => { if (qrValue.trim()) { onAddQr(qrValue.trim()); setQrValue(""); }}}>
             Insert
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground leading-tight">
+        <div className="text-[10px] text-[var(--w11-text-secondary)] leading-tight">
           QR codes automatically bind to individual student tokens during bulk generation.
-        </p>
-      </div>
+        </div>
+      </SectionCard>
 
       {/* Watermark Card */}
-      <div className="p-3.5 rounded-2xl border border-border/70 bg-card/40 backdrop-blur-sm space-y-2.5 shadow-xs">
-        <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+      <SectionCard className="p-3.5 space-y-2.5">
+        <p className="text-[11px] font-semibold text-[var(--w11-text-primary)] flex items-center gap-1.5">
           <Stamp className="h-3.5 w-3.5 text-amber-500" /> Watermark Stamp
         </p>
         <div className="flex gap-1.5">
           <Input
             value={wmText}
             onChange={(e) => setWmText(e.target.value)}
-            className="h-8 text-xs bg-background/80 rounded-xl"
+            className="h-8 text-xs"
             placeholder="Stamp text…"
           />
-          <Button size="sm" variant="outline" className="h-8 px-3 text-xs rounded-xl shrink-0"
+          <Button size="sm" variant="outline" className="h-8 px-3 text-xs shrink-0"
             onClick={() => wmText.trim() && onAddWatermark(wmText.trim())}>
             Apply
           </Button>
@@ -135,57 +151,63 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
             <button
               key={t}
               onClick={() => onAddWatermark(t)}
-              className="text-[10px] font-medium px-2.5 py-1 rounded-full border border-border/80 bg-background/60 hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all duration-150"
+              className="text-[10px] font-medium px-2.5 py-1 rounded-[var(--w11-radius-full)] border border-[var(--w11-border-default)] hover:bg-[var(--w11-accent-light)] hover:border-[var(--w11-accent)] hover:text-[var(--w11-accent)] transition-colors"
+              style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}
             >
               {t}
             </button>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* ── Elements browser (Canva-style) ─────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-            <Shapes className="h-3.5 w-3.5 text-primary" /> Graphics & Elements
-            <span className="text-[10px] font-normal text-muted-foreground">({ELEMENT_TOTAL})</span>
+          <p className="text-[11px] font-semibold text-[var(--w11-text-primary)] flex items-center gap-1.5">
+            <Shapes className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} /> Graphics &amp; Elements
+            <span className="text-[10px] font-normal text-[var(--w11-text-secondary)]">({ELEMENT_TOTAL})</span>
           </p>
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--w11-text-tertiary)] pointer-events-none" />
           <Input
             ref={searchRef}
             placeholder={`Search ${ELEMENT_TOTAL} vector elements…`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-8 text-xs pl-8 bg-background/80 rounded-xl"
+            className="h-8 text-xs pl-8"
           />
         </div>
 
         {/* Accent Color Picker Row */}
         <div className="flex items-center justify-between py-1">
-          <span className="text-[10px] font-medium text-muted-foreground">Color</span>
+          <span className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Color</span>
           <ColorRow color={accent} onChange={setAccent} />
         </div>
 
-        {/* Horizontal Category Pill Strip */}
+        {/* Horizontal Category Pill Strip — active = accent-light + accent text */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
-          {ELEMENT_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => { setActiveCat(cat.id); setQuery(""); }}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 shrink-0 ${
-                activeCat === cat.id && !query.trim()
-                  ? "bg-primary text-primary-foreground font-medium shadow-xs"
-                  : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.label}</span>
-            </button>
-          ))}
+          {ELEMENT_CATEGORIES.map((cat) => {
+            const on = activeCat === cat.id && !query.trim();
+            return (
+              <button
+                key={cat.id}
+                onClick={() => { setActiveCat(cat.id); setQuery(""); }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--w11-radius-full)] text-[11px] whitespace-nowrap shrink-0"
+                style={{
+                  transition: "background var(--w11-transition-fast), color var(--w11-transition-fast)",
+                  ...(on
+                    ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)", fontWeight: 600 }
+                    : { background: "var(--w11-control-hover)", color: "var(--w11-text-secondary)" }),
+                }}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Elements Grid (Clean, single scroll with parent) */}
@@ -193,14 +215,14 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
           {listing.groups.map((group) => (
             <div key={group.id} className="space-y-2">
               {query.trim() && (
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="text-[10px] font-medium text-[var(--w11-text-tertiary)] uppercase tracking-wider">
                   {group.label} · {group.items.length} found
-                </p>
+                </div>
               )}
               {group.items.length === 0 ? (
-                <div className="text-center py-6 px-3 bg-muted/20 rounded-2xl border border-dashed border-border/60">
-                  <p className="text-xs text-muted-foreground font-medium">No elements found</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">Try shapes, star, arrow, heart, badge…</p>
+                <div className="text-center py-6 px-3 rounded-[var(--w11-radius-lg)] border border-dashed border-[var(--w11-border-default)]">
+                  <div className="text-xs text-[var(--w11-text-secondary)] font-medium">No elements found</div>
+                  <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-0.5">Try shapes, star, arrow, heart, badge…</div>
                 </div>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
@@ -209,10 +231,10 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
                       key={item.id}
                       title={item.label}
                       onClick={() => insert(item.svg)}
-                      className="aspect-square flex items-center justify-center border border-border/70 rounded-xl p-2
-                        bg-card/60 hover:bg-primary/10 hover:border-primary hover:shadow-md hover:scale-[1.06]
-                        transition-all duration-150 text-muted-foreground hover:text-foreground
+                      className="aspect-square flex items-center justify-center border border-[var(--w11-border-subtle)] rounded-[var(--w11-radius-md)] p-2
+                        hover:bg-[var(--w11-accent-light)] hover:border-[var(--w11-accent)] transition-colors text-[var(--w11-text-secondary)]
                         [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-8 [&>svg]:max-w-8"
+                      style={{ background: "var(--w11-control-bg)", transitionDuration: "var(--w11-transition-fast)" }}
                       dangerouslySetInnerHTML={{ __html: item.svg }}
                     />
                   ))}
@@ -222,9 +244,9 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
           ))}
         </div>
 
-        <p className="text-[10px] text-muted-foreground/80 text-center pt-1">
+        <div className="text-[10px] text-[var(--w11-text-tertiary)] text-center pt-1">
           Click any element to add. Re-color anytime from the Properties panel.
-        </p>
+        </div>
       </div>
     </div>
   );

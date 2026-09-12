@@ -20,7 +20,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TextSelection } from "@tiptap/pm/state";
-import { useSearchParams } from "next/navigation";
+import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -38,6 +38,7 @@ import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { useWin11Scope } from "@/lib/win11-scope";
 import { writerBlocksToHTML } from "@/lib/designer/writer-blocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,6 +137,27 @@ const TOKEN_CSS = `
 .writer-has-tall { background: #ffffff; border-radius: 2px; }
 .writer-has-tall .writer-band { box-shadow: none; outline: 1px solid #e2e8f0; }
 .writer-has-tall .writer-band + .writer-band { border-top: 1px dashed #94a3b8; }
+
+/* Browser print / Save-as-PDF: print the DOCUMENT ONLY — no ribbon, no
+   panels, no window chrome. Everything on the page is hidden except the
+   .writer-print-area subtree, which is promoted to the top of the page. */
+@media print {
+  body { background: #ffffff !important; }
+  body * { visibility: hidden !important; }
+  .writer-print-area, .writer-print-area * { visibility: visible !important; }
+  .writer-print-area {
+    position: absolute !important;
+    left: 0 !important; top: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    width: auto !important; height: auto !important;
+  }
+  .writer-print-area .writer-band {
+    box-shadow: none !important; outline: none !important;
+    border-top: 1px dashed #94a3b8;
+  }
+  .writer-print-area .writer-band:first-child { border-top: none; }
+}
 `;
 
 export default function WriterPage() {
@@ -148,9 +170,12 @@ export default function WriterPage() {
 
 function WriterContent() {
   const router = useAOSRouterNavigate();
-  const searchParams = useSearchParams();
+  const searchParams = useAOSRouteParams();
   const docId = searchParams.get("doc");
   const templateId = searchParams.get("template");
+  // Win11 token scope mirrored from the AOS shell — flips every --w11-* token
+  // (surfaces, text, borders, accent) with the OS light/dark theme.
+  const win11 = useWin11Scope();
 
   const [docName, setDocName] = useState("Untitled Document");
   const [settings, setSettings] = useState<WriterSettings>(() => mergeSettings());
@@ -351,13 +376,29 @@ function WriterContent() {
     onError: () => toast.error("Failed to save"),
   });
 
-  // server PDF via template render or saved doc
+  // server PDF via template render or saved doc — auto-saves unsaved
+  // changes first so the export never dead-ends on "save first".
   const pdfMutation = useMutation({
     mutationFn: async () => {
-      if (!docId) throw new Error("save-first");
+      let effectiveDocId = docId;
+      if (!effectiveDocId || dirty) {
+        const payload: any = {
+          name: docName,
+          template_type: "writer_doc",
+          canvas_state: { type: "writer2", doc: editor?.getJSON(), config: settings },
+        };
+        if (effectiveDocId) payload.id = effectiveDocId;
+        const saved = (await api.post("/design-studio/documents", payload)).data?.data;
+        if (saved?.id) {
+          effectiveDocId = saved.id;
+          setDirty(false);
+          if (!docId) router(`/dashboard/designer/writer?doc=${saved.id}`);
+        }
+      }
+      if (!effectiveDocId) throw new Error("save-first");
       const r = await api.post(
         "/design-studio/export/pdf",
-        { document_id: docId },
+        { document_id: effectiveDocId },
         { responseType: "blob" },
       );
       return r.data as Blob;
@@ -367,7 +408,7 @@ function WriterContent() {
       toast.success("PDF downloaded (print-ready, Nepali-safe)");
     },
     onError: (e: any) => {
-      if (e?.message === "save-first") toast.info("Save the document first, then export server PDF");
+      if (e?.message === "save-first") toast.info("Could not save the document for export");
       else toast.error("Server PDF failed");
     },
   });
@@ -720,7 +761,7 @@ function WriterContent() {
 
   const find = useMemo(() => ({ query: "", caseSensitive: false, index: 0 }), []);
 
-  if (!editor) return <div className="h-screen win11" style={{ background: "var(--w11-window-bg)" }} />;
+  if (!editor) return <div className={`h-screen ${win11.className}`} data-theme={win11.theme} style={{ background: "var(--w11-window-bg)" }} />;
 
   const { pw, ph } = geom;
   const contentW = Math.max(80, pw - settings.marginLeft - settings.marginRight);
@@ -759,39 +800,56 @@ function WriterContent() {
 
   return (
     <div
-      className="relative h-screen flex flex-col overflow-hidden win11"
+      className={`relative h-screen flex flex-col overflow-hidden ${win11.className}`}
+      data-theme={win11.theme}
       style={{ background: "var(--w11-window-bg)" }}
     >
       <style>{TOKEN_CSS}</style>
 
-      {/* Title bar — MS Word 365 Style */}
+      {/* Title bar — Fluent chrome (token-driven, adapts to light/dark) */}
       <div
-        className={`flex items-center gap-2.5 px-3.5 h-12 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 ${focusMode ? "hidden" : ""}`}
+        className={`flex items-center gap-2.5 px-3.5 h-12 shrink-0 border-b ${focusMode ? "hidden" : ""}`}
+        style={{
+          background: "var(--w11-surface-solid)",
+          borderColor: "var(--w11-border-default)",
+        }}
       >
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => router("/dashboard/designer")}>
+        <Button variant="ghost" size="icon" onClick={() => router("/dashboard/designer")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-[#0078d4] shrink-0" />
+          <FileText className="h-4 w-4 shrink-0" style={{ color: "var(--w11-accent)" }} />
           <Input
             value={docName}
             onChange={(e) => { setDocName(e.target.value); setDirty(true); }}
-            className="w-56 h-8 text-sm font-semibold border-transparent hover:border-border focus:border-[#0078d4] bg-transparent hover:bg-muted/40 transition-colors rounded-lg px-2"
+            className="w-56 h-8 text-sm font-semibold border-transparent focus:border-[var(--w11-accent)] bg-transparent hover:bg-[var(--w11-control-hover)] transition-colors px-2"
           />
         </div>
-        <span className="text-[11px] hidden md:flex items-center gap-1.5 text-muted-foreground font-medium">
+        <span className="text-[11px] hidden md:flex items-center gap-1.5 font-medium" style={{ color: "var(--w11-text-secondary)" }}>
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Word Document
         </span>
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium" onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}>
+          {/* ghost = 11.css `subtle` — commandbar hover, token-driven */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-medium"
+            onClick={() => setSidePanel(sidePanel === "research" ? "none" : "research")}
+          >
             <BookOpen className="h-3.5 w-3.5 text-violet-500" /> Research &amp; AI
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium" onClick={() => setShowTokenBar(!showTokenBar)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs gap-1.5 font-medium"
+            onClick={() => setShowTokenBar(!showTokenBar)}
+          >
             <Braces className="h-3.5 w-3.5 text-blue-500" /> Tokens
           </Button>
+          {/* default variant = 11.css `accent` fill (token-driven hover) */}
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5 rounded-lg bg-[#0078d4] hover:bg-[#106ebe] text-white font-medium shadow-xs"
+            className="h-8 text-xs gap-1.5 font-medium"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
           >
@@ -800,13 +858,13 @@ function WriterContent() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1 rounded-lg border-slate-300 dark:border-slate-700 font-medium hover:border-[#0078d4]">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1 font-medium">
                 <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-border">
               <DropdownMenuItem onClick={doExportDocx} disabled={exporting} className="gap-2 cursor-pointer">
-                {exporting ? <Loader2 className="h-4 w-4 animate-spin text-[#0078d4]" /> : <FileText className="h-4 w-4 text-[#0078d4]" />}
+                {exporting ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--w11-accent)" }} /> : <FileText className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
                 <div className="flex flex-col">
                   <span className="font-semibold text-xs">Word Document (.docx)</span>
                   <span className="text-[10px] text-muted-foreground">Editable in Microsoft Word</span>
@@ -923,7 +981,7 @@ function WriterContent() {
           }}
         >
           <div
-            className={`relative ${hasTallBlock ? "writer-has-tall" : ""}`}
+            className={`relative writer-print-area ${hasTallBlock ? "writer-has-tall" : ""}`}
             style={{
               transform: `scale(${zoomScale})`,
               transformOrigin: "top left",

@@ -30,6 +30,7 @@ import {
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
 import { ChevronRight } from "lucide-react";
+import { TemplateThumb } from "@/components/designer/TemplateThumb";
 
 // Quick links — the design_studio manifest subitems plus the Writer surface.
 const QUICK_LINKS = [
@@ -342,14 +343,14 @@ export default function DesignerPage() {
                     }}
                   >
                     <div
-                      className="aspect-[4/3] flex items-center justify-center overflow-hidden"
+                      className="relative aspect-[4/3] flex items-center justify-center overflow-hidden"
                       style={{ background: "var(--w11-control-hover)" }}
                     >
-                      {doc.thumbnail_url ? (
-                        <img src={doc.thumbnail_url} alt={doc.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Palette className="h-8 w-8" style={{ color: "var(--w11-text-tertiary)" }} />
-                      )}
+                      <TemplateThumb
+                        url={doc.thumbnail_url}
+                        name={doc.name || "Design"}
+                        icon={<Palette className="h-5 w-5" />}
+                      />
                     </div>
                     <div className="p-2">
                       <p className="text-xs font-medium truncate" style={{ color: "var(--w11-text-primary)" }}>{doc.name}</p>
@@ -477,26 +478,18 @@ function TemplateCard({ template }: { template: any }) {
       style={{ padding: 0 }}
       onClick={() => router(dest)}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail — real image when the template ships one, otherwise a
+          deterministic gradient tile so the card never looks broken. */}
       <div
         className="relative overflow-hidden"
         style={{ paddingTop: `${Math.min(ratio * 100, 133)}%`, background: "var(--w11-control-hover)" }}
       >
-        {template.thumbnail_url ? (
-          <img
-            src={template.thumbnail_url}
-            alt={template.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ color: "var(--w11-text-tertiary)" }}
-          >
-            {CATEGORY_ICON[template.category] ?? <LayoutTemplate className="h-8 w-8" />}
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+        <TemplateThumb
+          url={template.thumbnail_url}
+          name={template.name}
+          icon={CATEGORY_ICON[template.category] ?? <LayoutTemplate className="h-5 w-5" />}
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none" />
         {/* Tool indicator */}
         <div className="absolute top-1.5 right-1.5">
           <Badge variant="outline" className="text-[9px] h-4 px-1.5 backdrop-blur-sm">

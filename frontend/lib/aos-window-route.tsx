@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { createContext, useContext, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * In-process navigation for the AOS desktop.
@@ -94,4 +94,24 @@ export function useAOSRouterNavigate(): (route: string) => void {
     },
     [aosNavigate, router]
   );
+}
+
+/**
+ * Query params that work inside AOS windows: the window's virtual route
+ * params take precedence; the browser URL's params are the fallback (for
+ * direct visits / aos_embed iframes). useSearchParams() alone reflects the
+ * pinned shell URL (/dashboard) and never sees window navigation.
+ */
+export function useAOSRouteParams(): URLSearchParams {
+  const windowRoute = useContext(WindowRouteContext);
+  const searchParams = useSearchParams();
+  return useMemo(() => {
+    const merged = new URLSearchParams(searchParams?.toString() || "");
+    if (windowRoute) {
+      for (const [k, v] of Object.entries(windowRoute.params)) {
+        merged.set(k, v);
+      }
+    }
+    return merged;
+  }, [windowRoute, searchParams]);
 }
