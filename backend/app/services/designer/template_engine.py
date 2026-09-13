@@ -1218,7 +1218,16 @@ class TemplateEngineService:
 
     @classmethod
     def _ensure_seeded(cls) -> None:
-        """Populate / sync the template table from the built-in registry.
+        """No-op: the FILE SCAN is the single source of truth for builtin
+        templates (list_templates_for_school / get_template read folders
+        directly). The DB table now only holds school-specific customs and
+        overrides; the old seeding sweep is retired."""
+        return
+
+    @classmethod
+    def _seed_sweep_retired(cls) -> None:
+        """(Retired) original seeding sweep kept for reference.
+        Populate / sync the template table from the built-in registry.
 
         Runs a full upsert so that builtin templates (school_id=None) always
         reflect the latest writer_json / editor_type from the code.
@@ -1449,48 +1458,56 @@ class TemplateEngineService:
 
     @classmethod
     def list_templates_for_school(cls, category: str | None = None, school_id=None) -> list:
-        """Return templates with school-specific overrides applied."""
+        """Return templates: FILE SCAN is the single source of truth for
+        builtins (edits to template folders land immediately — no DB sync);
+        DB rows contribute only school-specific customs/overrides."""
         from app.models.designer_template import DesignerTemplate
 
-        cls._ensure_seeded()
         normalized_category = cls.normalize_category(category)
 
-        try:
-            query = DesignerTemplate.query.filter(DesignerTemplate.is_deleted.is_(False))
-            if school_id is not None:
-                query = query.filter((DesignerTemplate.school_id.is_(None)) | (DesignerTemplate.school_id == school_id))
-            else:
-                query = query.filter(DesignerTemplate.school_id.is_(None))
-            rows = query.all()
-        except Exception:
-            rows = []
+        # 1) Base list straight from the file scan (plus the legacy
+        #    code-defined registry as a fallback source).
+        from app.services.designer.template_folders import scan_template_folders
 
-        templates = {}
-        for row in sorted(rows, key=lambda item: (item.school_id is not None, item.updated_at or item.created_at)):
-            meta = cls._template_record_to_meta(row)
+        templates: dict = {}
+        for tid, meta in {**TEMPLATES, **scan_template_folders()}.items():
             template_category = cls.normalize_category(meta.get("category")) or meta.get("category")
             if normalized_category and template_category != normalized_category:
                 continue
-            templates[meta.get("template_key") or meta.get("id")] = meta
+            templates[tid] = {
+                "id": tid,
+                "template_key": tid,
+                **meta,
+                "page_count": cls._template_page_count(meta),
+            }
 
-        if templates:
-            return list(templates.values())
+        # 2) School-specific DB rows override/extend (custom templates and
+        #    school white-label overrides of builtins). Seeded builtin copies
+        #    (school_id IS NULL) are deliberately ignored.
+        if school_id is not None:
+            try:
+                rows = DesignerTemplate.query.filter(
+                    DesignerTemplate.is_deleted.is_(False),
+                    DesignerTemplate.school_id == school_id,
+                ).all()
+            except Exception:
+                rows = []
+            for row in sorted(rows, key=lambda item: item.updated_at or item.created_at):
+                meta = cls._template_record_to_meta(row)
+                template_category = cls.normalize_category(meta.get("category")) or meta.get("category")
+                if normalized_category and template_category != normalized_category:
+                    continue
+                templates[meta.get("template_key") or meta.get("id")] = meta
 
-        result = []
-        for tid, meta in TEMPLATES.items():
-            template_category = cls.normalize_category(meta.get("category")) or meta.get("category")
-            if normalized_category and template_category != normalized_category:
-                continue
-            result.append({"id": tid, "template_key": tid, **meta, "page_count": cls._template_page_count(meta)})
-        return result
+        return list(templates.values())
 
     @classmethod
     def get_template(cls, template_id: str, school_id=None) -> dict | None:
         from app.models.designer_template import DesignerTemplate
 
-        cls._ensure_seeded()
         resolved_id = cls.resolve_template_id(template_id)
 
+        # 1) School-specific override (DB) wins for customized templates.
         try:
             if school_id is not None:
                 row = DesignerTemplate.query.filter_by(
@@ -1500,16 +1517,15 @@ class TemplateEngineService:
                 ).first()
                 if row:
                     return cls._template_record_to_meta(row)
-
-            row = DesignerTemplate.query.filter_by(
-                school_id=None,
-                template_key=resolved_id,
-                is_deleted=False,
-            ).first()
-            if row:
-                return cls._template_record_to_meta(row)
         except Exception:
             pass
+
+        # 2) File scan is the source of truth for builtins — always fresh.
+        from app.services.designer.template_folders import get_folder_template
+
+        file_meta = get_folder_template(resolved_id)
+        if file_meta:
+            return {"id": resolved_id, "template_key": resolved_id, **file_meta}
 
         return cls._build_fallback_template(resolved_id)
 

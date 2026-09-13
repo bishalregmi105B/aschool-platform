@@ -115,3 +115,15 @@ export function useAOSRouteParams(): URLSearchParams {
     return merged;
   }, [windowRoute, searchParams]);
 }
+
+/**
+ * Path segment from the window's virtual route (1-based position AFTER
+ * /dashboard: segment 1 = module, 2 = first nested segment...). Returns
+ * null outside a window so callers can fall back to useParams().
+ */
+export function useAOSPathParam(position: number): string | null {
+  const windowRoute = useContext(WindowRouteContext);
+  if (!windowRoute) return null;
+  const segments = windowRoute.pathname.split("/").filter(Boolean); // ["dashboard", "students", "<id>"]
+  return segments[position] ?? null; // segments[1] = module, segments[2] = first nested
+}

@@ -126,6 +126,8 @@ export default function DesignerPage() {
   });
 
   const filtered = (templates as any[]).filter((t: any) => {
+    // Designer templates only — writer templates live in the Writer's gallery.
+    if (t.editor_type === "writer") return false;
     const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
     const matchCat    = activeTab === "all" || t.category === activeTab;
     return matchSearch && matchCat;

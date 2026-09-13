@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import { useAOSPathParam } from "@/lib/aos-window-route";
 import Link from "next/link";
 import { ArrowLeft, Calendar, ClipboardList, FileBarChart, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +68,7 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function ExamDetailPage() {
   const params = useParams();
-  const examId = params.id as string;
+  const examId = useAOSPathParam(2) || (params.id as string);
 
   const { data: exam, isLoading, error } = useQuery({
     queryKey: ["exam", examId],
