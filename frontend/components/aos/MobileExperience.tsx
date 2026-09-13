@@ -17,6 +17,7 @@ import {
   type AOSApp,
 } from "@/lib/aos-app-adapter";
 import { resolveModuleComponent } from "./AOSModuleRegistry";
+import { resolveRouteComponent } from "./AOSRouteTable";
 import IOSControlCenter from "./IOSControlCenter";
 import IOSNotificationCenter from "./IOSNotificationCenter";
 import { useAuth } from "@/lib/auth-context";
@@ -267,6 +268,13 @@ export default function MobileExperience({
 
   const activeAppComponent = useMemo(() => {
     if (!activeApp) return null;
+    // Route windows resolve their EXACT page first (same order as the
+    // desktop WindowManager) — resolveModuleComponent alone would render
+    // the module hub for every subroute.
+    if (activeApp.startsWith("route:")) {
+      const route = activeApp.slice("route:".length);
+      return resolveRouteComponent(route) ?? resolveModuleComponent(activeApp);
+    }
     return resolveModuleComponent(activeApp);
   }, [activeApp]);
 
