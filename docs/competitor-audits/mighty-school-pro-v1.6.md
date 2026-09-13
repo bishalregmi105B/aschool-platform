@@ -1,5 +1,16 @@
 # Competitor Audit: Mighty School Pro v1.6 (Codecanyon 57385565, FueDevs LTD)
 
+> **SUPERSEDED by `audits/deep-ux-2026-09/mighty-school-pro-v1.6.md` (2026-09-13).**
+> This file is retained as the v1/v2 evidence base. The deep-ux report re-verified every major claim at source and extends this draft with full screen inventories, per-screen UI/UX element inventories, task benchmarks, and Mermaid IA diagrams. Changelog of what changed:
+> 1. **Corrected — SaaS enforcement**: `CheckSubscription` was described as 403-ing every request; it is actually **dead code** (aliased in `bootstrap/app.php` but mounted on zero routes). Plan quotas/expiry are enforced nowhere at runtime.
+> 2. **Corrected — update package**: `updated-api-code-v1.6` is **byte-identical** (Modules/ + app/, 1,470 files) to the install package — a full-directory re-ship for v1.5→v1.6 upgraders, not a distinct patch set.
+> 3. **Corrected — SMS**: balance is never deducted and `SmsBalance::first()` is unscoped; only 2 gateways actually send (twilio, bulksmsbd — the 14-gateway trait has zero callers); composed SMS never dispatch (scheduler line commented; failure-blind job).
+> 4. **Corrected — notices**: `UserNotice` stores targeting rows, not per-user read state; notices cannot target a class and have no push/SMS fanout.
+> 5. **Corrected — module count**: 19 modules on disk, not 20.
+> 6. **New findings**: student OTP hardcoded '1234' and returned in the response; staff login is a global unscoped lookup on non-unique `users.email`; gateway-credential update IDOR; admin dashboard KPIs partially hardcoded fake numbers (fees/library widgets); e-learning course management commented out of the sidebar; report-card PDF ships with placeholder grey boxes; attendance store's first catch skips rollback.
+> 7. **Verified still true** (headline items): `system:reset` everyMinute; branch IDORs; `changeBranch` unvalidated; trial subscription hardcoded to institute 1; commented-out fee-collection transaction; one-sided GL postings; unscoped `examResult`; 100-mark cap; fees FIFO/waiver/fine math; Flutter counts (1,858 files / 46 features / 197 routes); X-Domain tenancy; Bangladesh-market defaults.
+> The verification ledger at the end of the new report maps every claim above to file:line evidence.
+
 - **Audited**: 2026-09-11
 - **Source**: `Other Projects/Mighty School Pro v1.6/.../codecanyon-57385565-mighty-school-pro-school-management-system-erp-multibranch-saas-all-in-one/` — three deliverables:
   - `install-api-code-v1.6_x/` — Laravel 11 API + web installer (the canonical backend)

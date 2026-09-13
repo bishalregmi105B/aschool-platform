@@ -361,6 +361,15 @@ class PluginLoader:
                     )
             except ImportError:
                 logger.debug("Plugin %s: blueprint %s not found (skip)", slug, bp_path)
+            except (SyntaxError, AttributeError, NameError) as exc:
+                # E7: importlib.import_module executes the module body, which
+                # can raise far more than ImportError — a plugin with a
+                # SyntaxError used to crash boot. Broken plugins stay
+                # unmounted and the app comes up (audit 6.4-7).
+                logger.error(
+                    "Plugin %s: blueprint module %s failed to import (%s: %s) — plugin stays unmounted",
+                    slug, bp_path, type(exc).__name__, exc,
+                )
 
     @classmethod
     def _find_blueprint(cls, module):

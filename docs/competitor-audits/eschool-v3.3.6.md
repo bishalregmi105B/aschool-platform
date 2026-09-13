@@ -1,5 +1,16 @@
 # Competitor Deep Audit: eSchool v3.3.6 (Virtual School Management System)
 
+> **SUPERSEDED by `audits/deep-ux-2026-09/eschool-v3.3.6.md` (2026-09-13).** The deep-UX audit re-verified every major claim in this file at source and extended it substantially. Changelog of what changed:
+>
+> 1. **Backend path corrected:** the authoritative Laravel tree is now `audits/deep-ux-2026-09/work/eschool-adminpanel/PHP_Code/` (fresh zip extraction); the `PHP Code/PHP_CODE_x/` path cited below is filesystem-flaky — line numbers in the new report refer to the extraction.
+> 2. **45 claims verified still true** (route counts, god-controller LOC, security holes incl. `/migrate` backdoors + answer-key leak + Razorpay webhook-secret leak, exam/fees/chat flows, single-tenancy) — every re-checked fact held up.
+> 3. **2 claims corrected:** (a) the teacher app has NO showcaseview coach marks in 3.3.6 (grep: zero hits); (b) mobile theming is hardcoded in `colors.dart`, NOT server-driven — `theme_color` reaches only the website/panel. Plus a new dead route found: `student/edit-assignment` binds to a method that does not exist.
+> 4. **6 new weaknesses found:** cross-gateway `required_if:razorpay_status` validation bug in fees-config; unauthenticated chat-purge cron; both Flutter apps disable TLS certificate validation (`badCertificateCallback=true`); stray dev artifacts shipped; parents create-form DOB readonly while passwords derive from DOB; leave-status enum mismatch (DB comment 0/1/3 vs validators 0/1/2).
+> 5. **New coverage:** 33 end-to-end backend traces, per-screen element inventories for all admin view families and ~35 mobile screens, both apps' API registries cross-referenced (86 + 56 constants), model-relationship map, complete migration schema history, changelog↔code consistency check, upgrade-zip characterization (full-source shipping), vendor docs corpus census (106 screenshots), and ASchool deltas re-verified at current HEAD (exams.py/fees.py/mobile.py/assignments.py/communications.py).
+> 6. **Six task benchmarks** now have click-path detail (attendance 1 screen/3 clicks/2 filters; fee collection 1+1 modal/~4 clicks/4 fields; notice 1+1/~4 clicks/3 fields; report card 2/3/0; enroll student 1/1/~15 fields; online exam 2/~6/~8).
+>
+> This file is retained for history; treat the new report as the single source of truth.
+
 **Product:** eSchool — Virtual School Management System (Flutter app + Laravel admin panel), CodeCanyon item 38335673, vendor WRTEAM (wrteam.in, India)
 **Audited copy:** `Other Projects/eSchool v3.3.6/eSchool v3.3.6/codecanyon-38335673-eschool-virtual-school-management-system-flutter-app-with-laravel-admin-panel/`
 **Laravel root (referred to as `PHP_Code/`):** `ESCHOOL Admin Panel 3.3.6_extracted/ESCHOOL Admin Panel 3.3.6/PHP Code/PHP_Code_x/PHP_Code`

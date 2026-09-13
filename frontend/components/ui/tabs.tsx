@@ -2,6 +2,11 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 
+// 11.css styles [role=tablist]/[role=tab]/[role=tabpanel] (and the
+// .win11-tab* classes) — Radix sets those roles automatically, so adding
+// the class names here gives every tab surface in the product Fluent
+// styling with Radix keyboard nav + a11y for free (plan G1 / Part 31.2).
+
 const Tabs = TabsPrimitive.Root;
 
 const TabsList = React.forwardRef<
@@ -10,7 +15,7 @@ const TabsList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn("w-full gap-1 whitespace-nowrap", className)}
+    className={cn("win11-tablist w-full gap-1 whitespace-nowrap", className)}
     {...props}
   />
 ));
@@ -23,7 +28,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "whitespace-nowrap outline-none disabled:pointer-events-none disabled:opacity-50",
+      "win11-tab whitespace-nowrap outline-none disabled:pointer-events-none disabled:opacity-50",
       className
     )}
     {...props}
@@ -37,7 +42,7 @@ const TabsContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    className={cn("mt-2 outline-none", className)}
+    className={cn("win11-tabpanel mt-2 outline-none", className)}
     {...props}
   />
 ));

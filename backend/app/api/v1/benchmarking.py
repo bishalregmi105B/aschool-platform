@@ -87,7 +87,7 @@ def _rankings_rows():
     from datetime import date, timedelta
 
     from app.models.academic import Class
-    from app.models.analytics import ReportCard
+    from app.models.exam import ReportCard
     from app.models.attendance import Attendance
     from app.models.exam import Exam
     from app.models.student import Student

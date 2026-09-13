@@ -27,6 +27,7 @@ import { CalendarOff, Plus, Pencil, Trash2 } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Holiday {
   id: string;
   title: string;
@@ -46,6 +47,7 @@ export default function HolidaysPage() {
 }
 
 function HolidaysContent() {
+  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Holiday | null>(null);
   const queryClient = useQueryClient();
@@ -165,8 +167,9 @@ function HolidaysContent() {
                         aria-label={`Delete ${h.title}`}
                         disabled={deleteMutation.isPending}
                         onClick={() => {
-                          if (confirm(`Delete "${h.title}"?`))
-                            deleteMutation.mutate(h.id);
+                          confirm({ title: "Delete holiday", body: `Delete "${h.title}"?` }).then((ok) => {
+                            if (ok) deleteMutation.mutate(h.id);
+                          });
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />

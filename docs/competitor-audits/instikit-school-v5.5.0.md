@@ -1,3 +1,27 @@
+# > SUPERSEDED by audits/deep-ux-2026-09/instikit-v5.5.0.md (2026-09-13)
+#
+# This first-draft audit (implementation-level, `_x` tree, 2026-09-12) has been deepened and
+# superseded by the deep-UX pass at `audits/deep-ux-2026-09/instikit-v5.5.0.md` (2,349 lines,
+# audited against the verified `_extracted` tree per RECON_MAP §2). Changelog vs this draft:
+#   1. Institution-type question answered definitively: NO institution-type model exists anywhere;
+#      school/college/institute/academy coverage is generic ProgramType→Program→Division→Course→Batch
+#      + Period/Session vocabulary + options + 418 config keys (new §3.2 of the new report).
+#   2. Route count corrected: 1,535 explicit Route:: statements across 78 route files (208 apiResource
+#      declarations → 2,100+ live endpoints), not 1,410; top-level menu modules = 30, not 33; created
+#      tables = exactly 223; SPA chunk count 957 re-verified exactly right (1,907 files incl. .gz pairs
+#      and fonts; manifest 1,022 entries).
+#   3. All 13 V2 findings re-verified still true (IDOR media delete, TOCTOU, seat caps, stub payment
+#      services, cross-team bulk reassignment, racy code numbers, global biometric limiter, etc.).
+#   4. New findings: `.reinstall` magic-password backdoor (Login.php:151-153); bcrypt'd failed-password
+#      storage; hostel room allocations have zero capacity/overlap validation; global auth/otp rate
+#      limiters (shared-fate); "modern" site theme directory ships empty (0 blades); attendance-on-holiday
+#      guard commented out; guardians have no create route; timetable enforces incharge-only teachers.
+#   5. New coverage: complete endpoint inventory (all 34 API route files), 223-table column census,
+#      17×644 permission matrix computed, 70-job inventory, 107-enum catalog, Ghana/Cameroon marksheet
+#      processors (market targeting), full per-screen field inventories from ~40 FormRequests.
+# The structure/comparison tables below remain directionally correct except where marked above; treat
+# every claim as re-anchored in the new report before quoting.
+
 # Competitor Deep Audit: InstiKit School v5.5.0 (ScriptMint)
 
 **Product:** InstiKit Premium — "Most Comprehensive School/College/Institute/Academy Management Kit", CodeCanyon-style self-hosted ERP, vendor ScriptMint (scriptmint.com, instikit.com). First release 13 July 2018; v5.5 released 16 Dec 2025.

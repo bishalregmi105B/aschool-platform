@@ -16,7 +16,7 @@ capabilities:
   - app.services.website.white_label
 ui:
   nav:
-    route: /white-label
+    route: /dashboard/white-label
     section: Design & Web
     label: White Label
     label_nepali: ह्वाइट-लेबल
@@ -25,11 +25,11 @@ ui:
     - school_admin
     subitems:
     - label: Branding
-      route: /white-label/branding
+      route: /dashboard/white-label/branding
     - label: Custom Domain
-      route: /white-label/domain
+      route: /dashboard/white-label/domain
     - label: Theme
-      route: /white-label/theme
+      route: /dashboard/white-label/theme
   aos:
     about: "Make ASchool yours — custom branding, your own domain, and removal of ASchool branding."
 mobile:

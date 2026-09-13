@@ -17,7 +17,7 @@ import {
   AOSFinanceIcon,
   AOSSettingsIcon,
 } from "@/components/aos/AOSIcons";
-import { Trash2, LayoutGrid, Layers, Sparkles } from "lucide-react";
+import { LayoutGrid, Layers, Sparkles } from "lucide-react";
 import { WindowInstance, SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins, PluginSidebarItem } from "@/lib/plugins";
 import { getAOSAppForModule, normalizeAOSModuleId } from "@/lib/aos-app-adapter";
@@ -345,28 +345,6 @@ export default function Dock({
             })}
           </>
         )}
-
-        {/* Separator before Trash */}
-        <div className="dock-separator" />
-
-        {/* Academic Archive / Trash */}
-        <div
-          className="dock-app-item"
-          onClick={() => alert("Academic Archive: Recycle Bin is clean.")}
-        >
-          <div className="dock-tooltip">Academic Archive</div>
-          <div
-            className="dock-icon-wrapper"
-            style={{
-              width: `${iconPx}px`,
-              height: `${iconPx}px`,
-              background: "rgba(255,255,255,0.12)",
-              borderRadius: "12px",
-            }}
-          >
-            <Trash2 size={Math.round(iconPx * 0.6)} color="#94a3b8" />
-          </div>
-        </div>
       </div>
     </div>
   );

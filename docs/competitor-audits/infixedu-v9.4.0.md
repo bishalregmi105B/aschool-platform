@@ -1,3 +1,18 @@
+# SUPERSEDED by audits/deep-ux-2026-09/infixedu-v9.4.0.md (2026-09-13)
+
+**Changelog (what the superseding report changed vs this draft):**
+1. Stack pinned: Laravel **13.9.0** locked, PHP ^8.3, nwidart ^8.2, Octane/Pulse/Passport 13/Rector/Pint declared (`composer.json`/`composer.lock`).
+2. Counts corrected: admin_tenant.php 1,297 active route defs (not 1,355); api.php 750 (not 739); v2api 224; `app/Models` 245 (not 191); `modules_statuses.json` 49 slots (not 48).
+3. Due-fees gate corrected: `FeesDueCheckMiddleware` never blocks — it only warms cache; the sole gate is the parent 403 wall in `UserRolePermission.php:30-40`; **no student-side gate exists** in the current tree (the "students redirected at login via blade checks" claim was not reproducible).
+4. Header-partial claim corrected: academic-year switcher lives in `partials/menu.blade.php:115-123` (+ `developer.js:321` → `tenant.php:261`), not in `header.blade.php`.
+5. Attendance extended: blade offers a 5th state **Le (leave)**; the notify job doesn't know it (labels it Absent).
+6. Nepal nuance: Khalti integration UI ships in the base student fees blade (gated by absent addon) — runtime claim true, code-presence claim corrected.
+7. New evidence added: full leaf-level menu inventory (1,248 seed rows parsed: 11 sections/58 groups/~389 staff items + student 61 + parent 57), 13 backend traces (auth, timetable, payroll, notice, library, transport, inventory, dormitory/staff added), six task benchmarks, 37 per-screen element inventories, 16-family print-artifact catalog, upgrade-folder characterization.
+8. New defects found: password embedded in secret-login URLs + lockout check commented out (`LoginController.php:302-318,401-406`); `$return`-before-definition in book-issue (`SmBookController.php:358`); payroll last-iteration leave bug (`SmPayrollController.php:134-140`); route name `student-dashboardstudent-dashboard` (`routes/student.php:16`); `staff-download-timeline-doc` path-building closure; student-list edit/delete `href="#"` dead menu items.
+9. Every major claim of this draft is re-verified in the new report's "Prior-draft verification ledger" (verified still true / corrected / extended).
+
+---
+
 # Competitor Audit: InfixEdu v9.4.0 (Codecanyon, Infixedu/Spondonit)
 
 - **Audited**: 2026-09-11

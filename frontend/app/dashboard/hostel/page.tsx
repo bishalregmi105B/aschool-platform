@@ -24,6 +24,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Building2, BedDouble, Users, Plus, UserX } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // Backend GET /hostel/summary returns an array of per-hostel stats:
 // {hostel_id, hostel_name, type, total_rooms, total_capacity, occupied, available, occupancy_pct}
@@ -62,6 +63,7 @@ export default function HostelPage() {
 }
 
 function HostelContent() {
+  const confirm = useConfirm();
 
 const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
   {
@@ -125,7 +127,7 @@ const ALLOCATION_COLUMNS: Column<HostelAllocation>[] = [
           style={{ color: "#c42b1c", borderColor: "rgba(196,43,28,0.3)" }}
           onClick={(e) => {
             e.stopPropagation();
-            if (confirm(`Check out ${a.student_name}?`)) checkout.mutate(a.id);
+            confirm({ title: "Check out", body: `Check out ${a.student_name}?` }).then((ok) => { if (ok) checkout.mutate(a.id); });
           }}
         >
           <UserX className="mr-1 h-3 w-3" />Checkout

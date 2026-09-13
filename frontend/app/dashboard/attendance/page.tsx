@@ -544,11 +544,26 @@ function AttendanceContent() {
         {/* ── Not selected state ─────────────────────────────────────────── */}
         {!isReady && (
           <div className="win11-card">
-            <AOSEmptyState
-              icon={<Users className="h-12 w-12" />}
-              title="Select a class to get started"
-              description="Choose a class above to mark or view attendance"
-            />
+            {(classes || []).length === 0 ? (
+              /* Dependency-chain empty state: attendance is blocked on a
+                 class existing — deep-link the unblocking step (audit 5.2a). */
+              <AOSEmptyState
+                icon={<Users className="h-12 w-12" />}
+                title="No classes yet"
+                description="Attendance needs at least one class. Create classes in Academics first."
+                action={
+                  <a href="/dashboard/academics" className="win11-btn accent" style={{ textDecoration: "none" }}>
+                    Create your first class — कक्षा सिर्जना गर्नुहोस्
+                  </a>
+                }
+              />
+            ) : (
+              <AOSEmptyState
+                icon={<Users className="h-12 w-12" />}
+                title="Select a class to get started"
+                description="Choose a class above to mark or view attendance"
+              />
+            )}
           </div>
         )}
 

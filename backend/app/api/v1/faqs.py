@@ -4,6 +4,7 @@ from flask_jwt_extended import jwt_required
 
 from app.extensions import db
 from app.models.faq import FAQ
+from app.utils.decorators import role_required
 from app.utils.response import success_response, created_response, no_content_response, error_response
 from . import api_v1_bp
 
@@ -49,6 +50,7 @@ def list_public_faqs():
 
 @faqs_bp.route("", methods=["POST"])
 @jwt_required()
+@role_required("superadmin", "school_admin")
 def create_faq():
     """Create a new FAQ entry."""
     data = request.get_json() or {}
@@ -71,6 +73,7 @@ def create_faq():
 
 @faqs_bp.route("/<uuid:faq_id>", methods=["PUT"])
 @jwt_required()
+@role_required("superadmin", "school_admin")
 def update_faq(faq_id):
     """Update an existing FAQ."""
     faq = FAQ.query.filter_by(id=faq_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -84,6 +87,7 @@ def update_faq(faq_id):
 
 @faqs_bp.route("/<uuid:faq_id>", methods=["DELETE"])
 @jwt_required()
+@role_required("superadmin", "school_admin")
 def delete_faq(faq_id):
     """Soft-delete an FAQ."""
     faq = FAQ.query.filter_by(id=faq_id, school_id=g.school_id, is_deleted=False).first_or_404()

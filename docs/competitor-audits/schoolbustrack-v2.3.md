@@ -1,5 +1,13 @@
 # SchoolBusTrack v2.3 — Deep Competitor Audit (Transport Benchmark)
 
+> **SUPERSEDED by `audits/deep-ux-2026-09/schoolbustrack-v2.3.md` (2026-09-13).**
+> The replacement is a full re-verification pass at source (routes/api.php in full, TripController/TripUtils/UserUtils re-read, both Flutter apps, admin SPA, ASchool S-A4 transport stack) with a per-claim verification ledger. Changelog vs this draft:
+> 1. All V2-01…V2-19 security/bug findings re-verified still true at identical lines (verification ledger in the new report).
+> 2. New findings: phantom client route `update-trip-details-order` (driver app calls it, server has no such route), admin dashboard role-count swap (parents counted from role_id=3/drivers from role_id=2), dead route-edit branch in RouteController, plaintext never-expiring OTP, shipped live Google Maps key + hardcoded production socket IP in app configs, stringly-typed `"null"` ticket convention, and a 60/min API rate limiter that bounds (but does not prevent) the payment-replay finding.
+> 3. Corrections: routes/api.php is 412 lines (not ~700); EventTypesSeeder carries 4 locales per event (8 locales = the apps' l10n ARBs); route "edit" cannot persist (update branch commented out).
+> 4. The ASchool gap analysis (§6.1 here) is historical: S-A4 shipped the 4-layer trip lifecycle, ride_status, notification prefs + dedupe, dual GPS ingest, driver endpoints/screens, and reports (`backend/app/models/transport.py`, `backend/app/services/transport_service.py`, `backend/app/api/v1/transport.py`). Still true from §6.1: parent app polls 15 s (no push on mobile), 2 km-only deviation alert, no real ETA.
+> 5. The remaining actionable steals are now UX-level (driver audio coaching banners, per-student radius picker, call-driver FAB, trip empty states, drag-drop stop ordering, printable QR card) plus the server geofence-vs-stop check on pickup; §12 of the new report has the endpoint-by-endpoint table.
+
 **Audited:** `Other Projects/SchoolBusTrack v2.3/SchoolBusTrack v2.3/` (Code/AdminPanel Laravel+Vue, Code/Apps two Flutter apps, Documentation, UpgradeGuide)
 **Compared against:** ASchool gps_tracking plugin + transport pages + parent app bus_tracker
 **Audit date:** 2026-09-11. All SchoolBusTrack paths are relative to the product root unless prefixed `ASchool:`.

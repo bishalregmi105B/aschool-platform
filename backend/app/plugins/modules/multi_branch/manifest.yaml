@@ -14,7 +14,7 @@ capabilities:
   models_module: app.models.school_chain
 ui:
   nav:
-    route: /multi-branch
+    route: /dashboard/multi-branch
     section: Admin
     label: Multi-Branch
     label_nepali: बहु-शाखा
@@ -23,11 +23,11 @@ ui:
     - school_admin
     subitems:
     - label: Branches
-      route: /multi-branch/branches
+      route: /dashboard/multi-branch/branches
     - label: Unified Dashboard
-      route: /multi-branch/dashboard
+      route: /dashboard/multi-branch/dashboard
     - label: Chain Analytics
-      route: /multi-branch/analytics
+      route: /dashboard/multi-branch/analytics
   aos:
     about: "Run a school chain from one place with a cross-branch unified dashboard and chain analytics."
 mobile:

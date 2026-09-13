@@ -22,6 +22,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Plus, Route, Pencil, Trash2, Map } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TransportRoute {
   id: string;
@@ -33,6 +34,7 @@ interface TransportRoute {
 }
 
 export default function RoutesPage() {
+  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<TransportRoute | null>(null);
   const [search, setSearch] = useState("");
@@ -136,7 +138,7 @@ export default function RoutesPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => {
             e.stopPropagation();
-            if(confirm("Are you sure you want to delete this route?")) deleteMutation.mutate(r.id);
+            confirm({ title: "Delete route", body: "Are you sure you want to delete this route?" }).then((ok) => { if (ok) deleteMutation.mutate(r.id); });
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>

@@ -31,6 +31,7 @@ import { Calendar, CalendarDays, Clock, Layers, Wand2, Plus, Trash2, ChevronRigh
 import Link from "next/link";
 import { ICON_MAP } from "@/lib/icon-map";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TimetableSlot {
   id: string;
@@ -63,6 +64,7 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -271,8 +273,9 @@ function TimetableContent() {
                                   style={{ color: "#c42b1c" }}
                                   disabled={deleteSlotMut.isPending}
                                   onClick={() => {
-                                    if (confirm(`Remove ${slot.subject_name || "this slot"} on ${day} (P${slot.period_number})?`))
-                                      deleteSlotMut.mutate(slot.id);
+                                    confirm({ title: "Remove slot", body: `Remove ${slot.subject_name || "this slot"} on ${day} (P${slot.period_number})?` }).then((ok) => {
+                                      if (ok) deleteSlotMut.mutate(slot.id);
+                                    });
                                   }}
                                 >
                                   <Trash2 className="h-3 w-3" />

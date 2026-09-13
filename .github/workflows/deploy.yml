@@ -68,6 +68,26 @@ jobs:
           # hand with no check. This fails CI when they drift apart.
           python scripts/check_migration_drift.py
 
+      - name: Plugin contract gate (deep-ux 48.8)
+        working-directory: backend
+        run: |
+          # Manifest contract: 50 manifests, 0 errors, 0 warnings — a broken
+          # or non-conforming plugin manifest fails the build.
+          python scripts/plugin_doctor.py
+
+      - name: API route smoke audit (deep-ux 6.6)
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/aschool_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET_KEY: test-jwt-key
+          FLASK_ENV: testing
+        run: |
+          # Probes every route for hard-500s — this gate would have caught
+          # the benchmarking dead-import 500 that shipped in the W0 rewrite.
+          python scripts/api_route_audit.py
+
       - name: Run tests
         working-directory: backend
         env:

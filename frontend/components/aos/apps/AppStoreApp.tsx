@@ -31,6 +31,7 @@ import {
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
 import type { SchoolRole } from "../RoleSwitcherModal";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * AOS App Store — the unified, REAL store.
@@ -465,6 +466,7 @@ export default function AppStoreApp({
   currentRole: propRole,
   accentColor = "#0ea5e9",
 }: AppStoreAppProps) {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { refreshPlugins } = useInstalledPlugins();
@@ -602,9 +604,13 @@ export default function AppStoreApp({
   );
 
   const handleUninstall = (p: RawMarketplacePlugin) => {
-    if (window.confirm(`Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`)) {
-      uninstallMutation.mutate(p.slug);
-    }
+    confirm({
+      title: "Uninstall plugin",
+      body: `Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`,
+      confirmLabel: "Uninstall",
+    }).then((ok) => {
+      if (ok) uninstallMutation.mutate(p.slug);
+    });
   };
 
   return (

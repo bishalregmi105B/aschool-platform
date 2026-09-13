@@ -11,8 +11,8 @@ extensions_bp = Blueprint("ai_extensions", __name__, url_prefix="/ai/ext")
 
 # PD coach (AW-09) — registered onto the workbench blueprint's url space
 ext.register_pd_routes(extensions_bp)
-# live polls (AW-10)
-ext.register_poll_routes(extensions_bp)
+# AW-10 live polls removed 2026-09-13 (audit 6.1-12): zero consumers,
+# ungated in-memory state — see services/ai/extensions.py note.
 
 
 @extensions_bp.route("/qti/export", methods=["GET"])

@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useDebounced } from "@/components/ui/filter-bar";
 import { Spinner } from "@/components/ui/spinner";
 import { DataTable, type Column, type BulkAction } from "@/components/ui/data-table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
@@ -136,6 +137,9 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
+  // 300 ms debounce — the list query follows the input without firing on
+  // every keystroke (audit 5.5).
+  const debouncedSearch = useDebounced(search, 300);
   const [filterGender, setFilterGender] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterGrade, setFilterGrade] = useState("all");
@@ -192,7 +196,7 @@ export default function StudentsPage() {
     queryKey: [
       "students",
       page,
-      search,
+      debouncedSearch,
       filterGender,
       filterStatus,
       filterGrade,
@@ -204,7 +208,7 @@ export default function StudentsPage() {
         page: String(page),
         per_page: String(pageSize),
       });
-      if (search) params.set("search", search);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (filterGender !== "all") params.set("gender", filterGender);
       if (filterStatus !== "all") params.set("status", filterStatus);
       // Prefer class_id over grade

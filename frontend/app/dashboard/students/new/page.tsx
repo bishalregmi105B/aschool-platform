@@ -301,6 +301,18 @@ export default function NewStudentPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {/* Dependency-chain empty state: enrollment is blocked on a
+                  class existing — deep-link the blocking setup step instead
+                  of a silently-empty picker (audit 5.2a). */}
+              {Array.isArray(classes) && classes.length === 0 && (
+                <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
+                  {t("No classes yet —", "कक्षा छैन —")}{" "}
+                  <a href="/dashboard/academics" className="underline" style={{ color: "var(--w11-accent)" }}>
+                    {t("create your first class in Academics", "शैक्षिक भागमा पहिलो कक्षा सिर्जना गर्नुहोस्")}
+                  </a>
+                  {t(" first.", " पहिले।")}
+                </p>
+              )}
             </FormField>
             <FormField label="Section" ne="खण्ड">
               <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>

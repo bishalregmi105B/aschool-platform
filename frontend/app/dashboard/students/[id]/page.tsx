@@ -19,6 +19,7 @@ import { ArrowLeft, User, Phone, Mail, MapPin, Calendar } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   fetchStudentAttendance,
   fetchStudentById,
@@ -41,6 +42,7 @@ function parentDefaultHint(
 }
 
 export default function StudentDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const studentId = useAOSPathParam(2) || (params.id as string);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -171,7 +173,7 @@ export default function StudentDetailPage() {
                   size="sm"
                   disabled={resetPw.isPending}
                   onClick={() => {
-                    if (!window.confirm("Reset the student's login password to the school default?")) return;
+                    confirm({ title: "Confirm", body: "Reset the student's login password to the school default?" }).then((ok) => { if (ok) return; });
                     resetPw.mutate();
                   }}
                 >

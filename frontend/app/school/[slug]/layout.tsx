@@ -260,7 +260,7 @@ export default async function SchoolLayout({
           logo={school.logo_url}
           phone={school.phone}
           email={school.email}
-          address={school.address || `${school.municipality}, ${school.district}`}
+          address={school.address || [school.municipality, school.district].filter(Boolean).join(", ") || undefined}
           primaryColor="var(--color-primary)"
           accentColor="var(--color-accent)"
           livePages={(data.pages as Array<{ slug: string; title: string; page_type?: string }>) || []}
@@ -287,7 +287,8 @@ export default async function SchoolLayout({
                 </div>
               </div>
               <p className="text-sm opacity-70 leading-relaxed">
-                {school.municipality}, {school.district}, Nepal
+                {[school.municipality, school.district].filter(Boolean).join(", ")}
+                {school.municipality || school.district ? ", Nepal" : "Nepal"}
               </p>
               {school.established_year_bs && (
                 <p className="text-xs opacity-60 mt-1">Est. {school.established_year_bs} BS</p>
@@ -326,7 +327,10 @@ export default async function SchoolLayout({
               <ul className="space-y-3 text-sm opacity-80">
                 <li className="flex gap-2 items-start">
                   <span className="mt-0.5 flex-shrink-0">📍</span>
-                  <span>{school.municipality}, {school.district}, Nepal</span>
+                  <span>
+                    {[school.municipality, school.district].filter(Boolean).join(", ") || "Nepal"}
+                    {school.municipality || school.district ? ", Nepal" : ""}
+                  </span>
                 </li>
                 {school.phone && (
                   <li>

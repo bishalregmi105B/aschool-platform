@@ -309,6 +309,24 @@ def create_quiz(course_id):
     return created_response(_quiz_dict(quiz))
 
 
+def _score_quiz(quiz, answers: dict) -> tuple:
+    """Server-side scoring — the client's claimed score is never trusted.
+    answers is keyed by question index (string or int) with the chosen value;
+    returns (score, total) computed from the stored questions."""
+    questions = quiz.questions or []
+    score = 0.0
+    total = 0.0
+    for i, q in enumerate(questions):
+        marks = float(q.get("marks") or 1)
+        total += marks
+        if q.get("correct_answer") is None:
+            continue
+        given = answers.get(str(i), answers.get(i))
+        if given is not None and str(given) == str(q.get("correct_answer")):
+            score += marks
+    return score, total
+
+
 @lms_bp.route("/quizzes/<quiz_id>/attempt", methods=["POST"])
 @jwt_required()
 @school_required
@@ -320,12 +338,18 @@ def submit_quiz_attempt(quiz_id):
     if not quiz:
         return error_response("Quiz not found", 404)
     data = request.get_json(silent=True) or {}
+    answers = data.get("answers") or {}
+    if not isinstance(answers, dict):
+        return error_response("answers must be an object", 422)
+    # Score is computed server-side from stored questions — a client-posted
+    # score is never persisted (audit finding 6.1-6).
+    score, _total = _score_quiz(quiz, answers)
     attempt = QuizAttempt(
         school_id=g.school_id,
         quiz_id=quiz.id,
         student_id=_current_user_id(),
-        answers=data.get("answers", {}),
-        score=data.get("score"),
+        answers=answers,
+        score=score,
     )
     db.session.add(attempt)
     db.session.commit()

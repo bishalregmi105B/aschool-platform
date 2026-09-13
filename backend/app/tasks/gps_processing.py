@@ -175,7 +175,7 @@ def check_geofence_alerts(bus_id, lat, lng):
         """Calculate distance between two GPS points in km."""
         R = 6371.0
         dlat = math.radians(lat2 - lat1)
-        dlon = math.radians(lon2 - lat1)
+        dlon = math.radians(lon2 - lon1)
         a = (
             math.sin(dlat / 2) ** 2
             + math.cos(math.radians(lat1))
@@ -202,7 +202,7 @@ def check_geofence_alerts(bus_id, lat, lng):
             bus.school_id,
             "Bus Route Alert",
             f"Bus {bus.vehicle_number} has deviated {min_distance:.1f}km from its route.",
-            roles=["admin", "principal", "transport_manager"],
+            roles=["superadmin", "school_admin"],
         )
         return {
             "alert": True,

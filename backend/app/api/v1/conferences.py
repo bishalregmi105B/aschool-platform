@@ -255,9 +255,16 @@ def create_slots(conf_id):
 @plugin_required("conferences")
 def book_slot(slot_id):
     """Parent books an available slot."""
-    slot = ConferenceSlot.query.filter_by(
-        id=slot_id, school_id=g.school_id, is_deleted=False
-    ).first()
+    # with_for_update: row-level lock so two concurrent bookings of the same
+    # slot serialize — the second sees is_booked=True and 409s instead of
+    # both overwriting each other (TOCTOU, audit finding 6.1-8).
+    slot = (
+        ConferenceSlot.query.filter_by(
+            id=slot_id, school_id=g.school_id, is_deleted=False
+        )
+        .with_for_update()
+        .first()
+    )
     if not slot:
         return error_response("Slot not found", 404)
     if slot.is_booked:

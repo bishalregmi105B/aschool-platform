@@ -10,7 +10,7 @@ description: Digital books, past papers, educational resources
 depends_on: []
 conflicts_with: []
 capabilities:
-  api_blueprint: app.api.v1.library
+  api_blueprint: app.api.v1.elibrary
   models_module: app.models.digital_content
 ui:
   nav:

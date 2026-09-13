@@ -210,6 +210,11 @@ function ReportCardsContent() {
                 icon={<FileText className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
                 title="No report cards generated yet."
                 description='Click "Generate with AI" to create report cards with personalized remarks.'
+                action={
+                  <a href="/dashboard/exams" className="win11-btn" style={{ textDecoration: "none" }}>
+                    Create an exam and enter marks — परीक्षा सिर्जना गर्नुहोस्
+                  </a>
+                }
               />
             ) : (
               <DataTable

@@ -29,6 +29,9 @@ ui:
     label: Library
     label_nepali: पुस्तकालय
     icon: Library
+    visible_to:
+    - school_admin
+    - teacher
     subitems:
     - label: Catalog
       route: /library/catalog

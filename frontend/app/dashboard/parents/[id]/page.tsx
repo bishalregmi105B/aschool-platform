@@ -29,6 +29,7 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface ParentChild {
   id: string;
@@ -59,6 +60,7 @@ interface StudentOption {
 }
 
 export default function ParentDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const parentId = useAOSPathParam(2) || (Array.isArray(params.id) ? params.id[0] : (params.id as string));
   const queryClient = useQueryClient();
@@ -423,9 +425,9 @@ export default function ParentDetailPage() {
                       className="text-destructive"
                       disabled={unlinkStudentMutation.isPending}
                       onClick={() => {
-                        if (confirm(`Unlink ${child.name} from this parent?`)) {
-                          unlinkStudentMutation.mutate(child.id);
-                        }
+                        confirm({ title: "Unlink child", body: `Unlink ${child.name} from this parent?` }).then((ok) => {
+                          if (ok) unlinkStudentMutation.mutate(child.id);
+                        });
                       }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" /> Unlink

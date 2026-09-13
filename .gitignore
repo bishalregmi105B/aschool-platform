@@ -14,82 +14,69 @@ build/
 venv/
 .venv/
 env/
-
 # Flask
 instance/
 .webassets-cache
-
 # Environment
 .env
 .env.local
 .env.production
-
 # Node
 node_modules/
 .next/
 out/
 .swc/
-
 # Flutter
 flutter_*/build/
 flutter_*/.dart_tool/
 flutter_*/.packages
 flutter_*/.pub-cache/
 flutter_*/.pub/
-
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
 # OS
 .DS_Store
 Thumbs.db
-
 # Docker
 postgres_data/
-
 # Logs (backend/runtime output only — frontend/dashboard "logs" modules are code)
 *.log
 backend/logs/
 frontend/*.log
-
 # Coverage
 htmlcov/
 .coverage
 coverage/
 .nyc_output/
-
 # Misc
 *.bak
 *.tmp
-
 # Runtime uploads/artifacts
 uploads/
 backend/uploads/
 backend/celerybeat-schedule
-
 # External vendor/source dumps (exclude from ASchool platform repo)
 eSchool SaaS v1.8.0 Nulled/
 Mighty School Pro v1.6/
-
 # local build logs
 *.log
-
 # live browser-test evidence + agent probe scripts
 gui-test-screenshots/
 backend/tmp_*_verify.py
 .playwright-mcp/
 nginx/app-web/
-
 # Next.js local build isolation dir (dist overridden out of the tree via tsconfig)
 frontend/tmp/
-
 # Nepal textbook source corpus (content-entry source data, not platform code)
 nepal_textbooks/
-
 Other Projects/
 audits_old/
-
+audits/deep-ux-2026-09/work/
+frontend/.next-dev/
+frontend/.next-verify/
+/editor-dark.png
+/designer-editor-dark.png

@@ -1,3 +1,24 @@
+<!--
+SUPERSEDED by audits/deep-ux-2026-09/eduex-lms-v2.0.md (2026-09-13).
+That deep-UX report re-verifies every major claim below against the current source and adds a live-booted
+crawl of all four surfaces (29 screenshots + 24 vendor-doc images). Changelog vs this draft:
+
+- CORRECTED: framework is Laravel 12.53 (not 11); lessons.video_type enum is ('url','upload','live') — no
+  youtube/vimeo values (YouTube/Vimeo are URL-regex-detected at read time); Flutter has 73 screen files /
+  30 route constants (not 67/32); web front end is jQuery+Bootstrap (no Alpine/Livewire); cron route at
+  web.php:128 (not 118); roles use the users.role enum column, not spatie (dual role systems).
+- EXTENDED: all V2-01..V2-12 defects re-verified at current lines and renumbered W-1..W-26; full 642-route
+  table; complete per-screen field inventories for public/student/instructor/admin surfaces; Flutter
+  API-client endpoint map; task-benchmark numbers; licensing deep-dive (RS256 domain-locked JWT client).
+- NEW (live-booted findings): unauthenticated path traversal /api/video/stream?path=../../../.env serving
+  APP_KEY (W-1); two shipped 500s (/admin/courses/pending, /admin/users — missing Blade views, W-4);
+  sqlite fresh installs break on MySQL-only enum DDL (W-3); /cron/run default-open (W-14); raw i18n keys
+  on production pages (W-16); dead approved.instructor middleware → pending-instructor token hole (W-18);
+  only 2 in-app notification send sites exist; shipped license token pre-activated for 127.0.0.1.
+This file is retained as the 2026-09-12 implementation-level baseline; see the new report's Section 13
+ledger for the claim-by-claim verification result.
+-->
+
 # Competitor Deep Audit: EduEx LMS v2.0 (Laravel + Flutter)
 
 **Audited:** `Other Projects/EduEx LMS v2.0/EduEx LMS v2.0/codecanyon-61977497-eduex-the-ultimate-learning-management-system-lms-with-flutter-mobile-app/`

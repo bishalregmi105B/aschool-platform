@@ -21,6 +21,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { BookOpen, Plus, Pencil, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export default function CatalogPage() {
   return <PluginGate slug="library"><CatalogContent /></PluginGate>;
@@ -34,6 +35,7 @@ interface BookForm {
 const EMPTY_FORM: BookForm = { title: "", author: "", isbn: "", category: "general", publisher: "", copies: "1", shelf_location: "" };
 
 function CatalogContent() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
@@ -138,7 +140,7 @@ function CatalogContent() {
             title="Delete"
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`Delete "${b.title}" from the catalog?`)) remove.mutate(b.id);
+              confirm({ title: "Confirm", body: `Delete "${b.title}" from the catalog?` }).then((ok) => { if (ok) remove.mutate(b.id); });
             }}
           >
             <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />

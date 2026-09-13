@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { formatCurrency } from "@/lib/utils";
 import { Plug, Settings, Store, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   AOSPage,
   AOSPageHeader,
@@ -64,6 +65,7 @@ function PluginIcon({ emoji }: { emoji?: string }) {
 }
 
 export default function InstalledPluginsPage() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -204,13 +206,13 @@ export default function InstalledPluginsPage() {
             title="Uninstall (plugin data is preserved)"
             onClick={(e) => {
               e.stopPropagation();
-              if (
-                window.confirm(
-                  `Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`
-                )
-              ) {
-                uninstallMutation.mutate(p.slug);
-              }
+              confirm({
+                title: "Uninstall plugin",
+                body: `Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`,
+                confirmLabel: "Uninstall",
+              }).then((ok) => {
+                if (ok) uninstallMutation.mutate(p.slug);
+              });
             }}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />

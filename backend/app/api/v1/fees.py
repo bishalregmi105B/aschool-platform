@@ -1386,7 +1386,14 @@ def record_payment(collection_id):
     Supports idempotency: pass an 'idempotency_key' in the request body
     to prevent duplicate payments on network retries or double-clicks.
     """
-    fc = FeeCollection.query.get(collection_id)
+    # Row lock: two desks collecting against the same collection must
+    # serialize — the second reads the first's committed receipts SUM and
+    # payment_status instead of racing them (6.1-7).
+    fc = (
+        FeeCollection.query.filter_by(id=collection_id)
+        .with_for_update()
+        .first()
+    )
     if fc and not fc.is_deleted and str(fc.school_id) != str(g.school_id):
         return error_response("Fee collection belongs to another school", 403)
     if not fc or fc.is_deleted:
@@ -1838,7 +1845,14 @@ def _initiate_online_payment(collection_id, data):
     from app.services.payments.esewa_gateway import EsewaGateway
     from app.services.payments.khalti_gateway import KhaltiGateway
 
-    fc = FeeCollection.query.get(collection_id)
+    # Row lock: two desks collecting against the same collection must
+    # serialize — the second reads the first's committed receipts SUM and
+    # payment_status instead of racing them (6.1-7).
+    fc = (
+        FeeCollection.query.filter_by(id=collection_id)
+        .with_for_update()
+        .first()
+    )
     if fc and not fc.is_deleted and str(fc.school_id) != str(g.school_id):
         return error_response("Fee collection belongs to another school", 403)
     if not fc or fc.is_deleted:
@@ -2885,16 +2899,21 @@ def _extract_partial_paid(collection):
     if collection.payment_status == "paid":
         return _collection_payable_total(collection)
 
-    notes = collection.notes or ""
-    marker = "[partial_paid:"
-    if marker not in notes:
-        return 0
-
-    try:
-        value = notes.split(marker, 1)[1].split("]", 1)[0]
-        return float(value)
-    except (ValueError, TypeError, IndexError):
-        return 0
+    # Source of truth is the receipts ledger — SUM(fee_receipts.amount) for
+    # this collection. The old "[partial_paid:N]" note-string marker raced
+    # when two desks recorded payments concurrently (both read the same N,
+    # both wrote N+their-amount, one payment silently vanished from the
+    # marker). Receipts are append-only rows, so the SUM cannot lose a
+    # payment (audit finding 6.1-7 / prior M4).
+    total = (
+        db.session.query(func.coalesce(func.sum(FeeReceipt.amount), 0))
+        .filter(
+            FeeReceipt.collection_id == collection.id,
+            FeeReceipt.is_deleted.is_(False),
+        )
+        .scalar()
+    )
+    return float(total or 0)
 
 
 def _merge_partial_payment_note(existing_notes, paid_amount):

@@ -176,89 +176,10 @@ def jwt_required_ext():
     return jwt_required()
 
 
-# ── AW-10: live poll/quiz (ephemeral) ───────────────────────────────────
-
-# In-process store with TTL — ephemeral by design: presentation surfaces
-# need sub-second reads, aggregates only, and no reviewable artifact.
-_POLLS: dict[str, dict] = {}
-_POLL_TTL = 3600
-
-
-class LivePoll:
-    @staticmethod
-    def create(question: str, options: list[str], school_id, created_by) -> dict:
-        key = f"poll-{int(time.time()*1000)}"
-        _POLLS[key] = {
-            "school_id": str(school_id), "question": question,
-            "options": options, "created_by": str(created_by),
-            "created_at": time.time(), "votes": {},  # voter_id -> option idx
-        }
-        LivePoll._gc()
-        return {"poll_key": key, "question": question, "options": options}
-
-    @staticmethod
-    def vote(key: str, voter_id: str, option_index: int) -> dict:
-        poll = _POLLS.get(key)
-        if poll is None or time.time() - poll["created_at"] > _POLL_TTL:
-            return {"error": "poll not found or expired"}
-        if not 0 <= int(option_index) < len(poll["options"]):
-            return {"error": "bad option"}
-        poll["votes"][str(voter_id)] = int(option_index)
-        return {"ok": True}
-
-    @staticmethod
-    def results(key: str) -> dict:
-        """Aggregate only — never who-voted-what."""
-        poll = _POLLS.get(key)
-        if poll is None:
-            return {"error": "poll not found or expired"}
-        counts = [0] * len(poll["options"])
-        for v in poll["votes"].values():
-            counts[v] += 1
-        return {"question": poll["question"],
-                "results": counts, "total_votes": len(poll["votes"])}
-
-    @staticmethod
-    def _gc():
-        now = time.time()
-        for k in [k for k, p in _POLLS.items()
-                  if now - p["created_at"] > _POLL_TTL]:
-            _POLLS.pop(k, None)
-
-
-def register_poll_routes(bp) -> None:
-    from flask import g, request
-    from app.utils.response import success_response, error_response
-
-    @bp.route("/live-polls", methods=["POST"])
-    @jwt_required_ext()
-    def create_poll():
-        data = request.get_json(silent=True) or {}
-        q = (data.get("question") or "").strip()
-        opts = data.get("options") or []
-        if not q or len(opts) < 2:
-            return error_response("question and 2+ options are required", 400)
-        return success_response(
-            LivePoll.create(q, opts, g.school_id, g.user_id)
-        )
-
-    @bp.route("/live-polls/<key>/vote", methods=["POST"])
-    @jwt_required_ext()
-    def vote_poll(key):
-        data = request.get_json(silent=True) or {}
-        out = LivePoll.vote(key, str(g.user_id), data.get("option_index"))
-        if "error" in out:
-            return error_response(out["error"], 404)
-        return success_response(out)
-
-    @bp.route("/live-polls/<key>/results", methods=["GET"])
-    @jwt_required_ext()
-    def poll_results(key):
-        out = LivePoll.results(key)
-        if "error" in out:
-            return error_response(out["error"], 404)
-        return success_response(out)
-
+# ── AW-10 live polls REMOVED 2026-09-13 (audit 6.1-12): zero consumers,
+# in-memory state broke across workers/restarts, no plugin/role/school
+# gating, zero tests. Restore only as a real gated route module with a
+# persistent store and a consumer.
 
 # ── AW-11: Caliper events + QTI export ──────────────────────────────────
 

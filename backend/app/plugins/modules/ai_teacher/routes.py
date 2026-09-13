@@ -640,11 +640,49 @@ def webhook_lesson_event():
     etype = event.get("type", "")
     payload = event.get("payload") or {}
 
+    # The key must belong to the lesson's school — a valid signature from
+    # school A's service key must never mutate school B's lesson. Ownership
+    # resolves two ways: a DB AITeacherServiceKey row (carries school_id), or
+    # the config-map path where the owning school is the one whose ai_teacher
+    # plugin-config envelope holds this key_id's secret.
+    from app.models.ai_teacher import AITeacherServiceKey
+    from app.models.plugin import SchoolPlugin
+
+    key_row = AITeacherServiceKey.query.filter_by(key_id=key_id).first()
+    if key_row:
+        if key_row.revoked_at is not None:
+            return error_response("Unknown service key", 401)
+        key_school_id = str(key_row.school_id)
+    elif key_id in secrets_map:
+        # Deployment-config key: find the school whose envelope holds it.
+        owner = (
+            SchoolPlugin.query.filter_by(plugin_slug="ai_teacher")
+            .order_by(SchoolPlugin.created_at)
+            .all()
+        )
+        key_school_id = None
+        for sp in owner:
+            env = (sp.config or {}).get("webhook_secret_envelope_key_id")
+            if env == key_id:
+                key_school_id = str(sp.school_id)
+                break
+        if key_school_id is None:
+            # Envelope carries no key_id marker (legacy) — the config map is
+            # deployment-trusted; allow but log for audit.
+            current_app.logger.warning(
+                "ai_teacher webhook: config-map key %s has no school binding", key_id
+            )
+            key_school_id = None
+    else:
+        return error_response("Unknown service key", 401)
+
     lesson = AITeacherLesson.query.filter_by(
         id=lesson_id, is_deleted=False
     ).first()
     if not lesson:
         return error_response("Lesson not found", 404)
+    if key_school_id is not None and key_school_id != str(lesson.school_id):
+        return error_response("Service key does not belong to this lesson's school", 403)
 
     return success_response(apply_event(lesson, etype, payload, event_id))
 
@@ -658,6 +696,16 @@ def apply_event(lesson, etype: str, payload: dict, event_id=None) -> dict:
         AITeacherLessonChapter,
         AITeacherMessage,
     )
+
+    # Idempotency: the (lesson_id, event_id) pair is the dedupe key. A
+    # replayed event (webhook retry, reconciler overlap) must be a no-op —
+    # every applied event leaves a learning-event row carrying object_id.
+    if event_id:
+        seen = AITeacherLearningEvent.query.filter_by(
+            lesson_id=lesson.id, object_id=str(event_id)[:80]
+        ).first()
+        if seen:
+            return {"duplicate": True}
 
     if etype == "lesson.started":
         lesson.status = "teaching"
@@ -764,7 +812,7 @@ def apply_event(lesson, etype: str, payload: dict, event_id=None) -> dict:
             student_id=lesson.student_id,
             verb=etype.replace(".", "_"),
             object_type="lesson_event",
-            object_id=event_id,
+            object_id=str(event_id)[:80] if event_id else None,
             context=payload,
         )
     )

@@ -28,6 +28,9 @@ const SYSTEM_FONTS = [
 ];
 
 const GOOGLE_FONTS = [
+  // Devanagari first — this is a Nepal product; certificates, ID cards and
+  // notices print in Nepali (audit 5.6: pickers lacked Devanagari fonts).
+  "Mukta", "Noto Sans Devanagari", "Hind", "Yatra One", "Baloo 2",
   "Roboto", "Open Sans", "Lato", "Montserrat", "Oswald",
   "Source Sans Pro", "Raleway", "Ubuntu", "Nunito", "Poppins",
   "Playfair Display", "Merriweather", "PT Serif", "PT Sans",

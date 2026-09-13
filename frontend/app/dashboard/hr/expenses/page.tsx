@@ -26,6 +26,7 @@ import { Plus, Receipt, Pencil, Trash2 } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { displayBS } from "@/lib/nepali_date";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Category {
   id: string;
   name: string;
@@ -43,6 +44,7 @@ interface Expense {
 }
 
 export default function ExpensesPage() {
+  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Expense | null>(null);
   const [search, setSearch] = useState("");
@@ -120,7 +122,7 @@ export default function ExpensesPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(ev) => {
             ev.stopPropagation();
-            if(confirm("Are you sure?")) deleteMutation.mutate(e.id);
+            confirm({ title: "Delete expense", body: "Delete this expense record?" }).then((ok) => { if (ok) deleteMutation.mutate(e.id); });
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>

@@ -15,6 +15,7 @@ import { ColorField } from "@/components/ui/color-field";
 import { VaultImageField } from "@/components/files/VaultImageField";
 import type { SchoolSection, SchoolWidgetDef, SchoolWidgetControl } from "@/lib/school-website/types";
 import { generateThemeCSS, getThemeById, DEFAULT_THEME_ID } from "@/themes/registry";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type ContentState = Record<string, unknown>;
 type SectionDraft = { title?: string; content?: ContentState };
@@ -394,6 +395,7 @@ function EditableSectionBlock({
 // ─── Main Editor Page ──────────────────────────────────────────────────────────
 
 export default function WebsiteEditor() {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const searchParams = useAOSRouteParams();
   const pageId = searchParams.get("page");
@@ -686,20 +688,22 @@ export default function WebsiteEditor() {
 
   const handleDelete = useCallback(
     (sectionId: string) => {
-      if (!confirm("Delete this section?")) return;
-      qc.setQueryData<PageState>(["website-page-sections", pageId], (old) =>
-        old
-          ? { ...old, sections: old.sections.filter((s) => s.id !== sectionId).map((s, i) => ({ ...s, sort_order: i })) }
-          : old
-      );
-      setDraft((prev) => {
-        if (!(sectionId in prev)) return prev;
-        const next = { ...prev };
-        delete next[sectionId];
-        return next;
+      confirm({ title: "Delete section", body: "Delete this section?" }).then((ok) => {
+        if (!ok) return;
+        qc.setQueryData<PageState>(["website-page-sections", pageId], (old) =>
+          old
+            ? { ...old, sections: old.sections.filter((s) => s.id !== sectionId).map((s, i) => ({ ...s, sort_order: i })) }
+            : old
+        );
+        setDraft((prev) => {
+          if (!(sectionId in prev)) return prev;
+          const next = { ...prev };
+          delete next[sectionId];
+          return next;
+        });
+        if (selectedSectionId === sectionId) setSelectedSectionId(null);
+        schedulePersist();
       });
-      if (selectedSectionId === sectionId) setSelectedSectionId(null);
-      schedulePersist();
     },
     [pageId, qc, selectedSectionId, schedulePersist]
   );

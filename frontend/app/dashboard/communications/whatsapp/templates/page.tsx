@@ -20,6 +20,7 @@ import {
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface AutoReplyRule {
   keyword: string;
@@ -44,6 +45,7 @@ export default function WhatsAppTemplatesPage() {
 }
 
 function WhatsAppTemplatesContent() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<AutoReplyRule>(emptyDraft);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -223,9 +225,9 @@ function WhatsAppTemplatesContent() {
                             size="icon"
                             aria-label="Delete template"
                             onClick={() => {
-                              if (confirm(`Delete template "${rule.keyword}"?`)) {
-                                deleteMutation.mutate(index);
-                              }
+                              confirm({ title: "Delete template", body: `Delete template "${rule.keyword}"?` }).then((ok) => {
+                                if (ok) deleteMutation.mutate(index);
+                              });
                             }}
                           >
                             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />

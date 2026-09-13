@@ -577,6 +577,13 @@ function CollectContent() {
                     ? "Try changing your filters to bring a student ledger into view."
                     : "Student ledgers will appear here once fee structures are applied or bills are created manually."
                 }
+                action={
+                  !hasFilters ? (
+                    <a href="/dashboard/students/new" className="win11-btn" style={{ textDecoration: "none" }}>
+                      Enroll a student first — विद्यार्थी भर्ना गर्नुहोस्
+                    </a>
+                  ) : undefined
+                }
               />
             ) : (
               <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">

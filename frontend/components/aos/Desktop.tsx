@@ -1,28 +1,25 @@
 "use client";
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import {
-  Trash2,
-  FolderPlus,
-  RefreshCw,
-  Monitor,
-  Palette,
-  Eye,
-  ArrowUpDown,
-  MoreHorizontal,
-  Folder,
-  FolderOpen,
-  FolderMinus,
-  PenLine,
-  ListPlus,
-  ChevronRight,
-  Plus,
-  AppWindow,
-  LayoutGrid,
-  GripHorizontal,
-  X,
-  Check,
-} from "lucide-react";
+import {FolderPlus,
+ RefreshCw,
+ Monitor,
+ Palette,
+ Eye,
+ ArrowUpDown,
+ MoreHorizontal,
+ Folder,
+ FolderOpen,
+ FolderMinus,
+ PenLine,
+ ListPlus,
+ ChevronRight,
+ Plus,
+ AppWindow,
+ LayoutGrid,
+ GripHorizontal,
+ X,
+ Check} from "lucide-react";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { getAOSAppForModule, SECTION_GRADIENTS, type AOSApp } from "@/lib/aos-app-adapter";
 import { useAOSNavigate } from "@/lib/aos-window-route";
@@ -1012,21 +1009,10 @@ export default function Desktop({
       ? deduped.filter((item) => !folderedAppIds.has(item.id))
       : deduped;
 
-    // Add Academic Archive (Recycle Bin) at the end
-    loose.push({
-      id: "recycle_bin",
-      name: "Academic Archive",
-      icon: (
-        <div style={{ width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Trash2 size={38} color="#94a3b8" />
-        </div>
-      ),
-    });
-
     return loose;
   }, [externalApps, sidebarItems, folderMode, folderedAppIds]);
 
-  // Tile order: folders first, then loose apps (recycle bin last).
+  // Tile order: folders first, then loose apps.
   const tileIds = useMemo(
     () => [
       ...(resolvedFolders ?? []).map((folder) => folder.id),
@@ -1314,7 +1300,7 @@ export default function Desktop({
     setDialog(null);
   };
 
-  const looseAppsForDialog = desktopIcons.filter((item) => item.id !== "recycle_bin");
+  const looseAppsForDialog = desktopIcons;
 
   // ── Pointer / selection plumbing (unchanged behavior) ─────────────────────
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -1976,16 +1962,12 @@ export default function Desktop({
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                if (item.id === "recycle_bin") {
-                  alert("Academic Archive is clean.");
-                } else {
-                  onOpenApp(item.id);
-                }
+                onOpenApp(item.id);
               }}
               onContextMenu={(e) => {
                 // Loose apps get their own menu in folder mode; the recycle
                 // bin and the classic desktop keep the background menu.
-                if (item.id === "recycle_bin" || !folderMode) return;
+                if (!folderMode) return;
                 openContextMenu(e, { kind: "app", appId: item.id });
               }}
               icon={item.icon}

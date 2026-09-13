@@ -1,3 +1,14 @@
+> **SUPERSEDED by audits/deep-ux-2026-09/infixedu-addon-modules.md (2026-09-13).**
+> This v2 draft remains as history; treat the new report as authoritative. Changelog vs this draft:
+> 1. Every claim re-verified at source against the `_extracted/` trees (inner zips re-extracted read-only to /tmp/deepux-addons/); ~20 net-new findings, 3 corrections, several extensions (full ledger in the new report §13).
+> 2. Corrected: `{Module}.json` manifests are NOT uniform — Jitsi has no `names` drop-list, ParentRegistration has no `item_id`, RazorPay's `names` is `[]`.
+> 3. Corrected/extended: the host's `User::checkPermission` is stubbed to `return true;` (nulled) — all module license gates pass on this build; most surfaces were ungated even un-nulled.
+> 4. NEW critical: Zoom API notification helpers call nonexistent route names (`zoom.meetings.index`, `zoom.virtual-class.index`) — every mobile create/update throws after the remote Zoom call, rolls back local writes, and orphans a remote meeting.
+> 5. NEW: Jitsi edit forms read a nonexistent `date_of_meeting` column (date resets to today); meetings `update()` has the same `logo`-column unlink bug as vclass `destroy()`; route-name collision `meeting.join` ×2; upload-before-validation.
+> 6. NEW: ParentReg form `last_name` prefills from `student_email`; approve/delete modals default to the LAST row's id; the v4.5 upgrade kit overwrites 12 host files (incl. `User.php`, `sidebar.blade.php`) — stronger than "manual SQL dumps".
+> 7. Extended: full per-screen field/state inventories, per-role permission matrices, sequence diagrams, i18n/string defect catalogue, controller-method index, and the §9 packaging comparison vs ASchool's plugin system with an ASchool evidence pack (loader/decorators/entitlements/billing/config_schema/widgets/events/validator/listeners).
+> 8. ASchool-side claims (VideoService/LiveClass drift, lms manifest tabs) re-verified: still true; `GET /lms/live-classes` now exists (list-only).
+
 # Competitor Audit — InfixEdu Add-On Modules (4 packages)
 
 Audited: 2026-09-12. Source: `/home/bishal-regmi/Desktop/ASchool/Other Projects/InfixEdu School Modules/InfixEdu School Modules/` (inner module zips extracted to `/tmp/audit/` for reading; originals are `jitsi-meet-infixedu-module-1.4_extracted`, `razorpay-payment-gateway-for-infixedu-2.0_extracted`, `infixedu-zoom-live-class-module-2.0_extracted`, `parent-student-registration-for-infixedu-1.0.0_extracted`).

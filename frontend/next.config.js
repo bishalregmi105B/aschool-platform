@@ -8,9 +8,13 @@ const isDev = process.env.NODE_ENV === "development";
 const dashboardCsp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
+  // Google Fonts CSS + woff2: the app loads Mukta (Devanagari) and Inter
+  // via fonts.googleapis.com/fonts.gstatic.com — without these the
+  // dashboard renders Devanagari in a fallback font in production
+  // (audit 5.6: every page shipped a console font error).
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https://*.aschool.com.np https://*.r2.cloudflarestorage.com",
-  `font-src 'self' data:${isDev ? " https://fonts.gstatic.com" : ""}`,
+  "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src 'self' https://api.groq.com${isDev ? " ws: http://localhost:*" : ""}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",

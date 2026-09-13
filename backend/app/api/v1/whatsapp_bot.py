@@ -491,6 +491,8 @@ def send_message():
 @role_required("superadmin", "school_admin")
 def send_bulk_message():
     """Send bulk WhatsApp messages."""
+    import re
+
     from app.services.communications.whatsapp_cloud import WhatsAppCloudService
 
     data = request.get_json(silent=True) or {}
@@ -498,15 +500,50 @@ def send_bulk_message():
     message = data.get("message", "")
     template = data.get("template")
 
-    results = []
+    # Recipients are validated (Nepal-style and E.164 phone numbers) and
+    # every send is persisted to WhatsAppMessage — the audit trail gap that
+    # made this endpoint a blind bulk channel (audit finding 6.1-10).
+    _phone_re = re.compile(r"^\+?[0-9]{7,15}$")
+    valid_numbers, rejected = [], []
     for number in numbers:
+        n = str(number).strip().replace(" ", "").replace("-", "")
+        if _phone_re.match(n):
+            valid_numbers.append(n)
+        else:
+            rejected.append(number)
+
+    if not template and not message.strip():
+        return error_response("message or template is required", 422)
+    if not valid_numbers:
+        return error_response(
+            {"error": "no valid recipient numbers", "rejected": rejected}, 422
+        )
+
+    results = []
+    for number in valid_numbers:
         if template:
             r = WhatsAppCloudService.send_template(number, template)
         else:
             r = WhatsAppCloudService.send_text(number, message)
+        wa_id = None
+        if isinstance(r, dict):
+            msgs = r.get("messages")
+            if isinstance(msgs, list) and msgs:
+                wa_id = msgs[0].get("id")
+        db.session.add(WhatsAppMessage(
+            school_id=g.school_id,
+            to_phone=number,
+            direction="outbound",
+            message_type="template" if template else "text",
+            content=template or message,
+            wa_message_id=wa_id,
+            status="failed" if (isinstance(r, dict) and r.get("error")) else "sent",
+        ))
         results.append({"to": number, "result": r})
+    db.session.commit()
 
     return success_response({
-        "total": len(numbers),
+        "total": len(valid_numbers),
+        "rejected": rejected,
         "results": results,
     })

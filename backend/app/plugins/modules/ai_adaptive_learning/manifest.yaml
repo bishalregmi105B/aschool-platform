@@ -1,0 +1,45 @@
+slug: ai_adaptive_learning
+name: AI Adaptive Learning
+name_nepali: एआई अनुकूलनशील शिक्षा
+category: premium
+price_monthly: 0
+price_yearly: 0
+emoji: 🧭
+icon: Route
+version: 1.0.0
+author: ASchool
+published: true
+coming_soon: false
+description: Adaptive learning paths and per-student mastery records that feed
+  the AI Suite's recommendations. Part of the AI Suite family — every route
+  gates ai_suite, so this module ships as part of it rather than a separate
+  purchase.
+depends_on:
+- ai_suite
+conflicts_with: []
+models:
+- app.models.adaptive_learning
+events:
+  emits:
+  listens: []
+owns_tables:
+- learning_paths
+- mastery_records
+capabilities:
+  api_blueprint: app.plugins.modules.ai_adaptive_learning.routes
+  models_module: app.models.adaptive_learning
+  services: []
+  tasks: []
+ui:
+  nav:
+    route: /dashboard/ai-tools
+    section: Learning
+    label: Adaptive Learning
+    label_nepali: अनुकूलनशील शिक्षा
+    icon: Route
+    visible_to:
+    - school_admin
+    - teacher
+    subitems: []
+  aos:
+    about: "Adaptive learning paths and mastery records powering AI Suite recommendations."

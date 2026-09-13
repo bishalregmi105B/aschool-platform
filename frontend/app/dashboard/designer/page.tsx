@@ -31,6 +31,7 @@ import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
 import { ChevronRight } from "lucide-react";
 import { TemplateThumb } from "@/components/designer/TemplateThumb";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // Quick links — the design_studio manifest subitems plus the Writer surface.
 const QUICK_LINKS = [
@@ -75,6 +76,7 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
 };
 
 export default function DesignerPage() {
+  const confirm = useConfirm();
   const router = useAOSRouterNavigate();
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -386,7 +388,7 @@ export default function DesignerPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => {
-                          if (window.confirm(`Delete "${doc.name}"?`)) deleteDocMutation.mutate(doc.id);
+                          confirm({ title: "Confirm", body: `Delete "${doc.name}"?` }).then((ok) => { if (ok) deleteDocMutation.mutate(doc.id); });
                         }}>
                           <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
                         </DropdownMenuItem>

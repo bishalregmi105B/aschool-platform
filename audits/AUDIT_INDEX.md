@@ -360,3 +360,48 @@ attendance upsert + report, holiday idempotency, import preview/commit); S-A1 + 
 suites 23/23 (regression); drift gate PASS (0 blocking / 483 allowlisted); `tsc --noEmit` clean;
 plugin_doctor 49/0/0; `flutter analyze` 0 errors (shared + student).
 
+
+## 2026-09-13 — Deep-UX quick-win wave 1 (plan 6.1 + 6.2/6.7/48 + Batch-0)
+
+Executed from `audits/deep-ux-2026-09/IMROVEMENT_PLAN.md` Parts 6/31/48. All verified in-container.
+
+**Backend — security & correctness (plan 6.1, all 14 code fixes):**
+- P1 upload path traversal: `safe_storage_key()` in `app/utils/file_upload.py` (rejects `..`/absolute/backslash/colon segments); `files.py` r2_key + folder path guarded; `delete_file`/`generate_presigned_url` hardened. Verified: all attack cases rejected, container test.
+- P1 benchmarking 500: `ReportCard` import moved `app.models.analytics` → `app.models.exam` (`benchmarking.py:90`). Import verified live.
+- P1 GPS Haversine: `lon2 - lat1` → `lon2 - lon1` (`gps_processing.py:178`). Kathmandu→Bhaktapur = 12.6 km verified.
+- P1 ai_teacher webhook: key↔school binding (DB key row strict-check; config-map key via envelope owner with audit log) + `(lesson_id, event_id)` replay guard via learning-events `object_id` check + 80-char truncation (`ai_teacher/routes.py`). Tests 4/4 pass.
+- P2 fixes: FAQ writes role-gated (`faqs.py`, role_required decorator ×3); LMS quiz server-side scoring `_score_quiz()` (client score never persisted); conference booking `with_for_update()` TOCTOU lock; payroll status transition whitelist (draft→approved→paid); WhatsApp bulk phone-validated + WhatsAppMessage audit trail; Unsplash `trigger_url` stock-host allowlist before key fetch; live-polls deleted (zero consumers — `ai/extensions.py` + `ai_extensions.py` notes); report_generation role enums (principal/admin → superadmin/school_admin); GPS push roles fixed to real enums; fees partial-paid read = SUM(fee_receipts) + row locks on both collect paths (note-string marker race closed).
+- P2 PII: `iemis_templates/*.xlsx` regenerated with deterministic synthetic data (308 + 1 rows), exact government headers preserved, importer-compatible. **OPEN: git history still contains originals — needs `git filter-repo` + coordinated force-push (user decision).**
+
+**Backend — plugin system (plan 6.2/6.4-7):**
+- elibrary manifest `api_blueprint` corrected to `app.api.v1.elibrary` (was pointing at the physical-library blueprint).
+- `ai_adaptive_learning/manifest.yaml` created (was manifest-less; models/tables/depends_on ai_suite; route nav under ai-tools). plugin_doctor: **50 manifests · 0 errors · 0 warnings** (was 49+orphan).
+- Loader E7: `except ImportError` → + `(SyntaxError, AttributeError, NameError)` with ERROR log (`loader.py:_register_manifest_blueprints`).
+
+**Manifest UI contract (plan 48.2):**
+- white_label (4) + multi_branch (3) manifest routes fixed to `/dashboard/*` prefix.
+- `visible_to` added to academics, basic_website, library_management manifests (41/41 now gated).
+
+**Demo tenant seeded (plan 6.7-6 / WO-10)** — `backend/scripts/seed_demo_data.py` (idempotent): academic year 2083-84, 10 classes, 16 sections, 40 students + 40 guardians (bilingual names, BS DOBs), 80 fee collections (month 1 paid / month 2 due), First Terminal Examination. DB verified; login OK. **Unblocks all six UX-task benchmarks (BLOCKED cells).**
+
+**Frontend (plan 5.x/31.2 Batch-0):**
+- G1: `ui/tabs.tsx` wired to `win11-tablist/tab/tabpanel` classes (11.css role-based selectors + Radix a11y free) — all 11 tab pages gain Fluent styling.
+- WO-7: LayersPanel duplicate-key fix (`LayerInfo.id`, stable per-object identity; fixes 28 React key errors on multi-shape templates).
+- WO-6: dashboard CSP `font-src`/`style-src` now allow Google Fonts in production (Mukta Devanagari fixed on every page); Designer font picker gains Devanagari set (Mukta/Noto/Hind/Yatra One/Baloo 2).
+- WO-8: public-site null-address guards ×3 (`app/school/[slug]/layout.tsx` — "null, Kathmandu" impossible now).
+- 5.2a dependency-chain empty states: students/new (create-class link), attendance (create-first-class CTA), fees POS (enroll-student CTA), report-cards (create-exam CTA).
+- All modified frontend files `tsc --noEmit` clean.
+
+**Verification:** all 14 backend files parse + targeted checks pass; plugin_doctor 50/50; live app boots with 865 routes (live-polls gone); ai_teacher suite 4/4. Full pytest regression still running at log time.
+
+## 2026-09-13 — Deep-UX quick-win wave 2 (plan 5.5/4.2/6.6/31.2 Batch-0)
+
+**5.5 — Native confirms eradicated (16 files):** all remaining `confirm()`/`window.confirm()` sites converted to the shared `useConfirm()` dialog (hr/expenses, hr/expense-categories, hostel, transport/routes, transport/pickup-points, attendance/holidays, attendance/subject (already used hook), whatsapp/templates, website-builder/pages, website-builder/editor, parents/[id], timetable, library/catalog, designer, students/[id], plugins page, AppStoreApp). Students search debounced 300 ms via `useDebounced`. Full-project `tsc --noEmit` = 0 errors.
+
+**4.2 — Fake trash deleted:** "Academic Archive" alert() stub removed from Dock.tsx + Desktop.tsx (icon injection, double-click special-case, stale filters, unused Trash2 imports). Real recently-deleted archive deferred to the Files batch per plan.
+
+**6.6 — CI gates + upload-seam tests:** deploy.yml gains "Plugin contract gate" (plugin_doctor.py) and "API route smoke audit" (api_route_audit.py) steps after the drift gate. New `backend/tests/test_upload_seam.py`: 6 unit tests on `safe_storage_key` (traversal/absolute/backslash/colon/well-formed) + 3 API tests on `POST /files/upload` (traversal→400, normal→201, unauth→401) with the `file_management` plugin fixture.
+
+**31.2 Batch-0 — Kit components:** G4 empty-state merge — `AOSEmptyState` now delegates to the shared `ui/empty-state` (44+ call sites get richer styling with zero page changes). New `components/aos/kit/detail-kit.tsx`: `ObjectHeader` (win11-persona, A2 archetype header), `EditableField` (inline edit, Enter/Esc), `ListView` (win11-listview, keyboard nav), `TreeView` (win11-treeview, arrow keys) — the four previously-unused 11.css families now have kit wrappers.
+
+**Verification:** plan-7.1 quick-wins grep-verified all present (traversal guard, benchmarking import, haversine, webhook binding, synthetic XLSX, CSP fonts, LayersPanel keys, null guards ×3, elibrary pointer, FAQ roles, quiz scoring, GPS roles, whatsapp, payroll, conference lock, unsplash allowlist, live-polls removed, 40 seeded students, dependency chains ×2, debounce, trash gone, 0 native confirms, 2 CI gates).

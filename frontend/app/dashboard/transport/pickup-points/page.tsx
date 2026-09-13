@@ -25,6 +25,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TransportRoute {
   id: string;
@@ -44,6 +45,7 @@ interface BusStop {
 }
 
 export default function PickupPointsPage() {
+  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<BusStop | null>(null);
   const [search, setSearch] = useState("");
@@ -119,7 +121,7 @@ export default function PickupPointsPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => {
             e.stopPropagation();
-            if(confirm("Are you sure you want to delete this stop?")) deleteMutation.mutate(s.id);
+            confirm({ title: "Delete stop", body: "Are you sure you want to delete this stop?" }).then((ok) => { if (ok) deleteMutation.mutate(s.id); });
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>

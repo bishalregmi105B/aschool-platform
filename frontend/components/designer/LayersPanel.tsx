@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useDesignerStore } from "@/lib/designer/store";
 
 interface LayerInfo {
+  id: string;
   name: string;
   type: string;
   label: string;
@@ -47,6 +48,11 @@ export default function LayersPanel({ canvas }: { canvas: any }) {
     if (!fc) return;
     const read = () => {
       const objs: LayerInfo[] = fc.getObjects().map((o: any) => ({
+        // fabric objects have no guaranteed-unique name (unnamed objects
+        // all fall back to the same `${type}-?` string — the duplicate-key
+        // React errors on multi-shape templates) — key on a stable
+        // per-object identity instead (WO-7 / audit 5.10).
+        id: o.id ?? `${o.type}-${fc.getObjects().indexOf(o)}`,
         name: o.name ?? `${o.type}-?`,
         type: o.type ?? "unknown",
         label: o.name ?? o.text?.slice(0, 24) ?? o.type,
@@ -104,7 +110,7 @@ export default function LayersPanel({ canvas }: { canvas: any }) {
     <div className="space-y-1">
       {layers.map((l, i) => (
         <div
-          key={l.name}
+          key={l.id ?? i}
           className="group flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--w11-radius-md)] border text-xs cursor-pointer transition-colors"
           style={{
             transitionDuration: "var(--w11-transition-fast)",

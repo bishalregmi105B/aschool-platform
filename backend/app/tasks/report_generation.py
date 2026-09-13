@@ -376,7 +376,7 @@ def generate_compliance_report(school_id: str, report_type: str):
     students = Student.query.filter_by(school_id=school_id, is_deleted=False).all()
     staff = User.query.filter(
         User.school_id == school_id,
-        User.role.in_(["teacher", "staff", "principal", "admin"]),
+        User.role.in_(["teacher", "staff", "superadmin", "school_admin"]),
         User.is_deleted.is_(False),
     ).all()
 

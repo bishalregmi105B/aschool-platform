@@ -15,6 +15,7 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface WebPage {
   id: string;
@@ -45,6 +46,7 @@ const PREBUILT_PAGES: { slug: string; title: string; description: string; icon: 
 ];
 
 export default function WebsitePagesManager() {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -175,9 +177,9 @@ export default function WebsitePagesManager() {
       </a>
       <button
         onClick={() => {
-          if (confirm(`Delete page "${p.title}"?`)) {
-            deleteMut.mutate(p.id);
-          }
+          confirm({ title: "Delete page", body: `Delete page "${p.title}"?` }).then((ok) => {
+            if (ok) deleteMut.mutate(p.id);
+          });
         }}
         className="win11-btn"
         style={{ fontSize: "12px", padding: "4px 12px" }}

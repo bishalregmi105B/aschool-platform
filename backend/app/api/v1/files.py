@@ -28,7 +28,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.models.file import FileFolder, ManagedFile
 from app.plugins.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
-from app.utils.file_upload import VirusDetectedError, delete_file, generate_presigned_url, upload_file
+from app.utils.file_upload import VirusDetectedError, delete_file, generate_presigned_url, safe_storage_key, upload_file
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -205,7 +205,11 @@ def upload():
                 + ", ".join(sorted(_allowed_extensions())),
                 415,
             )
-        r2_key = f"{g.school_id}/{folder}/{uuid.uuid4().hex}.{ext}" if ext else f"{g.school_id}/{folder}/{uuid.uuid4().hex}"
+        try:
+            folder_key = safe_storage_key(g.school_id, folder)
+        except ValueError:
+            return error_response("Invalid folder", 400)
+        r2_key = f"{folder_key}/{uuid.uuid4().hex}.{ext}" if ext else f"{folder_key}/{uuid.uuid4().hex}"
         mime = f.content_type or "application/octet-stream"
 
         # Rewind and upload (raises VirusDetectedError if threat found)
@@ -216,6 +220,8 @@ def upload():
             public_url = upload_file(file_obj, folder=f"{g.school_id}/{folder}", filename=os.path.basename(r2_key))
         except VirusDetectedError as exc:
             return error_response(f"File '{f.filename}' rejected: {exc}", 422)
+        except ValueError:
+            return error_response("Invalid upload path", 400)
 
         record = ManagedFile(
             school_id=g.school_id,
@@ -555,12 +561,17 @@ def stock_import():
             400,
         )
 
-    # Fire Unsplash download trigger (required by Unsplash API terms)
+    # Fire Unsplash download trigger (required by Unsplash API terms).
+    # The trigger URL is client-supplied, so it must pass the same stock-host
+    # allowlist before the platform key is ever appended to it (audit 6.1-11:
+    # previously an arbitrary https URL could be fetched with the key).
     if source == "unsplash" and trigger_url:
         try:
-            key = os.getenv("UNSPLASH_ACCESS_KEY", "")
-            if key:
-                _requests.get(f"{trigger_url}?client_id={key}", timeout=5)
+            tp = urlparse(str(trigger_url))
+            if tp.scheme == "https" and tp.hostname in _STOCK_HOSTS:
+                key = os.getenv("UNSPLASH_ACCESS_KEY", "")
+                if key:
+                    _requests.get(f"{trigger_url}?client_id={key}", timeout=5)
         except Exception:
             pass
 

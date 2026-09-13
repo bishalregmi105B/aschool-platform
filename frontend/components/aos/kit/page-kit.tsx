@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { EmptyState as SharedEmptyState } from "@/components/ui/empty-state";
 
 /**
  * AOS page kit — the aos-app page anatomy as reusable pieces.
@@ -353,7 +354,13 @@ export function AOSModuleLoadingState({ label = "Loading module…" }: { label?:
   );
 }
 
-/** Standard module empty state. */
+/** Standard module empty state.
+ *
+ * G4 (plan 31.2): delegates to the shared ui/empty-state — ONE empty-state
+ * implementation product-wide. AOSEmptyState call sites pass a rendered icon
+ * node and an optional ReactNode action; both map onto the shared API
+ * (action as ReactNode renders below the structured CTA row via children).
+ */
 export function AOSEmptyState({
   icon,
   title,
@@ -363,20 +370,40 @@ export function AOSEmptyState({
   icon?: React.ReactNode;
   title: React.ReactNode;
   description?: React.ReactNode;
-  action?: React.ReactNode;
+  action?:
+    | React.ReactNode
+    | { label: string; href?: string; onClick?: () => void };
 }) {
+  const structured =
+    action && !React.isValidElement(action)
+      ? (action as { label: string; href?: string; onClick?: () => void })
+      : undefined;
+  const nodeAction = React.isValidElement(action) ? action : null;
   return (
-    <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
-      {icon && <div style={{ opacity: 0.5, marginBottom: 4 }}>{icon}</div>}
-      <div className="text-[14px] font-semibold" style={{ color: "var(--w11-text-primary)" }}>
-        {title}
-      </div>
-      {description && (
-        <div className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
-          {description}
-        </div>
-      )}
-      {action && <div className="mt-3">{action}</div>}
+    <div className="flex flex-col items-center">
+      <SharedEmptyState
+        icon={
+          icon
+            ? (() => {
+                function IconNode({ className }: { className?: string }) {
+                  return (
+                    <span
+                      className={className}
+                      style={{ display: "inline-flex", opacity: 0.7 }}
+                    >
+                      {icon}
+                    </span>
+                  );
+                }
+                return IconNode;
+              })()
+            : undefined
+        }
+        title={String(title)}
+        body={description ? String(description) : undefined}
+        action={structured}
+      />
+      {nodeAction && <div className="mt-3">{nodeAction}</div>}
     </div>
   );
 }

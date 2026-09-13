@@ -92,12 +92,40 @@ def scan_for_viruses(data: bytes, filename: str = "") -> None:
         logger.warning("ClamAV scan unavailable (non-strict): %s", exc)
 
 
+# ── Path safety ────────────────────────────────────────────────────────────
+
+def safe_storage_key(*parts: str) -> str:
+    """Build a storage key from parts, rejecting anything that escapes the root.
+
+    Raises ValueError on '..' segments, absolute paths, or backslash tricks, so
+    a caller-controlled 'folder' form field can never traverse outside the
+    upload root (local) or inject '../' into an object key (R2).
+    """
+    cleaned: list[str] = []
+    for part in parts:
+        if part is None:
+            continue
+        part = str(part)
+        if part.startswith("/") or "\\" in part:
+            raise ValueError("invalid storage path")
+        for segment in part.split("/"):
+            if segment in ("", "."):
+                continue
+            if segment == ".." or ":" in segment:
+                raise ValueError("invalid storage path")
+            cleaned.append(segment)
+    if not cleaned:
+        raise ValueError("invalid storage path")
+    return "/".join(cleaned)
+
+
 # ── Public API ─────────────────────────────────────────────────────────────
 
 def upload_file(file_obj, folder: str, filename: str | None = None) -> str:
     """Upload a file and return its public URL or local path.
 
     Raises VirusDetectedError if ClamAV is enabled and a threat is found.
+    Raises ValueError if folder/filename would escape the storage root.
     """
     ext = ""
     if hasattr(file_obj, "filename") and file_obj.filename:
@@ -105,7 +133,7 @@ def upload_file(file_obj, folder: str, filename: str | None = None) -> str:
     if filename is None:
         filename = f"{uuid.uuid4().hex}{ext}"
 
-    key = f"{folder}/{filename}"
+    key = safe_storage_key(folder, os.path.basename(filename))
 
     content_type = "application/octet-stream"
     if hasattr(file_obj, "content_type") and file_obj.content_type:
@@ -134,6 +162,7 @@ def upload_file(file_obj, folder: str, filename: str | None = None) -> str:
 
 def delete_file(key: str):
     """Delete a file by its storage key."""
+    key = safe_storage_key(key)
     if _backend() == "r2":
         client = _get_r2_client()
         bucket = os.getenv("R2_BUCKET_NAME", "aschool")
@@ -149,6 +178,7 @@ def delete_file(key: str):
 
 def generate_presigned_url(key: str, expires_in: int = 3600) -> str:
     """Return a time-limited URL for a file (R2) or a direct local path."""
+    key = safe_storage_key(key)
     if _backend() == "r2":
         client = _get_r2_client()
         bucket = os.getenv("R2_BUCKET_NAME", "aschool")

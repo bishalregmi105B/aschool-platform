@@ -318,6 +318,22 @@ def update_payroll(payroll_id):
     if not payroll:
         return error_response("Payroll record not found", 404)
     data = request.get_json(silent=True) or {}
+    # Status transitions are enforced — a client cannot jump draft → paid
+    # past approval, or resurrect a paid record (audit finding 6.1-9).
+    _STATUS_TRANSITIONS = {
+        "draft": {"approved"},
+        "approved": {"paid"},
+        "paid": set(),
+    }
+    new_status = data.get("status")
+    if new_status is not None and new_status != payroll.status:
+        allowed = _STATUS_TRANSITIONS.get(payroll.status, set())
+        if new_status not in allowed:
+            return error_response(
+                f"Invalid status transition {payroll.status!r} → {new_status!r}. "
+                f"Allowed from {payroll.status!r}: {sorted(allowed) or 'none'}",
+                422,
+            )
     for key in (
         "basic_salary",
         "allowances",
