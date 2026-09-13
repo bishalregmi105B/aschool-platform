@@ -1,0 +1,891 @@
+{
+  "schema_version": 1,
+  "templates": [
+    {
+      "template_key": "admission_form",
+      "name": "Admission Application Form",
+      "name_nepali": null,
+      "category": "reports",
+      "editor_type": "designer",
+      "description": "प्रवेश आवेदन फारम — bilingual (Nepali/English) admission application form with dashed fill-in fields",
+      "page_size": "A4",
+      "thumbnail_emoji": "📝",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "class_name"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "dates": {
+          "today_bs": "auto"
+        },
+        "notes": "Print blank for walk-in applicants, or open in the designer to customise. {today_bs} fills automatically."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "admit_card_hall_ticket",
+      "name": "Hall Ticket",
+      "name_nepali": null,
+      "category": "admit_cards",
+      "editor_type": "designer",
+      "description": "Exam hall ticket variant with subject schedule rows",
+      "page_size": "A5",
+      "thumbnail_emoji": "🎫",
+      "is_default": true,
+      "width": 559,
+      "height": 794,
+      "fields": [
+        "name",
+        "class",
+        "roll_no",
+        "dob",
+        "exam_name",
+        "symbol_no"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "admit_card_standard",
+      "name": "Exam Admit Card",
+      "name_nepali": null,
+      "category": "admit_cards",
+      "editor_type": "designer",
+      "description": "Exam admit card with student details, photo box and subject schedule rows",
+      "page_size": "A4 Half",
+      "thumbnail_emoji": "🎫",
+      "is_default": true,
+      "width": 559,
+      "height": 794,
+      "fields": [
+        "school_name",
+        "exam_name",
+        "student_name",
+        "class_name",
+        "roll_no",
+        "dob",
+        "father_name",
+        "photo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "attendance_ledger",
+      "name": "Attendance Ledger",
+      "name_nepali": "हाजिरी खाता",
+      "category": "registers",
+      "editor_type": "designer",
+      "description": "Monthly class attendance register — 20 roll-wise student rows × 31 day columns with P/A/L marks and present/absent totals. Bulk-generate per class + BS month with real attendance records (one page per 20 students).",
+      "page_size": "A4",
+      "thumbnail_emoji": "📋",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "class_name",
+        "section_name",
+        "month_name",
+        "year_bs",
+        "roll_list",
+        "name_list",
+        "attendance_marks",
+        "attendance_totals"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school",
+          "class_roster",
+          "attendance"
+        ],
+        "notes": "Roll/name rows map to {roll_N}/{name_N}; the day grid fills each {m_<row>_<day>} with P, A, L (late), H (half-day), Lv (leave) or blank when no attendance record exists, and {total_p_N}/{total_a_N} carry the row totals. Bulk: pick class + BS month — 20 students per A4 page, attendance marks come from the month's attendance records.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "calendar_monthly_2083",
+      "name": "Monthly Calendar 2083 (Pre-filled)",
+      "name_nepali": "महिना क्यालेन्डर 2083 — मिति भरिएको",
+      "category": "calendars",
+      "editor_type": "designer",
+      "description": "Pathshala-style monthly calendar — 12 pages, every BS date of 2083 pre-filled as its own editable text (Devanagari numeral + tiny AD date + event slot). Twelve accent colours, holiday legend, dashed Holidays/Activities panels.",
+      "page_size": "A4",
+      "thumbnail_emoji": "🗓️",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "school_website",
+        "school_email",
+        "school_logo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "Dates are baked in — restyle or annotate any day cell directly. Holidays/Activities are plain editable bullet text; header autofills.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "calendar_wall_2083",
+      "name": "Wall Calendar 2083 (Single Sheet)",
+      "name_nepali": "भित्ते क्यालेन्डर 2083",
+      "category": "calendars",
+      "editor_type": "designer",
+      "description": "SM-style A2 wall calendar — all 12 months of BS 2083 pre-filled in Devanagari numerals around a central photo strip, scalloped orange ribbon header, year badge, red Saturdays.",
+      "page_size": "A2",
+      "thumbnail_emoji": "🧾",
+      "is_default": true,
+      "width": 1191,
+      "height": 1684,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "school_website",
+        "school_logo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "Every date of BS 2083 is a real editable textbox. Replace the three SCHOOL PHOTO slots with school event photos; header/footer autofill.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "character_certificate",
+      "name": "Character Certificate",
+      "name_nepali": null,
+      "category": "certificates",
+      "editor_type": "designer",
+      "description": "Formal character certificate with conduct statement and principal seal line",
+      "page_size": "A4",
+      "thumbnail_emoji": "📜",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "student_name",
+        "class_name",
+        "roll_no",
+        "conduct",
+        "issue_date"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "character_certificate_nepali",
+      "name": "Character Certificate (Nepali)",
+      "name_nepali": null,
+      "category": "certificates",
+      "editor_type": "designer",
+      "description": "चरित्र प्रमाणपत्र — formal Nepali-language character certificate with school seal and principal signature",
+      "page_size": "A4",
+      "thumbnail_emoji": "📜",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "name",
+        "father_name",
+        "class_name",
+        "section",
+        "roll_no",
+        "enrollment_number"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "dates": {
+          "today_bs": "auto",
+          "today_ad": "auto"
+        },
+        "notes": "Auto dates: {today_bs} / {today_ad} fill automatically at render time. Bulk-generate for a whole class from the designer hub."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "circular",
+      "name": "Parent Circular",
+      "name_nepali": null,
+      "category": "notices",
+      "editor_type": "writer",
+      "description": "Circular to parents with header, body placeholders and signatures",
+      "page_size": "A4",
+      "thumbnail_emoji": "📨",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "date",
+        "class",
+        "section"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "event_banner",
+      "name": "Event / Annual Day Banner",
+      "name_nepali": "वार्षिकोत्सव ब्यानर",
+      "category": "banners",
+      "editor_type": "designer",
+      "description": "A3-landscape annual-day banner — dark header band, programme column, chief-guest photo slot.",
+      "page_size": "A3 Landscape (wide)",
+      "thumbnail_emoji": "🎉",
+      "is_default": true,
+      "width": 1191,
+      "height": 1000,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "chief_guest_photo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "fee_bill",
+      "name": "Student Fee Bill",
+      "name_nepali": null,
+      "category": "reports",
+      "editor_type": "writer",
+      "description": "Student fee bill / payment receipt with itemised fee table",
+      "page_size": "A4",
+      "thumbnail_emoji": "🧾",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "student_name",
+        "class_name",
+        "roll_no",
+        "bill_no",
+        "bill_date",
+        "due_date",
+        "fee_items",
+        "total_amount"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "homework_assignment",
+      "name": "Homework Assignment Sheet",
+      "name_nepali": "साप्ताहिक गृहकार्य",
+      "category": "lesson_plans",
+      "editor_type": "writer",
+      "description": "Weekly homework grid with daily parent-signature column and Nepali note.",
+      "page_size": "A4",
+      "thumbnail_emoji": "📚",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "id_card_nepali",
+      "name": "Student ID Card (Nepali)",
+      "name_nepali": null,
+      "category": "id_cards",
+      "editor_type": "designer",
+      "description": "विद्यार्थी पहिचानपत्र — Devanagari-labelled ID card in Nepal-flag crimson with photo and QR",
+      "page_size": "ID Card",
+      "thumbnail_emoji": "🇳🇵",
+      "is_default": true,
+      "width": 300,
+      "height": 189,
+      "fields": [
+        "photo",
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "dob",
+        "blood_group",
+        "phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "dates": "auto (school footer)",
+        "notes": "School fields merge automatically; record data comes from bulk generation or the data-fill panel. Devanagari renders correctly in print PDF (Noto Sans Devanagari)."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "id_card_staff",
+      "name": "Staff ID Card",
+      "name_nepali": null,
+      "category": "id_cards",
+      "editor_type": "designer",
+      "description": "Vertical staff ID card with photo, designation and school contacts",
+      "page_size": "ID Card Portrait",
+      "thumbnail_emoji": "🪪",
+      "is_default": true,
+      "width": 300,
+      "height": 480,
+      "fields": [
+        "photo",
+        "name",
+        "designation",
+        "department",
+        "employee_id",
+        "phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "id_card_standard",
+      "name": "Student ID Card",
+      "name_nepali": null,
+      "category": "id_cards",
+      "editor_type": "designer",
+      "description": "Horizontal student ID card with photo, name, class, roll and contacts",
+      "page_size": "ID Card",
+      "thumbnail_emoji": "🪪",
+      "is_default": true,
+      "width": 300,
+      "height": 189,
+      "fields": [
+        "photo",
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "blood_group",
+        "phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "leave_application",
+      "name": "Student Leave Application",
+      "name_nepali": "बिदा आवेदन (विद्यार्थी)",
+      "category": "letters",
+      "editor_type": "writer",
+      "description": "Student leave application — guardian request with approval footer.",
+      "page_size": "A4",
+      "thumbnail_emoji": "✉",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "lesson_plan_cdc",
+      "name": "Lesson Plan (CDC Format)",
+      "name_nepali": "दैनिक पाठ योजना",
+      "category": "lesson_plans",
+      "editor_type": "writer",
+      "description": "Daily lesson plan following Nepal CDC structure — 45-min phases, objectives, reflection.",
+      "page_size": "A4",
+      "thumbnail_emoji": "📋",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "letterhead_official",
+      "name": "Official Letterhead",
+      "name_nepali": null,
+      "category": "letterheads",
+      "editor_type": "writer",
+      "description": "Formal letterhead — logo band, reference line, signature block",
+      "page_size": "A4",
+      "thumbnail_emoji": "📜",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "school_website"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "marksheet",
+      "name": "NEB Marksheet",
+      "name_nepali": null,
+      "category": "reports",
+      "editor_type": "writer",
+      "description": "IEMIS-style NEB marksheet with theory/practical split, grade points and grading legend",
+      "page_size": "A4",
+      "thumbnail_emoji": "📝",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "name",
+        "class_name",
+        "roll_no",
+        "exam_name",
+        "subjects_marks",
+        "grade",
+        "gpa",
+        "percentage"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "meeting_minutes",
+      "name": "Meeting Minutes",
+      "name_nepali": "बैठक निर्णय",
+      "category": "notices",
+      "editor_type": "writer",
+      "description": "PTA / staff / SMC meeting minutes with agenda, decisions and action table.",
+      "page_size": "A4",
+      "thumbnail_emoji": "🗓",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "merit_certificate",
+      "name": "Merit Certificate",
+      "name_nepali": null,
+      "category": "certificates",
+      "editor_type": "designer",
+      "description": "Landscape merit award certificate with achievement and rank lines",
+      "page_size": "A4 Landscape",
+      "thumbnail_emoji": "🏅",
+      "is_default": true,
+      "width": 1123,
+      "height": 794,
+      "fields": [
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "achievement",
+        "rank",
+        "date"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "nepali_calendar_12_months",
+      "name": "Nepali School Calendar",
+      "name_nepali": null,
+      "category": "calendars",
+      "editor_type": "designer",
+      "description": "Multi-page Nepali calendar — one month per page with school header and image placeholder",
+      "page_size": "A4",
+      "thumbnail_emoji": "🗓️",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_logo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "notice",
+      "name": "Notice",
+      "name_nepali": null,
+      "category": "notices",
+      "editor_type": "writer",
+      "description": "Official school notice with header band and signature block",
+      "page_size": "A4",
+      "thumbnail_emoji": "📢",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "date",
+        "title"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "participation_certificate",
+      "name": "Participation Certificate",
+      "name_nepali": null,
+      "category": "certificates",
+      "editor_type": "designer",
+      "description": "Landscape participation certificate for events and programs",
+      "page_size": "A4 Landscape",
+      "thumbnail_emoji": "🎖️",
+      "is_default": true,
+      "width": 1123,
+      "height": 794,
+      "fields": [
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "event_name",
+        "event_date",
+        "date"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "recommendation_letter",
+      "name": "Recommendation Letter",
+      "name_nepali": "सिफारिस पत्र",
+      "category": "letters",
+      "editor_type": "writer",
+      "description": "To-whom-it-may-concern student recommendation with GPA/conduct strip and validity footer.",
+      "page_size": "A4",
+      "thumbnail_emoji": "🎓",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "report_card",
+      "name": "Report Card",
+      "name_nepali": null,
+      "category": "reports",
+      "editor_type": "designer",
+      "description": "Terminal report card with subject table, attendance and remarks",
+      "page_size": "A4",
+      "thumbnail_emoji": "📋",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "exam_name"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "report_card_writer",
+      "name": "Report Card (Document)",
+      "name_nepali": null,
+      "category": "reports",
+      "editor_type": "writer",
+      "description": "Editable report card document with subject rows and grading legend",
+      "page_size": "A4",
+      "thumbnail_emoji": "📝",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "name",
+        "class",
+        "section",
+        "roll_no",
+        "exam_name"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    },
+    {
+      "template_key": "science_exhibition_flyer",
+      "name": "Science Exhibition Flyer",
+      "name_nepali": "विज्ञान प्रदर्शनी",
+      "category": "posters",
+      "editor_type": "designer",
+      "description": "A4 bilingual science-exhibition flyer — student/visitor info cards and two photo slots.",
+      "page_size": "A4",
+      "thumbnail_emoji": "🔬",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "school_website",
+        "event_photo"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "sports_day_poster",
+      "name": "Sports Day Poster",
+      "name_nepali": "खेलकुद दिवस पोस्टर",
+      "category": "posters",
+      "editor_type": "designer",
+      "description": "A4 sports-day poster — events list, date/venue strip, welcome banner.",
+      "page_size": "A4",
+      "thumbnail_emoji": "🏅",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone",
+        "school_website"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "teacher_leave_letter",
+      "name": "Teacher Leave Request",
+      "name_nepali": "बिदा आवेदन (शिक्षक)",
+      "category": "letters",
+      "editor_type": "writer",
+      "description": "Teacher / staff leave request letter with approval footer.",
+      "page_size": "A4",
+      "thumbnail_emoji": "✉",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "school_name",
+        "school_address",
+        "school_phone"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel.\n"
+      },
+      "assets": []
+    },
+    {
+      "template_key": "transfer_certificate",
+      "name": "Transfer Certificate",
+      "name_nepali": null,
+      "category": "certificates",
+      "editor_type": "designer",
+      "description": "School leaving / transfer certificate with numbered leaving-record fields",
+      "page_size": "A4",
+      "thumbnail_emoji": "📤",
+      "is_default": true,
+      "width": 794,
+      "height": 1123,
+      "fields": [
+        "name",
+        "father_name",
+        "mother_name",
+        "class",
+        "section",
+        "dob",
+        "leaving_reason",
+        "leaving_date"
+      ],
+      "tags": [],
+      "autofill": {
+        "sources": [
+          "school"
+        ],
+        "notes": "School fields ({school_name}, {school_address}, {school_phone}, {school_website}, {school_logo}) merge into every render automatically. Record data (students, exams) is provided by bulk generation or the data-fill panel."
+      },
+      "assets": []
+    }
+  ]
+}

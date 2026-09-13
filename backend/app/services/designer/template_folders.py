@@ -93,29 +93,59 @@ def _normalize(meta: dict, folder: str, key: str) -> dict:
     return out
 
 
+REGISTRY_PATH = os.path.join(TEMPLATES_DIR, "templates.json")
+
+
+def _load_registry() -> list[dict]:
+    """Read the master template registry (templates.json)."""
+    with open(REGISTRY_PATH, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    return data.get("templates", [])
+
+
 def scan_template_folders(force: bool = False) -> dict[str, dict[str, Any]]:
-    """Scan backend/app/templates/designer/*/ and return {key: template_dict}."""
+    """Templates from the REGISTRY (templates.json) — the single source of
+    truth for the template list and all metadata. Each entry's folder still
+    supplies its canvas.json / writer.json / assets, loaded here.
+
+    Folders without a registry entry are NOT listed (add them to
+    templates.json — or run scripts/build_template_registry.py to
+    regenerate the registry from folder template.yaml files)."""
     global _CACHE
     if _CACHE is not None and not force:
         return _CACHE
 
-    found: dict[str, dict[str, Any]] = {}
-    if os.path.isdir(TEMPLATES_DIR):
-        for entry in sorted(os.listdir(TEMPLATES_DIR)):
-            folder = os.path.join(TEMPLATES_DIR, entry)
-            meta_path = os.path.join(folder, "template.yaml")
-            if not os.path.isfile(meta_path):
-                continue
-            try:
-                meta = _read_yaml(meta_path)
-                key = meta.get("template_key") or entry
-                found[key] = _normalize(meta, folder, key)
-            except Exception as exc:  # malformed folder must not break startup
-                import logging
+    import logging
 
-                logging.getLogger(__name__).warning(
-                    "template folder %s failed to load: %s", entry, exc
-                )
+    logger = logging.getLogger(__name__)
+    found: dict[str, dict[str, Any]] = {}
+    try:
+        entries = _load_registry()
+    except Exception as exc:
+        logger.warning("templates.json unreadable (%s); no file templates", exc)
+        _CACHE = found
+        return found
+
+    for entry in entries:
+        key = entry.get("template_key") or entry.get("id")
+        if not key:
+            continue
+        folder = os.path.join(TEMPLATES_DIR, key)
+        if not os.path.isdir(folder):
+            logger.warning("registry entry %s has no folder; skipped", key)
+            continue
+        meta = dict(entry)
+        meta["_folder"] = folder
+        canvas_path = os.path.join(folder, "canvas.json")
+        writer_path = os.path.join(folder, "writer.json")
+        try:
+            if os.path.isfile(canvas_path):
+                meta.setdefault("canvas_json", _read_json(canvas_path))
+            if os.path.isfile(writer_path):
+                meta.setdefault("writer_json", _read_json(writer_path))
+        except Exception as exc:
+            logger.warning("template %s content failed to load: %s", key, exc)
+        found[key] = meta
     _CACHE = found
     return found
 
