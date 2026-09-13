@@ -609,6 +609,21 @@ def create_app(config_name: str | None = None) -> Flask:
 
     PluginLoader.discover_and_register(app)
 
+    # Designer templates: the templates.json registry auto-rebuilds from
+    # folder metadata at startup (folders are the authoring source; the
+    # registry is the listing source of truth) and a background watchdog
+    # keeps it fresh every few minutes. Best-effort — never blocks boot.
+    try:
+        from app.services.designer.template_folders import (
+            start_registry_watchdog,
+            sync_registry,
+        )
+
+        sync_registry()
+        start_registry_watchdog()
+    except Exception as e:  # noqa: BLE001 — startup resilience
+        app.logger.error("Template registry auto-sync failed at startup: %s", e)
+
     # WP-style catalog: the plugins directory is the source of truth. Sync
     # the DB mirror rows (create/update/unpublish orphans) so a fresh deploy
     # gets a full marketplace with ZERO plugin seeding. Best-effort — a
