@@ -270,6 +270,13 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "staff__bulk-upload": dynamic(() => import("@/app/dashboard/bulk-uploads/csv/page"), { loading: AOSModuleLoading }), // → bulk-uploads/csv
   "students__guardians": dynamic(() => import("@/app/dashboard/parents/page"), { loading: AOSModuleLoading }), // → parents
   "teachers__bulk-upload": dynamic(() => import("@/app/dashboard/bulk-uploads/csv/page"), { loading: AOSModuleLoading }), // → bulk-uploads/csv
+
+  // ── Dynamic routes ([id]/[slug] pages) — pattern keys where a {param}
+  //    segment matches any single path segment. ─────────────────────────
+  "students__{id}": dynamic(() => import("@/app/dashboard/students/[id]/page"), { loading: AOSModuleLoading }),
+  "parents__{id}": dynamic(() => import("@/app/dashboard/parents/[id]/page"), { loading: AOSModuleLoading }),
+  "exams__{id}": dynamic(() => import("@/app/dashboard/exams/[id]/page"), { loading: AOSModuleLoading }),
+  "plugins__{slug}__settings": dynamic(() => import("@/app/dashboard/plugins/[slug]/settings/page"), { loading: AOSModuleLoading }),
 };
 
 /** Map a /dashboard route path to its route-table key. */
@@ -281,9 +288,26 @@ export function routeToKey(route: string): string | null {
   return segments.slice(1).join("__");
 }
 
+const DYNAMIC_ROUTE_PATTERNS = ["students__{id}", "parents__{id}", "exams__{id}", "plugins__{slug}__settings"];
+
 /** Resolve any /dashboard route to its exact page component (null if absent). */
 export function resolveRouteComponent(route: string): React.ComponentType<any> | null {
   const key = routeToKey(route);
   if (!key) return null;
-  return AOS_ROUTE_COMPONENTS[key] || null;
+
+  // Exact hit first.
+  if (AOS_ROUTE_COMPONENTS[key]) return AOS_ROUTE_COMPONENTS[key];
+
+  // Dynamic-route patterns: a {param} segment matches any single segment.
+  const segments = key.split("__");
+  for (const pattern of DYNAMIC_ROUTE_PATTERNS) {
+    const patternSegments = pattern.split("__");
+    if (patternSegments.length !== segments.length) continue;
+    const matches = patternSegments.every(
+      (p, i) => (p.startsWith("{") && p.endsWith("}")) || p === segments[i]
+    );
+    if (matches) return AOS_ROUTE_COMPONENTS[pattern];
+  }
+
+  return null;
 }

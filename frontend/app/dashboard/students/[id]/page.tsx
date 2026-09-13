@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import { useAOSPathParam } from "@/lib/aos-window-route";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ function parentDefaultHint(
 
 export default function StudentDetailPage() {
   const params = useParams();
-  const studentId = params.id as string;
+  const studentId = useAOSPathParam(2) || (params.id as string);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const { data, isLoading } = useQuery({

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useAOSPathParam } from "@/lib/aos-window-route";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { getPluginDisplayName } from "@/lib/plugins";
@@ -153,7 +154,7 @@ function parseJsonDefault(raw: string): unknown {
 
 export default function PluginSettingsPage() {
   const params = useParams<{ slug: string }>();
-  const slug = typeof params?.slug === "string" ? params.slug : "";
+  const slug = useAOSPathParam(2) || (typeof params?.slug === "string" ? params.slug : "");
   const { user } = useAuth();
   const queryClient = useQueryClient();
 

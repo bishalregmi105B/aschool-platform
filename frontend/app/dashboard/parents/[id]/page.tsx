@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useAOSPathParam } from "@/lib/aos-window-route";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
@@ -59,7 +60,7 @@ interface StudentOption {
 
 export default function ParentDetailPage() {
   const params = useParams();
-  const parentId = Array.isArray(params.id) ? params.id[0] : (params.id as string);
+  const parentId = useAOSPathParam(2) || (Array.isArray(params.id) ? params.id[0] : (params.id as string));
   const queryClient = useQueryClient();
 
   const [profileForm, setProfileForm] = useState({
