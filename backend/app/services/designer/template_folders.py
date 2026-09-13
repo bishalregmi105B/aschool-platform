@@ -24,6 +24,8 @@ folders win over registry entries with the same template_key.
 import copy
 import json
 import os
+import threading
+import time
 from typing import Any
 
 import yaml
@@ -34,7 +36,20 @@ TEMPLATES_DIR = os.path.join(
     "designer",
 )
 
+REGISTRY_PATH = os.path.join(TEMPLATES_DIR, "templates.json")
+
 _CACHE: dict[str, dict[str, Any]] | None = None
+
+# ── Registry auto-sync ───────────────────────────────────────────────────────
+# templates.json is the listing source of truth; the FOLDERS remain the
+# authoring source. The registry rebuilds itself automatically at startup
+# and on a background interval whenever folder content changes — no manual
+# script run needed (scripts/build_template_registry.py stays as a fallback).
+
+REGISTRY_SYNC_INTERVAL_SECONDS = 300
+_last_sync_check = 0.0
+_sync_lock = threading.Lock()
+_registry_watchdog_started = threading.Event()
 
 
 def _read_yaml(path: str) -> dict:
@@ -171,3 +186,117 @@ def deep_merge(base: dict, overlay: dict) -> dict:
 def reset_cache() -> None:
     global _CACHE
     _CACHE = None
+
+
+# ── Registry auto-sync implementation ───────────────────────────────────────
+
+def _folder_latest_mtime() -> float:
+    """Newest mtime across template folders' metadata/content files."""
+    latest = 0.0
+    if not os.path.isdir(TEMPLATES_DIR):
+        return latest
+    for entry in os.listdir(TEMPLATES_DIR):
+        folder = os.path.join(TEMPLATES_DIR, entry)
+        if not os.path.isdir(folder):
+            continue
+        for name in ("template.yaml", "canvas.json", "writer.json"):
+            path = os.path.join(folder, name)
+            if os.path.isfile(path):
+                try:
+                    latest = max(latest, os.path.getmtime(path))
+                except OSError:
+                    continue
+    return latest
+
+
+def build_registry_from_folders() -> list[dict]:
+    """Rebuild registry entries from folder template.yaml metadata."""
+    entries: list[dict] = []
+    for entry in sorted(os.listdir(TEMPLATES_DIR)):
+        folder = os.path.join(TEMPLATES_DIR, entry)
+        if not os.path.isdir(folder):
+            continue
+        meta_path = os.path.join(folder, "template.yaml")
+        if not os.path.isfile(meta_path):
+            continue
+        try:
+            meta = _read_yaml(meta_path)
+            key = meta.get("template_key") or entry
+            normalized = _normalize(meta, folder, key)
+            normalized.pop("_folder", None)
+            normalized.pop("canvas_json", None)
+            normalized.pop("writer_json", None)
+            entries.append({"template_key": key, **normalized})
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "registry sync: template folder %s failed: %s", entry, exc
+            )
+    return entries
+
+
+def sync_registry(force: bool = False) -> bool:
+    """Rebuild templates.json from folder metadata when folders changed.
+
+    Runs at most once per REGISTRY_SYNC_INTERVAL_SECONDS unless forced.
+    Returns True when the registry file was rewritten (cache reset)."""
+    global _last_sync_check
+
+    with _sync_lock:
+        now = time.monotonic()
+        if not force and (now - _last_sync_check) < REGISTRY_SYNC_INTERVAL_SECONDS:
+            return False
+        _last_sync_check = now
+
+    try:
+        # Cheap change detection: registry older than any folder file.
+        if not force and os.path.isfile(REGISTRY_PATH):
+            if os.path.getmtime(REGISTRY_PATH) >= _folder_latest_mtime():
+                return False
+
+        entries = build_registry_from_folders()
+        payload = {"schema_version": 1, "templates": entries}
+        existing = None
+        if os.path.isfile(REGISTRY_PATH):
+            try:
+                with open(REGISTRY_PATH, "r", encoding="utf-8") as fh:
+                    existing = json.load(fh)
+            except Exception:
+                existing = None
+
+        if existing == payload:
+            # Content unchanged — touch nothing, just refresh the stamp so
+            # the mtime check stays cheap.
+            os.utime(REGISTRY_PATH)
+            return False
+
+        with open(REGISTRY_PATH, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+        reset_cache()
+        import logging
+
+        logging.getLogger(__name__).info(
+            "template registry auto-synced: %d templates", len(entries)
+        )
+        return True
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning("registry sync failed: %s", exc)
+        return False
+
+
+def _registry_watchdog() -> None:
+    while True:
+        time.sleep(REGISTRY_SYNC_INTERVAL_SECONDS)
+        sync_registry()
+
+
+def start_registry_watchdog() -> None:
+    """Start the background auto-sync thread (idempotent, daemon)."""
+    if not _registry_watchdog_started.is_set():
+        _registry_watchdog_started.set()
+        threading.Thread(
+            target=_registry_watchdog, name="template-registry-watchdog", daemon=True
+        ).start()
