@@ -46,7 +46,9 @@ class Book(SchoolModel):
 
 
 class BookTransaction(SchoolModel):
-    __tablename__ = "book_transactions"
+    # deep-ux 6.5: vestigial — v2 uses copy-based transactions; table renamed,
+    # kept for historical rows. No route reads or writes this model.
+    __tablename__ = "book_transactions_deprecated"
 
     book_id = Column(UUID(as_uuid=True), ForeignKey("books.id"), nullable=False)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
