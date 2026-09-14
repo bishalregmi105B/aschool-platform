@@ -17,8 +17,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
 import {
-  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSEmptyState,
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel,
 } from "@/components/aos/kit/page-kit";
 import { Plus, Pencil, Trash2, Tag, Info } from "lucide-react";
 
@@ -29,6 +32,10 @@ interface FeeType {
   is_system?: boolean;
 }
 
+/**
+ * Fee types — A1 registry (plan 34-8): system defaults read-only, custom
+ * types in a DataTable with undoable delete. ≤2 required fields.
+ */
 export default function FeeTypesPage() {
   return (
     <PluginGate slug="fees">
@@ -38,8 +45,10 @@ export default function FeeTypesPage() {
 }
 
 function FeeTypesContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<FeeType | null>(null);
   const [form, setForm] = useState({ name: "", description: "" });
 
@@ -72,9 +81,9 @@ function FeeTypesContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fee-types"] });
       setShowDialog(false);
-      toast.success("Fee type created");
+      toast.success(t("Fee type created", "शुल्क प्रकार बन्यो"));
     },
-    onError: () => toast.error("Failed to create fee type"),
+    onError: () => toast.error(t("Failed to create fee type", "बनाउन सकिएन")),
   });
 
   const updateMutation = useMutation({
@@ -83,20 +92,29 @@ function FeeTypesContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fee-types"] });
       setShowDialog(false);
-      toast.success("Fee type updated");
+      toast.success(t("Fee type updated", "शुल्क प्रकार अद्यावधिक भयो"));
     },
-    onError: () => toast.error("Failed to update fee type"),
+    onError: () => toast.error(t("Failed to update fee type", "अद्यावधिक गर्न सकिएन")),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) =>
-      api.delete(`/fees/types/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fee-types"] });
-      toast.success("Fee type deleted");
-    },
-    onError: () => toast.error("Cannot delete this fee type"),
-  });
+  const removeFeeType = (ft: FeeType) => {
+    if (!ft.id) return;
+    const id = ft.id;
+    undoableDelete({
+      label: `${t("fee type", "शुल्क प्रकार")} "${ft.name}"`,
+      optimistic: () => setHiddenIds((prev) => new Set(prev).add(id)),
+      rollback: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        }),
+      commit: async () => {
+        await api.delete(`/fees/types/${id}`);
+        queryClient.invalidateQueries({ queryKey: ["fee-types"] });
+      },
+    });
+  };
 
   const handleSubmit = () => {
     if (!form.name.trim()) return;
@@ -112,7 +130,7 @@ function FeeTypesContent() {
   const FEE_TYPE_COLUMNS: Column<FeeType>[] = [
     {
       key: "name",
-      label: "Name",
+      label: t("Name", "नाम"),
       sortable: true,
       value: (ft) => ft.name,
       render: (ft) => (
@@ -122,10 +140,10 @@ function FeeTypesContent() {
         </div>
       ),
     },
-    { key: "description", label: "Description", value: (ft) => ft.description ?? "", render: (ft) => <span className="text-[color:var(--w11-text-secondary)] text-sm">{ft.description || "—"}</span> },
+    { key: "description", label: t("Description", "विवरण"), value: (ft) => ft.description ?? "", render: (ft) => <span className="text-[color:var(--w11-text-secondary)] text-sm">{ft.description || "—"}</span> },
     {
       key: "actions",
-      label: "Actions",
+      label: t("Actions", "कार्य"),
       noExport: true,
       render: (ft) => (
         <div className="flex justify-end gap-1">
@@ -137,9 +155,8 @@ function FeeTypesContent() {
             size="icon"
             onClick={(e) => {
               e.stopPropagation();
-              ft.id && deleteMutation.mutate(ft.id);
+              removeFeeType(ft);
             }}
-            disabled={deleteMutation.isPending}
           >
             <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
           </Button>
@@ -152,11 +169,14 @@ function FeeTypesContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Tag className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Fee Types"
-        subtitle="Manage fee categories — used when defining fee structures and collecting payments"
+        title={t("Fee Types", "शुल्क प्रकारहरू")}
+        subtitle={t(
+          "Manage fee categories — used when defining fee structures and collecting payments",
+          "शुल्क श्रेणीहरू — संरचना र संकलनमा प्रयोग हुने"
+        )}
         actions={
           <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Add Fee Type
+            <Plus className="h-4 w-4" /> {t("Add Fee Type", "शुल्क प्रकार थप्नुहोस्")}
           </Button>
         }
       />
@@ -167,30 +187,30 @@ function FeeTypesContent() {
             title={
               <span className="flex items-center gap-2">
                 <Info className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
-                Default Fee Types
+                {t("Default Fee Types", "पूर्वनिर्धारित शुल्क प्रकार")}
                 <Badge variant="secondary" className="ml-1">
-                  System
+                  {t("System", "सिस्टम")}
                 </Badge>
               </span>
             }
             bodyClassName="p-0"
           >
             <p className="text-sm text-[color:var(--w11-text-secondary)] px-4 pt-3">
-              These are standard fee types included with ASchool. You can
-              add custom types below.
+              {t("These are standard fee types included with ASchool. You can add custom types below.",
+                 "यी ASchool का मानक शुल्क प्रकारहरू हुन्। तल आफ्नै प्रकार थप्न सक्नुहुन्छ।")}
             </p>
             <div className="flex flex-wrap gap-2 px-4 pt-3 pb-4">
-              {systemTypes.map((t, i) => (
+              {systemTypes.map((st, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-1.5 border border-[var(--w11-border-default)] rounded-lg px-3 py-1.5"
                   style={{ background: "var(--w11-control-hover)" }}
                 >
                   <Tag className="h-3.5 w-3.5 text-[color:var(--w11-text-secondary)]" />
-                  <span className="text-sm font-medium">{t.name}</span>
-                  {t.description && (
+                  <span className="text-sm font-medium">{st.name}</span>
+                  {st.description && (
                     <span className="text-xs text-[color:var(--w11-text-secondary)]">
-                      — {t.description}
+                      — {st.description}
                     </span>
                   )}
                 </div>
@@ -200,26 +220,25 @@ function FeeTypesContent() {
         )}
 
         {/* Custom Fee Types */}
-        <DataPanel title="Custom Fee Types" bodyClassName="p-0">
+        <DataPanel title={t("Custom Fee Types", "आफ्नै शुल्क प्रकारहरू")} bodyClassName="p-0">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="win11-spinner" />
+            <div className="p-4">
+              <SkeletonTable rows={4} columns={3} />
             </div>
-          ) : customTypes.length === 0 ? (
-            <AOSEmptyState
-              icon={<Tag className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
-              title="No custom fee types yet"
-              description="Add custom types for school-specific fee categories"
-            />
           ) : (
             <DataTable<FeeType>
               columns={FEE_TYPE_COLUMNS}
-              rows={customTypes}
+              rows={customTypes.filter((ft) => !ft.id || !hiddenIds.has(ft.id))}
               rowKey={(ft) => ft.id || ft.name}
               searchable
-              searchPlaceholder="Search fee types…"
+              searchPlaceholder={t("Search fee types…", "शुल्क प्रकार खोज्नुहोस्…")}
               exportFileName="fee-types"
-              empty={{ icon: Tag, title: "No custom fee types yet", body: "Add custom types for school-specific fee categories." }}
+              empty={{
+                icon: Tag,
+                title: t("No custom fee types yet", "अहिलेसम्म आफ्नै शुल्क प्रकार छैन"),
+                body: t("Add custom types for school-specific fee categories.", "विद्यालय-विशिष्ट शुल्क श्रेणीका लागि प्रकार थप्नुहोस्।"),
+                action: { label: t("Add Fee Type", "थप्नुहोस्"), onClick: openCreate },
+              }}
             />
           )}
         </DataPanel>
@@ -229,30 +248,30 @@ function FeeTypesContent() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editing?.id ? "Edit Fee Type" : "Create Fee Type"}
+                {editing?.id ? t("Edit Fee Type", "सम्पादन") : t("Create Fee Type", "नयाँ शुल्क प्रकार")}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>
-                  Name <span style={{ color: "#c42b1c" }}>*</span>
+                  {t("Name", "नाम")} <span style={{ color: "#c42b1c" }}>*</span>
                 </Label>
                 <Input
                   value={form.name}
                   onChange={(e) =>
                     setForm((d) => ({ ...d, name: e.target.value }))
                   }
-                  placeholder="e.g. Computer Lab Fee"
+                  placeholder={t("e.g. Computer Lab Fee", "जस्तै: कम्प्युटर ल्याब शुल्क")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Description</Label>
+                <Label>{t("Description", "विवरण")}</Label>
                 <Input
                   value={form.description}
                   onChange={(e) =>
                     setForm((d) => ({ ...d, description: e.target.value }))
                   }
-                  placeholder="Brief description (optional)"
+                  placeholder={t("Brief description (optional)", "छोटो विवरण (वैकल्पिक)")}
                 />
               </div>
             </div>
@@ -261,7 +280,7 @@ function FeeTypesContent() {
                 variant="outline"
                 onClick={() => setShowDialog(false)}
               >
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button
                 onClick={handleSubmit}
@@ -270,12 +289,12 @@ function FeeTypesContent() {
                 {isPending ? (
                   <span className="flex items-center gap-2">
                     <span className="win11-spinner" />
-                    Saving…
+                    {t("Saving…", "सुरक्षित हुँदै…")}
                   </span>
                 ) : editing?.id ? (
-                  "Update"
+                  t("Update", "अद्यावधिक")
                 ) : (
-                  "Create"
+                  t("Create", "बनाउनुहोस्")
                 )}
               </Button>
             </DialogFooter>

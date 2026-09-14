@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import { EntityPicker } from "@/components/ui/entity-picker";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
+import Link from "next/link";
 import {
   AOSPage,
   AOSPageHeader,
@@ -18,13 +22,30 @@ import {
   FormSection,
 } from "@/components/aos/kit/page-kit";
 import { Send, MessageSquare, Mail, Phone, Radio } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function BroadcastPage() {
   return <PluginGate slug="communications"><BroadcastContent /></PluginGate>;
 }
 
 function BroadcastContent() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
   const [form, setForm] = useState({ channel: "sms", audience: "all_parents", class_id: "", subject: "", message: "" });
+
+  // Template + class pickers — both endpoints already exist; the class field
+  // was a raw "Enter class ID" text input (UUIDs are not human-typable).
+  const { data: templates } = useQuery({
+    queryKey: ["comm-templates"],
+    queryFn: async () => {
+      const r = await api.get("/communications/templates");
+      return (r.data?.data || []) as { id: string; name: string; content: string }[];
+    },
+    retry: 1,
+  });
+
+  const segments = Math.ceil(form.message.length / 160) || 1;
 
   const send = useMutation({
     mutationFn: async () =>
@@ -98,6 +119,13 @@ function BroadcastContent() {
         icon={<Radio className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Broadcast Message"
         subtitle="Send messages to groups of parents, students, or staff"
+        actions={
+          <Link href="/dashboard/notifications/matrix">
+            <Button variant="outline" size="sm">
+              {t("Channel rules (Matrix)", "माध्यम नियम (म्याट्रिक्स)")}
+            </Button>
+          </Link>
+        }
       />
       <AOSPageBody>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -130,8 +158,29 @@ function BroadcastContent() {
             <FormSection title="Message">
               <div className="space-y-4">
                 {form.channel === "email" && <div className="space-y-2"><Label>Subject</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Email subject" /></div>}
+                {(templates?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <Label>{t("Start from a template", "टेम्प्लेटबाट सुरु")}</Label>
+                    <AdvancedSelect
+                      clearable
+                      searchable
+                      value=""
+                      onChange={(v) => {
+                        const tpl = templates?.find((x) => x.id === v);
+                        if (tpl) setForm({ ...form, message: tpl.content });
+                      }}
+                      placeholder={t("— Optional —", "— वैकल्पिक —")}
+                      options={(templates || []).map((x) => ({ value: x.id, label: x.name }))}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2"><Label>Message</Label><Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Type your message..." rows={6} /></div>
-                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Variables: {"{{student_name}}, {{parent_name}}, {{school_name}}, {{class}}"}</p>
+                <div className="flex items-center justify-between text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  <span>Variables: {"{{student_name}}, {{parent_name}}, {{school_name}}, {{class}}"}</span>
+                  {form.channel === "sms" && form.message && (
+                    <span>{t(`${segments} SMS segment(s) per recipient`, `प्राप्तकर्ताप्रति ${segments} SMS सेगमेन्ट`)}</span>
+                  )}
+                </div>
               </div>
             </FormSection>
           </div>
@@ -160,13 +209,37 @@ function BroadcastContent() {
                     {a.label}
                   </button>
                 ))}
-                {form.audience === "class_parents" && <div className="space-y-2 mt-2"><Label>Class ID</Label><Input value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })} placeholder="Enter class ID" /></div>}
+                {form.audience === "class_parents" && (
+                  <div className="space-y-2 mt-2">
+                    <Label>{t("Class", "कक्षा")}</Label>
+                    <EntityPicker
+                      value={form.class_id}
+                      onChange={(id) => setForm({ ...form, class_id: id })}
+                      query={{ path: "/academics/classes", searchKey: "q", perPage: 50 }}
+                      getOptions={(rows) =>
+                        (rows as { id: string; name: string; name_nepali?: string }[]).map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          ne: c.name_nepali || undefined,
+                        }))
+                      }
+                      placeholder={t("Search class…", "कक्षा खोज्नुहोस्…")}
+                      nePlaceholder="कक्षा खोज्नुहोस्…"
+                    />
+                  </div>
+                )}
               </div>
             </DataPanel>
 
+            {isAdmin ? (
             <Button className="w-full" size="lg" onClick={() => send.mutate()} disabled={!form.message || send.isPending}>
               {send.isPending ? <Spinner className="mr-2" /> : <Send className="h-4 w-4 mr-2" />} Send Broadcast
             </Button>
+            ) : (
+              <div className="win11-infobar info text-[12px]" style={{ padding: "8px 12px" }}>
+                {t("Broadcasts are sent by school admins; you can browse the composer.", "प्रसारण विद्यालय एडमिनले पठाउँछन्।")}
+              </div>
+            )}
           </div>
         </div>
       </AOSPageBody>

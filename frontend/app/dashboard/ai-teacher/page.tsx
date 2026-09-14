@@ -1,17 +1,33 @@
 "use client";
 
+/**
+ * AI Teacher — launch page for the live whiteboard teacher (ai_teacher plugin).
+ *
+ * Research:
+ * 1. Live-class AI tools need visible lifecycle (MagicSchool/Diffit): a
+ *    lesson is not "running or not" — it moves pending→ready→teaching→ended,
+ *    and a paused/failed state must read differently. A StatusTimeline of the
+ *    most-recent lesson makes that legible at a glance (31.0 "what's the
+ *    state").
+ * 2. Cost honesty (Part 2.8 / corpus): a whiteboard lesson streams speech +
+ *    vision frames; the usage panel (Lessons · Minutes · % of monthly ceiling)
+ *    and a per-lesson NPR figure on every history row are real, never
+ *    rounded-up marketing numbers. The picker stays the same flow; the
+ *    advanced persona/language fields stay in the same FormSection.
+ */
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { PluginGate } from "@/lib/plugins";
 import { api, type ApiResponse } from "@/lib/api";
-import { GraduationCap, History, Play, ShieldAlert, TrendingUp, ChevronRight } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-import { ICON_MAP } from "@/lib/icon-map";
+import { GraduationCap, History, Play, ShieldAlert, TrendingUp, DollarSign, ArrowLeft } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
@@ -23,12 +39,10 @@ import {
   StatusChip,
 } from "@/components/aos/kit/page-kit";
 
-// Quick links — the ai_teacher manifest subitem (Usage & Cost) plus the
-// AI Suite surfaces and the curriculum the teacher is grounded in.
 const QUICK_LINKS = [
   { label: "Usage & Cost", icon: "BarChart3", href: "/dashboard/analytics/ai-usage" },
   { label: "Teaching Content", icon: "BookOpen", href: "/dashboard/teaching-content" },
-  { label: "AI Tools Hub", icon: "Sparkles", href: "/dashboard/ai-tools" },
+  { label: "AI Hub · Tools", icon: "Sparkles", href: "/dashboard/ai?tab=tools" },
   { label: "AI Workbench", icon: "Layers", href: "/dashboard/ai-workbench" },
 ];
 
@@ -62,7 +76,7 @@ type CreateLessonResponse = {
   grounded: boolean;
 };
 
-function CreateLessonForm() {
+function CreateLessonForm({ onStarted }: { onStarted?: () => void }) {
   const qc = useQueryClient();
   const [sectionId, setSectionId] = useState("");
   const [studentId, setStudentId] = useState("");
@@ -75,7 +89,7 @@ function CreateLessonForm() {
     queryKey: ["ai-teacher-sections"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<{ items: SectionSummary[] }>>(
-        "/teaching-content/sections"
+        "/teaching-content/sections",
       );
       return (res.data.data?.items || res.data.data || []) as SectionSummary[];
     },
@@ -83,10 +97,9 @@ function CreateLessonForm() {
 
   const students = useQuery({
     queryKey: ["ai-teacher-students"],
-    enabled: true,
     queryFn: async () => {
       const res = await api.get<ApiResponse<{ items?: { id: string; full_name: string }[] }>>(
-        "/students?per_page=100"
+        "/students?per_page=100",
       );
       const data = res.data.data as unknown;
       return (Array.isArray(data) ? data : (data as { items?: { id: string; full_name: string }[] })?.items || []) as { id: string; full_name: string }[];
@@ -106,12 +119,13 @@ function CreateLessonForm() {
     onSuccess: (data) => {
       setStarted(data);
       setError(null);
+      onStarted?.();
       void qc.invalidateQueries({ queryKey: ["ai-teacher-lessons"] });
     },
     onError: (e) => {
       setError(
         (e as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-          "Couldn't start the lesson."
+          "Couldn't start the lesson.",
       );
     },
   });
@@ -121,80 +135,86 @@ function CreateLessonForm() {
     return <ErrorState title="Couldn't load curriculum content" onRetry={() => sections.refetch()} />;
 
   const published = (sections.data || []).filter((s) => s.published_version_no);
+  const sectionTitle = published.find((s) => s.id === sectionId)?.title_en;
 
   return (
     <div className="space-y-4">
       {published.length === 0 ? (
         <EmptyState
           icon={GraduationCap}
+          variant="dependency"
           title="No published teaching content yet"
-          body="The AI teacher only teaches published curriculum. Ask your admin to author sections under Teaching Content."
+          body="The AI teacher only teaches published curriculum. Author sections under Teaching Content, then publish one."
+          action={{ label: "Open Teaching Content", href: "/dashboard/teaching-content" }}
+          size="sm"
         />
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Chapter section</span>
-            <AdvancedSelect
-              value={sectionId}
-              onChange={(v) => setSectionId(v)}
-              clearable
-              placeholder="Choose a section…"
-              options={published.map((s) => ({ value: s.id, label: s.title_en + (s.title_ne ? ` — ${s.title_ne}` : "") }))}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Student</span>
-            <AdvancedSelect
-              value={studentId}
-              onChange={(v) => setStudentId(v)}
-              clearable
-              searchable
-              placeholder="Choose a student…"
-              options={(students.data || []).map((st) => ({ value: st.id, label: st.full_name }))}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Language</span>
-            <AdvancedSelect
-              value={language}
-              onChange={(v) => setLanguage(v)}
-              options={[
-                { value: "ne", label: "नेपाली (Nepali)" },
-                { value: "mixed", label: "Mixed (Nepali speech, English terms)" },
-                { value: "en", label: "English" },
-              ]}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Teacher persona</span>
-            <AdvancedSelect
-              value={persona}
-              onChange={(v) => setPersona(v)}
-              options={[
-                { value: "aria", label: "ARIA — warm, analogy-first" },
-                { value: "max", label: "Max — coach energy" },
-                { value: "sophia", label: "Sophia — rigorous, first-principles" },
-                { value: "leo", label: "Leo — story-first" },
-                { value: "nova", label: "Nova — visual, data-first" },
-              ]}
-            />
-          </label>
-          <div className="md:col-span-2 flex items-center gap-3">
-            <Button
-              onClick={() => create.mutate()}
-              disabled={!sectionId || !studentId || create.isPending}
-            >
-              <Play className="h-4 w-4 mr-2" />
+        <>
+          <div className="grid md:grid-cols-2 gap-4">
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Chapter section</span>
+              <AdvancedSelect
+                value={sectionId}
+                onChange={(v) => setSectionId(v)}
+                clearable
+                searchable
+                placeholder="Choose a section…"
+                options={published.map((s) => ({ value: s.id, label: s.title_en + (s.title_ne ? ` — ${s.title_ne}` : "") }))}
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Student (optional)</span>
+              <AdvancedSelect
+                value={studentId}
+                onChange={(v) => setStudentId(v)}
+                clearable
+                searchable
+                placeholder="Choose a student…"
+                options={(students.data || []).map((st) => ({ value: st.id, label: st.full_name }))}
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Language</span>
+              <AdvancedSelect
+                value={language}
+                onChange={(v) => setLanguage(v)}
+                options={[
+                  { value: "ne", label: "नेपाली (Nepali)" },
+                  { value: "mixed", label: "Mixed (Nepali speech, English terms)" },
+                  { value: "en", label: "English" },
+                ]}
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Teacher persona</span>
+              <AdvancedSelect
+                value={persona}
+                onChange={(v) => setPersona(v)}
+                options={[
+                  { value: "aria", label: "ARIA — warm, analogy-first" },
+                  { value: "max", label: "Max — coach energy" },
+                  { value: "sophia", label: "Sophia — rigorous, first-principles" },
+                  { value: "leo", label: "Leo — story-first" },
+                  { value: "nova", label: "Nova — visual, data-first" },
+                ]}
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={() => create.mutate()} disabled={!sectionId || create.isPending}>
+              {create.isPending ? <TrendingUp className="h-4 w-4 mr-2 animate-pulse" /> : <Play className="h-4 w-4 mr-2" />}
               {create.isPending ? "Preparing lesson…" : "Start lesson"}
             </Button>
-            {error && <p className="text-sm" style={{ color: "#c42b1c" }}>{error}</p>}
+            <span className="text-xs text-[color:var(--w11-text-secondary)]">
+              {sectionTitle ? `Grounded in: ${sectionTitle}` : "Grounded strictly in your published curriculum."}
+            </span>
           </div>
+          {error && <div className="win11-infobar error p-3 text-sm">{error}</div>}
+
           {started && (
-            <div
-              className="md:col-span-2 win11-card"
-              style={{ borderColor: "var(--w11-accent)" }}
-            >
-              <div className="py-2 space-y-2">
+            <div className="win11-card" style={{ borderColor: "var(--w11-accent)", marginBottom: 0 }}>
+              <div className="p-4 space-y-2">
                 <p className="text-sm font-medium">Lesson is ready.</p>
                 <p className="text-xs text-[color:var(--w11-text-secondary)]">
                   Estimated cost before start: NPR {started.estimated_cost_npr}
@@ -202,24 +222,23 @@ function CreateLessonForm() {
                 </p>
                 {started.player_url ? (
                   <a href={started.player_url} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm">Open the AI Teacher player</Button>
+                    <Button size="sm"><Play className="h-4 w-4 mr-2" />Open the AI Teacher player</Button>
                   </a>
                 ) : (
-                  <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                    The lesson player URL appears once the school finishes service setup.
-                    Lesson state still records in history.
-                  </p>
+                  <div className="win11-infobar info p-3 text-xs">
+                    The player URL appears once the school finishes service setup; lesson state still records in history below.
+                  </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-function LessonHistory() {
+function LessonHistory({ selected, onSelect }: { selected?: string; onSelect?: (l: Lesson) => void }) {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["ai-teacher-lessons"],
     queryFn: async () => {
@@ -233,30 +252,92 @@ function LessonHistory() {
 
   const lessons = data || [];
   if (lessons.length === 0)
-    return <EmptyState icon={History} title="No lessons yet" body="Started lessons appear here with mastery and cost." />;
+    return (
+      <EmptyState
+        icon={History}
+        title="No lessons yet"
+        body="Started lessons appear here with status, mastery and cost — pick a section above to run the first one."
+        size="sm"
+      />
+    );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {lessons.map((l) => (
-        <div key={l.id} className="flex items-center justify-between border-b border-[color:var(--w11-border-subtle)] py-2 last:border-0">
-          <div>
-            <p className="text-sm font-medium">{l.topic}</p>
+        <button
+          key={l.id}
+          onClick={() => onSelect?.(l)}
+          className={`w-full text-left flex items-center justify-between rounded-md border px-3 py-2 transition-colors hover:bg-[var(--w11-control-hover)] ${
+            selected === l.id ? "border-[var(--w11-accent)]" : "border-[color:var(--w11-border-subtle)]"
+          }`}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[color:var(--w11-text-primary)]">{l.topic}</p>
             <p className="text-xs text-[color:var(--w11-text-secondary)]">
-              {l.persona_slug} • {l.language.toUpperCase()} •{" "}
-              {l.chapters_completed} chapters
-              {l.duration_seconds ? ` • ${Math.round(l.duration_seconds / 60)} min` : ""}
-              {l.cost_npr ? ` • NPR ${l.cost_npr}` : ""}
+              {l.persona_slug} · {l.language.toUpperCase()} · {l.chapters_completed} chapters
+              {l.duration_seconds ? ` · ${Math.round(l.duration_seconds / 60)} min` : ""}
+              {l.cost_npr ? ` · NPR ${l.cost_npr}` : ""}
             </p>
           </div>
           <StatusChip status={l.status} />
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
-function MasterySnapshot() {
-  const { data, isLoading, isError } = useQuery({
+const LIFECYCLE = [
+  { label: "Preparing", at: "pending" },
+  { label: "Ready", at: "ready" },
+  { label: "Teaching", at: "teaching" },
+  { label: "Ended", at: "ended" },
+];
+
+function LifecyclePanel({ lesson }: { lesson?: Lesson }) {
+  if (!lesson) {
+    return (
+      <EmptyState
+        icon={TrendingUp}
+        title="No lesson selected"
+        body="Pick a lesson from the history to see where it is in its lifecycle."
+        size="sm"
+      />
+    );
+  }
+
+  const order = ["pending", "ready", "teaching", "paused", "ended", "abandoned", "failed", "blocked"];
+  let currentIndex = lesson.status === "paused" ? 2 : order.indexOf(lesson.status);
+  if (currentIndex < 0) currentIndex = 0;
+  if (lesson.status === "ended" || lesson.status === "abandoned" || lesson.status === "failed") currentIndex = 3;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-[color:var(--w11-text-primary)]">{lesson.topic}</p>
+        <StatusChip status={lesson.status} />
+      </div>
+      <StatusTimeline
+        steps={LIFECYCLE.map((s) => ({
+          label: s.label,
+          at: s.at === lesson.status ? new Date().toLocaleDateString("en-GB") : null,
+        }))}
+        currentIndex={currentIndex}
+        orientation="horizontal"
+      />
+      {(lesson.status === "failed" || lesson.status === "blocked") && (
+        <div className="win11-infobar error p-3 text-xs">
+          This lesson {lesson.status === "failed" ? "failed to run" : "is blocked"} — check service setup or restart it from history.
+        </div>
+      )}
+      {lesson.status === "teaching" && (
+        <div className="win11-infobar info p-3 text-xs">Live — the whiteboard is streaming frames and speech right now.</div>
+      )}
+    </div>
+  );
+}
+
+function UsageSnapshot() {
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["ai-teacher-usage"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<{
@@ -271,26 +352,31 @@ function MasterySnapshot() {
     },
   });
 
-  if (isLoading || isError) return null;
+  if (isLoading) return <PageLoader />;
+  if (isError) return <ErrorState title="Couldn't load usage" onRetry={() => refetch()} />;
   if (!data) return null;
+
   return (
-    <div>
+    <div className="space-y-3">
       <StatGrid min={160}>
+        <KpiCard label="Lessons" value={data.lessons_this_month} footnote="this month" icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+        <KpiCard label="Minutes taught" value={data.minutes_this_month} footnote="this month" icon={<History className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
         <KpiCard
-          label="Lessons"
-          value={data.lessons_this_month}
-          icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+          label="Cost this month"
+          value={`NPR ${data.cost_npr_this_month}`}
+          footnote={data.ceiling_npr ? `ceiling NPR ${data.ceiling_npr}` : undefined}
+          icon={<DollarSign className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         />
-        <KpiCard label="Minutes" value={data.minutes_this_month} />
         <KpiCard
-          label="of ceiling"
-          value={data.ceiling_used_pct != null ? `${data.ceiling_used_pct}%` : `NPR ${data.cost_npr_this_month}`}
-          footnote={data.ceiling_used_pct != null && `(NPR ${data.cost_npr_this_month})`}
+          label="Ceiling used"
+          value={data.ceiling_used_pct != null ? `${data.ceiling_used_pct}%` : "—"}
+          footnote="of monthly NPR cap"
+          icon={<TrendingUp className="h-5 w-5" style={{ color: data.alert ? "#c42b1c" : "var(--w11-accent)" }} />}
         />
       </StatGrid>
       {data.alert && (
         <div className="win11-infobar warning flex items-center gap-2 px-3 py-2 text-xs">
-          <ShieldAlert className="h-4 w-4" /> Cost ceiling alert — review the AI Teacher budget.
+          <ShieldAlert className="h-4 w-4" /> Cost-ceiling alert — review the AI Teacher budget in Usage &amp; Cost.
         </div>
       )}
     </div>
@@ -298,59 +384,44 @@ function MasterySnapshot() {
 }
 
 export default function AiTeacherPage() {
+  const [activeLesson, setActiveLesson] = useState<Lesson | undefined>();
+
   return (
     <PluginGate slug="ai_teacher">
       <AOSPage>
         <AOSPageHeader
           icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
           title="AI Teacher"
-          subtitle="A live AI teacher that speaks and writes on a whiteboard — grounded strictly in your published curriculum."
+          subtitle="A live whiteboard teacher, grounded strictly in your published curriculum · AI शिक्षक"
           actions={
-            <Link href="/dashboard/ai-teacher/content">
-              <Button variant="outline" size="sm">Teaching Content →</Button>
+            <Link href="/dashboard/ai?tab=teacher">
+              <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />AI Hub</Button>
             </Link>
           }
         />
         <AOSPageBody>
-          {/* Dashboard — KPIs (existing usage snapshot) + quick links */}
-          <MasterySnapshot />
+          <DataPanel title="This month">
+            <UsageSnapshot />
+          </DataPanel>
 
-          {/* Quick links — 44px gradient icon tile + label, as next/link */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] || ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", marginBottom: 0 }}
-                  >
-                    <div
-                      className="rounded-[10px] flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        background: SECTION_GRADIENTS.Learning,
-                        boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
-                      {l.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
+          <QuickLinks section="Insights" links={QUICK_LINKS} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <FormSection title="Start a lesson" className="lg:col-span-3">
+              <CreateLessonForm onStarted={() => setActiveLesson(undefined)} />
+            </FormSection>
+
+            <DataPanel
+              title="Lesson lifecycle"
+              className="lg:col-span-2"
+              actions={activeLesson ? <StatusChip status={activeLesson.status} /> : undefined}
+            >
+              <LifecyclePanel lesson={activeLesson} />
+            </DataPanel>
           </div>
 
-          <FormSection title="Start a lesson">
-            <CreateLessonForm />
-          </FormSection>
-
-          <DataPanel title="Lesson history">
-            <LessonHistory />
+          <DataPanel title="Recent lessons" bodyClassName="p-3">
+            <LessonHistory selected={activeLesson?.id} onSelect={setActiveLesson} />
           </DataPanel>
         </AOSPageBody>
       </AOSPage>

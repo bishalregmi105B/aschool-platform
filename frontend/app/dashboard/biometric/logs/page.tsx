@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/components/ui/filter-bar";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -23,8 +23,9 @@ export default function BiometricLogsPage() {
 }
 
 function LogsContent() {
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const { values, setValues, clear, activeCount } = useUrlFilters(["q", "status"]);
+  const search = values.q || "";
+  const status = values.status || "all";
 
   const { data, isLoading, isError, refetch } = useQuery({
     retry: 1,
@@ -83,14 +84,14 @@ function LogsContent() {
             rowKey={(l: any) => l.id}
             searchable
             searchValue={search}
-            onSearchChange={setSearch}
+            onSearchChange={(v) => setValues({ q: v })}
             searchPlaceholder="Search by device or user..."
             exportFileName="biometric-logs"
             toolbar={
               <AdvancedSelect
                 className="w-36"
                 value={status}
-                onChange={setStatus}
+                onChange={(v) => setValues({ status: v === "all" ? "" : v })}
                 clearable
                 placeholder="All Status"
                 options={[

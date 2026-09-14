@@ -16,6 +16,7 @@ import {
   StatGrid,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+import { PrintButton, PrintArea } from "../analytics-kit";
 
 export default function FinancialAnalyticsPage() {
   const [period, setPeriod] = useState("yearly");
@@ -63,6 +64,7 @@ export default function FinancialAnalyticsPage() {
             <Link href="/dashboard/analytics">
               <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4" /></Button>
             </Link>
+            <PrintButton />
             <AdvancedSelect className="w-40" value={period} onChange={(v) => setPeriod(v)}
               options={[
                 { value: "monthly", label: "This Month" },
@@ -74,6 +76,7 @@ export default function FinancialAnalyticsPage() {
         }
       />
       <AOSPageBody>
+        <PrintArea>
         <StatGrid min={180}>
           <KpiCard label="Total Revenue" value={`Rs. ${(analytics.total_revenue || 0).toLocaleString()}`} icon={<DollarSign className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
           <KpiCard label="Collected" value={`Rs. ${(analytics.collected || 0).toLocaleString()}`} icon={<TrendingUp className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
@@ -96,7 +99,7 @@ export default function FinancialAnalyticsPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No monthly data</p>}
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No collections this period — collect fees to see the monthly trend.</p>}
           </DataPanel>
 
           <DataPanel title="Revenue by Fee Type">
@@ -114,7 +117,7 @@ export default function FinancialAnalyticsPage() {
                   );
                 })}
               </div>
-            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No fee type data</p>}
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No fee type data — collect a payment to populate revenue split by fee type.</p>}
           </DataPanel>
         </div>
 
@@ -132,6 +135,7 @@ export default function FinancialAnalyticsPage() {
             </div>
           </DataPanel>
         )}
+        </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

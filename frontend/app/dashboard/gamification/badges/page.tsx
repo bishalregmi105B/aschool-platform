@@ -11,13 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Award, Plus, Pencil } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 
 export default function BadgesPage() {
@@ -81,7 +82,7 @@ function BadgesContent() {
     },
   ];
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading badges…" />;
   if (isError) {
     return (
       <AOSPage>

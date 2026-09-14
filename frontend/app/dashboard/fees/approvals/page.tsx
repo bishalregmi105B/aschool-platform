@@ -31,6 +31,8 @@ import {
 import { getFile } from "@/lib/services/files.service";
 import { formatNepaliDate } from "@/lib/nepali_date";
 import { formatNepaliCurrency } from "@/lib/nepali-utils";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
 
 interface OfflineSubmission {
   id: string;
@@ -61,14 +63,15 @@ interface SubmissionListPayload {
   };
 }
 
-const STATUS_FILTERS = [
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-] as const;
+const STATUS_FILTERS: Array<{ value: string; label: string; ne: string }> = [
+  { value: "pending", label: "Pending", ne: "बाँकी" },
+  { value: "approved", label: "Approved", ne: "स्वीकृत" },
+  { value: "rejected", label: "Rejected", ne: "अस्वीकृत" },
+];
 
 /** Opens the uploaded slip (ManagedFile) in a new tab via its stored URL. */
 function SlipLink({ fileId }: { fileId: string }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const open = async () => {
     setLoading(true);
@@ -77,10 +80,10 @@ function SlipLink({ fileId }: { fileId: string }) {
       if (file?.url) {
         window.open(file.url, "_blank", "noopener");
       } else {
-        toast.error("Slip file is unavailable");
+        toast.error(t("Slip file is unavailable", "स्लिप फाइल उपलब्ध छेन"));
       }
     } catch {
-      toast.error("Could not open slip file");
+      toast.error(t("Could not open slip file", "स्लिप खोल्न सकिएन"));
     } finally {
       setLoading(false);
     }
@@ -88,7 +91,7 @@ function SlipLink({ fileId }: { fileId: string }) {
   return (
     <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={loading} onClick={open}>
       {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
-      Slip
+      {t("Slip", "स्लिप")}
     </Button>
   );
 }
@@ -102,9 +105,13 @@ export default function FeeApprovalsPage() {
 }
 
 function ApprovalsContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<string>("pending");
-  const [page, setPage] = useState(1);
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["status", "page"]);
+  const status = urlFilters.status || "pending";
+  const page = Number(urlFilters.page) || 1;
+  const setStatus = (v: string) => setUrlFilters({ status: v === "pending" ? "" : v });
+  const setPage = (n: number) => setUrlFilters({ page: n === 1 ? "" : String(n) });
   const [reviewTarget, setReviewTarget] = useState<{ sub: OfflineSubmission; mode: "approve" | "reject" } | null>(null);
   const [notes, setNotes] = useState("");
 
@@ -150,14 +157,14 @@ function ApprovalsContent() {
   const COLUMNS: Column<OfflineSubmission>[] = [
     {
       key: "student_name",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
       value: (s) => s.student_name || "",
       render: (s) => <span className="font-medium">{s.student_name}</span>,
     },
     {
       key: "amount",
-      label: "Amount",
+      label: t("Amount", "रकम"),
       align: "right",
       sortable: true,
       value: (s) => s.amount,
@@ -165,18 +172,18 @@ function ApprovalsContent() {
     },
     {
       key: "method",
-      label: "Method",
+      label: t("Method", "माध्यम"),
       sortable: true,
       value: (s) => s.method,
       render: (s) => (
         <Badge variant="outline">
-          {s.method === "bank" ? "Bank Transfer" : "Cheque"}
+          {s.method === "bank" ? t("Bank Transfer", "बैँक रासि") : t("Cheque", "चेक")}
         </Badge>
       ),
     },
     {
       key: "details",
-      label: "Details",
+      label: t("Details", "विवरण"),
       value: (s) => `${s.bank_name ?? ""} ${s.reference_no ?? ""}`,
       render: (s) => (
         <div className="text-sm">
@@ -188,39 +195,39 @@ function ApprovalsContent() {
     },
     {
       key: "paid_on_bs",
-      label: "Paid On (BS)",
+      label: t("Paid On (BS)", "भुक्तमिति"),
       sortable: true,
       value: (s) => s.paid_on_bs ?? "",
       render: (s) => (s.paid_on_bs ? formatNepaliDate(s.paid_on_bs) : "—"),
     },
     {
       key: "status",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (s) => s.status,
       render: (s) => <StatusChip status={s.status} />,
     },
     {
       key: "notes",
-      label: "Review Notes",
+      label: t("Review Notes", "टिप्पणी"),
       hidden: true,
       value: (s) => s.review_notes ?? "",
       render: (s) => <span className="text-xs text-[color:var(--w11-text-secondary)]">{s.review_notes || "—"}</span>,
     },
     {
       key: "slip",
-      label: "Slip",
+      label: t("Slip", "स्लिप"),
       noExport: true,
       render: (s) =>
         s.slip_file_id ? (
           <SlipLink fileId={s.slip_file_id} />
         ) : (
-          <span className="text-xs text-[color:var(--w11-text-secondary)]">No file</span>
+          <span className="text-xs text-[color:var(--w11-text-secondary)]">{t("No file", "फाइल छेन")}</span>
         ),
     },
     {
       key: "actions",
-      label: "Actions",
+      label: t("Actions", "कार्य"),
       noExport: true,
       render: (s) =>
         s.status === "pending" ? (
@@ -234,7 +241,7 @@ function ApprovalsContent() {
                 setReviewTarget({ sub: s, mode: "approve" });
               }}
             >
-              <CheckCircle2 className="h-3 w-3" /> Approve
+              <CheckCircle2 className="h-3 w-3" /> {t("Approve", "स्वीकार")}
             </Button>
             <Button
               size="sm"
@@ -246,12 +253,12 @@ function ApprovalsContent() {
                 setReviewTarget({ sub: s, mode: "reject" });
               }}
             >
-              <XCircle className="h-3 w-3" /> Reject
+              <XCircle className="h-3 w-3" /> {t("Reject", "अस्वीकार")}
             </Button>
           </div>
         ) : (
           <span className="text-xs text-[color:var(--w11-text-secondary)]">
-            {s.status === "approved" ? `${s.receipt_ids?.length || 0} receipt(s)` : "—"}
+            {s.status === "approved" ? `${s.receipt_ids?.length || 0} ${t("receipt(s)", "रसिद(मा)")}` : "—"}
           </span>
         ),
     },
@@ -263,11 +270,11 @@ function ApprovalsContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<FileCheck2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Slip Approvals"
+        title={t("Slip Approvals", "स्लिप स्वीकृति")}
         subtitle={
           pendingCount !== undefined && pendingCount > 0
-            ? `${pendingCount} awaiting review · Review offline bank-transfer and cheque submissions before money is applied`
-            : "Review offline bank-transfer and cheque submissions before money is applied"
+            ? t(`${pendingCount} awaiting review`, `${pendingCount} स्वीकृति को कर्ने`)
+            : t("Review offline bank-transfer and cheque submissions before money is applied", "नगद/बैँक स्लिप समीक्षा गैरेपछन्चनपूर्व जाँच गर्नुहोस")
         }
       />
       <AOSPageBody className="space-y-4">
@@ -284,7 +291,7 @@ function ApprovalsContent() {
                   setPage(1);
                 }}
               >
-                {f.label}
+                {t(f.label, f.ne)}
               </Button>
             ))}
           </div>
@@ -293,9 +300,9 @@ function ApprovalsContent() {
         <DataPanel
           title={
             <span className="flex items-center gap-2">
-              <FileCheck2 className="h-4 w-4" /> Submission Queue
+              <FileCheck2 className="h-4 w-4" /> {t("Submission Queue", "बेनश")}&#32;
               {pendingCount !== undefined && pendingCount > 0 && (
-                <Badge variant="warning">{pendingCount} awaiting review</Badge>
+                <Badge variant="warning">{pendingCount} {t("awaiting review", "कर्ने")}</Badge>
               )}
             </span>
           }
@@ -305,7 +312,7 @@ function ApprovalsContent() {
             rows={submissions}
             rowKey={(s) => s.id}
             loading={isLoading}
-            error={isError ? "Failed to load submissions." : null}
+            error={isError ? t("Failed to load submissions.", "बेनलोड सकिएन।") : null}
             onRetry={() => refetch()}
             pagination={
               meta
@@ -324,8 +331,8 @@ function ApprovalsContent() {
             dense
             empty={{
               icon: FileCheck2,
-              title: status === "pending" ? "Nothing awaiting review" : `No ${status} submissions`,
-              body: "Offline slips submitted by parents and students will appear here.",
+              title: status === "pending" ? t("Nothing awaiting review", "कुनै कर्ने छेन") : t("No submissions", "बेन छेन"),
+              body: t("Offline slips submitted by parents and students will appear here.", "अभिभावकले प्रेरेक स्लिप यहाँ देखिएन।"),
             }}
           />
         </DataPanel>
@@ -337,7 +344,7 @@ function ApprovalsContent() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {reviewTarget?.mode === "approve" ? "Approve Submission" : "Reject Submission"}
+                {reviewTarget?.mode === "approve" ? t("Approve Submission", "बेन स्वीकार गर्नु") : t("Reject Submission", "बेन अस्वीकार गर्नु")}
               </DialogTitle>
             </DialogHeader>
             {reviewTarget && (
@@ -349,7 +356,7 @@ function ApprovalsContent() {
                   <p className="font-medium">{reviewTarget.sub.student_name}</p>
                   <p className="text-[color:var(--w11-text-secondary)]">
                     {formatNepaliCurrency(reviewTarget.sub.amount || 0)} •{" "}
-                    {reviewTarget.sub.method === "bank" ? "Bank Transfer" : "Cheque"}
+                    {reviewTarget.sub.method === "bank" ? t("Bank Transfer", "बैँक रासि") : t("Cheque", "चेक")}
                     {reviewTarget.sub.paid_on_bs
                       ? ` • Paid ${formatNepaliDate(reviewTarget.sub.paid_on_bs)}`
                       : ""}
@@ -358,19 +365,18 @@ function ApprovalsContent() {
                 </div>
                 {reviewTarget.mode === "approve" && (
                   <p className="text-sm text-[color:var(--w11-text-secondary)]">
-                    Approving records the payment through the standard collection flow —
-                    receipts are issued and the referenced bills are settled FIFO.
+                    {t("Approving records the payment through the standard collection flow — receipts are issued and the referenced bills are settled FIFO.", "स्वीकार गर्दा मजबुट लगान्छर, रसिद बन्चार र बिजक FIFO मिट्छन।")}
                   </p>
                 )}
                 <div className="space-y-2">
-                  <Label>Review Notes (optional)</Label>
+                  <Label>{t("Review Notes (optional)", "टिप्पणी (वैकल्पिक)")}</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder={
                       reviewTarget.mode === "approve"
-                        ? "e.g. Verified against bank statement"
-                        : "e.g. Reference number not found in bank statement"
+                        ? t("e.g. Verified against bank statement", "जस्ताई: बैँक स्टेटमेन्टबाट मिल्य")
+                        : t("e.g. Reference number not found in bank statement", "जस्ताई: रेफरन्स नंबर बैँक स्टेटमेन्टमा बेटिएन")
                     }
                     rows={3}
                   />
@@ -379,7 +385,7 @@ function ApprovalsContent() {
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setReviewTarget(null)} disabled={review.isPending}>
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               {reviewTarget?.mode === "approve" ? (
                 <Button
@@ -387,7 +393,7 @@ function ApprovalsContent() {
                   disabled={review.isPending}
                 >
                   {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                  Approve & Record Payment
+                  {t("Approve & Record Payment", "स्वीकार गरी भुक्तान लगाउन")}
                 </Button>
               ) : (
                 reviewTarget && (
@@ -397,7 +403,7 @@ function ApprovalsContent() {
                     disabled={review.isPending}
                   >
                     {review.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
-                    Reject Submission
+                    {t("Reject Submission", "अस्वीकार")}
                   </Button>
                 )
               )}

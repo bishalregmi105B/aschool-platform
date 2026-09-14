@@ -1,21 +1,37 @@
 "use client";
 
 /**
- * "Apply online" — the S-A5 public admission application.
+ * "Apply online" — the S-A5 public admission application, now a 3-step
+ * guest wizard (A4 grammar, Part 39/45.3; the InstiKit guest-funnel steal).
  *
  * Posts to /website/public/<slug>/admission/registration (no auth, slug
- * scoped). The response carries the registration number AND a one-time
- * verification token that doubles as the applicant's tracking receipt, so
- * the success screen shows both. Custom questions come from the school's
- * custom-fields defs (form_name=student_registration, public read).
+ * scoped, rate-limited 5/h). The response carries the registration number
+ * AND a one-time verification token that doubles as the applicant's
+ * tracking receipt, so the success screen shows both + a status timeline.
+ *
+ * Step grammar (GOV.UK "check answers" + NN/g long-form research):
+ *  1 Student details · 2 Guardian + documents you'll bring · 3 School's
+ *  extra questions + review → submit. Back never loses answers; each step
+ *  validates before Next.
+ *
+ * FLAG: the guest cannot UPLOAD files — POST /files is jwt_required — so
+ * step 2 records a DOCUMENT CHECKLIST (name + reference), stored in the
+ * registration's `documents` JSONB the backend already accepts, with an
+ * explicit "bring originals to the office" note. No fake upload widget.
  */
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Wizard } from "@/components/ui/wizard";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 
 interface CustomFieldDef {
   id: string;
@@ -34,6 +50,43 @@ interface SubmitResult {
   message: string;
 }
 
+type DocEntry = { name: string; ref: string };
+
+interface FormState {
+  student_first_name: string;
+  student_last_name: string;
+  student_dob_bs: string;
+  gender: string;
+  previous_school: string;
+  guardian_name: string;
+  guardian_relation: string;
+  guardian_phone: string;
+  guardian_email: string;
+  documents: DocEntry[];
+}
+
+const initial: FormState = {
+  student_first_name: "",
+  student_last_name: "",
+  student_dob_bs: "",
+  gender: "",
+  previous_school: "",
+  guardian_name: "",
+  guardian_relation: "",
+  guardian_phone: "",
+  guardian_email: "",
+  documents: [],
+};
+
+const DOC_OPTIONS = [
+  "Birth certificate / नागरिकता प्रमाणपत्र (copy)",
+  "Last report card / नम्बर शेिट",
+  "Transfer certificate",
+  "Character certificate",
+  "Recommendation letter",
+  "Student photo (recent)",
+];
+
 function errMessage(err: unknown, fallback: string): string {
   const e = err as { response?: { data?: { error?: unknown } } };
   const raw = e?.response?.data?.error;
@@ -44,18 +97,33 @@ function errMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+const inputCls =
+  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#0e3b2e)]/30";
+
+function Field({ label, required, children, hint }: { label: string; required?: boolean; children: React.ReactNode; hint?: string }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-sm font-medium text-gray-800">
+        {label}
+        {required ? " *" : ""}
+      </Label>
+      {children}
+      {hint && <p className="text-[11px] text-gray-500">{hint}</p>}
+    </div>
+  );
+}
+
 export function ApplyOnlineForm({ slug }: { slug: string }) {
   const [defs, setDefs] = useState<CustomFieldDef[]>([]);
   const [defsLoading, setDefsLoading] = useState(true);
   const [defsError, setDefsError] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState<SubmitResult | null>(null);
-  // Radix selects don't submit via FormData — tracked controls.
-  const [gender, setGender] = useState("");
-  const [dobBS, setDobBS] = useState("");
+  const [f, setF] = useState<FormState>(initial);
   // dynamic_fields keyed by def id (checkbox: boolean, multiselect: string[]).
   const [dynamic, setDynamic] = useState<Record<string, string | string[] | boolean>>({});
+  const [submitError, setSubmitError] = useState("");
+  const [result, setResult] = useState<SubmitResult | null>(null);
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((prev) => ({ ...prev, [k]: v }));
 
   useEffect(() => {
     let alive = true;
@@ -65,7 +133,7 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
         if (alive) setDefs((res.data?.data?.fields as CustomFieldDef[]) || []);
       })
       .catch(() => {
-        if (alive) setDefsError("Could not load the extra questions for this form.");
+        if (alive) setDefsError("Could not load the school's extra questions — you can still submit the main form.");
       })
       .finally(() => {
         if (alive) setDefsLoading(false);
@@ -83,49 +151,75 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
     )}`;
   }, [result, slug]);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setSending(true);
-    const fd = new FormData(e.currentTarget);
-    const body: Record<string, unknown> = {
-      student_first_name: String(fd.get("student_first_name") || "").trim(),
-      guardian_name: String(fd.get("guardian_name") || "").trim(),
-      guardian_phone: String(fd.get("guardian_phone") || "").trim(),
-    };
-    for (const key of [
-      "student_last_name",
-      "guardian_relation",
-      "guardian_email",
-      "previous_school",
-    ]) {
-      const v = String(fd.get(key) || "").trim();
-      if (v) body[key] = v;
+  /* ── step validation ─────────────────────────────────────────────────── */
+
+  const v1 = () =>
+    f.student_first_name.trim().length < 2 ? "Enter the student's first name." : null;
+
+  const v2 = () => {
+    if (f.guardian_name.trim().length < 2) return "Enter the guardian's name.";
+    if (!/^(98|97|96)\d{8}$/.test(f.guardian_phone.trim()))
+      return "Enter a valid Nepal mobile number (98/97/96 followed by 8 digits).";
+    if (f.guardian_email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.guardian_email))
+      return "That email address looks incomplete.";
+    return null;
+  };
+
+  const v3 = () => {
+    for (const def of defs) {
+      if (!def.required) continue;
+      const v = dynamic[def.id];
+      if (v === undefined || v === "" || (Array.isArray(v) && !v.length) || (def.field_type === "checkbox" && v !== true)) {
+        return `Please answer: ${def.label}`;
+      }
     }
-    if (dobBS) body.student_dob_bs = dobBS;
-    if (gender) body.gender = gender;
-    // Only send non-empty dynamic answers, keyed by the def id.
+    return null;
+  };
+
+  async function submit() {
+    setSubmitError("");
     const dynamicFields: Record<string, string | string[] | boolean> = {};
     for (const [key, value] of Object.entries(dynamic)) {
-      if (value === true || (Array.isArray(value) && value.length) || (typeof value === "string" && value.trim())) {
+      if (
+        value === true ||
+        (Array.isArray(value) && value.length) ||
+        (typeof value === "string" && value.trim())
+      ) {
         dynamicFields[key] = value;
       }
     }
-    if (Object.keys(dynamicFields).length) body.dynamic_fields = dynamicFields;
-
+    const body: Record<string, unknown> = {
+      student_first_name: f.student_first_name.trim(),
+      student_last_name: f.student_last_name.trim() || undefined,
+      student_dob_bs: f.student_dob_bs || undefined,
+      gender: f.gender || undefined,
+      previous_school: f.previous_school.trim() || undefined,
+      guardian_name: f.guardian_name.trim(),
+      guardian_relation: f.guardian_relation || undefined,
+      guardian_phone: f.guardian_phone.trim(),
+      guardian_email: f.guardian_email.trim() || undefined,
+      documents: f.documents
+        .filter((d) => d.name)
+        // Shape chosen so the admin review drawer's `d.label || d.file_id`
+        // render shows the checklist line (guests have no file_id — upload
+        // is auth-gated).
+        .map((d) => ({ label: d.ref.trim() ? `${d.name} — ${d.ref.trim()}` : d.name })),
+      dynamic_fields: Object.keys(dynamicFields).length ? dynamicFields : undefined,
+      source: "website",
+    };
     try {
       const res = await api.post(`/website/public/${slug}/admission/registration`, body);
       setResult(res.data?.data as SubmitResult);
     } catch (err) {
-      setError(errMessage(err, "Could not submit the application. Please try again."));
-    } finally {
-      setSending(false);
+      setSubmitError(errMessage(err, "Could not submit the application. Please try again."));
     }
   }
 
+  /* ── success screen ──────────────────────────────────────────────────── */
+
   if (result) {
     return (
-      <div className="border rounded-lg p-6 md:p-8" data-testid="apply-success">
+      <div className="border rounded-xl p-6 md:p-8 bg-white" data-testid="apply-success">
         <div className="text-center">
           <div className="text-4xl mb-3">🎉</div>
           <h3 className="text-xl font-semibold mb-1" style={{ color: "var(--color-primary)" }}>
@@ -140,7 +234,17 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
           </p>
           <p className="text-xs text-gray-500">Save this number — quote it when the office calls.</p>
         </div>
-        <div className="mt-4 rounded-lg border p-4 space-y-2">
+        <div className="mt-5">
+          <StatusTimeline
+            steps={[
+              { label: "Submitted", at: "now", detail: "We have your application" },
+              { label: "Under review", detail: "The office checks the details" },
+              { label: "Approved", detail: "You'll be called for document verification + enrollment" },
+            ]}
+            currentIndex={0}
+          />
+        </div>
+        <div className="mt-6 rounded-lg border p-4 space-y-2">
           <p className="text-sm font-medium">Track your application</p>
           <p className="text-xs text-gray-500">
             Bookmark this private link to check your status any time:
@@ -164,8 +268,7 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
             onClick={() => {
               setResult(null);
               setDynamic({});
-              setGender("");
-              setDobBS("");
+              setF(initial);
             }}
             className="text-sm underline"
             style={{ color: "var(--color-primary)" }}
@@ -177,103 +280,197 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
     );
   }
 
+  /* ── the wizard ──────────────────────────────────────────────────────── */
+
+  const steps = [
+    {
+      key: "student",
+      title: "Student details",
+      description: "Who is applying — names as on the birth certificate work best.",
+      validate: v1,
+      content: (
+        <div className="p-4 md:p-5 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Student's First Name" required>
+              <Input value={f.student_first_name} onChange={(e) => set("student_first_name", e.target.value)} placeholder="निबेदिता / Nivedita" className={inputCls} />
+            </Field>
+            <Field label="Student's Last Name">
+              <Input value={f.student_last_name} onChange={(e) => set("student_last_name", e.target.value)} placeholder="Thapa" className={inputCls} />
+            </Field>
+            <Field label="Date of Birth (B.S.)">
+              <BSDateInput emit="bs" value={f.student_dob_bs} onChange={(v) => set("student_dob_bs", v)} placeholder="2081-01-15" />
+            </Field>
+            <Field label="Gender">
+              <AdvancedSelect
+                value={f.gender}
+                onChange={(v) => set("gender", v)}
+                placeholder="Select…"
+                options={[
+                  { value: "male", label: "Male / छोरा" },
+                  { value: "female", label: "Female / छोरी" },
+                  { value: "other", label: "Other / अन्य" },
+                ]}
+              />
+            </Field>
+          </div>
+          <Field label="Previous School" hint="Only if transferring — leave blank for first admission.">
+            <Input value={f.previous_school} onChange={(e) => set("previous_school", e.target.value)} placeholder="Shree Saraswati Secondary School" className={inputCls} />
+          </Field>
+        </div>
+      ),
+    },
+    {
+      key: "guardian",
+      title: "Guardian & documents",
+      description: "We call THIS number — keep it active. Documents are verified at the office.",
+      validate: v2,
+      content: (
+        <div className="p-4 md:p-5 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Guardian's Name" required>
+              <Input value={f.guardian_name} onChange={(e) => set("guardian_name", e.target.value)} placeholder="अभिभावकको नाम" className={inputCls} />
+            </Field>
+            <Field label="Relation with Student">
+              <AdvancedSelect
+                value={f.guardian_relation}
+                onChange={(v) => set("guardian_relation", v)}
+                placeholder="Father / Mother / …"
+                options={["Father", "Mother", "Grandparent", "Sibling", "Other"].map((r) => ({ value: r.toLowerCase(), label: r }))}
+              />
+            </Field>
+            <Field label="Phone Number" required hint="Nepali mobile — the office will call this number.">
+              <Input value={f.guardian_phone} onChange={(e) => set("guardian_phone", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="98XXXXXXXX" className={inputCls} />
+            </Field>
+            <Field label="Email" hint="Optional — used only if the school sends updates by email.">
+              <Input value={f.guardian_email} onChange={(e) => set("guardian_email", e.target.value)} type="email" placeholder="guardian@example.com" className={inputCls} />
+            </Field>
+          </div>
+
+          <fieldset className="rounded-lg border border-gray-200 p-4 space-y-3">
+            <legend className="px-1 text-sm font-semibold text-gray-800">Documents you will bring</legend>
+            <p className="text-xs text-gray-500">
+              Online file upload isn't available for guests — tick what you already have and note any
+              certificate numbers. The office verifies originals during review.
+            </p>
+            {f.documents.map((d, i) => (
+              <div key={i} className="flex flex-col sm:flex-row gap-2">
+                <AdvancedSelect
+                  className="flex-1"
+                  value={d.name}
+                  onChange={(v) =>
+                    set("documents", f.documents.map((x, k) => (k === i ? { ...x, name: v } : x)))
+                  }
+                  placeholder="Document…"
+                  options={DOC_OPTIONS.map((o) => ({ value: o, label: o }))}
+                />
+                <Input
+                  value={d.ref}
+                  onChange={(e) =>
+                    set("documents", f.documents.map((x, k) => (k === i ? { ...x, ref: e.target.value } : x)))
+                  }
+                  placeholder="Number (if printed)"
+                  className={inputCls + " sm:w-48"}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Remove document"
+                  onClick={() => set("documents", f.documents.filter((_, k) => k !== i))}
+                  className="text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => set("documents", [...f.documents, { name: "", ref: "" }])}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add document
+            </Button>
+          </fieldset>
+        </div>
+      ),
+    },
+    {
+      key: "review",
+      title: defs.length ? "School's questions & review" : "Review & submit",
+      description: "Check everything, then submit — you get a registration number instantly.",
+      validate: v3,
+      content: (
+        <div className="p-4 md:p-5 space-y-5">
+          {defsLoading && (
+            <p className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading the school&apos;s extra questions…
+            </p>
+          )}
+          {defsError && <p className="text-sm text-amber-700">{defsError}</p>}
+          {defs.map((def) => (
+            <Field
+              key={def.id}
+              label={`${def.label}${def.label_nepali ? ` · ${def.label_nepali}` : ""}`}
+              required={def.required}
+            >
+              <DynamicInput
+                def={def}
+                value={dynamic[def.id]}
+                onChange={(v) => setDynamic((prev) => ({ ...prev, [def.id]: v }))}
+              />
+            </Field>
+          ))}
+
+          <div className="rounded-lg border bg-gray-50 p-4 text-sm space-y-1.5">
+            <p className="font-semibold text-gray-800">Review — use Back to fix anything</p>
+            <ReviewRow label="Student" value={`${f.student_first_name} ${f.student_last_name}`.trim()} />
+            {f.student_dob_bs && <ReviewRow label="DOB (BS)" value={f.student_dob_bs} />}
+            {f.gender && <ReviewRow label="Gender" value={f.gender} />}
+            {f.previous_school && <ReviewRow label="Previous school" value={f.previous_school} />}
+            <ReviewRow label="Guardian" value={`${f.guardian_name}${f.guardian_relation ? ` (${f.guardian_relation})` : ""}`} />
+            <ReviewRow label="Phone" value={f.guardian_phone} />
+            {f.guardian_email && <ReviewRow label="Email" value={f.guardian_email} />}
+            {f.documents.filter((d) => d.name).length > 0 && (
+              <ReviewRow
+                label="Bringing"
+                value={f.documents
+                  .filter((d) => d.name)
+                  .map((d) => (d.ref ? `${d.name} #${d.ref}` : d.name))
+                  .join(", ")}
+              />
+            )}
+          </div>
+
+          {submitError && (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {submitError}
+            </p>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="border rounded-lg p-6">
+    <div className="border rounded-xl bg-white p-5 md:p-7 win11">
       <h2 className="text-xl font-semibold mb-1" style={{ color: "var(--color-primary)" }}>
         Apply Online
       </h2>
       <p className="text-sm text-gray-500 mb-5">
-        Fill the form below — the school office will review it and contact you.
+        Three short steps — the school office reviews every application and calls you. No account needed.
       </p>
-
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Student&apos;s First Name *</label>
-            <input name="student_first_name" required className="w-full border rounded-md px-3 py-2 text-sm" placeholder="अनिवार्य — first name" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Student&apos;s Last Name</label>
-            <input name="student_last_name" className="w-full border rounded-md px-3 py-2 text-sm" placeholder="Thapa" />
-          </div>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Date of Birth (B.S.)</label>
-            <BSDateInput emit="bs" value={dobBS} onChange={(v) => setDobBS(v)} placeholder="2081-01-15" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Gender</label>
-            <AdvancedSelect
-              value={gender}
-              onChange={(v) => setGender(v)}
-              placeholder="Select…"
-              options={[
-                { value: "male", label: "Male / छोरा" },
-                { value: "female", label: "Female / छोरी" },
-                { value: "other", label: "Other / अन्य" },
-              ]}
-            />
-          </div>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Guardian&apos;s Name *</label>
-            <input name="guardian_name" required className="w-full border rounded-md px-3 py-2 text-sm" placeholder="अभिभावकको नाम" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Relation with Student</label>
-            <input name="guardian_relation" className="w-full border rounded-md px-3 py-2 text-sm" placeholder="Father / Mother / ..." />
-          </div>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Phone Number *</label>
-            <input name="guardian_phone" type="tel" required className="w-full border rounded-md px-3 py-2 text-sm" placeholder="98XXXXXXXX" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input name="guardian_email" type="email" className="w-full border rounded-md px-3 py-2 text-sm" placeholder="guardian@example.com" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Previous School</label>
-          <input name="previous_school" className="w-full border rounded-md px-3 py-2 text-sm" placeholder="If transferring" />
-        </div>
-
-        {defsLoading && (
-          <p className="flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading form questions…
-          </p>
-        )}
-        {defsError && <p className="text-sm text-amber-700">{defsError}</p>}
-
-        {defs.map((def) => (
-          <div key={def.id}>
-            <label className="block text-sm font-medium mb-1">
-              {def.label}
-              {def.label_nepali ? <span className="text-gray-400"> · {def.label_nepali}</span> : null}
-              {def.required ? " *" : ""}
-            </label>
-            <DynamicInput
-              def={def}
-              value={dynamic[def.id]}
-              onChange={(v) => setDynamic((prev) => ({ ...prev, [def.id]: v }))}
-            />
-          </div>
-        ))}
-
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={sending}
-          className="w-full py-3 rounded-md text-white font-semibold disabled:opacity-50"
-          style={{ backgroundColor: "var(--color-primary)" }}
-        >
-          {sending ? "Submitting…" : "Submit Application"}
-        </button>
-      </form>
+      <Wizard steps={steps} onFinish={submit} finishLabel="Submit Application" compact />
     </div>
+  );
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex gap-2">
+      <span className="w-28 shrink-0 text-xs uppercase tracking-wide text-gray-400">{label}</span>
+      <span className="font-medium text-gray-800">{value}</span>
+    </p>
   );
 }
 
@@ -290,23 +487,21 @@ function DynamicInput({
   switch (def.field_type) {
     case "textarea":
       return (
-        <textarea
+        <Textarea
           rows={3}
-          required={def.required}
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          className={inputCls}
         />
       );
     case "number":
       return (
-        <input
+        <Input
           type="number"
           step="any"
-          required={def.required}
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          className={inputCls}
         />
       );
     case "date":
@@ -338,21 +533,17 @@ function DynamicInput({
     case "checkbox":
       return (
         <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={value === true}
-            onCheckedChange={(checked) => onChange(checked === true)}
-          />
+          <Checkbox checked={value === true} onCheckedChange={(checked) => onChange(checked === true)} />
           <span>Yes</span>
         </label>
       );
     default:
       return (
-        <input
+        <Input
           type="text"
-          required={def.required}
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full border rounded-md px-3 py-2 text-sm"
+          className={inputCls}
         />
       );
   }
@@ -371,6 +562,7 @@ interface TrackStatus {
 }
 
 const STATUS_STEPS = ["submitted", "under_review", "approved", "converted"];
+const STEP_LABELS = ["Submitted", "Under review", "Approved", "Enrolled"];
 
 export function TrackApplication({ slug }: { slug: string }) {
   const [id, setId] = useState("");
@@ -419,9 +611,10 @@ export function TrackApplication({ slug }: { slug: string }) {
   }, [id, token]);
 
   const stepIdx = status ? STATUS_STEPS.indexOf(status.status) : -1;
+  const rejected = status?.status === "rejected";
 
   return (
-    <div className="border rounded-lg p-6" data-testid="track-application">
+    <div className="border rounded-xl bg-white p-6" data-testid="track-application">
       <h2 className="text-lg font-semibold mb-1" style={{ color: "var(--color-primary)" }}>
         Track Application
       </h2>
@@ -436,31 +629,16 @@ export function TrackApplication({ slug }: { slug: string }) {
         }}
       >
         <div>
-          <label className="block text-xs font-medium mb-1 text-gray-600">Application ID</label>
-          <input
-            value={id}
-            onChange={(e) => setId(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
-            placeholder="e.g. 6f1c…"
-          />
+          <Label className="mb-1 block text-xs font-medium text-gray-600">Application ID</Label>
+          <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="e.g. 6f1c…" className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1 text-gray-600">Tracking Token</label>
-          <input
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
-            placeholder="from your receipt link"
-          />
+          <Label className="mb-1 block text-xs font-medium text-gray-600">Tracking Token</Label>
+          <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="from your receipt link" className={inputCls} />
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 rounded-md text-white text-sm font-semibold disabled:opacity-50"
-          style={{ backgroundColor: "var(--color-primary)" }}
-        >
+        <Button type="submit" disabled={loading} className="h-11">
           {loading ? "Checking…" : "Check Status"}
-        </button>
+        </Button>
       </form>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -477,34 +655,21 @@ export function TrackApplication({ slug }: { slug: string }) {
               <p className="font-medium text-sm">{status.student_name}</p>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1">
-            {STATUS_STEPS.map((step, i) => {
-              const rejected = status.status === "rejected";
-              const reached = rejected ? i === 0 : stepIdx >= i && stepIdx >= 0;
-              const current = rejected ? false : stepIdx === i;
-              return (
-                <div key={step} className="flex-1">
-                  <div
-                    className={`h-1.5 rounded-full ${current ? "bg-[var(--color-primary)]" : reached ? "bg-[var(--color-primary)]/40" : "bg-gray-200"}`}
-                  />
-                  <p className={`mt-1 text-[10px] ${current ? "font-semibold" : "text-gray-500"}`}>
-                    {step.replace("_", " ")}
-                  </p>
-                </div>
-              );
-            })}
+          <div className="mt-4 win11">
+            {rejected ? (
+              <p className="text-sm font-medium text-red-700">
+                Not approved{status.review_notes ? ` — note from the school: ${status.review_notes}` : ""}
+              </p>
+            ) : (
+              <StatusTimeline
+                steps={STEP_LABELS.map((label) => ({ label }))}
+                currentIndex={Math.max(0, stepIdx)}
+                orientation="horizontal"
+              />
+            )}
           </div>
-          <p className="mt-2 text-sm font-medium capitalize">
-            Status:{" "}
-            <span style={{ color: "var(--color-primary)" }}>
-              {status.status.replace("_", " ")}
-            </span>
-          </p>
-          {status.status === "rejected" && status.review_notes && (
-            <p className="mt-1 text-xs text-red-600">Note from the school: {status.review_notes}</p>
-          )}
           {status.submitted_at && (
-            <p className="mt-1 text-[11px] text-gray-500">
+            <p className="mt-2 text-[11px] text-gray-500">
               Submitted {new Date(status.submitted_at).toLocaleDateString()}
             </p>
           )}

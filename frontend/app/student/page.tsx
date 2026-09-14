@@ -136,7 +136,7 @@ export default function StudentDashboard() {
                   <div
                     key={p.id || i}
                     className={`flex items-center gap-3 py-2 px-3 rounded-lg ${
-                      p.is_current ? "bg-violet-50 border border-violet-200" : ""
+                      p.is_current ? "bg-[var(--w11-control-hover,rgba(0,0,0,0.04))] border border-[var(--w11-accent)]" : ""
                     }`}
                   >
                     <span className="text-sm text-muted-foreground w-24">

@@ -15,10 +15,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PageLoader } from "@/components/ui/spinner";
-import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState, DependencyMissingEmptyState } from "@/components/ui/empty-state";
 import { BSDateInput, BSMonthInput } from "@/components/ui/bs-date-input";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { useI18n } from "@/lib/i18n";
 import { MarkHolidayDialog } from "@/components/attendance/mark-holiday-dialog";
 import {
   AOSPage,
@@ -77,14 +83,27 @@ export default function SubjectAttendancePage() {
 function SubjectAttendanceContent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
   const confirm = useConfirm();
 
-  // ── Filters ───────────────────────────────────────────────────────────────
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [classId, setClassId] = useState("");
-  const [sectionId, setSectionId] = useState("all");
-  const [subjectId, setSubjectId] = useState("");
+  // ── Filters — URL-backed scope (?date=&class=&section=&subject=) ─────────
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/attendance/subject";
+  function setScope(patch: Record<string, string>) {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && v !== "all") next.set(k, v);
+      else next.delete(k);
+    }
+    navigate(`${pathname}?${next.toString()}`);
+  }
+  const date = routeParams.get("date") || new Date().toISOString().split("T")[0];
+  const classId = routeParams.get("class") ?? "";
+  const sectionId = routeParams.get("section") || "all";
+  const subjectId = routeParams.get("subject") ?? "";
   const [registerMonth, setRegisterMonth] = useState<string | null>(null);
   const [holidayOpen, setHolidayOpen] = useState(false);
 
@@ -256,13 +275,13 @@ function SubjectAttendanceContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Subject Attendance"
-        subtitle="Mark period-wise attendance per class, subject and date"
+        title={t("Subject Attendance", "विषय उपस्थिति")}
+        subtitle={t("Mark period-wise attendance per class, subject and date", "कक्षा-विषयअनुसार अवधिगत उपस्थिति")}
         actions={
           <>
             {isAdmin && (
               <Button variant="outline" onClick={() => setHolidayOpen(true)}>
-                <CalendarOff className="h-4 w-4 mr-2" /> Mark Holiday
+                <CalendarOff className="h-4 w-4 mr-2" /> {t("Mark Holiday", "विदा")}
               </Button>
             )}
             <Button
@@ -275,7 +294,7 @@ function SubjectAttendanceContent() {
               ) : (
                 <Printer className="h-4 w-4 mr-2" />
               )}
-              Register Print
+              {t("Register Print", "रजिस्टर प्रिन्ट")}
             </Button>
           </>
         }
@@ -284,23 +303,21 @@ function SubjectAttendanceContent() {
         {/* ── Filters ───────────────────────────────────────────────────────── */}
         <FilterCommandBar>
           <div className="space-y-1">
-            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Date</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">{t("Date", "मिति")}</Label>
             <BSDateInput
               value={date}
               onChange={(v) => {
-                setDate(v);
+                setScope({ date: v });
                 setHasChanges(false);
               }}
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Class</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">{t("Class", "कक्षा")}</Label>
             <Select
               value={classId}
               onValueChange={(v) => {
-                setClassId(v);
-                setSubjectId("");
-                setSectionId("all");
+                setScope({ class: v, subject: "", section: "" });
               }}
             >
               <SelectTrigger className="h-9">
@@ -314,17 +331,17 @@ function SubjectAttendanceContent() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Section</Label>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">{t("Section", "सेक्सन")}</Label>
             <Select
               value={sectionId}
-              onValueChange={setSectionId}
+              onValueChange={(v) => setScope({ section: v })}
               disabled={!classId || !sections.length}
             >
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="All sections" />
+                <SelectValue placeholder={t("All sections", "सबै सेक्सन")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sections</SelectItem>
+                <SelectItem value="all">{t("All Sections", "सबै सेक्सन")}</SelectItem>
                 {sections.map((s: { id: string; name: string }) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -332,8 +349,8 @@ function SubjectAttendanceContent() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">Subject</Label>
-            <Select value={subjectId} onValueChange={setSubjectId} disabled={!classId}>
+            <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">{t("Subject", "विषय")}</Label>
+            <Select value={subjectId} onValueChange={(v) => setScope({ subject: v })} disabled={!classId}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Select subject…" />
               </SelectTrigger>
@@ -348,7 +365,7 @@ function SubjectAttendanceContent() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-[color:var(--w11-text-secondary)] font-medium">
-              Register month (print)
+              {t("Register month (print)", "रजिस्टर महिना (प्रिन्ट)")}
             </Label>
             <BSMonthInput
               value={registerMonth ?? undefined}
@@ -358,17 +375,30 @@ function SubjectAttendanceContent() {
         </FilterCommandBar>
 
         {!classId || !subjectId ? (
+          (classes || []).length === 0 && !classId ? (
+            <div className="win11-card">
+              <DependencyMissingEmptyState
+                icon={BookOpen}
+                title={t("No classes yet", "अझै कक्षा छैन")}
+                body={t("Subject attendance needs a class with mapped subjects.", "कक्षा र विषय चाहिन्छ।")}
+                prerequisiteName={t("Classes", "कक्षा")}
+                setupHref="/dashboard/academics"
+                setupLabel={t("Create your first class →", "पहिलो कक्षा बनाउनुहोस् →")}
+              />
+            </div>
+          ) : (
           <div className="win11-card">
-            <AOSEmptyState
-              icon={<BookOpen className="h-12 w-12" />}
-              title="Select a class and subject"
-              description={
+            <EmptyState
+              icon={BookOpen}
+              title={t("Select a class and subject", "कक्षा र विषय छान्नुहोस्")}
+              body={
                 subjectsLoading
-                  ? "Loading subjects…"
-                  : "Choose a class, subject and date to mark attendance"
+                  ? t("Loading subjects…", "विषय लोड हुँदै…")
+                  : t("Choose a class, subject and date to mark attendance.", "कक्षा, विषय र मिति छान्नुहोस्।")
               }
             />
           </div>
+          )
         ) : (
           <>
             {/* Summary strip */}
@@ -389,7 +419,7 @@ function SubjectAttendanceContent() {
 
             <DataPanel bodyClassName="p-0">
               {studentsLoading ? (
-                <PageLoader />
+                <SkeletonTable rows={8} columns={4} />
               ) : existing.isError ? (
                 <ErrorState
                   body="Failed to load the register for this date. Please try again."
@@ -406,10 +436,10 @@ function SubjectAttendanceContent() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-14">Roll</TableHead>
-                      <TableHead>Student Name</TableHead>
-                      <TableHead className="w-[340px]">Status</TableHead>
-                      <TableHead className="w-56">Remarks</TableHead>
+                      <TableHead className="w-14">{t("Roll", "रोल")}</TableHead>
+                      <TableHead>{t("Student Name", "नाम")}</TableHead>
+                      <TableHead className="w-[340px]">{t("Status", "अवस्था")}</TableHead>
+                      <TableHead className="w-56">{t("Remarks", "टिप्पणी")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -494,14 +524,14 @@ function SubjectAttendanceContent() {
                     onClick={() => markAll("present")}
                     disabled={!studentList.length}
                   >
-                    <CheckCheck className="h-4 w-4 mr-1.5" /> All Present
+                    <CheckCheck className="h-4 w-4 mr-1.5" /> {t("All Present", "सबै हाजिर")}
                   </Button>
                   <Button
                     onClick={() =>
                       confirm({
-                        title: "Save subject attendance?",
-                        body: `${marked.length} of ${studentList.length} students have a status. Unmarked students keep any previously saved status.`,
-                        confirmLabel: "Save",
+                        title: t("Save subject attendance?", "विषय उपस्थिति सेभ गर्ने?"),
+                        body: t(`${marked.length} of ${studentList.length} students have a status. Unmarked students keep any previously saved status.`, `${marked.length}/${studentList.length} टिपिएको छ।`),
+                        confirmLabel: t("Save", "सेभ"),
                       }).then((ok) => {
                         if (ok) saveMutation.mutate();
                       })
@@ -513,7 +543,7 @@ function SubjectAttendanceContent() {
                     ) : (
                       <Save className="h-4 w-4 mr-2" />
                     )}
-                    Save Attendance
+                    {t("Save Attendance", "सुरक्षित")}
                   </Button>
                 </div>
               </div>

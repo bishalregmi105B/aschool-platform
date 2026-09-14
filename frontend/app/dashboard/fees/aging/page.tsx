@@ -9,8 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
-  FilterCommandBar, DataPanel, AOSModuleLoadingState,
+  FilterCommandBar, DataPanel, StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { ErrorState } from "@/components/ui/empty-state";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Label } from "@/components/ui/label";
@@ -55,8 +58,10 @@ export default function FeeAgingPage() {
 }
 
 function AgingContent() {
-  const [asOfBS, setAsOfBS] = useState<string>(todayBS());
-  const [classId, setClassId] = useState("");
+  const { t } = useI18n();
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["as_of", "class"]);
+  const asOfBS = urlFilters.as_of || todayBS();
+  const classId = urlFilters.class || "";
 
   const { data: classes } = useQuery({
     queryKey: ["classes"],
@@ -86,14 +91,14 @@ function AgingContent() {
   const CLASS_COLUMNS: Column<AgingClassRow>[] = [
     {
       key: "class_name",
-      label: "Class",
+      label: t("Class", "कक्षा"),
       sortable: true,
       value: (r) => r.class_name,
       render: (r) => <span className="font-medium">{r.class_name}</span>,
     },
     {
       key: "unscheduled",
-      label: "Unscheduled",
+      label: t("Unscheduled", "तारिखविहिन"),
       align: "right",
       sortable: true,
       value: (r) => r.unscheduled,
@@ -101,7 +106,7 @@ function AgingContent() {
     },
     {
       key: "current_or_30",
-      label: "0–30 days",
+      label: "0–30 d",
       align: "right",
       sortable: true,
       value: (r) => r.current_or_30,
@@ -109,7 +114,7 @@ function AgingContent() {
     },
     {
       key: "b31_60",
-      label: "31–60 days",
+      label: "31–60 d",
       align: "right",
       sortable: true,
       value: (r) => r.b31_60,
@@ -117,7 +122,7 @@ function AgingContent() {
     },
     {
       key: "b61_90",
-      label: "61–90 days",
+      label: "61–90 d",
       align: "right",
       sortable: true,
       value: (r) => r.b61_90,
@@ -125,7 +130,7 @@ function AgingContent() {
     },
     {
       key: "b90_plus",
-      label: "90+ days",
+      label: "90+ d",
       align: "right",
       sortable: true,
       value: (r) => r.b90_plus,
@@ -137,7 +142,7 @@ function AgingContent() {
     },
     {
       key: "total",
-      label: "Total",
+      label: t("Total", "कुल"),
       align: "right",
       sortable: true,
       value: (r) => r.total,
@@ -162,22 +167,23 @@ function AgingContent() {
     },
     {
       key: "oldest_overdue_days",
-      label: "Oldest Overdue",
+      label: t("Oldest Overdue", "धेरो बाकि"),
       align: "center",
       sortable: true,
       value: (s) => s.oldest_overdue_days ?? -1,
       render: (s) =>
         s.oldest_overdue_days == null ? (
-          <Badge variant="secondary">Unscheduled</Badge>
+          <StatusChip status="pending" label={t("Unscheduled", "तारिख विहिन")} />
         ) : (
-          <Badge variant={s.oldest_overdue_days > 90 ? "destructive" : s.oldest_overdue_days > 30 ? "warning" : "outline"}>
-            {s.oldest_overdue_days} days
-          </Badge>
+          <StatusChip
+            status={s.oldest_overdue_days > 90 ? "overdue" : s.oldest_overdue_days > 60 ? "late" : s.oldest_overdue_days > 30 ? "due" : "pending"}
+            label={`${s.oldest_overdue_days} ${t("d", "दिन")}`}
+          />
         ),
     },
     {
       key: "total",
-      label: "Outstanding",
+      label: t("Outstanding", "बाँकी"),
       align: "right",
       sortable: true,
       value: (s) => s.total,
@@ -185,37 +191,52 @@ function AgingContent() {
     },
   ];
 
-  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading aging report…" /></AOSPage>;
+  if (isLoading)
+    return (
+      <AOSPage>
+        <AOSPageHeader title={t("Accounts Receivable Aging", "बुक्की उम्र")} />
+        <AOSPageBody>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="win11-card h-24 animate-pulse" style={{ margin: 0 }} />
+              ))}
+            </div>
+            <div className="win11-card h-64 animate-pulse" style={{ margin: 0 }} />
+          </div>
+        </AOSPageBody>
+      </AOSPage>
+    );
 
   return (
     <AOSPage>
       <AOSPageHeader
-        title="Accounts Receivable Aging"
-        subtitle="Outstanding balances bucketed by days past the BS due date"
+        title={t("Accounts Receivable Aging", "बुक्की उम्र (AR Aging)")}
+        subtitle={t("Outstanding balances bucketed by days past the BS due date", "मिति गुडरि दिन अनुसर बाँकी रकम")}
         actions={
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            {isFetching ? "Refreshing…" : "Refresh"}
+            {isFetching ? t("Refreshing…", "ताजा हुँदा…") : t("Refresh", "ताजा")}
           </Button>
         }
       />
       <AOSPageBody className="space-y-4">
         <FilterCommandBar>
           <div className="space-y-1">
-            <Label className="text-xs">As of (BS)</Label>
+            <Label className="text-xs">{t("As of (BS)", "मिति (BS)")}</Label>
             <BSDateInput
               value={asOfBS}
-              onChange={(v) => setAsOfBS(v)}
+              onChange={(v) => setUrlFilters({ as_of: v })}
               emit="bs"
               className="w-44"
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Class</Label>
+            <Label className="text-xs">{t("Class", "कक्षा")}</Label>
             <AdvancedSelect
               value={classId}
-              onChange={(v) => setClassId(v)}
+              onChange={(v) => setUrlFilters({ class: v })}
               clearable
-              placeholder="All Classes"
+              placeholder={t("All Classes", "सबै कक्षा")}
               className="w-44"
               options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
             />
@@ -224,36 +245,36 @@ function AgingContent() {
 
         {isError ? (
           <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <p className="text-sm text-[#c42b1c]">Failed to load the aging report. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
+            <ErrorState
+            title={t("Failed to load the aging report.", "अर्लिँग रिपोर्ट लोड सकिएन।")}
+            onRetry={() => refetch()}
+          />
           </div>
         ) : (
           <>
             {/* Summary cards */}
             <StatGrid className="mb-0" min={200}>
               <KpiCard
-                label="Total Receivable"
+                label={t("Total Receivable", "कुल बुक्की")}
                 value={formatNepaliCurrency(grandTotal)}
                 color="#c42b1c"
                 icon={<AlertTriangle className="h-5 w-5" style={{ color: "#c42b1c" }} />}
                 footnote={`as of ${data?.as_of_bs || asOfBS} BS`}
               />
               <KpiCard
-                label="Current / ≤30 days"
+                label={t("Current / ≤30 days", "हाली / ≤30 दिन")}
                 value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.current_or_30 || 0), 0))}
                 color="#107c10"
                 icon={<Timer className="h-5 w-5" style={{ color: "#107c10" }} />}
               />
               <KpiCard
-                label="31–90 days"
+                label={t("31–90 days", "31–90 दिन")}
                 value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.b31_60 || 0) + (r.b61_90 || 0), 0))}
                 color="#d83b01"
                 icon={<Clock className="h-5 w-5" style={{ color: "#d83b01" }} />}
               />
               <KpiCard
-                label="90+ days"
+                label={t("90+ days", "90+ दिन")}
                 value={formatNepaliCurrency(byClass.reduce((s, r) => s + (r.b90_plus || 0), 0))}
                 color="#c42b1c"
                 icon={<Hourglass className="h-5 w-5" style={{ color: "#c42b1c" }} />}
@@ -261,7 +282,7 @@ function AgingContent() {
             </StatGrid>
 
             {/* By class */}
-            <DataPanel title="Aging by Class">
+            <DataPanel title={t("Aging by Class", "कक्षा अनुसर उम्र")}>
               <DataTable<AgingClassRow>
                 columns={CLASS_COLUMNS}
                 rows={byClass}
@@ -271,8 +292,8 @@ function AgingContent() {
                 dense
                 empty={{
                   icon: AlertTriangle,
-                  title: "No outstanding balances",
-                  body: "Every pending bill falls inside the selected window, or there is nothing due.",
+                  title: t("No outstanding balances", "बाँकी रकम छेन"),
+                  body: t("Every pending bill falls inside the selected window, or there is nothing due.", "यहाँ बाँकी कुनै रकम छन।"),
                 }}
               />
             </DataPanel>
@@ -281,10 +302,10 @@ function AgingContent() {
             <DataPanel
               title={
                 <span className="flex items-center">
-                  Top Outstanding Students
+                  {t("Top Outstanding Students", "वशिष्ठ बाँकी विद्यार्थी")}
                   {oldest30 > 0 && (
                     <Badge variant="warning" className="ml-2">
-                      {oldest30} past 30 days
+                      {oldest30} {t("past 30 days", "30 दिन बिगरे")}
                     </Badge>
                   )}
                 </span>
@@ -296,18 +317,18 @@ function AgingContent() {
                 rowKey={(s) => s.student_id}
                 loading={isFetching}
                 searchable
-                searchPlaceholder="Search students…"
+                searchPlaceholder={t("Search students…", "खोज्नुहोस…")}
                 exportFileName="fee-aging-by-student"
                 dense
                 empty={{
                   icon: AlertTriangle,
-                  title: "No student balances",
-                  body: "Nothing is outstanding for the selected date and class.",
+                  title: t("No student balances", "विद्यार्थी बाँकी छेन"),
+                  body: t("Nothing is outstanding for the selected date and class.", "छानियेको मिति/कक्षामा बाँकी छन।"),
                 }}
               />
               {(data?.by_student?.length ?? 0) > 25 && (
                 <p className="mt-2 text-xs text-[color:var(--w11-text-secondary)]">
-                  Showing the 25 most overdue of {data!.by_student.length} students with balances.
+                  {t("Showing the 25 most overdue of", "धेरो 25 देखाएन — कुल")} {data!.by_student.length} {t("students with balances.", "विद्यार्थी।")}
                 </p>
               )}
             </DataPanel>

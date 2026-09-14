@@ -18,6 +18,7 @@ import {
   DataPanel,
   StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { PrintButton, PrintArea } from "../analytics-kit";
 
 export default function AcademicAnalyticsPage() {
   const [examId, setExamId] = useState("");
@@ -78,15 +79,18 @@ export default function AcademicAnalyticsPage() {
             <Link href="/dashboard/analytics">
               <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4" /></Button>
             </Link>
+            <PrintButton />
             <AdvancedSelect
               value={examId}
               onChange={(v) => setExamId(v)}
               options={(exams || []).map((e: any) => ({ value: e.id, label: e.name }))}
+              placeholder="All exams (latest results)"
             />
           </>
         }
       />
       <AOSPageBody>
+        <PrintArea>
         <StatGrid min={180}>
           <KpiCard label="Students" value={analytics.total_students || 0} icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
           <KpiCard label="Pass Rate" value={analytics.pass_rate ? `${analytics.pass_rate}%` : "—"} icon={<Trophy className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
@@ -106,7 +110,7 @@ export default function AcademicAnalyticsPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No class data available</p>}
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No class results yet — enter and publish marks to see per-class performance.</p>}
           </DataPanel>
 
           <DataPanel title="Subject-wise Scores">
@@ -120,7 +124,7 @@ export default function AcademicAnalyticsPage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No subject data available</p>}
+            ) : <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No subject scores yet — record exam marks to compare subjects.</p>}
           </DataPanel>
         </div>
 
@@ -139,6 +143,7 @@ export default function AcademicAnalyticsPage() {
             />
           </DataPanel>
         )}
+        </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

@@ -5,6 +5,7 @@ import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { revalidateSchoolSite } from "@/lib/revalidate";
+import { schoolSiteUrl } from "@/lib/site-domain";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { sanitizeCss } from "@/lib/sanitize";
@@ -404,6 +405,7 @@ export default function WebsiteEditor() {
   const [leftTab, setLeftTab] = useState<"sections" | "widgets">("sections");
   const [draft, setDraft] = useState<Record<string, SectionDraft>>({});
   const [showHistory, setShowHistory] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "unsaved" | "saving" | "saved" | "error">("idle");
 
@@ -437,8 +439,14 @@ export default function WebsiteEditor() {
   });
 
   // Fetch website config for theme CSS injection in the preview canvas
-  const { data: websiteConfig } = useQuery<{ theme_slug?: string; customizations?: { colors?: Record<string, string>; custom_css?: string } }>({
-    queryKey: ["website-config-theme"],
+  // Shared with the builder hub cache — powers the "Open Site" link.
+  const { data: siteStatus } = useQuery<{ subdomain?: string; public_url?: string | null }>({
+    queryKey: ["website-status"],
+    queryFn: () => api.get("/website-builder/status").then((r) => r.data.data),
+    staleTime: 60_000,
+  });
+
+  const { data: websiteConfig } = useQuery<{ theme_slug?: string; customizations?: { colors?: Record<string, string>; custom_css?: string } }>({    queryKey: ["website-config-theme"],
     queryFn: () => api.get("/website/config").then((r) => r.data.data || r.data),
     staleTime: 60_000,
   });
@@ -463,6 +471,22 @@ export default function WebsiteEditor() {
       return d ? { ...s, title: d.title ?? s.title, content: d.content ?? s.content } : s;
     });
   }, [page?.sections, draft]);
+
+  /**
+   * "What changed" (no diff): section names with edits pending in the local
+   * draft layer — autosaved to the DRAFT, not yet published to the live site.
+   */
+  const pendingEdits = useMemo(() => {
+    const ids = Object.keys(draft);
+    if (!ids.length || !page) return [] as { id: string; title: string }[];
+    return ids
+      .map((id) => {
+        const s = page.sections.find((x) => x.id === id);
+        const d = draft[id];
+        return { id, title: d.title ?? s?.title ?? "Untitled section" };
+      })
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [draft, page]);
 
   const selectedSection = viewSections.find((s) => s.id === selectedSectionId) ?? null;
 
@@ -828,7 +852,21 @@ export default function WebsiteEditor() {
         <div className="sticky top-0 z-20 backdrop-blur border-b border-[var(--w11-border-default)] px-4 py-2 flex items-center justify-between shadow-sm" style={{ background: "var(--w11-surface-solid)" }}>
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium" style={{ color: "var(--w11-text-secondary)" }}>Live Preview</span>
+            {/* Page publish state pill (draft vs live) — plan FC-C02 */}
+            <span className={`win11-chip ${page?.is_published ? "success" : "warning"}`}>
+              {page?.is_published ? "Live" : "Draft only"}
+            </span>
             <span className="text-xs px-2 py-0.5 rounded-full" style={saveBadgeStyle}>{saveBadge}</span>
+            {pendingEdits.length > 0 && (
+              <button
+                onClick={() => setShowChanges((v) => !v)}
+                className="win11-chip accent"
+                title="Sections with unpublish edits"
+              >
+                {pendingEdits.length} unpublished change{pendingEdits.length === 1 ? "" : "s"}
+                {showChanges ? " ▲" : " ▼"}
+              </button>
+            )}
             {/* W-02: draft saves no longer touch the live site — publish here */}
             <button
               onClick={() => void publishDraft()}
@@ -859,9 +897,37 @@ export default function WebsiteEditor() {
             >
               {saveState === "saving" ? "Saving…" : "Save now"}
             </button>
-            <a href="/dashboard/website-builder" target="_blank" className="text-xs hover:underline" style={{ color: "var(--w11-accent)" }}>Open Site ↗</a>
+            <a href={siteStatus?.public_url || schoolSiteUrl(siteStatus?.subdomain)} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: "var(--w11-accent)" }}>Open Site ↗</a>
           </div>
         </div>
+
+        {/* FC-C02: "what changed" summary — no diff, just the unsaved-edits list */}
+        {showChanges && pendingEdits.length > 0 && (
+          <div className="mx-6 mt-3 rounded-lg border border-[var(--w11-border-default)] p-3" style={{ background: "var(--w11-card-bg)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Unpublished changes</span>
+              <button className="text-xs" style={{ color: "var(--w11-text-secondary)" }} onClick={() => setShowChanges(false)}>close</button>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {pendingEdits.map((p) => (
+                <li key={p.id} className="flex items-center gap-2">
+                  <span className="win11-chip warning">edited</span>
+                  <button
+                    className="hover:underline text-left"
+                    style={{ color: "var(--w11-text-primary)" }}
+                    onClick={() => selectSection(p.id, true)}
+                  >
+                    {p.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs mt-2" style={{ color: "var(--w11-text-secondary)" }}>
+              These edits are auto-saved to the draft — the live site keeps the
+              last published version until you press <strong>Publish</strong>.
+            </p>
+          </div>
+        )}
 
         {/* FC-C03: publish history — restore a previous live version */}
         {showHistory && (

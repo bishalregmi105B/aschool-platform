@@ -56,6 +56,7 @@ function CommsContent() {
     { label: "Notices", desc: "School announcements and circulars", icon: "Bell", href: "/dashboard/notices", count: stats.notices_count },
     { label: "Announcements", desc: "Public website announcements", icon: "Megaphone", href: "/dashboard/communications/announcements" },
     { label: "Broadcast", desc: "Send SMS, email, or WhatsApp to groups", icon: "Send", href: "/dashboard/communications/broadcast", count: stats.broadcasts_sent },
+    { label: "SMS & Credits", desc: "Sparrow SMS balance, templates, direct sends", icon: "MessageSquare", href: "/dashboard/sms" },
     { label: "Diary", desc: "Class diary notes for parents", icon: "BookOpen", href: "/dashboard/communications/diary" },
     { label: "Gallery", desc: "Photo gallery on the school website", icon: "Image", href: "/dashboard/communications/gallery" },
     { label: "Home Sliders", desc: "Website homepage slider images", icon: "Layers", href: "/dashboard/communications/sliders" },

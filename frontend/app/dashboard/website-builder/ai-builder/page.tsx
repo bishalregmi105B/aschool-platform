@@ -11,6 +11,7 @@ import {
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
 
 interface DesignVariation {
@@ -126,14 +127,34 @@ export default function AIBuilderPage() {
             </button>
 
             {generateMut.isError && (
-              <p className="text-sm" style={{ color: "var(--w11-text-primary)" }}>
-                Failed to generate designs. Please try again.
-              </p>
+              <div className="win11-infobar error">
+                <div>
+                  <p className="text-sm font-medium">Couldn&rsquo;t generate designs</p>
+                  <p className="text-xs mt-1">
+                    The AI service didn&rsquo;t answer — check the AI plugin is active and try again.
+                  </p>
+                </div>
+                <button
+                  className="win11-btn"
+                  onClick={() => generateMut.mutate({ prompt, school_type: schoolType })}
+                >
+                  Retry
+                </button>
+              </div>
             )}
           </div>
         </DataPanel>
 
         {/* Variations */}
+        {variations.length === 0 && !generateMut.isPending ? (
+          <DataPanel>
+            <AOSEmptyState
+              icon={<Sparkles className="h-10 w-10" />}
+              title="No designs yet"
+              description="Describe your school above and generate three AI design variations to choose from."
+            />
+          </DataPanel>
+        ) : null}
         {variations.length > 0 && (
           <div className="space-y-4 mb-4">
             <h2 className="text-lg font-semibold" style={{ color: "var(--w11-text-primary)" }}>

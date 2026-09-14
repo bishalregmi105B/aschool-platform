@@ -17,6 +17,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Settings, Save, Plus, Trash2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface School {
   id: string;
@@ -33,7 +34,9 @@ interface School {
 }
 
 export default function PayrollSettingsPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [serverJson, setServerJson] = useState<string>("");
 
   const [formData, setFormData] = useState({
     basicSalaryPercentage: 100,
@@ -53,13 +56,15 @@ export default function PayrollSettingsPage() {
 
   useEffect(() => {
     if (school?.settings?.payroll) {
-      setFormData({
+      const next = {
         basicSalaryPercentage: school.settings.payroll.basicSalaryPercentage || 100,
         taxRate: school.settings.payroll.taxRate || 0,
         paymentDay: school.settings.payroll.paymentDay || 1,
         allowances: school.settings.payroll.allowances || [],
         deductions: school.settings.payroll.deductions || [],
-      });
+      };
+      setServerJson(JSON.stringify(next));
+      setFormData(next);
     }
   }, [school]);
 
@@ -72,9 +77,9 @@ export default function PayrollSettingsPage() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["current-school"] });
-      toast.success("Payroll settings saved");
+      toast.success(t("Payroll settings saved", "सेटिङ सुरक्षित भयो"));
     },
-    onError: () => toast.error("Failed to save settings"),
+    onError: () => toast.error(t("Failed to save settings", "सुरक्षित गर्न सकिएन")),
   });
 
   const handleSave = () => {
@@ -106,34 +111,37 @@ export default function PayrollSettingsPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<Settings className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Payroll Settings"
-        subtitle="Configure global salary structures and rules"
+        title={t("Payroll Settings", "पेरोल सेटिंग")}
+        subtitle={t("Configure global salary structures and rules", "ग्लोबल तलब संरचना र नियम")}
         actions={
-          <Button onClick={handleSave} disabled={updateMutation.isPending}>
+          <Button
+            onClick={handleSave}
+            disabled={updateMutation.isPending || (serverJson !== "" && JSON.stringify(formData) === serverJson)}
+          >
             {updateMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Settings
+            {t("Save Settings", "सेटिंग सुरक्ष")}
           </Button>
         }
       />
       <AOSPageBody>
         <div className="max-w-4xl space-y-4">
-          <FormSection title="General Settings">
+          <FormSection title={t("General Settings", "साझेत सेटिंग")}>
             <p className="text-xs mb-4" style={{ color: "var(--w11-text-secondary)" }}>
-              Basic configurations for payroll generation
+              {t("These values apply when new payroll rows are generated.", "नयाँ पेरोल बनाउँदा यी मूल्य लगन्छ।")}
             </p>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label>Basic Salary Percentage (%)</Label>
+                <Label>{t("Basic Salary Percentage (%)", "आधार तलब \%")}</Label>
                 <Input
                   type="number"
                   value={formData.basicSalaryPercentage}
                   onChange={(e) => setFormData(prev => ({ ...prev, basicSalaryPercentage: Number(e.target.value) }))}
                   placeholder="e.g. 100"
                 />
-                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>What percentage of Gross Salary is considered Basic Salary</p>
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{t("Share of gross treated as basic salary.", "कुल तलबमध्ये आधार तलबको हिस्सा।")}</p>
               </div>
               <div className="space-y-2">
-                <Label>Default Tax Rate (%)</Label>
+                <Label>{t("Default Tax Rate (%)", "पूर्वनियुक्त कर \%")}</Label>
                 <Input
                   type="number"
                   value={formData.taxRate}
@@ -142,7 +150,7 @@ export default function PayrollSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Monthly Payment Day</Label>
+                <Label>{t("Monthly Payment Day", "मासिक भुक्तान दिन")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -151,14 +159,14 @@ export default function PayrollSettingsPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, paymentDay: Number(e.target.value) }))}
                   placeholder="e.g. 1"
                 />
-                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>Day of the month when salaries are typically paid</p>
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{t("Shown as reminder when closing a month's payroll.", "महिना बन्द गर्दा सम्झनाका लागि।")}</p>
               </div>
             </div>
           </FormSection>
 
           <div className="grid md:grid-cols-2 gap-4">
             <DataPanel
-              title="Allowances"
+              title={t("Allowances", "भत्ता")}
               actions={
                 <Button variant="outline" size="sm" onClick={() => addArrayItem("allowances")}>
                   <Plus className="h-4 w-4" /> Add
@@ -166,13 +174,13 @@ export default function PayrollSettingsPage() {
               }
             >
               <p className="text-xs mb-4" style={{ color: "var(--w11-text-secondary)" }}>
-                Global allowances applied to basic salary
+                {t("Added on top of basic salary for every staff payroll.", "आधार तलबमा सबैका लागि थपिन्छ।")}
               </p>
               <div className="space-y-4">
                 {formData.allowances.map((item, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Input
-                      placeholder="Name (e.g. Transport)"
+                      placeholder={t("Name (e.g. Transport)", "नाम (जस्तै: यातायात)")}
                       value={item.name}
                       onChange={(e) => updateArrayItem("allowances", index, "name", e.target.value)}
                       className="flex-1"
@@ -190,13 +198,13 @@ export default function PayrollSettingsPage() {
                   </div>
                 ))}
                 {formData.allowances.length === 0 && (
-                  <p className="text-center text-sm py-4" style={{ color: "var(--w11-text-secondary)" }}>No allowances configured</p>
+                  <p className="text-center text-sm py-4" style={{ color: "var(--w11-text-secondary)" }}>{t("No allowances configured", "भत्ता सेट गरिएको छैन")}</p>
                 )}
               </div>
             </DataPanel>
 
             <DataPanel
-              title="Deductions"
+              title={t("Deductions", "कट्टा")}
               actions={
                 <Button variant="outline" size="sm" onClick={() => addArrayItem("deductions")}>
                   <Plus className="h-4 w-4" /> Add
@@ -204,13 +212,13 @@ export default function PayrollSettingsPage() {
               }
             >
               <p className="text-xs mb-4" style={{ color: "var(--w11-text-secondary)" }}>
-                Global deductions applied to basic salary
+                {t("Subtracted from gross for every staff payroll.", "सबैको कुल तलबबाट घटिन्छ।")}
               </p>
               <div className="space-y-4">
                 {formData.deductions.map((item, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Input
-                      placeholder="Name (e.g. PF, SSF)"
+                      placeholder={t("Name (e.g. PF, SSF)", "नाम (जस्तै: SSF)")}
                       value={item.name}
                       onChange={(e) => updateArrayItem("deductions", index, "name", e.target.value)}
                       className="flex-1"
@@ -228,7 +236,7 @@ export default function PayrollSettingsPage() {
                   </div>
                 ))}
                 {formData.deductions.length === 0 && (
-                  <p className="text-center text-sm py-4" style={{ color: "var(--w11-text-secondary)" }}>No deductions configured</p>
+                  <p className="text-center text-sm py-4" style={{ color: "var(--w11-text-secondary)" }}>{t("No deductions configured", "कट्टा सेट गरिएको छैन")}</p>
                 )}
               </div>
             </DataPanel>

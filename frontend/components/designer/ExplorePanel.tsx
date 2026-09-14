@@ -10,7 +10,7 @@
  * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
  * win11 scope, so no scope of its own is needed.
  */
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Image as ImageIcon, Loader2, Search, Shapes, Sparkles } from "lucide-react";
@@ -26,7 +26,7 @@ import { TemplateThumb } from "@/components/designer/TemplateThumb";
 
 interface Props {
   onLoadTemplate: (tpl: unknown) => void;
-  onAddIcon: (svg: string, color: string) => void;
+  onAddIcon: (svg: string, color?: string) => void;
   onAddPhoto: (url: string) => void;
 }
 
@@ -52,7 +52,7 @@ function SectionLabel({ icon, children }: { icon: React.ReactNode; children: Rea
   );
 }
 
-export default function ExplorePanel({ onLoadTemplate, onAddIcon, onAddPhoto }: Props) {
+function ExplorePanel({ onLoadTemplate, onAddIcon, onAddPhoto }: Props) {
   const [query, setQuery] = useState("");
   const [accent, setAccent] = useState(ACCENT);
   const [submitted, setSubmitted] = useState("");
@@ -235,3 +235,9 @@ export default function ExplorePanel({ onLoadTemplate, onAddIcon, onAddPhoto }: 
     </div>
   );
 }
+
+// memo: the Explore result grid is the most expensive sliding-panel body and
+// the parent CanvasEditor re-renders on every zoom/drag/store tick. Props are
+// stable (canvasApiRef-backed callbacks in CanvasEditor) so memo makes the
+// zoom wheel + snapping cost-free for this panel (wave-J perf pass).
+export default memo(ExplorePanel);

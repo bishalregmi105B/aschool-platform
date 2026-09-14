@@ -17,6 +17,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
+import { PrintButton, ChartEmpty, PrintArea } from "../analytics/analytics-kit";
 import {
   BarChart3,
   Users,
@@ -129,9 +130,10 @@ function ReportsContent() {
         icon={<BarChart3 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Reports & Analytics"
         subtitle="Overview of school performance metrics"
+        actions={<PrintButton />}
       />
       <AOSPageBody>
-      <div className="space-y-6">
+      <PrintArea className="space-y-6">
       {/* Dashboard — KPI stat grid from the overview this page loads */}
       <StatGrid className="mb-0">
         <KpiCard
@@ -269,6 +271,9 @@ function ReportsContent() {
       {/* Charts Row 1: Attendance by Class + Fee Collection Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DataPanel title="Attendance by Class">
+          {attendanceByClass.length === 0 ? (
+            <ChartEmpty label="No attendance recorded yet — mark attendance to see class trends." />
+          ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={attendanceByClass}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--w11-border-subtle)" />
@@ -278,9 +283,13 @@ function ReportsContent() {
                 <Bar dataKey="percentage" fill={ACCENT} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          )}
         </DataPanel>
 
         <DataPanel title="Fee Collection Status">
+          {feePieData.length === 0 ? (
+            <ChartEmpty label="No fee bills yet — create a fee structure to see collection status." />
+          ) : (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -303,12 +312,16 @@ function ReportsContent() {
                 <Tooltip formatter={(v: number) => formatCurrency(v)} />
               </PieChart>
             </ResponsiveContainer>
-          </DataPanel>
+          )}
+        </DataPanel>
       </div>
 
       {/* Charts Row 2: Fee Monthly Trend + Exam Subject Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DataPanel title="Monthly Fee Collection Trend">
+          {feeByMonth.length === 0 ? (
+            <ChartEmpty label="No payments collected this year — the monthly trend appears after the first receipt." />
+          ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={feeByMonth}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--w11-border-subtle)" />
@@ -320,9 +333,13 @@ function ReportsContent() {
                 <Bar dataKey="pending" name="Pending" fill={WARN} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          )}
         </DataPanel>
 
         <DataPanel title="Subject Performance">
+          {examBySubject.length === 0 ? (
+            <ChartEmpty label="No exam marks yet — record marks to compare subjects." />
+          ) : (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={examBySubject}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--w11-border-subtle)" />
@@ -348,9 +365,10 @@ function ReportsContent() {
                 />
               </LineChart>
             </ResponsiveContainer>
+          )}
         </DataPanel>
       </div>
-      </div>
+      </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

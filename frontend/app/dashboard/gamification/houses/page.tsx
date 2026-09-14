@@ -9,14 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Users, Plus } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { MetricCard } from "@/components/ui/metric-card";
 
 const HOUSE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"];
 
@@ -47,7 +49,7 @@ function HousesContent() {
     onError: () => toast.error("Failed to create house"),
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading houses…" />;
   if (isError) {
     return (
       <AOSPage>
@@ -83,20 +85,20 @@ function HousesContent() {
       <AOSPageBody>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {houses.length === 0 ? (
-            <p className="col-span-3 text-center py-12 text-[color:var(--w11-text-secondary)]">No houses created yet. Add your first house to get started.</p>
+            <DataPanel className="col-span-3">
+              <p className="text-center py-12 text-[color:var(--w11-text-secondary)]">
+                No houses created yet. Add your first house to get started.
+              </p>
+            </DataPanel>
           ) : houses.map((h: any) => (
-            <div key={h.id} className="win11-card" style={{ marginBottom: 0, borderLeft: `4px solid ${h.color}` }}>
-              <div className="pt-2">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="h-8 w-8 rounded-full" style={{ backgroundColor: h.color }} />
-                  <h3 className="font-semibold text-lg text-[color:var(--w11-text-primary)]">{h.name}</h3>
-                </div>
-                {h.motto && <p className="text-sm italic mb-2 text-[color:var(--w11-text-secondary)]">&ldquo;{h.motto}&rdquo;</p>}
-                <div className="flex justify-between items-center mt-3">
-                  <span className="text-sm text-[color:var(--w11-text-secondary)]">{h.member_count || 0} members</span>
-                  <span className="win11-chip font-mono">{h.total_points?.toLocaleString() || 0} pts</span>
-                </div>
-              </div>
+            /* House scores as MetricCards — per spec 34#45. */
+            <div key={h.id} style={{ borderTop: `3px solid ${h.color || "var(--w11-accent)"}` }}>
+              <MetricCard
+                label={h.name}
+                value={h.total_points?.toLocaleString() || 0}
+                denominator="pts"
+                footnote={`“${h.motto || "—"}” · ${h.member_count || 0} members`}
+              />
             </div>
           ))}
         </div>

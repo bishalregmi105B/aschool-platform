@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { AlertCircle, Palette, Save } from "lucide-react";
+import { AlertCircle, Palette } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
@@ -17,52 +14,111 @@ import {
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import {
+  SettingsSection,
+  SettingField,
+  useSectionSave,
+} from "@/app/dashboard/settings/settings-section";
 
-const DEFAULT_FORM = {
+/**
+ * White-label Theme settings (A8): appearance tokens and colors save
+ * separately with change detection; the preview strip always reflects the
+ * current drafts so the admin sees the effect before saving.
+ */
+
+type AppearanceValues = {
+  mode: string;
+  sidebar_style: string;
+  card_style: string;
+  density: string;
+};
+type ColorValues = {
+  accent_color: string;
+  sidebar_color: string;
+  sidebar_text_color: string;
+};
+
+const DEFAULT_APPEARANCE: AppearanceValues = {
   mode: "light",
   sidebar_style: "default",
   card_style: "rounded",
   density: "comfortable",
+};
+const DEFAULT_COLORS: ColorValues = {
   accent_color: "#2563EB",
   sidebar_color: "#1e293b",
   sidebar_text_color: "#f8fafc",
 };
 
-export default function ThemePage() {
-  return <PluginGate slug="white_label"><ThemeContent /></PluginGate>;
+function ThemeColorInput({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  id: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        id={id}
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-12 h-10 cursor-pointer"
+        style={{ border: "1px solid var(--w11-control-border)", borderRadius: "var(--w11-radius-sm)" }}
+      />
+      <span
+        className="text-sm"
+        style={{ color: "var(--w11-text-secondary)", fontFamily: "var(--w11-font-mono)" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
 
 function ThemeContent() {
   const qc = useQueryClient();
-  const [form, setForm] = useState<any>(null);
 
-  const { data, isLoading, isError, refetch } = useQuery<any>({
+  const { data, isLoading, isError, refetch } = useQuery<Record<string, unknown> | null>({
     queryKey: ["white-label-theme"],
-    queryFn: async () => { const r = await api.get("/schools/white-label/theme"); return r.data?.data ?? r.data; },
+    queryFn: async () => {
+      const r = await api.get("/schools/white-label/theme");
+      return (r.data?.data ?? r.data) as Record<string, unknown> | null;
+    },
     retry: 1,
   });
 
-  useEffect(() => {
-    if (data && form === null) {
-      setForm({
-        mode: data?.mode ?? DEFAULT_FORM.mode,
-        sidebar_style: data?.sidebar_style ?? DEFAULT_FORM.sidebar_style,
-        card_style: data?.card_style ?? DEFAULT_FORM.card_style,
-        density: data?.density ?? DEFAULT_FORM.density,
-        accent_color: data?.accent_color ?? DEFAULT_FORM.accent_color,
-        sidebar_color: data?.sidebar_color ?? DEFAULT_FORM.sidebar_color,
-        sidebar_text_color: data?.sidebar_text_color ?? DEFAULT_FORM.sidebar_text_color,
-      });
-    }
-  }, [data, form]);
+  const appearanceInitial = useMemo<AppearanceValues>(
+    () => ({
+      mode: (data?.mode as string) ?? DEFAULT_APPEARANCE.mode,
+      sidebar_style: (data?.sidebar_style as string) ?? DEFAULT_APPEARANCE.sidebar_style,
+      card_style: (data?.card_style as string) ?? DEFAULT_APPEARANCE.card_style,
+      density: (data?.density as string) ?? DEFAULT_APPEARANCE.density,
+    }),
+    [data],
+  );
+  const colorsInitial = useMemo<ColorValues>(
+    () => ({
+      accent_color: (data?.accent_color as string) ?? DEFAULT_COLORS.accent_color,
+      sidebar_color: (data?.sidebar_color as string) ?? DEFAULT_COLORS.sidebar_color,
+      sidebar_text_color: (data?.sidebar_text_color as string) ?? DEFAULT_COLORS.sidebar_text_color,
+    }),
+    [data],
+  );
 
-  const save = useMutation({
-    mutationFn: async () => (await api.patch("/schools/white-label/theme", form)).data,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["white-label-theme"] }); toast.success("Theme saved"); },
-    onError: (err: any) => toast.error(err?.response?.data?.error || "Failed to save theme"),
-  });
+  async function patch(fields: Record<string, unknown>) {
+    await api.patch("/schools/white-label/theme", fields);
+    qc.invalidateQueries({ queryKey: ["white-label-theme"] });
+    qc.invalidateQueries({ queryKey: ["white-label-overview"] });
+  }
 
-  if (isLoading || (isError && !form)) return <AOSModuleLoadingState label="Loading theme settings…" />;
+  const appearance = useSectionSave<AppearanceValues>(appearanceInitial, (v) => patch({ ...v }));
+  const colors = useSectionSave<ColorValues>(colorsInitial, (v) => patch({ ...v }));
+
+  if (isLoading) return <AOSModuleLoadingState label="Loading theme settings…" />;
 
   if (isError) {
     return (
@@ -75,11 +131,13 @@ function ThemeContent() {
         <AOSPageBody>
           <DataPanel className="max-w-2xl mx-auto">
             <div className="flex flex-col items-center gap-3 pt-6 text-center">
-              <AlertCircle className="h-8 w-8" style={{ color: "var(--w11-accent)" }} />
+              <AlertCircle className="h-8 w-8" style={{ color: "var(--w11-danger, #c42b1c)" }} />
               <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
                 Failed to load theme settings. Please try again.
               </p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
             </div>
           </DataPanel>
         </AOSPageBody>
@@ -87,80 +145,117 @@ function ThemeContent() {
     );
   }
 
-  if (!form) return <AOSModuleLoadingState label="Loading theme settings…" />;
-
-  const ColorField = ({ label, field }: { label: string; field: string }) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex gap-2">
-        <input
-          type="color"
-          value={form[field]}
-          onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-          className="w-12 h-10 rounded cursor-pointer"
-          style={{ border: "1px solid var(--w11-control-border)", borderRadius: "var(--w11-radius-sm)" }}
-        />
-        <span
-          className="flex items-center text-sm"
-          style={{ color: "var(--w11-text-secondary)", fontFamily: "var(--w11-font-mono)" }}
-        >
-          {form[field]}
-        </span>
-      </div>
-    </div>
-  );
-
-  const SelectField = ({ label, field, options }: { label: string; field: string; options: { value: string; label: string }[] }) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <AdvancedSelect value={form[field]} onChange={(v) => setForm({ ...form, [field]: v })}
-        options={options.map((o) => ({ value: o.value, label: o.label }))} />
-    </div>
-  );
-
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Palette className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Theme Settings"
-        subtitle="Customize the admin app appearance"
-        actions={
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending ? <Spinner /> : <><Save className="h-4 w-4 mr-2" />Save Theme</>}
-          </Button>
-        }
+        subtitle="Customize the admin app appearance — each section saves independently"
       />
       <AOSPageBody>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <DataPanel title="Appearance">
+          <SettingsSection
+            title="Appearance"
+            description="Layout choices applied to the admin shell."
+            form={appearance}
+          >
             <div className="space-y-4">
-              <SelectField label="Color Mode" field="mode" options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "Follow System" }]} />
-              <SelectField label="Sidebar Style" field="sidebar_style" options={[{ value: "default", label: "Default" }, { value: "compact", label: "Compact" }, { value: "icon-only", label: "Icon Only" }]} />
-              <SelectField label="Card Style" field="card_style" options={[{ value: "rounded", label: "Rounded" }, { value: "sharp", label: "Sharp" }, { value: "flat", label: "Flat" }]} />
-              <SelectField label="UI Density" field="density" options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }, { value: "spacious", label: "Spacious" }]} />
+              <SettingField label="Color Mode" help="Dark, light, or follow the operating-system setting.">
+                <AdvancedSelect
+                  value={appearance.values.mode}
+                  onChange={(v) => appearance.setField({ mode: v })}
+                  options={[
+                    { value: "light", label: "Light" },
+                    { value: "dark", label: "Dark" },
+                    { value: "system", label: "Follow System" },
+                  ]}
+                />
+              </SettingField>
+              <SettingField label="Sidebar Style" help="Compact and icon-only sidebars free up horizontal space on small screens.">
+                <AdvancedSelect
+                  value={appearance.values.sidebar_style}
+                  onChange={(v) => appearance.setField({ sidebar_style: v })}
+                  options={[
+                    { value: "default", label: "Default" },
+                    { value: "compact", label: "Compact" },
+                    { value: "icon-only", label: "Icon Only" },
+                  ]}
+                />
+              </SettingField>
+              <SettingField label="Card Style" help="Corner treatment of panels across the admin app.">
+                <AdvancedSelect
+                  value={appearance.values.card_style}
+                  onChange={(v) => appearance.setField({ card_style: v })}
+                  options={[
+                    { value: "rounded", label: "Rounded" },
+                    { value: "sharp", label: "Sharp" },
+                    { value: "flat", label: "Flat" },
+                  ]}
+                />
+              </SettingField>
+              <SettingField label="UI Density" help="Row and control heights — compact fits more per screen.">
+                <AdvancedSelect
+                  value={appearance.values.density}
+                  onChange={(v) => appearance.setField({ density: v })}
+                  options={[
+                    { value: "comfortable", label: "Comfortable" },
+                    { value: "compact", label: "Compact" },
+                    { value: "spacious", label: "Spacious" },
+                  ]}
+                />
+              </SettingField>
             </div>
-          </DataPanel>
+          </SettingsSection>
 
-          <DataPanel title="Colors">
+          <SettingsSection
+            title="Colors"
+            description="Accent and sidebar colors for the admin shell."
+            form={colors}
+          >
             <div className="space-y-4">
-              <ColorField label="Accent Color" field="accent_color" />
-              <ColorField label="Sidebar Background" field="sidebar_color" />
-              <ColorField label="Sidebar Text" field="sidebar_text_color" />
+              <SettingField label="Accent Color" help="Buttons, links and active navigation markers.">
+                <ThemeColorInput
+                  id="wl-accent"
+                  value={colors.values.accent_color}
+                  onChange={(v) => colors.setField({ accent_color: v })}
+                />
+              </SettingField>
+              <SettingField label="Sidebar Background" help="The dark rail behind module navigation.">
+                <ThemeColorInput
+                  id="wl-sidebar"
+                  value={colors.values.sidebar_color}
+                  onChange={(v) => colors.setField({ sidebar_color: v })}
+                />
+              </SettingField>
+              <SettingField label="Sidebar Text" help="Menu labels inside the sidebar — keep high contrast.">
+                <ThemeColorInput
+                  id="wl-sidebar-text"
+                  value={colors.values.sidebar_text_color}
+                  onChange={(v) => colors.setField({ sidebar_text_color: v })}
+                />
+              </SettingField>
             </div>
-          </DataPanel>
+          </SettingsSection>
 
-          <DataPanel className="lg:col-span-2" title="Preview">
-            <div
-              className="flex h-32 rounded-lg overflow-hidden border border-[var(--w11-border-default)]"
-            >
-              <div className="w-48 h-full flex flex-col p-3 gap-2" style={{ backgroundColor: form.sidebar_color, color: form.sidebar_text_color }}>
+          <DataPanel className="lg:col-span-2" title="Preview (unsaved values)">
+            <div className="flex h-32 rounded-lg overflow-hidden border border-[var(--w11-border-default)]">
+              <div
+                className="w-48 h-full flex flex-col p-3 gap-2"
+                style={{ backgroundColor: colors.values.sidebar_color, color: colors.values.sidebar_text_color }}
+              >
                 <div className="text-xs font-bold opacity-80">Sidebar</div>
                 {["Dashboard", "Students", "Exams"].map((item) => (
-                  <div key={item} className="text-xs px-2 py-1 rounded" style={{ backgroundColor: `${form.accent_color}22` }}>{item}</div>
+                  <div
+                    key={item}
+                    className="text-xs px-2 py-1 rounded"
+                    style={{ backgroundColor: `${colors.values.accent_color}22` }}
+                  >
+                    {item}
+                  </div>
                 ))}
               </div>
               <div className="flex-1 p-4" style={{ background: "var(--w11-card-bg)" }}>
-                <div className="h-4 w-24 rounded mb-2" style={{ backgroundColor: form.accent_color }} />
+                <div className="h-4 w-24 rounded mb-2" style={{ backgroundColor: colors.values.accent_color }} />
                 <div className="h-3 w-48 rounded mb-1" style={{ background: "var(--w11-control-hover)" }} />
                 <div className="h-3 w-36 rounded" style={{ background: "var(--w11-control-hover)" }} />
               </div>
@@ -169,5 +264,13 @@ function ThemeContent() {
         </div>
       </AOSPageBody>
     </AOSPage>
+  );
+}
+
+export default function ThemePage() {
+  return (
+    <PluginGate slug="white_label">
+      <ThemeContent />
+    </PluginGate>
   );
 }

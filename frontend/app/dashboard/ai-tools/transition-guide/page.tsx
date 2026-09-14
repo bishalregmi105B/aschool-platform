@@ -1,88 +1,47 @@
 "use client";
-/** Transition Guide — POST /ai/generate/transition_guide (wave-2). */
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { PageLoader } from "@/components/ui/spinner";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ArrowLeft, Compass, Sparkles } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
-import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
-  FormSection,
-  DataPanel,
-} from "@/components/aos/kit/page-kit";
+
+/**
+ * Transition Guide — POST /ai/generate/transition_guide.
+ * Research: MagicSchool's transition tool is a two-field generator whose
+ * output is shared with families — so the page carries an explicit
+ * "general national guidance, verify school rules" honesty line (corpus
+ * Part 2.8: labeled fallbacks, never silent overclaim).
+ */
+
+import { Compass } from "lucide-react";
+import { AiToolPage } from "../_components/ai-tool-page";
 
 interface Section { heading: string; content: string }
 interface Result { sections: Section[] }
 
 export default function TransitionGuidePage() {
-  return <PluginGate slug="ai_suite"><Content /></PluginGate>;
-}
-
-function Content() {
-  const [fromGrade, setFromGrade] = useState("10");
-  const [toGrade, setToGrade] = useState("11");
-  const [result, setResult] = useState<Result | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const gen = useMutation({
-    mutationFn: async () =>
-      (await api.post("/ai/generate/transition_guide", { from_grade: fromGrade, to_grade: toGrade })).data?.data as Result,
-    onSuccess: (d) => { setResult(d); setError(null); toast.success("Guide ready"); },
-    onError: (e: unknown) => setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Generation failed"),
-  });
-
   return (
-    <AOSPage>
-      <AOSPageHeader
-        icon={<Compass className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Transition Guide"
-        subtitle="What changes between grades — for students and guardians"
-        actions={
-          <Link href="/dashboard/ai-tools">
-            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
-          </Link>
-        }
-      />
-      <AOSPageBody>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <FormSection title="Transition">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>From grade</Label><Input value={fromGrade} onChange={(e) => setFromGrade(e.target.value)} /></div>
-                <div className="space-y-2"><Label>To grade</Label><Input value={toGrade} onChange={(e) => setToGrade(e.target.value)} /></div>
+    <AiToolPage
+      icon={Compass}
+      title="Transition Guide"
+      subtitle="Grade-transition prep for students and guardians"
+      subtitleNe="कक्षा-संक्रमण तयारी — विद्यार्थी र संरक्षकका लागि"
+      toolKey="transition_guide"
+      generateLabel="Write guide"
+      resultTitle="Guide"
+      resultHint="General national guidance — verify school-specific rules."
+      fields={[
+        { key: "from_grade", label: "From grade", ne: "कुन कक्षाबाट", required: true, defaultValue: "10" },
+        { key: "to_grade", label: "To grade", ne: "कुन कक्षामा", required: true, defaultValue: "11" },
+      ]}
+      renderResult={(data) => {
+        const result = data as Result;
+        return (
+          <div className="space-y-3">
+            {(result.sections || []).map((s, i) => (
+              <div key={i} className="rounded-md border border-[color:var(--w11-border-subtle)] p-3">
+                <p className="text-sm font-semibold text-[color:var(--w11-text-primary)]">{s.heading}</p>
+                <p className="text-sm mt-1 whitespace-pre-wrap text-[color:var(--w11-text-secondary)]">{s.content}</p>
               </div>
-              <Button className="w-full" onClick={() => gen.mutate()} disabled={!fromGrade || !toGrade || gen.isPending}>
-                <Sparkles className="h-4 w-4 mr-2" /> {gen.isPending ? "Writing…" : "Write guide"}
-              </Button>
-            </div>
-          </FormSection>
-          <DataPanel title="Guide">
-            {gen.isPending ? <PageLoader /> : error ? (
-              <EmptyState title="Couldn't write the guide" body={error} action={{ label: "Try again", onClick: () => gen.mutate() }} />
-            ) : !result ? (
-              <div className="text-center py-16 text-[color:var(--w11-text-secondary)]"><Compass className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>General national guidance — verify school-specific rules.</p></div>
-            ) : (
-              <div className="space-y-3">
-                {result.sections?.map((s, i) => (
-                  <div key={i} className="rounded-md border border-[color:var(--w11-border-subtle)] p-3">
-                    <p className="text-sm font-semibold text-[color:var(--w11-text-primary)]">{s.heading}</p>
-                    <p className="text-sm mt-1 whitespace-pre-wrap text-[color:var(--w11-text-secondary)]">{s.content}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </DataPanel>
-        </div>
-      </AOSPageBody>
-    </AOSPage>
+            ))}
+          </div>
+        );
+      }}
+    />
   );
 }

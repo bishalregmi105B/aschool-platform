@@ -221,8 +221,12 @@ function StatsSection({ c }: { c: C }) {
 
 function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const school = liveData?.school;
-  const location = school ? `${school.municipality || ""}, ${school.district || ""}`.replace(/^, |, $/, "") || "Location" : "Location";
-  const phone = school?.phone || "Contact Number";
+  // Null-safe metadata (audit §8.4: "null, Kathmandu" / "Established: –"):
+  // rows that have no data are NOT rendered — never a placeholder string.
+  const location = school
+    ? [school.municipality, school.district].filter(Boolean).join(", ") || String(c.address || "")
+    : "";
+  const phone = school?.phone || "";
   const estYear = school?.established_year_bs;
   const showVision = bool(c.show_vision, true);
   const showMission = bool(c.show_mission, false);
@@ -278,10 +282,9 @@ function AboutSection({ c, liveData }: { c: C; liveData?: LiveData }) {
           <div className="bg-gray-50 rounded-xl p-5 border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
             <h3 className="font-bold mb-3 text-sm" style={{ color: "var(--color-primary, #1e3a5f)" }}>Quick Info</h3>
             <div className="space-y-2 text-sm text-gray-500">
-              <div className="flex gap-2"><span>📍</span><span>{location}</span></div>
-              <div className="flex gap-2"><span>📞</span><span>{phone}</span></div>
+              {location && <div className="flex gap-2"><span>📍</span><span>{location}</span></div>}
+              {phone && <div className="flex gap-2"><span>📞</span><span>{phone}</span></div>}
               {estYear && <div className="flex gap-2"><span>🏫</span><span>Established: {estYear} BS</span></div>}
-              {!estYear && <div className="flex gap-2"><span>🏫</span><span>Established: –</span></div>}
             </div>
           </div>
         </div>
@@ -821,11 +824,14 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
   const slug = school?.slug;
   const showForm = bool(c.show_form, true);
   const showMap = bool(c.show_map, false);
-  const phone = school?.phone || str(c.phone, "+977-XX-XXXXXXX");
-  const email = school?.email || str(c.email, "info@school.edu.np");
-  const address = school
+  // Null-safe metadata: prefer live school data, fall back to the section's
+  // config, and hide a row entirely when neither has a value (no fake
+  // "+977-XX-XXXXXXX" ever reaching a public page).
+  const phone = school?.phone || str(c.phone, "");
+  const email = school?.email || str(c.email, "");
+  const address = (school
     ? [school.municipality, school.district, "Nepal"].filter(Boolean).join(", ")
-    : str(c.address, "School Address, District, Nepal");
+    : "") || str(c.address, "");
 
   return (
     <section className="py-14 bg-white">
@@ -838,18 +844,28 @@ function ContactSection({ c, liveData }: { c: C; liveData?: LiveData }) {
         </div>
         <div className={`grid gap-10 ${showMap ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1 lg:grid-cols-2"}`}>
           <div className="space-y-4">
-            <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
-              <span className="text-xl">📍</span>
-              <div><p className="font-semibold text-sm">Address</p><p className="text-sm text-gray-500">{address}</p></div>
-            </div>
-            <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
-              <span className="text-xl">📞</span>
-              <div><p className="font-semibold text-sm">Phone</p><p className="text-sm text-gray-500">{phone}</p></div>
-            </div>
-            <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
-              <span className="text-xl">✉️</span>
-              <div><p className="font-semibold text-sm">Email</p><p className="text-sm text-gray-500">{email}</p></div>
-            </div>
+            {address && (
+              <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                <span className="text-xl">📍</span>
+                <div><p className="font-semibold text-sm">Address</p><p className="text-sm text-gray-500">{address}</p></div>
+              </div>
+            )}
+            {phone && (
+              <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                <span className="text-xl">📞</span>
+                <div><p className="font-semibold text-sm">Phone</p><p className="text-sm text-gray-500">
+                  <a href={`tel:${phone}`} className="hover:underline">{phone}</a>
+                </p></div>
+              </div>
+            )}
+            {email && (
+              <div className="flex gap-3 p-4 rounded-xl border" style={{ borderColor: "var(--color-border, #e5e7eb)" }}>
+                <span className="text-xl">✉️</span>
+                <div><p className="font-semibold text-sm">Email</p><p className="text-sm text-gray-500 break-all">
+                  <a href={`mailto:${email}`} className="hover:underline">{email}</a>
+                </p></div>
+              </div>
+            )}
           </div>
           {showForm && (
             <div className={showMap ? "lg:col-span-1" : ""}>

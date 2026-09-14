@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listFormats,
@@ -8,20 +8,12 @@ import {
   runImport,
   getHistory,
   getTemplateUrl,
-  type IemisFormat,
   type ImportPreview,
   type ImportLog,
 } from "@/lib/services/iemis.service";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -30,12 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Wizard } from "@/components/ui/wizard";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { Spinner } from "@/components/ui/spinner";
 import {
   AOSPage,
   AOSPageHeader,
@@ -52,9 +42,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   History,
-  Eye,
   Download,
-  ChevronRight,
 } from "lucide-react";
 import { FilePicker } from "@/components/files/FilePicker";
 import {
@@ -63,32 +51,26 @@ import {
 } from "@/lib/services/files.service";
 import Link from "next/link";
 import { useAOSRouteParams } from "@/lib/aos-window-route";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-import { ICON_MAP } from "@/lib/icon-map";
+import { useI18n } from "@/lib/i18n";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+/**
+ * IEMIS Importer — A4 wizard (plan 34-42/4.3-6; NN/g import guidance:
+ * validate before commit, plain-language per-row errors, retry without
+ * restarting).
+ *
+ * Three steps: Upload → Detect (server dry-run summary: format, counts,
+ * warnings) → Preview & Commit (per-row grid + honest consequence line).
+ * The government workbook usually arrives by e-mail/USB, so step 1 accepts
+ * both a local file and a vault file via FilePicker. Detection is the real
+ * `/iemis/validate` dry run — nothing is guessed client-side and nothing is
+ * written before the final step.
+ */
 
-const STATUS_TONE: Record<ImportLog["status"], string> = {
-  pending: "subtle",
-  processing: "accent",
-  completed: "success",
-  partial: "warning",
-  failed: "error",
+const FORMAT_LABELS: Record<string, { en: string; ne: string }> = {
+  student_namewise: { en: "Student Name-wise Report", ne: "विद्यार्थी नाम-अनुसार प्रतिवेदन" },
+  school_level: { en: "School Level Report", ne: "विद्यालय-स्तर प्रतिवेदन" },
+  staff_details: { en: "Staff Details Report", ne: "कर्मचारी विवरण प्रतिवेदन" },
 };
-
-const FORMAT_LABELS: Record<string, string> = {
-  student_namewise: "Student Name-wise Report",
-  school_level: "School Level Report",
-};
-
-// Quick links — the iemis_importer manifest ui.nav.subitems.
-const QUICK_LINKS = [
-  { label: "Import Students", desc: "Student Name-wise Report", icon: "Users", href: "/dashboard/iemis-import?format=student_namewise" },
-  { label: "Import School Data", desc: "School Level Report", icon: "Building2", href: "/dashboard/iemis-import?format=school_level" },
-  { label: "Import History", desc: "Every past import run", icon: "History", href: "/dashboard/iemis-import/history" },
-];
-
-// ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function IemisImportPage() {
   return (
@@ -99,25 +81,25 @@ export default function IemisImportPage() {
 }
 
 function IemisImportContent() {
+  const { t } = useI18n();
   const searchParams = useAOSRouteParams();
   const initialFormat = searchParams.get("format") || "";
-  const [selectedFormat, setSelectedFormat] = useState<string>(
-    initialFormat === "student_namewise" || initialFormat === "school_level" ? initialFormat : "",
+  const [selectedFormat] = useState<string>(
+    FORMAT_LABELS[initialFormat] ? initialFormat : ""
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
+  const [doneLog, setDoneLog] = useState<ImportLog | null>(null);
   const [showFilePicker, setShowFilePicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  // ── Formats list ──
   const { data: formatsData, isLoading: formatsLoading } = useQuery({
     queryKey: ["iemis-formats"],
     queryFn: () => listFormats(),
   });
 
-  // ── Import history (sidebar summary) ──
-  const { data: historyData, isLoading: historyLoading } = useQuery({
+  const { data: historyData } = useQuery({
     queryKey: ["iemis-history"],
     queryFn: async () => {
       const res = await getHistory(1);
@@ -125,379 +107,419 @@ function IemisImportContent() {
     },
   });
 
-  // ── Validate (dry run) ──
-  const validateMutation = useMutation({
-    mutationFn: ({ file, format }: { file: File; format: string }) =>
-      validateImport(file, format || undefined),
-    onSuccess: (data) => {
-      setPreview(data);
-      setStep("preview");
-    },
-    onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { error?: string } } };
-      toast.error(axiosErr?.response?.data?.error || "Validation failed");
-    },
-  });
-
-  // ── Live import ──
   const importMutation = useMutation({
     mutationFn: ({ file, format }: { file: File; format: string }) =>
       runImport(file, format || undefined),
     onSuccess: (data) => {
-      toast.success(
-        `Import complete — ${data.imported_rows} rows imported, ${data.skipped_rows} skipped, ${data.error_rows} errors`,
-      );
       queryClient.invalidateQueries({ queryKey: ["iemis-history"] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      setStep("done");
+      setDoneLog(data);
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { error?: string } } };
-      toast.error(axiosErr?.response?.data?.error || "Import failed");
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error || t("Import failed", "आयात असफल"));
     },
   });
 
   const handleManagedFileSelect = async (files: ManagedFile[]) => {
     const mf = files[0];
     try {
-      // Fetch the picked vault file's bytes back as a native File so the
-      // existing validate/import multipart flow keeps working unchanged.
       const file = await fetchManagedFileAsFile(mf);
       setSelectedFile(file);
       setPreview(null);
-      setStep("upload");
     } catch {
-      toast.error("Failed to load file from the file manager");
+      toast.error(
+        t("Failed to load file from the file manager", "फाइल म्यानेजरबाट फाइल लोड गर्न सकिएन")
+      );
     }
   };
 
-  const handleValidate = () => {
-    if (!selectedFile) {
-      toast.error("Please select an Excel file first");
-      return;
-    }
-    validateMutation.mutate({ file: selectedFile, format: selectedFormat });
-  };
-
-  const handleImport = () => {
-    if (!selectedFile) return;
-    importMutation.mutate({ file: selectedFile, format: selectedFormat });
-  };
-
-  const handleReset = () => {
+  const reset = () => {
     setSelectedFile(null);
     setPreview(null);
-    setStep("upload");
-    setSelectedFormat("");
+    setDoneLog(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const invalidRows = preview ? Math.max(0, preview.total_rows - preview.valid_rows) : 0;
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<FileSpreadsheet className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="IEMIS Data Importer"
-        subtitle="Import Nepal Ministry of Education IEMIS reports directly into ASchool"
+        title={t("IEMIS Data Importer", "IEMIS डाटा आयात")}
+        subtitle={t(
+          "Import Nepal MoE IEMIS reports — validated row by row before anything is written",
+          "नेपाल शिक्षा मन्त्रालयका IEMIS प्रतिवेदन आयात — लेख्नुअघि प्रत्येक पङ्क्ति जाँचिन्छ"
+        )}
         actions={
           <Link href="/dashboard/iemis-import/history">
             <Button variant="outline" size="sm">
               <History className="h-4 w-4 mr-2" />
-              Import History
+              {t("Import History", "आयात इतिहास")}
             </Button>
           </Link>
         }
       />
       <AOSPageBody>
         <div className="max-w-5xl w-full mx-auto">
-          {/* Dashboard — KPI stat grid from the import history this page loads */}
           <StatGrid>
             <KpiCard
-              label="Imports Run"
+              label={t("Imports Run", "आयातहरू")}
               value={(historyData || []).length}
               icon={<FileSpreadsheet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
             />
             <KpiCard
-              label="Completed"
+              label={t("Completed", "सफल")}
               value={(historyData || []).filter((l) => l.status === "completed").length}
               color="#107c10"
               icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
             />
             <KpiCard
-              label="Needs Attention"
-              value={(historyData || []).filter((l) => l.status === "failed" || l.status === "partial" || l.status === "processing").length}
+              label={t("Needs Attention", "ध्यान आवश्यक")}
+              value={(historyData || []).filter((l) =>
+                ["failed", "partial", "processing"].includes(l.status)
+              ).length}
               color="#d83b01"
               icon={<AlertTriangle className="h-4 w-4" style={{ color: "#d83b01" }} />}
             />
             <KpiCard
-              label="Rows Imported"
+              label={t("Rows Imported", "आयात पङ्क्तिहरू")}
               value={(historyData || []).reduce((a, l) => a + (l.imported_rows || 0), 0)}
               color="var(--w11-text-primary)"
-              icon={<Upload className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             />
           </StatGrid>
 
-          {/* Quick links — 44px gradient icon tile + label, as next/link */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] || ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", marginBottom: 0 }}
-                  >
-                    <div
-                      className="rounded-[10px] flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        background: SECTION_GRADIENTS.Operations,
-                        boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
-                        {l.label}
-                      </p>
-                      <p className="text-[11px] leading-snug" style={{ color: "var(--w11-text-secondary)" }}>
-                        {l.desc}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <QuickLinks
+            section="Operations"
+            links={[
+              { label: t("Import Students", "विद्यार्थी आयात"), icon: "Users", href: "/dashboard/iemis-import?format=student_namewise" },
+              { label: t("Import School Data", "विद्यालय डाटा आयात"), icon: "Building2", href: "/dashboard/iemis-import?format=school_level" },
+              { label: t("Import History", "आयात इतिहास"), icon: "History", href: "/dashboard/iemis-import/history" },
+              { label: t("Compliance & EMIS", "अनुपालन र EMIS"), icon: "ShieldCheck", href: "/dashboard/compliance" },
+            ]}
+          />
 
           <Tabs defaultValue="import">
             <TabsList>
-              <TabsTrigger value="import">Import Data</TabsTrigger>
-              <TabsTrigger value="formats">Supported Formats</TabsTrigger>
+              <TabsTrigger value="import">{t("Import Data", "डाटा आयात")}</TabsTrigger>
+              <TabsTrigger value="formats">{t("Supported Formats", "समर्थित ढाँचाहरू")}</TabsTrigger>
             </TabsList>
 
-            {/* ── Import Tab ── */}
-            <TabsContent value="import" className="space-y-4 mt-4">
-
-              {/* Step 1: Upload */}
-              {step === "upload" && (
-                <DataPanel title={<span className="text-base">Step 1 — Select IEMIS Export File</span>}>
-                  <div className="space-y-4">
-                    {/* Format selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>Report Format (optional — auto-detected)</label>
-                      <Select value={selectedFormat || "auto"} onValueChange={(v) => setSelectedFormat(v === "auto" ? "" : v)}>
-                        <SelectTrigger className="w-full max-w-xs">
-                          <SelectValue placeholder="Auto-detect from file" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Auto-detect</SelectItem>
-                          <SelectItem value="student_namewise">Student Name-wise Report</SelectItem>
-                          <SelectItem value="school_level">School Level Report</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Template download */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={getTemplateUrl("student_namewise")}
-                        className="inline-flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5"
-                        style={{
-                          color: "var(--w11-accent)",
-                          background: "var(--w11-accent-light)",
-                          border: "1px solid var(--w11-accent)",
-                        }}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Download Student Template (.xlsx)
-                      </a>
-                      <a
-                        href={getTemplateUrl("school_level")}
-                        className="inline-flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5"
-                        style={{
-                          color: "var(--w11-accent)",
-                          background: "var(--w11-accent-light)",
-                          border: "1px solid var(--w11-accent)",
-                        }}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        School Level Template
-                      </a>
-                    </div>
-
-                    {/* File input */}
-                    <div
-                      className="border-2 border-dashed rounded-lg p-8 text-center transition-colors"
-                      style={{ borderColor: "var(--w11-border-strong)", background: "var(--w11-control-hover)" }}
-                    >
-                      <Upload className="h-8 w-8 mx-auto mb-2" style={{ color: "var(--w11-text-secondary)" }} />
-                      {selectedFile ? (
-                        <p className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>{selectedFile.name}</p>
-                      ) : (
-                        <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
-                          Select your IEMIS <span className="font-medium">.xlsx</span> file
-                        </p>
-                      )}
-                      <p className="text-xs mt-1 mb-3" style={{ color: "var(--w11-text-secondary)" }}>Supports .xlsx and .xls — max 20 MB</p>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setShowFilePicker(true)}>
-                          <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                          Choose from File Manager
-                        </Button>
-                      </div>
-                    </div>
-
-                    {selectedFile && (
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleValidate}
-                          disabled={validateMutation.isPending}
-                          className="flex-1 max-w-xs"
-                        >
-                          {validateMutation.isPending ? "Validating…" : "Validate & Preview"}
-                        </Button>
-                        <Button variant="outline" onClick={handleReset}>Clear</Button>
-                      </div>
-                    )}
-                  </div>
-                </DataPanel>
-              )}
-
-              {/* Step 2: Preview */}
-              {step === "preview" && preview && (
-                <div className="space-y-4">
-                  {/* Summary card */}
-                  <DataPanel
-                    title={
-                      <span className="text-base flex items-center gap-2">
-                        <Eye className="h-4 w-4" style={{ color: "var(--w11-accent)" }} /> Step 2 — Preview
-                      </span>
-                    }
-                  >
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <StatBox label="Format" value={FORMAT_LABELS[preview.format] ?? preview.format} />
-                        <StatBox label="File" value={preview.filename} />
-                        <StatBox label="Total Rows" value={String(preview.total_rows)} />
-                        <StatBox label="Valid Rows" value={String(preview.valid_rows)} highlight />
-                      </div>
-
-                      {preview.warnings.length > 0 && (
-                        <div
-                          className="rounded p-3"
-                          style={{ background: "rgba(255,185,0,0.10)", border: "1px solid rgba(255,185,0,0.35)" }}
-                        >
-                          <p className="text-xs font-medium flex items-center gap-1 mb-1" style={{ color: "#8a6116" }}>
-                            <AlertTriangle className="h-3.5 w-3.5" /> Warnings ({preview.warnings.length})
-                          </p>
-                          <ul className="text-xs space-y-0.5" style={{ color: "#8a6116" }}>
-                            {preview.warnings.map((w: string, i: number) => <li key={i}>• {w}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </DataPanel>
-
-                  {/* Data preview table */}
-                  {preview.preview.length > 0 && (
-                    <DataPanel
-                      bodyClassName="overflow-x-auto"
-                      title={
-                        <span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
-                          Data Preview (first {preview.preview.length} rows)
-                        </span>
-                      }
-                    >
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            {Object.keys(preview.preview[0]).filter((k) => k !== "row").map((k) => (
-                              <TableHead key={k} className="text-xs whitespace-nowrap">{k}</TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {preview.preview.map((row: Record<string, string | number | null>, i: number) => (
-                            <TableRow key={i}>
-                              {Object.entries(row)
-                                .filter(([k]) => k !== "row")
-                                .map(([k, v]) => (
-                                  <TableCell key={k} className="text-xs whitespace-nowrap max-w-[160px] truncate">
-                                    {v != null ? String(v) : "—"}
-                                  </TableCell>
-                                ))}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </DataPanel>
+            <TabsContent value="import" className="mt-4">
+              {doneLog ? (
+                <ImportResult log={doneLog} onReset={reset} />
+              ) : (
+                <Wizard
+                  finishLabel={t(
+                    `Import ${preview?.valid_rows ?? 0} Rows`,
+                    `${preview?.valid_rows ?? 0} पङ्क्ति आयात`
                   )}
+                  onFinish={async () => {
+                    if (!selectedFile) return;
+                    await importMutation.mutateAsync({
+                      file: selectedFile,
+                      format: selectedFormat,
+                    });
+                  }}
+                  steps={[
+                    {
+                      key: "upload",
+                      title: t("Upload", "अपलोड"),
+                      description: t(
+                        "Choose the government Excel file",
+                        "सरकारी Excel फाइल छान्नुहोस्"
+                      ),
+                      validate: () =>
+                        selectedFile
+                          ? null
+                          : t("Please choose a file first", "कृपया पहिले फाइल छान्नुहोस्"),
+                      validateAsync: async () => {
+                        if (!selectedFile)
+                          return t("Please choose a file first", "कृपया पहिले फाइल छान्नुहोस्");
+                        if (preview && preview.filename === selectedFile.name) return null;
+                        try {
+                          const p = await validateImport(selectedFile, selectedFormat || undefined);
+                          setPreview(p);
+                          return null;
+                        } catch (err: unknown) {
+                          const e = err as { response?: { data?: { error?: string } } };
+                          return (
+                            e?.response?.data?.error ||
+                            t("The file could not be read", "फाइल पढ्न सकिएन")
+                          );
+                        }
+                      },
+                      content: (
+                        <div className="space-y-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <Upload className="h-3.5 w-3.5 mr-1.5" />
+                              {t("Choose from this device", "यही यन्त्रबाट छान्नुहोस्")}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowFilePicker(true)}
+                            >
+                              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                              {t("Choose from File Manager", "फाइल म्यानेजरबाट छान्नुहोस्")}
+                            </Button>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".xlsx,.xls,.csv"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0] || null;
+                                setSelectedFile(f);
+                                setPreview(null);
+                              }}
+                            />
+                          </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleImport}
-                      disabled={importMutation.isPending}
-                      style={{ background: "#107c10" }}
-                    >
-                      {importMutation.isPending ? "Importing…" : `Import ${preview.valid_rows} Rows`}
-                    </Button>
-                    <Button variant="outline" onClick={handleReset}>Start Over</Button>
-                  </div>
-                </div>
-              )}
+                          <div
+                            className="border-2 border-dashed rounded-lg p-8 text-center transition-colors"
+                            style={{
+                              borderColor: "var(--w11-border-strong)",
+                              background: "var(--w11-control-hover)",
+                            }}
+                          >
+                            <FileSpreadsheet
+                              className="h-8 w-8 mx-auto mb-2"
+                              style={{ color: "var(--w11-text-secondary)" }}
+                            />
+                            {selectedFile ? (
+                              <p className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>
+                                {selectedFile.name}
+                              </p>
+                            ) : (
+                              <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                                {t("No file chosen yet", "अहिलेसम्म फाइल छानिएको छैन")}
+                              </p>
+                            )}
+                            <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
+                              {t(
+                                "Supports .xlsx, .xls, .csv — max 20 MB. Format is auto-detected.",
+                                ".xlsx, .xls, .csv समर्थित — अधिकतम 20 MB। ढाँचा स्वचालित पहिचान हुन्छ।"
+                              )}
+                            </p>
+                          </div>
 
-              {/* Step 3: Done */}
-              {step === "done" && (
-                <DataPanel>
-                  <div className="py-10 text-center space-y-3">
-                    <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: "#107c10" }} />
-                    <p className="font-semibold text-lg" style={{ color: "var(--w11-text-primary)" }}>Import Complete!</p>
-                    <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
-                      Your IEMIS data has been imported. Check import history for details.
-                    </p>
-                    <div className="flex gap-2 justify-center">
-                      <Button onClick={handleReset}>Import Another File</Button>
-                      <Link href="/dashboard/iemis-import/history">
-                        <Button variant="outline">View History</Button>
-                      </Link>
-                    </div>
-                  </div>
-                </DataPanel>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                              {t("Blank government templates:", "खाली सरकारी ढाँचाहरू:")}
+                            </span>
+                            {Object.keys(FORMAT_LABELS).map((code) => (
+                              <a
+                                key={code}
+                                href={getTemplateUrl(code)}
+                                className="inline-flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1"
+                                style={{
+                                  color: "var(--w11-accent)",
+                                  background: "var(--w11-accent-light)",
+                                  border: "1px solid var(--w11-accent)",
+                                }}
+                              >
+                                <Download className="h-3 w-3" />
+                                {t(FORMAT_LABELS[code].en, FORMAT_LABELS[code].ne)}
+                              </a>
+                            ))}
+                          </div>
+                          <p className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                            {t(
+                              "Next runs a server-side dry-run validation — nothing is written yet.",
+                              "Next ले सर्भर-साइड ड्राई-रन जाँच गर्छ — अहिलेसम्म केही लेखिएको छैन।"
+                            )}
+                          </p>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "detect",
+                      title: t("Detect", "पहिचान"),
+                      description: t("Server dry-run results", "सर्भर ड्राई-रन नतिजा"),
+                      validate: () =>
+                        preview
+                          ? null
+                          : t(
+                              "Validation did not run — go back and press Next again",
+                              "जाँच भएन — पछाडि फर्केर Next थिच्नुहोस्"
+                            ),
+                      content: preview ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <StatBox
+                              label={t("Detected format", "पहिचान ढाँचा")}
+                              value={
+                                FORMAT_LABELS[preview.format]
+                                  ? t(FORMAT_LABELS[preview.format].en, FORMAT_LABELS[preview.format].ne)
+                                  : preview.format
+                              }
+                            />
+                            <StatBox label={t("File", "फाइल")} value={preview.filename} />
+                            <StatBox
+                              label={t("Total rows", "कुल पङ्क्ति")}
+                              value={String(preview.total_rows)}
+                            />
+                            <StatBox
+                              label={t("Valid rows", "मान्य पङ्क्ति")}
+                              value={String(preview.valid_rows)}
+                              highlight
+                            />
+                          </div>
+                          {invalidRows > 0 && (
+                            <div
+                              className="win11-infobar error text-[12px]"
+                              style={{ padding: "8px 12px" }}
+                            >
+                              {t(
+                                `${invalidRows} row(s) will be skipped — the exact reason per row is reported after the run in History.`,
+                                `${invalidRows} पङ्क्ति छोडिनेछ — प्रत्येक पङ्क्तिको कारण आयातपछि इतिहासमा हेर्नुहोस्।`
+                              )}
+                            </div>
+                          )}
+                          {preview.warnings.length > 0 && (
+                            <div
+                              className="win11-infobar warning text-[12px]"
+                              style={{ padding: "8px 12px" }}
+                            >
+                              <p className="font-medium mb-1">
+                                {t(
+                                  `Warnings (${preview.warnings.length})`,
+                                  `चेतावनी (${preview.warnings.length})`
+                                )}
+                              </p>
+                              <ul className="space-y-0.5">
+                                {preview.warnings.map((w, i) => (
+                                  <li key={i}>• {w}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ) : null,
+                    },
+                    {
+                      key: "preview",
+                      title: t("Preview & Commit", "पूर्वावलोकन र पुष्टि"),
+                      description: t(
+                        "Check the rows, then import",
+                        "पङ्क्तिहरू हेर्नुहोस्, अनि आयात"
+                      ),
+                      content: preview ? (
+                        <div className="space-y-3">
+                          <DataPanel
+                            bodyClassName="overflow-x-auto p-0"
+                            title={
+                              <span
+                                className="text-[12px]"
+                                style={{ color: "var(--w11-text-secondary)" }}
+                              >
+                                {t(
+                                  `Preview — first ${preview.preview.length} valid rows`,
+                                  `पूर्वावलोकन — पहिलो ${preview.preview.length} मान्य पङ्क्ति`
+                                )}
+                              </span>
+                            }
+                          >
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {Object.keys(preview.preview[0] || { full_name: "" })
+                                    .filter((k) => k !== "row")
+                                    .map((k) => (
+                                      <TableHead key={k} className="text-xs whitespace-nowrap">
+                                        {k}
+                                      </TableHead>
+                                    ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {preview.preview.map((row, i) => (
+                                  <TableRow key={i}>
+                                    {Object.entries(row)
+                                      .filter(([k]) => k !== "row")
+                                      .map(([k, v]) => (
+                                        <TableCell
+                                          key={k}
+                                          className="text-xs whitespace-nowrap max-w-[160px] truncate"
+                                        >
+                                          {v != null ? String(v) : "—"}
+                                        </TableCell>
+                                      ))}
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </DataPanel>
+                          <p className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                            {t(
+                              "Importing writes to live records and cannot be undone from this screen — a full per-row log is kept in History.",
+                              "आयातले प्रत्यक्ष रेकर्डमा लेख्छ — पूर्ण लग इतिहासमा राखिन्छ।"
+                            )}
+                          </p>
+                        </div>
+                      ) : null,
+                    },
+                  ]}
+                />
               )}
             </TabsContent>
 
-            {/* ── Formats Tab ── */}
             <TabsContent value="formats" className="mt-4">
               {formatsLoading ? (
-                <AOSModuleLoadingState label="Loading formats…" />
+                <AOSModuleLoadingState label={t("Loading formats…", "ढाँचा लोड हुँदैछ…")} />
               ) : (
                 <div className="space-y-4">
                   {(formatsData ?? []).map((fmt) => (
                     <DataPanel
                       key={fmt.code}
                       title={
-                        <span className="text-base flex items-center gap-2">
-                          <FileSpreadsheet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
+                        <span className="text-[13px] flex items-center gap-2">
+                          <FileSpreadsheet
+                            className="h-4 w-4"
+                            style={{ color: "var(--w11-accent)" }}
+                          />
                           {fmt.name}
                           <span className="win11-chip subtle text-xs font-mono">{fmt.code}</span>
                         </span>
                       }
                     >
-                      <p className="text-xs mb-3" style={{ color: "var(--w11-text-secondary)" }}>Sheet: {fmt.sheet}</p>
+                      <p className="text-xs mb-3" style={{ color: "var(--w11-text-secondary)" }}>
+                        {t("Sheet", "सिट")}: {fmt.sheet}
+                      </p>
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="text-xs">IEMIS Column</TableHead>
-                              <TableHead className="text-xs">ASchool Field</TableHead>
+                              <TableHead className="text-xs">
+                                {t("IEMIS Column", "IEMIS पङ्क्तिशीर्षक")}
+                              </TableHead>
+                              <TableHead className="text-xs">
+                                {t("ASchool Field", "ASchool फिल्ड")}
+                              </TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {fmt.columns.map((col) => (
                               <TableRow key={col.iemis_column}>
-                                <TableCell className="text-xs font-mono" style={{ color: "var(--w11-text-secondary)" }}>{col.iemis_column}</TableCell>
-                                <TableCell className="text-xs font-mono" style={{ color: "var(--w11-accent)" }}>{col.aschool_field}</TableCell>
+                                <TableCell
+                                  className="text-xs font-mono"
+                                  style={{ color: "var(--w11-text-secondary)" }}
+                                >
+                                  {col.iemis_column}
+                                </TableCell>
+                                <TableCell
+                                  className="text-xs font-mono"
+                                  style={{ color: "var(--w11-accent)" }}
+                                >
+                                  {col.aschool_field}
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -515,32 +537,88 @@ function IemisImportContent() {
           open={showFilePicker}
           onOpenChange={setShowFilePicker}
           onSelect={handleManagedFileSelect}
-          title="Select IEMIS Spreadsheet"
+          title={t("Select IEMIS Spreadsheet", "IEMIS स्प्रेडसिट छान्नुहोस्")}
         />
       </AOSPageBody>
     </AOSPage>
   );
 }
 
-// ── Small stat box ─────────────────────────────────────────────────────────
-function StatBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function ImportResult({ log, onReset }: { log: ImportLog; onReset: () => void }) {
+  const { t } = useI18n();
+  const errors = log.errors || [];
+  const ok = log.status === "completed";
+  return (
+    <DataPanel>
+      <div className="py-8 text-center space-y-3">
+        <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: ok ? "#107c10" : "#d83b01" }} />
+        <p className="font-semibold text-lg" style={{ color: "var(--w11-text-primary)" }}>
+          {ok
+            ? t("Import complete", "आयात सम्पन्न")
+            : t("Import finished with problems", "केही समस्यासहित आयात सम्पन्न")}
+        </p>
+        <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+          {t(
+            `${log.imported_rows} imported · ${log.skipped_rows} skipped · ${log.error_rows} errors`,
+            `${log.imported_rows} आयात · ${log.skipped_rows} छोडिएको · ${log.error_rows} त्रुटि`
+          )}
+        </p>
+        {errors.length > 0 && (
+          <div className="max-w-md mx-auto text-left">
+            <div className="win11-infobar error text-[12px]" style={{ padding: "8px 12px" }}>
+              <p className="font-medium mb-1">
+                {t("Per-row errors", "पङ्क्ति-अनुसार त्रुटिहरू")}:
+              </p>
+              <ul className="space-y-0.5 max-h-40 overflow-y-auto">
+                {errors.slice(0, 50).map((e, i) => (
+                  <li key={i}>
+                    {e.row != null ? t(`Row ${e.row}`, `पङ्क्ति ${e.row}`) : "#"}: {e.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2 justify-center pt-2">
+          <Button onClick={onReset}>
+            {t("Import another file", "अर्को फाइल आयात")}
+          </Button>
+          <Link href="/dashboard/iemis-import/history">
+            <Button variant="outline">{t("View History", "इतिहास हेर्नुहोस्")}</Button>
+          </Link>
+        </div>
+      </div>
+    </DataPanel>
+  );
+}
+
+function StatBox({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
     <div
       className="rounded-lg p-3 border text-center"
       style={
         highlight
-          ? {
-              background: "rgba(16,124,16,0.08)",
-              borderColor: "rgba(16,124,16,0.35)",
-            }
-          : {
-              background: "var(--w11-control-hover)",
-              borderColor: "var(--w11-border-subtle)",
-            }
+          ? { background: "rgba(16,124,16,0.08)", borderColor: "rgba(16,124,16,0.35)" }
+          : { background: "var(--w11-control-hover)", borderColor: "var(--w11-border-subtle)" }
       }
     >
-      <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{label}</p>
-      <p className="text-sm font-semibold truncate" style={{ color: highlight ? "#107c10" : "var(--w11-text-primary)" }}>{value}</p>
+      <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+        {label}
+      </p>
+      <p
+        className="text-sm font-semibold truncate"
+        style={{ color: highlight ? "#107c10" : "var(--w11-text-primary)" }}
+      >
+        {value}
+      </p>
     </div>
   );
 }

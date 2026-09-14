@@ -21,6 +21,8 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Banknote } from "lucide-react";
 
 interface Fine {
@@ -42,6 +44,7 @@ export default function FinesPage() {
 
 function FinesContent() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [status, setStatus] = useState("unpaid");
   const [payFine, setPayFine] = useState<Fine | null>(null);
   const [payAmount, setPayAmount] = useState("");
@@ -109,7 +112,15 @@ function FinesContent() {
             setPayAmount(String(f.amount - f.paid_amount));
           }}><Banknote className="h-3 w-3 mr-1" /> Pay</Button>
           <Button size="sm" variant="outline" disabled={waive.isPending}
-            onClick={(e) => { e.stopPropagation(); waive.mutate(f); }}>Waive</Button>
+            onClick={(e) => {
+              e.stopPropagation();
+              confirm({
+                title: "Waive this fine?",
+                body: `Rs ${f.amount.toFixed(2)} for ${f.student_name}${f.book_title ? ` — ${f.book_title}` : ""} will be written off with no payment.`,
+                confirmLabel: "Waive",
+                tone: "danger",
+              }).then((ok) => { if (ok) waive.mutate(f); });
+            }}>Waive</Button>
         </div>
       ) : null
     ) },
@@ -165,16 +176,17 @@ function FinesContent() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Method</Label>
-                  <select
-                    className="w-full rounded-md border border-[var(--w11-control-border)] px-3 py-2 text-sm"
-                    style={{ background: "var(--w11-control-bg)", color: "var(--w11-text-primary)" }}
-                    value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
-                    <option value="cash">Cash</option>
-                    <option value="esewa">eSewa</option>
-                    <option value="khalti">Khalti</option>
-                    <option value="fonepay">FonePay</option>
-                    <option value="voucher">Voucher</option>
-                  </select>
+                  <AdvancedSelect
+                    value={payMethod}
+                    onChange={setPayMethod}
+                    options={[
+                      { value: "cash", label: "Cash" },
+                      { value: "esewa", label: "eSewa" },
+                      { value: "khalti", label: "Khalti" },
+                      { value: "fonepay", label: "FonePay" },
+                      { value: "voucher", label: "Voucher" },
+                    ]}
+                  />
                 </div>
                 <Button className="w-full" disabled={pay.isPending} onClick={() => pay.mutate()}>
                   Record payment

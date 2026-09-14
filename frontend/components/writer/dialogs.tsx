@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
-  replaceAllMatches, replaceCurrentMatch, findNextMatch, setFindState, countMatches,
+  replaceAllMatches, replaceCurrentMatch, findNextMatch, setFindState, countMatches, findReplaceKey,
 } from "@/lib/writer/findReplace";
 import { WORDART_STYLES } from "@/lib/writer/settings";
 import type { WriterCtx } from "@/components/writer/context";
@@ -35,7 +35,18 @@ export function FindReplaceDialog({
   const [replacement, setReplacement] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
+  // 1-based position of the highlighted "current" match — read from the
+  // ProseMirror plugin state after every navigation (wave-J: the old copy
+  // said "N matches highlighted" but never where you were in them).
+  const [pos, setPos] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const refreshPos = () => {
+    const s = findReplaceKey.getState(editor.state);
+    const total = s?.query ? countMatches(editor, s.query, s.caseSensitive) : 0;
+    setMatchCount(total);
+    setPos(total && s ? (s.index % total) + 1 : 0);
+  };
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
@@ -46,13 +57,16 @@ export function FindReplaceDialog({
   useEffect(() => {
     setFindState(editor, { query, caseSensitive, index: 0 });
     setMatchCount(query ? countMatches(editor, query, caseSensitive) : 0);
+    setPos(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, caseSensitive]);
 
   const doReplaceAll = () => {
     const n = replaceAllMatches(editor, replacement);
-    if (n) { toast.success(`Replaced ${n} occurrence${n > 1 ? "s" : ""}`); setMatchCount(0); }
-    else toast.info("No matches to replace");
+    if (n) {
+      toast.success(`Replaced ${n} occurrence${n > 1 ? "s" : ""}`);
+      setTimeout(refreshPos, 0);
+    } else toast.info("No matches to replace");
   };
 
   return (
@@ -67,19 +81,24 @@ export function FindReplaceDialog({
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") findNextMatch(editor, e.shiftKey ? -1 : 1); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { findNextMatch(editor, e.shiftKey ? -1 : 1); setTimeout(refreshPos, 0); }
+                }}
                 placeholder="Search the document…"
                 className="h-8 text-sm"
               />
-              <Button size="icon" variant="outline" className="h-8 w-8" title="Previous match" onClick={() => findNextMatch(editor, -1)}>
+              <Button size="icon" variant="outline" className="h-8 w-8" title="Previous match (Shift+Enter)" onClick={() => { findNextMatch(editor, -1); setTimeout(refreshPos, 0); }}>
                 <ChevronUp className="h-4 w-4" />
               </Button>
-              <Button size="icon" variant="outline" className="h-8 w-8" title="Next match" onClick={() => findNextMatch(editor, 1)}>
+              <Button size="icon" variant="outline" className="h-8 w-8" title="Next match (Enter)" onClick={() => { findNextMatch(editor, 1); setTimeout(refreshPos, 0); }}>
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </div>
             <div className="text-[10px] text-[var(--w11-text-secondary)] mt-1">
-              {query ? `${matchCount} match${matchCount === 1 ? "" : "es"} highlighted` : "All matches are highlighted as you type"}
+              {!query ? "All matches are highlighted as you type"
+                : matchCount === 0 ? "No matches in this document"
+                : pos > 0 ? `Match ${pos} of ${matchCount} · Enter = next, Shift+Enter = previous`
+                : `${matchCount} match${matchCount === 1 ? "" : "es"} · press Enter to jump`}
             </div>
           </div>
 
@@ -88,7 +107,7 @@ export function FindReplaceDialog({
               <Label className="text-[10px]">Replace with</Label>
               <Input value={replacement} onChange={(e) => setReplacement(e.target.value)} className="h-8 text-sm" />
               <div className="flex gap-2 mt-2">
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => replaceCurrentMatch(editor, replacement)}>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { replaceCurrentMatch(editor, replacement); setTimeout(refreshPos, 0); }}>
                   Replace
                 </Button>
                 <Button size="sm" className="h-7 text-xs" onClick={doReplaceAll}>

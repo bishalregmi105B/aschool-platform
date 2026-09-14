@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
+import { useDebounced, useUrlFilters } from "@/components/ui/filter-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,9 +79,11 @@ const PER_PAGE = 20;
 
 export default function ParentsPage() {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const { values, setValues } = useUrlFilters(["page", "q", "status"]);
+  const page = Math.max(1, parseInt(values.page || "1", 10) || 1);
+  const [searchInput, setSearchInput] = useState(values.q || "");
+  const search = useDebounced(searchInput, 300);
+  const statusFilter = values.status || "all";
   const [showAdd, setShowAdd] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [form, setForm] = useState({
@@ -469,10 +472,10 @@ export default function ParentsPage() {
             <Input
               placeholder="Search parent by name, phone, or email..."
               className="pl-9"
-              value={search}
+              value={searchInput}
               onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
+                setSearchInput(e.target.value);
+                setValues({ q: e.target.value, page: "" });
               }}
             />
           </div>
@@ -480,8 +483,7 @@ export default function ParentsPage() {
           <Select
             value={statusFilter}
             onValueChange={(value) => {
-              setStatusFilter(value);
-              setPage(1);
+              setValues({ status: value === "all" ? "" : value, page: "" });
             }}
           >
             <SelectTrigger className="w-full md:w-52">
@@ -501,8 +503,8 @@ export default function ParentsPage() {
             rows={parents}
             rowKey={(pr) => pr.id}
             searchable
-            searchValue={search}
-            onSearchChange={setSearch}
+            searchValue={searchInput}
+            onSearchChange={(v) => { setSearchInput(v); setValues({ q: v, page: "" }); }}
             searchPlaceholder="Search parents…"
             exportFileName="parents"
             pagination={pagination ? {
@@ -513,7 +515,7 @@ export default function ParentsPage() {
               has_next: pagination.has_next,
               has_prev: pagination.has_prev,
             } : undefined}
-            onPageChange={setPage}
+            onPageChange={(n) => setValues({ page: String(n) })}
             empty={{ icon: ShieldCheck, title: "No parent accounts found", body: "Parent accounts are created from guardian records." }}
           />
         </DataPanel>

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +55,7 @@ function formatMessageTime(iso: string | null): string {
 }
 
 function WhatsAppConversationsContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
@@ -96,13 +98,33 @@ function WhatsAppConversationsContent() {
       });
       return res.data;
     },
-    onSuccess: () => {
-      toast.success("Reply sent");
+    onSuccess: (d) => {
+      // Honest outcome (plan 6.1-10): the service returns {skipped:true,
+      // reason:"whatsapp_not_configured"} when credentials are missing, and
+      // {error} on delivery failure — neither is a "Reply sent".
+      const r = d?.data || {};
+      if (r.skipped) {
+        toast.error(
+          t(
+            "WhatsApp is not configured for this school — nothing was sent. Set it up in WhatsApp Bot settings.",
+            "यस विद्यालयका लागि WhatsApp कन्फिगर भएको छैन — केही पठाइएन।"
+          )
+        );
+        return;
+      }
+      if (r.error) {
+        toast.error(`${t("Delivery failed:", "डेलिभरी असफल:")} ${typeof r.error === "string" ? r.error : r.error.message || "WhatsApp API error"}`);
+        return;
+      }
+      toast.success(t("Reply sent", "जवाफ पठाइयो"));
       setReplyDraft("");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-conversation", selectedPhone] });
       queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
     },
-    onError: () => toast.error("Failed to send reply"),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error || t("Failed to send reply", "जवाफ पठाउन सकिएन"));
+    },
   });
 
   if (isLoading) return <AOSModuleLoadingState label="Loading conversations…" />;

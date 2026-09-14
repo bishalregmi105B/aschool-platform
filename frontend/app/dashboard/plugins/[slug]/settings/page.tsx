@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAOSPathParam } from "@/lib/aos-window-route";
@@ -28,7 +28,7 @@ import {
   setPath as frSetPath,
   type V2Schema,
 } from "@/components/config/form-renderer";
-import { ArrowLeft, Plus, Save, Trash2, Plug } from "lucide-react";
+import { ArrowLeft, Plus, Save, Trash2, Plug, RotateCcw, Eye, EyeOff } from "lucide-react";
 import {
   AOSPage,
   AOSPageHeader,
@@ -152,6 +152,105 @@ function parseJsonDefault(raw: string): unknown {
   }
 }
 
+/**
+ * TextControl — text/number input; credential-looking keys render masked with
+ * a reveal toggle (plan 48.5 "secret fields render masked with reveal").
+ */
+function TextControl({
+  id,
+  field,
+  secret,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  field: DraftField;
+  secret?: boolean;
+  disabled?: boolean;
+  onChange: (next: DraftField) => void;
+}) {
+  const [reveal, setReveal] = useState(false);
+  const masked = secret && field.kind === "string" && field.text !== "";
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={field.kind === "number" ? "number" : masked && !reveal ? "password" : "text"}
+        value={field.text}
+        disabled={disabled}
+        className={masked ? "pr-16" : undefined}
+        onChange={(e) => onChange({ ...field, text: e.target.value })}
+      />
+      {masked && (
+        <button
+          type="button"
+          onClick={() => setReveal((r) => !r)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+          style={{ color: "var(--w11-text-tertiary)" }}
+          aria-label={reveal ? "Hide value" : "Reveal value"}
+        >
+          {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Heuristic: schema keys/labels that read like credentials get masked input. */
+function looksSecret(keyOrLabel: string): boolean {
+  return /(secret|token|password|api[_-]?key|private[_-]?key|key$|_key)/i.test(
+    keyOrLabel.trim(),
+  );
+}
+
+/**
+ * Section-scoped save controls (plan 48.5): Save/Reset live per section with
+ * change detection, plus the transient "Saved ✓" flash.
+ */
+function SectionControls({
+  dirty,
+  saving,
+  saved,
+  onSave,
+  onReset,
+  showReset = true,
+}: {
+  dirty: boolean;
+  saving: boolean;
+  saved: boolean;
+  onSave: () => void;
+  onReset?: () => void;
+  showReset?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {saved ? (
+        <span
+          className="text-[12px] font-semibold"
+          style={{ color: "var(--w11-success, #107c10)" }}
+          role="status"
+        >
+          Saved ✓
+        </span>
+      ) : dirty ? (
+        <span className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+          Unsaved changes
+        </span>
+      ) : null}
+      {showReset && dirty && onReset && (
+        <Button variant="ghost" size="sm" disabled={saving} onClick={onReset} title="Discard changes in this section">
+          <RotateCcw className="h-3.5 w-3.5 mr-1" />
+          Reset
+        </Button>
+      )}
+      <Button size="sm" disabled={!dirty || saving} onClick={onSave}>
+        {saving ? <Spinner size="sm" className="mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+        {saving ? "Saving…" : "Save"}
+      </Button>
+    </div>
+  );
+}
+
 export default function PluginSettingsPage() {
   const params = useParams<{ slug: string }>();
   const slug = useAOSPathParam(2) || (typeof params?.slug === "string" ? params.slug : "");
@@ -202,6 +301,18 @@ export default function PluginSettingsPage() {
   const [newKey, setNewKey] = useState("");
   const [newKind, setNewKind] = useState<FieldKind>("string");
 
+  // Per-section save grammar (plan 48.5): each section's Save only commits
+  // that section's drafts; the other section keeps its server-committed
+  // baseline, so half-typed edits can never be saved implicitly.
+  const [schemaBaseline, setSchemaBaseline] = useState<Record<string, DraftField>>({});
+  const [extraBaseline, setExtraBaseline] = useState<Record<string, DraftField>>({});
+  const [savedSection, setSavedSection] = useState<string | null>(null);
+  const pendingSection = useRef<string | null>(null);
+  const sentDrafts = useRef<{
+    schema: Record<string, DraftField>;
+    extras: Record<string, DraftField>;
+  } | null>(null);
+
   // Top-level config keys claimed by schema fields (dot-path roots).
   const schemaTopKeys = useMemo(
     () => new Set(schemaFields.map((f) => f.key.split(".")[0])),
@@ -224,26 +335,29 @@ export default function PluginSettingsPage() {
       return;
     }
     if (schemaFields.length > 0) {
-      setSchemaDrafts(
-        Object.fromEntries(
-          schemaFields.map((f) => [
-            f.key,
-            toDraft(getPath(clean, f.key) ?? f.default, f.type),
-          ])
-        )
+      const drafts = Object.fromEntries(
+        schemaFields.map((f) => [
+          f.key,
+          toDraft(getPath(clean, f.key) ?? f.default, f.type),
+        ])
       );
-      setExtraDrafts(
-        Object.fromEntries(
-          Object.entries(clean)
-            .filter(([k]) => !schemaTopKeys.has(k))
-            .map(([k, v]) => [k, toDraft(v)])
-        )
+      const extras = Object.fromEntries(
+        Object.entries(clean)
+          .filter(([k]) => !schemaTopKeys.has(k))
+          .map(([k, v]) => [k, toDraft(v)])
       );
+      setSchemaDrafts(drafts);
+      setSchemaBaseline(drafts);
+      setExtraDrafts(extras);
+      setExtraBaseline(extras);
     } else {
-      setSchemaDrafts({});
-      setExtraDrafts(
-        Object.fromEntries(Object.entries(clean).map(([k, v]) => [k, toDraft(v)]))
+      const extras = Object.fromEntries(
+        Object.entries(clean).map(([k, v]) => [k, toDraft(v)])
       );
+      setSchemaDrafts({});
+      setSchemaBaseline({});
+      setExtraDrafts(extras);
+      setExtraBaseline(extras);
     }
   }, [data, schemaFields, schemaTopKeys, v2Schema]);
 
@@ -262,6 +376,14 @@ export default function PluginSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["plugins-config", slug] });
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
       setV2Errors({});
+      // The saved drafts are now the server truth — commit the baselines so
+      // the dirty flag clears for the section that was saved.
+      setSchemaBaseline(sentDrafts.current?.schema ?? {});
+      setExtraBaseline(sentDrafts.current?.extras ?? {});
+      if (pendingSection.current) {
+        setSavedSection(pendingSection.current);
+        pendingSection.current = null;
+      }
       toast.success("Settings saved");
     },
     onError: (err: unknown) => {
@@ -281,7 +403,8 @@ export default function PluginSettingsPage() {
     },
   });
 
-  const handleSave = () => {
+  const handleSave = (scope: "all" | "schema" | "extras" | "v2" = "all") => {
+    pendingSection.current = scope === "all" ? "all" : scope;
     // Base: the stored config (reserved keys stripped, deep-cloned) so unknown
     // nested structures survive the ?replace=1 full-dict save.
     const payload: Record<string, unknown> = data
@@ -306,10 +429,19 @@ export default function PluginSettingsPage() {
       return;
     }
 
+    // Per-section saves commit ONLY that section's drafts; the other section
+    // is written back from its committed baseline (never its dirty draft).
+    const useSchema = scope === "all" || scope === "schema";
+    const useExtras = scope === "all" || scope === "extras";
+    const schemaValues = useSchema ? schemaDrafts : schemaBaseline;
+    const extraValues = useExtras ? extraDrafts : extraBaseline;
+    // What the server will hold after this save — becomes the new baseline.
+    sentDrafts.current = { schema: schemaValues, extras: extraValues };
+
     // Extra (schema-undeclared) keys: validate, then REPLACE the top-level
     // keys not claimed by the schema — keys the user removed actually drop.
     const extras: Record<string, unknown> = {};
-    for (const [key, field] of Object.entries(extraDrafts)) {
+    for (const [key, field] of Object.entries(extraValues)) {
       const parsed = fromDraft(field);
       if (!parsed.ok) {
         toast.error(`"${key}" ${parsed.error}`);
@@ -324,7 +456,7 @@ export default function PluginSettingsPage() {
     }
     Object.assign(payload, extras);
     // Schema values set at their dot-paths last — they win over stored state.
-    for (const [key, field] of Object.entries(schemaDrafts)) {
+    for (const [key, field] of Object.entries(schemaValues)) {
       const parsed = fromDraft(field);
       if (!parsed.ok) {
         toast.error(`"${key}" ${parsed.error}`);
@@ -333,6 +465,23 @@ export default function PluginSettingsPage() {
       setPath(payload, key, parsed.value);
     }
     saveMutation.mutate(payload);
+  };
+
+  // v1 per-section dirty flags (change detection for the Save buttons).
+  const schemaDirty =
+    JSON.stringify(schemaDrafts) !== JSON.stringify(schemaBaseline);
+  const extrasDirty =
+    JSON.stringify(extraDrafts) !== JSON.stringify(extraBaseline);
+
+  useEffect(() => {
+    if (!savedSection) return;
+    const t = setTimeout(() => setSavedSection(null), 2500);
+    return () => clearTimeout(t);
+  }, [savedSection]);
+
+  const resetSection = (section: "schema" | "extras") => {
+    if (section === "schema") setSchemaDrafts(schemaBaseline);
+    else setExtraDrafts(extraBaseline);
   };
 
   const addKey = () => {
@@ -365,7 +514,8 @@ export default function PluginSettingsPage() {
   const renderControl = (
     id: string,
     field: DraftField,
-    onChange: (next: DraftField) => void
+    onChange: (next: DraftField) => void,
+    secret = false
   ) => {
     if (field.kind === "boolean") {
       return (
@@ -393,15 +543,7 @@ export default function PluginSettingsPage() {
         />
       );
     }
-    return (
-      <Input
-        id={id}
-        type={field.kind === "number" ? "number" : "text"}
-        value={field.text}
-        disabled={!canManage}
-        onChange={(e) => onChange({ ...field, text: e.target.value })}
-      />
-    );
+    return <TextControl id={id} field={field} secret={secret} disabled={!canManage} onChange={onChange} />;
   };
 
   if (isLoading) return <AOSModuleLoadingState label="Loading plugin settings…" />;
@@ -492,7 +634,7 @@ export default function PluginSettingsPage() {
 
       {v2Schema && canManage && (
         <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+          <Button onClick={() => handleSave("v2")} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? (
               <Spinner size="sm" />
             ) : (
@@ -506,7 +648,20 @@ export default function PluginSettingsPage() {
       )}
 
       {!v2Schema && hasSchema && (
-        <DataPanel title="Settings">
+        <DataPanel
+          title="Settings"
+          actions={
+            canManage ? (
+              <SectionControls
+                dirty={schemaDirty}
+                saving={saveMutation.isPending}
+                saved={savedSection === "schema" || savedSection === "all"}
+                onSave={() => handleSave("schema")}
+                onReset={() => resetSection("schema")}
+              />
+            ) : undefined
+          }
+        >
           <div className="space-y-5">
             <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
               Defined by the plugin&apos;s settings schema — labels and
@@ -515,10 +670,22 @@ export default function PluginSettingsPage() {
             {schemaFields.map((f) => {
               const field = schemaDrafts[f.key];
               if (!field) return null;
+              const isDefault =
+                f.default !== undefined &&
+                (field.kind === "boolean"
+                  ? field.bool === f.default
+                  : field.text === String(f.default));
               return (
                 <div key={f.key} className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor={`cfg-${f.key}`}>{f.label || f.key}</Label>
+                    <Label htmlFor={`cfg-${f.key}`}>
+                      {f.label || f.key}
+                      {isDefault && (
+                        <span className="ml-2 text-[10px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                          (default)
+                        </span>
+                      )}
+                    </Label>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[10px] uppercase">
                         {field.kind}
@@ -530,9 +697,13 @@ export default function PluginSettingsPage() {
                   </div>
                   {renderControl(`cfg-${f.key}`, field, (next) =>
                     setSchemaDrafts((prev) => ({ ...prev, [f.key]: next }))
-                  )}
-                  {f.help && (
+                  , looksSecret(`${f.key} ${f.label ?? ""}`))}
+                  {f.help ? (
                     <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{f.help}</p>
+                  ) : (
+                    <p className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                      Changing this value takes effect the next time the plugin runs.
+                    </p>
                   )}
                 </div>
               );
@@ -542,7 +713,20 @@ export default function PluginSettingsPage() {
       )}
 
       {!v2Schema && (
-      <DataPanel title={hasSchema ? "Other settings" : "Settings"}>
+      <DataPanel
+        title={hasSchema ? "Other settings" : "Settings"}
+        actions={
+          canManage ? (
+            <SectionControls
+              dirty={extrasDirty}
+              saving={saveMutation.isPending}
+              saved={savedSection === "extras" || savedSection === "all"}
+              onSave={() => handleSave("extras")}
+              onReset={() => resetSection("extras")}
+            />
+          ) : undefined
+        }
+      >
         <div className="space-y-5">
           <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
             {hasSchema
@@ -590,7 +774,7 @@ export default function PluginSettingsPage() {
                 </div>
                 {renderControl(`cfg-${key}`, field, (next) =>
                   setExtraDrafts((prev) => ({ ...prev, [key]: next }))
-                )}
+                , looksSecret(key))}
               </div>
             );
           })}
@@ -621,21 +805,9 @@ export default function PluginSettingsPage() {
                   Add
                 </Button>
               </div>
-            </div>
-          )}
-
-          {canManage && (
-            <div className="flex justify-end border-t border-[var(--w11-border-subtle)] pt-4">
-              <Button onClick={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Settings
-                  </>
-                )}
-              </Button>
+              <p className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                New keys apply when you press Save in this section&rsquo;s header.
+              </p>
             </div>
           )}
         </div>

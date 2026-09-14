@@ -36,7 +36,13 @@ import {
 import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft, Layers, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useAOSRouteParams } from "@/lib/aos-window-route";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useI18n } from "@/lib/i18n";
 
 interface Student {
   id: string;
@@ -109,10 +115,27 @@ export default function MarksPage() {
 
 function MarksContent() {
   const queryClient = useQueryClient();
-  const searchParams = useAOSRouteParams();
-  const [examId, setExamId] = useState(searchParams.get("exam") || "");
-  const [classId, setClassId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  const { t } = useI18n();
+  // Wave C: the picker selection + view tab are window-route URL state
+  // (plan 33 rule 2) — hub links like ?exam=<id> still land, refresh / share
+  // restores the exact view, and ?tab= deep-links the summary.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const marksPathname = windowRoute?.pathname ?? "/dashboard/exams/marks";
+  const setRouteFilter = (patch: Record<string, string>) => {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    const qs = next.toString();
+    navigate(qs ? `${marksPathname}?${qs}` : marksPathname);
+  };
+  const examId = routeParams.get("exam") || "";
+  const classId = routeParams.get("cls") || "";
+  const subjectId = routeParams.get("subj") || "";
+  const tab = routeParams.get("tab") || "entry";
   const [marks, setMarks] = useState<Record<string, MarkEntry>>({});
 
   const { data: exams } = useQuery({
@@ -372,6 +395,42 @@ function MarksContent() {
   const effectiveFullMarks = hasComponents ? componentsFullMarks : totalFullMarks;
   const effectivePassMarks = hasComponents ? componentsPassMarks : totalPassMarks;
 
+  // Wave C summary tab data (view-layer only, derived from the same state):
+  // who is still blank + the live NEB grade distribution.
+  const hasEntryValue = (s: Student) => {
+    const m = marks[s.id];
+    if (!m) return false;
+    return hasComponents
+      ? componentTotals(m).any
+      : Boolean(m.theory_marks || m.practical_marks);
+  };
+  const notEntered = studentList.filter((s) => !hasEntryValue(s));
+  const gradeDistribution = (() => {
+    const buckets = new Map<string, number>();
+    for (const s of studentList) {
+      const m = marks[s.id];
+      if (!m) continue;
+      let g: string | null = null;
+      if (hasComponents) {
+        const { total, any, failing } = componentTotals(m);
+        if (!any) continue;
+        g = !failing && total >= effectivePassMarks && effectiveFullMarks > 0
+          ? nebGrade((total / effectiveFullMarks) * 100).grade
+          : "NG";
+      } else {
+        const theory = parseFloat(m.theory_marks) || 0;
+        const practical = parseFloat(m.practical_marks) || 0;
+        const total = theory + practical;
+        if (total <= 0) continue;
+        g = isPassingResolvedMarksConfig(marksConfig, theory, practical)
+          ? nebGrade((total / totalFullMarks) * 100).grade
+          : "NG";
+      }
+      buckets.set(g, (buckets.get(g) || 0) + 1);
+    }
+    return Array.from(buckets.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  })();
+
   return (
     <AOSPage>
       <AOSPageHeader
@@ -382,16 +441,16 @@ function MarksContent() {
             </Button>
           </Link>
         }
-        title="Marks Entry"
-        subtitle="Enter subject-wise marks • NEB auto-grading"
+        title={t("Marks Entry", "अंक प्रविष्टि")}
+        subtitle={t("Enter subject-wise marks • NEB auto-grading", "विषयगत अंक भर्नुहोस् • NEB स्वतः ग्रेडिङ")}
         actions={
           <>
             <Link href="/dashboard/exams">
-              <Button variant="outline">Manage Exams</Button>
+              <Button variant="outline">{t("Manage Exams", "परीक्षा व्यवस्थापन")}</Button>
             </Link>
             {examId && subjectId && (
               <Button variant="outline" onClick={() => setComponentsOpen(true)}>
-                <Layers className="h-4 w-4 mr-2" /> Components
+                <Layers className="h-4 w-4 mr-2" /> {t("Components", "कम्पोनेन्ट")}
                 {hasComponents && (
                   <Badge variant="secondary" className="ml-2">{components.length}</Badge>
                 )}
@@ -399,7 +458,7 @@ function MarksContent() {
             )}
             {examId && classId && subjectId && (
               <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                <Save className="h-4 w-4 mr-2" /> {saveMutation.isPending ? "Saving..." : "Save All Marks"}
+                <Save className="h-4 w-4 mr-2" /> {saveMutation.isPending ? t("Saving...", "सुरक्षित हुँदैछ...") : t("Save All Marks", "सबै अंक सुरक्षित")}
               </Button>
             )}
           </>
@@ -410,7 +469,7 @@ function MarksContent() {
         <FilterCommandBar>
           <div className="space-y-1 w-full md:w-56">
             <Label className="text-xs">Exam</Label>
-            <Select value={examId} onValueChange={setExamId}>
+            <Select value={examId} onValueChange={(v) => setRouteFilter({ exam: v })}>
               <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
               <SelectContent>
                 {(exams || []).map((e: { id: string; name: string; exam_type: string }) => (
@@ -421,7 +480,7 @@ function MarksContent() {
           </div>
           <div className="space-y-1 w-full md:w-48">
             <Label className="text-xs">Class</Label>
-            <Select value={classId} onValueChange={(v) => { setClassId(v); setSubjectId(""); }}>
+            <Select value={classId} onValueChange={(v) => setRouteFilter({ cls: v, subj: "" })}>
               <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
               <SelectContent>
                 {(classes || []).map((c: { id: string; name: string }) => (
@@ -432,7 +491,7 @@ function MarksContent() {
           </div>
           <div className="space-y-1 w-full md:w-56">
             <Label className="text-xs">Subject</Label>
-            <Select value={subjectId} onValueChange={setSubjectId}>
+            <Select value={subjectId} onValueChange={(v) => setRouteFilter({ subj: v })}>
               <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
               <SelectContent>
                 {(subjects || []).map((s: { id: string; name: string; code?: string }) => (
@@ -495,8 +554,20 @@ function MarksContent() {
           </StatGrid>
         )}
 
-        {/* Marks Table — the plugin-carried keyboard grid when served */}
+        {/* Marks view — Tabs over the same data (plan 33-1): grid for entry,
+            summary for the outstanding/grading read-out. Tab is URL state. */}
         {examId && classId && subjectId && (
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setRouteFilter({ tab: v === "entry" ? "" : v })}
+          >
+            <TabsList className="mb-3">
+              <TabsTrigger value="entry">{t("Marks Grid", "अंक ग्रिड")}</TabsTrigger>
+              <TabsTrigger value="summary" badge={notEntered.length > 0 ? notEntered.length : undefined}>
+                {t("Summary", "सारांश")}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="entry">
           <DataPanel
             title={
               <span className="flex items-center gap-2">
@@ -707,6 +778,51 @@ function MarksContent() {
               </Table>
             )}
           </DataPanel>
+            </TabsContent>
+            <TabsContent value="summary">
+              <DataPanel title={t("Entry Summary", "प्रविष्टि सारांश")}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-2" style={{ color: "var(--w11-text-secondary)" }}>
+                      {t("NEB Grade Distribution", "NEB ग्रेड वितरण")}
+                    </p>
+                    {gradeDistribution.length === 0 ? (
+                      <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                        {t("No marks entered yet — the distribution updates as you type.", "अझै अंक भरेको छैन — टाइप गर्दै जाँदा अड्चल देखिन्छ।")}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {gradeDistribution.map(([grade, count]) => (
+                          <span key={grade} className="win11-chip subtle px-3 py-1">
+                            <strong>{grade}</strong> · {count}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-2" style={{ color: "var(--w11-text-secondary)" }}>
+                      {t("Not Entered", "नभरेका")} ({notEntered.length})
+                    </p>
+                    {notEntered.length === 0 ? (
+                      <p className="flex items-center gap-2 text-sm" style={{ color: W11_SUCCESS }}>
+                        <CheckCircle2 className="h-4 w-4" /> {t("Every student has marks.", "सबै विद्यार्थीका अंक भरिएका छन्।")}
+                      </p>
+                    ) : (
+                      <ul className="text-sm space-y-1 max-h-52 overflow-y-auto" style={{ color: "var(--w11-text-primary)" }}>
+                        {notEntered.slice(0, 50).map((s) => (
+                          <li key={s.id} className="flex items-center gap-2">
+                            <span className="font-mono text-xs w-8 text-right" style={{ color: "var(--w11-text-tertiary)" }}>{s.roll_number}</span>
+                            {s.first_name} {s.last_name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </DataPanel>
+            </TabsContent>
+          </Tabs>
         )}
 
         {/* Components manager — define/edit the mark distribution for this

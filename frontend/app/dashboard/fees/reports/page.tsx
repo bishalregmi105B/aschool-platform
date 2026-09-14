@@ -12,6 +12,9 @@ import {
   FilterCommandBar, DataPanel, AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { ErrorState } from "@/components/ui/empty-state";
+import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,11 +56,15 @@ export default function FeeReportsPage() {
 }
 
 function ReportsContent() {
+  const { t } = useI18n();
   const [period, setPeriod] = useState<FeeReportPeriod>("monthly");
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [reportTab, setReportTab] = useState("collection");
+  // Tab lives in the URL (?tab=) so deep links and Back work (plan 33-2).
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["tab"]);
+  const reportTab = urlFilters.tab || "collection";
+  const setReportTab = (v: string) => setUrlFilters({ tab: v === "collection" ? "" : v });
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["fee-reports", period],
     queryFn: () => fetchFeeReports(period),
     enabled: reportTab === "collection",
@@ -82,7 +89,7 @@ function ReportsContent() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error("CSV export unavailable");
+      toast.error(t("CSV export unavailable", "CSV उपलब्ध छेन"));
     } finally {
       setExportingCsv(false);
     }
@@ -94,13 +101,13 @@ function ReportsContent() {
     <AOSPage>
       <Tabs value={reportTab} onValueChange={setReportTab} className="flex flex-col h-full">
         <AOSPageHeader
-          title="Fee Reports"
-          subtitle="Financial overview, fines and waivers analytics"
+          title={t("Fee Reports", "शुल्क प्रतिवेदन")}
+          subtitle={t("Financial overview, fines and waivers analytics", "कुल रकम, जरिवाना र छुट विश्लेषण")}
           actions={
             <TabsList>
-              <TabsTrigger value="collection">Collection</TabsTrigger>
-              <TabsTrigger value="fines">Fines</TabsTrigger>
-              <TabsTrigger value="waivers">Waivers</TabsTrigger>
+              <TabsTrigger value="collection">{t("Collection", "संकलन")}</TabsTrigger>
+              <TabsTrigger value="fines">{t("Fines", "जरिवाना")}</TabsTrigger>
+              <TabsTrigger value="waivers">{t("Waivers", "छुट")}</TabsTrigger>
             </TabsList>
           }
         />
@@ -108,9 +115,10 @@ function ReportsContent() {
           <TabsContent value="collection" className="mt-0 space-y-4">
             {isError || !data ? (
               <DataPanel>
-                <p className="text-sm text-[color:var(--w11-text-secondary)]">
-                  Unable to load fee report data.
-                </p>
+                <ErrorState
+                  title={t("Unable to load fee report data.", "तथ्य लोड गएन सकिएन")}
+                  onRetry={() => refetch()}
+                />
               </DataPanel>
             ) : (
               <>
@@ -121,9 +129,9 @@ function ReportsContent() {
                       value={period}
                       onChange={(v) => setPeriod(v as FeeReportPeriod)}
                       options={[
-                        { value: "monthly", label: "This Month" },
-                        { value: "quarterly", label: "This Quarter" },
-                        { value: "yearly", label: "This Year" },
+                        { value: "monthly", label: t("This Month", "यो महिना") },
+                        { value: "quarterly", label: t("This Quarter", "यो क्वार्टर") },
+                        { value: "yearly", label: t("This Year", "यो वर्ष") },
                       ]}
                     />
                     <Button
@@ -131,7 +139,7 @@ function ReportsContent() {
                       disabled={exportingCsv}
                       onClick={exportCollectionsCsv}
                     >
-                      {exportingCsv ? "Exporting…" : "Export CSV"}
+                      {exportingCsv ? t("Exporting…", "निकारहुँदा…") : t("Export CSV", "CSV निकास")}
                     </Button>
                     <Button
                       variant="outline"
@@ -149,11 +157,11 @@ function ReportsContent() {
                           a.click();
                           URL.revokeObjectURL(url);
                         } catch {
-                          toast.error("PDF export unavailable");
+                          toast.error(t("PDF export unavailable", "PDF उपलब्ध छेन"));
                         }
                       }}
                     >
-                      Export PDF
+                      {t("Export PDF", "PDF निकास")}
                     </Button>
                   </div>
                 </FilterCommandBar>
@@ -182,28 +190,29 @@ function ReportsContent() {
 type FeeReportsData = NonNullable<Awaited<ReturnType<typeof fetchFeeReports>>>;
 
 function CollectionStats({ data }: { data: FeeReportsData }) {
+  const { t } = useI18n();
   const overview = data.overview;
   const stats = [
     {
-      label: "Total Expected",
+      label: t("Total Expected", "कुल अपेक्षित"),
       value: overview.totalExpected,
       icon: DollarSign,
       color: "var(--w11-accent)",
     },
     {
-      label: "Total Collected",
+      label: t("Total Collected", "कुल उठेको"),
       value: overview.totalCollected,
       icon: TrendingUp,
       color: "#107c10",
     },
     {
-      label: "Outstanding",
+      label: t("Outstanding", "बाँकी"),
       value: overview.totalOutstanding,
       icon: TrendingDown,
       color: "#c42b1c",
     },
     {
-      label: "Collection Rate",
+      label: t("Collection Rate", "संकलन दर"),
       value: `${overview.collectionRate}%`,
       icon: PieChart,
       color: "var(--w11-accent)",
@@ -230,18 +239,19 @@ function CollectionStats({ data }: { data: FeeReportsData }) {
 }
 
 function CollectionDetails({ data }: { data: FeeReportsData }) {
+  const { t } = useI18n();
   const byClass = data.byClass;
   const recentPayments = data.recentPayments;
 
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DataPanel title="Selected Period">
+        <DataPanel title={t("Selected Period", "छानियेको अवधि")}>
           <div className="space-y-4 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Date Range
+                {t("Date Range", "मिति वर्तमान")}
               </span>
               <span className="font-medium">
                 {data.period.start} to {data.period.end}
@@ -250,7 +260,7 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
             <div className="flex items-center justify-between">
               <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                Collected In Period
+                {t("Collected In Period", "अवधिमा उठेको")}
               </span>
               <span className="font-medium" style={{ color: "#107c10" }}>
                 {data.hasPeriodAnalytics &&
@@ -262,7 +272,7 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
             <div className="flex items-center justify-between">
               <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
                 <Receipt className="h-4 w-4" />
-                Payments Recorded
+                {t("Payments Recorded", "पुन्जीकृत भुक्तान")}
               </span>
               <span className="font-medium">
                 {data.hasPeriodAnalytics &&
@@ -274,7 +284,7 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
             <div className="flex items-center justify-between">
               <span className="text-[color:var(--w11-text-secondary)] flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Active Students
+                {t("Active Students", "सक्रिय विद्यार्थी")}
               </span>
               <span className="font-medium">{data.totalStudents}</span>
             </div>
@@ -287,7 +297,7 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
           </div>
         </DataPanel>
 
-        <DataPanel title="Collection by Class">
+        <DataPanel title={t("Collection by Class", "कक्षा अनुसर")}>
           {byClass.length > 0 ? (
             <div className="space-y-3">
               {byClass.map((c, i) => (
@@ -305,11 +315,11 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
                 </div>
               ))}
             </div>
-          ) : <p className="text-center text-[color:var(--w11-text-secondary)] py-8">No data available</p>}
+          ) : <p className="text-center text-[color:var(--w11-text-secondary)] py-8">{t("No data available", "तथ्य छेन")}</p>}
         </DataPanel>
       </div>
 
-      <DataPanel title="Recent Payments">
+      <DataPanel title={t("Recent Payments", "भर्खका भुक्तान")}>
         {recentPayments.length > 0 ? (
           <div className="space-y-3">
             {recentPayments.map((payment) => (
@@ -336,7 +346,7 @@ function CollectionDetails({ data }: { data: FeeReportsData }) {
           </div>
         ) : (
           <p className="text-center text-[color:var(--w11-text-secondary)] py-8">
-            No recent payments available
+            {t("No recent payments available", "भर्खको भुक्तान छेन")}
           </p>
         )}
       </DataPanel>
@@ -360,6 +370,7 @@ interface FinesReport {
 }
 
 function FinesContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -400,18 +411,18 @@ function FinesContent() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-[color:var(--w11-text-secondary)]">
           <Gavel className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
-          Late fines accrued, grouped by class and BS month
+          {t("Late fines accrued, grouped by class and BS month", "कक्षर र BS महिना अनुसर जरिवाना")}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setShowSettings(true)}>
-            <Settings2 className="h-4 w-4 mr-2" /> Fine Policy
+            <Settings2 className="h-4 w-4 mr-2" /> {t("Fine Policy", "जरिवाना नीति")}
             {policy && (
               <Badge variant="secondary" className="ml-2">
                 {policy.mode === "none"
-                  ? "No fines"
+                  ? t("No fines", "जरिवाना छेन")
                   : policy.mode === "fixed_once"
-                    ? `Rs. ${policy.value} once`
-                    : `${policy.value}% daily`}
+                    ? `Rs. ${policy.value} ×1`
+                    : `${policy.value}%/${t("day", "दिन")}`}
               </Badge>
             )}
           </Button>
@@ -421,30 +432,30 @@ function FinesContent() {
             ) : (
               <Zap className="h-4 w-4 mr-2" />
             )}
-            Accrue Fines Now
+            {t("Accrue Fines Now", "जरिवाना लगाउनु")}
           </Button>
         </div>
       </div>
 
       {isError ? (
         <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
-          <p className="text-sm text-[#c42b1c]">Failed to load the fines report. Please try again.</p>
+          <p className="text-sm text-[#c42b1c]">{t("Failed to load the fines report.", "जरिवाना प्रतिवेदन लोड गएन")}</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Retry
+            {t("Retry", "फेरि")}
           </Button>
         </div>
       ) : (
         <>
           <StatGrid className="mb-0" min={200}>
             <KpiCard
-              label="Grand Total Fines"
+              label={t("Grand Total Fines", "कुल जरिवाना")}
               value={formatNepaliCurrency(data?.grand_total || 0)}
               color="#c42b1c"
             />
           </StatGrid>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DataPanel title="Fines by Class">
+            <DataPanel title={t("Fines by Class", "कक्षाअनुसर जरिवाना")}>
               {data?.by_class?.length ? (
                 <div className="divide-y divide-[var(--w11-border-subtle)]">
                   {data.by_class.map((r) => (
@@ -458,12 +469,12 @@ function FinesContent() {
                 </div>
               ) : (
                 <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                  No fines accrued yet.
+                  {t("No fines accrued yet.", "अहिले जरिवाना छेन")}
                 </p>
               )}
             </DataPanel>
 
-            <DataPanel title="Fines by Month (BS)">
+            <DataPanel title={t("Fines by Month (BS)", "महिनाअनुसर (BS)")}>
               {data?.by_month?.length ? (
                 <div className="divide-y divide-[var(--w11-border-subtle)]">
                   {data.by_month.map((r) => (
@@ -479,7 +490,7 @@ function FinesContent() {
                 </div>
               ) : (
                 <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                  No fines accrued yet.
+                  {t("No fines accrued yet.", "अहिले जरिवाना छेन")}
                 </p>
               )}
             </DataPanel>
@@ -499,6 +510,7 @@ function FinePolicyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     enabled: open,
@@ -539,7 +551,7 @@ function FinePolicyDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fee-fines-policy"] });
       onOpenChange(false);
-      toast.success("Fine policy saved.");
+      toast.success(t("Fine policy saved.", "नीति सुरक्षभयो"));
     },
     onError: (e: any) =>
       toast.error(e?.response?.data?.error || e?.message || "Could not save fine policy"),
@@ -549,21 +561,21 @@ function FinePolicyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Fine Policy</DialogTitle>
+          <DialogTitle>{t("Fine Policy", "जरिवाना नीति")}</DialogTitle>
         </DialogHeader>
         {isLoading && !data ? (
           <AOSModuleLoadingState />
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Mode</Label>
+              <Label>{t("Mode", "प्रकार")}</Label>
               <AdvancedSelect
                 value={mode}
                 onChange={(v) => setMode(v)}
                 options={[
-                  { value: "none", label: "No late fines" },
-                  { value: "fixed_once", label: "Fixed amount (charged once)" },
-                  { value: "daily_percent", label: "Daily percent of the due" },
+                  { value: "none", label: t("No late fines", "कुनै जरिवाना छेन") },
+                  { value: "fixed_once", label: t("Fixed amount (charged once)", "निष्चित रकम (अली गरेत)") },
+                  { value: "daily_percent", label: t("Daily percent of the due", "दैनिक प्रतिशत") },
                 ]}
               />
             </div>
@@ -571,36 +583,35 @@ function FinePolicyDialog({
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs">
-                    {mode === "fixed_once" ? "Amount (Rs.)" : "Percent (%)"}
+                    {mode === "fixed_once" ? t("Amount (Rs.)", "रकम") : t("Percent (%)", "प्रतिशत %")}
                   </Label>
                   <Input type="number" min="0" step="0.01" value={value}
                     onChange={(e) => setValue(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs">Grace Days</Label>
+                  <Label className="text-xs">{t("Grace Days", "सरहत दिन")}</Label>
                   <Input type="number" min="0" value={graceDays}
                     onChange={(e) => setGraceDays(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs">Max Fine (Rs., optional)</Label>
+                  <Label className="text-xs">{t("Max Fine (Rs., optional)", "अधिक तम जरिवाना")}</Label>
                   <Input type="number" min="0" step="0.01" value={maxAmount}
-                    onChange={(e) => setMaxAmount(e.target.value)} placeholder="No cap" />
+                    onChange={(e) => setMaxAmount(e.target.value)} placeholder={t("No cap", "कुनै सीमा")} />
                 </div>
               </div>
             )}
             <p className="text-xs text-[color:var(--w11-text-secondary)]">
-              Fines are applied to overdue bills when you press “Accrue Fines Now”
-              (or on schedule, if configured). Bills already fully paid or waived
-              are never fined.
+              {t("Fines apply to overdue bills when you press Accrue Fines Now (or on schedule). Paid or waived bills are never fined.",
+                 "जरिवाना लगाउनु ग्रबेक्षन गर्दैको बापत बिजकमा लग्नेछ। तिरेका/छुट बिजकमा लग्नन्नेछ।")}
             </p>
           </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={save.isPending}>
-            Cancel
+            {t("Cancel", "रद्द")}
           </Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending && <Spinner className="mr-2" />} Save Policy
+            {save.isPending && <Spinner className="mr-2" />} {t("Save Policy", "नीति सुरक्ष")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -617,6 +628,7 @@ interface WaiversReport {
 }
 
 function WaiversContent() {
+  const { t } = useI18n();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["fee-waivers-report"],
     retry: 1,
@@ -632,27 +644,27 @@ function WaiversContent() {
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-[color:var(--w11-text-secondary)]">
         <HandCoins className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
-        Every rupee waived (scholarships + credits) — the accountability view
+        {t("Every rupee waived (scholarships + credits) — the accountability view", "कुनै छुट रकम (छात्रवृत्ति + क्रेडिट)")}
       </div>
 
       {isError ? (
         <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
-          <p className="text-sm text-[#c42b1c]">Failed to load the waivers report. Please try again.</p>
+          <p className="text-sm text-[#c42b1c]">{t("Failed to load the waivers report.", "छुट प्रतिवेदन लोड गएन")}</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Retry
+            {t("Retry", "फेरि")}
           </Button>
         </div>
       ) : (
         <>
           <StatGrid className="mb-0" min={200}>
             <KpiCard
-              label="Grand Total Waived"
+              label={t("Grand Total Waived", "कुल छुट")}
               value={formatNepaliCurrency(data?.grand_total || 0)}
             />
           </StatGrid>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DataPanel title="Waivers by Class">
+            <DataPanel title={t("Waivers by Class", "कक्षा अनुसर छुट")}>
               {data?.by_class?.length ? (
                 <div className="divide-y divide-[var(--w11-border-subtle)]">
                   {data.by_class.map((r) => (
@@ -666,12 +678,12 @@ function WaiversContent() {
                 </div>
               ) : (
                 <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                  No waivers recorded yet.
+                  {t("No waivers recorded yet.", "अहिले छुट छेन")}
                 </p>
               )}
             </DataPanel>
 
-            <DataPanel title="Waivers by Fee Type">
+            <DataPanel title={t("Waivers by Fee Type", "शुल्क प्रकार अनुसर छुट")}>
               {data?.by_fee_type?.length ? (
                 <div className="divide-y divide-[var(--w11-border-subtle)]">
                   {data.by_fee_type.map((r) => (
@@ -685,7 +697,7 @@ function WaiversContent() {
                 </div>
               ) : (
                 <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                  No waivers recorded yet.
+                  {t("No waivers recorded yet.", "अहिले छुट छेन")}
                 </p>
               )}
             </DataPanel>

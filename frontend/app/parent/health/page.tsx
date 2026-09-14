@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type ChildHealthPayload = {
@@ -22,10 +23,11 @@ type ChildHealthPayload = {
 
 /** Parent → Health. Backed by GET /parent/child-health. */
 export default function ParentHealthPage() {
+  const { selectedId, childParam } = useSelectedChild();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["parent-child-health"],
+    queryKey: ["parent-child-health", selectedId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<ChildHealthPayload>>("/parent/child-health");
+      const res = await api.get<ApiResponse<ChildHealthPayload>>(`/parent/child-health${childParam ? `?${childParam}` : ""}`);
       return res.data.data;
     },
   });
@@ -36,6 +38,7 @@ export default function ParentHealthPage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Health Records" />
       <Card>
         <CardHeader><CardTitle>Health Profile</CardTitle></CardHeader>

@@ -104,6 +104,11 @@ function DomainContent() {
   const status = data?.status ?? "not_configured";
   const statusMeta = STATUS_META[status] ?? STATUS_META.not_configured;
   const dnsRecords: any[] = data?.dns_records ?? [];
+  const normalizedDomain = domain.trim().toLowerCase();
+  const domainInvalid =
+    Boolean(normalizedDomain) &&
+    (/^(https?:\/\/|.*\/)/.test(normalizedDomain) ||
+      !/^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(normalizedDomain));
 
   return (
     <AOSPage>
@@ -120,11 +125,31 @@ function DomainContent() {
           >
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Your Custom Domain</Label>
+                <Label htmlFor="wl-domain-input">Your Custom Domain</Label>
                 <div className="flex gap-2">
-                  <Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. school.yourschool.edu.np" />
-                  <Button onClick={() => save.mutate()} disabled={save.isPending || !domain}>{save.isPending ? <Spinner /> : "Save"}</Button>
+                  <Input
+                    id="wl-domain-input"
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value)}
+                    placeholder="e.g. school.yourschool.edu.np"
+                    aria-invalid={domainInvalid}
+                  />
+                  <Button
+                    onClick={() => save.mutate()}
+                    disabled={save.isPending || !normalizedDomain || domainInvalid}
+                  >
+                    {save.isPending ? <Spinner /> : "Save"}
+                  </Button>
                 </div>
+                {domainInvalid ? (
+                  <p className="text-[11px]" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                    Enter a bare hostname like app.yourschool.edu.np — no http:// and no path.
+                  </p>
+                ) : (
+                  <p className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                    Saving shows the DNS records you must add at your registrar; the platform serves your app at that address once verified.
+                  </p>
+                )}
               </div>
               {status === "active" && data?.custom_domain && (
                 <div className="win11-infobar success">

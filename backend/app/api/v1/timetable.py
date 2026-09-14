@@ -16,6 +16,10 @@ from extensions import db
 
 timetable_bp = Blueprint("timetable", __name__, url_prefix="/timetable")
 
+# Safety bound: a full school grid is ~10 classes × 3 sections × 6 days × 8 periods ≈ 1,440
+# slots; anything past this is a runaway query, not a real timetable.
+MAX_TIMETABLE_SLOTS = 5000
+
 
 @timetable_bp.route("", methods=["GET"])
 @jwt_required()
@@ -38,7 +42,9 @@ def get_timetable():
     if day:
         query = query.filter_by(day_of_week=day)
 
-    query = query.order_by(TimetableSlot.day_of_week, TimetableSlot.period_number)
+    query = query.order_by(TimetableSlot.day_of_week, TimetableSlot.period_number).limit(
+        MAX_TIMETABLE_SLOTS
+    )
     slots = query.all()
     return success_response([_slot_dict(s) for s in slots])
 
@@ -52,7 +58,7 @@ def get_teacher_timetable_compat(teacher_id):
         school_id=g.school_id,
         teacher_id=teacher_id,
         is_deleted=False,
-    ).order_by(TimetableSlot.day_of_week, TimetableSlot.period_number)
+    ).order_by(TimetableSlot.day_of_week, TimetableSlot.period_number).limit(MAX_TIMETABLE_SLOTS)
     return success_response([_slot_dict(slot) for slot in query.all()])
 
 

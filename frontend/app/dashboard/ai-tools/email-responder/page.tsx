@@ -1,37 +1,15 @@
 "use client";
 
 /**
- * Email Responder — dedicated tool page (wave-2, communication).
- * API: POST /ai/generate/email_responder (generic workbench dispatcher).
+ * Email Responder — POST /ai/generate/email_responder.
+ * Research: AI email tools for schools (MagicSchool "Parent Communication")
+ * constrain the model to the teacher's own bullet points and then list the
+ * commitments the draft makes for verification — the result panel keeps that
+ * "verify these are yours" checklist; nothing sends from the app.
  */
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PageLoader } from "@/components/ui/spinner";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ArrowLeft, Copy, Mail, Send, ShieldCheck, Sparkles } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
-import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
-  FormSection,
-  DataPanel,
-} from "@/components/aos/kit/page-kit";
+import { Mail, Send, ShieldCheck } from "lucide-react";
+import { AiToolPage } from "../_components/ai-tool-page";
 
 interface EmailResult {
   reply: string;
@@ -42,179 +20,91 @@ interface EmailResult {
 
 export default function EmailResponderPage() {
   return (
-    <PluginGate slug="ai_suite">
-      <EmailContent />
-    </PluginGate>
-  );
-}
-
-function EmailContent() {
-  const [incoming, setIncoming] = useState("");
-  const [points, setPoints] = useState("");
-  const [tone, setTone] = useState("warm");
-  const [senderRole, setSenderRole] = useState("");
-  const [result, setResult] = useState<EmailResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const generate = useMutation({
-    mutationFn: async () => {
-      const res = await api.post("/ai/generate/email_responder", {
-        incoming: incoming || undefined,
-        points: points
-          .split("\n")
-          .map((p) => p.trim())
-          .filter(Boolean),
-        tone,
-        sender_role: senderRole || undefined,
-      });
-      return res.data?.data as EmailResult;
-    },
-    onSuccess: (data) => {
-      setResult(data);
-      setError(null);
-      toast.success("Draft ready — review key points before sending");
-    },
-    onError: (err: unknown) => {
-      setError(
-        (err as { response?: { data?: { error?: string } } })?.response?.data
-          ?.error || "Generation failed — try again",
-      );
-    },
-  });
-
-  return (
-    <AOSPage>
-      <AOSPageHeader
-        icon={<Mail className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Email Responder"
-        subtitle="Professional replies from your bullet points — never invented facts"
-        actions={
-          <Link href="/dashboard/ai-tools">
-            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
-          </Link>
-        }
-      />
-      <AOSPageBody>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <FormSection title="What you're replying to">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>The incoming message (paste or summarize)</Label>
-                <Textarea
-                  rows={5}
-                  value={incoming}
-                  onChange={(e) => setIncoming(e.target.value)}
-                  placeholder="e.g. Parent asks why the bus was late twice this week…"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Your points (one per line — the only facts it may use)</Label>
-                <Textarea
-                  rows={5}
-                  value={points}
-                  onChange={(e) => setPoints(e.target.value)}
-                  placeholder={"Bus 4 had a mechanical check on Tuesday\nRoute adjusted from Monday; pickup moves 10 min earlier"}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tone</Label>
-                  <Select value={tone} onValueChange={setTone}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="warm">Warm</SelectItem>
-                      <SelectItem value="neutral">Neutral</SelectItem>
-                      <SelectItem value="formal">Formal</SelectItem>
-                      <SelectItem value="firm">Firm</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Signed as (optional)</Label>
-                  <Input
-                    value={senderRole}
-                    onChange={(e) => setSenderRole(e.target.value)}
-                    placeholder="Class Teacher — Grade 8"
-                  />
-                </div>
-              </div>
-              <Button
-                className="w-full"
-                onClick={() => generate.mutate()}
-                disabled={(!incoming.trim() && !points.trim()) || generate.isPending}
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                {generate.isPending ? "Drafting…" : "Draft reply"}
-              </Button>
+    <AiToolPage
+      icon={Mail}
+      title="Email Responder"
+      subtitle="Professional parent/stakeholder replies from your bullet points"
+      subtitleNe="तपाईंका बुँदाहरूबाट व्यावसायिक इमेल जवाफ"
+      toolKey="email_responder"
+      generateLabel="Draft reply"
+      resultTitle="Draft"
+      resultHint="Paste the message and your points — get a sendable draft."
+      note="The reply may use only the facts you supply. Nothing is sent from here — review, copy, and send it yourself."
+      fields={[
+        {
+          key: "incoming",
+          label: "The incoming message (paste or summarize)",
+          ne: "आएको सन्देश",
+          type: "textarea",
+          rows: 5,
+          full: true,
+          placeholder: "e.g. Parent asks why the bus was late twice this week…",
+        },
+        {
+          key: "points",
+          label: "Your points (one per line — the only facts it may use)",
+          ne: "तपाईंका बुँदाहरू",
+          type: "textarea",
+          rows: 5,
+          full: true,
+          placeholder: "Bus 4 had a mechanical check on Tuesday\nRoute adjusted from Monday; pickup moves 10 min earlier",
+        },
+        {
+          key: "tone",
+          label: "Tone",
+          ne: "शैली",
+          type: "select",
+          defaultValue: "warm",
+          options: [
+            { value: "warm", label: "Warm" },
+            { value: "neutral", label: "Neutral" },
+            { value: "formal", label: "Formal" },
+            { value: "firm", label: "Firm" },
+          ],
+        },
+        { key: "sender_role", label: "Signed as (optional)", ne: "हस्ताक्षर", placeholder: "Class Teacher — Grade 8" },
+      ]}
+      validate={(v) => (!v.incoming.trim() && !v.points.trim() ? "Paste the message or list your points first" : null)}
+      buildPayload={(v) => ({
+        incoming: v.incoming || undefined,
+        points: String(v.points || "").split("\n").map((p) => p.trim()).filter(Boolean),
+        tone: v.tone,
+        sender_role: v.sender_role || undefined,
+      })}
+      toText={(d) => {
+        const r = d as EmailResult;
+        return `${r.subject_line ? `Subject: ${r.subject_line}\n\n` : ""}${r.reply}`;
+      }}
+      renderResult={(data) => {
+        const result = data as EmailResult;
+        return (
+          <div className="space-y-4">
+            {result.subject_line && (
+              <p className="text-sm">
+                <span className="font-semibold">Subject: </span>
+                {result.subject_line}
+              </p>
+            )}
+            <div className="rounded-lg p-4 text-sm whitespace-pre-wrap" style={{ background: "var(--w11-control-bg)" }}>
+              {result.reply}
             </div>
-          </FormSection>
-
-          <DataPanel
-            title="Draft"
-            actions={result ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(result.reply);
-                  toast.success("Copied!");
-                }}
-              >
-                <Copy className="h-4 w-4 mr-1" /> Copy
-              </Button>
-            ) : undefined}
-          >
-            {generate.isPending ? (
-              <PageLoader />
-            ) : error ? (
-              <EmptyState
-                title="Couldn't draft the reply"
-                body={error}
-                action={{ label: "Try again", onClick: () => generate.mutate() }}
-              />
-            ) : !result ? (
-              <div className="text-center py-16 text-[color:var(--w11-text-secondary)]">
-                <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Paste the message and your points — get a sendable draft.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {result.subject_line && (
-                  <p className="text-sm">
-                    <span className="font-semibold">Subject: </span>
-                    {result.subject_line}
-                  </p>
-                )}
-                <div className="rounded-lg p-4 text-sm whitespace-pre-wrap" style={{ background: "var(--w11-control-bg)" }}>
-                  {result.reply}
-                </div>
-                {result.key_points && result.key_points.length > 0 && (
-                  <div className="win11-infobar success p-3">
-                    <p className="mb-1.5 flex items-center gap-1 text-xs font-semibold">
-                      <ShieldCheck className="h-3.5 w-3.5" /> COMMITMENTS IN THIS
-                      DRAFT — verify these are yours
-                    </p>
-                    <ul className="list-disc space-y-1 pl-5 text-xs">
-                      {result.key_points.map((k, i) => (
-                        <li key={i}>{k}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {result.tone_note && (
-                  <p className="text-xs text-[color:var(--w11-text-secondary)]">{result.tone_note}</p>
-                )}
-                <p className="flex items-center gap-1 text-[11px] text-[color:var(--w11-text-secondary)]">
-                  <Send className="h-3 w-3" /> Nothing is sent from here — copy
-                  it into your mail client after review.
+            {result.key_points && result.key_points.length > 0 && (
+              <div className="win11-infobar success p-3">
+                <p className="mb-1.5 flex items-center gap-1 text-xs font-semibold">
+                  <ShieldCheck className="h-3.5 w-3.5" /> COMMITMENTS IN THIS DRAFT — verify these are yours
                 </p>
+                <ul className="list-disc space-y-1 pl-5 text-xs">
+                  {result.key_points.map((k, i) => <li key={i}>{k}</li>)}
+                </ul>
               </div>
             )}
-          </DataPanel>
-        </div>
-      </AOSPageBody>
-    </AOSPage>
+            {result.tone_note && <p className="text-xs text-[color:var(--w11-text-secondary)]">{result.tone_note}</p>}
+            <p className="flex items-center gap-1 text-[11px] text-[color:var(--w11-text-secondary)]">
+              <Send className="h-3 w-3" /> Nothing is sent from here — copy it into your mail client after review.
+            </p>
+          </div>
+        );
+      }}
+    />
   );
 }

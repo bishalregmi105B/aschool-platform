@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Image, Plus, Upload } from "lucide-react";
+import { ImageIcon, Plus, Upload } from "lucide-react";
 import Link from "next/link";
 
 import { api, ApiResponse } from "@/lib/api";
@@ -93,7 +93,7 @@ function GalleryContent() {
   return (
     <AOSPage>
       <AOSPageHeader
-        icon={<Image className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        icon={<ImageIcon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Gallery"
         subtitle={`${files.length} photo${files.length === 1 ? "" : "s"} in school media${year !== "all" ? ` · ${year}` : ""}`}
         actions={
@@ -126,7 +126,7 @@ function GalleryContent() {
         {files.length === 0 ? (
           <DataPanel>
             <AOSEmptyState
-              icon={<Image className="h-10 w-10" />}
+              icon={<ImageIcon className="h-10 w-10" />}
               title="No gallery photos found"
               description="No gallery photos found for the selected year."
             />

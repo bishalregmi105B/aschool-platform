@@ -3,41 +3,47 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { useI18n } from "@/lib/i18n";
+import { displayBS } from "@/lib/nepali_date";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
   KpiCard,
   StatGrid,
+  DataPanel,
+  StatusChip,
 } from "@/components/aos/kit/page-kit";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, History, ChevronRight } from "lucide-react";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-import { ICON_MAP } from "@/lib/icon-map";
-import CsvUploadPage from "./csv/page";
-
-// Quick links — the bulk-uploads subpages (CSV importer, IEMIS importer,
-// import history).
-const QUICK_LINKS = [
-  { label: "CSV Import", desc: "Standard CSV template uploads", icon: "FileSpreadsheet", href: "/dashboard/bulk-uploads/csv" },
-  { label: "IEMIS Import", desc: "Ministry IEMIS report importer", icon: "Database", href: "/dashboard/bulk-uploads/iemis" },
-  { label: "Import History", desc: "Every past import run", icon: "History", href: "/dashboard/bulk-uploads/history" },
-];
+import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface ImportLog {
   id: string;
+  format_code: string;
+  filename: string;
   status: "pending" | "processing" | "completed" | "partial" | "failed";
+  total_rows: number;
   imported_rows: number;
   error_rows: number;
+  created_at: string;
 }
 
-/** Bulk Uploads hub — dashboard (import-history KPIs + quick links to the
- * csv/iemis/history subpages) above the CSV uploader it has always opened. */
+/**
+ * Bulk Uploads hub — A5 (plan 34-49): KPI band + launcher grid + ONE
+ * embeddable "most used" panel (the five latest import jobs). The hub used
+ * to render the full CSV uploader page nested inside its own AOSPage body
+ * (double header, double scroll); it now links to the two importers instead.
+ */
 export default function BulkUploadsPage() {
-  // Same endpoint/queryKey the history subpage uses — react-query dedupes.
+  const { t } = useI18n();
+
   const { data: history } = useQuery({
     queryKey: ["import-history"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<ImportLog[]>>("/iemis/history");
+      const res = await api.get<ApiResponse<ImportLog[]>>("/iemis/history", {
+        params: { per_page: 5 },
+      });
       return res.data.data ?? [];
     },
     retry: 1,
@@ -49,76 +55,87 @@ export default function BulkUploadsPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<Upload className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Bulk Uploads"
-        subtitle="Import students, staff and school data in bulk"
+        title={t("Bulk Uploads", "बल्क अपलोड")}
+        subtitle={t(
+          "Import students, staff and school data in bulk — every run is validated and logged",
+          "विद्यार्थी, कर्मचारी र विद्यालय डाटा बल्क आयात — हरेक पटक जाँचिएर लग हुन्छ"
+        )}
       />
       <AOSPageBody>
-        {/* Dashboard — KPI stat grid from the import history */}
         <StatGrid>
           <KpiCard
-            label="Imports Run"
+            label={t("Imports Run", "आयातहरू")}
             value={logs.length}
             icon={<FileSpreadsheet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
           />
           <KpiCard
-            label="Completed"
+            label={t("Completed", "सफल")}
             value={logs.filter((l) => l.status === "completed").length}
             color="#107c10"
             icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
           />
           <KpiCard
-            label="Needs Attention"
-            value={logs.filter((l) => l.status === "failed" || l.status === "partial" || l.status === "processing").length}
+            label={t("Needs Attention", "ध्यान आवश्यक")}
+            value={logs.filter((l) => ["failed", "partial", "processing"].includes(l.status)).length}
             color="#d83b01"
             icon={<AlertTriangle className="h-4 w-4" style={{ color: "#d83b01" }} />}
           />
           <KpiCard
-            label="Rows Imported"
+            label={t("Rows Imported (recent)", "आयात पङ्क्ति (हालको)")}
             value={logs.reduce((a, l) => a + (l.imported_rows || 0), 0)}
             color="var(--w11-text-primary)"
             icon={<Upload className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
           />
         </StatGrid>
 
-        {/* Quick links — 44px gradient icon tile + label, as next/link */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          {QUICK_LINKS.map((l) => {
-            const Icon = ICON_MAP[l.icon] || ChevronRight;
-            return (
-              <Link key={l.href} href={l.href} className="block h-full">
-                <div
-                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
-                  style={{ cursor: "pointer", marginBottom: 0 }}
-                >
-                  <div
-                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
-                    style={{
-                      width: 44,
-                      height: 44,
-                      background: SECTION_GRADIENTS.Operations,
-                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
-                    }}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
-                      {l.label}
-                    </p>
-                    <p className="text-[11px] leading-snug" style={{ color: "var(--w11-text-secondary)" }}>
-                      {l.desc}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        <QuickLinks
+          section="Operations"
+          links={[
+            { label: t("CSV Import", "CSV आयात"), icon: "FileText", href: "/dashboard/bulk-uploads/csv" },
+            { label: t("IEMIS Import (Excel)", "IEMIS आयात (Excel)"), icon: "FileSpreadsheet", href: "/dashboard/iemis-import" },
+            { label: t("Import History", "आयात इतिहास"), icon: "History", href: "/dashboard/bulk-uploads/history" },
+            { label: t("Compliance & EMIS", "अनुपालन र EMIS"), icon: "ShieldCheck", href: "/dashboard/compliance" },
+          ]}
+        />
 
-        {/* The CSV uploader this hub has always shown, kept below */}
-        <div style={{ height: 640 }}>
-          <CsvUploadPage />
-        </div>
+        <DataPanel
+          title={t("Latest import jobs", "पछिल्ला आयात कार्यहरू")}
+          actions={
+            <Link href="/dashboard/bulk-uploads/history">
+              <Button variant="ghost" size="sm">{t("View all", "सबै हेर्नुहोस्")}</Button>
+            </Link>
+          }
+        >
+          {logs.length === 0 ? (
+            <p className="text-[12px] py-4 text-center" style={{ color: "var(--w11-text-secondary)" }}>
+              {t("No imports yet — start with the CSV or IEMIS importer above.", "अझै आयात छैन — माथिको CSV वा IEMIS आयातबाट सुरु गर्नुहोस्।")}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {logs.map((l) => (
+                <div
+                  key={l.id}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 border border-[var(--w11-border-subtle)]"
+                >
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" style={{ color: "var(--w11-text-secondary)" }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium truncate" style={{ color: "var(--w11-text-primary)" }}>
+                      {l.filename || l.format_code}
+                    </p>
+                    <p className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                      {t(`${l.imported_rows} imported · ${l.error_rows} errors`, `${l.imported_rows} आयात · ${l.error_rows} त्रुटि`)}{" "}
+                      · {displayBS(l.created_at)}
+                    </p>
+                  </div>
+                  <StatusChip
+                    status={l.status === "completed" ? "completed" : l.status === "failed" ? "failed" : l.status === "partial" ? "partial" : "pending"}
+                    label={l.status}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </DataPanel>
       </AOSPageBody>
     </AOSPage>
   );

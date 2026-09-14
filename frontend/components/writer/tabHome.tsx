@@ -121,14 +121,15 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
 
   return (
     <>
-      {/* Clipboard */}
+      {/* Clipboard — shortcut hints only for keys that actually exist
+          (native Ctrl+X/C/V in the contenteditable surface) */}
       <RibbonGroup label="Clipboard">
         <BtnCol>
-          <RBtn icon={<ClipboardPaste className="h-4 w-4" />} label="Paste" title="Paste from clipboard" onClick={paste} />
+          <RBtn icon={<ClipboardPaste className="h-4 w-4" />} label="Paste" title="Paste from clipboard (Ctrl+V)" onClick={paste} />
           <div className="flex gap-0.5">
-            <RBtn icon={<Scissors className="h-3.5 w-3.5" />} title="Cut" onClick={cutSel} />
-            <RBtn icon={<Copy className="h-3.5 w-3.5" />} title="Copy" onClick={copySel} />
-            <RBtn icon={<Paintbrush className="h-3.5 w-3.5" />} title="Format painter" active={ctx.painterActive} onClick={paintMarks} />
+            <RBtn icon={<Scissors className="h-3.5 w-3.5" />} title="Cut (Ctrl+X)" onClick={cutSel} />
+            <RBtn icon={<Copy className="h-3.5 w-3.5" />} title="Copy (Ctrl+C)" onClick={copySel} />
+            <RBtn icon={<Paintbrush className="h-3.5 w-3.5" />} title="Format painter — copy the cursor's formatting, then select text to paint" active={ctx.painterActive} onClick={paintMarks} />
           </div>
         </BtnCol>
       </RibbonGroup>
@@ -161,7 +162,7 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
               <RBtn icon={<Bold className="h-3.5 w-3.5" />} title="Bold (Ctrl+B)" active={editor.isActive("bold")} onClick={() => ch.toggleBold().run()} />
               <RBtn icon={<Italic className="h-3.5 w-3.5" />} title="Italic (Ctrl+I)" active={editor.isActive("italic")} onClick={() => ch.toggleItalic().run()} />
               <RBtn icon={<UnderlineIcon className="h-3.5 w-3.5" />} title="Underline (Ctrl+U)" active={editor.isActive("underline")} onClick={() => ch.toggleUnderline().run()} />
-              <RBtn icon={<Strikethrough className="h-3.5 w-3.5" />} title="Strikethrough" active={editor.isActive("strike")} onClick={() => ch.toggleStrike().run()} />
+              <RBtn icon={<Strikethrough className="h-3.5 w-3.5" />} title="Strikethrough (Ctrl+Shift+X)" active={editor.isActive("strike")} onClick={() => ch.toggleStrike().run()} />
             </div>
             <div className="flex">
               <RBtn icon={<SubIcon className="h-3.5 w-3.5" />} title="Subscript" active={editor.isActive("subscript")} onClick={() => ch.toggleSubscript().run()} />
@@ -193,8 +194,8 @@ export function HomeTab({ ctx }: { ctx: WriterCtx }) {
         <div className="flex gap-1 items-start">
           <div className="flex flex-col gap-0.5">
             <div className="flex">
-              <RBtn icon={<List className="h-3.5 w-3.5" />} title="Bullets" active={editor.isActive("bulletList")} onClick={() => ch.toggleBulletList().run()} />
-              <RBtn icon={<ListOrdered className="h-3.5 w-3.5" />} title="Numbering" active={editor.isActive("orderedList")} onClick={() => ch.toggleOrderedList().run()} />
+              <RBtn icon={<List className="h-3.5 w-3.5" />} title="Bullets (Ctrl+Shift+8)" active={editor.isActive("bulletList")} onClick={() => ch.toggleBulletList().run()} />
+              <RBtn icon={<ListOrdered className="h-3.5 w-3.5" />} title="Numbering (Ctrl+Shift+7)" active={editor.isActive("orderedList")} onClick={() => ch.toggleOrderedList().run()} />
               <RBtn icon={<Outdent className="h-3.5 w-3.5" />} title="Decrease indent" disabled={!editor.can().liftListItem("listItem") && !editor.can().indentLess()} onClick={() => {
                 if (editor.isActive("bulletList") || editor.isActive("orderedList")) ch.liftListItem("listItem").run();
                 else ch.indentLess().run();

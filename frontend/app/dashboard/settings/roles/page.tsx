@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
+import { useAOSRouteParams, useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { toast } from "sonner";
 import { PluginGate, type PluginSidebarItem } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
@@ -24,14 +25,12 @@ import {
   Users,
 } from "lucide-react";
 import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
   DataPanel,
   StatusChip,
   AOSModuleLoadingState,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { SettingsPage } from "../settings-page";
 
 /**
  * Roles & Permissions — B-17 rewrite. Live per-role counts from
@@ -88,7 +87,12 @@ export default function RolesPage() {
 }
 
 function RolesContent() {
-  const [tab, setTab] = useState("roles");
+  // Tab is URL state (plan 33): /dashboard/settings/roles?tab=permissions deep-links work.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const tab = routeParams.get("tab") === "permissions" ? "permissions" : "roles";
+  const setTab = (next: string) =>
+    navigate(`/dashboard/settings/roles${next === "roles" ? "" : `?tab=${next}`}`);
   const [openRole, setOpenRole] = useState<string | null>(null);
 
   const {
@@ -114,21 +118,20 @@ function RolesContent() {
   );
 
   return (
-    <AOSPage>
-      <AOSPageHeader
-        icon={<Shield className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Roles & Permissions"
-        subtitle={
-          <>
-            Who uses the school, and what each role can reach
-            {stats ? ` — ${stats.total_users} users total` : ""}
-          </>
-        }
-      />
-      <AOSPageBody>
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="roles">Roles</TabsTrigger>
+    <SettingsPage
+      active="roles"
+      icon={<Shield className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+      title="Roles & Permissions"
+      subtitle={
+        <>
+          Who uses the school, and what each role can reach
+          {stats ? ` — ${stats.total_users} users total` : ""}
+        </>
+      }
+    >
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
             <TabsTrigger value="permissions">Permissions</TabsTrigger>
           </TabsList>
 
@@ -211,8 +214,7 @@ function RolesContent() {
           role={openRole}
           onClose={() => setOpenRole(null)}
         />
-      </AOSPageBody>
-    </AOSPage>
+    </SettingsPage>
   );
 }
 

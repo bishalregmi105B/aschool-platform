@@ -19,8 +19,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
-import { HelpCircle, Plus, Pencil, Trash2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import { HelpCircle, Plus, Pencil, Trash2, ChevronDown, ChevronUp, ChevronRight, Info } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
 import {
@@ -56,6 +59,12 @@ const FAQ_CATEGORIES = ["General", "Admissions", "Fees", "Academics", "Transport
 
 export default function FAQsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const confirm = useConfirm();
+  const { t } = useI18n();
+  // Backend (app/api/v1/faqs.py) restricts writes to school_admin+. The UI
+  // mirrors the contract: non-admins browse, admins act — no 403 surprises.
+  const canManage = user?.role === "school_admin" || user?.role === "superadmin";
   const [showDialog, setShowDialog] = useState(false);
   const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -97,6 +106,19 @@ export default function FAQsPage() {
     onError: () => toast.error("Failed to delete FAQ"),
   });
 
+  const removeFaq = async (faq: FAQ) => {
+    const ok = await confirm({
+      title: t("Delete this FAQ?", "यो FAQ मेटाउने?"),
+      body: t(
+        `"${faq.question}" will no longer appear on the school website.`,
+        `"${faq.question}" अब वेबसाइटमा देखिने छैन।`
+      ),
+      tone: "danger",
+      confirmLabel: t("Delete", "मेटाउनुहोस्"),
+    });
+    if (ok) deleteMutation.mutate(faq.id);
+  };
+
   const openAdd = () => {
     setEditingFaq(null);
     setForm({ question: "", answer: "", category: "General", is_active: true, sort_order: 0 });
@@ -132,12 +154,23 @@ export default function FAQsPage() {
         title="FAQ Management"
         subtitle="Manage frequently asked questions shown on the school website"
         actions={
-          <Button onClick={openAdd}>
-            <Plus className="h-4 w-4 mr-2" /> Add FAQ
-          </Button>
+          canManage ? (
+            <Button onClick={openAdd}>
+              <Plus className="h-4 w-4 mr-2" /> Add FAQ
+            </Button>
+          ) : undefined
         }
       />
       <AOSPageBody>
+        {!canManage && (
+          <div
+            className="win11-infobar info flex items-center gap-2 mb-4 text-[12px]"
+            style={{ padding: "8px 12px" }}
+          >
+            <Info className="h-4 w-4 shrink-0" />
+            {t("You can view FAQs here. Only school admins can add or edit them.", "तपाईंले यहाँ FAQ हेर्न मिल्छ। थप्न/सम्पादन स्कूल एडमिनले मात्र मिल्छ।")}
+          </div>
+        )}
         {/* Stats */}
         <StatGrid>
           <KpiCard label="Total FAQs" value={faqs?.length ?? 0} />
@@ -182,8 +215,8 @@ export default function FAQsPage() {
             <AOSEmptyState
               icon={<HelpCircle className="h-10 w-10" />}
               title="No FAQs yet"
-              description="Add your first FAQ to help students and parents"
-              action={<Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add FAQ</Button>}
+              description={canManage ? "Add your first FAQ to help students and parents" : "The school has not published FAQs yet."}
+              action={canManage ? <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add FAQ</Button> : undefined}
             />
           </DataPanel>
         ) : (
@@ -205,7 +238,7 @@ export default function FAQsPage() {
                       <TableHead className="w-8">#</TableHead>
                       <TableHead>Question</TableHead>
                       <TableHead className="w-24">Status</TableHead>
-                      <TableHead className="w-24">Actions</TableHead>
+                      {canManage && <TableHead className="w-24">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -233,6 +266,7 @@ export default function FAQsPage() {
                           <TableCell>
                             <StatusChip status={faq.is_active ? "active" : "inactive"} label={faq.is_active ? "Active" : "Inactive"} />
                           </TableCell>
+                          {canManage && (
                           <TableCell>
                             <div className="flex gap-1">
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(faq)}>
@@ -240,12 +274,13 @@ export default function FAQsPage() {
                               </Button>
                               <Button
                                 size="icon" variant="ghost" className="h-7 w-7 text-[#c42b1c]"
-                                onClick={() => deleteMutation.mutate(faq.id)}
+                                onClick={() => removeFaq(faq)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </TableCell>
+                          )}
                         </TableRow>
                       </>
                     ))}

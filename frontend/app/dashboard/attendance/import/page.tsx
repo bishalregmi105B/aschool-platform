@@ -7,6 +7,8 @@ import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Wizard, type WizardStep } from "@/components/ui/wizard";
+import { useI18n } from "@/lib/i18n";
 import { FilePicker } from "@/components/files/FilePicker";
 import {
   fetchManagedFileAsFile,
@@ -156,7 +158,7 @@ function parseEntries(csv: string): { entries: ImportEntry[]; parseErrors: strin
 }
 
 function ImportContent() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const { t } = useI18n();
   const [fileName, setFileName] = useState("");
   const [rawCsv, setRawCsv] = useState("");
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -167,7 +169,6 @@ function ImportContent() {
   const parsed = useMemo(() => parseEntries(rawCsv), [rawCsv]);
 
   const reset = () => {
-    setStep(1);
     setFileName("");
     setRawCsv("");
     setPreview(null);
@@ -177,7 +178,7 @@ function ImportContent() {
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     if (!/\.(csv|txt)$/i.test(file.name)) {
-      toast.error("Please choose a .csv file (export your spreadsheet as CSV first).");
+      toast.error(t("Please choose a .csv file (export your spreadsheet as CSV first).", ".csv फाइल छान्नुहोस्।"));
       return;
     }
     const text = await file.text();
@@ -185,7 +186,6 @@ function ImportContent() {
     setRawCsv(text);
     setPreview(null);
     setCommitResult(null);
-    setStep(2);
   };
 
   /** Vault pick → fetch the file's bytes back → run the existing CSV parse. */
@@ -197,25 +197,18 @@ function ImportContent() {
       const fileObj = await fetchManagedFileAsFile(mf);
       await onFile(fileObj);
     } catch {
-      toast.error("Failed to load file from the file manager");
+      toast.error(t("Failed to load file from the file manager", "फाइल लोड हुन सकेन"));
     } finally {
       setLoadingFile(false);
     }
   };
 
-  const previewMutation = useMutation({
+  const previewQuery = useMutation({
     mutationFn: async () => {
       const res = await api.post("/attendance/import/preview", { entries: parsed.entries });
       return res.data?.data as PreviewResponse;
     },
-    onSuccess: (data) => {
-      setPreview(data);
-      setStep(3);
-    },
-    onError: (err) => {
-      const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
-      toast.error(typeof msg === "string" ? msg : "Preview failed");
-    },
+    onSuccess: (data) => setPreview(data),
   });
 
   const commitMutation = useMutation({
@@ -225,11 +218,11 @@ function ImportContent() {
     },
     onSuccess: (data) => {
       setCommitResult(data);
-      toast.success(`Import applied — ${data?.applied ?? 0} rows written.`);
+      toast.success(t(`Import applied — ${data?.applied ?? 0} rows written.`, `${data?.applied ?? 0} पङ्क्ति लेखिए।`));
     },
     onError: (err) => {
       const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
-      toast.error(typeof msg === "string" ? msg : "Commit failed");
+      toast.error(typeof msg === "string" ? msg : t("Commit failed", "कमिट असफल"));
     },
   });
 
@@ -248,321 +241,220 @@ function ImportContent() {
     URL.revokeObjectURL(url);
   };
 
-  const STEPS = [
-    { id: 1, label: "Choose file", icon: Upload },
-    { id: 2, label: "Parse & review", icon: FileSpreadsheet },
-    { id: 3, label: "Preview & import", icon: CloudUpload },
+  // A4: ui/wizard owns the step chrome; async validation runs the SERVER
+  // preview as the gate between "review" and "commit" (plan: per-row errors
+  // before commit; failure offers retry-from-step, never restart).
+  const steps: WizardStep[] = [
+    {
+      key: "file",
+      title: t("Choose file", "फाइल छान्नुहोस्"),
+      validate: () =>
+        !rawCsv
+          ? t("Choose a CSV from the file manager to continue.", "CSV छान्नुहोस्।")
+          : parsed.entries.length === 0
+          ? t("The file parsed to zero rows — check the column layout.", "कुनै पङ्क्ति पार्स भएन।")
+          : null,
+      content: (
+        <div className="p-4 sm:p-5 space-y-4">
+          <div
+            role="button"
+            tabIndex={0}
+            className="flex flex-col items-center justify-center gap-2 rounded-[var(--w11-radius-lg)] border-2 border-dashed border-[var(--w11-border-default)] py-12 cursor-pointer hover:bg-[var(--w11-control-hover)] transition-colors"
+            onClick={() => setShowFilePicker(true)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowFilePicker(true); } }}
+          >
+            <FolderOpen className="h-10 w-10 text-[color:var(--w11-text-secondary)] opacity-40" />
+            <p className="font-medium">
+              {loadingFile
+                ? t("Loading file from the vault…", "फाइल आउँदै…")
+                : fileName || t("Choose a CSV from the file manager", "फाइल म्यानेजरबाट CSV छान्नुहोस्")}
+            </p>
+            <p className="text-xs text-[color:var(--w11-text-secondary)]">
+              {t("Columns: student_id, date_bs (or date), status, remarks — .csv / .txt", "स्तम्भ: student_id, date_bs, status, remarks")}
+            </p>
+          </div>
+          <div className="win11-infobar info">
+            <div>
+              <p className="text-[12px]">
+                {t("Spreadsheets (XLSX) are not parsed in-browser — export the sheet as CSV first. Statuses: present, absent, late, half_day, leave, holiday.", "XLSX ब्राउजरमा पार्स हुँदैन — CSV निर्यात गर्नुहोस्।")}
+              </p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={downloadTemplate}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Download CSV template", "टेम्प्लेट")}
+              </Button>
+            </div>
+          </div>
+          {parsed.parseErrors.length > 0 && (
+            <div
+              className="rounded-[var(--w11-radius-md)] border px-3 py-2 text-xs space-y-0.5"
+              style={{ borderColor: "rgba(216,59,1,0.3)", background: "rgba(216,59,1,0.08)", color: "#d83b01" }}
+            >
+              <p className="font-medium">{t("Some rows were skipped while parsing:", "केही पङ्क्ति छोडियो:")}</p>
+              {parsed.parseErrors.slice(0, 5).map((e, i) => <p key={i}>• {e}</p>)}
+              {parsed.parseErrors.length > 5 && <p>• …{parsed.parseErrors.length - 5}+</p>}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "validate",
+      title: t("Validate against the school", "सर्वर जाँच"),
+      description: t("Every student, date and status is checked before anything is written.", "लेख्नुअघि सबै कुरा जाँचिन्छ।"),
+      validateAsync: async () => {
+        if (!parsed.entries.length) return t("No rows to validate.", "जाँच गर्नुपर्छ।");
+        try {
+          const data = await previewQuery.mutateAsync();
+          if (!data || data.valid_count === 0) {
+            return t("Nothing valid to import — review the errors in the list below, fix the file, and start over.", "कुनै वैध पङ्क्ति छैन — त्रुटि हेर्नुहोस्।");
+          }
+          return null;
+        } catch {
+          return t("Server validation failed — nothing was written. Use Back and retry.", "सर्वर जाँच असफल — फेरि प्रयास।");
+        }
+      },
+      content: (
+        <div className="p-4 sm:p-5 space-y-3">
+          <p className="text-sm">{t(`Parsed ${parsed.entries.length} rows from`, "")} <strong>{fileName}</strong></p>
+          <StatGrid min={140}>
+            <KpiCard label={t("Rows parsed", "पङ्क्ति")} value={parsed.entries.length} />
+            {parsed.parseErrors.length > 0 && (
+              <KpiCard label={t("Local parse issues", "स्थानीय समस्या")} value={parsed.parseErrors.length} color="#d83b01" />
+            )}
+          </StatGrid>
+          <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-64">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-14">{t("Row", "पङ्क्ति")}</TableHead>
+                  <TableHead>{t("Student ID", "विद्यार्थी")}</TableHead>
+                  <TableHead>{t("Date", "मिति")}</TableHead>
+                  <TableHead>{t("Status", "अवस्था")}</TableHead>
+                  <TableHead>{t("Remarks", "टिप्पणी")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parsed.entries.slice(0, 20).map((e, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-center font-mono text-xs">{i + 1}</TableCell>
+                    <TableCell className="font-mono text-xs">{e.student_id}</TableCell>
+                    <TableCell>{e.date_bs || e.date}</TableCell>
+                    <TableCell><Badge variant="outline">{e.status}</Badge></TableCell>
+                    <TableCell>{e.remarks || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {parsed.entries.length > 20 && (
+              <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
+                {t(`Showing first 20 of ${parsed.entries.length} rows.`, `पहिलो २०/${parsed.entries.length}`)}
+              </p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "commit",
+      title: t("Preview & import", "पूर्वावलोकन र आयात"),
+      description: t("Commit writes only the rows the server marked valid.", "वैध पङ्क्ति मात्र लेखिन्छ।"),
+      validate: () => (!preview ? t("Run validation in the previous step first.", "अघिल्लो चरण पूरा गर्नुहोस्।") : null),
+      content: !preview ? (
+        <div className="p-5 text-sm text-[color:var(--w11-text-secondary)]">{t("No validation result yet.", "नतिजा छैन।")}</div>
+      ) : commitResult ? (
+        <div
+          className="m-4 rounded-[var(--w11-radius-lg)] border px-4 py-6 text-center"
+          style={{ borderColor: "rgba(16,124,16,0.3)", background: "rgba(16,124,16,0.08)" }}
+        >
+          <CheckCircle2 className="h-10 w-10 mx-auto mb-2" style={{ color: "#107c10" }} />
+          <p className="text-lg font-bold" style={{ color: "#107c10" }}>
+            {commitResult.applied} {t("rows applied", "पङ्क्ति लेखिए")}
+          </p>
+          {commitResult.skipped_invalid > 0 && (
+            <p className="text-sm" style={{ color: "#d83b01" }}>
+              {commitResult.skipped_invalid} {t("invalid rows were skipped.", "अवैध पङ्क्ति छोडियो।")}
+            </p>
+          )}
+          <Button variant="outline" size="sm" className="mt-3" onClick={reset}>
+            {t("Import another file", "अर्को फाइल")}
+          </Button>
+        </div>
+      ) : (
+        <div className="p-4 sm:p-5 space-y-4">
+          <StatGrid min={140} className="max-w-sm">
+            <KpiCard label={t("Valid rows", "वैध")} value={preview.valid_count} color="#107c10" />
+            <KpiCard label={t("Rows with errors", "त्रुटि")} value={preview.error_count} color="#c42b1c" />
+          </StatGrid>
+          {preview.errors.length > 0 && (
+            <div className="rounded-[var(--w11-radius-lg)] border border-[rgba(196,43,28,0.3)] overflow-auto max-h-56">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">{t("Row", "पङ्क्ति")}</TableHead>
+                    <TableHead>{t("Error", "त्रुटि")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.errors.map((e, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-center font-mono text-xs">{e.row}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#c42b1c" }}>
+                        <span className="inline-flex items-center gap-1.5">
+                          <XCircle className="h-3.5 w-3.5" /> {e.error}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {preview.preview.length > 0 && (
+            <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-72">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("Student", "विद्यार्थी")}</TableHead>
+                    <TableHead>{t("Date", "मिति")}</TableHead>
+                    <TableHead>{t("Status", "अवस्था")}</TableHead>
+                    <TableHead>{t("Remarks", "टिप्पणी")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.preview.map((pr, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium text-sm">{pr.student_name}</TableCell>
+                      <TableCell>{pr.date_bs || pr.date}</TableCell>
+                      <TableCell><Badge variant="outline">{pr.status}</Badge></TableCell>
+                      <TableCell>{pr.remarks || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Upload className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Import Attendance"
-        subtitle="Bulk-load register rows from a CSV — validated first, nothing is written until you commit"
-        actions={
-          <Button variant="outline" onClick={downloadTemplate}>
-            <Download className="h-4 w-4 mr-2" /> CSV template
-          </Button>
-        }
+        title={t("Import Attendance", "उपस्थिति आयात")}
+        subtitle={t(
+          "Bulk-load register rows from a CSV — validated first, nothing is written until you commit",
+          "CSV बाट रजिस्टर आयात — पहिले जाँच, कमिट नगरेसम्म लेखिँदैन",
+        )}
       />
       <AOSPageBody>
-        {/* Stepper */}
-        <div className="flex items-center gap-2 flex-wrap mb-4">
-          {STEPS.map((s, i) => (
-            <div key={s.id} className="flex items-center gap-2">
-              <div
-                className={`flex items-center gap-2 rounded-[var(--w11-radius-full)] border px-3 py-1.5 text-sm ${
-                  step === s.id
-                    ? "border-[var(--w11-accent)] bg-[var(--w11-accent-light)] text-[color:var(--w11-accent)] font-medium"
-                    : step > s.id
-                      ? "border-[#107c10] bg-[rgba(16,124,16,0.12)] text-[#107c10]"
-                      : "border-[var(--w11-border-default)] text-[color:var(--w11-text-secondary)]"
-                }`}
-              >
-                {step > s.id ? <CheckCircle2 className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
-                {s.id}. {s.label}
-              </div>
-              {i < STEPS.length - 1 && <span className="text-[color:var(--w11-text-secondary)]">→</span>}
-            </div>
-          ))}
+        <div className="max-w-4xl">
+          <Wizard
+            steps={steps}
+            finishLabel={preview ? t(`Import ${preview.valid_count} rows`, `${preview.valid_count} आयात`) : t("Import", "आयात")}
+            onFinish={async () => { await commitMutation.mutateAsync(); }}
+          />
         </div>
-
-        {/* ── Step 1: choose file ───────────────────────────────────────────── */}
-        {step === 1 && (
-          <DataPanel title="1. Choose a CSV file">
-            <div className="space-y-4">
-              <div
-                className="flex flex-col items-center justify-center gap-2 rounded-[var(--w11-radius-lg)] border-2 border-dashed border-[var(--w11-border-default)] py-12 cursor-pointer hover:bg-[var(--w11-control-hover)] transition-colors"
-                onClick={() => setShowFilePicker(true)}
-              >
-                <FolderOpen className="h-10 w-10 text-[color:var(--w11-text-secondary)] opacity-40" />
-                <p className="font-medium">
-                  {loadingFile ? "Loading file from the vault…" : "Choose a CSV from the file manager"}
-                </p>
-                <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                  Columns: student_id, date_bs (or date), status, remarks — .csv / .txt
-                </p>
-              </div>
-              <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                Spreadsheets (XLSX) are not parsed in-browser — export the sheet as CSV
-                first. Statuses: present, absent, late, half_day, leave, holiday.
-              </p>
-            </div>
-          </DataPanel>
-        )}
-
-        {/* ── Step 2: client-side parse ─────────────────────────────────────── */}
-        {step === 2 && (
-          <DataPanel
-            title={
-              <span className="flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4" /> 2. Parsed {fileName}
-              </span>
-            }
-            actions={
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Start over
-              </Button>
-            }
-          >
-            {parsed.entries.length === 0 && parsed.parseErrors.length === 0 ? (
-              <EmptyState
-                size="sm"
-                icon={FileSpreadsheet}
-                title="Nothing parsed"
-                body="The file has no data rows — check the column layout."
-              />
-            ) : (
-              <>
-                <StatGrid min={140}>
-                  <KpiCard label="Rows parsed" value={parsed.entries.length} />
-                  {(parsed.parseErrors.length > 0 || parsed.entries.length === 0) && (
-                    <KpiCard
-                      label="Local parse issues"
-                      value={parsed.parseErrors.length}
-                      color="#d83b01"
-                    />
-                  )}
-                </StatGrid>
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => previewMutation.mutate()}
-                    disabled={parsed.entries.length === 0 || previewMutation.isPending}
-                  >
-                    {previewMutation.isPending ? (
-                      <Spinner className="h-4 w-4 mr-2" />
-                    ) : (
-                      <FileCheck2 className="h-4 w-4 mr-2" />
-                    )}
-                    Validate against the school
-                  </Button>
-                </div>
-
-                {/* Sample of parsed rows */}
-                {parsed.entries.length > 0 && (
-                  <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-64 mt-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-14">Row</TableHead>
-                          <TableHead>Student ID</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Remarks</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {parsed.entries.slice(0, 20).map((e, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-center font-mono text-xs">{i + 1}</TableCell>
-                            <TableCell className="font-mono text-xs">{e.student_id}</TableCell>
-                            <TableCell>{e.date_bs || e.date}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{e.status}</Badge>
-                            </TableCell>
-                            <TableCell>{e.remarks || "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {parsed.entries.length > 20 && (
-                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
-                        Showing first 20 of {parsed.entries.length} rows.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Local parse errors */}
-                {parsed.parseErrors.length > 0 && (
-                  <div
-                    className="rounded-[var(--w11-radius-md)] border px-3 py-2 text-xs space-y-0.5 mt-4"
-                    style={{
-                      borderColor: "rgba(216,59,1,0.3)",
-                      background: "rgba(216,59,1,0.08)",
-                      color: "#d83b01",
-                    }}
-                  >
-                    <p className="font-medium">Some rows were skipped while parsing:</p>
-                    {parsed.parseErrors.slice(0, 5).map((e, i) => (
-                      <p key={i}>• {e}</p>
-                    ))}
-                    {parsed.parseErrors.length > 5 && (
-                      <p>• …and {parsed.parseErrors.length - 5} more</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </DataPanel>
-        )}
-
-        {/* ── Step 3: server preview + commit ───────────────────────────────── */}
-        {step === 3 && preview && (
-          <DataPanel
-            title={
-              <span className="flex items-center gap-2">
-                <CloudUpload className="h-4 w-4" /> 3. Preview &amp; import
-              </span>
-            }
-            actions={
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Start over
-              </Button>
-            }
-          >
-            {commitResult ? (
-              <div
-                className="rounded-[var(--w11-radius-lg)] border px-4 py-6 text-center"
-                style={{
-                  borderColor: "rgba(16,124,16,0.3)",
-                  background: "rgba(16,124,16,0.08)",
-                }}
-              >
-                <CheckCircle2 className="h-10 w-10 mx-auto mb-2" style={{ color: "#107c10" }} />
-                <p className="text-lg font-bold" style={{ color: "#107c10" }}>
-                  {commitResult.applied} rows applied
-                </p>
-                {commitResult.skipped_invalid > 0 && (
-                  <p className="text-sm" style={{ color: "#d83b01" }}>
-                    {commitResult.skipped_invalid} invalid rows were skipped.
-                  </p>
-                )}
-                <Button variant="outline" size="sm" className="mt-3" onClick={reset}>
-                  Import another file
-                </Button>
-              </div>
-            ) : (
-              <>
-                <StatGrid min={140} className="max-w-sm">
-                  <KpiCard
-                    label="Valid rows"
-                    value={preview.valid_count}
-                    color="#107c10"
-                  />
-                  <KpiCard
-                    label="Rows with errors"
-                    value={preview.error_count}
-                    color="#c42b1c"
-                  />
-                </StatGrid>
-
-                {/* Per-row errors */}
-                {preview.errors.length > 0 && (
-                  <div className="rounded-[var(--w11-radius-lg)] border border-[rgba(196,43,28,0.3)] overflow-auto max-h-56">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-16">Row</TableHead>
-                          <TableHead>Error</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {preview.errors.map((e, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-center font-mono text-xs">{e.row}</TableCell>
-                            <TableCell className="text-sm" style={{ color: "#c42b1c" }}>
-                              <span className="inline-flex items-center gap-1.5">
-                                <XCircle className="h-3.5 w-3.5" /> {e.error}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {preview.error_count > preview.errors.length && (
-                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
-                        Showing first {preview.errors.length} of {preview.error_count} errors.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Valid preview rows */}
-                {preview.preview.length > 0 && (
-                  <div className="rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] overflow-auto max-h-72 mt-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Student</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Remarks</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {preview.preview.map((p, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-medium text-sm">{p.student_name}</TableCell>
-                            <TableCell>{p.date_bs || p.date}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{p.status}</Badge>
-                            </TableCell>
-                            <TableCell>{p.remarks || "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {preview.valid_count > preview.preview.length && (
-                      <p className="px-3 py-2 text-xs text-[color:var(--w11-text-secondary)]">
-                        Showing first {preview.preview.length} of {preview.valid_count} valid rows.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {preview.valid_count === 0 ? (
-                  <div
-                    className="flex items-center gap-2 rounded-[var(--w11-radius-md)] border px-3 py-2 text-sm mt-4"
-                    style={{
-                      borderColor: "rgba(196,43,28,0.3)",
-                      background: "rgba(196,43,28,0.08)",
-                      color: "#c42b1c",
-                    }}
-                  >
-                    <AlertTriangle className="h-4 w-4" /> No valid rows to import — fix the
-                    errors and upload again.
-                  </div>
-                ) : (
-                  <div className="flex justify-end mt-4">
-                    <Button
-                      onClick={() => commitMutation.mutate()}
-                      disabled={commitMutation.isPending || preview.valid_count === 0}
-                    >
-                      {commitMutation.isPending ? (
-                        <Spinner className="h-4 w-4 mr-2" />
-                      ) : (
-                        <CloudUpload className="h-4 w-4 mr-2" />
-                      )}
-                      Import {preview.valid_count} rows
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </DataPanel>
-        )}
       </AOSPageBody>
 
       <FilePicker

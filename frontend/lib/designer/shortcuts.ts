@@ -27,6 +27,8 @@ export interface ShortcutHandlers {
   togglePanel: (p: DesignerPanel) => void;
   nextPage: () => void;
   prevPage: () => void;
+  /** "?" / Ctrl+/ — open the shortcut-help overlay (wave-J). */
+  help: () => void;
 }
 
 function isEditableTarget(t: EventTarget | null): boolean {
@@ -100,6 +102,10 @@ export function attachShortcuts(handlers: ShortcutHandlers): () => void {
           e.preventDefault();
           handlers.zoomFit();
           return;
+        case "/":
+          e.preventDefault();
+          handlers.help();
+          return;
       }
       return;
     }
@@ -144,6 +150,9 @@ export function attachShortcuts(handlers: ShortcutHandlers): () => void {
         return;
       case "l":
         handlers.togglePanel("layers");
+        return;
+      case "?":
+        handlers.help();
         return;
     }
   };

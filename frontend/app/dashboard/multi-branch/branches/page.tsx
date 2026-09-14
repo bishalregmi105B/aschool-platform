@@ -32,7 +32,8 @@ function BranchesContent() {
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", code: "", address: "", phone: "", email: "", principal_name: "" });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
+    retry: 1,
     queryKey: ["branches", search],
     queryFn: async () => { const r = await api.get("/schools/branches", { params: { search: search || undefined } }); return r.data?.data ?? r.data; },
   });
@@ -85,6 +86,9 @@ function BranchesContent() {
             columns={BRANCH_COLUMNS}
             rows={branches}
             rowKey={(b: any) => b.id}
+            loading={isLoading}
+            error={isError ? "Failed to load branches. Please try again." : null}
+            onRetry={() => refetch()}
             searchable
             searchValue={search}
             onSearchChange={setSearch}
@@ -96,7 +100,12 @@ function BranchesContent() {
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add New Branch</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Add New Branch</DialogTitle>
+              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                Name and code are required — the code is used in reports and transport routes across the chain.
+              </p>
+            </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Branch Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Kathmandu Branch" /></div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Image, Pencil, Plus, Trash2 } from "lucide-react";
+import { ImageIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, ApiResponse } from "@/lib/api";
@@ -133,7 +133,7 @@ function SlidersContent() {
   return (
     <AOSPage>
       <AOSPageHeader
-        icon={<Image className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        icon={<ImageIcon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Banners &amp; Sliders"
         subtitle={`${sliders.length} carousel ${sliders.length === 1 ? "banner" : "banners"} · ${sliders.filter((s) => s.is_active).length} active`}
         actions={
@@ -146,7 +146,7 @@ function SlidersContent() {
         {sliders.length === 0 ? (
           <DataPanel>
             <AOSEmptyState
-              icon={<Image className="h-10 w-10" />}
+              icon={<ImageIcon className="h-10 w-10" />}
               title="No sliders configured"
               description="No sliders configured for this school."
             />
@@ -203,7 +203,7 @@ function SlidersContent() {
                 <Textarea rows={3} value={form.subtitle} onChange={(event) => setForm({ ...form, subtitle: event.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Image</Label>
+                <Label>ImageIcon</Label>
                 <VaultImageField
                   value={form.image_url || null}
                   onChange={(url) => setForm({ ...form, image_url: url ?? "" })}

@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 import { formatNepaliCurrency } from "@/lib/nepali-utils";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
 
 interface CarryStudent {
   student_id: string;
@@ -85,8 +87,11 @@ export default function CarryForwardPage() {
 }
 
 function CarryForwardContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState("wizard");
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["tab"]);
+  const tab = urlFilters.tab || "wizard";
+  const setTab = (v: string) => setUrlFilters({ tab: v === "wizard" ? "" : v });
 
   // Wizard state
   const [fromYear, setFromYear] = useState("2082");
@@ -160,7 +165,7 @@ function CarryForwardContent() {
   const CARRY_COLUMNS: Column<CarryStudent>[] = [
     {
       key: "student_name",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
       value: (s) => s.student_name || "",
       render: (s) => (
@@ -172,18 +177,18 @@ function CarryForwardContent() {
     },
     {
       key: "balance_type",
-      label: "Type",
+      label: t("Type", "प्रकार"),
       sortable: true,
       value: (s) => s.balance_type,
       render: (s) => (
         <Badge variant={s.balance_type === "due" ? "destructive" : "success"}>
-          {s.balance_type === "due" ? "Due" : "Credit"}
+          {s.balance_type === "due" ? t("Due", "बाँकी") : t("Credit", "क्रेडिट")}
         </Badge>
       ),
     },
     {
       key: "signed_balance",
-      label: "Signed Balance",
+      label: t("Signed Balance", "रकम (चिनो)"),
       align: "right",
       sortable: true,
       value: (s) => s.signed_balance,
@@ -195,7 +200,7 @@ function CarryForwardContent() {
     },
     {
       key: "balance",
-      label: "Amount",
+      label: t("Amount", "रकम"),
       align: "right",
       sortable: true,
       value: (s) => s.balance,
@@ -206,7 +211,7 @@ function CarryForwardContent() {
   const bulkActions: BulkAction<CarryStudent>[] = [
     {
       key: "apply",
-      label: "Apply Carry-Forward",
+      label: t("Apply Carry-Forward", "रकम सारि लागू"),
       tone: "default",
       onClick: (rows) => setApplyTarget(rows),
     },
@@ -267,26 +272,26 @@ function CarryForwardContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<ArrowRightLeft className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Carry Forward"
-        subtitle="Roll last year's due/credit balances into the new academic year"
+        title={t("Carry Forward", "रकम सारि लागू")}
+        subtitle={t("Roll last year's due/credit balances into the new academic year", "पगेको वर्षको बाँकी/क्रेडिट नयो शैक्षिक वर्षमा सार्नु")}
       />
       <AOSPageBody>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="wizard" className="gap-1">
-              <ArrowRightLeft className="h-3.5 w-3.5" /> Carry Forward
+              <ArrowRightLeft className="h-3.5 w-3.5" /> {t("Carry Forward", "सारि")}
             </TabsTrigger>
             <TabsTrigger value="log" className="gap-1">
-              <History className="h-3.5 w-3.5" /> Log
+              <History className="h-3.5 w-3.5" /> {t("Log", "लग")}&#32;
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="wizard" className="space-y-4 mt-4">
             {/* Step 1: pick years */}
-            <DataPanel title="1. Pick Academic Years (BS)">
+            <DataPanel title={t("1. Pick Academic Years (BS)", "1. शैक्षिक वर्ष छान्नु (BS)")}>
               <div className="flex flex-wrap items-end gap-4">
                 <div className="space-y-1">
-                  <Label className="text-xs">From Year (BS)</Label>
+                  <Label className="text-xs">{t("From Year (BS)", "गरेको वर्ष")}</Label>
                   <AdvancedSelect
                     value={fromYear}
                     onChange={(v) => {
@@ -299,7 +304,7 @@ function CarryForwardContent() {
                 </div>
                 <ArrowRightLeft className="h-4 w-4 mb-2 text-[color:var(--w11-text-secondary)]" />
                 <div className="space-y-1">
-                  <Label className="text-xs">To Year (BS)</Label>
+                  <Label className="text-xs">{t("To Year (BS)", "नयो वर्ष")}</Label>
                   <AdvancedSelect
                     value={toYear}
                     onChange={(v) => setToYear(v)}
@@ -308,7 +313,7 @@ function CarryForwardContent() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Class (optional)</Label>
+                  <Label className="text-xs">{t("Class (optional)", "कक्षा (वैकल्पिक)")}</Label>
                   <AdvancedSelect
                     value={classId}
                     onChange={(v) => {
@@ -316,7 +321,7 @@ function CarryForwardContent() {
                       setPreview(null);
                     }}
                     clearable
-                    placeholder="All Classes"
+                    placeholder={t("All Classes", "सबै कक्षा")}
                     className="w-44"
                     options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
                   />
@@ -330,11 +335,11 @@ function CarryForwardContent() {
                   ) : (
                     <PlayCircle className="h-4 w-4 mr-2" />
                   )}
-                  Load Preview
+                  {t("Load Preview", "क्षणहेरी हेर्नु")}
                 </Button>
                 {fromYear === toYear && (
                   <p className="text-xs mb-1" style={{ color: "#c42b1c" }}>
-                    From and to years must differ.
+                    {t("From and to years must differ.", "दुवै वर्ष फर्क हुनुपर्छ")}
                   </p>
                 )}
               </div>
@@ -345,24 +350,24 @@ function CarryForwardContent() {
               <>
                 <StatGrid className="mb-0" min={200}>
                   <KpiCard
-                    label="Total Due to Carry"
+                    label={t("Total Due to Carry", "सार्ने कुल बाँकी")}
                     value={formatNepaliCurrency(preview.total_due || 0)}
                     color="#c42b1c"
                   />
                   <KpiCard
-                    label="Total Credit to Carry"
+                    label={t("Total Credit to Carry", "सार्ने कुल क्रेडिट")}
                     value={formatNepaliCurrency(preview.total_credit || 0)}
                     color="#107c10"
                   />
-                  <KpiCard label="Students with Balances" value={preview.students.length} />
+                  <KpiCard label={t("Students with Balances", "रकम बाँकी विद्यार्थी")} value={preview.students.length} />
                 </StatGrid>
 
                 <DataPanel
                   title={
                     <span className="flex items-center gap-2">
-                      2. Select Students
+                      {t("2. Select Students", "2. विद्यार्थी छान्नु")}
                       <span className="text-xs font-normal text-[color:var(--w11-text-secondary)]">
-                        Balances for {preview.from_year_bs} BS
+                        {t("Balances for", "रकम")} {preview.from_year_bs} BS
                       </span>
                     </span>
                   }
@@ -378,8 +383,8 @@ function CarryForwardContent() {
                     dense
                     empty={{
                       icon: TrendingUp,
-                      title: "No balances to carry",
-                      body: `No student has a non-zero balance for ${preview.from_year_bs} BS.`,
+                      title: t("No balances to carry", "सार्ने रकम छेन"),
+                      body: `${preview.from_year_bs} BS {t("ma kunai baunki chhaina", "मा कुनै रकम बाँकी छेन")}`,
                     }}
                   />
                 </DataPanel>
@@ -388,13 +393,13 @@ function CarryForwardContent() {
           </TabsContent>
 
           <TabsContent value="log" className="mt-4">
-            <DataPanel title="Carry-Forward History">
+            <DataPanel title={t("Carry-Forward History", "रकम सारि यश")}>
               <DataTable<CarryLogRow>
                 columns={LOG_COLUMNS}
                 rows={logQuery.data?.log ?? []}
                 rowKey={(r) => r.id}
                 loading={logQuery.isLoading}
-                error={logQuery.isError ? "Failed to load carry-forward log." : undefined}
+                error={logQuery.isError ? t("Failed to load carry-forward log.", "लग लोड सकिएन।") : undefined}
                 onRetry={() => logQuery.refetch()}
                 pagination={
                   logQuery.data?.meta
@@ -413,8 +418,8 @@ function CarryForwardContent() {
                 dense
                 empty={{
                   icon: History,
-                  title: "No carry-forward entries yet",
-                  body: "Applied carry-forwards will be logged here.",
+                  title: t("No carry-forward entries yet", "अहिले कुनै प्रविष्ट छेन"),
+                  body: t("Applied carry-forwards will be logged here.", "लागू एक्षयहरू यहाँ लग्नेछ।"),
                 }}
               />
             </DataPanel>
@@ -428,14 +433,11 @@ function CarryForwardContent() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Apply Carry-Forward</DialogTitle>
+              <DialogTitle>{t("Apply Carry-Forward", "रकम सारि लागू")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-[color:var(--w11-text-secondary)]">
-                Roll <strong>{applyTarget?.length ?? 0}</strong> selected student balance(s)
-                from <strong>{fromYear}</strong> into <strong>{toYear}</strong> BS. Due
-                balances become a pending bill in the new year; credits become a
-                self-settling credit line. Already-applied students are skipped.
+                {t(`Roll ${applyTarget?.length ?? 0} selected balance(s) from ${fromYear} to ${toYear} BS. Due balances become pending bills in the new year; credits become self-settling lines. Already-applied students are skipped.`, `छानिएका ${applyTarget?.length ?? 0} विद्यार्थीका रकम ${fromYear} बाट ${toYear} BS मा सर्नेछन्। बाँकी रकम नयाँ वर्षको बिजक बन्छ; क्रेडिट आफैँ मिल्ने लाइन बन्छ। पहिले लागू भएका छोडिन्छन्।`)}
               </p>
               <div className="flex gap-4 text-sm">
                 <span className="flex items-center gap-1" style={{ color: "#c42b1c" }}>
@@ -454,13 +456,13 @@ function CarryForwardContent() {
                 </span>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Due Date for the new bill (BS, optional)</Label>
+                <Label className="text-xs">{t("Due Date for the new bill (BS, optional)", "नयौको बिजकको मिति (वैकल्पिक)")}</Label>
                 <BSDateInput value={dueDateBS} onChange={(v) => setDueDateBS(v)} emit="bs" className="w-56" />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setApplyTarget(null)} disabled={apply.isPending}>
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button
                 onClick={() => apply.mutate((applyTarget || []).map((s) => s.student_id))}
@@ -471,7 +473,7 @@ function CarryForwardContent() {
                 ) : (
                   <ArrowRightLeft className="h-4 w-4 mr-2" />
                 )}
-                Apply to {applyTarget?.length ?? 0} Student(s)
+                {t("Apply to", "लागू")} {applyTarget?.length ?? 0} {t("student(s)", "विद्यार्थी")}
               </Button>
             </DialogFooter>
           </DialogContent>

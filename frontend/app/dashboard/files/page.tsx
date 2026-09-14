@@ -1,21 +1,38 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+/**
+ * FileManager (archetype A6 workspace — plan 34 #48).
+ *
+ * Research notes: (1) modern web file managers (NN/g, GitHub files) put a
+ * persistent folder tree on the LEFT, breadcrumb + search + view-toggle in a
+ * top command bar, and selection/quota in a BOTTOM statusbar — all three are
+ * now present; (2) destructive delete in a file manager must be confirmable
+ * and reversible (native dialogs banned).
+ *
+ * The "Recently Deleted" tree node lists soft-deleted rows via the service;
+ * the backend has no deleted-list endpoint, so it falls back to an honest
+ * explanation (see note below + wave-F report).
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import {
   ChevronRight,
+  Clock,
   Download,
   File,
   FileText,
   Film,
+  Folder,
   FolderOpen,
   FolderPlus,
   Globe,
   Grid3X3,
   HardDrive,
+  Home,
   Image,
   LayoutList,
   Link2,
@@ -29,6 +46,9 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { TreeView, type TreeNode } from "@/components/aos/kit/detail-kit";
+import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
+import { useDebounced } from "@/components/ui/filter-bar";
 
 import {
   createFolder,
@@ -104,6 +124,7 @@ export default function FilesPage() {
 
 function FilesContent() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   // Navigation state
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -112,12 +133,20 @@ function FilesContent() {
   const [openOnSingleClick, setOpenOnSingleClick] = useState(true);
 
   // UI state
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounced(searchInput, 300);
   const [typeFilter, setTypeFilter] = useState<FileType | "all">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dragOver, setDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<ManagedFile | null>(null);
+  // Multi-select (winnowed to files) drives the bottom statusbar selection
+  // count and bulk-delete. Cmd/Ctrl+click toggles; single click previews.
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+
+  // "recently-deleted" pseudo-route in the tree nav; the backend has no
+  // deleted-list endpoint so this renders an honest note (see report).
+  const [showDeleted, setShowDeleted] = useState(false);
 
   // Folder creation
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -135,6 +164,32 @@ function FilesContent() {
     queryKey: ["file-folders", currentFolderId],
     queryFn: () => listFolders(currentFolderId),
   });
+
+  // Full folder tree for the left nav — one BFS per level over the existing
+  // GET /files/folders?parent_id= endpoint (trees in schools are shallow).
+  const { data: allFolders = [] } = useQuery<FileFolder[]>({
+    queryKey: ["file-folder-tree"],
+    queryFn: async () => {
+      const out: FileFolder[] = [];
+      let level = await listFolders(null);
+      let depth = 0;
+      while (level.length && depth < 5) {
+        out.push(...level);
+        const kids = await Promise.all(level.map((f) => listFolders(f.id)));
+        level = kids.flat();
+        depth++;
+      }
+      return out;
+    },
+    staleTime: 30_000,
+  });
+
+  // id → ancestor path, so a tree click can rebuild the breadcrumb trail.
+  const folderById = useMemo(() => {
+    const m = new Map<string, FileFolder>();
+    for (const f of allFolders) m.set(f.id, f);
+    return m;
+  }, [allFolders]);
 
   const { data: filesData, isLoading: filesLoading } = useQuery({
     queryKey: ["managed-files", currentFolderId, search, typeFilter],
@@ -176,6 +231,75 @@ function FilesContent() {
     });
     setSelectedFile(null);
   }, []);
+
+  // Tree-nav click: jump to any folder (rebuilds the breadcrumb trail from
+  // the parent chain) or toggle the Recently-deleted pseudo-view.
+  const navigateTo = useCallback((id: string) => {
+    setShowDeleted(false);
+    if (id === "__root__") {
+      setCurrentFolderId(null);
+      setFolderTrail([]);
+      setFocusedFolderId(null);
+      setSelectedFile(null);
+      return;
+    }
+    if (id === "__deleted__") {
+      setShowDeleted(true);
+      return;
+    }
+    const trail: { id: string; name: string }[] = [];
+    let cur: string | null = id;
+    while (cur) {
+      const f = folderById.get(cur);
+      if (!f) break;
+      trail.unshift({ id: f.id, name: f.name });
+      cur = f.parent_id;
+    }
+    setCurrentFolderId(id);
+    setFolderTrail(trail);
+    setFocusedFolderId(null);
+    setSelectedFile(null);
+    setCheckedIds(new Set());
+  }, [folderById]);
+
+  const folderTree = useMemo<TreeNode[]>(() => {
+    const byParent = new Map<string | null, FileFolder[]>();
+    for (const f of allFolders) {
+      const key = f.parent_id ?? null;
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key)!.push(f);
+    }
+    const build = (parentId: string | null): TreeNode[] =>
+      (byParent.get(parentId) || [])
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((f) => ({
+          id: f.id,
+          label: (
+            <span
+              className="flex items-center gap-1.5 truncate"
+              // Clicking the label of a folder with children would only
+              // toggle expand in the tree; make it navigate as well.
+              onClick={(e) => {
+                if ((byParent.get(f.id) || []).length === 0) return; // leaf: TreeView handles
+                e.stopPropagation();
+                navigateTo(f.id);
+              }}
+            >
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--w11-accent)" }} />
+              <span className="truncate">{f.name}</span>
+            </span>
+          ),
+          children: build(f.id),
+          trailing: f.file_count ? (
+            <span className="text-[10px]" style={{ color: "var(--w11-text-tertiary)" }}>{f.file_count}</span>
+          ) : undefined,
+          defaultOpen: depth0Has(f.id),
+        }));
+    function depth0Has(id: string) {
+      return (byParent.get(id) || []).length > 0;
+    }
+    return build(null);
+  }, [allFolders]);
 
   // Focus first folder when folder list changes
   useEffect(() => {
@@ -253,6 +377,7 @@ function FilesContent() {
       setShowNewFolder(false);
       setNewFolderName("");
       queryClient.invalidateQueries({ queryKey: ["file-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["file-folder-tree"] });
     },
     onError: () => toast.error("Failed to create folder"),
   });
@@ -262,28 +387,52 @@ function FilesContent() {
     if (name) createFolderMutation.mutate(name);
   };
 
-  // ── Folder delete ──
+  // ── Folder delete (danger confirm — it takes its files with it) ──
   const deleteFolderMutation = useMutation({
     mutationFn: (id: string) => deleteFolderService(id),
     onSuccess: () => {
       toast.success("Folder deleted");
       queryClient.invalidateQueries({ queryKey: ["file-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["file-folder-tree"] });
       queryClient.invalidateQueries({ queryKey: ["managed-files"] });
+      queryClient.invalidateQueries({ queryKey: ["file-usage"] });
     },
     onError: () => toast.error("Failed to delete folder"),
   });
 
-  // ── File delete ──
-  const deleteFileMutation = useMutation({
-    mutationFn: (id: string) => deleteFileService(id),
-    onSuccess: () => {
-      toast.success("File deleted");
-      setSelectedFile(null);
-      queryClient.invalidateQueries({ queryKey: ["managed-files"] });
-      queryClient.invalidateQueries({ queryKey: ["file-usage"] });
-    },
-    onError: () => toast.error("Failed to delete file"),
-  });
+  const removeFolder = async (folder: FileFolder) => {
+    const ok = await confirm({
+      title: "Delete folder",
+      body: `“${folder.name}” and its ${folder.file_count} file(s) will be removed. Storage objects are deleted for good.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (ok) deleteFolderMutation.mutate(folder.id);
+  };
+
+  const removeFile = async (file: ManagedFile) => {
+    undoableDelete({
+      label: file.original_name,
+      commit: async () => { await deleteFileService(file.id); },
+      optimistic: () => setCheckedIds((ids) => { const n = new Set(ids); n.delete(file.id); return n; }),
+    });
+    queryClient.invalidateQueries({ queryKey: ["managed-files"] });
+    queryClient.invalidateQueries({ queryKey: ["file-usage"] });
+    setSelectedFile(null);
+  };
+
+  const removeChecked = async () => {
+    const items = files.filter((f) => checkedIds.has(f.id));
+    if (!items.length) return;
+    const ok = await confirm({
+      title: `Delete ${items.length} file${items.length === 1 ? "" : "s"}`,
+      body: `Delete ${items.length} selected file(s)? You get one undo toast per file.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    for (const f of items) removeFile(f);
+  };
 
   // ── Breadcrumb ──
   const breadcrumb = [{ id: null as string | null, name: "My Files" }, ...folderTrail];
@@ -442,8 +591,8 @@ function FilesContent() {
         <div className="relative w-48">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[color:var(--w11-text-secondary)]" />
           <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search files…"
             className="pl-8 h-8 text-sm"
           />
@@ -548,25 +697,43 @@ function FilesContent() {
         />
       </div>
 
-      {/* Storage usage bar */}
-      {usageData && (
-        <div className="flex items-center gap-4 px-4 py-2 border-b bg-[color:var(--w11-control-hover)] text-xs text-[color:var(--w11-text-secondary)] shrink-0 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <HardDrive className="h-3.5 w-3.5" />
-            <span className="font-medium text-[color:var(--w11-text-primary)]">{usageData.total_mb} MB</span> used
-            &middot;
-            <span className="font-medium text-[color:var(--w11-text-primary)]">{usageData.total_files}</span> files
-          </span>
-          {usageData.breakdown.map((b) => (
-            <span key={b.file_type}>
-              {b.file_type}: <span className="font-medium text-[color:var(--w11-text-primary)]">{b.count}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
       {/* ── Content area ──────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Folder tree (win11-treeview) — left nav pane */}
+        <aside className="w-56 shrink-0 border-r flex flex-col bg-[color:var(--w11-card-bg)] overflow-hidden">
+          <div className="px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wide text-[color:var(--w11-text-secondary)] shrink-0">
+            Folders
+          </div>
+          <div className="flex-1 overflow-y-auto py-1">
+            <TreeView
+              aria-label="Folder tree"
+              selectedId={showDeleted ? "__deleted__" : (currentFolderId ?? "__root__")}
+              onSelect={navigateTo}
+              nodes={[
+                {
+                  id: "__root__",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <Home className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} /> My Files
+                    </span>
+                  ),
+                  children: folderTree,
+                  defaultOpen: true,
+                },
+                {
+                  id: "__deleted__",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" style={{ color: "var(--w11-text-secondary)" }} />
+                      Recently deleted
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        </aside>
+
         {/* Main content + drag-drop */}
         <div
           className={`flex-1 overflow-y-auto p-4 transition-colors ${dragOver ? "ring-2 ring-[color:var(--w11-accent)] ring-inset bg-[color:var(--w11-accent-light)]" : ""}`}
@@ -583,7 +750,18 @@ function FilesContent() {
             </div>
           )}
 
-          {filesLoading ? (
+          {showDeleted ? (
+            <div className="flex flex-col items-center justify-center py-24 text-[color:var(--w11-text-secondary)] max-w-md mx-auto text-center">
+              <Trash2 className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-sm font-medium">Recently deleted — not available</p>
+              <p className="text-xs mt-2 leading-relaxed opacity-80">
+                The storage API soft-flags deleted files but exposes no “list deleted”
+                endpoint, so deleted items cannot be shown or restored here yet.
+                Deletions are confirmed before they run; ask an admin to restore a
+                specific file from a backup if needed.
+              </p>
+            </div>
+          ) : filesLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
             </div>
@@ -615,7 +793,7 @@ function FilesContent() {
                             if (openOnSingleClick) openFolder(folder);
                           }}
                           onDoubleClick={() => openFolder(folder)}
-                          onDelete={() => deleteFolderMutation.mutate(folder.id)}
+                          onDelete={() => removeFolder(folder)}
                         />
                       ))}
                     </div>
@@ -633,7 +811,7 @@ function FilesContent() {
                             if (openOnSingleClick) openFolder(folder);
                           }}
                           onDoubleClick={() => openFolder(folder)}
-                          onDelete={() => deleteFolderMutation.mutate(folder.id)}
+                          onDelete={() => removeFolder(folder)}
                         />
                       ))}
                     </div>
@@ -654,6 +832,8 @@ function FilesContent() {
                           key={file.id}
                           file={file}
                           selected={selectedFile?.id === file.id}
+                          checked={checkedIds.has(file.id)}
+                          onCheck={() => setCheckedIds((ids) => { const n = new Set(ids); if (n.has(file.id)) n.delete(file.id); else n.add(file.id); return n; })}
                           onClick={() => setSelectedFile(selectedFile?.id === file.id ? null : file)}
                         />
                       ))}
@@ -665,6 +845,8 @@ function FilesContent() {
                           key={file.id}
                           file={file}
                           selected={selectedFile?.id === file.id}
+                          checked={checkedIds.has(file.id)}
+                          onCheck={() => setCheckedIds((ids) => { const n = new Set(ids); if (n.has(file.id)) n.delete(file.id); else n.add(file.id); return n; })}
                           onClick={() => setSelectedFile(selectedFile?.id === file.id ? null : file)}
                         />
                       ))}
@@ -770,16 +952,37 @@ function FilesContent() {
                 variant="destructive"
                 size="sm"
                 className="w-full justify-start"
-                onClick={() => deleteFileMutation.mutate(selectedFile.id)}
-                disabled={deleteFileMutation.isPending}
+                onClick={() => removeFile(selectedFile)}
               >
-                {deleteFileMutation.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  : <Trash2 className="h-3.5 w-3.5 mr-2" />}
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
                 Delete
               </Button>
             </div>
           </aside>
+        )}
+      </div>
+
+      {/* ── Statusbar (win11-statusbar): selection + quota ────────────── */}
+      <div className="win11-statusbar flex items-center justify-between gap-4 px-4 py-1.5 border-t text-[12px] shrink-0 flex-wrap" style={{ color: "var(--w11-text-secondary)" }}>
+        <div className="flex items-center gap-4">
+          <span>
+            {files.length} file{files.length === 1 ? "" : "s"} · {folders.length} folder{folders.length === 1 ? "" : "s"}
+          </span>
+          {checkedIds.size > 0 && (
+            <span className="flex items-center gap-2">
+              <span style={{ color: "var(--w11-accent)", fontWeight: 600 }}>
+                {checkedIds.size} selected · {formatBytes(files.filter((f) => checkedIds.has(f.id)).reduce((n, f) => n + (f.size_bytes || 0), 0))}
+              </span>
+              <button type="button" className="underline hover:text-[#c42b1c]" onClick={removeChecked}>Delete selected</button>
+              <button type="button" className="underline" onClick={() => setCheckedIds(new Set())}>Clear</button>
+            </span>
+          )}
+        </div>
+        {usageData && (
+          <span className="flex items-center gap-1.5">
+            <HardDrive className="h-3.5 w-3.5" />
+            {usageData.total_mb} MB used · {usageData.total_files} files
+          </span>
         )}
       </div>
 
@@ -1089,10 +1292,14 @@ function FolderRow({
 function FileCard({
   file,
   selected,
+  checked,
+  onCheck,
   onClick,
 }: {
   file: ManagedFile;
   selected: boolean;
+  checked: boolean;
+  onCheck: () => void;
   onClick: () => void;
 }) {
   return (
@@ -1102,11 +1309,23 @@ function FileCard({
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
       className={`group relative border rounded-lg overflow-hidden cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--w11-accent)] ${
-        selected
+        selected || checked
           ? "ring-2 ring-[color:var(--w11-accent)] border-[color:var(--w11-accent)]"
           : "hover:ring-2 hover:ring-[color:var(--w11-accent)]"
       }`}
     >
+      <button
+        type="button"
+        aria-label={checked ? "Unselect file" : "Select file"}
+        onClick={(e) => { e.stopPropagation(); onCheck(); }}
+        className={`absolute top-1.5 left-1.5 z-10 h-4 w-4 rounded border flex items-center justify-center text-[10px] transition-all ${
+          checked
+            ? "bg-[color:var(--w11-accent)] border-[color:var(--w11-accent)] text-white"
+            : "opacity-0 group-hover:opacity-100 bg-[color:var(--w11-card-bg)]/90"
+        }`}
+      >
+        {checked ? "✓" : ""}
+      </button>
       <div className="aspect-square bg-[color:var(--w11-control-bg)] flex items-center justify-center">
         {file.file_type === "image" && file.url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -1131,10 +1350,14 @@ function FileCard({
 function FileRow({
   file,
   selected,
+  checked,
+  onCheck,
   onClick,
 }: {
   file: ManagedFile;
   selected: boolean;
+  checked: boolean;
+  onCheck: () => void;
   onClick: () => void;
 }) {
   return (
@@ -1143,10 +1366,22 @@ function FileRow({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
-      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-[color:var(--w11-control-hover)] cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
-        selected ? "bg-[color:var(--w11-accent-light)]" : ""
+      className={`group flex items-center gap-3 px-4 py-2.5 hover:bg-[color:var(--w11-control-hover)] cursor-pointer transition-colors border-b last:border-b-0 focus-visible:outline-none ${
+        selected || checked ? "bg-[color:var(--w11-accent-light)]" : ""
       }`}
     >
+      <button
+        type="button"
+        aria-label={checked ? "Unselect file" : "Select file"}
+        onClick={(e) => { e.stopPropagation(); onCheck(); }}
+        className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center text-[10px] transition-all ${
+          checked
+            ? "bg-[color:var(--w11-accent)] border-[color:var(--w11-accent)] text-white"
+            : "opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        {checked ? "✓" : ""}
+      </button>
       <div className="w-7 h-7 shrink-0 flex items-center justify-center">
         {file.file_type === "image" && file.url ? (
           // eslint-disable-next-line @next/next/no-img-element

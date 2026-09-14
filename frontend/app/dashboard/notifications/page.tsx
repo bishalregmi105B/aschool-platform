@@ -1,9 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Bell, Check, CheckCheck, Trash2, ChevronRight, ListOrdered } from "lucide-react";
-import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  Trash2,
+  ListOrdered,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 import {
   AOSPage,
   AOSPageHeader,
@@ -12,10 +25,7 @@ import {
   DataPanel,
   KpiCard,
   StatGrid,
-  AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-import { ICON_MAP } from "@/lib/icon-map";
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -28,8 +38,16 @@ import {
   type InAppNotification,
 } from "@/lib/services/notifications.service";
 
-// Quick links — the notification surfaces from the settings_core manifest
-// (Notification Matrix) plus the sibling Communication apps.
+/**
+ * Notifications — A1 registry (plan 34-10: "list(A1 + category chips stay)").
+ *
+ * NN/g status-tracker guidance applied here: newest first, plain-language
+ * titles, the read/unread distinction carried by a left accent border, and
+ * destructive actions reversed by an undo toast instead of a blocking dialog.
+ * Category selection lives in the URL (`?cat=`) so a filtered view survives
+ * refresh and can be shared.
+ */
+
 const QUICK_LINKS = [
   { label: "Notification Matrix", icon: "ListOrdered", href: "/dashboard/notifications/matrix" },
   { label: "Notification Settings", icon: "Settings", href: "/dashboard/settings/notifications" },
@@ -38,186 +56,171 @@ const QUICK_LINKS = [
 ];
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<InAppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [activeCategory, setActiveCategory] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const { values, setValues } = useUrlFilters(["cat"]);
+  const activeCategory = values.cat ?? "";
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
-  const loadNotifications = useCallback(async (category?: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["notifications", activeCategory],
+    queryFn: async () => {
       const params: Record<string, unknown> = { per_page: 100 };
-      if (category) params.category = category;
-      const data = await fetchNotifications(params as Parameters<typeof fetchNotifications>[0]);
-      setNotifications(data);
-      const count = await fetchUnreadCount();
-      setUnreadCount(count);
-    } catch {
-      // Show an explicit error state — never render an empty list as if
-      // the user simply has no notifications.
-      setError("Could not load notifications. Please try again.");
-    }
-    setIsLoading(false);
-  }, []);
+      if (activeCategory) params.category = activeCategory;
+      const [list, count] = await Promise.all([
+        fetchNotifications(params as Parameters<typeof fetchNotifications>[0]),
+        fetchUnreadCount(),
+      ]);
+      return { list: list as InAppNotification[], count };
+    },
+    retry: 1,
+  });
 
-  useEffect(() => {
-    loadNotifications(activeCategory || undefined);
-  }, [activeCategory, loadNotifications]);
+  const notifications = useMemo(
+    () => (data?.list || []).filter((n) => !hiddenIds.has(n.id)),
+    [data, hiddenIds]
+  );
+  const unreadCount = data?.count ?? 0;
 
-  const handleMarkRead = async (id: string) => {
-    await markNotificationRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
+  const refresh = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    [queryClient]
+  );
 
-  const handleMarkAllRead = async () => {
-    await markAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    setUnreadCount(0);
-  };
+  const markRead = useMutation({
+    mutationFn: (id: string) => markNotificationRead(id),
+    onSuccess: refresh,
+    onError: () => toast.error(t("Could not update notification", "सूचना अद्यावधिक गर्न सकिएन")),
+  });
 
-  const handleDelete = async (id: string) => {
-    const wasUnread = notifications.find((n) => n.id === id && !n.is_read);
-    await deleteNotification(id);
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
+  const markAll = useMutation({
+    mutationFn: () => markAllNotificationsRead(),
+    onSuccess: () => {
+      refresh();
+      toast.success(t("All notifications marked read", "सबै सूचना पढिएको चिन्ह लगाइयो"));
+    },
+    onError: () => toast.error(t("Could not mark all read", "सबै पढिएको लगाउन सकिएन")),
+  });
+
+  const remove = (n: InAppNotification) => {
+    undoableDelete({
+      label: t(`notification "${n.title}"`, `सूचना "${n.title}"`),
+      optimistic: () => setHiddenIds((p) => new Set(p).add(n.id)),
+      rollback: () =>
+        setHiddenIds((p) => {
+          const next = new Set(p);
+          next.delete(n.id);
+          return next;
+        }),
+      commit: async () => {
+        await deleteNotification(n.id);
+        refresh();
+      },
+    });
   };
 
   return (
     <AOSPage>
-      {/* Header */}
       <AOSPageHeader
         icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Notifications"
+        title={t("Notifications", "सूचनाहरू")}
         subtitle={
           unreadCount > 0
-            ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
-            : "All caught up!"
+            ? t(`${unreadCount} unread`, `${unreadCount} पढिएका छैनन्`)
+            : t("All caught up!", "सबै पढिसकियो!")
         }
         actions={
           unreadCount > 0 ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleMarkAllRead}
+              onClick={() => markAll.mutate()}
               className="gap-2"
               id="mark-all-read-btn"
             >
               <CheckCheck className="h-4 w-4" />
-              Mark All Read
+              {t("Mark All Read", "सबै पढिएको")}
             </Button>
           ) : undefined
         }
       />
       <AOSPageBody>
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Dashboard — KPIs computed from the notifications already loaded */}
           <StatGrid>
             <KpiCard
-              label="Unread"
+              label={t("Unread", "पढिएका")}
               value={unreadCount}
               icon={<Bell className="h-4 w-4" style={{ color: unreadCount > 0 ? "#d83b01" : "var(--w11-text-secondary)" }} />}
               color={unreadCount > 0 ? "#d83b01" : "var(--w11-accent)"}
             />
             <KpiCard
-              label="Loaded"
-              value={notifications.length}
-              icon={<CheckCheck className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
-              color="var(--w11-text-primary)"
-            />
-            <KpiCard
-              label="High Priority"
+              label={t("High Priority", "उच्च प्राथमिकता")}
               value={notifications.filter((n) => n.priority === "high" || n.priority === "urgent").length}
               icon={<Bell className="h-4 w-4" style={{ color: "#c42b1c" }} />}
               color="#c42b1c"
             />
             <KpiCard
-              label="Categories"
-              value={NOTIFICATION_CATEGORIES.length}
+              label={t("Showing", "देखिएका")}
+              value={notifications.length}
               icon={<ListOrdered className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
               color="var(--w11-text-primary)"
             />
           </StatGrid>
 
-          {/* Quick links — 44px gradient icon tile + label, as next/link */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] || ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", marginBottom: 0 }}
-                  >
-                    <div
-                      className="rounded-[10px] flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        background: SECTION_GRADIENTS.Communication,
-                        boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
-                      {l.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <QuickLinks section="Communication" links={QUICK_LINKS} />
 
-          {/* Category Filters */}
           <FilterCommandBar>
             {NOTIFICATION_CATEGORIES.map((cat) => (
               <button
                 key={cat.key}
-                onClick={() => setActiveCategory(cat.key)}
+                onClick={() => setValues({ cat: cat.key })}
                 className={`win11-chip ${activeCategory === cat.key ? "accent" : ""}`}
                 id={`filter-${cat.key || "all"}`}
+                style={{ cursor: "pointer" }}
               >
                 <span className="mr-1">{cat.icon}</span>
-                {cat.label}
+                {t(cat.label, cat.label)}
+                {cat.key === "" && unreadCount > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-4"
+                    style={{ background: "var(--w11-accent)", color: "#fff" }}>
+                    {unreadCount}
+                  </span>
+                )}
               </button>
             ))}
           </FilterCommandBar>
 
-          {/* Notification List */}
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="win11-card p-4 animate-pulse" style={{ marginBottom: 0 }}>
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg" style={{ background: "var(--w11-control-hover)" }} />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 rounded w-2/3" style={{ background: "var(--w11-control-hover)" }} />
-                      <div className="h-3 rounded w-full" style={{ background: "var(--w11-control-hover)" }} />
-                    </div>
-                  </div>
-                </div>
+                <Skeleton key={i} className="h-20 w-full rounded-lg" />
               ))}
             </div>
-          ) : error ? (
+          ) : isError ? (
             <DataPanel>
-              <div className="py-12 text-center">
-                <Bell className="h-12 w-12 mx-auto mb-3 opacity-40" />
-                <p className="mb-4" style={{ color: "#c42b1c" }}>{error}</p>
-                <Button variant="outline" size="sm" onClick={() => loadNotifications(activeCategory || undefined)}>
-                  Retry
-                </Button>
-              </div>
+              <ErrorState
+                title={t("Notifications could not be loaded", "सूचनाहरू लोड गर्न सकिएन")}
+                onRetry={() => refetch()}
+              />
             </DataPanel>
           ) : notifications.length === 0 ? (
             <DataPanel>
-              <AOSEmptyState
-                icon={<Bell className="h-12 w-12" />}
-                title="No notifications in this category"
+              <EmptyState
+                icon={Bell}
+                title={
+                  activeCategory
+                    ? t("No notifications in this category", "यस श्रेणीमा सूचना छैन")
+                    : t("No notifications yet", "अझै सूचना छैन")
+                }
+                body={t(
+                  "Events like attendance marking, fee payments, and new notices will appear here.",
+                  "उपस्थिति, शुल्क भुक्तानी, नयाँ सूचना जस्ता घटनाहरू यहाँ देखिन्छन्।"
+                )}
+                action={
+                  activeCategory
+                    ? { label: t("Show all", "सबै हेर्नुहोस्"), onClick: () => setValues({ cat: "" }) }
+                    : undefined
+                }
               />
             </DataPanel>
           ) : (
@@ -233,18 +236,17 @@ export default function NotificationsPage() {
                   id={`notification-${n.id}`}
                 >
                   <div className="flex items-start gap-3">
-                    {/* Category Icon */}
                     <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
                       style={{ background: "var(--w11-control-hover)" }}
+                      aria-hidden
                     >
                       {getCategoryIcon(n.category)}
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm ${!n.is_read ? "font-semibold" : ""}`}>
+                        <p className={`text-sm ${!n.is_read ? "font-semibold" : ""}`} style={{ color: "var(--w11-text-primary)" }}>
                           {n.title}
                         </p>
                         <span className="text-xs whitespace-nowrap text-[color:var(--w11-text-secondary)]">
@@ -254,8 +256,6 @@ export default function NotificationsPage() {
                       <p className="text-sm mt-1 line-clamp-2 text-[color:var(--w11-text-secondary)]">
                         {n.body}
                       </p>
-
-                      {/* Priority badge */}
                       {n.priority === "high" || n.priority === "urgent" ? (
                         <span className="win11-chip error mt-2 text-[10px] font-bold uppercase">
                           {n.priority}
@@ -263,15 +263,14 @@ export default function NotificationsPage() {
                       ) : null}
                     </div>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
                       {!n.is_read && (
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => handleMarkRead(n.id)}
-                          title="Mark as read"
+                          onClick={() => markRead.mutate(n.id)}
+                          aria-label={t("Mark as read", "पढिएको चिन्ह")}
                         >
                           <Check className="h-3.5 w-3.5" />
                         </Button>
@@ -280,8 +279,8 @@ export default function NotificationsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-[#c42b1c]"
-                        onClick={() => handleDelete(n.id)}
-                        title="Delete"
+                        onClick={() => remove(n)}
+                        aria-label={t("Delete", "मेटाउनुहोस्")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

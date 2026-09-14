@@ -12,13 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { OtpInput } from "@/components/portal/otp-input";
 import {
   Lock,
   Mail,
   Phone,
   CheckCircle2,
   ArrowRight,
-  ShieldCheck,
   Sparkles,
   ArrowLeft,
 } from "lucide-react";
@@ -152,9 +152,9 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between text-[11px] text-white/70">
-          <span>Trusted by 400+ Schools</span>
+          <span>School OS — Academics · Fees · Transport · Exams</span>
           <span className="flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-mint" /> ISO 27001
+            <CheckCircle2 className="w-3.5 h-3.5 text-mint" /> Made in Nepal
           </span>
         </div>
       </div>
@@ -316,16 +316,15 @@ export default function LoginPage() {
             ) : (
               <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="otp" className="text-xs font-bold">
+                  <Label className="text-xs font-bold">
                     Enter 6-digit Code sent to {phone}
                   </Label>
-                  <Input
-                    id="otp"
-                    placeholder="000000"
-                    maxLength={6}
-                    className="h-12 text-center text-2xl tracking-[0.5em] font-bold rounded-xl"
+                  <OtpInput
+                    value={otpForm.watch("otp")}
+                    label="6-digit verification code"
+                    onChange={(v) => otpForm.setValue("otp", v, { shouldValidate: true })}
+                    onComplete={() => void otpForm.handleSubmit(handleVerifyOtp)()}
                     autoFocus
-                    {...otpForm.register("otp")}
                   />
                   {otpForm.formState.errors.otp && (
                     <p className="text-xs text-destructive mt-1">
@@ -358,7 +357,7 @@ export default function LoginPage() {
             <div>
               <p className="text-xs font-bold text-foreground">Need a new school management account?</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Set up your school in 2 minutes with free starter features.
+                Create your school workspace and add your first students today.
               </p>
             </div>
             <Link

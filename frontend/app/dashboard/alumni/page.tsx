@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDebounced, useUrlFilters } from "@/components/ui/filter-bar";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
@@ -24,7 +25,8 @@ import {
   AOSEmptyState,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { GraduationCap, CalendarDays, UserCheck, Building2, Plus, Mail, Phone, MapPin } from "lucide-react";
+import { GraduationCap, CalendarDays, UserCheck, Building2, Plus, Mail, Phone, MapPin, Pencil, Search, Trash2 } from "lucide-react";
+import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function AlumniPage() {
   return <PluginGate slug="alumni"><AlumniContent /></PluginGate>;
@@ -32,9 +34,12 @@ export default function AlumniPage() {
 
 function AlumniContent() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [batch, setBatch] = useState("");
+  const confirm = useConfirm();
+  const { values, setValues, clear, activeCount } = useUrlFilters(["q", "batch"]);
+  const search = useDebounced(values.q || "", 300);
+  const batch = values.batch || "";
   const [showDialog, setShowDialog] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
   // Backend contract (POST /alumni): first_name + last_name required,
   // graduation_year/batch (strings), designation, current_organization, location.
   const [form, setForm] = useState({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" });
@@ -50,25 +55,69 @@ function AlumniContent() {
   const alumni = data?.data || [];
   const stats = data?.meta?.stats || {};
 
-  const create = useMutation({
-    mutationFn: async () => {
-      const [first_name = "", ...rest] = form.name.trim().split(/\s+/);
-      const payload = {
-        first_name,
-        last_name: rest.join(" ") || first_name,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        graduation_year: form.batch_year || undefined,
-        batch: form.batch_year || undefined,
-        designation: form.designation || undefined,
-        current_organization: form.organization || undefined,
-        location: form.location || undefined,
-      };
-      return (await api.post("/alumni", payload)).data;
+  const toPayload = () => {
+    const [first_name = "", ...rest] = form.name.trim().split(/\s+/);
+    return {
+      first_name,
+      last_name: rest.join(" ") || first_name,
+      email: form.email || undefined,
+      phone: form.phone || undefined,
+      graduation_year: form.batch_year || undefined,
+      batch: form.batch_year || undefined,
+      designation: form.designation || undefined,
+      current_organization: form.organization || undefined,
+      location: form.location || undefined,
+    };
+  };
+
+  const save = useMutation({
+    mutationFn: async () =>
+      editItem
+        ? (await api.put(`/alumni/${editItem.id}`, toPayload())).data
+        : (await api.post("/alumni", toPayload())).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alumni"] });
+      setShowDialog(false);
+      setEditItem(null);
+      setForm({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" });
+      toast.success(editItem ? "Alumni updated" : "Alumni added");
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["alumni"] }); setShowDialog(false); setForm({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" }); toast.success("Alumni added"); },
-    onError: () => toast.error("Failed to add alumni"),
+    onError: () => toast.error("Failed to save alumni"),
   });
+
+  const openEdit = (a: any) => {
+    setEditItem(a);
+    setForm({
+      name: [a.first_name, a.last_name].filter(Boolean).join(" "),
+      email: a.email || "",
+      phone: a.phone || "",
+      batch_year: String(a.batch || a.graduation_year || ""),
+      designation: a.designation || "",
+      organization: a.current_organization || "",
+      location: a.location || "",
+    });
+    setShowDialog(true);
+  };
+
+  const removeAlumni = async (a: any) => {
+    const name = [a.first_name, a.last_name].filter(Boolean).join(" ") || "this alumnus";
+    const ok = await confirm({
+      title: "Remove alumni",
+      body: `Remove ${name} from the directory?`,
+      confirmLabel: "Remove",
+      tone: "danger",
+    });
+    if (!ok) return;
+    undoableDelete({
+      label: name,
+      commit: async () => { await api.delete(`/alumni/${a.id}`); },
+      optimistic: () => setHideIds((ids) => new Set(ids).add(a.id)),
+      rollback: () => setHideIds((ids) => { const next = new Set(ids); next.delete(a.id); return next; }),
+    });
+    queryClient.invalidateQueries({ queryKey: ["alumni"] });
+  };
+
+  const [hideIds, setHideIds] = useState<Set<string>>(new Set());
 
   if (isLoading) return <AOSModuleLoadingState label="Loading alumni…" />;
 
@@ -98,7 +147,9 @@ function AlumniContent() {
         title="Alumni Network"
         subtitle={`${stats.total || alumni.length} alumni · ${stats.organizations || 0} organizations`}
         actions={
-          <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Alumni</Button>
+          <Button onClick={() => { setEditItem(null); setForm({ name: "", email: "", phone: "", batch_year: "", designation: "", organization: "", location: "" }); setShowDialog(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> Add Alumni
+          </Button>
         }
       />
       <AOSPageBody>
@@ -114,16 +165,35 @@ function AlumniContent() {
         </StatGrid>
 
         <FilterCommandBar>
-          <AdvancedSelect className="w-40" value={batch} onChange={(v) => setBatch(v)} clearable placeholder="All Batches"
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--w11-text-tertiary)" }} />
+            <Input
+              className="win11-searchbox pl-8 h-9"
+              placeholder="Search alumni…"
+              value={values.q || ""}
+              onChange={(e) => setValues({ q: e.target.value })}
+              aria-label="Search alumni"
+            />
+          </div>
+          <AdvancedSelect className="w-40" value={batch} onChange={(v) => setValues({ batch: v })} clearable placeholder="All Batches"
             options={batchYears.map((y) => ({ value: String(y), label: String(y) }))} />
+          {activeCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clear}>Clear</Button>
+          )}
         </FilterCommandBar>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {alumni.length === 0 ? (
+          {(() => { const visible = alumni.filter((a: any) => !hideIds.has(a.id)); return visible.length === 0 ? (
             <DataPanel className="col-span-full">
-              <AOSEmptyState title="No alumni found" />
+              <AOSEmptyState
+                title={alumni.length ? "No alumni match your filters" : "No alumni yet"}
+                description={alumni.length ? "Clear the search or batch filter to see the whole network." : "Add your first graduate to start the network."}
+                action={alumni.length
+                  ? { label: "Clear filters", onClick: clear }
+                  : { label: "Add Alumni", onClick: () => setShowDialog(true) }}
+              />
             </DataPanel>
-          ) : alumni.map((a: any) => {
+          ) : visible.map((a: any) => {
           const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ") || "Alumni";
           return (
           <div key={a.id} className="win11-card hover:shadow-md transition-shadow">
@@ -142,16 +212,20 @@ function AlumniContent() {
                   {a.phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{a.phone}</div>}
                   {a.location && <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{a.location}</div>}
                 </div>
+                <div className="mt-3 flex justify-end gap-1 border-t border-[var(--w11-border-subtle)] pt-2">
+                  <Button size="sm" variant="ghost" aria-label="Edit alumni" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="ghost" aria-label="Remove alumni" onClick={() => removeAlumni(a)}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
+                </div>
               </div>
             </div>
           </div>
           );
-        })}
+        }) })()}
         </div>
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add Alumni</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editItem ? "Edit Alumni" : "Add Alumni"}</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2"><Label>Full Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-4">
@@ -165,7 +239,12 @@ function AlumniContent() {
               <div className="space-y-2"><Label>Organization</Label><Input value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} /></div>
               <div className="space-y-2"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
             </div>
-            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Add Alumni</Button></DialogFooter>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setShowDialog(false); setEditItem(null); }}>Cancel</Button>
+              <Button onClick={() => save.mutate()} disabled={!form.name || save.isPending}>
+                {save.isPending ? <Spinner className="mr-2" /> : null} {editItem ? "Save" : "Add Alumni"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </AOSPageBody>

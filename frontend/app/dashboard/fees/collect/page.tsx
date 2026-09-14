@@ -14,8 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
-  FilterCommandBar, DataPanel, AOSEmptyState,
+  FilterCommandBar, DataPanel, AOSEmptyState, StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { useUrlFilters, useDebounced } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
+import { SkeletonList, SkeletonStat } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -39,6 +42,7 @@ import {
   ChevronRight,
   Users,
   Wallet,
+  Banknote,
 } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { adToBS, displayBS, formatBSMonth } from "@/lib/nepali_date";
@@ -125,39 +129,6 @@ interface StudentAccountSummary {
   paid_amount: number;
   due_amount: number;
 }
-
-/** Fee status → chip paint using the Fluent status palette (the 11.css
- *  win11-chip tone recipe). */
-const STATUS_CONFIG: Record<
-  FeeStatus,
-  { label: string; style: React.CSSProperties; icon: typeof CheckCircle2 }
-> = {
-  paid: {
-    label: "Paid",
-    style: { background: "rgba(16,124,16,.12)", color: "#107c10" },
-    icon: CheckCircle2,
-  },
-  partial: {
-    label: "Partial",
-    style: { background: "rgba(216,59,1,.12)", color: "#d83b01" },
-    icon: Clock,
-  },
-  pending: {
-    label: "Pending",
-    style: { background: "var(--w11-control-hover)", color: "var(--w11-text-secondary)" },
-    icon: Clock,
-  },
-  overdue: {
-    label: "Overdue",
-    style: { background: "rgba(196,43,28,.12)", color: "#c42b1c" },
-    icon: AlertTriangle,
-  },
-  waived: {
-    label: "Waived",
-    style: { background: "var(--w11-accent-light)", color: "var(--w11-accent)" },
-    icon: CheckCircle2,
-  },
-};
 
 function formatCurrency(value: number) {
   return `Rs. ${value.toLocaleString()}`;
@@ -275,10 +246,15 @@ export default function FeeCollectPage() {
 }
 
 function CollectContent() {
-  const [search, setSearch] = useState("");
-  const [classId, setClassId] = useState("all");
-  const [sectionId, setSectionId] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { t } = useI18n();
+  // Filters live in the URL (addressable desk states — plan 5.1/33).
+  const { values: filters, setValues: setFilters, clear: clearFilters, activeCount } =
+    useUrlFilters(["search", "class", "section", "status"]);
+  const search = filters.search ?? "";
+  const classId = filters.class || "all";
+  const sectionId = filters.section || "all";
+  const statusFilter = filters.status || "all";
+  const debouncedSearch = useDebounced(search, 300);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     null,
   );
@@ -301,12 +277,12 @@ function CollectContent() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["fee-collections", classId, sectionId, search, statusFilter],
+    queryKey: ["fee-collections", classId, sectionId, debouncedSearch, statusFilter],
     queryFn: async () => {
       const params: Record<string, string> = { per_page: "500" };
       if (classId !== "all") params.class_id = classId;
       if (sectionId !== "all") params.section_id = sectionId;
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter !== "all") params.status = statusFilter;
       const response = await api.get("/fees/collections", { params });
       return (response.data?.data || []) as FeeCollection[];
@@ -439,49 +415,50 @@ function CollectContent() {
     }
   }, []);
 
-  const clearFilters = () => {
-    setSearch("");
-    setClassId("all");
-    setSectionId("all");
-    setStatusFilter("all");
-  };
-
-  const hasFilters =
-    !!search ||
-    classId !== "all" ||
-    sectionId !== "all" ||
-    statusFilter !== "all";
+  const hasFilters = activeCount > 0;
 
   return (
     <AOSPage>
       <AOSPageHeader
-        title="Collect Fees"
-        subtitle="Search a student, review the full fee ledger, and collect payment from one accountant workspace."
+        title={t("Collect Fees", "शुल्क संकलन")}
+        subtitle={t(
+          "Search a student, review the full fee ledger, and collect payment from one accountant workspace.",
+          "विद्यार्थी खोज्नुहोस्, शुल्क खाता हेर्नुहोस् र एउटै कार्यक्षेत्रबाट भुक्तानी उठाउनुहोस्।"
+        )}
+        actions={
+          <div className="flex items-center gap-2">
+            {isFetching && !isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-[color:var(--w11-text-secondary)]" aria-hidden />
+            ) : null}
+          </div>
+        }
       />
       <AOSPageBody className="space-y-4">
         <FilterCommandBar>
           <div className="md:col-span-2 relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--w11-text-secondary)]" />
             <Input
-              className="pl-9"
-              placeholder="Search by student name, admission number, or ID"
+              className="pl-9 win11-searchbox"
+              placeholder={t(
+                "Search by name, admission number, or ID",
+                "नाम, भर्ना नम्बर वा ID बाट खोज्नुहोस्"
+              )}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setFilters({ search: e.target.value })}
             />
           </div>
 
           <Select
             value={classId}
             onValueChange={(v) => {
-              setClassId(v);
-              setSectionId("all");
+              setFilters({ class: v === "all" ? "" : v, section: "" });
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All Classes" />
+              <SelectValue placeholder={t("All Classes", "सबै कक्षा")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
+              <SelectItem value="all">{t("All Classes", "सबै कक्षा")}</SelectItem>
               {(classes || []).map((c: any) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
@@ -492,14 +469,14 @@ function CollectContent() {
 
           <Select
             value={sectionId}
-            onValueChange={setSectionId}
+            onValueChange={(v) => setFilters({ section: v === "all" ? "" : v })}
             disabled={classId === "all" || !sections.length}
           >
             <SelectTrigger>
-              <SelectValue placeholder="All Sections" />
+              <SelectValue placeholder={t("All Sections", "सबै सेक्सन")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Sections</SelectItem>
+              <SelectItem value="all">{t("All Sections", "सबै सेक्सन")}</SelectItem>
               {sections.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
@@ -508,17 +485,20 @@ function CollectContent() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setFilters({ status: v === "all" ? "" : v })}
+          >
             <SelectTrigger>
-              <SelectValue placeholder="All Status" />
+              <SelectValue placeholder={t("All Status", "सबै अवस्था")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="partial">Partially Paid</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="waived">Waived</SelectItem>
+              <SelectItem value="all">{t("All Status", "सबै अवस्था")}</SelectItem>
+              <SelectItem value="pending">{t("Pending", "बाँकी")}</SelectItem>
+              <SelectItem value="partial">{t("Partially Paid", "आंशिक भुक्तानी")}</SelectItem>
+              <SelectItem value="overdue">{t("Overdue", "ढिला")}</SelectItem>
+              <SelectItem value="paid">{t("Paid", "भुक्तानी")}</SelectItem>
+              <SelectItem value="waived">{t("Waived", "माफ)")}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -527,22 +507,53 @@ function CollectContent() {
               onClick={clearFilters}
               className="text-xs text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] flex items-center gap-1"
             >
-              <X className="h-3 w-3" /> Clear filters
+              <X className="h-3 w-3" /> {t("Clear filters", "फिल्टर हटाउनुहोस्")}
             </button>
           )}
         </FilterCommandBar>
 
         <StatGrid className="mb-0" min={140}>
-          <KpiCard label="Students" value={isFetching ? "…" : summary.students} color="var(--w11-text-primary)" />
-          <KpiCard label="Fee Bills" value={isFetching ? "…" : summary.feeRecords} color="var(--w11-text-primary)" />
-          <KpiCard label="Open Bills" value={isFetching ? "…" : summary.pending} color="#d83b01" />
-          <KpiCard label="Overdue" value={isFetching ? "…" : summary.overdue} color="#c42b1c" />
-          <KpiCard label="Total Collected" value={isFetching ? "…" : formatCurrency(summary.totalCollected)} color="#107c10" />
-          <KpiCard
-            label="Outstanding"
-            value={isFetching ? "…" : formatCurrency(summary.totalDue)}
-            color={summary.totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)"}
-          />
+          {isLoading ? (
+            <>
+              <SkeletonStat />
+              <SkeletonStat />
+              <SkeletonStat />
+              <SkeletonStat />
+            </>
+          ) : (
+            <>
+              <KpiCard
+                label={t("Students", "विद्यार्थी")}
+                value={isFetching ? "…" : summary.students}
+                color="var(--w11-text-primary)"
+              />
+              <KpiCard
+                label={t("Fee Bills", "शुल्क बीजक")}
+                value={isFetching ? "…" : summary.feeRecords}
+                color="var(--w11-text-primary)"
+              />
+              <KpiCard
+                label={t("Open Bills", "खुला बीजक")}
+                value={isFetching ? "…" : summary.pending}
+                color="#d83b01"
+              />
+              <KpiCard
+                label={t("Overdue", "ढिला")}
+                value={isFetching ? "…" : summary.overdue}
+                color="#c42b1c"
+              />
+              <KpiCard
+                label={t("Total Collected", "कुल संकलन")}
+                value={isFetching ? "…" : formatCurrency(summary.totalCollected)}
+                color="#107c10"
+              />
+              <KpiCard
+                label={t("Outstanding", "बाँकी")}
+                value={isFetching ? "…" : formatCurrency(summary.totalDue)}
+                color={summary.totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)"}
+              />
+            </>
+          )}
         </StatGrid>
 
         <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -550,37 +561,55 @@ function CollectContent() {
             title={
               <span className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Student Accounts
+                {t("Student Accounts", "विद्यार्थी खाता")}
               </span>
             }
             bodyClassName="px-3 pb-3 pt-0"
           >
             <p className="text-xs text-[color:var(--w11-text-secondary)] pt-3 pb-2">
-              Pick a student to keep pending dues, full history, and payment
-              actions in one place.
+              {t(
+                "Pick a student to keep pending dues, full history, and payment actions in one place.",
+                "बाँकी रकम, पूरा इतिहास र भुक्तानी एकै ठाउँमा हेर्न विद्यार्थी छान्नुहोस्।"
+              )}
             </p>
             {isError ? (
               <div className="flex flex-col items-center py-12 space-y-3">
-                <p className="text-sm text-[#c42b1c]">Failed to load student ledgers. Please try again.</p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+                <p className="text-sm text-[#c42b1c]">
+                  {t("Failed to load student ledgers.", "विद्यार्थी खाता लोड गर्न सकिएन।")}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  {t("Retry", "फेरि प्रयास")}
+                </Button>
               </div>
             ) : isLoading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="h-[92px] rounded-xl animate-pulse"
+                    style={{ background: "var(--w11-control-hover)" }}
+                  />
+                ))}
               </div>
             ) : studentAccounts.length === 0 ? (
               <AOSEmptyState
                 icon={<AlertCircle className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
-                title="No student accounts found"
+                title={t("No student accounts found", "कुनै विद्यार्थी खाता भेटिएन")}
                 description={
                   hasFilters
-                    ? "Try changing your filters to bring a student ledger into view."
-                    : "Student ledgers will appear here once fee structures are applied or bills are created manually."
+                    ? t(
+                        "Try changing your filters to bring a student ledger into view.",
+                        "अर्को खाता देख्न फिल्टर बदलेर हेर्नुहोस्।"
+                      )
+                    : t(
+                        "Student ledgers appear here once fee structures are applied or bills are created manually.",
+                        "शुल्क संरचना लागू गरेपछि वा म्यानुअल बीजक बनाएपछि खाता यहाँ देखिन्छ।"
+                      )
                 }
                 action={
                   !hasFilters ? (
                     <a href="/dashboard/students/new" className="win11-btn" style={{ textDecoration: "none" }}>
-                      Enroll a student first — विद्यार्थी भर्ना गर्नुहोस्
+                      {t("Enroll a student first", "पहिले विद्यार्थी भर्ना गर्नुहोस्")}
                     </a>
                   ) : undefined
                 }
@@ -618,23 +647,23 @@ function CollectContent() {
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Badge variant="outline">{account.fee_count} bills</Badge>
+                        <Badge variant="outline">{account.fee_count} {t("bills", "बीजक")}</Badge>
                         {account.pending_count > 0 ? (
                           <span className="win11-chip warning">
-                            {account.pending_count} open
+                            {account.pending_count} {t("open", "खुला")}
                           </span>
                         ) : null}
                         {account.overdue_count > 0 ? (
                           <span className="win11-chip error">
-                            {account.overdue_count} overdue
+                            {account.overdue_count} {t("overdue", "ढिला")}
                           </span>
                         ) : null}
                       </div>
 
                       <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className="text-[color:var(--w11-text-secondary)]">Outstanding</span>
+                        <span className="text-[color:var(--w11-text-secondary)]">{t("Outstanding", "बाँकी")}</span>
                         <span
-                          className="font-semibold"
+                          className="font-semibold tabular-nums"
                           style={{ color: account.due_amount > 0 ? "#c42b1c" : "var(--w11-text-primary)" }}
                         >
                           {formatCurrency(account.due_amount)}
@@ -676,7 +705,9 @@ function StudentAccountWorkbench({
   onPrintStatement: (account: StudentAccountSummary) => void;
   onStudentFocus: (studentId: string) => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [denomOpen, setDenomOpen] = useState(false);
   const [selectedFeeId, setSelectedFeeId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -984,13 +1015,13 @@ function StudentAccountWorkbench({
     return (
       <div className="win11-card flex min-h-[420px] flex-col items-center justify-center text-center text-[color:var(--w11-text-secondary)] p-6">
         <Users className="mb-3 h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />
-        <p className="font-medium text-[color:var(--w11-text-primary)]">Choose a student account</p>
+        <p className="font-medium text-[color:var(--w11-text-primary)]">{t("Choose a student account", "विद्यार्थी खाता छान्नुहोस्")}</p>
         <p className="mt-1 max-w-md text-sm">
-          Start from the left panel to open one student ledger, review dues,
-          and collect payment without switching pages.
+          {t("Start from the left panel to open one student ledger, review dues, and collect payment without switching pages.",
+             "बायाँ प्यानलबाट सुरु गरी खाता खोल्नुहोस्, रकम हेर्नुहोस् र पृष्ठ फेर्नै पर्दैन।")}
         </p>
         <div className="mt-5 w-full max-w-md text-left space-y-2">
-          <Label>Find student for bill creation</Label>
+          <Label>{t("Find student for bill creation", "बीजक बनाउन विद्यार्थी खोज्नुहोस्")}</Label>
           <Input
             value={studentSearch}
             onChange={(event) => {
@@ -998,7 +1029,7 @@ function StudentAccountWorkbench({
               setStudentMenuOpen(true);
             }}
             onFocus={() => setStudentMenuOpen(true)}
-            placeholder="Search by name, ID, or admission number"
+            placeholder={t("Search by name, ID, or admission number", "नाम, ID वा भर्ना नम्बरबाट खोज्नुहोस्")}
           />
           {studentMenuOpen && studentSearch.trim().length >= 2 ? (
             <div
@@ -1007,7 +1038,7 @@ function StudentAccountWorkbench({
             >
               {(studentSearchResults || []).length === 0 ? (
                 <div className="px-4 py-3 text-sm text-[color:var(--w11-text-secondary)]">
-                  No matching students found.
+                  {t("No matching students found.", "मिल्ने विद्यार्थी भेटिएन।")}
                 </div>
               ) : (
                 (studentSearchResults || []).map((student) => (
@@ -1037,8 +1068,9 @@ function StudentAccountWorkbench({
 
   if (isLoading) {
     return (
-      <div className="win11-card flex min-h-[420px] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+      <div className="win11-card min-h-[420px] p-4 space-y-3">
+        <SkeletonStat />
+        <SkeletonList rows={5} />
       </div>
     );
   }
@@ -1055,17 +1087,16 @@ function StudentAccountWorkbench({
         actions={
           <div className="flex items-center gap-2">
             {isFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin text-[color:var(--w11-text-secondary)]" />
+              <Loader2 className="h-4 w-4 animate-spin text-[color:var(--w11-text-secondary)]" aria-hidden />
             ) : null}
             <Button
               type="button"
               size="sm"
-              variant="outline"
               className="h-8 gap-1"
               onClick={() => openBillDialog("create")}
             >
               <Plus className="h-3 w-3" />
-              New Bill
+              {t("New Bill", "नयाँ बीजक")}
             </Button>
             <Button
               type="button"
@@ -1075,7 +1106,7 @@ function StudentAccountWorkbench({
               disabled={!selectedFee}
               onClick={() => openBillDialog("adjust")}
             >
-              Adjust Bill
+              {t("Adjust Bill", "बीजक सम्पादन")}
             </Button>
             <Button
               type="button"
@@ -1095,7 +1126,7 @@ function StudentAccountWorkbench({
               ) : (
                 <Printer className="h-3 w-3" />
               )}
-              Print Statement
+              {t("Print Statement", "खाता विवरण छाप्न")}
             </Button>
           </div>
         }
@@ -1105,13 +1136,13 @@ function StudentAccountWorkbench({
         </p>
         <div className="grid gap-3 sm:grid-cols-4">
           {[
-            { label: "Outstanding", value: formatCurrency(totalDue), color: totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)" },
-            { label: "Collected", value: formatCurrency(totalPaid), color: "#107c10" },
-            { label: "Open Bills", value: String(openBillCount), color: openBillCount > 0 ? "#d83b01" : "var(--w11-text-primary)" },
-            { label: "Receipts", value: String(receiptCount), color: "var(--w11-text-primary)" },
+            { label: t("Outstanding", "बाँकी"), value: formatCurrency(totalDue), color: totalDue > 0 ? "#c42b1c" : "var(--w11-text-primary)" },
+            { label: t("Collected", "अदा गरिएको"), value: formatCurrency(totalPaid), color: "#107c10" },
+            { label: t("Open Bills", "खुला बीजक"), value: String(openBillCount), color: openBillCount > 0 ? "#d83b01" : "var(--w11-text-primary)" },
+            { label: t("Receipts", "रसिद"), value: String(receiptCount), color: "var(--w11-text-primary)" },
           ].map((item) => (
             <div key={item.label} className="rounded-xl px-4 py-3" style={{ background: "var(--w11-control-hover)" }}>
-              <p className="text-lg font-semibold" style={{ color: item.color }}>{item.value}</p>
+              <p className="text-lg font-semibold tabular-nums" style={{ color: item.color }}>{item.value}</p>
               <p className="text-xs text-[color:var(--w11-text-secondary)]">{item.label}</p>
             </div>
           ))}
@@ -1123,25 +1154,45 @@ function StudentAccountWorkbench({
           title={
             <span className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              Account History
+              {t("Account History", "खाता इतिहास")}
             </span>
           }
         >
           <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-3">
-            Every bill, receipt, and remaining balance for the selected
-            student.
+            {t("Every bill, receipt, and remaining balance for the selected student.",
+               "चयन गरिएको विद्यार्थीको हरेक बीजक, रसिद र बाँकी रकम।")}
           </p>
           {fees.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--w11-border-default)] px-4 py-10 text-center text-[color:var(--w11-text-secondary)]">
-              No fee records found for this student yet.
+              {t("No fee records for this student yet.", "यस विद्यार्थीको अहिलेसम्म शुल्क रेकर्ड छैन।")}
+              <div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 gap-1"
+                  onClick={() => openBillDialog("create")}
+                >
+                  <Plus className="h-3 w-3" />
+                  {t("Create first bill", "पहिलो बीजक बनाउनुहोस्")}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
               {fees.map((fee) => {
-                const status =
-                  STATUS_CONFIG[fee.payment_status] || STATUS_CONFIG.pending;
-                const StatusIcon = status.icon;
                 const isSelected = fee.id === selectedFeeId;
+                const statusLabel: Record<FeeStatus, string> = {
+                  paid: t("Paid", "भुक्तानी"),
+                  partial: t("Partial", "आंशिक"),
+                  pending: t("Pending", "बाँकी"),
+                  overdue: t("Overdue", "ढिला"),
+                  waived: t("Waived", "माफ"),
+                };
+                const lineTotal =
+                  (fee.base_amount ?? fee.amount ?? 0) +
+                  (fee.late_fine_amount ?? 0) -
+                  (fee.discount_amount ?? 0);
 
                 return (
                   // E206: must NOT be a <button> — the receipt <Button> below
@@ -1170,40 +1221,45 @@ function StudentAccountWorkbench({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-sm">{fee.fee_type}</p>
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={status.style}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                            {status.label}
-                          </span>
+                          <StatusChip
+                            status={fee.payment_status}
+                            label={statusLabel[fee.payment_status]}
+                          />
                           {isSelected ? (
-                            <Badge variant="outline">Selected</Badge>
+                            <Badge variant="outline">{t("Selected", "चयनित")}</Badge>
                           ) : null}
                         </div>
                         <p className="mt-1 text-xs text-[color:var(--w11-text-secondary)]">
                           {fee.receipt_number
                             ? `Receipt #${fee.receipt_number}`
-                            : "No receipt generated yet"}
+                            : t("No receipt generated yet", "अहिलेसम्म रसिद छैन")}
                           {fee.due_date
-                            ? ` • Due ${displayBS(fee.due_date)}`
+                            ? ` • ${t("Due", "मिति")} ${displayBS(fee.due_date)}`
                             : fee.created_at
-                              ? ` • Added ${displayBS(fee.created_at)}`
+                              ? ` • ${t("Added", "थपिएको")} ${displayBS(fee.created_at)}`
                               : ""}
                         </p>
+                        {fee.late_fine_amount || fee.discount_amount ? (
+                          <p className="mt-1 text-[11px] tabular-nums text-[color:var(--w11-text-secondary)]">
+                            {t("Breakdown", "विभाजन")}: {formatCurrency(fee.base_amount ?? fee.amount ?? 0)}
+                            {fee.late_fine_amount ? ` + ${t("fine", " जरिवाना ")} ${formatCurrency(fee.late_fine_amount)}` : ""}
+                            {fee.discount_amount ? ` − ${t("waiver", "छुट")} ${formatCurrency(fee.discount_amount)}` : ""}
+                            {lineTotal !== (fee.amount ?? 0) ? ` = ${formatCurrency(lineTotal)}` : ""}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="grid grid-cols-5 gap-2 text-xs xl:min-w-[380px]">
                         <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
-                          <p className="text-[color:var(--w11-text-secondary)]">Period</p>
+                          <p className="text-[color:var(--w11-text-secondary)]">{t("Period", "अवधि")}</p>
                           <p className="font-semibold">{formatBSMonth(fee.month_bs, fee.year_bs)}</p>
                         </div>
                         <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
-                          <p className="text-[color:var(--w11-text-secondary)]">Total</p>
+                          <p className="text-[color:var(--w11-text-secondary)]">{t("Total", "कुल")}</p>
                           <p className="font-semibold">{formatCurrency(fee.amount || 0)}</p>
                         </div>
                         <div className="rounded-lg px-3 py-2" style={{ background: "rgba(16,124,16,.08)", color: "#107c10" }}>
-                          <p style={{ opacity: 0.7 }}>Paid</p>
+                          <p style={{ opacity: 0.7 }}>{t("Paid", "भुक्तानी")}</p>
                           <p className="font-semibold">
                             {formatCurrency(fee.paid_amount || 0)}
                           </p>
@@ -1216,22 +1272,46 @@ function StudentAccountWorkbench({
                               : { background: "var(--w11-control-hover)" }
                           }
                         >
-                          <p style={{ opacity: 0.7 }}>Due</p>
+                          <p style={{ opacity: 0.7 }}>{t("Due", "बाँकी")}</p>
                           <p className="font-semibold">
                             {formatCurrency(fee.due_amount || 0)}
                           </p>
                         </div>
                         <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-control-hover)" }}>
-                          <p className="text-[color:var(--w11-text-secondary)]">Due Date</p>
+                          <p className="text-[color:var(--w11-text-secondary)]">{t("Due date", "भुक्तानी मिति")}</p>
                           <p className="font-semibold">{fee.due_date ? displayBS(fee.due_date) : "—"}</p>
                         </div>
                       </div>
                     </div>
 
+                    {(fee.paid_amount || 0) > 0 && hasOutstandingBalance(fee) ? (
+                      <div className="mt-2">
+                        <div
+                          className="w-full rounded-full h-1.5"
+                          style={{ background: "var(--w11-control-hover)" }}
+                          role="progressbar"
+                          aria-valuenow={Math.round(((fee.paid_amount || 0) / (fee.amount || 1)) * 100)}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        >
+                          <div
+                            className="h-1.5 rounded-full"
+                            style={{
+                              width: `${Math.min(100, ((fee.paid_amount || 0) / (fee.amount || 1)) * 100)}%`,
+                              background: "#d83b01",
+                            }}
+                          />
+                        </div>
+                        <p className="mt-1 text-[11px] tabular-nums text-[color:var(--w11-text-secondary)]">
+                          {t("Partially paid", "आंशिक भुक्तानी")}: {formatCurrency(fee.paid_amount || 0)} / {formatCurrency(fee.amount || 0)}
+                        </p>
+                      </div>
+                    ) : null}
+
                     <div className="mt-3 flex flex-wrap gap-2">
                       {hasOutstandingBalance(fee) ? (
                         <span className="win11-chip warning">
-                          Ready to collect
+                          {t("Ready to collect", "उठाउन तयार")}
                         </span>
                       ) : null}
                       {fee.receipt_id ? (
@@ -1246,7 +1326,7 @@ function StudentAccountWorkbench({
                           }}
                         >
                           <Download className="h-3 w-3" />
-                          Receipt
+                          {t("Receipt", "रसिद")}
                         </Button>
                       ) : null}
                     </div>
@@ -1262,17 +1342,17 @@ function StudentAccountWorkbench({
           title={
             <span className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
-              Quick Collection
+              {t("Quick Collection", "द्रुत संकलन")}
             </span>
           }
         >
           <p className="text-xs text-[color:var(--w11-text-secondary)] -mt-2 mb-4">
-            Select an open bill from the ledger and collect it from this same
-            screen.
+            {t("Select an open bill from the ledger and collect it from this same screen.",
+               "खाताबाट खुला बीजक छान्नुहोस् र यही स्क्रिनबाट भुक्तानी उठाउनुहोस्।")}
           </p>
           {!selectedFee ? (
             <div className="rounded-xl border border-dashed border-[var(--w11-border-default)] px-4 py-8 text-center text-sm text-[color:var(--w11-text-secondary)]">
-              Select a fee record to start collecting payment.
+              {t("Select a fee record to start collecting payment.", "भुक्तानी सुरु गर्न बीजक छान्नुहोस्।")}
             </div>
           ) : (
             <>
@@ -1285,34 +1365,37 @@ function StudentAccountWorkbench({
                     <p className="text-sm font-semibold">{selectedFee.fee_type}</p>
                     <p className="text-xs text-[color:var(--w11-text-secondary)]">
                       {selectedFee.receipt_number
-                        ? `Latest receipt #${selectedFee.receipt_number}`
-                        : "No receipt issued yet"}
+                        ? `Receipt #${selectedFee.receipt_number}`
+                        : t("No receipt issued yet", "रसिद जारी भएको छैन")}
                     </p>
                   </div>
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={
-                      STATUS_CONFIG[selectedFee.payment_status]?.style ||
-                      STATUS_CONFIG.pending.style
+                  <StatusChip
+                    status={selectedFee.payment_status}
+                    label={
+                      ({
+                        paid: t("Paid", "भुक्तानी"),
+                        partial: t("Partial", "आंशिक"),
+                        pending: t("Pending", "बाँकी"),
+                        overdue: t("Overdue", "ढिला"),
+                        waived: t("Waived", "माफ"),
+                      } as Record<FeeStatus, string>)[selectedFee.payment_status]
                     }
-                  >
-                    {STATUS_CONFIG[selectedFee.payment_status]?.label || "Pending"}
-                  </span>
+                  />
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 text-xs">
                   <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)" }}>
-                    <p className="text-[color:var(--w11-text-secondary)]">Period</p>
+                    <p className="text-[color:var(--w11-text-secondary)]">{t("Period", "अवधि")}</p>
                     <p className="font-semibold">{formatBSMonth(selectedFee.month_bs, selectedFee.year_bs)}</p>
                   </div>
                   <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)" }}>
-                    <p className="text-[color:var(--w11-text-secondary)]">Total</p>
+                    <p className="text-[color:var(--w11-text-secondary)]">{t("Total", "कुल")}</p>
                     <p className="font-semibold">
                       {formatCurrency(selectedFee.amount || 0)}
                     </p>
                   </div>
                   <div className="rounded-lg px-3 py-2" style={{ background: "var(--w11-card-bg)", color: "#107c10" }}>
-                    <p style={{ opacity: 0.7 }}>Paid</p>
+                    <p style={{ opacity: 0.7 }}>{t("Paid", "भुक्तानी")}</p>
                     <p className="font-semibold">
                       {formatCurrency(selectedFee.paid_amount || 0)}
                     </p>
@@ -1325,7 +1408,7 @@ function StudentAccountWorkbench({
                         : { background: "var(--w11-card-bg)" }
                     }
                   >
-                    <p style={{ opacity: 0.7 }}>Due</p>
+                    <p style={{ opacity: 0.7 }}>{t("Due", "बाँकी")}</p>
                     <p className="font-semibold">
                       {formatCurrency(selectedFee.due_amount || 0)}
                     </p>
@@ -1336,15 +1419,13 @@ function StudentAccountWorkbench({
               {hasOutstandingBalance(selectedFee) ? (
                 <>
                   {enabledPaymentMethods.length === 0 ? (
-                    <div
-                      className="rounded-xl border px-4 py-3 text-sm mb-4"
-                      style={{ background: "rgba(216,59,1,.08)", borderColor: "rgba(216,59,1,.3)", color: "#d83b01" }}
-                    >
-                      No payment methods are configured for this school. Update them in Integrations before collecting payment.
+                    <div className="win11-infobar warning rounded-xl mb-4 text-sm">
+                      {t("No payment methods are configured for this school. Enable them in Settings → Integrations before collecting payment.",
+                         "यस विद्यालयका लागि कुनै भुक्तानी माध्यम सेट गरिएको छैन। भुक्तानी अघि Settings → Integrations बाट सक्रिय गर्नुहोस्।")}
                     </div>
                   ) : (
                     <div className="space-y-2 mb-4">
-                      <Label>Payment Method</Label>
+                      <Label>{t("Payment Method", "भुक्तानी माध्यम")}</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {enabledPaymentMethods.map((option) => (
                           <button
@@ -1374,15 +1455,18 @@ function StudentAccountWorkbench({
                       className="rounded-xl border px-4 py-3 text-sm mb-4"
                       style={{ background: "var(--w11-accent-light)", borderColor: "var(--w11-accent)", color: "var(--w11-accent)" }}
                     >
-                      The payer will be redirected to {selectedMethod?.label || "online gateway"} to complete {formatCurrency(selectedFee.due_amount || 0)}.
+                      {t(
+                        `The payer will be redirected to ${selectedMethod?.label || "the gateway"} to complete ${formatCurrency(selectedFee.due_amount || 0)}.`,
+                        `भुक्तानकर्ता ${selectedMethod?.label || "गेटवे"} मा ${formatCurrency(selectedFee.due_amount || 0)} पूरा गर्न निर्देशित हुनेछ।`
+                      )}
                     </div>
                   ) : (
                     <>
                       <div className="space-y-1.5 mb-4">
                         <Label>
-                          Amount (NPR)
+                          {t("Amount (NPR)", "रकम (रु.)")}
                           <span className="ml-1 text-xs font-normal text-[color:var(--w11-text-secondary)]">
-                            max {formatCurrency(selectedFee.due_amount || 0)}
+                            {t("max", "बढीमा")} {formatCurrency(selectedFee.due_amount || 0)}
                           </span>
                         </Label>
                         <Input
@@ -1395,13 +1479,13 @@ function StudentAccountWorkbench({
                         {Number.parseFloat(amount) > 0 &&
                         Number.parseFloat(amount) < (selectedFee.due_amount || 0) ? (
                           <p className="text-xs" style={{ color: "#d83b01" }}>
-                            Partial collection will leave {formatCurrency((selectedFee.due_amount || 0) - Number.parseFloat(amount))} still outstanding.
+                            {t("Partial payment leaves", "आंशिक भुक्तानीबाट")} {formatCurrency((selectedFee.due_amount || 0) - Number.parseFloat(amount))} {t("still outstanding.", "बाँकी रहनेछ।")}
                           </p>
                         ) : null}
                       </div>
 
                       <div className="space-y-1.5 mb-4">
-                        <Label>Payment Date</Label>
+                        <Label>{t("Payment Date", "भुक्तानी मिति")}</Label>
                         <BSDateInput
                           value={payDate}
                           onChange={setPayDate}
@@ -1411,15 +1495,15 @@ function StudentAccountWorkbench({
                       {selectedMethod?.requires_reference ? (
                         <div className="space-y-1.5 mb-4">
                           <Label>
-                            Transaction ID / Reference
+                            {t("Transaction ID / Reference", "कारोबार ID / सन्दर्भ")}
                             <span className="ml-1 text-xs font-normal text-[color:var(--w11-text-secondary)]">
-                              optional
+                              {t("optional", "वैकल्पिक")}
                             </span>
                           </Label>
                           <Input
                             value={reference}
                             onChange={(event) => setReference(event.target.value)}
-                            placeholder="Bank ref, cheque no., QR settlement ID"
+                            placeholder={t("Bank ref, cheque no., QR settlement ID", "बैंक सन्दर्भ, चेक नं., QR सेटलमेन्ट ID")}
                           />
                         </div>
                       ) : null}
@@ -1432,7 +1516,7 @@ function StudentAccountWorkbench({
                           className="rounded-xl border px-4 py-3 text-sm space-y-2 mb-4"
                           style={{ background: "rgba(16,124,16,.06)", borderColor: "rgba(16,124,16,.3)", color: "#107c10" }}
                         >
-                          <p className="font-medium">{selectedMethod.label} QR Payment</p>
+                          <p className="font-medium">{selectedMethod.label} {t("QR Payment", "QR भुक्तानी")}</p>
                           {selectedMethod.qr_image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -1457,6 +1541,21 @@ function StudentAccountWorkbench({
                     </>
                   )}
 
+                  {method === "cash" ? (
+                    <div className="mb-4">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-1.5"
+                        onClick={() => setDenomOpen(true)}
+                      >
+                        <Banknote className="h-3.5 w-3.5" />
+                        {t("Count cash denominations", "नगद दरपत्र गन्नुहोस्")}
+                      </Button>
+                    </div>
+                  ) : null}
+
                   <Button
                     className="w-full gap-2"
                     onClick={() => payMutation.mutate()}
@@ -1473,8 +1572,8 @@ function StudentAccountWorkbench({
                       <DollarSign className="h-4 w-4" />
                     )}
                     {selectedMethod?.mode === "online"
-                      ? `Pay via ${selectedMethod?.label || "Gateway"}`
-                      : "Record Payment & Print Receipt"}
+                      ? `${t("Pay via", "बाट")} ${selectedMethod?.label || "Gateway"}`
+                      : t("Record Payment & Print Receipt", "भुक्तानी रेकर्ड गरी रसिद छाप")}
                   </Button>
                 </>
               ) : (
@@ -1482,8 +1581,8 @@ function StudentAccountWorkbench({
                   className="rounded-xl border px-4 py-3 text-sm"
                   style={{ background: "rgba(16,124,16,.08)", borderColor: "rgba(16,124,16,.3)", color: "#107c10" }}
                 >
-                  This fee record has no outstanding balance. Select another
-                  bill if you need to collect more.
+                  {t("This bill is fully settled. Select another bill to collect more.",
+                     "यो बीजक पूर्ण भुक्तानी भएको छ। अर्को बीजक छान्नुहोस्।")}
                 </div>
               )}
 
@@ -1495,7 +1594,7 @@ function StudentAccountWorkbench({
                   onClick={() => onDownloadReceipt(selectedFee)}
                 >
                   <Receipt className="h-4 w-4" />
-                  Download Latest Receipt
+                  {t("Download Latest Receipt", "पछिल्लो रसिद डाउनलोड")}
                 </Button>
               ) : null}
             </>
@@ -1507,13 +1606,13 @@ function StudentAccountWorkbench({
             <DialogHeader>
               <DialogTitle>
                 {billDialogMode === "create"
-                  ? `New Bill — ${account.student_name}`
-                  : `Adjust Bill — ${selectedFee?.fee_type || ""}`}
+                  ? `${t("New Bill", "नयाँ बीजक")} — ${account.student_name}`
+                  : `${t("Adjust Bill", "बीजक सम्पादन")} — ${selectedFee?.fee_type || ""}`}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Fee name</Label>
+                <Label>{t("Fee name", "शुल्कको नाम")}</Label>
                 <Input
                   value={billForm.feeType}
                   onChange={(e) =>
@@ -1524,7 +1623,7 @@ function StudentAccountWorkbench({
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Amount (NPR)</Label>
+                  <Label>{t("Amount (NPR)", "रकम (रु.)")}</Label>
                   <Input
                     type="number"
                     min={1}
@@ -1535,7 +1634,7 @@ function StudentAccountWorkbench({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Discount</Label>
+                  <Label>{t("Discount", "छुट")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -1546,7 +1645,7 @@ function StudentAccountWorkbench({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Late fine</Label>
+                  <Label>{t("Late fine", "ढिलाई जरिवाना")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -1559,7 +1658,7 @@ function StudentAccountWorkbench({
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Academic year</Label>
+                  <Label>{t("Academic year", "शैक्षिक वर्ष")}</Label>
                   <Input
                     value={billForm.academicYear}
                     onChange={(e) =>
@@ -1569,14 +1668,14 @@ function StudentAccountWorkbench({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>BS month</Label>
+                  <Label>{t("BS month", "बि.सं. महिना")}</Label>
                   <BSMonthInput
                     value={billForm.monthBs}
                     onChange={(v) => setBillForm({ ...billForm, monthBs: v })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>BS year</Label>
+                  <Label>{t("BS year", "बि.सं. वर्ष")}</Label>
                   <Select
                     value={billForm.yearBs}
                     onValueChange={(v) => setBillForm({ ...billForm, yearBs: v })}
@@ -1591,7 +1690,7 @@ function StudentAccountWorkbench({
                 </div>
               </div>
               <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                Billing cycle: {formatBSMonth(billForm.monthBs, billForm.yearBs)}
+                {t("Billing cycle", "बिल चक्र")}: {formatBSMonth(billForm.monthBs, billForm.yearBs)}
               </p>
               <div className="flex items-center gap-2">
                 <Switch
@@ -1600,10 +1699,10 @@ function StudentAccountWorkbench({
                     setBillForm({ ...billForm, isScholarship: checked })
                   }
                 />
-                <Label>Scholarship-funded bill</Label>
+                <Label>{t("Scholarship-funded bill", "छात्रवृत्ति-वित्तपोषित बीजक")}</Label>
               </div>
               <div className="space-y-1.5">
-                <Label>Notes</Label>
+                <Label>{t("Notes", "टिप्पणी")}</Label>
                 <Textarea
                   value={billForm.notes}
                   onChange={(e) =>
@@ -1633,12 +1732,129 @@ function StudentAccountWorkbench({
                 {(createMutation.isPending || adjustMutation.isPending) ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                {billDialogMode === "create" ? "Create Bill" : "Save Adjustments"}
+                {billDialogMode === "create"
+                  ? t("Create Bill", "बीजक बनाउनुहोस्")
+                  : t("Save Adjustments", "सम्पादन सुरक्षित")}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <DenominationDialog
+          open={denomOpen}
+          onOpenChange={setDenomOpen}
+          targetAmount={selectedFee?.due_amount || 0}
+          onApply={(total) => setAmount(String(total))}
+        />
       </div>
     </div>
+  );
+}
+
+/**
+ * DenominationDialog — InstiKit's counter-control pattern (plan 16.3 "add
+ * denominations matrix"): count the drawer by note, see the total, apply it
+ * to the payment field. Counts are local to the dialog; only the total ever
+ * reaches the payment payload.
+ */
+const NPR_DENOMINATIONS = [1000, 500, 100, 50, 20, 10, 5, 2, 1];
+
+function DenominationDialog({
+  open,
+  onOpenChange,
+  targetAmount,
+  onApply,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  targetAmount: number;
+  onApply: (total: number) => void;
+}) {
+  const { t } = useI18n();
+  const [counts, setCounts] = useState<Record<number, string>>({});
+  const total = NPR_DENOMINATIONS.reduce(
+    (sum, d) => sum + d * (Number.parseInt(counts[d] || "0", 10) || 0),
+    0,
+  );
+  const change = total - targetAmount;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {t("Cash denominations", "नगद दरपत्र")}{" "}
+            <span className="text-xs font-normal text-[color:var(--w11-text-secondary)]">
+              {t("— count the drawer, apply the total", "— गनेर रकम भर्नुहोस्")}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <table className="win11-datagrid w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left">{t("Note", "नोट")}</th>
+              <th className="text-right">{t("Count", "संख्या")}</th>
+              <th className="text-right">{t("Subtotal", "जम्मा")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {NPR_DENOMINATIONS.map((d) => {
+              const n = Number.parseInt(counts[d] || "0", 10) || 0;
+              return (
+                <tr key={d}>
+                  <td className="tabular-nums">Rs. {d}</td>
+                  <td className="text-right">
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-7 w-20 text-right tabular-nums"
+                      value={counts[d] || ""}
+                      onChange={(e) =>
+                        setCounts({ ...counts, [d]: e.target.value })
+                      }
+                      aria-label={`${t("Number of", "संख्या")} Rs. ${d}`}
+                    />
+                  </td>
+                  <td className="text-right tabular-nums font-medium">
+                    {n ? formatCurrency(n * d) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div
+          className="rounded-xl px-4 py-3 text-sm space-y-1"
+          style={{ background: "var(--w11-control-hover)" }}
+        >
+          <div className="flex justify-between">
+            <span>{t("Counted total", "गरी कुल")}</span>
+            <span className="font-bold tabular-nums">{formatCurrency(total)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>{t("Amount due", "बाँकी रकम")}</span>
+            <span className="tabular-nums">{formatCurrency(targetAmount)}</span>
+          </div>
+          {change !== 0 && total > 0 ? (
+            <div className="flex justify-between" style={{ color: change > 0 ? "#107c10" : "#d83b01" }}>
+              <span>{change > 0 ? t("Change due back", "फिर्ता रकम") : t("Still short", "अझै बाँकी")}</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(Math.abs(change))}</span>
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            disabled={total <= 0}
+            onClick={() => {
+              onApply(total);
+              onOpenChange(false);
+            }}
+          >
+            {t("Use as payment amount", "भुक्तानी रकमको रूपमा प्रयोग")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

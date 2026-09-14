@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { EntityPicker } from "@/components/ui/entity-picker";
 import {
   AOSPage,
   AOSPageHeader,
@@ -111,7 +112,22 @@ function RecordsContent() {
             <DialogHeader><DialogTitle>Record Medical Visit</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Student ID</Label><Input value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>Student</Label>
+                  <EntityPicker
+                    value={form.student_id}
+                    onChange={(id) => setForm({ ...form, student_id: id })}
+                    query={{ path: "/students", searchKey: "q", perPage: 20 }}
+                    getOptions={(rows) =>
+                      (rows as any[]).map((s) => ({
+                        value: s.id,
+                        label: s.full_name || `${s.first_name} ${s.last_name}`,
+                        ne: s.full_name_nepali,
+                      }))
+                    }
+                    placeholder="Search student…"
+                  />
+                </div>
                 <div className="space-y-2"><Label>Visit Date</Label><BSDateInput value={form.visit_date} onChange={(v) => setForm({ ...form, visit_date: v })} /></div>
               </div>
               <div className="space-y-2"><Label>Reason for Visit</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>

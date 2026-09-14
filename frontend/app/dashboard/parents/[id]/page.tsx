@@ -6,20 +6,15 @@ import { useParams } from "next/navigation";
 import { useAOSPathParam } from "@/lib/aos-window-route";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PageLoader } from "@/components/ui/spinner";
+import { AOSModuleLoadingState, AOSPage, AOSPageHeader, AOSPageBody, DataPanel, FormSection, StatusChip } from "@/components/aos/kit/page-kit";
+import { ObjectHeader } from "@/components/aos/kit/detail-kit";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AdvancedSelect } from "@/components/ui/advanced-select";
 import {
   ArrowLeft,
   KeyRound,
@@ -27,7 +22,6 @@ import {
   Save,
   ShieldCheck,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -60,6 +54,7 @@ interface StudentOption {
 }
 
 export default function ParentDetailPage() {
+  const { t } = useI18n();
   const confirm = useConfirm();
   const params = useParams();
   const parentId = useAOSPathParam(2) || (Array.isArray(params.id) ? params.id[0] : (params.id as string));
@@ -196,227 +191,95 @@ export default function ParentDetailPage() {
     },
   });
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading parent account…" />;
 
   if (isError || !parent) {
     return (
-      <div className="space-y-4">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/parents">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Parents
-          </Link>
-        </Button>
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Parent account not found.
-          </CardContent>
-        </Card>
-      </div>
+      <AOSPage>
+        <AOSPageHeader title="Parent" />
+        <AOSPageBody>
+          <DataPanel className="max-w-2xl mx-auto">
+            <div className="py-10 text-center space-y-3">
+              <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>Parent account not found.</p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/parents">
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Back to Parents
+                </Link>
+              </Button>
+            </div>
+          </DataPanel>
+        </AOSPageBody>
+      </AOSPage>
     );
   }
 
+  const childrenList = parent.children || [];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-2">
-          <Button asChild variant="outline" size="sm">
+    <AOSPage>
+      <AOSPageHeader
+        title="Parent Account"
+        subtitle={t("Manage profile, security, and linked children", "प्रोफाइल, सुरक्षा र छोराछोरी")}
+        actions={
+          <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/parents">
               <ArrowLeft className="h-4 w-4 mr-2" /> Back to Parents
             </Link>
           </Button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <UserRound className="h-6 w-6" /> {parent.full_name}
-            </h1>
-            <Badge variant={parent.is_active ? "success" : "destructive"}>
-              {parent.is_active ? "Active" : "Inactive"}
-            </Badge>
-          </div>
-          <p className="text-muted-foreground">Manage profile, security, and linked children from one place.</p>
-        </div>
-
-        <Button
-          variant={parent.is_active ? "destructive" : "default"}
-          onClick={() => toggleStatusMutation.mutate()}
-          disabled={toggleStatusMutation.isPending}
-        >
-          {toggleStatusMutation.isPending
-            ? "Updating..."
-            : parent.is_active
-              ? "Deactivate Parent"
-              : "Activate Parent"}
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input
-                value={profileForm.full_name}
-                onChange={(e) => setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input
-                value={profileForm.phone}
-                onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={profileForm.email}
-                onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
-                placeholder="Optional"
-              />
-            </div>
+        }
+      />
+      <AOSPageBody>
+        <ObjectHeader
+          className="mb-4"
+          name={parent.full_name}
+          code={parent.login_id || parent.email || parent.phone}
+          codeLabel={t("Login", "लगइन")}
+          status={parent.is_active ? "active" : "inactive"}
+          meta={
+            <span className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+              {childrenList.length} {t("linked children", "जोडिएका सन्तान")}
+            </span>
+          }
+          actions={
             <Button
-              className="w-full"
-              onClick={() => {
-                if (!profileForm.full_name.trim() || !profileForm.phone.trim()) {
-                  toast.error("Full name and phone are required");
-                  return;
-                }
-                updateProfileMutation.mutate();
-              }}
-              disabled={updateProfileMutation.isPending}
+              variant={parent.is_active ? "destructive" : "default"}
+              size="sm"
+              onClick={() => toggleStatusMutation.mutate()}
+              disabled={toggleStatusMutation.isPending}
             >
-              <Save className="h-4 w-4 mr-2" />
-              {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
+              {parent.is_active ? "Deactivate" : "Activate"}
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Access</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Login ID</p>
-              <p className="font-medium break-all">{parent.login_id || parent.email || parent.phone}</p>
-            </div>
-            <div className="pt-2 border-t space-y-2">
-              <Label>Reset Password</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-              />
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  if (newPassword.length < 8) {
-                    toast.error("Password must be at least 8 characters");
-                    return;
-                  }
-                  resetPasswordMutation.mutate();
-                }}
-                disabled={resetPasswordMutation.isPending}
-              >
-                <KeyRound className="h-4 w-4 mr-2" />
-                {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <Tabs defaultValue="children">
+          <TabsList>
+            <TabsTrigger value="children" badge={childrenList.length}>{t("Children", "सन्तानहरू")}</TabsTrigger>
+            <TabsTrigger value="profile">{t("Profile & access", "प्रोफाइल")}</TabsTrigger>
+            <TabsTrigger value="link">{t("Link student", "विद्यार्थी जोड्ने")}</TabsTrigger>
+          </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Link Student</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Student</Label>
-              <Select
-                value={linkForm.studentId}
-                onValueChange={(value) => setLinkForm((prev) => ({ ...prev, studentId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select student" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableStudents.map((student) => {
-                    const studentName = student.full_name || `${student.first_name || ""} ${student.last_name || ""}`.trim();
-                    const meta = [student.class_name, student.section_name].filter(Boolean).join(" • ");
-                    return (
-                      <SelectItem key={student.id} value={student.id}>
-                        {studentName || "Unnamed student"}
-                        {meta ? ` (${meta})` : ""}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Relation</Label>
-              <Select
-                value={linkForm.relation}
-                onValueChange={(value) => setLinkForm((prev) => ({ ...prev, relation: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="father">Father</SelectItem>
-                  <SelectItem value="mother">Mother</SelectItem>
-                  <SelectItem value="guardian">Guardian</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <Button
-            onClick={() => linkStudentMutation.mutate()}
-            disabled={linkStudentMutation.isPending || !linkForm.studentId}
-          >
-            <Link2 className="h-4 w-4 mr-2" />
-            {linkStudentMutation.isPending ? "Linking..." : "Link Student"}
-          </Button>
-
-          {availableStudents.length === 0 && (
-            <p className="text-sm text-muted-foreground">All students are already linked to this parent.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Linked Children ({parent.children_count || (parent.children || []).length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(parent.children || []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No linked children yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {(parent.children || []).map((child) => (
-                <div key={child.id} className="border rounded-md p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{child.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {child.class_name || "Class -"}
-                      {child.section_name ? ` • ${child.section_name}` : ""}
-                      {child.student_id ? ` • ${child.student_id}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+          {/* ── Children ── */}
+          <TabsContent value="children">
+            {childrenList.length === 0 ? (
+              <DataPanel>
+                <p className="text-sm text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>
+                  No linked children yet — use “Link student” to add one.
+                </p>
+              </DataPanel>
+            ) : (
+              <ul className="win11-listview">
+                {childrenList.map((child) => (
+                  <li key={child.id}>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-medium truncate">{child.name}</div>
+                      <div className="text-[11px] truncate" style={{ color: "var(--w11-text-tertiary)" }}>
+                        {[child.class_name || "Class —", child.section_name, child.student_id].filter(Boolean).join(" • ")}
+                      </div>
+                    </div>
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/dashboard/students/${child.id}`}>
-                        <ShieldCheck className="h-4 w-4 mr-2" /> View Student
+                        <ShieldCheck className="h-4 w-4 mr-1" /> View
                       </Link>
                     </Button>
                     <Button
@@ -425,20 +288,144 @@ export default function ParentDetailPage() {
                       className="text-destructive"
                       disabled={unlinkStudentMutation.isPending}
                       onClick={() => {
-                        confirm({ title: "Unlink child", body: `Unlink ${child.name} from this parent?` }).then((ok) => {
+                        confirm({
+                          title: "Unlink child",
+                          body: `Unlink ${child.name} from this parent? The student keeps their own record.`,
+                          tone: "danger",
+                          confirmLabel: "Unlink",
+                        }).then((ok) => {
                           if (ok) unlinkStudentMutation.mutate(child.id);
                         });
                       }}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" /> Unlink
+                      <Trash2 className="h-4 w-4 mr-1" /> Unlink
                     </Button>
-                  </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+
+          {/* ── Profile & access ── */}
+          <TabsContent value="profile" className="grid gap-4 lg:grid-cols-2">
+            <FormSection title={t("Profile", "प्रोफाइल")}>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t("Full name", "पूरा नाम")}</Label>
+                  <Input value={profileForm.full_name} onChange={(e) => setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))} />
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                <div className="space-y-2">
+                  <Label>{t("Phone", "फोन")}</Label>
+                  <Input value={profileForm.phone} onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("Email (optional)", "इमेल (वैकल्पिक)")}</Label>
+                  <Input type="email" value={profileForm.email} onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))} />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    if (!profileForm.full_name.trim() || !profileForm.phone.trim()) {
+                      toast.error("Full name and phone are required");
+                      return;
+                    }
+                    updateProfileMutation.mutate();
+                  }}
+                  disabled={updateProfileMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
+                </Button>
+              </div>
+            </FormSection>
+
+            <FormSection title={t("Account access", "खाता पहुँच")}>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{t("Login ID", "लगइन आईडी")}</p>
+                  <p className="font-medium break-all">{parent.login_id || parent.email || parent.phone}</p>
+                </div>
+                <div className="pt-2 border-t space-y-2">
+                  <Label>{t("Reset password", "पासवर्ड रिसेट")}</Label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      if (newPassword.length < 8) {
+                        toast.error("Password must be at least 8 characters");
+                        return;
+                      }
+                      void (async () => {
+                        const ok = await confirm({
+                          title: `Reset ${parent.full_name}'s password?`,
+                          body: "They will need the new password at next sign-in on web and mobile.",
+                          tone: "danger",
+                          confirmLabel: "Reset password",
+                        });
+                        if (ok) resetPasswordMutation.mutate();
+                      })();
+                    }}
+                    disabled={resetPasswordMutation.isPending}
+                  >
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                  </Button>
+                </div>
+              </div>
+            </FormSection>
+          </TabsContent>
+
+          {/* ── Link student ── */}
+          <TabsContent value="link">
+            <FormSection title={t("Link a student to this parent", "यो अभिभावकसँग विद्यार्थी जोड्ने")}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("Student", "विद्यार्थी")}</Label>
+                  <AdvancedSelect
+                    value={linkForm.studentId}
+                    onChange={(v) => setLinkForm((prev) => ({ ...prev, studentId: v }))}
+                    searchable
+                    clearable
+                    placeholder={availableStudents.length ? "Search student…" : "All students already linked"}
+                    options={availableStudents.map((student) => {
+                      const studentName = student.full_name || `${student.first_name || ""} ${student.last_name || ""}`.trim();
+                      const meta = [student.class_name, student.section_name].filter(Boolean).join(" • ");
+                      return { value: student.id, label: studentName || "Unnamed student", ne: meta || undefined };
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("Relation", "नाता")}</Label>
+                  <AdvancedSelect
+                    value={linkForm.relation}
+                    onChange={(v) => setLinkForm((prev) => ({ ...prev, relation: v }))}
+                    options={[
+                      { value: "father", label: "Father" },
+                      { value: "mother", label: "Mother" },
+                      { value: "guardian", label: "Guardian" },
+                      { value: "other", label: "Other" },
+                    ]}
+                  />
+                </div>
+              </div>
+              <Button
+                className="mt-4"
+                onClick={() => linkStudentMutation.mutate()}
+                disabled={linkStudentMutation.isPending || !linkForm.studentId}
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                {linkStudentMutation.isPending ? "Linking..." : "Link Student"}
+              </Button>
+            </FormSection>
+          </TabsContent>
+        </Tabs>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

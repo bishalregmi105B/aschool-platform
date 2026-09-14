@@ -22,6 +22,7 @@ import {
   AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { ScrollText, Plus, Star, Trash2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 // ── Types (GET/POST /exams/grade-scales) ────────────────────────────────────
 interface GradeScaleRow {
@@ -67,6 +68,7 @@ export default function GradeScalesPage() {
 
 function GradeScalesContent() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GradeScale | null>(null);
 
@@ -94,11 +96,11 @@ function GradeScalesContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Grade Scales"
-        subtitle={`${scales.length} scales · School grading scales (NEB, SEE or custom) used for results, report cards and the tabulation sheet`}
+        title={t("Grade Scales", "ग्रेड स्केल")}
+        subtitle={`${scales.length} ${t("scales", "स्केल")} · ${t("School grading scales (NEB, SEE or custom) used for results, report cards and the tabulation sheet", "विद्यालयको ग्रेडिङ स्केल (NEB, SEE वा कस्टम)")}`}
         actions={
           <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" /> New Scale
+            <Plus className="h-4 w-4 mr-2" /> {t("New Scale", "नयाँ स्केल")}
           </Button>
         }
       />

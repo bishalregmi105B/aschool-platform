@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { ArrowLeft, Sparkles, Copy, MessageSquare } from "lucide-react";
+import { ArrowLeft, Sparkles, Copy, MessageSquare, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -110,10 +110,10 @@ function RemarksContent() {
       <AOSPageHeader
         icon={<MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="AI Report Remarks"
-        subtitle="Generate personalized remarks for each student"
+        subtitle="Personalized comments from real marks — failures stay empty, never invented · वास्तविक अंकबाट टिप्पणी"
         actions={
-          <Link href="/dashboard/ai-tools">
-            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          <Link href="/dashboard/ai?tab=tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />AI Hub · Tools</Button>
           </Link>
         }
       />
@@ -152,7 +152,8 @@ function RemarksContent() {
           </div>
           <div className="flex gap-2 mt-4">
             <Button onClick={gen} disabled={!examId || !classId || generating}>
-              <Sparkles className="h-4 w-4 mr-2" /> {generating ? "Generating..." : "Generate Remarks"}
+              {generating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              {generating ? "Generating…" : "Generate Remarks"}
             </Button>
             {remarks.some((r) => r.remark) && <Button variant="outline" onClick={copyAll}><Copy className="h-4 w-4 mr-2" /> Copy All</Button>}
           </div>
@@ -181,7 +182,7 @@ function RemarksContent() {
           </DataPanel>
         ) : !generating && (
           <DataPanel>
-            <div className="py-16 text-center text-[color:var(--w11-text-secondary)]"><Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Select exam and class to generate personalized remarks</p></div>
+            <div className="py-16 text-center text-[color:var(--w11-text-secondary)]"><MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Generate to see output — pick exam + class; remarks are written from the marks actually entered.</p></div>
           </DataPanel>
         )}
       </AOSPageBody>

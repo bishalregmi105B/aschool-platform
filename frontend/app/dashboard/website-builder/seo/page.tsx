@@ -257,7 +257,17 @@ export default function SeoPage() {
                   placeholder="G-XXXXXXXXXX"
                   className="w-full text-sm"
                   style={{ ...inputStyle, fontFamily: "var(--w11-font-mono)" }}
+                  aria-invalid={Boolean(form.google_analytics_id) && !/^(G-[A-Z0-9]+|UA-\d+-\d+)$/i.test(form.google_analytics_id)}
                 />
+                {form.google_analytics_id && !/^(G-[A-Z0-9]+|UA-\d+-\d+)$/i.test(form.google_analytics_id) ? (
+                  <p className="text-xs mt-1" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                    Looks malformed — a GA4 ID looks like G-1A2B3C4D5E (leave empty to disable tracking).
+                  </p>
+                ) : (
+                  <p className="text-xs mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
+                    When set, the public site loads Google Analytics so you can see traffic. Empty = no tracking script.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -275,6 +285,9 @@ export default function SeoPage() {
                   className="w-full text-sm"
                   style={{ ...inputStyle, fontFamily: "var(--w11-font-mono)" }}
                 />
+                <p className="text-xs mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
+                  Proves site ownership to Google Search Console so you can view index reports.
+                </p>
               </div>
             </div>
           </DataPanel>
@@ -284,7 +297,7 @@ export default function SeoPage() {
             <div className="space-y-4">
               <FormCheckbox
                 label="Auto-generate sitemap.xml"
-                description="Sitemap & crawling"
+                description="When on, search engines are given a list of your published pages."
                 checked={form.sitemap_enabled}
                 onCheckedChange={(v) => updateField("sitemap_enabled", v)}
               />
@@ -304,6 +317,9 @@ export default function SeoPage() {
                   className="w-full text-sm"
                   style={{ ...inputStyle, fontFamily: "var(--w11-font-mono)" }}
                 />
+                <p className="text-xs mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
+                  Tells search-engine crawlers which pages they may read. Saved with your other SEO settings.
+                </p>
               </div>
             </div>
           </DataPanel>

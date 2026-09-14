@@ -13,9 +13,19 @@ import {
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Shield, AlertTriangle, Map, Calendar, Bell } from "lucide-react";
+import { Shield, AlertTriangle, Map, Calendar, Bell, CheckCircle2, XCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { displayBS } from "@/lib/nepali_date";
+
+const CHECKLIST: Array<{ label: string; fix: string; test: (s: any) => boolean }> = [
+  { label: "At least one active evacuation plan", fix: "create one under Evacuation Plans", test: (s) => (s.active_plans ?? 0) >= 1 },
+  { label: "Two or more drills scheduled this year", fix: "schedule a second drill", test: (s) => (s.drills_this_year ?? 0) >= 2 },
+  { label: "A drill completed this year", fix: "mark a drill as done after it happens", test: (s) => (s.completed_this_year ?? 0) >= 1 },
+  { label: "Last drill within 6 months", fix: "drill recency keeps muscle memory", test: (s) => s.last_drill_at && Date.now() - new Date(s.last_drill_at).getTime() < 180 * 86400000 },
+  { label: "No unresolved alert backlog", fix: "resolve stale alerts", test: (s) => (s.active_alerts ?? 0) === 0 },
+  { label: "An upcoming drill is scheduled", fix: "plan the next date", test: (s) => (s.upcoming_drills ?? 0) >= 1 },
+];
 
 export default function DisasterPage() {
   return <PluginGate slug="disaster_management"><DisasterContent /></PluginGate>;
@@ -85,6 +95,42 @@ function DisasterContent() {
             footnote="Drill recency, frequency, evacuation plans & alert hygiene"
           />
         </StatGrid>
+
+        {/* Readiness checklist (plan 34#39: hub = readiness checklist). Items
+            are derived from the real overview stats — nothing fabricated. */}
+        <DataPanel
+          className="mb-4"
+          title={
+            <span className="flex items-center gap-2">
+              <Shield className="h-5 w-5" style={{ color: "#107c10" }} />
+              Readiness checklist
+            </span>
+          }
+          actions={
+            <span className="text-[12px] font-semibold" style={{ color: "var(--w11-text-secondary)" }}>
+              {stats.readiness_score ?? 0}/100
+            </span>
+          }
+        >
+          <Progress value={stats.readiness_score ?? 0} className="mb-3" aria-label="Readiness score" />
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+            {CHECKLIST.map((c) => ({ ...c, ok: c.test(stats) }))
+              .sort((a, b) => Number(a.ok) - Number(b.ok))
+              .map((c) => (
+                <li key={c.label} className="flex items-center gap-2 text-[13px]">
+                  {c.ok ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#107c10" }} />
+                  ) : (
+                    <XCircle className="h-4 w-4 shrink-0" style={{ color: "#c42b1c" }} />
+                  )}
+                  <span style={{ color: "var(--w11-text-primary)" }}>{c.label}</span>
+                  {!c.ok && (
+                    <span className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>— {c.fix}</span>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </DataPanel>
 
         {/* Quick links — every disaster subpage from the plugin manifest */}
         <QuickLinks

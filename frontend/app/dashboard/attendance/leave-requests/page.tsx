@@ -27,6 +27,12 @@ import {
   DataPanel,
 } from "@/components/aos/kit/page-kit";
 import { CheckCircle2, XCircle, Clock, CalendarDays, CalendarClock } from "lucide-react";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { useI18n } from "@/lib/i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface LeaveRequest {
@@ -68,7 +74,21 @@ export default function LeaveRequestsPage() {
 }
 
 function LeaveRequestsInner() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const { t } = useI18n();
+  // Status filter is URL-backed (?status=) — shareable review views.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/attendance/leave-requests";
+  const raw = routeParams.get("status");
+  const statusFilter: StatusFilter =
+    raw === "approved" || raw === "rejected" || raw === "all" ? raw : "pending";
+  function setStatusFilter(v: StatusFilter) {
+    const next = new URLSearchParams(routeParams.toString());
+    if (v === "pending") next.delete("status");
+    else next.set("status", v);
+    navigate(`${pathname}?${next.toString()}`);
+  }
   const [rejecting, setRejecting] = useState<LeaveRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const queryClient = useQueryClient();
@@ -88,7 +108,7 @@ function LeaveRequestsInner() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
       toast.success(
-        "Leave approved — attendance stamped for the date range",
+        t("Leave approved — attendance stamped for the date range", "बिदा स्वीकृत — रजिस्टरमा लेखियो"),
       );
     },
     onError: () => toast.error("Failed to approve leave"),
@@ -112,14 +132,14 @@ function LeaveRequestsInner() {
   const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   const REQUEST_COLUMNS: Column<any>[] = [
-    { key: "staff_name", label: "Staff", sortable: true, value: (lr) => lr.staff_name ?? "", render: (lr) => <span className="font-medium">{lr.staff_name || "Unknown staff"}</span> },
-    { key: "leave_type", label: "Type", sortable: true, value: (lr) => lr.leave_type ?? "", render: (lr) => LEAVE_TYPE_LABELS[lr.leave_type || ""] || lr.leave_type || "—" },
-    { key: "dates", label: "Dates", sortable: true, value: (lr) => lr.start_date ?? "", render: (lr) => <span className="whitespace-nowrap">{lr.start_date} → {lr.end_date}</span> },
-    { key: "days", label: "Days", align: "right", sortable: true, value: (lr) => leaveDays(lr), render: (lr) => leaveDays(lr) },
-    { key: "reason", label: "Reason", value: (lr) => lr.reason ?? "", render: (lr) => <span className="max-w-[280px] truncate block">{lr.reason || "—"}</span> },
+    { key: "staff_name", label: t("Staff", "कर्मचारी"), sortable: true, value: (lr) => lr.staff_name ?? "", render: (lr) => <span className="font-medium">{lr.staff_name || "Unknown staff"}</span> },
+    { key: "leave_type", label: t("Type", "प्रकार"), sortable: true, value: (lr) => lr.leave_type ?? "", render: (lr) => LEAVE_TYPE_LABELS[lr.leave_type || ""] || lr.leave_type || "—" },
+    { key: "dates", label: t("Dates", "मिति"), sortable: true, value: (lr) => lr.start_date ?? "", render: (lr) => <span className="whitespace-nowrap">{lr.start_date} → {lr.end_date}</span> },
+    { key: "days", label: t("Days", "दिन"), align: "right", sortable: true, value: (lr) => leaveDays(lr), render: (lr) => leaveDays(lr) },
+    { key: "reason", label: t("Reason", "कारण"), value: (lr) => lr.reason ?? "", render: (lr) => <span className="max-w-[280px] truncate block">{lr.reason || "—"}</span> },
     {
       key: "status",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (lr) => lr.status ?? "",
       render: (lr) => (
@@ -130,7 +150,7 @@ function LeaveRequestsInner() {
     },
     {
       key: "actions",
-      label: "Actions",
+      label: t("Actions", "कार्य"),
       noExport: true,
       render: (lr) =>
         lr.status === "pending" ? (
@@ -143,7 +163,7 @@ function LeaveRequestsInner() {
               onClick={(e) => { e.stopPropagation(); approve.mutate(lr.id); }}
             >
               <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#107c10" }} />
-              Approve
+              {t("Approve", "स्वीकृत")}
             </Button>
             <Button
               size="sm"
@@ -156,7 +176,7 @@ function LeaveRequestsInner() {
               }}
             >
               <XCircle className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
-              Reject
+              {t("Reject", "अस्वीकृत")}
             </Button>
           </div>
         ) : (
@@ -171,11 +191,11 @@ function LeaveRequestsInner() {
     <AOSPage>
       <AOSPageHeader
         icon={<CalendarClock className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Leave Requests"
-        subtitle="बिदा अनुरोध · Approve or reject staff leave requests. Approved leaves are written to the teacher attendance register."
+        title={t("Leave Requests", "बिदा अनुरोध")}
+        subtitle={t("Approve or reject staff leave requests. Approved leaves are written to the attendance register.", "अनुमोदन/अस्वीकरण — स्वीकृत बिदा उपस्थिति रजिस्टरमा लेखिन्छ।")}
         actions={
           <Button variant="outline" onClick={() => refetch()}>
-            Refresh
+            {t("Refresh", "ताजा")}
           </Button>
         }
       />
@@ -193,7 +213,7 @@ function LeaveRequestsInner() {
                 {s === "pending" && (
                   <Clock className="mr-1 h-3.5 w-3.5" style={{ color: "#d83b01" }} />
                 )}
-                {s}
+                {s === "all" ? t("all", "सबै") : t(s, s)}
               </Button>
             ))}
           </div>
@@ -236,7 +256,7 @@ function LeaveRequestsInner() {
 
         {pendingCount > 0 && statusFilter === "pending" && (
           <p className="text-[color:var(--w11-text-secondary)] text-sm mt-4">
-            {pendingCount} request{pendingCount === 1 ? "" : "s"} awaiting review
+            {pendingCount} {t("request(s) awaiting review", "अनुरोध प्रतीक्षारत")}
           </p>
         )}
 
@@ -248,7 +268,7 @@ function LeaveRequestsInner() {
         >
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Reject this leave request?</DialogTitle>
+              <DialogTitle>{t("Reject this leave request?", "यो बिदा अस्वीकृत गर्ने?")}</DialogTitle>
               <DialogDescription>
                 {rejecting?.staff_name &&
                   `${rejecting.staff_name} · ${rejecting?.start_date} → ${rejecting?.end_date}. `}
@@ -257,7 +277,7 @@ function LeaveRequestsInner() {
               </DialogDescription>
             </DialogHeader>
             <Textarea
-              placeholder="Reason (shown to the requester)"
+              placeholder={t("Reason (shown to the requester)", "कारण (निवेदकलाई देखिन्छ)")}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={3}
@@ -268,7 +288,7 @@ function LeaveRequestsInner() {
                 size="sm"
                 onClick={() => setRejecting(null)}
               >
-                Keep pending
+                {t("Keep pending", "प्रतीक्षारत राख्नुहोस्")}
               </Button>
               <Button
                 size="sm"
@@ -282,7 +302,7 @@ function LeaveRequestsInner() {
                   });
                 }}
               >
-                Reject request
+                {t("Reject request", "अस्वीकृत")}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -33,7 +33,14 @@ import { BSDateInput } from "@/components/ui/bs-date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useDebounced } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
 
 interface Exam {
   id: string;
@@ -160,17 +167,51 @@ function ExamRowActions({
   );
 }
 
+/** Write one query param into the enclosing AOS window's route (same
+ * contract as useUrlFilters from ui/filter-bar, but shell-safe: the URL lives
+ * on the window, not the pinned browser bar — plan 5.1 / 33-rule-2). */
+function useExamsRouteFilter() {
+  const params = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/exams";
+  return (patch: Record<string, string>) => {
+    const next = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    const qs = next.toString();
+    navigate(qs ? `${pathname}?${qs}` : pathname);
+  };
+}
+
 function ExamsContent() {
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
   const { user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = user?.role === "school_admin";
   const [createOpen, setCreateOpen] = useState(false);
   const [editExam, setEditExam] = useState<Exam | null>(null);
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [classFilter, setClassFilter] = useState("all");
-  const [academicYearFilter, setAcademicYearFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Wave C: selects are URL state (shareable, survive refresh — plan 33 rule
+  // 2); text search is local state flushed to the URL debounced, so a
+  // keystroke never fires a window navigation.
+  const routeParams = useAOSRouteParams();
+  const setRouteFilter = useExamsRouteFilter();
+  const typeFilter = routeParams.get("type") || "all";
+  const classFilter = routeParams.get("cls") || "all";
+  const academicYearFilter = routeParams.get("year") || "all";
+  const [searchQuery, setSearchQuery] = useState(() => routeParams.get("q") ?? "");
+  const clearFilters = () => {
+    setSearchQuery("");
+    setRouteFilter({ q: "", type: "", cls: "" });
+  };
+  const debouncedSearch = useDebounced(searchQuery, 300);
+  useEffect(() => {
+    const urlQ = routeParams.get("q") ?? "";
+    if (debouncedSearch !== urlQ) setRouteFilter({ q: debouncedSearch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
   const [formData, setFormData] = useState({
     name: "",
     name_nepali: "",
@@ -214,8 +255,9 @@ function ExamsContent() {
     if (academicYearFilter !== "all" || !academicYears?.length) return;
     const current = academicYears.find((year) => year.is_current);
     if (current?.id) {
-      setAcademicYearFilter(current.id);
+      setRouteFilter({ year: current.id });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academicYearFilter, academicYears]);
 
   const { data: classes } = useQuery({
@@ -285,14 +327,6 @@ function ExamsContent() {
     onError: () => toast.error("Failed to save exam"),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => api.delete(`/exams/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exams"] });
-      toast.success("Exam deleted");
-    },
-  });
-
   const statusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       if (status === "result_published") {
@@ -340,8 +374,8 @@ function ExamsContent() {
     return (
       <AOSPage>
         <AOSPageHeader
-          title="Examinations"
-          subtitle="Manage exams, marks entry, results & report cards (NEB grading)"
+          title={t("Examinations", "परीक्षाहरू")}
+          subtitle={t("Manage marks entry, results & report cards (NEB grading)", "अंक प्रविष्टि, नतिजा र रिपोर्ट कार्ड (NEB ग्रेडिङ)")}
         />
         <AOSPageBody>
           <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
@@ -353,16 +387,21 @@ function ExamsContent() {
     );
   }
 
-  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading exams…" /></AOSPage>;
+  if (isLoading) return <AOSPage><AOSModuleLoadingState label={t("Loading exams…", "परीक्षाहरू लोड हुँदैछ…")} /></AOSPage>;
   const allExams = exams || [];
   const academicYearById = new Map<string, AcademicYearOption>(
     (academicYears || []).map((year) => [year.id, year]),
   );
+  // Wave C fix: DataTable's search box only renders the input — the page must
+  // filter the rows itself. Previously `searchQuery` was wired but inert.
+  const needle = debouncedSearch.trim().toLowerCase();
   const filtered = allExams.filter((e) => {
+    if (needle && !`${e.name} ${e.name_nepali ?? ""} ${e.class_name ?? ""} ${e.description ?? ""}`.toLowerCase().includes(needle)) return false;
     if (typeFilter !== "all" && e.exam_type !== typeFilter) return false;
     if (classFilter !== "all" && e.class_id !== classFilter) return false;
     return true;
   });
+  const isFiltered = !!needle || typeFilter !== "all" || classFilter !== "all";
 
   const stats = {
     total: allExams.length,
@@ -455,15 +494,17 @@ function ExamsContent() {
           onEdit={(ex) => { openEdit(ex); }}
           onStatus={(id, status) => statusMutation.mutate({ id, status })}
           onDelete={(ex) => {
-            void (async () => {
-              const ok = await confirm({
-                title: "Delete this exam?",
-                body: "Marks and report cards already recorded stay in the archive.",
-                confirmLabel: "Delete exam",
-                tone: "danger",
-              });
-              if (ok) deleteMutation.mutate(ex.id);
-            })();
+            // Plan G8: recoverable delete is the default for list rows —
+            // exam delete is soft (server-side), so undo costs zero work.
+            undoableDelete({
+              label: t("exam “%s”", "परीक्षा “%s”").replace("%s", ex.name),
+              optimistic: () =>
+                queryClient.setQueryData<Exam[]>(["exams", academicYearFilter], (prev) =>
+                  (prev || []).filter((e) => e.id !== ex.id)
+                ),
+              commit: async () => { await api.delete(`/exams/${ex.id}`); },
+              rollback: () => queryClient.invalidateQueries({ queryKey: ["exams"] }),
+            });
           }}
         />
       ),
@@ -486,25 +527,25 @@ function ExamsContent() {
   return (
     <AOSPage>
       <AOSPageHeader
-        title="Examinations"
-        subtitle={`${allExams.length} exams · Manage marks entry, results & report cards (NEB grading)`}
+        title={t("Examinations", "परीक्षाहरू")}
+        subtitle={`${allExams.length} ${t("exams", "परीक्षा")} · ${t("Manage marks entry, results & report cards (NEB grading)", "अंक प्रविष्टि, नतिजा र रिपोर्ट कार्ड (NEB ग्रेडिङ)")}`}
         actions={
           isAdmin ? (
             <Button onClick={() => { resetForm(); setEditExam(null); setCreateOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" /> Create Exam
+              <Plus className="h-4 w-4 mr-2" /> {t("Create Exam", "नयाँ परीक्षा")}
             </Button>
           ) : (
-            <span className="text-xs text-[color:var(--w11-text-secondary)]">Only admins can create exams</span>
+            <span className="text-xs text-[color:var(--w11-text-secondary)]">{t("Only admins can create exams", "केवल प्रशासकले परीक्षा बनाउन सक्छन्")}</span>
           )
         }
       />
       <AOSPageBody className="space-y-4">
         {/* Stats */}
         <StatGrid className="mb-0">
-          <KpiCard label="Total Exams" value={stats.total} icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
-          <KpiCard label="Scheduled" value={stats.scheduled} icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-text-primary)" }} />} color="var(--w11-text-primary)" />
-          <KpiCard label="Ongoing" value={stats.ongoing} icon={<ClipboardList className="h-5 w-5" style={{ color: W11_WARNING }} />} color={W11_WARNING} />
-          <KpiCard label="Completed" value={stats.completed} icon={<Trophy className="h-5 w-5" style={{ color: W11_SUCCESS }} />} color={W11_SUCCESS} />
+          <KpiCard label={t("Total Exams", "कुल परीक्षा")} value={stats.total} icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label={t("Scheduled", "तालिकाबद्ध")} value={stats.scheduled} icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-text-primary)" }} />} color="var(--w11-text-primary)" />
+          <KpiCard label={t("Ongoing", "चालु")} value={stats.ongoing} icon={<ClipboardList className="h-5 w-5" style={{ color: W11_WARNING }} />} color={W11_WARNING} />
+          <KpiCard label={t("Completed", "सम्पन्न")} value={stats.completed} icon={<Trophy className="h-5 w-5" style={{ color: W11_SUCCESS }} />} color={W11_SUCCESS} />
         </StatGrid>
 
         {/* Quick Links — every exams subpage from the plugin manifest */}
@@ -525,7 +566,7 @@ function ExamsContent() {
         />
 
         {/* Filters + Exam List — DataTable owns search/filters/actions */}
-        <DataPanel title={`All Exams (${filtered.length})`}>
+        <DataPanel title={`${t("All Exams", "सबै परीक्षा")} (${filtered.length})`}>
           <DataTable
             columns={EXAM_COLUMNS}
             rows={filtered}
@@ -533,7 +574,7 @@ function ExamsContent() {
             searchable
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
-            searchPlaceholder="Search exams…"
+            searchPlaceholder={t("Search exams…", "परीक्षा खोज्नुहोस्…")}
             exportFileName="exams"
             toolbar={
               <div className="flex gap-2">
@@ -541,9 +582,9 @@ function ExamsContent() {
                   className="w-40"
                   triggerClassName="h-8 text-xs"
                   value={academicYearFilter}
-                  onChange={setAcademicYearFilter}
+                  onChange={(v) => setRouteFilter({ year: v || "" })}
                   clearable
-                  placeholder="All Sessions"
+                  placeholder={t("All Sessions", "सबै सत्र")}
                   options={(academicYears || []).map((year) => ({
                     value: year.id,
                     label: year.name + (year.is_current ? " (Current)" : ""),
@@ -553,28 +594,37 @@ function ExamsContent() {
                   className="w-36"
                   triggerClassName="h-8 text-xs"
                   value={typeFilter}
-                  onChange={setTypeFilter}
+                  onChange={(v) => setRouteFilter({ type: v || "" })}
                   clearable
-                  placeholder="All Types"
+                  placeholder={t("All Types", "सबै प्रकार")}
                   options={EXAM_TYPES.map((t: any) => ({ value: t.value, label: `${t.icon} ${t.label}` }))}
                 />
                 <AdvancedSelect
                   className="w-36"
                   triggerClassName="h-8 text-xs"
                   value={classFilter}
-                  onChange={setClassFilter}
+                  onChange={(v) => setRouteFilter({ cls: v || "" })}
                   clearable
-                  placeholder="All Classes"
+                  placeholder={t("All Classes", "सबै कक्षा")}
                   options={(classes || []).map((c: { id: string; name: string }) => ({ value: c.id, label: c.name }))}
                 />
               </div>
             }
-            empty={{
-              icon: GraduationCap,
-              title: "No exams found",
-              body: "Create your first exam to start recording marks.",
-              action: isAdmin ? { label: "Create Exam", onClick: () => setCreateOpen(true) } : undefined,
-            }}
+            empty={
+              isFiltered && allExams.length > 0
+                ? {
+                    icon: GraduationCap,
+                    title: t("No exams match these filters", "यी फिल्टरसँग कुनै परीक्षा भेटिएन"),
+                    body: t("Adjust the search or clear the filters.", "खोज मिल्ाउनुहोस् वा फिल्टर हटाउनुहोस्।"),
+                    action: { label: t("Clear filters", "फिल्टर हटाउनुहोस्"), onClick: clearFilters },
+                  }
+                : {
+                    icon: GraduationCap,
+                    title: t("No exams found", "कुनै परीक्षा भेटिएन"),
+                    body: t("Create your first exam to start recording marks.", "अंक रेकर्ड गर्न पहिलो परीक्षा बनाउनुहोस्।"),
+                    action: isAdmin ? { label: t("Create Exam", "नयाँ परीक्षा"), onClick: () => setCreateOpen(true) } : undefined,
+                  }
+            }
           />
         </DataPanel>
 
@@ -676,6 +726,15 @@ function ExamsContent() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* Empty-picker guidance (report §14-4): never a blank list. */}
+                  {createOpen && !editExam && (classes || []).length === 0 && (
+                    <p className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>
+                      {t("No classes yet.", "अहिले कुनै कक्षा छैन।")}{" "}
+                      <Link href="/dashboard/academics" className="underline" style={{ color: "var(--w11-accent)" }}>
+                        {t("Create a class first in Academics →", "पहिले Academics मा कक्षा बनाउनुहोस् →")}
+                      </Link>
+                    </p>
+                  )}
                 </div>
               </div>
 

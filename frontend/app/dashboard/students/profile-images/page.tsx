@@ -1,18 +1,36 @@
 "use client";
 
+/**
+ * Students / Profile Images — grid uploader (plan Part 34 row 1).
+ *
+ * Kept (working, honest): vault FilePicker as the file source, the
+ * /students/bulk-profile-images zip flow, per-file result rows, and the
+ * naming contract (photos named by Admission Number).
+ * Rewrite: AOSPage anatomy, keyboard-operable drop target (role=button +
+ * Enter/Space — the audit's dock-a11y lesson applied to page content),
+ * real win11-progressbar while processing, KPI band for the result summary
+ * instead of ad-hoc colored boxes, and bilingual chrome.
+ */
+
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
+import { StatusChip } from "@/components/aos/kit/page-kit";
 import { FilePicker } from "@/components/files/FilePicker";
 import {
   fetchManagedFileAsFile,
   type ManagedFile,
 } from "@/lib/services/files.service";
-import { Image as ImageIcon, FolderOpen, CheckCircle2, XCircle, AlertCircle, FileArchive } from "lucide-react";
+import {
+  Image as ImageIcon, FolderOpen, FileArchive, Inbox,
+} from "lucide-react";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, KpiCard, StatGrid,
+} from "@/components/aos/kit/page-kit";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useI18n } from "@/lib/i18n";
 
 interface UploadDetail {
   filename: string;
@@ -30,6 +48,7 @@ interface UploadResult {
 }
 
 export default function StudentProfileImagesPage() {
+  const { t } = useI18n();
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [loadingFile, setLoadingFile] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -46,13 +65,13 @@ export default function StudentProfileImagesPage() {
       // existing bulk-upload flow (multipart POST) keeps working unchanged.
       const fileObj = await fetchManagedFileAsFile(mf);
       if (!fileObj.name.toLowerCase().endsWith(".zip")) {
-        toast.error("Please select a .zip file");
+        toast.error(t("Please select a .zip file", ".zip फाइल छान्नुहोस्"));
         return;
       }
       setSelectedFile(fileObj);
       setResult(null);
     } catch {
-      toast.error("Failed to load file from the file manager");
+      toast.error(t("Failed to load file from the file manager", "फाइल लोड हुन सकेन"));
     } finally {
       setLoadingFile(false);
     }
@@ -75,171 +94,163 @@ export default function StudentProfileImagesPage() {
 
       const data = res.data?.data as UploadResult;
       setResult(data);
-      toast.success(`Updated ${data.updated} student photo${data.updated !== 1 ? "s" : ""}`);
+      toast.success(
+        t(`Updated ${data.updated} student photo${data.updated !== 1 ? "s" : ""}`, `${data.updated} फोटो अद्यावधिक`)
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      toast.error(e?.response?.data?.error || "Upload failed");
+      toast.error(e?.response?.data?.error || t("Upload failed", "अपलोड असफल"));
     } finally {
       setUploading(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ImageIcon className="h-6 w-6" /> Student Profile Images
-        </h1>
-        <p className="text-muted-foreground">Bulk upload and manage student display pictures</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Batch Image Upload</CardTitle>
-          <CardDescription>
-            Upload a zip file containing student images named by their Admission Number (e.g.,{" "}
-            <code className="bg-muted px-1 rounded text-xs">ADM1023.jpg</code>)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div
-            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-              selectedFile ? "border-green-400 bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
-            }`}
-            onClick={() => setShowFilePicker(true)}
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ImageIcon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={t("Student Profile Images", "विद्यार्थी फोटो")}
+        subtitle={t(
+          "Bulk-upload photos as one ZIP archive named by Admission Number",
+          "एउटा ZIP आर्काइभ — फाइलनाम भर्ना नम्बर अनुसार",
+        )}
+      />
+      <AOSPageBody>
+        <div className="max-w-4xl space-y-4">
+          <DataPanel
+            title={t("Batch Image Upload", "ब्याच फोटो अपलोड")}
+            actions={
+              <Button variant="outline" size="sm" onClick={() => setShowFilePicker(true)}>
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" /> {t("Browse Vault", "भान्ट खोल्नुहोस्")}
+              </Button>
+            }
           >
-            {loadingFile ? (
-              <>
-                <FileArchive className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
-                <h3 className="font-semibold text-lg mb-1">Loading file from the vault…</h3>
-              </>
-            ) : selectedFile ? (
-              <>
-                <FileArchive className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-1 text-green-700 dark:text-green-400">
-                  {selectedFile.name}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — Click to change
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label={t("Choose a zip file from the vault", "भान्टबाट zip छान्नुहोस्")}
+              className="flex flex-col items-center gap-2 rounded-[var(--w11-radius-lg)] border-2 border-dashed p-10 text-center transition-colors cursor-pointer"
+              style={{
+                borderColor: selectedFile ? "rgba(16,124,16,0.5)" : "var(--w11-border-default)",
+                background: selectedFile ? "rgba(16,124,16,0.05)" : "transparent",
+              }}
+              onClick={() => setShowFilePicker(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setShowFilePicker(true);
+                }
+              }}
+            >
+              {loadingFile ? (
+                <>
+                  <FileArchive className="h-10 w-10 animate-pulse" style={{ color: "var(--w11-text-secondary)" }} />
+                  <p className="text-[13px]">{t("Loading file from the vault…", "भान्टबाट फाइल आउँदै…")}</p>
+                </>
+              ) : selectedFile ? (
+                <>
+                  <FileArchive className="h-10 w-10" style={{ color: "#107c10" }} />
+                  <p className="text-[13px] font-semibold">{selectedFile.name}</p>
+                  <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — {t("Click to change", "फेर्न क्लिक")}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <FolderOpen className="h-10 w-10" style={{ color: "var(--w11-text-secondary)" }} />
+                  <p className="text-[13px] font-semibold">{t("Choose a .zip archive", ".zip आर्काइभ छान्नुहोस्")}</p>
+                  <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    {t("Photos named by Admission Number (e.g. ADM1023.jpg) match automatically.", "भर्ना नम्बरमा नामाकरण (ADM1023.jpg) — स्वतः मिल्छ।")}
+                  </p>
+                </>
+              )}
+            </div>
+
+            {uploading && (
+              <div className="space-y-2 mt-4">
+                <Progress value={progress} />
+                <p className="text-[12px] text-center" style={{ color: "var(--w11-text-secondary)" }}>
+                  {t("Uploading and matching photos…", "फोटो मिलान हुँदै…")}
                 </p>
-              </>
-            ) : (
-              <>
-                <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-1">Choose a .zip file</h3>
-                <p className="text-sm text-muted-foreground mb-4">Pick from the school file manager — upload it there first if needed</p>
-              </>
+              </div>
             )}
-            <Button type="button" variant={selectedFile ? "secondary" : "default"}>
-              {selectedFile ? "Change ZIP Archive" : "Browse Vault"}
-            </Button>
+
+            {selectedFile && !uploading && (
+              <Button onClick={handleUpload} className="w-full mt-4" size="lg">
+                <ImageIcon className="h-4 w-4 mr-2" /> {t("Upload & Match Student Photos", "अपलोड र मिलान")}
+              </Button>
+            )}
+          </DataPanel>
+
+          <div className="win11-infobar info">
+            <div>
+              <p className="text-[12px] font-medium">{t("How it works", "कसरी")}</p>
+              <p className="text-[12px] mt-1">
+                {t(
+                  "1) ZIP of JPG/JPEG/PNG/WebP, each named with the student's Admission Number. 2) Photos that don't match a student are reported as Not Found — nothing is deleted.",
+                  "१) JPG/PNG/WebP को ZIP, नाम भर्ना नम्बर। २) नमिल्दा 'नभेटियो' रिपोर्ट — केही हट्दैन।",
+                )}
+              </p>
+            </div>
           </div>
 
-          {uploading && (
-            <div className="space-y-2">
-              <Progress value={progress} />
-              <p className="text-sm text-muted-foreground text-center">Uploading and processing images…</p>
-            </div>
-          )}
-
-          {selectedFile && !uploading && (
-            <Button onClick={handleUpload} className="w-full" size="lg">
-              <FolderOpen className="h-4 w-4 mr-2" /> Upload &amp; Match Student Photos
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" /> Upload Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-muted rounded-lg">
-                <p className="text-2xl font-bold">{result.total}</p>
-                <p className="text-sm text-muted-foreground">Total Images</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-100">
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{result.updated}</p>
-                <p className="text-sm text-green-600">Updated</p>
-              </div>
-              <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-100">
-                <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">{result.skipped}</p>
-                <p className="text-sm text-orange-600">Not Found</p>
-              </div>
-            </div>
-
-            {result.errors && result.errors.length > 0 && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-100">
-                <p className="text-sm font-medium text-red-700 mb-1">Errors:</p>
-                {result.errors.map((e, i) => (
-                  <p key={i} className="text-xs text-red-600">{e}</p>
-                ))}
-              </div>
-            )}
-
-            {result.details && result.details.length > 0 && (
-              <div className="max-h-64 overflow-y-auto space-y-1">
-                {result.details.map((d, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-sm py-1.5 px-2 border-b last:border-0 rounded"
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">{d.filename}</span>
-                    <div className="flex items-center gap-2">
-                      {d.student_id && (
-                        <span className="text-xs text-muted-foreground">{d.student_id}</span>
-                      )}
-                      <Badge
-                        variant={
-                          d.status === "updated"
-                            ? "default"
-                            : d.status === "not_found"
-                            ? "secondary"
-                            : "destructive"
-                        }
-                        className="text-xs"
-                      >
-                        {d.status === "updated" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                        {d.status === "not_found" && <AlertCircle className="h-3 w-3 mr-1" />}
-                        {d.status === "error" && <XCircle className="h-3 w-3 mr-1" />}
-                        {d.status}
-                      </Badge>
-                    </div>
+          {result && (
+            <DataPanel title={t("Upload Results", "नतिजा")}>
+              <StatGrid min={130}>
+                <KpiCard label={t("Total images", "कुल")} value={result.total} color="var(--w11-text-primary)" />
+                <KpiCard label={t("Updated", "अद्यावधिक")} value={result.updated} color="#107c10" />
+                <KpiCard label={t("Not found", "नभेटियो")} value={result.skipped} color={result.skipped ? "#d13438" : "var(--w11-text-primary)"} />
+              </StatGrid>
+              {result.errors && result.errors.length > 0 && (
+                <div className="win11-infobar error mb-3">
+                  <div>
+                    <p className="text-[12px] font-medium">{t("Errors", "त्रुटि")}</p>
+                    {result.errors.map((e, i) => (
+                      <p key={i} className="text-[12px]">{e}</p>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                </div>
+              )}
+              {result.details && result.details.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto divide-y" style={{ borderColor: "var(--w11-border-subtle)" }}>
+                  {result.details.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-[12px] py-1.5 px-1">
+                      <span className="font-mono truncate">{d.filename}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {d.student_id && <span style={{ color: "var(--w11-text-tertiary)" }}>{d.student_id}</span>}
+                        <StatusChip
+                          status={d.status === "updated" ? "active" : d.status === "error" ? "failed" : "pending"}
+                          label={
+                            d.status === "updated"
+                              ? t("updated", "अद्यावधिक")
+                              : d.status === "not_found"
+                              ? t("not found", "नभेटियो")
+                              : t("error", "त्रुटि")
+                          }
+                        />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  size="sm"
+                  icon={Inbox}
+                  title={t("No images were processed", "कुनै फोटो प्रशोधन भएन")}
+                  body={t("Check that the ZIP contains image files.", "ZIP मा फोटो छन् कि हेर्नुहोस्।")}
+                />
+              )}
+            </DataPanel>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">How it works</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>1. Create a ZIP file containing student profile photos.</p>
-          <p>
-            2. Name each image using the student&apos;s <strong>Admission Number</strong> (e.g.,{" "}
-            <code className="bg-muted px-1 rounded">ADM1023.jpg</code>).
-          </p>
-          <p>3. Supported formats: JPG, JPEG, PNG, WebP.</p>
-          <p>4. The system will match each image to the student and update their profile picture.</p>
-          <p>5. Images that don&apos;t match any student will be reported as &quot;Not Found&quot;.</p>
-        </CardContent>
-      </Card>
-
-      <FilePicker
-        open={showFilePicker}
-        onOpenChange={setShowFilePicker}
-        onSelect={handleFileSelect}
-        title="Select ZIP Archive"
-      />
-    </div>
+        <FilePicker
+          open={showFilePicker}
+          onOpenChange={setShowFilePicker}
+          onSelect={handleFileSelect}
+          title="Select ZIP Archive"
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }

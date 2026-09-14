@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteUrl } from "@/lib/site-domain";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Globe, ExternalLink, Rocket, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
@@ -22,7 +23,9 @@ import {
 } from "@/components/aos/kit/page-kit";
 
 // Quick links — every website_builder manifest subitem plus the Custom
-// Domain surface (frontend route).
+// Domain surface (frontend route). Global site identity lives in School
+// Settings (Website & Design section) — the old /settings/website-design
+// redirect stub was a self-loop into this page (plan 34 #14 delete).
 const QUICK_LINKS = [
   { label: "Themes", desc: "Browse 20 beautiful themes. 5 free, 15 pro.", icon: "Palette", href: "/dashboard/website-builder/themes" },
   { label: "Pages", desc: "Add, edit, or rearrange your website pages.", icon: "FileText", href: "/dashboard/website-builder/pages" },
@@ -30,7 +33,7 @@ const QUICK_LINKS = [
   { label: "Section Editor", desc: "Drag & drop sections on each page.", icon: "Layers", href: "/dashboard/website-builder/editor" },
   { label: "Custom Domain", desc: "Connect your own domain name.", icon: "Globe", href: "/dashboard/website-builder/domain" },
   { label: "SEO Settings", desc: "Optimize your site for search engines.", icon: "TrendingUp", href: "/dashboard/website-builder/seo" },
-  { label: "Website Settings", desc: "Global site configuration.", icon: "Settings", href: "/dashboard/settings/website-design" },
+  { label: "School Identity", desc: "Name, logo and contact used across the site.", icon: "Settings", href: "/dashboard/settings" },
 ];
 
 interface WebsiteStatus {
@@ -57,7 +60,7 @@ export default function WebsiteBuilderPage() {
 
 function WebsiteBuilderContent() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"overview" | "quick-actions">("overview");
+  const confirm = useConfirm();
 
   const { data: status, isLoading, isError, refetch } = useQuery<WebsiteStatus>({
     queryKey: ["website-status"],
@@ -70,7 +73,9 @@ function WebsiteBuilderContent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-status"] });
       revalidateSchoolSite(status?.subdomain);
+      toast.success("Website published — your changes are now live.");
     },
+    onError: () => toast.error("Publish failed — the live site is unchanged."),
   });
 
   const unpublishMut = useMutation({
@@ -78,7 +83,9 @@ function WebsiteBuilderContent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-status"] });
       revalidateSchoolSite(status?.subdomain);
+      toast.success("Website unpublished — the public site is offline.");
     },
+    onError: () => toast.error("Unpublish failed."),
   });
 
   if (isLoading) {
@@ -123,7 +130,17 @@ function WebsiteBuilderContent() {
                     View Live Site
                   </a>
                 </Button>
-                <Button variant="outline" onClick={() => unpublishMut.mutate()} disabled={unpublishMut.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    confirm({
+                      title: "Unpublish website?",
+                      body: "Your public school site will go offline immediately. Visitors see a maintenance page until you publish again. Your pages and edits are kept.",
+                      confirmLabel: "Unpublish",
+                    }).then((ok) => ok && unpublishMut.mutate());
+                  }}
+                  disabled={unpublishMut.isPending}
+                >
                   Unpublish
                 </Button>
               </>

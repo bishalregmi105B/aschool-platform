@@ -1,10 +1,39 @@
 "use client";
 
-import { useState } from "react";
+/**
+ * Students — A1 registry page (plan Part 32/34 row 1).
+ *
+ * Where am I: header "Students / N enrolled". What can I do: Add Student
+ * (single primary action), quick-links to the 9 student utilities,
+ * filter/search the roster. What's the state: 4 KPIs + the table.
+ * What's next: the empty states chain to the blocker ("Create your first
+ * class →" lives on students/new; here: enroll-first CTA / clear-filters).
+ *
+ * Rewrite-wave-A changes vs previous version:
+ * - Class/gender/status/section filters + page live in the WINDOW ROUTE
+ *   (?class=&gender=&status=&section=&page=) so filtered views survive
+ *   refresh and are shareable (plan 5.1/33). Text search stays local +
+ *   debounced (300 ms, audit 5.5) to avoid a URL push per keystroke.
+ * - Quick Links panel → kit <QuickLinks/> (plan 31.3).
+ * - Duplicate "Add Student" primary in the table toolbar removed (one
+ *   primary per view); Import/Photos stay as secondary actions.
+ * - Row delete → undoableDelete (G8/35.4) instead of confirm+hard-delete;
+ *   bulk delete keeps ConfirmDialog (mass destructive).
+ * - Loading: the table keeps its chrome and shows skeleton rows instead
+ *   of an early-return full-page spinner (9.2).
+ * - Bilingual chrome via t() (9.7) — the page was English-only.
+ */
+
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAOSRouterNavigate } from "@/lib/aos-window-route";
+import {
+  useAOSRouterNavigate,
+  useAOSRouteParams,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -24,7 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 import { useDebounced } from "@/components/ui/filter-bar";
 import { Spinner } from "@/components/ui/spinner";
 import { DataTable, type Column, type BulkAction } from "@/components/ui/data-table";
@@ -35,14 +64,14 @@ import {
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  FilterCommandBar,
   StatGrid,
   KpiCard,
   StatusChip,
-  AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import {
   Plus,
-  Trash2,
   Pencil,
   Upload,
   ImagePlus,
@@ -50,41 +79,20 @@ import {
   UserCheck,
   BookOpen,
   Layers,
-  ChevronRight,
 } from "lucide-react";
-import Link from "next/link";
-import { ICON_MAP } from "@/lib/icon-map";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 
 /** Module dashboard quick links — mirrors the students plugin manifest
- * (backend/app/plugins/manifests/students.yaml ui.nav.subitems). */
-const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
-  { label: "Add Student", href: "/dashboard/students/new", icon: "UserPlus" },
-  { label: "Bulk Import", href: "/dashboard/students/bulk-import", icon: "Upload" },
-  { label: "Parents & Guardians", href: "/dashboard/parents", icon: "Users" },
-  { label: "Admission Inquiries", href: "/dashboard/admission", icon: "ClipboardList" },
-  { label: "Assign Roll Numbers", href: "/dashboard/students/roll-numbers", icon: "ListOrdered" },
-  { label: "Upload Profile Images", href: "/dashboard/students/profile-images", icon: "ImagePlus" },
-  { label: "Transfer Student", href: "/dashboard/students/transfers", icon: "ArrowRightLeft" },
-  { label: "Promote Students", href: "/dashboard/students/promote", icon: "TrendingUp" },
-  { label: "Reset Password", href: "/dashboard/students/reset-password", icon: "KeyRound" },
-];
-
-const GRADES = [
-  "ECD",
-  "KG",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
-  "12",
+ * (ui.nav.subitems). */
+const QUICK_LINK_ITEMS = [
+  { labelEn: "Add Student", labelNe: "विद्यार्थी थप्नुहोस्", href: "/dashboard/students/new", icon: "UserPlus" },
+  { labelEn: "Bulk Import", labelNe: "बल्क आयात", href: "/dashboard/students/bulk-import", icon: "Upload" },
+  { labelEn: "Parents & Guardians", labelNe: "अभिभावक", href: "/dashboard/parents", icon: "Users" },
+  { labelEn: "Admission Inquiries", labelNe: "भर्ना अनुरोध", href: "/dashboard/admission", icon: "ClipboardList" },
+  { labelEn: "Assign Roll Numbers", labelNe: "रोल नम्बर तोक्नुहोस्", href: "/dashboard/students/roll-numbers", icon: "ListOrdered" },
+  { labelEn: "Upload Profile Images", labelNe: "फोटो अपलोड", href: "/dashboard/students/profile-images", icon: "ImagePlus" },
+  { labelEn: "Transfer Student", labelNe: "स्थानान्तरण", href: "/dashboard/students/transfers", icon: "ArrowRightLeft" },
+  { labelEn: "Promote Students", labelNe: "उन्नतीकरण", href: "/dashboard/students/promote", icon: "TrendingUp" },
+  { labelEn: "Reset Password", labelNe: "पासवर्ड रिसेट", href: "/dashboard/students/reset-password", icon: "KeyRound" },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -133,28 +141,55 @@ interface StudentListResponse {
   };
 }
 
+/** Write one query param into the enclosing AOS window's route (→ address
+ * bar). `page` resets when any other filter changes, matching the
+ * useUrlFilters contract from ui/filter-bar. */
+function useRouteFilter() {
+  const params = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/students";
+
+  return useCallback(
+    (patch: Record<string, string>, opts?: { keepPage?: boolean }) => {
+      const next = new URLSearchParams(params.toString());
+      for (const [k, v] of Object.entries(patch)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      if (!opts?.keepPage && !("page" in patch)) next.delete("page");
+      const qs = next.toString();
+      navigate(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [params, navigate, pathname]
+  );
+}
+
 export default function StudentsPage() {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [search, setSearch] = useState("");
-  // 300 ms debounce — the list query follows the input without firing on
-  // every keystroke (audit 5.5).
+  const { t } = useI18n();
+  const routeParams = useAOSRouteParams();
+  const setRouteFilter = useRouteFilter();
+
+  const pageSize = 20;
+  // Text search is ephemeral (local, debounced); selects/pagination are URL
+  // state so the filtered roster survives refresh + sharing (plan 5.1).
+  const [search, setSearch] = useState(() => routeParams.get("q") ?? "");
   const debouncedSearch = useDebounced(search, 300);
-  const [filterGender, setFilterGender] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterGrade, setFilterGrade] = useState("all");
-  const [filterClassId, setFilterClassId] = useState("all");
-  const [filterSectionId, setFilterSectionId] = useState("all");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const filterClassId = routeParams.get("class") ?? "";
+  const filterSectionId = routeParams.get("section") ?? "";
+  const filterGender = routeParams.get("gender") ?? "";
+  const filterStatus = routeParams.get("status") ?? "";
+  const page = Number(routeParams.get("page") || "1");
+
   const [editStudent, setEditStudent] = useState<Student | null>(null);
-  // Row drill-in drawer — replaces full-page navigation for a quick look.
+  // Row drill-in drawer — a quick look without leaving the list.
   const [viewStudent, setViewStudent] = useState<Student | null>(null);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const router = useAOSRouterNavigate();
+  const navigate = useAOSRouterNavigate();
 
-  // Fetch classes for proper class/section filter
+  // Classes feed the class/section filters and the Classes/Sections KPIs.
   const { data: classesData } = useQuery({
     queryKey: ["classes"],
     queryFn: async () => {
@@ -187,40 +222,36 @@ export default function StudentsPage() {
     },
   });
 
-  const {
-    data,
-    isLoading,
-    isError: listError,
-    refetch: refetchStudents,
-  } = useQuery({
-    queryKey: [
+  const listQueryKey = useMemo(
+    () => [
       "students",
+      "list",
       page,
       debouncedSearch,
       filterGender,
       filterStatus,
-      filterGrade,
       filterClassId,
       filterSectionId,
     ],
+    [page, debouncedSearch, filterGender, filterStatus, filterClassId, filterSectionId]
+  );
+
+  const { data, isLoading, isError, refetch: refetchStudents } = useQuery({
+    queryKey: listQueryKey,
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         per_page: String(pageSize),
       });
       if (debouncedSearch) params.set("search", debouncedSearch);
-      if (filterGender !== "all") params.set("gender", filterGender);
-      if (filterStatus !== "all") params.set("status", filterStatus);
-      // Prefer class_id over grade
-      if (filterClassId !== "all") {
+      if (filterGender) params.set("gender", filterGender);
+      if (filterStatus) params.set("status", filterStatus);
+      if (filterClassId) {
         params.set("class_id", filterClassId);
-        if (filterSectionId !== "all")
-          params.set("section_id", filterSectionId);
-      } else if (filterGrade !== "all") {
-        params.set("grade", filterGrade);
+        if (filterSectionId) params.set("section_id", filterSectionId);
       }
       const res = await api.get<ApiResponse<StudentListResponse>>(
-        `/students?${params}`,
+        `/students?${params}`
       );
       return res.data;
     },
@@ -230,90 +261,79 @@ export default function StudentsPage() {
     mutationFn: (id: string) => api.delete(`/students/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      toast.success("Student deleted");
     },
-    onError: () => toast.error("Failed to delete student"),
+    onError: () => toast.error(t("Failed to delete student", "विद्यार्थी मेटाउन असफल")),
   });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => api.post("/students/bulk-delete", { ids }),
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      setSelected(new Set());
-      toast.success(`${ids.length} student(s) deleted`);
+      toast.success(
+        t(`${ids.length} student(s) deleted`, `${ids.length} विद्यार्थी मेटाइयो`)
+      );
     },
-    onError: () => toast.error("Bulk delete failed"),
+    onError: () => toast.error(t("Bulk delete failed", "बल्क मेटाउन असफल")),
   });
 
   const students = Array.isArray(data?.data) ? data.data : [];
   const pagination = data?.meta?.pagination;
 
-  const allSelected =
-    students.length > 0 && students.every((s) => selected.has(s.id));
-  const someSelected = selected.size > 0;
-  const hasFilters =
-    filterGender !== "all" || filterStatus !== "all" || filterGrade !== "all";
+  const hasActiveFilters =
+    !!filterClassId || !!filterSectionId || !!filterGender || !!filterStatus;
 
   function clearFilters() {
-    setFilterGender("all");
-    setFilterStatus("all");
-    setFilterGrade("all");
-    setPage(1);
+    setRouteFilter({ class: "", section: "", gender: "", status: "", page: "" });
   }
 
-  function toggleAll() {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(students.map((s) => s.id)));
-    }
-  }
-
-  function toggleOne(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }
-
-  async function handleBulkDelete() {
+  async function handleBulkDelete(rows: Student[]) {
     const ok = await confirm({
-      title: `Delete ${selected.size} selected student(s)?`,
-      body: "This cannot be undone — their login and guardian links are removed too.",
-      confirmLabel: "Delete students",
+      title: t(
+        `Delete ${rows.length} selected student(s)?`,
+        `चयनित ${rows.length} विद्यार्थी मेटाउने?`
+      ),
+      body: t(
+        "This cannot be undone — their login and guardian links are removed too.",
+        "यो फिर्ता हुँदैन — तिनको लगइन र अभिभावक लिंक हट्छ।"
+      ),
+      confirmLabel: t("Delete students", "विद्यार्थी मेटाउनुहोस्"),
       tone: "danger",
     });
     if (!ok) return;
-    bulkDeleteMutation.mutate(Array.from(selected));
+    bulkDeleteMutation.mutate(rows.map((r) => r.id));
   }
 
-  if (isLoading) return <AOSModuleLoadingState label="Loading students…" />;
+  // G8: single-row delete is undoable (optimistic hide + 5 s grace) instead
+  // of a scary confirm for a routine tidy-up.
+  function handleDeleteRow(s: Student) {
+    undoableDelete({
+      label: t(`${s.first_name} ${s.last_name}`, `${s.first_name} ${s.last_name}`),
+      optimistic: () => {
+        queryClient.setQueryData(listQueryKey, (prev: ApiResponse<StudentListResponse> | undefined) => {
+          if (!prev?.data) return prev;
+          const rows = prev.data as unknown as Student[];
+          return { ...prev, data: rows.filter((x) => x.id !== s.id) as unknown as typeof prev.data };
+        });
+      },
+      commit: async () => {
+        await deleteMutation.mutateAsync(s.id);
+      },
+      rollback: () => {
+        queryClient.invalidateQueries({ queryKey: ["students"] });
+      },
+    });
+  }
 
-  if (listError)
-    return (
-      <AOSPage>
-        <AOSPageHeader title="Students" subtitle={`${pagination?.total || 0} students enrolled`} />
-        <AOSPageBody>
-          <DataPanel className="max-w-2xl mx-auto">
-            <div className="py-10 text-center space-y-3">
-              <p className="text-sm" style={{ color: "#c42b1c" }}>
-                Failed to load students. Please try again.
-              </p>
-              <Button variant="outline" size="sm" onClick={() => refetchStudents()}>
-                Retry
-              </Button>
-            </div>
-          </DataPanel>
-        </AOSPageBody>
-      </AOSPage>
-    );
+  const classLabel = (s: Student) =>
+    s.class_name
+      ? `Class ${s.class_name.replace(/^\s*class\s+/i, "")}${s.section_name ? ` - ${s.section_name}` : ""}`
+      : "—";
 
   // ── DataTable wiring ──────────────────────────────────────────────────
   const COLUMNS: Column<Student>[] = [
     {
       key: "student",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
       value: (s) => `${s.first_name} ${s.last_name}`,
       render: (s) => (
@@ -329,23 +349,27 @@ export default function StudentsPage() {
         </div>
       ),
     },
-    { key: "enrollment_number", label: "Enrollment No.", sortable: true, value: (s) => s.enrollment_number },
+    { key: "enrollment_number", label: t("Enrollment No.", "भर्ना नम्बर"), sortable: true, value: (s) => s.enrollment_number },
     {
       key: "class_name",
-      label: "Class",
+      label: t("Class", "कक्षा"),
       sortable: true,
       value: (s) => s.class_name ?? "",
       render: (s) =>
         // E204: class names can already carry the "Class " prefix (legacy
         // rows store "Class 10") — strip before prepending.
-        s.class_name
-          ? `Class ${s.class_name.replace(/^\s*class\s+/i, "")}${s.section_name ? ` - ${s.section_name}` : ""}`
-          : "-",
+        classLabel(s),
     },
-    { key: "gender", label: "Gender", sortable: true, value: (s) => s.gender ?? "", render: (s) => <span className="capitalize">{s.gender || "-"}</span> },
+    {
+      key: "gender",
+      label: t("Gender", "लिङ्ग"),
+      sortable: true,
+      value: (s) => s.gender ?? "",
+      render: (s) => <span className="capitalize">{s.gender || "—"}</span>,
+    },
     {
       key: "status",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (s) => s.status,
       render: (s) => (
@@ -358,31 +382,17 @@ export default function StudentsPage() {
       noExport: true,
       render: (s) => (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditStudent(s)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setEditStudent(s)}>
             <Pencil className="h-3.5 w-3.5 mr-1" />
-            Edit
+            {t("Edit", "सम्पादन")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className="text-[#c42b1c]"
-            onClick={() => {
-              void (async () => {
-                const ok = await confirm({
-                  title: "Delete this student?",
-                  body: "Their login and guardian links are removed. This cannot be undone.",
-                  confirmLabel: "Delete student",
-                  tone: "danger",
-                });
-                if (ok) deleteMutation.mutate(s.id);
-              })();
-            }}
+            onClick={() => handleDeleteRow(s)}
           >
-            Delete
+            {t("Delete", "मेटाउनुहोस्")}
           </Button>
         </div>
       ),
@@ -392,22 +402,19 @@ export default function StudentsPage() {
   const BULK_ACTIONS: BulkAction<Student>[] = [
     {
       key: "delete",
-      label: "Delete selected",
+      label: t("Delete selected", "चयनित मेटाउनुहोस्"),
       tone: "danger",
-      onClick: (rows) => {
-        setSelected(new Set(rows.map((r) => r.id)));
-        void handleBulkDelete();
-      },
+      onClick: (rows) => void handleBulkDelete(rows),
     },
     {
       key: "promote",
-      label: "Promote…",
-      onClick: () => router("/dashboard/students/promote"),
+      label: t("Promote…", "उन्नतीकरण…"),
+      onClick: () => navigate("/dashboard/students/promote"),
     },
     {
       key: "reset-pw",
-      label: "Reset passwords…",
-      onClick: () => router("/dashboard/students/reset-password"),
+      label: t("Reset passwords…", "पासवर्ड रिसेट…"),
+      onClick: () => navigate("/dashboard/students/reset-password"),
     },
   ];
 
@@ -415,94 +422,124 @@ export default function StudentsPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Students"
-        subtitle={`${pagination?.total || 0} students enrolled`}
+        title={t("Students", "विद्यार्थी")}
+        subtitle={t(
+          `${pagination?.total ?? totalCount ?? 0} students enrolled`,
+          `${pagination?.total ?? totalCount ?? 0} विद्यार्थी भर्ना`
+        )}
         actions={
-          <Button onClick={() => router("/dashboard/students/new")}>
+          <Button onClick={() => navigate("/dashboard/students/new")}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Student
+            {t("Add Student", "विद्यार्थी थप्नुहोस्")}
           </Button>
         }
       />
       <AOSPageBody>
-        {/* Module dashboard — KPIs + quick links before the list */}
+        {/* Module dashboard — KPIs + quick links above the list (A1+hub) */}
         <StatGrid min={170}>
           <KpiCard
-            label="Total Students"
+            label={t("Total Students", "कुल विद्यार्थी")}
             value={totalCount ?? "—"}
             icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
           />
           <KpiCard
-            label="Active"
+            label={t("Active", "सक्रिय")}
             value={activeCount ?? "—"}
             denominator={totalCount != null ? `/ ${totalCount}` : undefined}
             color="#107c10"
             icon={<UserCheck className="h-4 w-4" style={{ color: "#107c10" }} />}
           />
           <KpiCard
-            label="Classes"
+            label={t("Classes", "कक्षा")}
             value={classes.length}
             icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             color="var(--w11-text-primary)"
           />
           <KpiCard
-            label="Sections"
+            label={t("Sections", "सेक्सन")}
             value={classes.reduce((sum, c) => sum + (c.sections?.length ?? 0), 0)}
             icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             color="var(--w11-text-primary)"
           />
         </StatGrid>
 
-        <DataPanel title="Students Quick Links" bodyClassName="p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", margin: 0 }}
-                  >
-                    <div
-                      className="flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: "44px",
-                        height: "44px",
-                        borderRadius: "10px",
-                        background: SECTION_GRADIENTS.Core,
-                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon size={22} strokeWidth={2.2} />
-                    </div>
-                    <span
-                      className="text-[13px] font-semibold leading-tight"
-                      style={{ color: "var(--w11-text-primary)" }}
-                    >
-                      {l.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </DataPanel>
+        <QuickLinks
+          section="Core"
+          className="mb-4"
+          links={QUICK_LINK_ITEMS.map((l) => ({
+            href: l.href,
+            icon: l.icon,
+            label: t(l.labelEn, l.labelNe),
+          }))}
+        />
+
+        {/* URL-backed filters (class → section, gender, status) above the
+            table; DataTable keeps search + Columns + Export. */}
+        <FilterCommandBar>
+          <AdvancedSelect
+            className="w-36"
+            value={filterClassId}
+            onChange={(v) =>
+              setRouteFilter({ class: v || "", section: "" })
+            }
+            clearable
+            placeholder={t("All Classes", "सबै कक्षा")}
+            options={classes.map((c) => ({ value: c.id, label: c.name }))}
+          />
+          {filterClassId && sections.length > 0 && (
+            <AdvancedSelect
+              className="w-32"
+              value={filterSectionId}
+              onChange={(v) => setRouteFilter({ section: v || "" })}
+              clearable
+              placeholder={t("All Sections", "सबै सेक्सन")}
+              options={sections.map((sec) => ({ value: sec.id, label: sec.name }))}
+            />
+          )}
+          <AdvancedSelect
+            className="w-32"
+            value={filterGender}
+            onChange={(v) => setRouteFilter({ gender: v || "" })}
+            clearable
+            placeholder={t("All Genders", "सबै लिङ्ग")}
+            options={[
+              { value: "male", label: t("Male", "पुरुष") },
+              { value: "female", label: t("Female", "महिला") },
+              { value: "other", label: t("Other", "अन्य") },
+            ]}
+          />
+          <AdvancedSelect
+            className="w-36"
+            value={filterStatus}
+            onChange={(v) => setRouteFilter({ status: v || "" })}
+            clearable
+            placeholder={t("All Statuses", "सबै अवस्था")}
+            options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
+          />
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="text-[12px]" onClick={clearFilters}>
+              {t(`Clear filters`, "फिल्टर हटाउनुहोस्")}
+            </Button>
+          )}
+        </FilterCommandBar>
 
         {/* Students table — one component for selection, sort, pagination,
-            export; row click opens the detail drawer (no full-page hop). */}
+            export; row click opens the detail drawer. */}
         <DataPanel bodyClassName="p-0">
           <DataTable<Student>
             columns={COLUMNS}
             rows={students}
             rowKey={(s) => s.id}
-            loading={false}
+            loading={isLoading}
+            error={isError ? t("Failed to load students.", "विद्यार्थी लोड हुन सकेन।") : null}
+            onRetry={isError ? () => void refetchStudents() : undefined}
             searchable
             searchValue={search}
-            onSearchChange={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-            searchPlaceholder="Search by name or enrollment number..."
+            onSearchChange={(v) => setSearch(v)}
+            searchPlaceholder={t(
+              "Search by name or enrollment number...",
+              "नाम वा भर्ना नम्बरले खोज्नुहोस्…"
+            )}
             selectable
             bulkActions={BULK_ACTIONS}
             onRowClick={(s) => setViewStudent(s)}
@@ -515,77 +552,42 @@ export default function StudentsPage() {
               has_next: pagination.has_next ?? pagination.page < pagination.pages,
               has_prev: pagination.has_prev ?? pagination.page > 1,
             } : undefined}
-            onPageChange={(p) => setPage(p)}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            onPageChange={(p) => setRouteFilter({ page: String(p) }, { keepPage: true })}
             exportFileName="students"
-            empty={{
-              icon: Users,
-              title: "No students found",
-              body: hasFilters ? "Try clearing the filters — or enroll your first student." : "Enroll your first student to get started.",
-              action: { label: "Add Student", href: "/dashboard/students/new" },
-            }}
+            empty={
+              hasActiveFilters || debouncedSearch
+                ? {
+                    icon: Users,
+                    title: t("No students match this search", "यस खोजसँग कुनै विद्यार्थी भेटिएन"),
+                    body: t(
+                      "Widen the filters or clear them to see the full roster.",
+                      "फिल्टर फराकिलो पार्नुहोस् वा हटाउनुहोस्।"
+                    ),
+                    action: {
+                      label: t("Clear filters", "फिल्टर हटाउनुहोस्"),
+                      onClick: () => {
+                        clearFilters();
+                        setSearch("");
+                      },
+                    },
+                  }
+                : {
+                    icon: Users,
+                    title: t("No students found", "कुनै विद्यार्थी भेटिएन"),
+                    body: t(
+                      "Enroll your first student to get started.",
+                      "सुरु गर्न पहिलो विद्यार्थी भर्ना गर्नुहोस्।"
+                    ),
+                    action: { label: t("Add Student", "विद्यार्थी थप्नुहोस्"), href: "/dashboard/students/new" },
+                  }
+            }
             toolbar={
               <div className="flex flex-wrap items-center gap-2">
-                <AdvancedSelect
-                  className="w-36"
-                  value={filterClassId}
-                  onChange={(v) => {
-                    setFilterClassId(v || "all");
-                    setFilterSectionId("all");
-                    setFilterGrade("all");
-                    setPage(1);
-                  }}
-                  clearable
-                  placeholder="All Classes"
-                  options={classes.map((c) => ({ value: c.id, label: c.name }))}
-                />
-                {filterClassId !== "all" && sections.length > 0 && (
-                  <AdvancedSelect
-                    className="w-32"
-                    value={filterSectionId}
-                    onChange={(v) => {
-                      setFilterSectionId(v || "all");
-                      setPage(1);
-                    }}
-                    clearable
-                    placeholder="All Sections"
-                    options={sections.map((sec) => ({ value: sec.id, label: sec.name }))}
-                  />
-                )}
-                <AdvancedSelect
-                  className="w-32"
-                  value={filterGender}
-                  onChange={(v) => {
-                    setFilterGender(v || "all");
-                    setPage(1);
-                  }}
-                  clearable
-                  placeholder="All Genders"
-                  options={[
-                    { value: "male", label: "Male" },
-                    { value: "female", label: "Female" },
-                    { value: "other", label: "Other" },
-                  ]}
-                />
-                <AdvancedSelect
-                  className="w-36"
-                  value={filterStatus}
-                  onChange={(v) => {
-                    setFilterStatus(v || "all");
-                    setPage(1);
-                  }}
-                  clearable
-                  placeholder="All Statuses"
-                  options={Object.entries(STATUS_LABELS).map(([val, label]) => ({ value: val, label }))}
-                />
-                <Button variant="outline" size="sm" onClick={() => router("/dashboard/students/bulk-import")}>
-                  <Upload className="h-3.5 w-3.5 mr-1" /> Import
+                <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/students/bulk-import")}>
+                  <Upload className="h-3.5 w-3.5 mr-1" /> {t("Import", "आयात")}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => router("/dashboard/students/profile-images")}>
-                  <ImagePlus className="h-3.5 w-3.5 mr-1" /> Photos
-                </Button>
-                <Button onClick={() => router("/dashboard/students/new")}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Student
+                <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/students/profile-images")}>
+                  <ImagePlus className="h-3.5 w-3.5 mr-1" /> {t("Photos", "फोटो")}
                 </Button>
               </div>
             }
@@ -596,7 +598,9 @@ export default function StudentsPage() {
         <Sheet open={!!viewStudent} onOpenChange={(open) => !open && setViewStudent(null)}>
           <SheetContent className="w-full sm:max-w-md overflow-y-auto">
             <div className="border-b border-[color:var(--w11-border-subtle)] px-4 py-3">
-              <SheetTitle className="text-[15px] font-semibold">Student Details</SheetTitle>
+              <SheetTitle className="text-[15px] font-semibold">
+                {t("Student Details", "विद्यार्थी विवरण")}
+              </SheetTitle>
             </div>
             {viewStudent && (
               <div className="space-y-5 px-4 pb-6">
@@ -611,7 +615,7 @@ export default function StudentsPage() {
                       {viewStudent.first_name} {viewStudent.last_name}
                     </p>
                     <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
-                      {viewStudent.enrollment_number || "No enrollment no."}
+                      {viewStudent.enrollment_number || t("No enrollment no.", "भर्ना नम्बर छैन")}
                     </p>
                     <StatusChip
                       status={viewStudent.status}
@@ -622,12 +626,17 @@ export default function StudentsPage() {
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
                   {[
-                    ["Class", viewStudent.class_name ? `Class ${viewStudent.class_name.replace(/^\s*class\s+/i, "")}${viewStudent.section_name ? ` - ${viewStudent.section_name}` : ""}` : "—"],
-                    ["Gender", viewStudent.gender ? viewStudent.gender.charAt(0).toUpperCase() + viewStudent.gender.slice(1) : "—"],
-                    ["Guardian", viewStudent.guardians?.[0]?.full_name || "—"],
-                    ["Guardian Phone", viewStudent.guardians?.[0]?.phone || "—"],
+                    [t("Class", "कक्षा"), classLabel(viewStudent)],
+                    [
+                      t("Gender", "लिङ्ग"),
+                      viewStudent.gender
+                        ? viewStudent.gender.charAt(0).toUpperCase() + viewStudent.gender.slice(1)
+                        : "—",
+                    ],
+                    [t("Guardian", "अभिभावक"), viewStudent.guardians?.[0]?.full_name || "—"],
+                    [t("Guardian Phone", "अभिभावक फोन"), viewStudent.guardians?.[0]?.phone || "—"],
                   ].map(([k, v]) => (
-                    <div key={k}>
+                    <div key={String(k)}>
                       <dt
                         className="text-[10px] font-medium uppercase tracking-wide"
                         style={{ color: "var(--w11-text-secondary)" }}
@@ -648,34 +657,14 @@ export default function StudentsPage() {
                       setViewStudent(null);
                     }}
                   >
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> {t("Edit", "सम्पादन")}
                   </Button>
                   <Button
                     size="sm"
                     className="flex-1"
-                    onClick={() => router(`/dashboard/students/${viewStudent.id}`)}
+                    onClick={() => navigate(`/dashboard/students/${viewStudent.id}`)}
                   >
-                    Full Profile
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-[#c42b1c]"
-                    onClick={() => {
-                      const target = viewStudent;
-                      setViewStudent(null);
-                      void (async () => {
-                        const ok = await confirm({
-                          title: "Delete this student?",
-                          body: "Their login and guardian links are removed. This cannot be undone.",
-                          confirmLabel: "Delete student",
-                          tone: "danger",
-                        });
-                        if (ok) deleteMutation.mutate(target.id);
-                      })();
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {t("Full Profile", "पूरा प्रोफाइल")}
                   </Button>
                 </div>
               </div>
@@ -683,7 +672,6 @@ export default function StudentsPage() {
           </SheetContent>
         </Sheet>
 
-        <AddStudentDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
         {editStudent && (
           <EditStudentDialog
             student={editStudent}
@@ -697,273 +685,6 @@ export default function StudentsPage() {
   );
 }
 
-function AddStudentDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedSectionId, setSelectedSectionId] = useState("");
-  const [selectedGender, setSelectedGender] = useState("");
-  const [selectedRelation, setSelectedRelation] = useState("father");
-  const [selectedRelation2, setSelectedRelation2] = useState("mother");
-
-  const { data: classes } = useQuery({
-    queryKey: ["classes"],
-    queryFn: async () => {
-      const res = await api.get("/academics/classes");
-      return Array.isArray(res.data?.data) ? res.data.data : [];
-    },
-  });
-
-  const selectedClass = (classes || []).find(
-    (c: any) => c.id === selectedClassId,
-  );
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const guardians = [];
-    const guardianName = formData.get("guardian_name")?.toString().trim();
-    const guardianPhone = formData.get("guardian_phone")?.toString().trim();
-    const guardian2Name = formData.get("guardian2_name")?.toString().trim();
-    const guardian2Phone = formData.get("guardian2_phone")?.toString().trim();
-
-    if (guardianName || guardianPhone) {
-      guardians.push({
-        full_name: guardianName,
-        phone: guardianPhone,
-        relation: selectedRelation,
-      });
-    }
-    if (guardian2Name || guardian2Phone) {
-      guardians.push({
-        full_name: guardian2Name,
-        phone: guardian2Phone,
-        relation: selectedRelation2,
-      });
-    }
-
-    const payload: any = {
-      first_name: formData.get("first_name"),
-      last_name: formData.get("last_name"),
-      student_id: formData.get("enrollment_number"),
-      class_id: selectedClassId || undefined,
-      section_id: selectedSectionId || undefined,
-      roll_number: formData.get("roll_number")
-        ? parseInt(formData.get("roll_number") as string)
-        : undefined,
-      gender: selectedGender || undefined,
-      dob_bs: formData.get("dob_bs") || undefined,
-      guardians,
-      password: formData.get("password") || undefined,
-    };
-    try {
-      await api.post("/students", payload);
-      toast.success("Student added successfully");
-      queryClient.invalidateQueries({ queryKey: ["students"] });
-      onOpenChange(false);
-    } catch {
-      toast.error("Failed to add student");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add New Student</DialogTitle>
-        </DialogHeader>
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 max-h-[60vh] overflow-y-auto pr-1"
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="first_name">First Name *</Label>
-              <Input id="first_name" name="first_name" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="last_name">Last Name *</Label>
-              <Input id="last_name" name="last_name" required />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Class *</Label>
-              <Select
-                value={selectedClassId}
-                onValueChange={(v) => {
-                  setSelectedClassId(v);
-                  setSelectedSectionId("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(classes || []).map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Section</Label>
-              <Select
-                value={selectedSectionId}
-                onValueChange={setSelectedSectionId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select section" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(selectedClass?.sections || []).map((s: any) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="enrollment_number">Student ID</Label>
-              <Input id="enrollment_number" name="enrollment_number" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roll_number">Roll No.</Label>
-              <Input id="roll_number" name="roll_number" type="number" />
-            </div>
-            <div className="space-y-2">
-              <Label>Gender</Label>
-              <Select value={selectedGender} onValueChange={setSelectedGender}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Login Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Leave empty for auto-generation"
-              />
-              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-                Default: {"{class}{section}{roll}.{first}"} (e.g. 7a12.ram)
-              </p>
-            </div>
-          </div>
-          <div className="space-y-4 pt-4 border-t border-[color:var(--w11-border-subtle)]">
-            <Label htmlFor="dob_bs">Date of Birth (BS)</Label>
-            <BSDateInput name="dob_bs" emit="bs" />
-          </div>
-          <div className="border-t border-[color:var(--w11-border-subtle)] pt-4">
-            <p className="text-sm font-medium mb-3">Guardian Information</p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="guardian_name">Guardian Name *</Label>
-                <Input id="guardian_name" name="guardian_name" required />
-                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-                  Creates the parent login
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="guardian_phone">Phone</Label>
-                <Input
-                  id="guardian_phone"
-                  name="guardian_phone"
-                  placeholder="98XXXXXXXX"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Relation</Label>
-                <Select
-                  value={selectedRelation}
-                  onValueChange={setSelectedRelation}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="father">Father</SelectItem>
-                    <SelectItem value="mother">Mother</SelectItem>
-                    <SelectItem value="guardian">Guardian</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mt-3">
-              <div className="space-y-2">
-                <Label htmlFor="guardian2_name">
-                  Second Guardian Name (Optional)
-                </Label>
-                <Input id="guardian2_name" name="guardian2_name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="guardian2_phone">Phone</Label>
-                <Input
-                  id="guardian2_phone"
-                  name="guardian2_phone"
-                  placeholder="98XXXXXXXX"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Relation</Label>
-                <Select
-                  value={selectedRelation2}
-                  onValueChange={setSelectedRelation2}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="father">Father</SelectItem>
-                    <SelectItem value="mother">Mother</SelectItem>
-                    <SelectItem value="guardian">Guardian</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving || !selectedClassId}>
-              {saving ? <Spinner size="sm" /> : "Add Student"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function EditStudentDialog({
   student,
   onOpenChange,
@@ -971,6 +692,7 @@ function EditStudentDialog({
   student: Student;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState(student.first_name);
@@ -1012,12 +734,12 @@ function EditStudentDialog({
         blood_group: bloodGroup || null,
         password: password || undefined,
       });
-      toast.success("Student updated");
+      toast.success(t("Student updated", "विद्यार्थी अद्यावधिक भयो"));
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["student", student.id] });
       onOpenChange(false);
     } catch {
-      toast.error("Failed to update student");
+      toast.error(t("Failed to update student", "अद्यावधिक हुन सकेन"));
     } finally {
       setSaving(false);
     }
@@ -1027,30 +749,22 @@ function EditStudentDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Edit Student</DialogTitle>
+          <DialogTitle>{t("Edit Student", "विद्यार्थी सम्पादन")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>First Name</Label>
-              <Input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
+              <Label>{t("First Name", "पहिलो नाम")}</Label>
+              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label>Last Name</Label>
-              <Input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
+              <Label>{t("Last Name", "थर")}</Label>
+              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Class / Grade</Label>
+              <Label>{t("Class / Grade", "कक्षा")}</Label>
               <Select
                 value={classId}
                 onValueChange={(value) => {
@@ -1059,10 +773,10 @@ function EditStudentDialog({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
+                  <SelectValue placeholder={t("Select class", "कक्षा छान्नुहोस्")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not assigned</SelectItem>
+                  <SelectItem value="none">{t("Not assigned", "तोकिएको छैन")}</SelectItem>
                   {(classes || []).map((klass: any) => (
                     <SelectItem key={klass.id} value={klass.id}>
                       {klass.name}
@@ -1072,13 +786,13 @@ function EditStudentDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Section</Label>
+              <Label>{t("Section", "सेक्सन")}</Label>
               <Select value={sectionId} onValueChange={setSectionId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select section" />
+                  <SelectValue placeholder={t("Select section", "सेक्सन छान्नुहोस्")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not assigned</SelectItem>
+                  <SelectItem value="none">{t("Not assigned", "तोकिएको छैन")}</SelectItem>
                   {(selectedClass?.sections || []).map((section: any) => (
                     <SelectItem key={section.id} value={section.id}>
                       {section.name}
@@ -1090,21 +804,21 @@ function EditStudentDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Gender</Label>
+              <Label>{t("Gender", "लिङ्ग")}</Label>
               <Select value={gender} onValueChange={setGender}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unknown">Not specified</SelectItem>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="unknown">{t("Not specified", "तोकिएको छैन")}</SelectItem>
+                  <SelectItem value="male">{t("Male", "पुरुष")}</SelectItem>
+                  <SelectItem value="female">{t("Female", "महिला")}</SelectItem>
+                  <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>{t("Status", "अवस्था")}</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger>
                   <SelectValue />
@@ -1121,7 +835,7 @@ function EditStudentDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Phone</Label>
+              <Label>{t("Phone", "फोन")}</Label>
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -1129,7 +843,7 @@ function EditStudentDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>{t("Email", "इमेल")}</Label>
               <Input
                 type="email"
                 value={email}
@@ -1140,15 +854,11 @@ function EditStudentDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Date of Birth (BS)</Label>
-              <BSDateInput
-                value={dobBs}
-                onChange={(v) => setDobBs(v)}
-                emit="bs"
-              />
+              <Label>{t("Date of Birth (BS)", "जन्म मिति (बि.सं.)")}</Label>
+              <BSDateInput value={dobBs} onChange={(v) => setDobBs(v)} emit="bs" />
             </div>
             <div className="space-y-2">
-              <Label>Blood Group</Label>
+              <Label>{t("Blood Group", "रगत समूह")}</Label>
               <Input
                 value={bloodGroup}
                 onChange={(e) => setBloodGroup(e.target.value)}
@@ -1157,26 +867,22 @@ function EditStudentDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit_password">Update Password</Label>
+            <Label htmlFor="edit_password">{t("Update Password", "पासवर्ड अद्यावधिक")}</Label>
             <Input
               id="edit_password"
               name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave blank to keep current"
+              placeholder={t("Leave blank to keep current", "हालको राख्न खालि छोड्नुहोस्")}
             />
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              {t("Cancel", "रद्द")}
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? <Spinner size="sm" /> : "Save Changes"}
+              {saving ? <Spinner size="sm" /> : t("Save Changes", "सुरक्षित")}
             </Button>
           </DialogFooter>
         </form>

@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
   AOSPage,
@@ -34,6 +36,7 @@ export default function StocktakePage() {
 
 function StocktakeContent() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [name, setName] = useState("");
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [scanCode, setScanCode] = useState("");
@@ -82,6 +85,25 @@ function StocktakeContent() {
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Close failed"),
   });
+
+  const SESSION_COLUMNS: Column<StocktakeSession>[] = [
+    { key: "name", label: "Session", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
+    { key: "created_at", label: "Started", sortable: true, value: (s) => s.created_at ?? "", render: (s) => (s.created_at ? displayBS(s.created_at.slice(0, 10)) : "—") },
+    { key: "scan", label: "Scanned / Expected", align: "right", sortable: true, value: (s) => s.scan_count, render: (s) => <span className="tabular-nums">{s.scan_count}/{s.expected_count}</span> },
+    { key: "status", label: "Status", sortable: true, value: (s) => s.status, render: (s) => <StatusChip status={s.status === "open" ? "active" : s.status} className="capitalize" /> },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      noExport: true,
+      render: (s) =>
+        s.status === "open" ? (
+          <Button size="sm" variant="outline" onClick={() => { setOpenSessionId(s.id); setLastScan(null); }}>
+            Resume
+          </Button>
+        ) : null,
+    },
+  ];
 
   if (isLoading) return <AOSModuleLoadingState label="Loading stock-take…" />;
   const sessions = data || [];
@@ -154,7 +176,14 @@ function StocktakeContent() {
                 <Button variant="outline" disabled={close.isPending}
                   onClick={() => close.mutate(false)}>Close (report only)</Button>
                 <Button variant="destructive" disabled={close.isPending}
-                  onClick={() => close.mutate(true)}>
+                  onClick={() => {
+                    confirm({
+                      title: "Close and open lost fines?",
+                      body: "Every unscanned copy is marked missing and replacement-cost fines are created. This cannot be undone from here.",
+                      confirmLabel: "Close & fine",
+                      tone: "danger",
+                    }).then((ok) => { if (ok) close.mutate(true); });
+                  }}>
                   Close &amp; create lost fines
                 </Button>
               </div>
@@ -167,41 +196,13 @@ function StocktakeContent() {
         )}
 
         <DataPanel bodyClassName="p-0">
-          <table className="w-full text-sm">
-            <thead
-              className="border-b border-[var(--w11-border-subtle)] text-left"
-              style={{ background: "var(--w11-control-hover)" }}
-            >
-              <tr>
-                <th className="p-3 font-medium">Session</th>
-                <th className="p-3 font-medium">Started</th>
-                <th className="p-3 font-medium text-right">Scanned / Expected</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.length === 0 && (
-                <tr><td colSpan={5} className="p-6 text-center" style={{ color: "var(--w11-text-secondary)" }}>No stock-take sessions yet.</td></tr>
-              )}
-              {sessions.map((s) => (
-                <tr key={s.id} className="border-b border-[var(--w11-border-subtle)] last:border-0">
-                  <td className="p-3 font-medium">{s.name}</td>
-                  <td className="p-3">{s.created_at ? displayBS(s.created_at.slice(0, 10)) : "—"}</td>
-                  <td className="p-3 text-right">{s.scan_count}/{s.expected_count}</td>
-                  <td className="p-3"><StatusChip status={s.status === "open" ? "active" : s.status} className="capitalize" /></td>
-                  <td className="p-3 text-right">
-                    {s.status === "open" && (
-                      <Button size="sm" variant="outline"
-                        onClick={() => { setOpenSessionId(s.id); setLastScan(null); }}>
-                        Resume
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable<StocktakeSession>
+            columns={SESSION_COLUMNS}
+            rows={sessions}
+            rowKey={(s) => s.id}
+            exportFileName="library-stocktakes"
+            empty={{ icon: ScanLine, title: "No stock-take sessions yet", body: "Start a session above to verify the shelves." }}
+          />
         </DataPanel>
       </AOSPageBody>
     </AOSPage>

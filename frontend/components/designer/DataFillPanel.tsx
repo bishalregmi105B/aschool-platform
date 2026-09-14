@@ -10,7 +10,7 @@
  * Skinned with 11.css (Win11 Fluent) tokens — var(--w11-*) — so the panel
  * adapts to the AOS light AND dark themes (renders inside a win11 scope).
  */
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,7 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   exam_result: <BarChart3 className="h-5 w-5" />,
 };
 
-export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelProps) {
+export default memo(function DataFillPanel({ onApply, onInsertToken }: DataFillPanelProps) {
   const [activeSource, setActiveSource] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -331,4 +331,4 @@ export default function DataFillPanel({ onApply, onInsertToken }: DataFillPanelP
       )}
     </div>
   );
-}
+});

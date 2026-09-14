@@ -22,7 +22,9 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { UserCheck, LogIn, LogOut } from "lucide-react";
+import { UserCheck, LogIn, LogOut, Printer } from "lucide-react";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { PrintStyles, PrintRegion, PrintTwinButton } from "@/app/dashboard/exams/print-twin";
 
 export default function VisitorsPage() {
   return <PluginGate slug="visitors"><VisitorsContent /></PluginGate>;
@@ -33,6 +35,7 @@ function VisitorsContent() {
   const [search, setSearch] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", purpose: "meeting", visiting_whom: "", id_type: "citizenship", id_number: "", vehicle_no: "" });
+  const [badge, setBadge] = useState<any | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["visitors", search],
@@ -92,9 +95,16 @@ function VisitorsContent() {
       key: "actions",
       label: "",
       noExport: true,
-      render: (v) => (!v.checked_out_at ? (
-        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); checkOut.mutate(v.id); }}><LogOut className="h-4 w-4" /></Button>
-      ) : null),
+      render: (v) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="sm" title="Print visitor badge" onClick={(e) => { e.stopPropagation(); setBadge(v); }}>
+            <Printer className="h-4 w-4" />
+          </Button>
+          {!v.checked_out_at && (
+            <Button variant="ghost" size="sm" title="Check out" onClick={(e) => { e.stopPropagation(); checkOut.mutate(v.id); }}><LogOut className="h-4 w-4" /></Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -111,6 +121,7 @@ function VisitorsContent() {
         }
       />
       <AOSPageBody>
+        <PrintStyles />
         <StatGrid>
           {[{ label: "Today's Visitors", val: stats.today || 0 }, { label: "Currently In", val: stats.currently_in || 0, color: "#107c10" }, { label: "This Month", val: stats.this_month || 0 }, { label: "Avg/Day", val: stats.avg_per_day || 0 }].map((s) => (
             <KpiCard key={s.label} label={s.label} value={s.val} color={s.color} />
@@ -164,6 +175,43 @@ function VisitorsContent() {
               </div>
             </div>
             <DialogFooter><Button onClick={() => checkIn.mutate()} disabled={!form.name || checkIn.isPending}>{checkIn.isPending ? <Spinner className="mr-2" /> : null} Check In</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Printable visitor pass (gate badge twin) + check-in timeline. */}
+        <Dialog open={!!badge} onOpenChange={(o) => { if (!o) setBadge(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Visitor Badge</DialogTitle></DialogHeader>
+            {badge && (
+              <div className="space-y-4">
+                <PrintRegion>
+                  <div className="rounded-lg border-2 border-[var(--w11-accent)] p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--w11-accent)" }}>VISITOR</p>
+                    <p className="text-lg font-semibold">{badge.name}</p>
+                    <p className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                      {badge.purpose?.replace(/_/g, " ")}{badge.visiting_whom ? ` · ${badge.visiting_whom}` : ""}
+                    </p>
+                    <p className="mt-2 text-[11px] tabular-nums" style={{ color: "var(--w11-text-secondary)" }}>
+                      In: {badge.checked_in_at ? new Date(badge.checked_in_at).toLocaleTimeString() : "—"}
+                      {badge.checked_out_at ? ` · Out: ${new Date(badge.checked_out_at).toLocaleTimeString()}` : " · ON CAMPUS"}
+                    </p>
+                    <p className="text-[11px]" style={{ color: "var(--w11-text-secondary)" }}>{badge.id_type} {badge.id_number || ""}</p>
+                  </div>
+                </PrintRegion>
+                <StatusTimeline
+                  currentIndex={badge.checked_out_at ? 2 : 1}
+                  steps={[
+                    { label: "Checked in", at: badge.checked_in_at ? new Date(badge.checked_in_at).toLocaleTimeString() : null },
+                    { label: badge.checked_out_at ? "Visit recorded" : "On campus" },
+                    { label: "Checked out", at: badge.checked_out_at ? new Date(badge.checked_out_at).toLocaleTimeString() : null },
+                  ]}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setBadge(null)}>Close</Button>
+                  <PrintTwinButton title={`Visitor-Badge-${badge.name}`} label="Print badge" variant="default" />
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </AOSPageBody>

@@ -1,16 +1,25 @@
 "use client";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { displayBS } from "@/lib/nepali_date";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-import { ICON_MAP } from "@/lib/icon-map";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { toast } from "sonner";
 import {
   AOSPage,
   AOSPageHeader,
@@ -18,7 +27,7 @@ import {
   KpiCard,
   StatGrid,
   DataPanel,
-  AOSEmptyState,
+  StatusChip,
 } from "@/components/aos/kit/page-kit";
 import {
   MessageSquare,
@@ -27,19 +36,20 @@ import {
   History,
   Wallet,
   Plus,
-  Loader2,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
-  ChevronRight,
+  Radio,
 } from "lucide-react";
 
-const inputStyle = {
-  background: "var(--w11-control-bg)",
-  color: "var(--w11-text-primary)",
-  border: "1px solid var(--w11-border-default)",
-  borderRadius: "var(--w11-radius-md)",
-};
+/**
+ * SMS — credits + templates + direct send (plan 34-15/16, §7 merge context).
+ *
+ * The route stays (the AOS route table is owned by the navigation step), but
+ * the page no longer federates the whole Communications family — that job
+ * belongs to /dashboard/communications, which is where the first quick link
+ * now goes. Bulk audience sends live in Broadcast (one A3 composer with
+ * EntityPicker recipients); this Send tab is kept for ad-hoc one-off phone
+ * lists, with the same character/credit meter so cost is never a surprise.
+ */
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SmsTemplate {
@@ -69,27 +79,6 @@ interface SmsStats {
   this_month_sent: number;
 }
 
-// ── Tabs ───────────────────────────────────────────────────────────────────
-const TABS = [
-  { id: "send", label: "Send SMS", icon: Send },
-  { id: "templates", label: "Templates", icon: FileText },
-  { id: "history", label: "History", icon: History },
-  { id: "credits", label: "Credits", icon: Wallet },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
-
-// ── Quick Links (sms_notifications manifest ui.nav.subitems) ────────────────
-const QUICK_LINKS = [
-  { label: "Announcements", icon: "Megaphone", href: "/dashboard/communications/announcements" },
-  { label: "Broadcast", icon: "Send", href: "/dashboard/communications/broadcast" },
-  { label: "Diary", icon: "BookOpen", href: "/dashboard/communications/diary" },
-  { label: "Gallery", icon: "Image", href: "/dashboard/communications/gallery" },
-  { label: "Home Sliders", icon: "Layers", href: "/dashboard/communications/sliders" },
-  { label: "Message Templates", icon: "FileText", href: "/dashboard/communications/templates" },
-];
-
-// ── Page ───────────────────────────────────────────────────────────────────
 export default function SmsPage() {
   return (
     <PluginGate slug="sms_notifications">
@@ -99,7 +88,9 @@ export default function SmsPage() {
 }
 
 function SmsPageContent() {
-  const [activeTab, setActiveTab] = useState<TabId>("send");
+  const { t } = useI18n();
+  const { values, setValues } = useUrlFilters(["tab"]);
+  const activeTab = values.tab || "send";
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
@@ -125,105 +116,84 @@ function SmsPageContent() {
   return (
     <AOSPage>
       <AOSPageHeader
-        icon={
-          <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "var(--w11-accent-light)" }}>
-            <MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
-          </div>
+        icon={<MessageSquare className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={t("SMS Notifications", "SMS सूचना")}
+        subtitle={t(
+          "Sparrow SMS balance, templates and direct sends",
+          "Sparrow SMS ब्यालेन्स, टेम्प्लेट र प्रत्यक्ष पठाइ"
+        )}
+        actions={
+          <Link href="/dashboard/communications">
+            <Button variant="outline" size="sm">
+              <Radio className="h-4 w-4 mr-2" />
+              {t("Communications Hub", "सञ्चार हब")}
+            </Button>
+          </Link>
         }
-        title="SMS Notifications"
-        subtitle="Send SMS to parents, students and staff via Sparrow SMS"
       />
       <AOSPageBody>
-        {/* Dashboard — KPI stat grid */}
         <StatGrid>
           <KpiCard
-            label="Credits Available"
+            label={t("Credits Available", "बाँकी क्रेडिट")}
             value={stats?.credits_available ?? "—"}
             icon={<Wallet className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
           />
           <KpiCard
-            label="Sent This Month"
+            label={t("Sent This Month", "यस महिना")}
             value={stats?.this_month_sent ?? "—"}
             icon={<Send className="h-4 w-4" style={{ color: "#107c10" }} />}
             color="#107c10"
           />
           <KpiCard
-            label="Total Sent"
+            label={t("Total Sent", "कुल पठाइएको")}
             value={stats?.total_sent ?? "—"}
-            icon={<CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             color="var(--w11-text-primary)"
           />
           <KpiCard
-            label="Total Failed"
+            label={t("Total Failed", "कुल असफल")}
             value={stats?.total_failed ?? "—"}
-            icon={<XCircle className="h-4 w-4" style={{ color: (stats?.total_failed ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-secondary)" }} />}
             color={(stats?.total_failed ?? 0) > 0 ? "#c42b1c" : "var(--w11-text-secondary)"}
-          />
-          <KpiCard
-            label="Templates"
-            value={templates?.length ?? 0}
-            icon={<FileText className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
-            color="var(--w11-text-primary)"
           />
         </StatGrid>
 
-        {/* Quick links — 44px gradient icon tile + label, as next/link */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          {QUICK_LINKS.map((l) => {
-            const Icon = ICON_MAP[l.icon] || ChevronRight;
-            return (
-              <Link key={l.href} href={l.href} className="block h-full">
-                <div
-                  className="win11-card h-full flex items-center gap-3 transition-colors hover:border-[var(--w11-accent)]"
-                  style={{ cursor: "pointer", marginBottom: 0 }}
-                >
-                  <div
-                    className="rounded-[10px] flex items-center justify-center text-white shrink-0"
-                    style={{
-                      width: 44,
-                      height: 44,
-                      background: SECTION_GRADIENTS.Communication,
-                      boxShadow: "0 6px 12px -4px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.35)",
-                    }}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--w11-text-primary)" }}>
-                    {l.label}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        <QuickLinks
+          section="Communication"
+          links={[
+            { label: t("Communications Hub", "सञ्चार हब"), icon: "Radio", href: "/dashboard/communications" },
+            { label: t("Broadcast", "प्रसारण"), icon: "Send", href: "/dashboard/communications/broadcast" },
+            { label: t("WhatsApp Bot", "WhatsApp बोट"), icon: "MessageCircle", href: "/dashboard/communications/whatsapp" },
+          ]}
+        />
 
-        {/* Tabs */}
-        <div className="border-b border-[color:var(--w11-border-subtle)] mb-4">
-          <nav className="-mb-px flex gap-0">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
-                style={{
-                  borderColor: activeTab === tab.id ? "var(--w11-accent)" : "transparent",
-                  color: activeTab === tab.id ? "var(--w11-accent)" : "var(--w11-text-secondary)",
-                }}
-              >
-                <tab.icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setValues({ tab: v })}>
+          <TabsList>
+            <TabsTrigger value="send">
+              <Send className="h-3.5 w-3.5 mr-1.5" /> {t("Send SMS", "SMS पठाउनुहोस्")}
+            </TabsTrigger>
+            <TabsTrigger value="templates" badge={(templates?.length || 0) || undefined}>
+              <FileText className="h-3.5 w-3.5 mr-1.5" /> {t("Templates", "टेम्प्लेटहरू")}
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="h-3.5 w-3.5 mr-1.5" /> {t("History", "इतिहास")}
+            </TabsTrigger>
+            <TabsTrigger value="credits">
+              <Wallet className="h-3.5 w-3.5 mr-1.5" /> {t("Credits", "क्रेडिट")}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab Content */}
-        <div>
-          {activeTab === "send" && <SendSmsTab isAdmin={isAdmin} />}
-          {activeTab === "templates" && <TemplatesTab isAdmin={isAdmin} />}
-          {activeTab === "history" && <HistoryTab />}
-          {activeTab === "credits" && <CreditsTab />}
-        </div>
+          <TabsContent value="send" className="mt-4">
+            <SendSmsTab isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="templates" className="mt-4">
+            <TemplatesTab isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="history" className="mt-4">
+            <HistoryTab />
+          </TabsContent>
+          <TabsContent value="credits" className="mt-4">
+            <CreditsTab />
+          </TabsContent>
+        </Tabs>
       </AOSPageBody>
     </AOSPage>
   );
@@ -231,171 +201,146 @@ function SmsPageContent() {
 
 // ── Send SMS Tab ───────────────────────────────────────────────────────────
 function SendSmsTab({ isAdmin }: { isAdmin: boolean }) {
+  const { t } = useI18n();
   const [recipients, setRecipients] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [result, setResult] = useState<{
-    success?: string;
-    error?: string;
-  } | null>(null);
   const queryClient = useQueryClient();
 
   const { data: templates } = useQuery({
     queryKey: ["sms-templates"],
     queryFn: async () => {
-      const res = await api.get<{ success: boolean; data: SmsTemplate[] }>(
-        "/sms/templates",
-      );
+      const res = await api.get<{ success: boolean; data: SmsTemplate[] }>("/sms/templates");
       return res.data.data || [];
     },
   });
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      const toList = recipients
-        .split(/[\n,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const toList = recipients.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
       return api.post("/sms/send", { to: toList, message });
     },
     onSuccess: () => {
-      setResult({ success: `SMS sent successfully!` });
       queryClient.invalidateQueries({ queryKey: ["sms-history"] });
       queryClient.invalidateQueries({ queryKey: ["sms-stats"] });
+      toast.success(t("SMS queued for delivery", "SMS पठाइको लाइनमा छ"));
+      setRecipients("");
+      setMessage("");
+      setSelectedTemplate("");
     },
     onError: (err: unknown) => {
       const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data
-          ?.error || "Failed to send SMS. Please try again.";
-      setResult({ error: msg });
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        t("Failed to send SMS", "SMS पठाउन असफल");
+      toast.error(msg);
     },
   });
 
   const charsUsed = message.length;
   const smsCount = Math.ceil(charsUsed / 160) || 1;
+  const recipientCount = recipients.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean).length;
 
-  const handleTemplateSelect = (templateId: string) => {
-    setSelectedTemplate(templateId);
-    const tpl = templates?.find((t) => t.id === templateId);
-    if (tpl) setMessage(tpl.content);
-  };
+  if (!isAdmin) {
+    return (
+      <DataPanel>
+        <p className="text-[12px] py-4 text-center" style={{ color: "var(--w11-text-secondary)" }}>
+          {t("Only school admins can send SMS from here.", "यहाँबाट SMS केवल विद्यालय एडमिनले पठाउन सक्छन्।")}
+        </p>
+      </DataPanel>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-5">
-      {/* Recipients */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium">
-          Recipients
-          <span className="font-normal ml-1 text-[color:var(--w11-text-secondary)]">
-            (phone numbers, comma or newline separated)
-          </span>
-        </label>
-        <textarea
-          value={recipients}
-          onChange={(e) => setRecipients(e.target.value)}
-          placeholder="9841234567&#10;9851234567&#10;..."
-          rows={4}
-          className="w-full rounded-lg px-3 py-2 text-sm resize-none font-mono"
-          style={inputStyle}
-        />
-        <p className="text-xs text-[color:var(--w11-text-secondary)]">
-          {
-            recipients
-              .split(/[\n,]+/)
-              .map((s) => s.trim())
-              .filter(Boolean).length
-          }{" "}
-          number(s)
+      <div>
+        <p className="text-[11px] mb-3" style={{ color: "var(--w11-text-secondary)" }}>
+          {t(
+            "For audience-based sends (all parents, one class, defaulters) use Broadcast — it picks recipients for you.",
+            "श्रोता-आधारित पठाइका लागि (सबै अभिभावक, एक कक्षा, असुली) Broadcast प्रयोग गर्नुहोस्।"
+          )}{" "}
+          <Link href="/dashboard/communications/broadcast" style={{ color: "var(--w11-accent)" }} className="underline">
+            {t("Open Broadcast", "Broadcast खोल्नुहोस्")}
+          </Link>
         </p>
+        <div className="space-y-2">
+          <Label htmlFor="sms-recipients">
+            {t("Recipients", "प्राप्तकर्ता")}{" "}
+            <span className="font-normal" style={{ color: "var(--w11-text-secondary)" }}>
+              ({t("comma or newline separated", "कomma वा newline ले छुट्याइएको")})
+            </span>
+          </Label>
+          <Textarea
+            id="sms-recipients"
+            value={recipients}
+            onChange={(e) => setRecipients(e.target.value)}
+            placeholder={"9841234567\n9851234567"}
+            rows={4}
+            className="font-mono"
+          />
+          <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+            {t(`${recipientCount} valid-looking number(s)`, `${recipientCount} नम्बर`)}
+          </p>
+        </div>
       </div>
 
-      {/* Template picker */}
       {templates && templates.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Use Template (optional)</label>
+          <Label>{t("Use Template (optional)", "टेम्प्लेट प्रयोग (वैकल्पिक)")}</Label>
           <AdvancedSelect
             value={selectedTemplate}
-            onChange={(v) => handleTemplateSelect(v)}
+            onChange={(v) => {
+              setSelectedTemplate(v);
+              const tpl = templates.find((x) => x.id === v);
+              if (tpl) setMessage(tpl.content);
+            }}
             clearable
             searchable
-            placeholder="— Select a template —"
-            options={templates.map((t) => ({ value: t.id, label: `${t.name} (${t.category})` }))}
+            placeholder={t("— Select a template —", "— टेम्प्लेट छान्नुहोस् —")}
+            options={templates.map((x) => ({ value: x.id, label: `${x.name} (${x.category})` }))}
           />
         </div>
       )}
 
-      {/* Message */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Message</label>
-        <textarea
+        <Label htmlFor="sms-message">{t("Message", "सन्देश")}</Label>
+        <Textarea
+          id="sms-message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type your message here..."
           rows={5}
           maxLength={960}
-          className="w-full rounded-lg px-3 py-2 text-sm resize-none"
-          style={inputStyle}
         />
-        <div className="flex justify-between text-xs text-[color:var(--w11-text-secondary)]">
-          <span>{charsUsed}/160 chars</span>
+        <div className="flex justify-between text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+          <span>{charsUsed}/160 {t("chars", "अक्षर")}</span>
           <span>
-            {smsCount} SMS credit{smsCount > 1 ? "s" : ""}
+            {t("Estimated cost", "अनुमानित लागत")}: {smsCount * Math.max(recipientCount, 1)}{" "}
+            {t("credits", "क्रेडिट")} ({smsCount} {t("SMS", "SMS")} × {recipientCount})
           </span>
         </div>
       </div>
 
-      {/* Result feedback */}
-      {result && (
-        <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm ${result.success ? "win11-infobar success" : "win11-infobar error"}`}>
-          {result.success ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <XCircle className="h-4 w-4 shrink-0" />
-          )}
-          {result.success || result.error}
-        </div>
-      )}
-
-      {/* Actions */}
-      {isAdmin && (
-        <button
-          onClick={() => {
-            setResult(null);
-            sendMutation.mutate();
-          }}
-          disabled={
-            sendMutation.isPending || !message.trim() || !recipients.trim()
-          }
-          className="win11-btn accent flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm"
-        >
-          {sendMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-          {sendMutation.isPending ? "Sending…" : "Send SMS"}
-        </button>
-      )}
+      <Button
+        onClick={() => sendMutation.mutate()}
+        disabled={sendMutation.isPending || !message.trim() || !recipients.trim()}
+      >
+        {sendMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+        {sendMutation.isPending ? t("Sending…", "पठाउँदै…") : t("Send SMS", "SMS पठाउनुहोस्")}
+      </Button>
     </div>
   );
 }
 
 // ── Templates Tab ──────────────────────────────────────────────────────────
 function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
+  const { t } = useI18n();
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    content: "",
-    category: "general",
-  });
+  const [formData, setFormData] = useState({ name: "", content: "", category: "general" });
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ["sms-templates"],
     queryFn: async () => {
-      const res = await api.get<{ success: boolean; data: SmsTemplate[] }>(
-        "/sms/templates",
-      );
+      const res = await api.get<{ success: boolean; data: SmsTemplate[] }>("/sms/templates");
       return res.data.data || [];
     },
   });
@@ -406,238 +351,212 @@ function TemplatesTab({ isAdmin }: { isAdmin: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["sms-templates"] });
       setShowForm(false);
       setFormData({ name: "", content: "", category: "general" });
+      toast.success(t("Template saved", "टेम्प्लेट सेभ भयो"));
     },
+    onError: () => toast.error(t("Could not save template", "टेम्प्लेट सेभ गर्न सकिएन")),
   });
+
+  const columns: Column<SmsTemplate>[] = [
+    { key: "name", label: t("Name", "नाम"), render: (x) => <span className="font-medium">{x.name}</span>, value: (x) => x.name },
+    {
+      key: "category",
+      label: t("Category", "श्रेणी"),
+      width: 130,
+      render: (x) => <span className="win11-chip accent capitalize">{x.category}</span>,
+      value: (x) => x.category,
+    },
+    {
+      key: "content",
+      label: t("Content", "सन्देश"),
+      render: (x) => (
+        <span className="text-[12px] block max-w-sm truncate" style={{ color: "var(--w11-text-secondary)" }}>
+          {x.content}
+        </span>
+      ),
+      value: (x) => x.content,
+    },
+  ];
 
   return (
     <div className="space-y-4">
       {isAdmin && (
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="win11-btn accent flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          Add Template
-        </button>
+        <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t("Add Template", "टेम्प्लेट थप्नुहोस्")}
+        </Button>
       )}
 
-      {/* Create form */}
       {showForm && (
-        <div className="win11-card p-5 space-y-4">
-          <h3 className="font-semibold text-[color:var(--w11-text-primary)]">New Template</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name</label>
-              <input
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData((d) => ({ ...d, name: e.target.value }))
-                }
-                className="w-full rounded-lg px-3 py-2 text-sm"
-                style={inputStyle}
-                placeholder="Template name"
-              />
+        <DataPanel title={t("New Template", "नयाँ टेम्प्लेट")}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="tpl-name">{t("Name", "नाम")}</Label>
+                <Input
+                  id="tpl-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData((d) => ({ ...d, name: e.target.value }))}
+                  placeholder={t("Template name", "टेम्प्लेट नाम")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("Category", "श्रेणी")}</Label>
+                <AdvancedSelect
+                  value={formData.category}
+                  onChange={(v) => setFormData((d) => ({ ...d, category: v }))}
+                  options={[
+                    { value: "general", label: t("General", "साधारण") },
+                    { value: "attendance", label: t("Attendance", "उपस्थिति") },
+                    { value: "fees", label: t("Fees", "शुल्क") },
+                    { value: "exam", label: t("Exam", "परीक्षा") },
+                    { value: "notice", label: t("Notice", "सूचना") },
+                  ]}
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Category</label>
-              <AdvancedSelect
-                value={formData.category}
-                onChange={(v) => setFormData((d) => ({ ...d, category: v }))}
-                options={[
-                  { value: "general", label: "General" },
-                  { value: "attendance", label: "Attendance" },
-                  { value: "fees", label: "Fees" },
-                  { value: "exam", label: "Exam" },
-                  { value: "notice", label: "Notice" },
-                ]}
+              <Label htmlFor="tpl-content">{t("Content", "सन्देश")}</Label>
+              <Textarea
+                id="tpl-content"
+                value={formData.content}
+                onChange={(e) => setFormData((d) => ({ ...d, content: e.target.value }))}
+                rows={3}
+                placeholder={t("SMS message content…", "SMS सन्देश…")}
               />
+              <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                {formData.content.length}/160
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => createMutation.mutate(formData)}
+                disabled={createMutation.isPending || !formData.name.trim() || !formData.content.trim()}
+              >
+                {createMutation.isPending && <Spinner size="sm" className="mr-2" />}
+                {t("Save Template", "टेम्प्लेट सेभ")}
+              </Button>
+              <Button variant="outline" onClick={() => setShowForm(false)}>
+                {t("Cancel", "रद्द")}
+              </Button>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Content</label>
-            <textarea
-              value={formData.content}
-              onChange={(e) =>
-                setFormData((d) => ({ ...d, content: e.target.value }))
-              }
-              rows={3}
-              className="w-full rounded-lg px-3 py-2 text-sm resize-none"
-              style={inputStyle}
-              placeholder="SMS message content…"
-            />
-            <p className="text-xs text-[color:var(--w11-text-secondary)]">
-              {formData.content.length}/160 chars
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => createMutation.mutate(formData)}
-              disabled={
-                createMutation.isPending ||
-                !formData.name.trim() ||
-                !formData.content.trim()
-              }
-              className="win11-btn accent flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              {createMutation.isPending && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              )}
-              Save Template
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="win11-btn px-4 py-2 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        </DataPanel>
       )}
 
-      {/* Templates list */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
-        </div>
-      ) : templates && templates.length > 0 ? (
-        <DataPanel bodyClassName="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Name</th>
-                <th className="text-left px-4 py-3 font-medium">Category</th>
-                <th className="text-left px-4 py-3 font-medium">Content</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--w11-border-subtle)]">
-              {templates.map((t) => (
-                <tr key={t.id}>
-                  <td className="px-4 py-3 font-medium">{t.name}</td>
-                  <td className="px-4 py-3">
-                    <span className="win11-chip accent capitalize">
-                      {t.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 max-w-sm truncate text-[color:var(--w11-text-secondary)]">
-                    {t.content}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataPanel>
-      ) : (
-        <DataPanel>
-          <AOSEmptyState
-            icon={<FileText className="h-10 w-10" />}
-            title="No templates yet"
-            description="Create a template to reuse common SMS messages"
-          />
-        </DataPanel>
-      )}
+      <DataPanel>
+        <DataTable
+          columns={columns}
+          rows={templates || []}
+          rowKey={(x) => x.id}
+          loading={isLoading}
+          searchable
+          empty={{
+            icon: FileText,
+            title: t("No templates yet", "अझै टेम्प्लेट छैन"),
+            body: t("Create a template to reuse common SMS messages.", "बारम्बार आउने SMS सन्देश टेम्प्लेटमा राख्नुहोस्।"),
+            action: isAdmin
+              ? { label: t("Add Template", "टेम्प्लेट थप्नुहोस्"), onClick: () => setShowForm(true) }
+              : undefined,
+          }}
+        />
+      </DataPanel>
     </div>
   );
 }
 
 // ── History Tab ────────────────────────────────────────────────────────────
 function HistoryTab() {
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { t } = useI18n();
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["sms-history"],
     queryFn: async () => {
-      const res = await api.get<{ success: boolean; data: SmsLog[] }>(
-        "/sms/history?per_page=50",
-      );
+      const res = await api.get<{ success: boolean; data: SmsLog[] }>("/sms/history?per_page=50");
       return res.data.data || [];
     },
   });
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-[color:var(--w11-text-secondary)]">Recent SMS logs</p>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 text-sm text-[color:var(--w11-text-secondary)]"
-        >
-          <RefreshCw
-            className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </button>
-      </div>
+  const columns: Column<SmsLog>[] = [
+    {
+      key: "created_at",
+      label: t("Date (BS)", "मिति (बि.सं.)"),
+      width: 140,
+      render: (l) => (
+        <span className="text-[12px] whitespace-nowrap" style={{ color: "var(--w11-text-secondary)" }}>
+          {displayBS(l.created_at)}
+        </span>
+      ),
+      value: (l) => l.created_at,
+    },
+    {
+      key: "message",
+      label: t("Message", "सन्देश"),
+      render: (l) => <span className="text-[12px] block max-w-xs truncate">{l.message}</span>,
+      value: (l) => l.message,
+    },
+    {
+      key: "to_phone",
+      label: t("Recipient", "प्राप्तकर्ता"),
+      width: 140,
+      render: (l) => <span className="font-mono text-[12px]">{l.to_phone}</span>,
+      value: (l) => l.to_phone,
+    },
+    {
+      key: "status",
+      label: t("Status", "स्थिति"),
+      width: 110,
+      // "queued" is the state every /sms/send row starts in (Celery flips it
+      // to sent/failed) — the chip map covers sent/queued/failed honestly.
+      render: (l) => (
+        <StatusChip
+          status={l.status === "sent" ? "completed" : l.status === "failed" ? "failed" : "pending"}
+          label={
+            l.status === "sent"
+              ? t("Sent", "पठित")
+              : l.status === "failed"
+                ? t("Failed", "असफल")
+                : t("Queued", "लाइनमा")
+          }
+        />
+      ),
+      value: (l) => l.status,
+    },
+  ];
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
-        </div>
-      ) : data && data.length > 0 ? (
-        <DataPanel bodyClassName="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-left px-4 py-3 font-medium">Message</th>
-                <th className="text-left px-4 py-3 font-medium">Recipient</th>
-                <th className="text-left px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--w11-border-subtle)]">
-              {data.map((log) => (
-                <tr key={log.id}>
-                  <td className="px-4 py-3 whitespace-nowrap text-[color:var(--w11-text-secondary)]">
-                    {displayBS(log.created_at)}
-                  </td>
-                  <td className="px-4 py-3 max-w-xs truncate">{log.message}</td>
-                  <td className="px-4 py-3 text-[color:var(--w11-text-secondary)]">
-                    {log.to_phone}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={log.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataPanel>
-      ) : (
-        <DataPanel>
-          <AOSEmptyState
-            icon={<History className="h-10 w-10" />}
-            title="No SMS history"
-            description="Sent messages will appear here"
-          />
-        </DataPanel>
-      )}
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: SmsLog["status"] }) {
-  // "queued" is the state every /sms/send row starts in (Celery flips it to
-  // sent/failed) — a missing entry here crashed the whole history table.
-  const config: Record<string, { label: string; tone: string }> = {
-    sent: { label: "Sent", tone: "success" },
-    failed: { label: "Failed", tone: "error" },
-    queued: { label: "Queued", tone: "warning" },
-    pending: { label: "Pending", tone: "warning" },
-  };
-  const badge = config[status] ?? { label: status, tone: "" };
   return (
-    <span className={`win11-chip ${badge.tone}`}>
-      {badge.label}
-    </span>
+    <DataPanel
+      title={t("Recent SMS logs", "पछिल्ला SMS लगहरू")}
+      actions={
+        <Button variant="ghost" size="sm" onClick={() => refetch()}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+          {t("Refresh", "ताजा")}
+        </Button>
+      }
+    >
+      <DataTable
+        columns={columns}
+        rows={data || []}
+        rowKey={(l) => l.id}
+        loading={isLoading}
+        error={isError ? t("Could not load SMS history", "SMS इतिहास लोड गर्न सकिएन") : null}
+        onRetry={() => refetch()}
+        exportFileName="sms-history"
+        empty={{
+          icon: History,
+          title: t("No SMS history", "SMS इतिहास छैन"),
+          body: t("Sent messages will appear here.", "पठाएका सन्देश यहाँ देखिन्छन्।"),
+        }}
+      />
+    </DataPanel>
   );
 }
 
 // ── Credits Tab ────────────────────────────────────────────────────────────
 function CreditsTab() {
+  const { t } = useI18n();
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["sms-stats"],
     queryFn: async () => {
-      const res = await api.get<{ success: boolean; data: SmsStats }>(
-        "/sms/stats",
-      );
+      const res = await api.get<{ success: boolean; data: SmsStats }>("/sms/stats");
       return res.data.data;
     },
     retry: 1,
@@ -647,20 +566,21 @@ function CreditsTab() {
     return (
       <div className="space-y-4 max-w-xl">
         <div className="win11-infobar error rounded-lg p-4 space-y-2">
-          <p className="text-sm font-medium">
-            Couldn&apos;t load SMS credits
-          </p>
+          <p className="text-sm font-medium">{t("Couldn't load SMS credits", "SMS क्रेडिट लोड गर्न सकिएन")}</p>
           <p className="text-xs">
             {error instanceof axios.AxiosError && error.response?.status === 403
-              ? "The SMS Notifications plugin is not active for your school. Activate it under Installed Plugins."
-              : "The SMS service didn't respond. Check your connection and try again."}
+              ? t(
+                  "The SMS Notifications plugin is not active for your school. Activate it under Installed Plugins.",
+                  "तपाईंको विद्यालयमा SMS प्लगइभ सक्रिय छैन।"
+                )
+              : t(
+                  "The SMS service didn't respond. Check your connection and try again.",
+                  "SMS सेवाले जवाफ दिएन। पुन: प्रयास गर्नुहोस्।"
+                )}
           </p>
-          <button
-            onClick={() => refetch()}
-            className="win11-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Retry
-          </button>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            {t("Retry", "पुन: प्रयास")}
+          </Button>
         </div>
       </div>
     );
@@ -669,48 +589,37 @@ function CreditsTab() {
   return (
     <div className="space-y-6 max-w-xl">
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-16 rounded-lg animate-pulse" style={{ background: "var(--w11-control-hover)" }} />
+          ))}
         </div>
       ) : (
         <>
-          {/* Stat cards */}
           <StatGrid min={200} className="mb-0">
-            <KpiCard label="Credits Available" value={data?.credits_available ?? "—"} />
-            <KpiCard label="This Month Sent" value={data?.this_month_sent ?? "—"} />
-            <KpiCard label="Total Sent" value={data?.total_sent ?? "—"} />
-            <KpiCard label="Total Failed" value={data?.total_failed ?? "—"} color={!!data?.total_failed ? "#c42b1c" : undefined} />
+            <KpiCard label={t("Credits Available", "बाँकी क्रेडिट")} value={data?.credits_available ?? "—"} />
+            <KpiCard label={t("This Month Sent", "यस महिना")} value={data?.this_month_sent ?? "—"} />
+            <KpiCard label={t("Total Sent", "कुल पठित")} value={data?.total_sent ?? "—"} />
+            <KpiCard
+              label={t("Total Failed", "कुल असफल")}
+              value={data?.total_failed ?? "—"}
+              color={data?.total_failed ? "#c42b1c" : undefined}
+            />
           </StatGrid>
 
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="win11-btn flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-            />
-            {isFetching ? "Checking…" : "Check Balance"}
-          </button>
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching ? t("Checking…", "जाँचदै…") : t("Check Balance", "ब्यालेन्स जाँच")}
+          </Button>
 
-          <p className="text-xs text-[color:var(--w11-text-secondary)]">
-            Credits are provided by Sparrow SMS. Contact your administrator to
-            top up credits.
+          <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+            {t(
+              "Credits are provided by Sparrow SMS. Contact your administrator to top up credits.",
+              "क्रेडिट Sparrow SMS बाट आउँछ। टाप-अपका लागि एडमिनसँग सम्पर्क गर्नुहोस्।"
+            )}
           </p>
         </>
       )}
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <KpiCard label={label} value={typeof value === "number" ? value.toLocaleString() : value} />
   );
 }

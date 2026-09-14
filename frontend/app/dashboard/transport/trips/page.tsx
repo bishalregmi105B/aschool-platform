@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
+import { useI18n } from "@/lib/i18n";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,10 @@ import { Label } from "@/components/ui/label";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { TimePicker } from "@/components/ui/time-picker";
+import { DetailSheet } from "@/components/ui/sheet";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -46,6 +51,18 @@ interface Trip {
 interface RouteOption { id: string; name: string; is_active: boolean }
 interface BusOption { id: string; vehicle_number: string }
 interface StaffOption { id: string; full_name: string }
+
+/** Daily run instance (the trip lifecycle materializes into these). */
+interface RunInstance {
+  id: string;
+  trip_id: string;
+  date: string;
+  direction: "morning" | "afternoon";
+  bus: string | null;
+  status: "scheduled" | "running" | "completed" | "cancelled";
+  started_at: string | null;
+  ended_at: string | null;
+}
 
 // ISO weekday ints, Mon=0 … Sun=6 (the backend contract).
 const WEEKDAYS = [
@@ -103,7 +120,9 @@ function TripsContent() {
   const [directionFilter, setDirectionFilter] = useState<"" | "morning" | "afternoon">("");
   const [showDialog, setShowDialog] = useState(false);
   const [editItem, setEditItem] = useState<Trip | null>(null);
+  const [detailTrip, setDetailTrip] = useState<Trip | null>(null);
   const [form, setForm] = useState<TripForm>(EMPTY_FORM);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["transport-trips"],
@@ -157,6 +176,7 @@ function TripsContent() {
   const openAdd = () => {
     setForm({ ...EMPTY_FORM, route_id: (routes || [])[0]?.id || "" });
     setEditItem(null);
+    setShowAdvanced(false);
     setShowDialog(true);
   };
 
@@ -173,6 +193,7 @@ function TripsContent() {
       effective_date_bs: t.effective_date_bs || "",
     });
     setEditItem(t);
+    setShowAdvanced(Boolean(t.name || t.bus_id || t.driver_id || t.effective_date_bs));
     setShowDialog(true);
   };
 
@@ -378,6 +399,18 @@ function TripsContent() {
     },
   ];
 
+  // Today's run instances for the opened trip (lifecycle timeline in detail sheet).
+  const { data: todayRuns, isLoading: runsLoading } = useQuery({
+    queryKey: ["transport-trip-runs", detailTrip?.id],
+    enabled: !!detailTrip,
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<{ instances: RunInstance[] }>>("/transport/instances", {
+        params: { per_page: 100 },
+      });
+      return (res.data?.data?.instances || []).filter((i) => i.trip_id === detailTrip?.id);
+    },
+  });
+
   const errorMessage = errMessage(error);
 
   return (
@@ -405,6 +438,7 @@ function TripsContent() {
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search trips…"
+            onRowClick={(t) => setDetailTrip(t)}
             exportFileName="transport-trips"
             toolbar={
               <div className="flex items-center gap-1">
@@ -521,50 +555,63 @@ function TripsContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Bus (optional)</Label>
-                  <AdvancedSelect
-                    value={form.bus_id}
-                    onChange={(v) => setForm({ ...form, bus_id: v })}
-                    options={(buses || []).map((b) => ({ value: b.id, label: b.vehicle_number }))}
-                    placeholder="Select bus"
-                    clearable
-                    searchable
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Driver (optional)</Label>
-                  <AdvancedSelect
-                    value={form.driver_id}
-                    onChange={(v) => setForm({ ...form, driver_id: v })}
-                    options={(staff || []).map((s) => ({ value: s.id, label: s.full_name }))}
-                    placeholder="Select driver"
-                    clearable
-                    searchable
-                  />
-                </div>
-              </div>
+              {/* ≤7 visible fields; the 4 optional ones collapse behind Advanced (plan 31.0). */}
+              <button
+                type="button"
+                className="flex w-full items-center gap-1 text-[12px] font-medium"
+                style={{ color: "var(--w11-accent)" }}
+                onClick={() => setShowAdvanced((s) => !s)}
+              >
+                {showAdvanced ? "▾" : "▸"} Advanced (bus, driver, name, effective date)
+              </button>
+              {showAdvanced && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Bus (optional)</Label>
+                      <AdvancedSelect
+                        value={form.bus_id}
+                        onChange={(v) => setForm({ ...form, bus_id: v })}
+                        options={(buses || []).map((b) => ({ value: b.id, label: b.vehicle_number }))}
+                        placeholder="Select bus"
+                        clearable
+                        searchable
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Driver (optional)</Label>
+                      <AdvancedSelect
+                        value={form.driver_id}
+                        onChange={(v) => setForm({ ...form, driver_id: v })}
+                        options={(staff || []).map((s) => ({ value: s.id, label: s.full_name }))}
+                        placeholder="Select driver"
+                        clearable
+                        searchable
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Trip name (optional)</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Ring Road Morning"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Effective from (BS)</Label>
-                  <BSDateInput
-                    emit="bs"
-                    value={form.effective_date_bs}
-                    onChange={(v) => setForm({ ...form, effective_date_bs: v })}
-                    placeholder="Pick date"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Trip name (optional)</Label>
+                      <Input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="e.g. Ring Road Morning"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Effective from (BS)</Label>
+                      <BSDateInput
+                        emit="bs"
+                        value={form.effective_date_bs}
+                        onChange={(v) => setForm({ ...form, effective_date_bs: v })}
+                        placeholder="Pick date"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
@@ -578,6 +625,81 @@ function TripsContent() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* A2-lite: trip detail — schedule facts + today's run lifecycle. */}
+        <DetailSheet
+          open={!!detailTrip}
+          onOpenChange={(o) => { if (!o) setDetailTrip(null); }}
+          title={detailTrip ? detailTrip.name || detailTrip.route_name || "Trip" : ""}
+          subtitle={detailTrip ? `${detailTrip.route_name || ""} · ${detailTrip.direction}` : undefined}
+          footer={
+            detailTrip ? (
+              <div className="flex w-full items-center justify-between gap-2">
+                <StatusChip status={detailTrip.status} className="capitalize" />
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { const t = detailTrip; setDetailTrip(null); openEdit(t); }}>
+                    Edit schedule
+                  </Button>
+                </div>
+              </div>
+            ) : null
+          }
+        >
+          {detailTrip && (
+            <div className="space-y-6">
+              <section>
+                <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
+                  Today&apos;s runs
+                </h3>
+                {runsLoading ? (
+                  <div className="space-y-3"><Skeleton className="h-24 w-full" /></div>
+                ) : !todayRuns?.length ? (
+                  <EmptyState
+                    size="sm"
+                    icon={CalendarClock}
+                    title="No run for this trip today"
+                    body="It operates on its scheduled weekdays; the daily run appears here once generated."
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {todayRuns.map((r) => (
+                      <div key={r.id} className="win11-card" style={{ margin: 0 }}>
+                        <p className="mb-2 text-[12px] font-medium capitalize" style={{ color: "var(--w11-text-secondary)" }}>
+                          {r.direction} · {r.bus || "Unassigned bus"} · {r.status}
+                        </p>
+                        <StatusTimeline
+                          currentIndex={
+                            r.status === "scheduled" ? 0 : r.status === "running" ? 1 : 2
+                          }
+                          steps={[
+                            { label: "Scheduled", detail: r.date },
+                            { label: r.status === "cancelled" ? "Cancelled" : "Running", at: r.started_at },
+                            { label: "Completed", at: r.ended_at },
+                          ]}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
+                  Schedule
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                  {(detailTrip.weekdays || []).map((d) => (
+                    <span key={d} className="win11-chip subtle">{WEEKDAYS[d]?.label}</span>
+                  ))}
+                  {(detailTrip.weekdays || []).length === 0 && <span className="win11-chip error">No run days</span>}
+                  {detailTrip.first_stop_time && <span className="win11-chip info">First stop {detailTrip.first_stop_time.slice(0, 5)}</span>}
+                  <span className="win11-chip subtle">{detailTrip.stop_to_stop_avg_mins ?? 5} min/stop</span>
+                  {detailTrip.bus && <span className="win11-chip subtle">{detailTrip.bus}</span>}
+                </div>
+              </section>
+            </div>
+          )}
+        </DetailSheet>
       </AOSPageBody>
     </AOSPage>
   );

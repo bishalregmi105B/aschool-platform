@@ -21,6 +21,8 @@ import {
   DataPanel,
 } from "@/components/aos/kit/page-kit";
 import { Users, Save, CheckSquare, Square } from "lucide-react";
+import { useDebounced } from "@/components/ui/filter-bar";
+import { DependencyMissingEmptyState } from "@/components/ui/empty-state";
 
 interface Student {
   id: string;
@@ -41,6 +43,7 @@ export default function TransportAllocationPage() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>("");
   const [selectedStopId, setSelectedStopId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const q = useDebounced(search, 250);
   const [allocatedIds, setAllocatedIds] = useState<Set<string>>(new Set());
 
   const queryClient = useQueryClient();
@@ -59,6 +62,14 @@ export default function TransportAllocationPage() {
     queryFn: async () => {
       const res = await api.get<ApiResponse<BusStop[]>>(`/transport/stops?route_id=${selectedRouteId}`);
       return res.data.data;
+    },
+  });
+
+  const { data: buses } = useQuery({
+    queryKey: ["transport-buses"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<any[]>>("/transport/buses");
+      return res.data.data || [];
     },
   });
 
@@ -112,9 +123,11 @@ export default function TransportAllocationPage() {
   };
 
   const filteredStudents = (students || []).filter((s: Student) =>
-    s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.admission_number?.toLowerCase().includes(search.toLowerCase())
+    s.full_name?.toLowerCase().includes(q.toLowerCase()) ||
+    s.admission_number?.toLowerCase().includes(q.toLowerCase())
   );
+
+  const routeCapacity = (buses || []).filter((b: any) => b.route_id === selectedRouteId).reduce((a: number, b: any) => a + (b.capacity || 0), 0);
 
   return (
     <AOSPage>
@@ -130,6 +143,24 @@ export default function TransportAllocationPage() {
         }
       />
       <AOSPageBody>
+        {(routes || []).length === 0 ? (
+          <DataPanel>
+            <DependencyMissingEmptyState
+              icon={Users}
+              prerequisiteName="Transport routes and stops"
+              setupHref="/dashboard/transport/routes"
+              setupLabel="Create a route first"
+              title="Nothing to allocate to yet"
+              body="Allocation assigns students to route stops. Create routes and stops before allocating."
+            />
+          </DataPanel>
+        ) : (
+        <>
+        {selectedStopId && routeCapacity > 0 && allocatedIds.size > routeCapacity && (
+          <p className="win11-infobar warning rounded-md px-3 py-2 mb-3 text-[12px]">
+            {`More students allocated (${allocatedIds.size}) than seats on this route (${routeCapacity}). Add a bus or trim the list.`}
+          </p>
+        )}
         <div className="grid md:grid-cols-3 gap-4">
           <DataPanel title="Select Stop" className="md:col-span-1 h-fit">
             <p className="text-xs mb-4" style={{ color: "var(--w11-text-secondary)" }}>
@@ -246,6 +277,8 @@ export default function TransportAllocationPage() {
             )}
           </DataPanel>
         </div>
+        </>
+        )}
       </AOSPageBody>
     </AOSPage>
   );

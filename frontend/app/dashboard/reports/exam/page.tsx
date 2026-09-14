@@ -18,6 +18,7 @@ import {
   FilterCommandBar,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { PrintButton, PrintArea } from "../../analytics/analytics-kit";
 
 interface ExamItem {
   id: string;
@@ -164,12 +165,16 @@ export default function ExamReportsPage() {
         title="Exam Analytics & Reports"
         subtitle="Comprehensive performance analysis across classes and subjects"
         actions={
-          <Button variant="outline" onClick={exportReport} disabled={subjects.length === 0}>
-            <Download className="h-4 w-4 mr-2" /> Export Report
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportReport} disabled={subjects.length === 0}>
+              <Download className="h-4 w-4 mr-2" /> Export Report
+            </Button>
+            <PrintButton />
+          </div>
         }
       />
       <AOSPageBody>
+        <PrintArea className="space-y-4">
         <FilterCommandBar className="mb-0">
           <div className="space-y-2 flex-1 min-w-[220px]">
             <Label>Term / Exam</Label>
@@ -272,6 +277,7 @@ export default function ExamReportsPage() {
             </DataPanel>
           </>
         )}
+        </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

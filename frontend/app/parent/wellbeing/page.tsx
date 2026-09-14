@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type MoodEntry = { date?: string; mood?: string; note?: string };
@@ -20,10 +21,11 @@ type ChildWellbeingPayload = {
 
 /** Parent → Wellbeing. Backed by GET /parent/child-wellbeing. */
 export default function ParentWellbeingPage() {
+  const { selectedId, childParam } = useSelectedChild();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["parent-child-wellbeing"],
+    queryKey: ["parent-child-wellbeing", selectedId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<ChildWellbeingPayload>>("/parent/child-wellbeing");
+      const res = await api.get<ApiResponse<ChildWellbeingPayload>>(`/parent/child-wellbeing${childParam ? `?${childParam}` : ""}`);
       return res.data.data;
     },
   });
@@ -36,6 +38,7 @@ export default function ParentWellbeingPage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Wellbeing" />
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>

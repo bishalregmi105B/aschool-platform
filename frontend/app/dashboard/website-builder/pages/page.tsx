@@ -7,6 +7,16 @@ import { toast } from "sonner";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteUrl } from "@/lib/site-domain";
 import { FileText, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AOSPage,
   AOSPageHeader,
@@ -51,6 +61,7 @@ export default function WebsitePagesManager() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [enabling, setEnabling] = useState<string | null>(null);
 
   const { data: siteData } = useQuery<{ subdomain?: string }>({
@@ -71,6 +82,8 @@ export default function WebsitePagesManager() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-pages"] });
       setShowCreate(false);
+      setShowErrors(false);
+      setSlugTouched(false);
       setNewTitle("");
       setNewSlug("");
       revalidateSchoolSite();
@@ -79,13 +92,23 @@ export default function WebsitePagesManager() {
     onError: () => toast.error("Failed to create page"),
   });
 
-  // The create-modal form referenced a nonexistent `handleCreate`, so
-  // submitting a new page crashed with a ReferenceError instead of creating it.
+  // Create-flow validation (inline errors, never a toast for field errors).
+  const [showErrors, setShowErrors] = useState(false);
+  const slugNorm = newSlug.trim().toLowerCase();
+  const titleError = newTitle.trim() ? null : "Page title is required.";
+  const slugError = !slugNorm
+    ? "URL slug is required."
+    : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slugNorm)
+      ? "Use lowercase letters, numbers and single hyphens (e.g. principals-message)."
+      : pages.some((p) => p.slug === slugNorm)
+        ? "A page with this URL already exists — pick another slug."
+        : null;
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    const slug = (newSlug || newTitle.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")).trim();
-    if (!newTitle.trim() || !slug) return;
-    createMut.mutate({ title: newTitle.trim(), slug });
+    setShowErrors(true);
+    if (titleError || slugError) return;
+    createMut.mutate({ title: newTitle.trim(), slug: slugNorm });
   };
 
   /** Materialize a prebuilt theme page as an editable builder page. */
@@ -315,77 +338,69 @@ export default function WebsitePagesManager() {
           </div>
         </div>
 
-        {/* Create modal */}
-        {showCreate && (
-          <div className="win11-modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div
-              className="win11-dialog max-w-md w-full p-6"
-              style={{ background: "var(--w11-surface-solid)" }}
-            >
-              <h2 className="text-lg font-bold mb-4" style={{ color: "var(--w11-text-primary)" }}>
-                Create New Page
-              </h2>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--w11-text-primary)" }}
-                  >
-                    Page Title
-                  </label>
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={(e) => {
-                      setNewTitle(e.target.value);
-                      setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
-                    }}
-                    placeholder="e.g. Principal's Message"
-                    required
-                    className="w-full text-sm"
-                    style={{
-                      background: "var(--w11-control-bg)",
-                      color: "var(--w11-text-primary)",
-                      border: "1px solid var(--w11-control-border)",
-                      borderRadius: "var(--w11-radius-md)",
-                      padding: "8px 12px",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--w11-text-primary)" }}
-                  >
-                    URL Slug
-                  </label>
-                  <input
-                    type="text"
-                    value={newSlug}
-                    onChange={(e) => setNewSlug(e.target.value)}
-                    placeholder="principals-message"
-                    className="w-full text-sm"
-                    style={{
-                      background: "var(--w11-control-bg)",
-                      color: "var(--w11-text-primary)",
-                      border: "1px solid var(--w11-control-border)",
-                      borderRadius: "var(--w11-radius-md)",
-                      padding: "8px 12px",
-                    }}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShowCreate(false)} className="win11-btn">
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={createMut.isPending} className="win11-btn accent">
-                    {createMut.isPending ? "Creating..." : "Create Page"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* Create dialog — ui/Dialog with inline field errors (grammar 35.1) */}
+        <Dialog open={showCreate} onOpenChange={(open) => !open && setShowCreate(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New Page</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <Label htmlFor="page-title">Page Title</Label>
+                <Input
+                  id="page-title"
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => {
+                    setNewTitle(e.target.value);
+                    if (!slugTouched) {
+                      setNewSlug(
+                        e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+                      );
+                    }
+                  }}
+                  placeholder="e.g. Principal's Message"
+                  aria-invalid={showErrors && Boolean(titleError)}
+                />
+                {showErrors && titleError && (
+                  <p className="text-[11px] mt-1" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                    {titleError}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="page-slug">URL Slug</Label>
+                <Input
+                  id="page-slug"
+                  type="text"
+                  value={newSlug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setNewSlug(e.target.value);
+                  }}
+                  placeholder="principals-message"
+                  aria-invalid={showErrors && Boolean(slugError)}
+                />
+                <p className="text-[11px] mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
+                  The public address becomes /school/&hellip;/{slugNorm || "&lt;slug&gt;"} — short, lowercase, hyphenated.
+                </p>
+                {showErrors && slugError && (
+                  <p className="text-[11px] mt-1" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                    {slugError}
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createMut.isPending}>
+                  {createMut.isPending ? "Creating…" : "Create Page"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </AOSPageBody>
     </AOSPage>
   );

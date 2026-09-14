@@ -6,10 +6,18 @@ import { ArrowLeft, BookOpen, CheckCircle2, Flag, Send, ChevronRight, Layers as 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { PageLoader } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { ICON_MAP } from "@/lib/icon-map";
 import {
@@ -78,8 +86,26 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function ContentReviewPage() {
   const qc = useQueryClient();
-  const [selected, setSelected] = useState<ContentSource | null>(null);
-  const [openUnit, setOpenUnit] = useState<UnitRow | null>(null);
+  const confirm = useConfirm();
+  const { t } = useI18n();
+  // Wave C (plan 34-52): queue + drill-in are URL state (?source=&unit=&q=) —
+  // a reviewer can hand the exact queue position to another reviewer.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const setRouteFilter = (patch: Record<string, string>) => {
+    const pathname = windowRoute?.pathname ?? "/dashboard/content-review";
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    const qs = next.toString();
+    navigate(qs ? `${pathname}?${qs}` : pathname);
+  };
+  const queueFilter = routeParams.get("q") || "all"; // all | pending | published
+  const selectedId = routeParams.get("source") || "";
+  const openUnitId = routeParams.get("unit") || "";
 
   const { data: sources, isLoading } = useQuery({
     queryKey: ["content-sources"],
@@ -89,8 +115,11 @@ export default function ContentReviewPage() {
     },
   });
 
+  const selected = (sources ?? []).find((x) => x.id === selectedId) ?? null;
+  const setSelected = (x: ContentSource | null) => setRouteFilter({ source: x?.id || "", unit: "" });
+
   const { data: detail } = useQuery({
-    queryKey: ["content-source", selected?.id],
+    queryKey: ["content-source", selectedId],
     enabled: Boolean(selected),
     queryFn: async () => {
       const resp = await api.get(`/content/sources/${selected!.id}`);
@@ -98,12 +127,15 @@ export default function ContentReviewPage() {
     },
   });
 
-  const { data: chunks } = useQuery({
-    queryKey: ["content-chunks", selected?.id, openUnit?.id],
-    enabled: Boolean(selected && openUnit),
+  const openUnit = (detail?.units ?? []).find((u) => u.id === openUnitId) ?? null;
+  const setOpenUnit = (u: UnitRow | null) => setRouteFilter({ unit: u?.id || "" });
+
+  const { data: chunks, isLoading: chunksLoading } = useQuery({
+    queryKey: ["content-chunks", selectedId, openUnitId],
+    enabled: Boolean(selectedId && openUnitId),
     queryFn: async () => {
       const resp = await api.get(
-        `/content/sources/${selected!.id}/chunks?unit_id=${openUnit!.id}&per_page=200`
+        `/content/sources/${selectedId}/chunks?unit_id=${openUnitId}&per_page=200`
       );
       return (resp.data.data ?? []) as ChunkRow[];
     },
@@ -174,12 +206,17 @@ export default function ContentReviewPage() {
     { label: "Pages Ingested", value: sourceList.reduce((a, s) => a + (s.page_count || 0), 0), color: "var(--w11-text-primary)", icon: <Send className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} /> },
   ];
 
+  const queueList = (sourceList).filter((x) =>
+    queueFilter === "pending" ? x.ingest_status !== "published" :
+    queueFilter === "published" ? x.ingest_status === "published" : true
+  );
+
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="AI Content Review"
-        subtitle="Human gate over ingested textbooks and question papers — nothing reaches AI tools until it is reviewed and published."
+        title={t("AI Content Review", "AI सामग्री समीक्षा")}
+        subtitle={t("Human gate over ingested textbooks and question papers — nothing reaches AI tools until it is reviewed and published.", "इन्जेस्ट गरिएका पाठ्यपुस्तकहरूमा मानव गेट — समीक्षा एवं प्रकाशन नभएसम्म AI ले प्रयोग गर्दैन।")}
         actions={
           <>
             {selected && (
@@ -235,18 +272,35 @@ export default function ContentReviewPage() {
               })}
             </div>
 
-            <DataPanel bodyClassName="p-0 pt-0">
+            <Tabs
+              value={queueFilter}
+              onValueChange={(v) => setRouteFilter({ q: v === "all" ? "" : v })}
+              className="w-full mb-3"
+            >
+              <TabsList>
+                <TabsTrigger value="all">{t("All", "सबै")}</TabsTrigger>
+                <TabsTrigger value="pending" badge={kpis[2].value || undefined}>{t("Awaiting review", "समीक्षा बाँकी")}</TabsTrigger>
+                <TabsTrigger value="published">{t("Published", "प्रकाशित")}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <DataPanel bodyClassName="p-0">
               {isLoading ? (
-                <div className="p-4"><PageLoader /></div>
+                <div className="p-4 space-y-2">
+                  {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full rounded-md" />)}
+                </div>
               ) : (
                 <DataTable
                   columns={columns}
-                  rows={sources ?? []}
-                  rowKey={(s) => s.id}
+                  rows={queueList}
+                  rowKey={(x) => x.id}
+                  onRowClick={(x) => setSelected(x)}
+                  exportFileName="content-review-queue"
                   empty={{
                     icon: BookOpen,
-                    title: "Nothing ingested yet",
-                    body: "Run the content loader on a staged book folder to see it here.",
+                    title: queueFilter !== "all" ? t("Nothing in this queue", "यो लिनमा केही छैन") : t("Nothing ingested yet", "अझै इन्जेस्ट भएको छैन"),
+                    body: t("Run the content loader on a staged book folder to see it here.", "स्टेज गरिएको फोल्डरको loader चलाउनुहोस्।"),
+                    action: queueFilter !== "all" ? { label: t("Show all", "सबै देखाउनुहोस्"), onClick: () => setRouteFilter({ q: "" }) } : undefined,
                   }}
                 />
               )}
@@ -299,6 +353,11 @@ export default function ContentReviewPage() {
               title={openUnit ? `Chunks — ${openUnit.title_ne || openUnit.unit_path}` : "Chunk review"}
               bodyClassName="max-h-[520px] space-y-2 overflow-y-auto"
             >
+              {chunksLoading && openUnit && (
+                <div className="space-y-2">
+                  {[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-md" />)}
+                </div>
+              )}
               {openUnit && (chunks ?? []).map((c) => (
                 <div key={c.id} className="rounded-md border border-[color:var(--w11-border-subtle)] p-2">
                   <div className="flex items-start justify-between gap-2">
@@ -323,8 +382,18 @@ export default function ContentReviewPage() {
                       </Button>
                       <Button
                         size="sm" variant="ghost"
-                        aria-label="Flag chunk for fixing"
-                        onClick={() => reviewChunk.mutate({ chunkId: c.id, action: "flag" })}
+                        aria-label={t("Flag chunk for fixing", "त्रुटि सुधारका लागि चिन्ह लगाउनुहोस्")}
+                        onClick={async () => {
+                          // Reject is destructive to the publication queue —
+                          // confirm first (plan 35.2), never native dialogs.
+                          const ok = await confirm({
+                            title: t("Flag this chunk for fixing?", "यो खण्ड फ्ल्याग गर्ने?"),
+                            body: t("It will stay out of the published set until an editor fixes it.", "सम्पादन नभएसम्म यो प्रकाशित सेटमा पर्नेछैन।"),
+                            confirmLabel: t("Flag chunk", "फ्ल्याग"),
+                            tone: "danger",
+                          });
+                          if (ok) reviewChunk.mutate({ chunkId: c.id, action: "flag" });
+                        }}
                       >
                         <Flag className="h-4 w-4" style={{ color: "#9d5d00" }} />
                       </Button>

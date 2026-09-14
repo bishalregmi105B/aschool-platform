@@ -22,7 +22,7 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Plus, Route, Pencil, Trash2, Map } from "lucide-react";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
 
 interface TransportRoute {
   id: string;
@@ -34,7 +34,6 @@ interface TransportRoute {
 }
 
 export default function RoutesPage() {
-  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<TransportRoute | null>(null);
   const [search, setSearch] = useState("");
@@ -66,15 +65,6 @@ export default function RoutesPage() {
       setEditItem(null);
     },
     onError: () => toast.error("Failed to update route"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/transport/routes/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transport-routes"] });
-      toast.success("Route deleted");
-    },
-    onError: () => toast.error("Failed to delete route"),
   });
 
   const toggleStatusMutation = useMutation({
@@ -138,7 +128,14 @@ export default function RoutesPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => {
             e.stopPropagation();
-            confirm({ title: "Delete route", body: "Are you sure you want to delete this route?" }).then((ok) => { if (ok) deleteMutation.mutate(r.id); });
+            // Optimistic + undoable (plan 35.4): no confirm dialog.
+            undoableDelete({
+              label: `route “${r.name}”`,
+              commit: async () => {
+                await api.delete(`/transport/routes/${r.id}`);
+                queryClient.invalidateQueries({ queryKey: ["transport-routes"] });
+              },
+            });
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>

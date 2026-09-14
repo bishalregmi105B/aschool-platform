@@ -21,6 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FileText, Download, Loader2, Receipt } from "lucide-react";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
 import { displayBS, formatNepaliDate } from "@/lib/nepali_date";
 import { formatNepaliCurrency } from "@/lib/nepali-utils";
 
@@ -65,13 +67,13 @@ interface InvoiceListPayload {
   meta: { total: number; page: number; per_page: number; pages: number; has_next: boolean; has_prev: boolean };
 }
 
-const STATUS_FILTERS = [
-  { value: "", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "partial", label: "Partial" },
-  { value: "paid", label: "Paid" },
-  { value: "waived", label: "Waived" },
-] as const;
+const STATUS_FILTERS: Array<{ value: string; label: string; ne: string }> = [
+  { value: "", label: "All", ne: "सबै" },
+  { value: "pending", label: "Pending", ne: "बाँकी" },
+  { value: "partial", label: "Partial", ne: "आँशिक" },
+  { value: "paid", label: "Paid", ne: "भुक्त" },
+  { value: "waived", label: "Waived", ne: "माफ" },
+];
 
 export default function FeeInvoicesPage() {
   return (
@@ -82,8 +84,13 @@ export default function FeeInvoicesPage() {
 }
 
 function InvoicesContent() {
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
+  const { t } = useI18n();
+  // Status/page/search are URL state (plan 33-2: tabs and filters as URLs).
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["status", "page", "search"]);
+  const status = urlFilters.status || "";
+  const setStatus = (v: string) => setUrlFilters({ status: v });
+  const setPage = (n: number) => setUrlFilters({ page: n === 1 ? "" : String(n) });
+  const page = Number(urlFilters.page) || 1;
   const [search, setSearch] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -140,7 +147,7 @@ function InvoicesContent() {
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error("Could not download receipt");
+      toast.error(t("Could not download receipt", "रसिद डाउनलोड गरेन।"));
     } finally {
       setDownloadingId(null);
     }
@@ -149,7 +156,7 @@ function InvoicesContent() {
   const COLUMNS: Column<Invoice>[] = [
     {
       key: "student_name",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
       value: (i) => i.student_name || "",
       render: (i) => (
@@ -161,7 +168,7 @@ function InvoicesContent() {
     },
     {
       key: "title",
-      label: "Invoice",
+      label: t("Invoice", "बिजक"),
       sortable: true,
       value: (i) => i.title || "",
       render: (i) => (
@@ -176,21 +183,21 @@ function InvoicesContent() {
     },
     {
       key: "due_date_bs",
-      label: "Due Date (BS)",
+      label: t("Due Date (BS)", "मिति (BS)"),
       sortable: true,
       value: (i) => i.due_date_bs ?? "",
       render: (i) => (i.due_date_bs ? formatNepaliDate(i.due_date_bs) : "—"),
     },
     {
       key: "status",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (i) => i.status,
       render: (i) => <StatusChip status={i.status} />,
     },
     {
       key: "total_amount",
-      label: "Total",
+      label: t("Total", "कुल"),
       align: "right",
       sortable: true,
       value: (i) => i.total_amount,
@@ -198,7 +205,7 @@ function InvoicesContent() {
     },
     {
       key: "paid_amount",
-      label: "Paid",
+      label: t("Paid", "भुक्त"),
       align: "right",
       sortable: true,
       value: (i) => i.paid_amount,
@@ -208,7 +215,7 @@ function InvoicesContent() {
     },
     {
       key: "due_amount",
-      label: "Due",
+      label: t("Due", "बाँकी"),
       align: "right",
       sortable: true,
       value: (i) => i.due_amount,
@@ -223,7 +230,7 @@ function InvoicesContent() {
     },
     {
       key: "line_count",
-      label: "Lines",
+      label: t("Lines", "पंक्ति"),
       align: "center",
       value: (i) => i.line_count ?? 0,
     },
@@ -235,8 +242,11 @@ function InvoicesContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Fee Invoices"
-        subtitle={`Per-student bill documents grouped from fee collections${meta ? ` · ${meta.total} invoices` : ""}`}
+        title={t("Fee Invoices", "शुल्क बिजक")}
+        subtitle={t(
+          `Per-student bill documents grouped from fee collections${meta ? ` · ${meta.total} invoices` : ""}`,
+          `विद्यार्थी गायी बाकि कागज${meta ? ` · ${meta.total} विवरण` : ""}`
+        )}
       />
       <AOSPageBody className="space-y-4">
         <FilterCommandBar>
@@ -252,7 +262,7 @@ function InvoicesContent() {
                   setPage(1);
                 }}
               >
-                {f.label}
+                {t(f.label, f.ne)}
               </Button>
             ))}
           </div>
@@ -261,7 +271,7 @@ function InvoicesContent() {
         <DataPanel
           title={
             <span className="flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Invoices
+              <FileText className="h-4 w-4" /> {t("Invoices", "बिजकहर")}
             </span>
           }
         >
@@ -270,7 +280,7 @@ function InvoicesContent() {
             rows={filtered}
             rowKey={(i) => i.id}
             loading={isLoading}
-            error={isError ? "Failed to load invoices." : null}
+            error={isError ? t("Failed to load invoices.", "बिजक लोड सकिएन।") : null}
             onRetry={() => refetch()}
             pagination={
               meta
@@ -288,14 +298,14 @@ function InvoicesContent() {
             searchable
             searchValue={search}
             onSearchChange={(v) => setSearch(v)}
-            searchPlaceholder="Search students…"
+            searchPlaceholder={t("Search students…", "खोज्नुहोस…")}
             onRowClick={(i) => setActiveId(i.id)}
             activeRowKey={activeId}
             exportFileName="fee-invoices"
             empty={{
               icon: Receipt,
-              title: "No invoices found",
-              body: "Invoices are created automatically when fee structures are applied to students.",
+              title: t("No invoices found", "कुनै बिजक छेन"),
+              body: t("Invoices are created automatically when fee structures are applied to students.", "संरचना लागू गुड्दा बिजक आफैनाइन बन्चाँ।"),
             }}
           />
         </DataPanel>
@@ -303,7 +313,7 @@ function InvoicesContent() {
         <DetailSheet
           open={Boolean(activeId)}
           onOpenChange={(open) => !open && setActiveId(null)}
-          title={detail?.student_name || "Invoice"}
+          title={detail?.student_name || t("Invoice", "बिजक")}
           subtitle={
             detail
               ? `${detail.title} • ${detail.academic_year || ""}${
@@ -321,19 +331,19 @@ function InvoicesContent() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label: "Total", value: detail.total_amount, color: "var(--w11-text-primary)" },
-                  { label: "Paid", value: detail.paid_amount, color: "#107c10" },
-                  { label: "Due", value: detail.due_amount, color: "#c42b1c" },
+                  { label: t("Total", "कुल"), value: detail.total_amount, color: "var(--w11-text-primary)" },
+                  { label: t("Paid", "भुक्त"), value: detail.paid_amount, color: "#107c10" },
+                  { label: t("Due", "बाँकी"), value: detail.due_amount, color: "#c42b1c" },
                 ].map((s) => (
                   <div key={s.label} className="win11-card pt-4 pb-3 px-4">
                     <p className="text-xs text-[color:var(--w11-text-secondary)]">{s.label}</p>
-                    <p className="text-lg font-bold" style={{ color: s.color }}>
+                    <p className="text-lg font-bold tabular-nums" style={{ color: s.color }}>
                       {formatNepaliCurrency(s.value || 0)}
                     </p>
                   </div>
                 ))}
                 <div className="win11-card pt-4 pb-3 px-4">
-                  <p className="text-xs text-[color:var(--w11-text-secondary)]">Status</p>
+                  <p className="text-xs text-[color:var(--w11-text-secondary)]">{t("Status", "अवस्था")}</p>
                   <div className="mt-1">
                     <StatusChip status={detail.status} />
                   </div>
@@ -344,13 +354,13 @@ function InvoicesContent() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Fee Item</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Net</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead className="text-right">Due</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Receipt</TableHead>
+                      <TableHead>{t("Fee Item", "शुल्क")}</TableHead>
+                      <TableHead>{t("Period", "अवधि")}</TableHead>
+                      <TableHead className="text-right">{t("Net", "नेट")}</TableHead>
+                      <TableHead className="text-right">{t("Paid", "भुक्त")}</TableHead>
+                      <TableHead className="text-right">{t("Due", "बाँकी")}</TableHead>
+                      <TableHead>{t("Status", "अवस्था")}</TableHead>
+                      <TableHead>{t("Receipt", "रसिद")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -360,12 +370,12 @@ function InvoicesContent() {
                           <p className="font-medium">{line.fee_type}</p>
                           {Number(line.discount_amount) > 0 && (
                             <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                              Discount {formatNepaliCurrency(line.discount_amount)}
+                              {t("Discount", "छुट")} {formatNepaliCurrency(line.discount_amount)}
                             </p>
                           )}
                           {Number(line.late_fine_amount) > 0 && (
                             <p className="text-xs" style={{ color: "#c42b1c" }}>
-                              Late fine {formatNepaliCurrency(line.late_fine_amount)}
+                              {t("Late fine", "जरिवाना")} {formatNepaliCurrency(line.late_fine_amount)}
                             </p>
                           )}
                         </TableCell>
@@ -418,7 +428,7 @@ function InvoicesContent() {
                     {!detail.lines?.length && (
                       <TableRow>
                         <TableCell colSpan={7} className="py-8 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                          No fee lines on this invoice.
+                          {t("No fee lines on this invoice.", "यस बिजकमा पंक्ति छेन।")}
                         </TableCell>
                       </TableRow>
                     )}

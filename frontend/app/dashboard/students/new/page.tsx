@@ -1,5 +1,23 @@
 "use client";
 
+/**
+ * Students / New — A3 create form (plan Part 16.5, 34 row 1, Part 35).
+ *
+ * Research (NN/g "Web Form Design"): keep related fields grouped and
+ * sectioned, one primary action, label required fields explicitly, and cut
+ * deferable fields from the first screen. Applied here: identity →
+ * academic → guardian on the first screen (only the 4 true required
+ * fields: first, last, class — enrollment/roll auto-assign — plus the
+ * contact essentials), and the IEMIS-flavoured extras (blood group,
+ * religion, ethnicity, nationality, address, previous school, contacts)
+ * fold into a `win11-expander` "Advanced details" disclosure.
+ *
+ * Kept from the previous version (audit "keep" list): BS picker with
+ * "AD auto-saved" microcopy, auto enrollment number, disabled-until-valid
+ * submit, AI Quick Fill, photo via FilePicker, and the dependency-chain
+ * "create your first class →" hint under the class picker.
+ */
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -19,12 +37,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  AOSPage,
+  AOSPageHeader,
+  AOSPageBody,
+} from "@/components/aos/kit/page-kit";
 import {
   AiFormAssist,
   type AiFieldSchema,
 } from "@/components/ai/ai-form-assist";
 import { ArrowLeft, UserPlus, FolderOpen, User, GraduationCap, Users } from "lucide-react";
-import Link from "next/link";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useI18n } from "@/lib/i18n";
 
@@ -48,9 +71,15 @@ const AI_FIELDS: AiFieldSchema[] = [
   { key: "guardian_relation", label: "Relation", ne: "नाता", type: "select", options: ["father", "mother", "guardian"] },
 ];
 
+const RELIGIONS = ["Hindu", "Buddhist", "Christian", "Muslim", "Kirant", "Other"];
+const RELIGION_NE: Record<string, string> = {
+  Hindu: "हिन्दू", Buddhist: "बौद्ध", Christian: "इसाई", Muslim: "मुस्लिम", Kirant: "किराँत", Other: "अन्य",
+};
+
 export default function NewStudentPage() {
   const router = useAOSRouterNavigate();
   const { t } = useI18n();
+  const confirm = useConfirm();
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
@@ -82,6 +111,8 @@ export default function NewStudentPage() {
     guardian2_email: "",
     guardian2_relation: "mother",
   });
+  // A3 dirty guard: leaving with unsaved data asks first (never silent loss).
+  const [dirty, setDirty] = useState(false);
 
   const { data: classes } = useQuery({
     queryKey: ["classes"],
@@ -90,16 +121,35 @@ export default function NewStudentPage() {
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
   });
+  const classesLoading = classes === undefined;
 
   const selectedClass = (classes || []).find((c: { id: string }) => c.id === form.class_id);
+
+  const set = (k: string, v: string) => {
+    setDirty(true);
+    setForm((prev) => ({ ...prev, [k]: v }));
+  };
 
   const handlePhotoSelect = (files: ManagedFile[]) => {
     const selected = files[0];
     if (selected?.url) {
       set("photo_url", selected.url);
-      toast.success("Photo selected from the file manager");
+      toast.success(t("Photo selected from the file manager", "फाइल म्यानेजरबाट फोटो चयन भयो"));
     }
   };
+
+  async function leave() {
+    if (dirty) {
+      const ok = await confirm({
+        title: t("Discard this enrollment?", "यो भर्ना खारेज गर्ने?"),
+        body: t("Fields you have filled in will be lost.", "भरेका विवरणहरू हट्नेछन्।"),
+        confirmLabel: t("Discard", "खारेज"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    router("/dashboard/students");
+  }
 
   const create = useMutation({
     mutationFn: async () => {
@@ -146,292 +196,326 @@ export default function NewStudentPage() {
       return (await api.post("/students", payload)).data;
     },
     onSuccess: (res) => {
+      setDirty(false);
       const s = res?.data ?? res;
       const enr = s?.enrollment_number || s?.admission_number;
       const roll = s?.roll_number;
       const assigned = [
-        enr ? `Enrollment No. ${enr}` : null,
-        roll ? `Roll No. ${roll}` : null,
+        enr ? t(`Enrollment No. ${enr}`, `भर्ना नम्बर ${enr}`) : null,
+        roll ? t(`Roll No. ${roll}`, `रोल नम्बर ${roll}`) : null,
       ].filter(Boolean).join(", ");
-      toast.success(assigned ? `Student enrolled! ${assigned} auto-assigned.` : "Student enrolled!");
+      toast.success(
+        assigned
+          ? t(`Student enrolled! ${assigned} auto-assigned.`, `विद्यार्थी भर्ना भयो! ${assigned} स्वतः तयार।`)
+          : t("Student enrolled!", "विद्यार्थी भर्ना भयो!")
+      );
       router("/dashboard/students");
     },
-    onError: () => toast.error("Failed to enroll student"),
+    onError: () =>
+      toast.error(t("Failed to enroll student", "विद्यार्थी भर्ना हुन सकेन")),
   });
 
-  const set = (k: string, v: string) => setForm((prev) => ({ ...prev, [k]: v }));
+  const canSubmit = !!form.first_name && !!form.last_name && !!form.class_id;
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/students">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{t("Enroll New Student", "नयाँ विद्यार्थी भर्ना")}</h1>
-          <p className="text-muted-foreground">{t("Add a new student to the system", "प्रणालीमा नयाँ विद्यार्थी थप्नुहोस्")}</p>
-        </div>
-      </div>
-
-      {/* AI Quick Fill — schema-driven, works on any field below */}
-      <AiFormAssist
-        formId="student_admission"
-        schema={AI_FIELDS}
-        values={form}
-        applyValues={(vals) => {
-          for (const [k, v] of Object.entries(vals)) {
-            if (k in form) set(k, v === null || v === undefined ? "" : String(v));
-          }
-        }}
+    <AOSPage>
+      <AOSPageHeader
+        icon={<UserPlus className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={t("Enroll New Student", "नयाँ विद्यार्थी भर्ना")}
+        subtitle={t(
+          "Fields marked * are required — everything else can wait until after enrollment.",
+          "* चिह्नित फिल्ड अनिवार्य — बाँकी भर्नापछि पनि भर्न मिल्छ।"
+        )}
+        actions={
+          <Button variant="ghost" size="sm" onClick={() => void leave()}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            {t("Back to list", "सूचीमा फर्कनुहोस्")}
+          </Button>
+        }
       />
+      <AOSPageBody>
+        <div className="space-y-6 max-w-6xl">
+          {/* AI Quick Fill — schema-driven, works on any field below */}
+          <AiFormAssist
+            formId="student_admission"
+            schema={AI_FIELDS}
+            values={form}
+            applyValues={(vals) => {
+              for (const [k, v] of Object.entries(vals)) {
+                if (k in form) set(k, v === null || v === undefined ? "" : String(v));
+              }
+            }}
+          />
 
-      <div className="space-y-6">
-        {/* ── Personal Information ── */}
-        <FormSection
-          title="Personal Information"
-          ne="व्यक्तिगत जानकारी"
-          description="Student identity as it appears on official documents"
-          neDescription="आधिकारिक कागजातमा देखिने विद्यार्थीको पहिचान"
-          icon={User}
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPhotoPicker(true)}
-            >
-              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-              {form.photo_url ? t("Change Photo", "फोटो फेर्नुहोस्") : t("Photo", "फोटो")}
-            </Button>
-          }
-        >
-          <FormGrid cols={3}>
-            <FormField label="First Name" ne="पहिलो नाम" required>
-              <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
-            </FormField>
-            <FormField label="Last Name" ne="थर" required>
-              <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} />
-            </FormField>
-            <FormField
-              label="Date of Birth"
-              ne="जन्म मिति"
-              hint="Pick in BS — the AD equivalent is kept automatically"
-              neHint="बि.सं.मा छान्नुहोस् — ई.सं. स्वतः सुरक्षित हुन्छ"
-            >
-              <BSDateInput value={form.date_of_birth} onChange={(v) => set("date_of_birth", v)} />
-            </FormField>
-            <FormField label="First Name (Nepali)" ne="पहिलो नाम (नेपाली)">
-              <Input value={form.first_name_nepali} onChange={(e) => set("first_name_nepali", e.target.value)} placeholder="पहिलो नाम" />
-            </FormField>
-            <FormField label="Last Name (Nepali)" ne="थर (नेपाली)">
-              <Input value={form.last_name_nepali} onChange={(e) => set("last_name_nepali", e.target.value)} placeholder="थर" />
-            </FormField>
-            <FormField label="Gender" ne="लिङ्ग">
-              <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">{t("Male", "पुरुष")}</SelectItem>
-                  <SelectItem value="female">{t("Female", "महिला")}</SelectItem>
-                  <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Blood Group" ne="रक्त समूह">
-              <Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} placeholder="A+" />
-            </FormField>
-            <FormField label="Religion" ne="धर्म">
-              <Select value={form.religion} onValueChange={(v) => set("religion", v)}>
-                <SelectTrigger><SelectValue placeholder={t("Select", "छान्नुहोस्")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Hindu">{t("Hindu", "हिन्दू")}</SelectItem>
-                  <SelectItem value="Buddhist">{t("Buddhist", "बौद्ध")}</SelectItem>
-                  <SelectItem value="Christian">{t("Christian", "इसाई")}</SelectItem>
-                  <SelectItem value="Muslim">{t("Muslim", "मुस्लिम")}</SelectItem>
-                  <SelectItem value="Kirant">{t("Kirant", "किराँत")}</SelectItem>
-                  <SelectItem value="Other">{t("Other", "अन्य")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Ethnicity" ne="जाति">
-              <Input value={form.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} placeholder={t("e.g. Brahmin", "जस्तै: ब्राह्मण")} />
-            </FormField>
-            <FormField label="Nationality" ne="राष्ट्रियता">
-              <Input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} />
-            </FormField>
-            <FormField label="Phone" ne="फोन">
-              <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="98XXXXXXXX" />
-            </FormField>
-            <FormField label="Email" ne="इमेल">
-              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-            </FormField>
-            <FormFull>
-              <FormField label="Address" ne="ठेगाना">
-                <Textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={2} />
-              </FormField>
-            </FormFull>
-            <FormFull>
-              <FormField label="Previous School" ne="अघिल्लो विद्यालय">
-                <Input value={form.previous_school} onChange={(e) => set("previous_school", e.target.value)} placeholder={t("Name of previous institution", "अघिल्लो संस्थाको नाम")} />
-              </FormField>
-            </FormFull>
-          </FormGrid>
-        </FormSection>
-
-        {/* ── Academic Information ── */}
-        <FormSection
-          title="Academic Information"
-          ne="शैक्षिक जानकारी"
-          description="Class placement and identification numbers"
-          neDescription="कक्षा तथा पहिचान नम्बर"
-          icon={GraduationCap}
-        >
-          <FormGrid cols={3}>
-            <FormField label="Class" ne="कक्षा">
-              <Select
-                value={form.class_id}
-                onValueChange={(v) => {
-                  set("class_id", v);
-                  set("section_id", "");
-                }}
+          {/* ── Personal Information (first screen) ── */}
+          <FormSection
+            title="Personal Information"
+            ne="व्यक्तिगत जानकारी"
+            description="Student identity as it appears on official documents"
+            neDescription="आधिकारिक कागजातमा देखिने विद्यार्थीको पहिचान"
+            icon={User}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPhotoPicker(true)}
               >
-                <SelectTrigger><SelectValue placeholder={t("Select class", "कक्षा छान्नुहोस्")} /></SelectTrigger>
-                <SelectContent>
-                  {(classes || []).map((klass: { id: string; name: string }) => (
-                    <SelectItem key={klass.id} value={klass.id}>{klass.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Dependency-chain empty state: enrollment is blocked on a
-                  class existing — deep-link the blocking setup step instead
-                  of a silently-empty picker (audit 5.2a). */}
-              {Array.isArray(classes) && classes.length === 0 && (
-                <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
-                  {t("No classes yet —", "कक्षा छैन —")}{" "}
-                  <a href="/dashboard/academics" className="underline" style={{ color: "var(--w11-accent)" }}>
-                    {t("create your first class in Academics", "शैक्षिक भागमा पहिलो कक्षा सिर्जना गर्नुहोस्")}
-                  </a>
-                  {t(" first.", " पहिले।")}
-                </p>
-              )}
-            </FormField>
-            <FormField label="Section" ne="खण्ड">
-              <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>
-                <SelectTrigger><SelectValue placeholder={t("Select section", "खण्ड छान्नुहोस्")} /></SelectTrigger>
-                <SelectContent>
-                  {((selectedClass as { sections?: { id: string; name: string }[] })?.sections || []).map((section) => (
-                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Admission Date" ne="भर्ना मिति">
-              <BSDateInput value={form.admission_date} onChange={(v) => set("admission_date", v)} />
-            </FormField>
-            <FormField
-              label="Enrollment No."
-              ne="भर्ना नम्बर"
-              hint={t("Leave blank to auto-assign the next number", "खाली छोड्दा अर्को नम्बर स्वतः दिइन्छ")}
-            >
-              <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder={t("Auto-generated", "स्वतः तयार हुने")} />
-            </FormField>
-            <FormField
-              label="Roll Number"
-              ne="रोल नम्बर"
-              hint={t("Leave blank to auto-assign within the class", "खाली छोड्दा कक्षाभित्रै स्वतः दिइन्छ")}
-            >
-              <Input type="number" value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder={t("Auto-assigned", "स्वतः तयार हुने")} />
-            </FormField>
-          </FormGrid>
-        </FormSection>
-
-        {/* ── Guardian Information ── */}
-        <FormSection
-          title="Guardian Information"
-          ne="अभिभावकको जानकारी"
-          description="Primary contact for notices, fees and emergencies"
-          neDescription="सूचना, शुल्क र आपतकालीन सम्पर्कको लागि"
-          icon={Users}
-        >
-          <FormGrid cols={3}>
-            <FormField label="Guardian Name" ne="अभिभावकको नाम" required>
-              <Input value={form.guardian_name} onChange={(e) => set("guardian_name", e.target.value)} />
-            </FormField>
-            <FormField label="Relation" ne="नाता">
-              <Select value={form.guardian_relation} onValueChange={(v) => set("guardian_relation", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="father">{t("Father", "बुबा")}</SelectItem>
-                  <SelectItem value="mother">{t("Mother", "आमा")}</SelectItem>
-                  <SelectItem value="guardian">{t("Guardian", "अभिभावक")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Phone" ne="फोन" hint={t("SMS notices go to this number", "यो नम्बरमा SMS सूचना जान्छ")}>
-              <Input value={form.guardian_phone} onChange={(e) => set("guardian_phone", e.target.value)} placeholder="98XXXXXXXX" />
-            </FormField>
-            <FormFull>
-              <FormField label="Email" ne="इमेल">
-                <Input type="email" value={form.guardian_email} onChange={(e) => set("guardian_email", e.target.value)} />
-              </FormField>
-            </FormFull>
-          </FormGrid>
-
-          <div className="mt-5 border-t pt-4">
-            <p className="mb-3 text-[12px] font-medium text-muted-foreground">
-              {t("Second Guardian (optional)", "दोस्रो अभिभावक (ऐच्छिक)")}
-            </p>
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                {form.photo_url ? t("Change Photo", "फोटो फेर्नुहोस्") : t("Photo", "फोटो")}
+              </Button>
+            }
+          >
             <FormGrid cols={3}>
-              <FormField label="Name" ne="नाम">
-                <Input value={form.guardian2_name} onChange={(e) => set("guardian2_name", e.target.value)} />
+              <FormField label="First Name" ne="पहिलो नाम" required>
+                <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
+              </FormField>
+              <FormField label="Last Name" ne="थर" required>
+                <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} />
+              </FormField>
+              <FormField
+                label="Date of Birth"
+                ne="जन्म मिति"
+                hint="Pick in BS — the AD equivalent is kept automatically"
+                neHint="बि.सं.मा छान्नुहोस् — ई.सं. स्वतः सुरक्षित हुन्छ"
+              >
+                <BSDateInput value={form.date_of_birth} onChange={(v) => set("date_of_birth", v)} />
+              </FormField>
+              <FormField label="First Name (Nepali)" ne="पहिलो नाम (नेपाली)">
+                <Input value={form.first_name_nepali} onChange={(e) => set("first_name_nepali", e.target.value)} placeholder="पहिलो नाम" />
+              </FormField>
+              <FormField label="Last Name (Nepali)" ne="थर (नेपाली)">
+                <Input value={form.last_name_nepali} onChange={(e) => set("last_name_nepali", e.target.value)} placeholder="थर" />
+              </FormField>
+              <FormField label="Gender" ne="लिङ्ग">
+                <Select value={form.gender} onValueChange={(v) => set("gender", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{t("Male", "पुरुष")}</SelectItem>
+                    <SelectItem value="female">{t("Female", "महिला")}</SelectItem>
+                    <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          {/* ── Academic Information ── */}
+          <FormSection
+            title="Academic Information"
+            ne="शैक्षिक जानकारी"
+            description="Class placement — enrollment and roll numbers auto-assign"
+            neDescription="कक्षा توकेपछि भर्ना र रोल नम्बर स्वतः तयार हुन्छन्"
+            icon={GraduationCap}
+          >
+            <FormGrid cols={3}>
+              <FormField label="Class" ne="कक्षा" required>
+                <Select
+                  value={form.class_id}
+                  onValueChange={(v) => {
+                    set("class_id", v);
+                    set("section_id", "");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={classesLoading ? t("Loading classes…", "कक्षा लोड हुँदै…") : t("Select class", "कक्षा छान्नुहोस्")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(classes || []).map((klass: { id: string; name: string }) => (
+                      <SelectItem key={klass.id} value={klass.id}>{klass.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Dependency-chain empty state: enrollment is blocked on a
+                    class existing — deep-link the blocking setup step instead
+                    of a silently-empty picker (audit 5.2a). */}
+                {!classesLoading && Array.isArray(classes) && classes.length === 0 && (
+                  <p className="text-xs mt-1" style={{ color: "var(--w11-text-secondary)" }}>
+                    {t("No classes yet —", "कक्षा छैन —")}{" "}
+                    <a href="/dashboard/academics" className="underline" style={{ color: "var(--w11-accent)" }}>
+                      {t("create your first class in Academics", "शैक्षिक भागमा पहिलो कक्षा सिर्जना गर्नुहोस्")}
+                    </a>
+                    {t(" first.", " पहिले।")}
+                  </p>
+                )}
+              </FormField>
+              <FormField label="Section" ne="खण्ड">
+                <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>
+                  <SelectTrigger><SelectValue placeholder={t("Select section", "खण्ड छान्नुहोस्")} /></SelectTrigger>
+                  <SelectContent>
+                    {((selectedClass as { sections?: { id: string; name: string }[] })?.sections || []).map((section) => (
+                      <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Admission Date" ne="भर्ना मिति">
+                <BSDateInput value={form.admission_date} onChange={(v) => set("admission_date", v)} />
+              </FormField>
+              <FormField
+                label="Enrollment No."
+                ne="भर्ना नम्बर"
+                hint={t("Leave blank to auto-assign the next number", "खाली छोड्दा अर्को नम्बर स्वतः दिइन्छ")}
+              >
+                <Input value={form.enrollment_number} onChange={(e) => set("enrollment_number", e.target.value)} placeholder={t("Auto-generated", "स्वतः तयार हुने")} />
+              </FormField>
+              <FormField
+                label="Roll Number"
+                ne="रोल नम्बर"
+                hint={t("Leave blank to auto-assign within the class", "खाली छोड्दा कक्षाभित्रै स्वतः दिइन्छ")}
+              >
+                <Input type="number" value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder={t("Auto-assigned", "स्वतः तयार हुने")} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          {/* ── Guardian Information ── */}
+          <FormSection
+            title="Guardian Information"
+            ne="अभिभावकको जानकारी"
+            description="Primary contact for notices, fees and emergencies"
+            neDescription="सूचना, शुल्क र आपतकालीन सम्पर्कको लागि"
+            icon={Users}
+          >
+            <FormGrid cols={3}>
+              <FormField
+                label="Guardian Name"
+                ne="अभिभावकको नाम"
+                required
+                hint={t("Creates the parent login", "यसबाट अभिभावक लगइन बन्छ")}
+              >
+                <Input value={form.guardian_name} onChange={(e) => set("guardian_name", e.target.value)} />
               </FormField>
               <FormField label="Relation" ne="नाता">
-                <Select value={form.guardian2_relation} onValueChange={(v) => set("guardian2_relation", v)}>
+                <Select value={form.guardian_relation} onValueChange={(v) => set("guardian_relation", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="father">{t("Father", "बुबा")}</SelectItem>
                     <SelectItem value="mother">{t("Mother", "आमा")}</SelectItem>
                     <SelectItem value="guardian">{t("Guardian", "अभिभावक")}</SelectItem>
-                    <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Phone" ne="फोन">
-                <Input value={form.guardian2_phone} onChange={(e) => set("guardian2_phone", e.target.value)} placeholder="98XXXXXXXX" />
+              <FormField label="Phone" ne="फोन" hint={t("SMS notices go to this number", "यो नम्बरमा SMS सूचना जान्छ")}>
+                <Input value={form.guardian_phone} onChange={(e) => set("guardian_phone", e.target.value)} placeholder="98XXXXXXXX" />
               </FormField>
-              <FormFull>
-                <FormField label="Email" ne="इमेल">
-                  <Input type="email" value={form.guardian2_email} onChange={(e) => set("guardian2_email", e.target.value)} />
-                </FormField>
-              </FormFull>
             </FormGrid>
-          </div>
-        </FormSection>
-      </div>
 
-      <FormActions>
-        <Button
-          variant="ghost"
-          onClick={() => router("/dashboard/students")}
-        >
-          {t("Cancel", "रद्द")}
-        </Button>
-        <Button
-          size="lg"
-          onClick={() => create.mutate()}
-          disabled={!form.first_name || !form.last_name || !form.class_id || create.isPending}
-        >
-          {create.isPending ? <Spinner className="mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-          {t("Enroll Student", "विद्यार्थी भर्ना गर्नुहोस्")}
-        </Button>
-      </FormActions>
+            <details className="win11-expander mt-4">
+              <summary>{t("Second guardian (optional)", "दोस्रो अभिभावक (ऐच्छिक)")}</summary>
+              <div className="expander-content">
+                <FormGrid cols={3}>
+                  <FormField label="Name" ne="नाम">
+                    <Input value={form.guardian2_name} onChange={(e) => set("guardian2_name", e.target.value)} />
+                  </FormField>
+                  <FormField label="Relation" ne="नाता">
+                    <Select value={form.guardian2_relation} onValueChange={(v) => set("guardian2_relation", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="father">{t("Father", "बुबा")}</SelectItem>
+                        <SelectItem value="mother">{t("Mother", "आमा")}</SelectItem>
+                        <SelectItem value="guardian">{t("Guardian", "अभिभावक")}</SelectItem>
+                        <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Phone" ne="फोन">
+                    <Input value={form.guardian2_phone} onChange={(e) => set("guardian2_phone", e.target.value)} placeholder="98XXXXXXXX" />
+                  </FormField>
+                  <FormFull>
+                    <FormField label="Email" ne="इमेल">
+                      <Input type="email" value={form.guardian2_email} onChange={(e) => set("guardian2_email", e.target.value)} />
+                    </FormField>
+                  </FormFull>
+                </FormGrid>
+              </div>
+            </details>
+          </FormSection>
 
-      <FilePicker
-        open={showPhotoPicker}
-        onOpenChange={setShowPhotoPicker}
-        onSelect={handlePhotoSelect}
-        fileType="image"
-        title="Select Student Photo"
-      />
-    </div>
+          {/* ── Advanced (IEMIS + contact details) — collapsed by default
+              per 31.0's ≤7-visible-fields law; still submitted untouched. ── */}
+          <details className="win11-expander">
+            <summary>
+              {t("Advanced details — IEMIS, address & contacts", "विवरण — IEMIS, ठेगाना र सम्पर्क")}
+            </summary>
+            <div className="expander-content">
+              <FormGrid cols={3}>
+                <FormField label="Blood Group" ne="रक्त समूह">
+                  <Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} placeholder="A+" />
+                </FormField>
+                <FormField label="Religion" ne="धर्म">
+                  <Select value={form.religion} onValueChange={(v) => set("religion", v)}>
+                    <SelectTrigger><SelectValue placeholder={t("Select", "छान्नुहोस्")} /></SelectTrigger>
+                    <SelectContent>
+                      {RELIGIONS.map((r) => (
+                        <SelectItem key={r} value={r}>{t(r, RELIGION_NE[r])}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Ethnicity" ne="जाति">
+                  <Input value={form.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} placeholder={t("e.g. Brahmin", "जस्तै: ब्राह्मण")} />
+                </FormField>
+                <FormField label="Nationality" ne="राष्ट्रियता">
+                  <Input value={form.nationality} onChange={(e) => set("nationality", e.target.value)} />
+                </FormField>
+                <FormField label="Phone" ne="फोन">
+                  <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="98XXXXXXXX" />
+                </FormField>
+                <FormField label="Email" ne="इमेल">
+                  <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                </FormField>
+                <FormFull>
+                  <FormField label="Address" ne="ठेगाना">
+                    <Textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={2} />
+                  </FormField>
+                </FormFull>
+                <FormFull>
+                  <FormField label="Guardian Email" ne="अभिभावक इमेल">
+                    <Input type="email" value={form.guardian_email} onChange={(e) => set("guardian_email", e.target.value)} />
+                  </FormField>
+                </FormFull>
+                <FormFull>
+                  <FormField label="Previous School" ne="अघिल्लो विद्यालय">
+                    <Input value={form.previous_school} onChange={(e) => set("previous_school", e.target.value)} placeholder={t("Name of previous institution", "अघिल्लो संस्थाको नाम")} />
+                  </FormField>
+                </FormFull>
+              </FormGrid>
+            </div>
+          </details>
+
+          <FormActions>
+            <Button variant="ghost" onClick={() => void leave()}>
+              {t("Cancel", "रद्द")}
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => create.mutate()}
+              disabled={!canSubmit || create.isPending}
+            >
+              {create.isPending ? <Spinner className="mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+              {t("Enroll Student", "विद्यार्थी भर्ना गर्नुहोस्")}
+            </Button>
+          </FormActions>
+
+          {/* Submit-gating honesty: tell the admin WHICH gate is holding. */}
+          {!canSubmit && (
+            <p className="text-[12px] text-center" style={{ color: "var(--w11-text-secondary)" }}>
+              {!form.first_name || !form.last_name
+                ? t("Enter the student's first and last name to continue.", "जान्नको लागि पहिलो र थर नाम लेख्नुहोस्।")
+                : t("Select a class to continue.", "जान्नको लागि कक्षा छान्नुहोस्।")}
+            </p>
+          )}
+        </div>
+
+        <FilePicker
+          open={showPhotoPicker}
+          onOpenChange={setShowPhotoPicker}
+          onSelect={handlePhotoSelect}
+          fileType="image"
+          title="Select Student Photo"
+        />
+      </AOSPageBody>
+    </AOSPage>
   );
 }

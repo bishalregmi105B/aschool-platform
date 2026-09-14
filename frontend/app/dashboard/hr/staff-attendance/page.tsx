@@ -17,7 +17,10 @@ import {
   DataPanel,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Calendar, Save, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Calendar, Save, CheckCircle, XCircle, Clock, UserCheck, ShieldCheck } from "lucide-react";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 interface User {
@@ -34,8 +37,11 @@ interface AttendanceRecord {
 }
 
 export default function StaffAttendancePage() {
+  const { t } = useI18n();
+  const confirm = useConfirm();
   const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({});
+  const [dirtyCount, setDirtyCount] = useState(0);
 
   const queryClient = useQueryClient();
 
@@ -75,30 +81,42 @@ export default function StaffAttendancePage() {
     mutationFn: (payload: any) => api.post("/attendance/teachers/mark", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-attendance", date] });
-      toast.success("Attendance saved successfully");
+      setDirtyCount(0); toast.success(t("Attendance saved successfully", "हाजिर सुरक्ष भए।"));
     },
-    onError: () => toast.error("Failed to save attendance"),
+    onError: () => toast.error(t("Failed to save attendance", "सुरक्ष गरेन")),
   });
 
   const handleStatusChange = (userId: string, status: AttendanceRecord["status"]) => {
+    setDirtyCount((n) => n + 1);
     setRecords(prev => ({
       ...prev,
       [userId]: { ...prev[userId], user_id: userId, status }
     }));
   };
 
-  const markAll = (status: AttendanceRecord["status"]) => {
+  const markAll = async (status: AttendanceRecord["status"]) => {
+    // Absent-alls is the dangerous default — confirm like the student register.
+    if (status === "absent") {
+      const ok = await confirm({
+        title: t("Mark everyone absent?", "सबैलाई अनुपस्थित लगाउने?"),
+        body: t("This sets Absent for every teacher and staff member. Save to commit.", "सबैको अनुपस्थित लग्ने। सुरक्ष गर्नु नपरेदै।"),
+        confirmLabel: t("Mark all absent", "सबै अनुपस्थित"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     const newRecords = { ...records };
     (staffData || []).forEach((staff: any) => {
       newRecords[staff.id] = { ...newRecords[staff.id], user_id: staff.id, status };
     });
     setRecords(newRecords);
+    setDirtyCount((n) => n + (staffData || []).length);
   };
 
   const handleSave = () => {
     const payloadRecords = Object.values(records);
     if (payloadRecords.length === 0) {
-      toast.error("No attendance changes to save");
+      toast.error(t("No attendance changes to save", "कुनै परिवर्तन छेन"));
       return;
     }
 
@@ -108,14 +126,14 @@ export default function StaffAttendancePage() {
     });
   };
 
-  if (staffLoading || attLoading) return <AOSModuleLoadingState label="Loading staff attendance…" />;
+  const loading = staffLoading || attLoading;
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Staff Attendance"
-        subtitle={`${(staffData || []).length} teachers and staff · mark daily attendance`}
+        title={t("Staff Attendance", "कर्मचारी हाजिर")}
+        subtitle={`${(staffData || []).length} ${t("teachers and staff · mark daily attendance", "शिक्षक र कर्मचारी · दैनिक हाजिर")} ${dirtyCount > 0 ? `· ${dirtyCount} ${t("unsaved changes", "नबुद्दे परिवर्तन")}` : ""}`}
         actions={
           <div className="flex items-center gap-2">
             <BSDateInput
@@ -125,27 +143,30 @@ export default function StaffAttendancePage() {
             />
             <Button onClick={handleSave} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Spinner size="sm" className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Attendance
+              {t("Save Attendance", "हाजिर सुरक्ष")}
             </Button>
           </div>
         }
       />
       <AOSPageBody>
+        {loading ? (
+          <div className="win11-card p-4"><SkeletonTable rows={8} columns={5} /></div>
+        ) : (
         <DataPanel bodyClassName="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Staff Member</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
+                <TableHead>{t("Staff Member", "कर्मचारी")}</TableHead>
+                <TableHead>{t("Role", "भूमिका")}</TableHead>
+                <TableHead>{t("Check In", "आगम")}</TableHead>
+                <TableHead>{t("Check Out", "निकल्न")}</TableHead>
                 <TableHead className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => markAll("present")}>
-                      Mark All Present
+                      {t("Mark All Present", "सबै उपस्थित")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => markAll("absent")}>
-                      Mark All Absent
+                      {t("Mark All Absent", "सबै अनुपस्थित")}
                     </Button>
                   </div>
                 </TableHead>
@@ -187,7 +208,7 @@ export default function StaffAttendancePage() {
                           onClick={() => handleStatusChange(staff.id, "present")}
                           style={record.status === "present" ? { backgroundColor: "#107c10" } : undefined}
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" /> Present
+                          <CheckCircle className="h-4 w-4 mr-1" /> {t("Present", "उपस्थित")}
                         </Button>
                         <Button
                           variant={record.status === "absent" ? "default" : "outline"}
@@ -195,7 +216,7 @@ export default function StaffAttendancePage() {
                           onClick={() => handleStatusChange(staff.id, "absent")}
                           style={record.status === "absent" ? { backgroundColor: "#c42b1c" } : undefined}
                         >
-                          <XCircle className="h-4 w-4 mr-1" /> Absent
+                          <XCircle className="h-4 w-4 mr-1" /> {t("Absent", "अनुपस्थित")}
                         </Button>
                         <Button
                           variant={record.status === "late" ? "default" : "outline"}
@@ -203,7 +224,23 @@ export default function StaffAttendancePage() {
                           onClick={() => handleStatusChange(staff.id, "late")}
                           style={record.status === "late" ? { backgroundColor: "#d83b01" } : undefined}
                         >
-                          <Clock className="h-4 w-4 mr-1" /> Late
+                          <Clock className="h-4 w-4 mr-1" /> {t("Late", "धेरो")}
+                        </Button>
+                        <Button
+                          variant={record.status === "half_day" ? "default" : "outline"}
+                          size="sm"
+                          title={t("Half day", "अध्य दिन")}
+                          onClick={() => handleStatusChange(staff.id, "half_day")}
+                        >
+                          <UserCheck className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={record.status === "excused" ? "default" : "outline"}
+                          size="sm"
+                          title={t("Excused", "क्षमा")}
+                          onClick={() => handleStatusChange(staff.id, "excused")}
+                        >
+                          <ShieldCheck className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -213,13 +250,14 @@ export default function StaffAttendancePage() {
               {(!staffData || staffData.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>
-                    No staff members found.
+                    {t("No staff members found. Add staff first.", "कुनै कर्मचारी छेन — पहिले थप्नु।")}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </DataPanel>
+        )}
       </AOSPageBody>
     </AOSPage>
   );

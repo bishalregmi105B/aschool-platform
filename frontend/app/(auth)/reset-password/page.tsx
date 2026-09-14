@@ -60,6 +60,15 @@ function ResetPasswordForm() {
       toast.error("Passwords do not match");
       return;
     }
+    if (
+      password.length < 8 ||
+      !/[a-z]/.test(password) ||
+      !/[A-Z]/.test(password) ||
+      !/\d/.test(password)
+    ) {
+      toast.error("Use 8+ characters with upper & lowercase letters and a number");
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/auth/reset-password", { token, new_password: password });
@@ -178,8 +187,10 @@ function ResetPasswordForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
+            <PasswordStrength password={password} />
           </div>
 
           <div className="space-y-1.5">
@@ -197,8 +208,15 @@ function ResetPasswordForm() {
                 onChange={(e) => setConfirm(e.target.value)}
                 required
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
+            {confirm && confirm !== password && (
+              <p className="text-xs text-destructive" role="alert">Passwords don&apos;t match yet.</p>
+            )}
+            {confirm && confirm === password && (
+              <p className="text-xs text-[#107c10]">Matches.</p>
+            )}
           </div>
 
           <Button
@@ -210,6 +228,58 @@ function ResetPasswordForm() {
           </Button>
         </form>
       )}
+    </div>
+  );
+}
+
+/**
+ * PasswordStrength — live meter + upfront criteria checklist.
+ *
+ * Research notes: usable-password guidance converges on (1) show the rules
+ * BEFORE the user types, not as a post-error, (2) real-time feedback while
+ * typing, (3) never block paste. The score mirrors the backend policy
+ * (8+ chars, upper+lower+digit) with a "strong" bonus tier at 12+.
+ */
+function scorePassword(pw: string): { score: 0 | 1 | 2 | 3; label: string; color: string } {
+  const checks =
+    (pw.length >= 8 ? 1 : 0) +
+    (/[a-z]/.test(pw) && /[A-Z]/.test(pw) ? 1 : 0) +
+    (/\d/.test(pw) ? 1 : 0);
+  const bonus = pw.length >= 12 && checks === 3;
+  if (!pw) return { score: 0, label: "", color: "transparent" };
+  if (checks < 2) return { score: 1, label: "Weak", color: "#c42b1c" };
+  if (checks === 2 || !bonus) return { score: 2, label: "Okay", color: "#eaa300" };
+  return { score: 3, label: "Strong", color: "#107c10" };
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const { score, label, color } = scorePassword(password);
+  const criteria = [
+    { ok: password.length >= 8, text: "8+ characters" },
+    { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: "Upper & lowercase letters" },
+    { ok: /\d/.test(password), text: "A number" },
+  ];
+  return (
+    <div className="space-y-1.5 pt-1" aria-live="polite">
+      <div className="flex items-center gap-2">
+        <div className="flex h-1.5 flex-1 gap-1" role="presentation">
+          {[1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className="flex-1 rounded-full transition-colors"
+              style={{ backgroundColor: i <= score ? color : "rgba(0,0,0,0.1)" }}
+            />
+          ))}
+        </div>
+        {label && <span className="text-[11px] font-bold" style={{ color }}>{label}</span>}
+      </div>
+      <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+        {criteria.map((c) => (
+          <li key={c.text} className={c.ok ? "text-[#107c10]" : undefined}>
+            {c.ok ? "✓" : "○"} {c.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

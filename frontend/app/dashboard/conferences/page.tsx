@@ -29,7 +29,10 @@ import {
 } from "@/components/aos/kit/page-kit";
 import { PluginGate } from "@/lib/plugins";
 import { toast } from "sonner";
-import { Calendar, Clock, Users, Video, Plus } from "lucide-react";
+import { Calendar, Clock, Users, Video, Plus, CalendarCheck } from "lucide-react";
+import { StatusTimeline } from "@/components/ui/status-timeline";
+import { DetailSheet } from "@/components/ui/sheet";
+import { DataTable, type Column } from "@/components/ui/data-table";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
 interface Conference {
@@ -60,6 +63,7 @@ export default function ConferencesPage() {
 function ConferencesContent() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [slotsConf, setSlotsConf] = useState<Conference | null>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -106,6 +110,16 @@ function ConferencesContent() {
       });
     },
     onError: () => toast.error("Failed to schedule conference"),
+  });
+
+  // Slot occupancy for the opened conference (GET /conferences/<id>/slots).
+  const { data: slots, isLoading: slotsLoading } = useQuery({
+    queryKey: ["conference-slots", slotsConf?.id],
+    enabled: !!slotsConf,
+    queryFn: async () => {
+      const res = await api.get(`/conferences/${slotsConf!.id}/slots?per_page=200`);
+      return (res.data?.data || []) as any[];
+    },
   });
 
   if (isLoading) return <AOSModuleLoadingState label="Loading conferences…" />;
@@ -276,13 +290,68 @@ function ConferencesContent() {
                       label={getStatus(conf)}
                     />
                     <span className="win11-chip subtle">{conf.is_virtual ? "online" : "in-person"}</span>
+                    <Button size="sm" variant="outline" onClick={() => setSlotsConf(conf)}>
+                      <CalendarCheck className="h-3.5 w-3.5 mr-1" /> Slots
+                    </Button>
                   </div>
+                </div>
+                {/* Conference lifecycle: scheduled → ongoing → completed (plan 34-36). */}
+                <div className="pl-16">
+                  <StatusTimeline
+                    orientation="horizontal"
+                    currentIndex={getStatus(conf) === "completed" ? 2 : getStatus(conf) === "ongoing" ? 1 : 0}
+                    steps={[
+                      { label: "Scheduled", detail: displayConferenceDate(conf.start_date_bs, conf.start_date) },
+                      { label: "Ongoing", detail: displayConferenceDate(conf.end_date_bs, conf.end_date) },
+                      { label: "Completed", detail: getStatus(conf) === "completed" ? "done" : undefined },
+                    ]}
+                  />
                 </div>
               </div>
             ))
           )}
         </div>
+        <SlotsSheet conf={slotsConf} slots={slots} loading={slotsLoading} onClose={() => setSlotsConf(null)} />
       </AOSPageBody>
     </AOSPage>
+  );
+}
+
+function SlotsSheet({ conf, slots, loading, onClose }: { conf: Conference | null; slots: any[] | undefined; loading: boolean; onClose: () => void }) {
+  const booked = (slots || []).filter((s) => s.is_booked).length;
+  const SLOT_COLUMNS: Column<any>[] = [
+    { key: "time", label: "Time", value: (s) => `${s.start_time ?? ""}-${s.end_time ?? ""}`, render: (s) => <span className="font-mono text-xs">{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</span> },
+    { key: "teacher", label: "Teacher", value: (s) => s.teacher_id ?? "" },
+    { key: "student", label: "Student", value: (s) => s.student_name ?? s.student_id ?? "" },
+    {
+      key: "status",
+      label: "Status",
+      value: (s) => (s.is_booked ? "booked" : "free"),
+      render: (s) => (s.is_booked
+        ? <StatusChip status="active" label="Booked" />
+        : <StatusChip status="pending" label="Open" />),
+    },
+  ];
+  return (
+    <DetailSheet
+      open={!!conf}
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title={conf?.title || "Slots"}
+      subtitle={conf ? `${booked}/${(slots || []).length} slots booked` : undefined}
+    >
+      {loading ? (
+        <AOSModuleLoadingState label="Loading slots…" />
+      ) : (
+        <DataPanel bodyClassName="p-0">
+          <DataTable
+            columns={SLOT_COLUMNS}
+            rows={slots || []}
+            rowKey={(s: any) => s.id}
+            dense
+            empty={{ icon: CalendarCheck, title: "No slots yet", body: "Parents book against the slots defined for this conference." }}
+          />
+        </DataPanel>
+      )}
+    </DetailSheet>
   );
 }

@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { X, Search, FileText, LayoutTemplate } from "lucide-react";
+import { X, Search, FileText, LayoutTemplate, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { TemplateThumb } from "@/components/designer/TemplateThumb";
@@ -26,6 +26,22 @@ export interface WriterTemplate {
   thumbnail_url?: string | null;
   thumbnail_emoji?: string;
   description?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** localStorage trail of the templates this user opened last (wave-J: the
+ *  gallery sorts recent-first so the common path is one click). */
+const RECENT_KEY = "writer-templates-recent";
+function readRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x: unknown) => typeof x === "string") : [];
+  } catch { return []; }
+}
+function writeRecent(ids: string[]) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(ids)); } catch { /* private mode */ }
 }
 
 export function WriterTemplatesDialog({
@@ -42,6 +58,9 @@ export function WriterTemplatesDialog({
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
+  // recently-used template ids, newest first (persisted across sessions)
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  useEffect(() => { if (open) setRecentIds(readRecent()); }, [open]);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["design-templates", "writer-gallery"],
@@ -69,7 +88,7 @@ export function WriterTemplatesDialog({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return templates.filter((t) => {
+    const list = templates.filter((t) => {
       if (category !== "all" && t.category !== category) return false;
       if (!q) return true;
       return (
@@ -78,7 +97,24 @@ export function WriterTemplatesDialog({
         || t.category?.toLowerCase().includes(q)
       );
     });
-  }, [templates, search, category]);
+    // recent-first (this user's last-opened ids lead), then newest template
+    // by updated_at so a freshly-saved school template floats to the top.
+    const rank = new Map(recentIds.map((id, i) => [id, i]));
+    return [...list].sort((a, b) => {
+      const ra = rank.has(a.id) ? rank.get(a.id)! : Number.MAX_SAFE_INTEGER;
+      const rb = rank.has(b.id) ? rank.get(b.id)! : Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+      return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+    });
+  }, [templates, search, category, recentIds]);
+
+  const pick = (tpl: WriterTemplate) => {
+    const next = [tpl.id, ...recentIds.filter((x) => x !== tpl.id)].slice(0, 12);
+    setRecentIds(next);
+    writeRecent(next);
+    onPick(tpl);
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -171,7 +207,7 @@ export function WriterTemplatesDialog({
                 <button
                   key={tpl.id}
                   type="button"
-                  onClick={() => { onPick(tpl); onClose(); }}
+                  onClick={() => pick(tpl)}
                   title={tpl.description || tpl.name}
                   className="group relative rounded-[var(--w11-radius-md)] border text-left overflow-hidden transition-all hover:-translate-y-0.5"
                   style={{
@@ -190,6 +226,15 @@ export function WriterTemplatesDialog({
                       eager={filtered.length <= 8}
                       className="transition-transform duration-300 group-hover:scale-[1.04]"
                     />
+                    {/* recently-used badge (wave-J: recent-first) */}
+                    {recentIds.includes(tpl.id) && (
+                      <span
+                        className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-[var(--w11-radius-full)] px-1.5 py-0.5 text-[9px] font-semibold backdrop-blur-md"
+                        style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}
+                      >
+                        <Clock className="h-2.5 w-2.5" /> Recent
+                      </span>
+                    )}
                   </div>
                   {/* name + category chip */}
                   <div className="px-2.5 py-2 flex items-center gap-1.5">

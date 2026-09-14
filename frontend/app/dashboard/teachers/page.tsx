@@ -19,7 +19,8 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useDebounced, useUrlFilters } from "@/components/ui/filter-bar";
 import { Spinner } from "@/components/ui/spinner";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import {
@@ -48,9 +49,12 @@ type Teacher = TeacherDto;
 export default function TeachersPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Teacher | null>(null);
-  const [search, setSearch] = useState("");
+  const { values, setValues } = useUrlFilters(["q"]);
+  const [searchInput, setSearchInput] = useState(values.q || "");
+  const search = useDebounced(searchInput, 250);
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
+  // Optimistically hidden rows for undoable delete (G8 default).
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
   const {
     data,
@@ -100,11 +104,13 @@ export default function TeachersPage() {
     onError: () => toast.error("Failed to update teacher status"),
   });
 
-  const teachers = (data || []).filter((t: Teacher) =>
-    t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.email?.toLowerCase().includes(search.toLowerCase()) ||
-    t.phone?.includes(search)
-  );
+  const teachers = (data || [])
+    .filter((t: Teacher) => !hiddenIds.has(t.id))
+    .filter((t: Teacher) =>
+      t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+      t.email?.toLowerCase().includes(search.toLowerCase()) ||
+      t.phone?.includes(search)
+    );
 
   const stats = {
     total: (data || []).length,
@@ -219,17 +225,12 @@ export default function TeachersPage() {
             className="text-[#c42b1c]"
             onClick={(e) => {
               e.stopPropagation();
-              void (async () => {
-                const ok = await confirm({
-                  title: `Delete teacher "${t.full_name}"?`,
-                  body: "Their classes keep running — reassign a class teacher afterwards.",
-                  confirmLabel: "Delete teacher",
-                  tone: "danger",
-                });
-                if (ok) {
-                  deleteMutation.mutate(t.id);
-                }
-              })();
+              undoableDelete({
+                label: `teacher ${t.full_name}`,
+                commit: async () => { await deleteMutation.mutateAsync(t.id); },
+                optimistic: () => setHiddenIds((s) => new Set(s).add(t.id)),
+                rollback: () => setHiddenIds((s) => { const n = new Set(s); n.delete(t.id); return n; }),
+              });
             }}
           >
             <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
@@ -308,8 +309,8 @@ export default function TeachersPage() {
             rows={teachers}
             rowKey={(t) => t.id}
             searchable
-            searchValue={search}
-            onSearchChange={setSearch}
+            searchValue={searchInput}
+            onSearchChange={(v) => { setSearchInput(v); setValues({ q: v }); }}
             searchPlaceholder="Search by name, email, or phone..."
             exportFileName="teachers"
             empty={{ icon: UserCog, title: "No teachers found", body: "Add teachers or bulk-upload your staff list.", action: { label: "Add Teacher", onClick: () => setShowAdd(true) } }}

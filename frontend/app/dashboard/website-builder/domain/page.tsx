@@ -5,7 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { schoolSiteHost } from "@/lib/site-domain";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Globe } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { toast } from "sonner";
 import {
   AOSPage,
   AOSPageHeader,
@@ -22,9 +25,20 @@ interface DomainSettings {
   dns_records: { type: string; name: string; value: string }[];
 }
 
+const HOSTNAME_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
+
 export default function DomainPage() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [domain, setDomain] = useState("");
+  const [showError, setShowError] = useState(false);
+
+  const normalized = domain.trim().toLowerCase();
+  const domainError = !normalized
+    ? "Enter the domain you want to connect."
+    : !HOSTNAME_RE.test(normalized) || normalized.includes("http") || normalized.includes("/")
+      ? "Enter a bare hostname like www.yourschool.edu.np (no http:// or path)."
+      : null;
 
   const { data: settings, isLoading, isError, refetch } = useQuery<DomainSettings>({
     queryKey: ["website-domain"],
@@ -35,9 +49,12 @@ export default function DomainPage() {
   const updateMut = useMutation({
     mutationFn: (custom_domain: string) =>
       api.put("/website-builder/domain", { custom_domain }),
-    onSuccess: () => {
+    onSuccess: (_res, custom_domain) => {
       qc.invalidateQueries({ queryKey: ["website-domain"] });
+      toast.success(custom_domain ? `Domain ${custom_domain} saved` : "Custom domain removed");
+      if (!custom_domain) setDomain("");
     },
+    onError: () => toast.error("Could not update the domain — try again"),
   });
 
   const verifyMut = useMutation({
@@ -187,9 +204,17 @@ export default function DomainPage() {
                   )}
 
                   <button
-                    onClick={() => updateMut.mutate("")}
+                    onClick={() => {
+                      confirm({
+                        title: "Remove custom domain",
+                        body: `Stop serving your site at ${settings.custom_domain}? Visitors using that address will get an error until its DNS records are removed at your registrar.`,
+                        confirmLabel: "Remove",
+                      }).then((ok) => {
+                        if (ok) updateMut.mutate("");
+                      });
+                    }}
                     className="block mt-3 text-sm hover:underline"
-                    style={{ color: "var(--w11-text-secondary)" }}
+                    style={{ color: "var(--w11-danger, #c42b1c)" }}
                   >
                     Remove custom domain
                   </button>
@@ -198,27 +223,34 @@ export default function DomainPage() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (domain.trim()) updateMut.mutate(domain.trim());
+                    setShowError(true);
+                    if (domainError) return;
+                    updateMut.mutate(normalized);
                   }}
-                  className="flex gap-2"
+                  className="space-y-1.5"
                 >
-                  <input
-                    type="text"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    placeholder="www.yourschool.edu.np"
-                    className="flex-1 text-sm"
-                    style={{
-                      background: "var(--w11-control-bg)",
-                      color: "var(--w11-text-primary)",
-                      border: "1px solid var(--w11-control-border)",
-                      borderRadius: "var(--w11-radius-md)",
-                      padding: "8px 12px",
-                    }}
-                  />
-                  <button type="submit" disabled={!domain.trim() || updateMut.isPending} className="win11-btn accent">
-                    {updateMut.isPending ? "Saving..." : "Connect Domain"}
-                  </button>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={domain}
+                      onChange={(e) => setDomain(e.target.value)}
+                      placeholder="www.yourschool.edu.np"
+                      aria-invalid={showError && Boolean(domainError)}
+                      className="flex-1"
+                    />
+                    <Button type="submit" disabled={updateMut.isPending} className="shrink-0">
+                      {updateMut.isPending ? "Saving…" : "Connect Domain"}
+                    </Button>
+                  </div>
+                  {showError && domainError ? (
+                    <p className="text-[11px]" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                      {domainError}
+                    </p>
+                  ) : (
+                    <p className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                      After connecting you&rsquo;ll get the DNS records to add at your registrar.
+                    </p>
+                  )}
                 </form>
               )}
             </div>

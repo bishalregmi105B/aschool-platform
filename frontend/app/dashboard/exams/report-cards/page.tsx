@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
@@ -19,6 +19,13 @@ import {
 import { FileText, Download, Printer, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { PrintStyles, PrintRegion, PrintTwinButton } from "../print-twin";
 
 interface ReportCard {
   id: string;
@@ -78,9 +85,26 @@ export default function ReportCardsPage() {
 
 function ReportCardsContent() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = user?.role === "school_admin";
-  const [examId, setExamId] = useState("");
-  const [classId, setClassId] = useState("");
+  // Wave C: exam/class pre-selection is URL state so the hub's
+  // "Report Cards" row link (?exam=<id>) lands ready.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const rcPathname = windowRoute?.pathname ?? "/dashboard/exams/report-cards";
+  const setRouteFilter = (patch: Record<string, string>) => {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    const qs = next.toString();
+    navigate(qs ? `${rcPathname}?${qs}` : rcPathname);
+  };
+  const examId = routeParams.get("exam") || "";
+  const classId = routeParams.get("cls") || "";
+  const [rcSearch, setRcSearch] = useState("");
 
   const { data: exams } = useQuery({
     queryKey: ["exams"],
@@ -98,6 +122,15 @@ function ReportCardsContent() {
     },
   });
 
+  // Deep-link convenience: ?exam=<id> without ?cls= fills the class from the
+  // exam itself (same behavior as picking the exam manually).
+  useEffect(() => {
+    if (!examId || classId) return;
+    const chosen = (exams || []).find((e: { id: string; class_id?: string | null }) => e.id === examId);
+    if (chosen?.class_id) setRouteFilter({ cls: chosen.class_id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, classId, exams]);
+
   const { data: reportCards, isLoading, isError, refetch } = useQuery({
     queryKey: ["report-cards", examId, classId],
     queryFn: async () => {
@@ -107,6 +140,12 @@ function ReportCardsContent() {
     enabled: !!examId && !!classId,
     retry: 1,
   });
+
+  // Wave C: local search actually filters (DataTable's box is display-only).
+  const rcNeedle = rcSearch.trim().toLowerCase();
+  const rcFiltered = (reportCards || []).filter((rc: ReportCard) =>
+    !rcNeedle || `${rc.student_name} ${rc.roll_number} ${rc.overall_grade ?? ""}`.toLowerCase().includes(rcNeedle)
+  );
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -143,25 +182,35 @@ function ReportCardsContent() {
 
   return (
     <AOSPage>
+      <PrintStyles />
       <AOSPageHeader
         icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Report Cards"
-        subtitle="Generate AI-powered report cards with personalized remarks"
+        title={t("Report Cards", "रिपोर्ट कार्ड")}
+        subtitle={t("Generate AI-powered report cards with personalized remarks", "व्यक्तिगत टिप्पणी सहित AI रिपोर्ट कार्ड बनाउनुहोस्")}
         actions={
-          <Button
-            variant="outline"
-            onClick={() => bulkDownloadMutation.mutate()}
-            disabled={!examId || !classId || bulkDownloadMutation.isPending}
-          >
-            <Download className="h-4 w-4 mr-2" /> Download All
-          </Button>
+          <>
+            <PrintTwinButton
+              title={`Report Cards — ${(exams || []).find((e: { id: string; name: string }) => e.id === examId)?.name || "Exam"}`}
+              disabled={!examId || !classId || (reportCards || []).length === 0}
+            />
+            <Button
+              variant="outline"
+              onClick={() => bulkDownloadMutation.mutate()}
+              disabled={!examId || !classId || bulkDownloadMutation.isPending}
+            >
+              <Download className="h-4 w-4 mr-2" /> {t("Download All PDF", "सबै PDF डाउनलोड")}
+            </Button>
+          </>
         }
       />
       <AOSPageBody className="space-y-4">
         <FilterCommandBar>
           <div className="space-y-1 w-full md:w-56">
             <Label className="text-xs">Select Exam</Label>
-            <Select value={examId} onValueChange={setExamId}>
+            <Select value={examId} onValueChange={(v) => {
+              const chosen = (exams || []).find((e: { id: string; class_id?: string | null }) => e.id === v);
+              setRouteFilter(chosen?.class_id && !classId ? { exam: v, cls: chosen.class_id } : { exam: v });
+            }}>
               <SelectTrigger><SelectValue placeholder="Choose exam" /></SelectTrigger>
               <SelectContent>
                 {(exams || []).map((e: { id: string; name: string }) => (
@@ -172,7 +221,7 @@ function ReportCardsContent() {
           </div>
           <div className="space-y-1 w-full md:w-48">
             <Label className="text-xs">Select Class</Label>
-            <Select value={classId} onValueChange={setClassId}>
+            <Select value={classId} onValueChange={(v) => setRouteFilter({ cls: v })}>
               <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
               <SelectContent>
                 {(classes || []).map((c: { id: string; name: string }) => (
@@ -217,14 +266,21 @@ function ReportCardsContent() {
                 }
               />
             ) : (
-              <DataTable
-                columns={REPORT_CARD_COLUMNS}
-                rows={reportCards}
-                rowKey={(rc: ReportCard) => rc.id}
-                searchable
-                searchPlaceholder="Search students…"
-                exportFileName="report-cards"
-              />
+              <PrintRegion>
+                <div className="hidden print:block px-4 pt-3">
+                  <p className="font-bold text-lg">Report Cards — {(exams || []).find((e: { id: string; name: string }) => e.id === examId)?.name || "Exam"} ({(classes || []).find((c: { id: string; name: string }) => c.id === classId)?.name || ""})</p>
+                </div>
+                <DataTable
+                  columns={REPORT_CARD_COLUMNS}
+                  rows={rcFiltered}
+                  rowKey={(rc: ReportCard) => rc.id}
+                  searchable
+                  searchValue={rcSearch}
+                  onSearchChange={setRcSearch}
+                  searchPlaceholder={t("Search students…", "विद्यार्थी खोज्नुहोस्…")}
+                  exportFileName="report-cards"
+                />
+              </PrintRegion>
             )}
           </DataPanel>
         )}

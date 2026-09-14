@@ -20,8 +20,14 @@ import {
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
-  AOSModuleLoadingState,
+  KpiCard,
+  StatGrid,
 } from "@/components/aos/kit/page-kit";
+import { ErrorState, DependencyMissingEmptyState } from "@/components/ui/empty-state";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
+import { formatNepaliCurrency } from "@/lib/nepali-utils";
 import { Plus, Receipt, Pencil, Trash2 } from "lucide-react";
 
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -44,7 +50,9 @@ interface Expense {
 }
 
 export default function ExpensesPage() {
+  const { t } = useI18n();
   const confirm = useConfirm();
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Expense | null>(null);
   const [search, setSearch] = useState("");
@@ -70,50 +78,57 @@ export default function ExpensesPage() {
     mutationFn: (payload: Record<string, unknown>) => api.post("/hr/expenses", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
-      toast.success("Expense recorded");
+      toast.success(t("Expense recorded", "खर्च पुन्जियो"));
       setShowAdd(false);
     },
-    onError: () => toast.error("Failed to record expense"),
+    onError: () => toast.error(t("Failed to record expense", "पुन्जाउन सकिएन")),
   });
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.put(`/hr/expenses/${editItem?.id}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
-      toast.success("Expense updated");
+      toast.success(t("Expense updated", "अपडेट भए"));
       setEditItem(null);
     },
-    onError: () => toast.error("Failed to update expense"),
+    onError: () => toast.error(t("Failed to update expense", "अपडेट सकिएन")),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/hr/expenses/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
-      toast.success("Expense deleted");
-    },
-    onError: () => toast.error("Failed to delete expense"),
-  });
+  const removeExpense = (e: Expense) => {
+    undoableDelete({
+      label: `${t("expense", "खर्च")} "${e.title}"`,
+      optimistic: () => setHiddenIds((prev) => new Set(prev).add(e.id)),
+      rollback: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          next.delete(e.id);
+          return next;
+        }),
+      commit: async () => {
+        await api.delete(`/hr/expenses/${e.id}`);
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      },
+    });
+  };
 
-  if (isLoading) return <AOSModuleLoadingState label="Loading expenses…" />;
-
-  const expenses = (data || []).filter((e: Expense) =>
+  const expensesAll = (data || []).filter((e: Expense) => !hiddenIds.has(e.id));
+  const expenses = (expensesAll || []).filter((e: Expense) =>
     e.title?.toLowerCase().includes(search.toLowerCase()) ||
     e.category_name?.toLowerCase().includes(search.toLowerCase())
   );
   const totalAmount = expenses.reduce((sum: number, e: Expense) => sum + (e.amount || 0), 0);
 
   const EXPENSE_COLUMNS: Column<Expense>[] = [
-    { key: "date", label: "Date", sortable: true, value: (e) => e.date, render: (e) => <span className="whitespace-nowrap">{e.date ? displayBS(e.date) : "—"}</span> },
-    { key: "title", label: "Title", sortable: true, value: (e) => e.title, render: (e) => <span className="font-medium">{e.title}</span> },
-    { key: "category_name", label: "Category", sortable: true, value: (e) => e.category_name ?? "", render: (e) => (
+    { key: "date", label: t("Date", "मिति"), sortable: true, value: (e) => e.date, render: (e) => <span className="whitespace-nowrap">{e.date ? displayBS(e.date) : "—"}</span> },
+    { key: "title", label: t("Title", "शीर्षक"), sortable: true, value: (e) => e.title, render: (e) => <span className="font-medium">{e.title}</span> },
+    { key: "category_name", label: t("Category", "श्रेणी"), sortable: true, value: (e) => e.category_name ?? "", render: (e) => (
       <span className="win11-chip subtle">{e.category_name}</span>
     ) },
-    { key: "amount", label: "Amount (Rs.)", align: "right", sortable: true, value: (e) => e.amount, render: (e) => <span className="font-bold">Rs. {e.amount.toLocaleString()}</span> },
-    { key: "recorded_by_name", label: "Recorded By", value: (e) => e.recorded_by_name ?? "", render: (e) => <span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{e.recorded_by_name}</span> },
+    { key: "amount", label: t("Amount (Rs.)", "रकम (रु.)"), align: "right", sortable: true, value: (e) => e.amount, render: (e) => <span className="font-bold tabular-nums">Rs. {e.amount.toLocaleString()}</span> },
+    { key: "recorded_by_name", label: t("Recorded By", "पुन्जीकरण"), value: (e) => e.recorded_by_name ?? "", render: (e) => <span className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{e.recorded_by_name}</span> },
     {
       key: "actions",
-      label: "Actions",
+      label: t("Actions", "कार्य"),
       noExport: true,
       render: (e) => (
         <div className="flex justify-end gap-2">
@@ -122,7 +137,7 @@ export default function ExpensesPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(ev) => {
             ev.stopPropagation();
-            confirm({ title: "Delete expense", body: "Delete this expense record?" }).then((ok) => { if (ok) deleteMutation.mutate(e.id); });
+            removeExpense(e);
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
@@ -135,15 +150,32 @@ export default function ExpensesPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<Receipt className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Expenses"
-        subtitle={`${expenses.length} ${expenses.length === 1 ? "record" : "records"} · Rs. ${totalAmount.toLocaleString()} total`}
+        title={t("Expenses", "खर्चहरु")}
+        subtitle={`${formatNepaliCurrency(totalAmount)} · ${expenses.length} ${t("records", "रटहर")}`}
         actions={
           <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Record Expense
+            <Plus className="h-4 w-4 mr-2" /> {t("Record Expense", "खर्च पुन्जाउनु")}
           </Button>
         }
       />
-      <AOSPageBody>
+      <AOSPageBody className="space-y-4">
+        <StatGrid className="mb-0" min={180}>
+          <KpiCard label={t("Total Spent", "कुल खर्च")} value={formatNepaliCurrency(totalAmount)} color="#d83b01" />
+          <KpiCard label={t("Records", "रटहर")} value={expenses.length} />
+        </StatGrid>
+        {isLoading ? (
+          <div className="win11-card p-4"><SkeletonTable rows={6} columns={6} /></div>
+        ) : (categoriesData || []).length === 0 ? (
+          <DataPanel>
+            <DependencyMissingEmptyState
+              title={t("No expense categories exist", "खर्च श्रेणी छेन")}
+              body={t("Create a category before recording expenses.", "खर्च पुन्जाउनपुर्व श्रेणी बनइन।")}
+              prerequisiteName={t("Expense Categories", "खर्च श्रेणी")}
+              setupHref="/dashboard/hr/expense-categories"
+              setupLabel={t("Manage categories", "श्रेणी लाग्नुहोस्")}
+            />
+          </DataPanel>
+        ) : (
         <DataPanel bodyClassName="p-0">
           <DataTable<Expense>
             columns={EXPENSE_COLUMNS}
@@ -152,18 +184,19 @@ export default function ExpensesPage() {
             searchable
             searchValue={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search expenses..."
+            searchPlaceholder={t("Search expenses…", "खर्च खोज्नु…")}
             exportFileName="expenses"
-            empty={{ icon: Receipt, title: "No expenses found", body: "Record your first school expenditure.", action: { label: "Record Expense", onClick: () => setShowAdd(true) } }}
+            empty={{ icon: Receipt, title: t("No expenses found", "कुनै खर्च छेन"), body: t("Record your first school expenditure.", "पहिलो खर्च पुन्जाउनु।"), action: { label: t("Record Expense", "पुन्जाउनु"), onClick: () => setShowAdd(true) } }}
           />
         </DataPanel>
+        )}
 
         <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
           if (!open) { setShowAdd(false); setEditItem(null); }
         }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editItem ? "Edit Expense" : "Record Expense"}</DialogTitle>
+              <DialogTitle>{editItem ? t("Edit Expense", "सम्पादन") : t("Record Expense", "खर्च पुन्जाउनु")}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={(e) => {
@@ -182,26 +215,26 @@ export default function ExpensesPage() {
               className="space-y-4"
             >
               <div className="space-y-2">
-                <Label>Title / Description</Label>
+                <Label>{t("Title / Description", "शीर्षक / विवरण")}</Label>
                 <Input name="title" required defaultValue={editItem?.title} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Amount (Rs.)</Label>
+                  <Label>{t("Amount (Rs.)", "रकम (रु.)")}</Label>
                   <Input name="amount" type="number" step="0.01" required defaultValue={editItem?.amount} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Date</Label>
+                  <Label>{t("Date", "मिति")}</Label>
                   <BSDateInput name="date" required value={editItem?.date ? editItem.date.split("T")[0] : undefined} />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>{t("Category", "श्रेणी")}</Label>
                 <Select name="category_id" defaultValue={editItem?.category_id} required>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
+                    <SelectValue placeholder={t("Select a category", "श्रेणी छान्नु")} />
                   </SelectTrigger>
                   <SelectContent>
                     {(categoriesData || []).map((c: Category) => (
@@ -212,16 +245,16 @@ export default function ExpensesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Notes (Optional)</Label>
+                <Label>{t("Notes (Optional)", "टिप्पणी")}</Label>
                 <Input name="notes" defaultValue={editItem?.notes} />
               </div>
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setShowAdd(false); setEditItem(null); }}>
-                  Cancel
+                  {t("Cancel", "रद्द")}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : "Save"}
+                  {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : t("Save", "सुरक्ष")}
                 </Button>
               </DialogFooter>
             </form>

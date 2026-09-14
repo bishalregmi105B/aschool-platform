@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Sparkles, AlertTriangle, CheckCircle2, Calendar } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertTriangle, Calendar } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -82,10 +82,10 @@ function TimetableContent() {
       <AOSPageHeader
         icon={<Calendar className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="AI Timetable Generator"
-        subtitle="Generate clash-free timetables automatically"
+        subtitle="Clash-free timetables from real constraints — review conflicts before publishing · ठक्कररहित तालिका"
         actions={
-          <Link href="/dashboard/ai-tools">
-            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />All AI Tools</Button>
+          <Link href="/dashboard/ai?tab=tools">
+            <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />AI Hub · Tools</Button>
           </Link>
         }
       />
@@ -173,7 +173,12 @@ function TimetableContent() {
           })
         ) : !gen.isPending && (
           <DataPanel>
-            <div className="py-16 text-center text-[color:var(--w11-text-secondary)]"><CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Select a session and generate a clash-free timetable</p></div>
+            <div className="py-16 text-center text-[color:var(--w11-text-secondary)]"><Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Generate to see output — select a session and let the solver run.</p></div>
+          </DataPanel>
+        )}
+        {gen.isPending && (
+          <DataPanel title="Solving…">
+            <div className="py-10 text-center text-[color:var(--w11-text-secondary)] text-sm">Running the constraint solver on classes, teachers and rooms…</div>
           </DataPanel>
         )}
       </AOSPageBody>

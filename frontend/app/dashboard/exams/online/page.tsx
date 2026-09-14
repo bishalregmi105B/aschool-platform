@@ -18,8 +18,10 @@ import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
   DataPanel, StatusChip, AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
-import { Monitor, Plus, Play, Clock, CheckCircle2, Sparkles } from "lucide-react";
+import { Monitor, Plus, Play, Clock, CheckCircle2, Sparkles, Eye } from "lucide-react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
+import { ExamRunnerDialog } from "./runner";
 
 interface OnlineExam {
   id: string;
@@ -61,8 +63,12 @@ export default function OnlineExamPage() {
 
 function OnlineExamContent() {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [search, setSearch] = useState("");
+  // Wave C: eSchool-style runner preview (palette + away warning + autosave).
+  const [runnerExamId, setRunnerExamId] = useState<string | null>(null);
 
   const { data: exams = [], isLoading } = useQuery<OnlineExam[]>({
     queryKey: ["online-exams"],
@@ -95,6 +101,12 @@ function OnlineExamContent() {
   const upcoming = exams.filter((e: any) => e.status === "upcoming").length;
   const active = exams.filter((e: any) => e.status === "active").length;
   const completed = exams.filter((e: any) => e.status === "completed").length;
+
+  // Wave C fix: DataTable's search box is display-only — filter here.
+  const needle = search.trim().toLowerCase();
+  const visibleExams = needle
+    ? exams.filter((e: any) => `${e.title} ${e.subject_name ?? ""}`.toLowerCase().includes(needle))
+    : exams;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +154,24 @@ function OnlineExamContent() {
         return <StatusChip status={tone ?? e.status} label={e.status} className="capitalize" />;
       },
     },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (e) => (
+        <div className="flex justify-end" onClick={(ev) => ev.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1.5"
+            title={t("Preview the exam runner (palette, timer, autosave)", "रनर पूर्वावलोकन")}
+            onClick={() => setRunnerExamId(e.id)}
+          >
+            <Eye className="h-3.5 w-3.5" /> {t("Preview runner", "रनर हेर्नुहोस्")}
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const loadingValue = (
@@ -152,8 +182,8 @@ function OnlineExamContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Monitor className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Online Exams"
-        subtitle={`${exams.length} exams · Create and manage online examinations with auto-grading`}
+        title={t("Online Exams", "अनलाइन परीक्षाहरू")}
+        subtitle={`${exams.length} ${t("exams", "परीक्षा")} · ${t("Create and manage online examinations with auto-grading", "स्वतः-ग्रेडिङका साथ अनलाइन परीक्षा बनाउनुहोस् र व्यवस्थापन गर्नुहोस्")}`}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -262,9 +292,7 @@ function OnlineExamContent() {
         </StatGrid>
 
         <DataPanel title={`All Online Exams (${exams.length})`}>
-          {isLoading ? (
-            <div className="flex justify-center py-12"><Spinner /></div>
-          ) : exams.length === 0 ? (
+          {exams.length === 0 && !isLoading ? (
             <AOSEmptyState
               icon={<Monitor className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}
               title="No online exams yet"
@@ -273,14 +301,28 @@ function OnlineExamContent() {
           ) : (
             <DataTable
               columns={ONLINE_EXAM_COLUMNS}
-              rows={exams}
+              rows={visibleExams}
               rowKey={(exam: any) => exam.id}
+              loading={isLoading}
               searchable
-              searchPlaceholder="Search online exams…"
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder={t("Search online exams…", "अनलाइन परीक्षा खोज्नुहोस्…")}
               exportFileName="online-exams"
+              empty={{
+                icon: Monitor,
+                title: t("No online exams found", "कुनै अनलाइन परीक्षा भेटिएन"),
+                body: t("Create your first online exam to get started with auto-grading.", "स्वतः-ग्रेडिङका लागि पहिलो अनलाइन परीक्षा बनाउनुहोस्।"),
+              }}
             />
           )}
         </DataPanel>
+
+        <ExamRunnerDialog
+          examId={runnerExamId}
+          open={!!runnerExamId}
+          onOpenChange={(v) => { if (!v) setRunnerExamId(null); }}
+        />
       </AOSPageBody>
     </AOSPage>
   );

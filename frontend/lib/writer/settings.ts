@@ -161,12 +161,18 @@ export const SYSTEM_FONTS = [
   "Calibri", "Cambria", "Arial", "Georgia", "Times New Roman", "Courier New",
   "Consolas", "Verdana", "Tahoma", "Trebuchet MS", "Impact", "Segoe UI",
 ];
+// Legacy Nepali typing fonts — installed on school PCs, NOT on Google Fonts.
+// The picker shows them; the loader must never try to fetch them (wave-J,
+// audit §6/§7: both editors' font pickers lacked Preeti).
+export const LOCAL_NEPALI_FONTS = ["Preeti", "Kalimati"];
 export const GOOGLE_FONTS = [
   "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito",
   "Playfair Display", "Merriweather", "PT Serif", "Libre Baskerville",
   "Noto Sans Devanagari", "Mukta", "Hind",
 ];
-export const ALL_FONTS = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
+export const ALL_FONTS = [...LOCAL_NEPALI_FONTS, ...SYSTEM_FONTS, ...GOOGLE_FONTS];
+/** Families that need the Devanagari subset when loaded from Google. */
+export const DEVANAGARI_FONTS = ["Noto Sans Devanagari", "Mukta", "Hind", ...LOCAL_NEPALI_FONTS];
 
 export const THEME_COLORS = [
   "#0f172a", "#334155", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#ffffff",

@@ -1,19 +1,14 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Bell, MessageCircle, Phone, Smartphone } from "lucide-react";
-import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
-  DataPanel,
-  AOSModuleLoadingState,
-} from "@/components/aos/kit/page-kit";
+import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
+import { SettingsPage } from "../settings-page";
+import { SettingsSection, SettingField, useSectionSave } from "../settings-section";
 
 interface NotificationConfig {
   push_enabled: boolean;
@@ -32,112 +27,137 @@ interface NotificationConfig {
 }
 
 const TYPE_LABELS: Record<string, { label: string; description: string }> = {
-  attendance: { label: "Attendance Alerts", description: "Notify parents when student is marked absent" },
-  fee_reminder: { label: "Fee Reminders", description: "Remind parents about overdue fee payments" },
-  fee_payment: { label: "Payment Receipts", description: "Confirm payment to parent when fee is collected" },
-  notice: { label: "Notices & Circulars", description: "Push new school notices to all users" },
-  homework: { label: "Homework / Assignments", description: "Alert students & parents when homework is posted" },
-  exam_result: { label: "Exam Results", description: "Notify when exam results are published" },
-  gamification: { label: "Gamification", description: "Celebrate points, badges, and achievements" },
+  attendance: { label: "Attendance Alerts", description: "Parents are notified when a student is marked absent." },
+  fee_reminder: { label: "Fee Reminders", description: "Parents receive a reminder when a fee becomes overdue." },
+  fee_payment: { label: "Payment Receipts", description: "A receipt confirmation is sent when a fee is collected." },
+  notice: { label: "Notices & Circulars", description: "New school notices are pushed to every user of this school." },
+  homework: { label: "Homework / Assignments", description: "Students and parents are alerted when homework is posted." },
+  exam_result: { label: "Exam Results", description: "Users are notified when exam results are published." },
+  gamification: { label: "Gamification", description: "Celebration messages for points, badges and achievements." },
 };
+
+type ChannelValues = Record<string, boolean>;
+type TypeValues = Record<string, boolean>;
 
 export default function NotificationSettingsPage() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<NotificationConfig>({
+  const { data, isLoading, isError, refetch } = useQuery<NotificationConfig>({
     queryKey: ["notification-settings"],
     queryFn: async () => {
       const r = await api.get("/schools/current/notification-settings");
       return r.data?.data;
     },
+    retry: 1,
   });
 
-  const save = useMutation({
-    mutationFn: async (patch: Partial<NotificationConfig>) =>
-      api.put("/schools/current/notification-settings", patch),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
-      toast.success("Notification settings saved.");
-    },
-    onError: (e: any) =>
-      toast.error(e?.response?.data?.error || "Failed to save settings"),
+  const channelInitial = useMemo<ChannelValues>(
+    () => ({
+      push_enabled: data?.push_enabled ?? false,
+      sms_enabled: data?.sms_enabled ?? false,
+      whatsapp_enabled: data?.whatsapp_enabled ?? false,
+    }),
+    [data],
+  );
+  const typesInitial = useMemo<TypeValues>(
+    () => Object.fromEntries(Object.keys(TYPE_LABELS).map((k) => [k, data?.types?.[k] ?? true])),
+    [data],
+  );
+
+  const channels = useSectionSave<ChannelValues>(channelInitial, async (v) => {
+    await api.put("/schools/current/notification-settings", v);
+    queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
+  });
+  const types = useSectionSave<TypeValues>(typesInitial, async (v) => {
+    await api.put("/schools/current/notification-settings", { types: v });
+    queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
   });
 
-  const toggleChannel = (
-    channel: keyof Pick<NotificationConfig, "push_enabled" | "sms_enabled" | "whatsapp_enabled">
-  ) => {
-    if (!data) return;
-    save.mutate({ [channel]: !data[channel] });
-  };
+  if (isError || (!isLoading && !data)) {
+    return (
+      <SettingsPage
+        active="notifications"
+        icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title="Notification Settings"
+        subtitle="Control which channels and event types are active for your school"
+      >
+        <div className="win11-infobar error">
+          <div>
+            <p className="text-sm font-medium">Couldn&rsquo;t load notification settings</p>
+            <p className="text-xs mt-1">The settings service didn&rsquo;t respond — retry to load them again.</p>
+          </div>
+          <button className="win11-btn" onClick={() => refetch()}>Retry</button>
+        </div>
+      </SettingsPage>
+    );
+  }
+  if (isLoading || !data) return <AOSModuleLoadingState label="Loading notification settings…" />;
 
-  const toggleType = (type: string) => {
-    if (!data) return;
-    save.mutate({ types: { ...data.types, [type]: !data.types[type] } });
-  };
-
-  if (isLoading) return <AOSModuleLoadingState label="Loading notification settings…" />;
-  if (!data) return null;
-
-  const channels = [
-    { key: "push_enabled" as const, label: "Push Notifications", icon: Smartphone },
-    { key: "sms_enabled" as const, label: "SMS", icon: Phone },
-    { key: "whatsapp_enabled" as const, label: "WhatsApp", icon: MessageCircle },
+  const channelDefs = [
+    { key: "push_enabled" as const, label: "Push Notifications", icon: Smartphone, help: "Mobile app push alerts to the signed-in device. Needs the school app installed." },
+    { key: "sms_enabled" as const, label: "SMS", icon: Phone, help: "Text alerts via the SMS gateway — costs credits per message (see the SMS plugin)." },
+    { key: "whatsapp_enabled" as const, label: "WhatsApp", icon: MessageCircle, help: "Sends event alerts through the connected WhatsApp Business account." },
   ];
 
   return (
-    <AOSPage>
-      <AOSPageHeader
-        icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Notification Settings"
-        subtitle="Control which channels and event types are active for your school."
-      />
-      <AOSPageBody>
-        <div className="space-y-4 max-w-3xl">
-          {/* Global channel toggles */}
-          <DataPanel title="Notification Channels">
-            <div className="space-y-4">
-              {channels.map((ch) => (
-                <div key={ch.key} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <ch.icon className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />
-                    <Label className="text-sm font-medium">{ch.label}</Label>
-                  </div>
+    <SettingsPage
+      active="notifications"
+      icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+      title="Notification Settings"
+      subtitle="Channels decide where alerts go; event types decide what is sent"
+    >
+      <div className="space-y-4 max-w-3xl">
+        {/* ── Channels ── */}
+        <SettingsSection
+          title="Notification Channels"
+          description="A channel must be on here before any event can be delivered through it."
+          form={channels}
+        >
+          <div className="space-y-4">
+            {channelDefs.map((ch) => (
+              <SettingField key={ch.key} label={ch.label} help={ch.help}>
+                <div className="flex items-center gap-3">
+                  <ch.icon className="h-4 w-4 shrink-0" style={{ color: "var(--w11-accent)" }} />
                   <Switch
-                    checked={data[ch.key]}
-                    onCheckedChange={() => toggleChannel(ch.key)}
-                    disabled={save.isPending}
+                    checked={Boolean(channels.values[ch.key])}
+                    disabled={channels.saving}
+                    onCheckedChange={(c) => channels.setField({ [ch.key]: c })}
+                    aria-label={ch.label}
                   />
+                  <span className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                    {channels.values[ch.key] ? "On" : "Off"}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </DataPanel>
+              </SettingField>
+            ))}
+            {channels.saving && (
+              <p className="flex items-center gap-2 text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
+                <Spinner size="sm" /> Saving channels…
+              </p>
+            )}
+          </div>
+        </SettingsSection>
 
-          {/* Per-type toggles */}
-          <DataPanel title="Notification Types">
-            <div className="space-y-5">
-              {Object.entries(TYPE_LABELS).map(([key, meta]) => (
-                <div key={key} className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>{meta.label}</p>
-                    <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{meta.description}</p>
-                  </div>
-                  <Switch
-                    checked={data.types[key] ?? true}
-                    onCheckedChange={() => toggleType(key)}
-                    disabled={save.isPending}
-                  />
-                </div>
-              ))}
-            </div>
-          </DataPanel>
-
-          {save.isPending && (
-            <div className="flex items-center gap-2 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
-              <Spinner className="h-4 w-4" /> Saving…
-            </div>
-          )}
-        </div>
-      </AOSPageBody>
-    </AOSPage>
+        {/* ── Event types ── */}
+        <SettingsSection
+          title="Notification Types"
+          description="Which events generate notifications (delivered via the channels above)."
+          form={types}
+        >
+          <div className="space-y-4">
+            {Object.entries(TYPE_LABELS).map(([key, meta]) => (
+              <SettingField key={key} label={meta.label} help={meta.description}>
+                <Switch
+                  checked={Boolean(types.values[key])}
+                  disabled={types.saving}
+                  onCheckedChange={(c) => types.setField({ [key]: c })}
+                  aria-label={meta.label}
+                />
+              </SettingField>
+            ))}
+          </div>
+        </SettingsSection>
+      </div>
+    </SettingsPage>
   );
 }

@@ -5,6 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ALL_TEMPLATES } from "@/lib/school-website/templates";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { Palette } from "lucide-react";
@@ -216,37 +224,20 @@ export default function ThemesPage() {
       />
       <AOSPageBody>
         <div className="space-y-4">
-          {/* Tab switcher */}
-          <div
-            className="flex gap-4 border-b border-[var(--w11-border-subtle)]"
-          >
-            <button
-              onClick={() => setActiveTab("templates")}
-              className="pb-3 px-1 text-sm font-medium border-b-2 transition-colors"
-              style={{
-                borderColor: activeTab === "templates" ? "var(--w11-accent)" : "transparent",
-                color: activeTab === "templates" ? "var(--w11-accent)" : "var(--w11-text-secondary)",
-              }}
-            >
-              📐 Page Templates
-              <span className="win11-chip ml-1.5">{ALL_TEMPLATES.length}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("themes")}
-              className="pb-3 px-1 text-sm font-medium border-b-2 transition-colors"
-              style={{
-                borderColor: activeTab === "themes" ? "var(--w11-accent)" : "transparent",
-                color: activeTab === "themes" ? "var(--w11-accent)" : "var(--w11-text-secondary)",
-              }}
-            >
-              🖌️ Color Themes
-              <span className="win11-chip ml-1.5">{themes.length}</span>
-            </button>
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "themes" | "templates")}>
+            <TabsList className="w-fit">
+              <TabsTrigger value="templates">
+                Page Templates
+                <span className="win11-chip ml-1.5">{ALL_TEMPLATES.length}</span>
+              </TabsTrigger>
+              <TabsTrigger value="themes">
+                Color Themes
+                <span className="win11-chip ml-1.5">{themes.length}</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Templates tab */}
-          {activeTab === "templates" && (
-            <div>
+            {/* Templates tab */}
+            <TabsContent value="templates">
               <div className="win11-infobar info mb-5">
                 <strong>💡 How templates work:</strong> Applying a template replaces all sections on your Home page
                 with a professionally designed layout. You can then customize each section using the editor.
@@ -261,12 +252,10 @@ export default function ThemesPage() {
                   />
                 ))}
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {/* Themes tab */}
-          {activeTab === "themes" && (
-            <div>
+            {/* Themes tab */}
+            <TabsContent value="themes">
               {/* Filter */}
               <FilterCommandBar>
                 {(["all", "free", "pro"] as const).map((f) => (
@@ -324,29 +313,24 @@ export default function ThemesPage() {
                       </div>
                     </div>
                   ))}
+                  {filtered.length === 0 && (
+                    <p className="col-span-full py-10 text-center text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                      No {filter} themes — <button className="underline" style={{ color: "var(--w11-accent)" }} onClick={() => setFilter("all")}>show all</button>
+                    </p>
+                  )}
                 </div>
               )}
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
 
-          {/* Theme Preview Modal */}
-          {previewTheme && (
-            <div className="win11-modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4">
-              <div
-                className="win11-dialog max-w-2xl w-full max-h-[80vh] overflow-auto"
-                style={{ background: "var(--w11-surface-solid)" }}
-              >
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{previewTheme.name}</h2>
-                    <button
-                      onClick={() => setPreviewTheme(null)}
-                      className="text-2xl"
-                      style={{ color: "var(--w11-text-secondary)" }}
-                    >
-                      ×
-                    </button>
-                  </div>
+          {/* Theme Preview — ui/Dialog (one dialog grammar, keyboard-dismissable) */}
+          <Dialog open={previewTheme !== null} onOpenChange={(o) => !o && setPreviewTheme(null)}>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+              {previewTheme && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{previewTheme.name}</DialogTitle>
+                  </DialogHeader>
                   <div className="rounded-lg overflow-hidden border border-[var(--w11-border-default)]" style={{ fontFamily: previewTheme.fonts.body }}>
                     <div className="p-6 text-white" style={{ background: `linear-gradient(135deg, ${previewTheme.colors.primary}, ${previewTheme.colors.secondary})` }}>
                       <h3 className="text-2xl font-bold" style={{ fontFamily: previewTheme.fonts.heading }}>School Name</h3>
@@ -361,14 +345,14 @@ export default function ThemesPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button onClick={() => setPreviewTheme(null)} className="win11-btn">Close</button>
-                    <button onClick={() => { applyThemeMut.mutate(previewTheme.id); setPreviewTheme(null); }} className="win11-btn accent">Apply Theme</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPreviewTheme(null)}>Close</Button>
+                    <Button onClick={() => { applyThemeMut.mutate(previewTheme.id); setPreviewTheme(null); }}>Apply Theme</Button>
+                  </DialogFooter>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </AOSPageBody>
     </AOSPage>

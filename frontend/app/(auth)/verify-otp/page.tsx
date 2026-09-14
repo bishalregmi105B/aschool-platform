@@ -4,10 +4,10 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { OtpInput } from "@/components/portal/otp-input";
 import { api } from "@/lib/api";
 
 export default function VerifyOtpPage() {
@@ -34,8 +34,8 @@ function VerifyOtpContent() {
     }
   }, [resendTimer]);
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerify = async (e?: { preventDefault(): void }) => {
+    e?.preventDefault();
     if (otp.length !== 6) { toast.error("Please enter 6-digit OTP"); return; }
     setLoading(true);
     try {
@@ -64,49 +64,60 @@ function VerifyOtpContent() {
   };
 
   return (
-    <Card className="shadow-lg max-w-sm mx-auto">
+    <Card className="shadow-lg max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="mx-auto h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl mb-2">A</div>
         <CardTitle className="text-2xl">Verify Phone</CardTitle>
-        <CardDescription>Enter the 6-digit OTP sent to {phone || "your phone"}</CardDescription>
+        <CardDescription>
+          {phone
+            ? "Enter the 6-digit OTP sent to " + phone
+            : "This link is missing your phone number — start the sign-up again."}
+        </CardDescription>
       </CardHeader>
 
       <CardContent>
-        {devOtp && (
-          <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-            <strong>Dev mode:</strong> OTP is <span className="font-mono font-bold">{devOtp}</span> (pre-filled)
-          </div>
-        )}
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="otp">OTP Code</Label>
-            <Input
-              id="otp"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="000000"
-              maxLength={6}
-              className="text-center text-2xl tracking-[0.5em]"
-              autoFocus
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
-            {loading ? <Spinner size="sm" /> : "Verify"}
+        {!phone ? (
+          <Button variant="outline" className="w-full h-11" onClick={() => router.push("/register")}>
+            Go to Register
           </Button>
-
-          <div className="text-center">
-            {resendTimer > 0 ? (
-              <p className="text-sm text-muted-foreground">Resend OTP in {resendTimer}s</p>
-            ) : (
-              <Button type="button" variant="ghost" size="sm" onClick={handleResend}>Resend OTP</Button>
+        ) : (
+          <form onSubmit={handleVerify} className="space-y-4">
+            {devOtp && (
+              <div className="rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                <strong>Dev mode:</strong> OTP is <span className="font-mono font-bold">{devOtp}</span> (pre-filled)
+              </div>
             )}
-          </div>
+            <div className="space-y-2">
+              <Label>OTP Code</Label>
+              <div className="flex justify-center">
+                <OtpInput
+                  value={otp}
+                  onChange={setOtp}
+                  onComplete={() => void handleVerify()}
+                  label="6-digit OTP code"
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            </div>
 
-          <p className="text-center text-sm text-muted-foreground">
-            <a href="/login" className="text-primary hover:underline">Back to login</a>
-          </p>
-        </form>
+            <Button type="submit" className="w-full h-11" disabled={loading || otp.length !== 6}>
+              {loading ? <Spinner size="sm" /> : "Verify"}
+            </Button>
+
+            <div className="text-center">
+              {resendTimer > 0 ? (
+                <p className="text-sm text-muted-foreground">Resend OTP in {resendTimer}s</p>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" onClick={handleResend}>Resend OTP</Button>
+              )}
+            </div>
+
+            <p className="text-center text-sm text-muted-foreground">
+              <a href="/login" className="text-primary hover:underline">Back to login</a>
+            </p>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

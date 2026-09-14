@@ -15,6 +15,8 @@ import {
   AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
 import { FileQuestion, Printer, Sparkles, Copy, Check } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { PrintStyles, PrintRegion, PrintTwinButton } from "../../print-twin";
 
 export default function OnlineExamQuestionsPage() {
   return (
@@ -27,6 +29,7 @@ export default function OnlineExamQuestionsPage() {
 }
 
 function QuestionsContent() {
+  const { t } = useI18n();
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
@@ -83,10 +86,11 @@ function QuestionsContent() {
 
   return (
     <AOSPage>
+      <PrintStyles orientation="portrait" />
       <AOSPageHeader
         icon={<Sparkles className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="AI Question Generator"
-        subtitle="Instantly generate exam papers and questions using AI"
+        title={t("AI Question Generator", "AI प्रश्नपत्र जेनेरेटर")}
+        subtitle={t("Instantly generate exam papers and questions using AI", "AI बाट तुरुन्तै परीक्षा प्रश्नपत्र बनाउनुहोस्")}
       />
       <AOSPageBody className="max-w-5xl">
         <div className="grid md:grid-cols-3 gap-4">
@@ -165,8 +169,11 @@ function QuestionsContent() {
                     {copied ? <Check className="h-4 w-4 mr-2" style={{ color: "#107c10" }} /> : <Copy className="h-4 w-4 mr-2" />}
                     {copied ? "Copied!" : "Copy Text"}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handlePrint} disabled={!result.html}>
-                    <Printer className="h-4 w-4 mr-2" /> Print PDF
+                  {/* Wave C: twin-first print (no popup to be blocked); the
+                      popup export stays for staff who want a separate sheet. */}
+                  <PrintTwinButton title={`Question Paper — ${result.subject || ""}`} label="Print paper" />
+                  <Button variant="ghost" size="sm" onClick={handlePrint} disabled={!result.html} title="Open the server-rendered paper in a new tab">
+                    <Printer className="h-4 w-4" />
                   </Button>
                 </div>
               )
@@ -180,6 +187,7 @@ function QuestionsContent() {
                   <p className="animate-pulse">AI is crafting the perfect questions...</p>
                 </div>
               ) : result ? (
+                <PrintRegion>
                 <div
                   className="p-6 h-[600px] overflow-y-auto font-serif"
                   style={{ background: "var(--w11-control-hover)" }}
@@ -190,6 +198,7 @@ function QuestionsContent() {
                     <pre className="whitespace-pre-wrap font-sans text-sm">{result.text || JSON.stringify(result, null, 2)}</pre>
                   )}
                 </div>
+                </PrintRegion>
               ) : (
                 <AOSEmptyState
                   icon={<FileQuestion className="h-12 w-12" style={{ color: "var(--w11-text-tertiary)" }} />}

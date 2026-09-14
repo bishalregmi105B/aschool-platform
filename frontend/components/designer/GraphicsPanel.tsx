@@ -14,7 +14,7 @@
  * adapts to the AOS light AND dark themes. Renders inside CanvasEditor's
  * win11 scope, so no scope of its own is needed.
  */
-import { useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -79,7 +79,7 @@ function ColorRow({ color, onChange }: { color: string; onChange: (c: string) =>
   );
 }
 
-export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Props) {
+export default memo(function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Props) {
   const [qrValue, setQrValue] = useState("");
   const [wmText, setWmText] = useState("DRAFT");
 
@@ -250,4 +250,4 @@ export default function GraphicsPanel({ onAddQr, onAddWatermark, onAddIcon }: Pr
       </div>
     </div>
   );
-}
+});

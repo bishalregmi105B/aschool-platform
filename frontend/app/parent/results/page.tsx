@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type SubjectResult = {
@@ -24,11 +25,12 @@ type ChildResultsPayload = {
 
 /** Parent → Results. Backed by GET /parent/child-results (per-exam subject rows). */
 export default function ParentResultsPage() {
+  const { selectedId, childParam } = useSelectedChild();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["parent-results"],
+    queryKey: ["parent-results", selectedId],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ChildResultsPayload[] | ChildResultsPayload>>(
-        "/parent/child-results"
+        `/parent/child-results${childParam ? `?${childParam}` : ""}`
       );
       const payload = res.data.data;
       return Array.isArray(payload) ? payload[0] : payload;
@@ -43,6 +45,7 @@ export default function ParentResultsPage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Results" />
       {data?.exam_name && (
         <p className="text-sm text-muted-foreground">{data.exam_name}</p>

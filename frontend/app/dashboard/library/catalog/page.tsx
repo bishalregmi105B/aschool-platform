@@ -20,8 +20,11 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { BookOpen, Plus, Pencil, Trash2 } from "lucide-react";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { BookOpen, FolderOpen, Plus, Pencil, Trash2 } from "lucide-react";
+import { TreeView, type TreeNode } from "@/components/aos/kit/detail-kit";
+import { DetailSplit } from "@/components/aos/kit/page-kit";
+import { useMemo } from "react";
+import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function CatalogPage() {
   return <PluginGate slug="library"><CatalogContent /></PluginGate>;
@@ -52,6 +55,42 @@ function CatalogContent() {
   });
 
   const books = data?.data || [];
+
+  // Category tree sidebar (G3 adoption): All + per-category counts, drives a
+  // client-side filter over the same search results.
+  const [selCat, setSelCat] = useState<string | null>(null);
+  const tree = useMemo<TreeNode[]>(() => {
+    const counts = new Map<string, number>();
+    (books as any[]).forEach((b) => {
+      const c = b.category || "general";
+      counts.set(c, (counts.get(c) || 0) + 1);
+    });
+    return [
+      {
+        id: "all",
+        label: (
+          <span className="flex items-center justify-between gap-2">
+            <span>All categories</span>
+            <span className="win11-chip subtle">{(books as any[]).length}</span>
+          </span>
+        ),
+        defaultOpen: true,
+        children: [...counts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([c, n]) => ({
+            id: c,
+            label: (
+              <span className="flex items-center justify-between gap-2">
+                <span className="capitalize">{c}</span>
+                <span style={{ color: "var(--w11-text-tertiary)" }} className="text-[11px] tabular-nums">{n}</span>
+              </span>
+            ),
+          })),
+      },
+    ];
+  }, [books]);
+
+  const shownBooks = selCat && selCat !== "all" ? (books as any[]).filter((b) => (b.category || "general") === selCat) : books;
 
   const openCreate = () => { setEditingId(null); setForm(EMPTY_FORM); setShowDialog(true); };
   const openEdit = (b: any) => {
@@ -140,7 +179,13 @@ function CatalogContent() {
             title="Delete"
             onClick={(e) => {
               e.stopPropagation();
-              confirm({ title: "Confirm", body: `Delete "${b.title}" from the catalog?` }).then((ok) => { if (ok) remove.mutate(b.id); });
+              undoableDelete({
+                label: `book “${b.title}”`,
+                commit: async () => {
+                  await api.delete(`/library/books/${b.id}`);
+                  queryClient.invalidateQueries({ queryKey: ["library-books"] });
+                },
+              });
             }}
           >
             <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
@@ -161,10 +206,22 @@ function CatalogContent() {
         }
       />
       <AOSPageBody>
+        <DetailSplit
+          sidebar={
+            <DataPanel title={<span className="flex items-center gap-2"><FolderOpen className="h-4 w-4" /> Categories</span>}>
+              <TreeView
+                nodes={tree}
+                selectedId={selCat ?? "all"}
+                onSelect={(id) => setSelCat(id === "all" ? null : id)}
+                aria-label="Book categories"
+              />
+            </DataPanel>
+          }
+        >
         <DataPanel bodyClassName="p-0">
           <DataTable
             columns={CATALOG_COLUMNS}
-            rows={books}
+            rows={shownBooks}
             rowKey={(b: any) => b.id}
             searchable
             searchValue={search}
@@ -174,6 +231,7 @@ function CatalogContent() {
             empty={{ icon: BookOpen, title: "No books found", body: "Add books to build the catalog.", action: { label: "Add Book", onClick: openCreate } }}
           />
         </DataPanel>
+        </DetailSplit>
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>

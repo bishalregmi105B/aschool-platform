@@ -673,7 +673,7 @@ function RegisterPageContent() {
       <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-muted-foreground text-center sm:text-left">
         <span>🇳🇵 Built specially for Nepalese Schools & Colleges</span>
         <span className="flex items-center gap-1">
-          <ShieldCheck className="w-3.5 h-3.5 text-primary" /> 256-Bit SSL Encrypted • Zero Data Loss Guarantee
+          <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Per-school data isolation · Secure cookie sessions
         </span>
       </div>
     </div>

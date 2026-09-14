@@ -17,8 +17,10 @@ import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { FormCheckbox } from "@/components/ui/form-checkbox";
 import {
   AOSPage, AOSPageHeader, AOSPageBody, DataPanel,
-  StatusChip, AOSEmptyState, AOSModuleLoadingState,
+  StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
 import { Plus, Trash2, Pencil, GraduationCap } from "lucide-react";
 
 interface Scholarship {
@@ -57,7 +59,9 @@ export default function ScholarshipsPage() {
 }
 
 function ScholarshipsContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [showDialog, setShowDialog] = useState(false);
   const [editTarget, setEditTarget] = useState<Scholarship | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -122,10 +126,10 @@ function ScholarshipsContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scholarships"] });
       setShowDialog(false);
-      toast.success("Scholarship created successfully.");
+      toast.success(t("Scholarship created successfully.", "छात्रवृत्ति बन्ये।"));
     },
     onError: (e: any) =>
-      toast.error(e?.response?.data?.error || "Failed to create scholarship"),
+      toast.error(e?.response?.data?.error || t("Failed to create scholarship", "बनाउन सकिएन")),
   });
 
   const update = useMutation({
@@ -142,24 +146,33 @@ function ScholarshipsContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scholarships"] });
       setShowDialog(false);
-      toast.success("Scholarship updated.");
+      toast.success(t("Scholarship updated.", "अपडेट भए।"));
     },
     onError: (e: any) =>
-      toast.error(e?.response?.data?.error || "Failed to update scholarship"),
+      toast.error(e?.response?.data?.error || t("Failed to update scholarship", "अपडेट सकिएन")),
   });
 
-  const remove = useMutation({
-    mutationFn: async (id: string) => api.delete(`/fees/scholarships/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scholarships"] });
-      toast.success("Scholarship deleted.");
-    },
-  });
+  const removeScholarship = (sc: Scholarship) => {
+    undoableDelete({
+      label: `${t("scholarship", "छात्रवृत्ति")} (${sc.student_name})`,
+      optimistic: () => setHiddenIds((prev) => new Set(prev).add(sc.id)),
+      rollback: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sc.id);
+          return next;
+        }),
+      commit: async () => {
+        await api.delete(`/fees/scholarships/${sc.id}`);
+        queryClient.invalidateQueries({ queryKey: ["scholarships"] });
+      },
+    });
+  };
 
   const SCHOLARSHIP_COLUMNS: Column<any>[] = [
     {
       key: "student_name",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
       value: (sc) => sc.student_name ?? "",
       render: (sc) => (
@@ -169,31 +182,31 @@ function ScholarshipsContent() {
         </div>
       ),
     },
-    { key: "class_name", label: "Class", sortable: true, value: (sc) => sc.class_name ?? "", render: (sc) => sc.class_name || "—" },
-    { key: "fee_type", label: "Fee Type", value: (sc) => sc.fee_type ?? "", render: (sc) => <Badge variant="outline">{sc.fee_type || "All Types"}</Badge> },
+    { key: "class_name", label: t("Class", "कक्षा"), sortable: true, value: (sc) => sc.class_name ?? "", render: (sc) => sc.class_name || "—" },
+    { key: "fee_type", label: t("Fee Type", "शुल्क प्रकार"), value: (sc) => sc.fee_type ?? "", render: (sc) => <Badge variant="outline">{sc.fee_type || t("All Types", "सबै")}</Badge> },
     {
       key: "discount_value",
-      label: "Discount",
+      label: t("Discount", "छुट"),
       align: "right",
       sortable: true,
       value: (sc) => sc.discount_value ?? 0,
       render: (sc) => (
-        <span className="font-semibold" style={{ color: "#107c10" }}>
+        <span className="font-semibold tabular-nums" style={{ color: "#107c10" }}>
           {sc.discount_type === "percent" ? `${sc.discount_value}%` : `Rs. ${sc.discount_value.toLocaleString()}`}
         </span>
       ),
     },
-    { key: "reason", label: "Reason", value: (sc) => sc.reason ?? "", render: (sc) => sc.reason || "—" },
+    { key: "reason", label: t("Reason", "कारण"), value: (sc) => sc.reason ?? "", render: (sc) => sc.reason || "—" },
     {
       key: "valid_until_bs",
-      label: "Valid Until",
+      label: t("Valid Until", "मितिसम्म"),
       sortable: true,
       value: (sc) => sc.valid_until_bs ?? "",
-      render: (sc) => (sc.valid_until_bs ? <span className="text-sm">{sc.valid_until_bs}</span> : <Badge variant="secondary">Open-ended</Badge>),
+      render: (sc) => (sc.valid_until_bs ? <span className="text-sm">{sc.valid_until_bs}</span> : <Badge variant="secondary">{t("Open-ended", "कुललाई")}</Badge>),
     },
     {
       key: "is_active",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (sc) => (sc.is_active ? "active" : "inactive"),
       render: (sc) => <StatusChip status={sc.is_active ? "active" : "inactive"} />,
@@ -207,7 +220,7 @@ function ScholarshipsContent() {
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(sc); }}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(sc.id); }} disabled={remove.isPending}>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeScholarship(sc); }} aria-label={t("Delete scholarship", "मेटाउनुहोस")}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
         </div>
@@ -215,7 +228,7 @@ function ScholarshipsContent() {
     },
   ];
 
-  if (isLoading) return <AOSPage><AOSModuleLoadingState label="Loading scholarships…" /></AOSPage>;
+  const visibleScholarships = scholarships.filter((sc) => !hiddenIds.has(sc.id));
 
   const isMutating = create.isPending || update.isPending;
 
@@ -223,32 +236,34 @@ function ScholarshipsContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Scholarships & Discounts"
-        subtitle={`${scholarships.length} defined · Per-student fee discounts automatically applied during fee generation.`}
+        title={t("Scholarships & Discounts", "छात्रवृत्ति र छुट")}
+        subtitle={t(
+          `${scholarships.length} defined · Per-student fee discounts automatically applied during fee generation.`,
+          `${scholarships.length} व्याप्त · शुल्क बनको बेला अनुसर आफैनाइनहरू छुट लगछ`
+        )}
         actions={
           <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Add Scholarship
+            <Plus className="h-4 w-4 mr-2" /> {t("Add Scholarship", "छात्रवृत्ति थप्नुहोस")}
           </Button>
         }
       />
       <AOSPageBody>
         <DataPanel>
-          {scholarships.length === 0 ? (
-            <AOSEmptyState
-              icon={<GraduationCap className="h-10 w-10" style={{ color: "var(--w11-text-tertiary)" }} />}
-              title="No scholarships defined."
-              description="Add one to auto-discount student fees."
-            />
-          ) : (
-            <DataTable
-              columns={SCHOLARSHIP_COLUMNS}
-              rows={scholarships}
-              rowKey={(sc) => sc.id}
-              searchable
-              searchPlaceholder="Search scholarships…"
-              exportFileName="scholarships"
-            />
-          )}
+          <DataTable
+            columns={SCHOLARSHIP_COLUMNS}
+            rows={visibleScholarships}
+            rowKey={(sc) => sc.id}
+            loading={isLoading}
+            searchable
+            searchPlaceholder={t("Search scholarships…", "खोज्नुहोस…")}
+            exportFileName="scholarships"
+            empty={{
+              icon: GraduationCap,
+              title: t("No scholarships defined", "छात्रवृत्ति छेन"),
+              body: t("Add one to auto-discount student fees.", "छुट अपल्य गर्न थप्नुहोस।"),
+              action: { label: t("Add Scholarship", "थप्नुहोस"), onClick: openCreate },
+            }}
+          />
         </DataPanel>
 
         {/* Add / Edit Dialog */}
@@ -256,15 +271,15 @@ function ScholarshipsContent() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editTarget ? "Edit Scholarship" : "Add Scholarship / Discount"}
+                {editTarget ? t("Edit Scholarship", "सम्पादन") : t("Add Scholarship / Discount", "छात्रवृत्ति थप्नुहोस")}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               {/* Student search */}
               <div className="space-y-2">
-                <Label>Student</Label>
+                <Label>{t("Student", "विद्यार्थी")} <span style={{ color: "#c42b1c" }}>*</span></Label>
                 <Input
-                  placeholder="Search student by name or enrollment…"
+                  placeholder={t("Search student by name or enrollment…", "नाम वा भर्ना नंबरबाट खोज्नुहोस")}
                   value={studentSearch}
                   onChange={(e) => {
                     setStudentSearch(e.target.value);
@@ -291,20 +306,20 @@ function ScholarshipsContent() {
                       </button>
                     ))}
                     {studentsData?.length === 0 && (
-                      <p className="px-3 py-2 text-sm text-[color:var(--w11-text-secondary)]">No students found</p>
+                      <p className="px-3 py-2 text-sm text-[color:var(--w11-text-secondary)]">{t("No students found", "विद्यार्थी बेटिएन")}</p>
                     )}
                   </div>
                 )}
                 {!editTarget && form.student_id && (
-                  <p className="text-xs" style={{ color: "#107c10" }}>✓ Student selected</p>
+                  <p className="text-xs" style={{ color: "#107c10" }}>✓ {t("Student selected", "विद्यार्थी छानिये")}</p>
                 )}
               </div>
 
               {/* Fee Type */}
               <div className="space-y-2">
-                <Label>Fee Type (leave blank to apply to all)</Label>
+                <Label>{t("Fee Type (leave blank to apply to all)", "शुल्क प्रकार (सबैमा खालि छोड्नु)")}</Label>
                 <Input
-                  placeholder="e.g. Tuition Fee (blank = all types)"
+                  placeholder={t("e.g. Tuition Fee (blank = all types)", "जस्ताई: पाठ शुल्क")}
                   value={form.fee_type}
                   onChange={(e) => setForm({ ...form, fee_type: e.target.value })}
                 />
@@ -313,7 +328,7 @@ function ScholarshipsContent() {
               {/* Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Discount Type</Label>
+                  <Label>{t("Discount Type", "छुट प्रकार")}</Label>
                   <AdvancedSelect
                     value={form.discount_type}
                     onChange={(v) => setForm({ ...form, discount_type: v as "percent" | "fixed" })}
@@ -325,7 +340,7 @@ function ScholarshipsContent() {
                 </div>
                 <div className="space-y-2">
                   <Label>
-                    {form.discount_type === "percent" ? "Discount %" : "Amount (Rs.)"}
+                    {form.discount_type === "percent" ? t("Discount %", "छुट %") : t("Amount (Rs.)", "रकम (रु.)")}
                   </Label>
                   <Input
                     type="number"
@@ -341,9 +356,9 @@ function ScholarshipsContent() {
 
               {/* Reason */}
               <div className="space-y-2">
-                <Label>Reason</Label>
+                <Label>{t("Reason", "कारण")}</Label>
                 <Input
-                  placeholder="e.g. Merit scholarship, Financial aid…"
+                  placeholder={t("e.g. Merit scholarship, Financial aid…", "जस्ताई: प्रतिभत्ती छात्रवृत्ति…")}
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
                 />
@@ -352,14 +367,14 @@ function ScholarshipsContent() {
               {/* Validity */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Valid From (BS)</Label>
+                  <Label>{t("Valid From (BS)", "सुरु (बि.सं.)")}</Label>
                   <BSMonthInput
                     value={form.valid_from_bs}
                     onChange={(v) => setForm({ ...form, valid_from_bs: v })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Valid Until (BS, blank = open-ended)</Label>
+                  <Label>{t("Valid Until (BS, blank = open-ended)", "सम्म (बि.सं.)")}</Label>
                   <BSMonthInput
                     value={form.valid_until_bs}
                     onChange={(v) => setForm({ ...form, valid_until_bs: v })}
@@ -368,15 +383,15 @@ function ScholarshipsContent() {
               </div>
 
               <FormCheckbox
-                label="Scholarship active"
-                description="Will be auto-applied during fee generation"
+                label={t("Scholarship active", "सक्रिय छ")}
+                description={t("Will be auto-applied during fee generation", "शुल्क बनदमा आफैनाइनहरू लग्नेछ")}
                 checked={form.is_active}
                 onCheckedChange={(v) => setForm({ ...form, is_active: v })}
               />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowDialog(false)}>
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button
                 onClick={() => (editTarget ? update.mutate() : create.mutate())}
@@ -387,7 +402,7 @@ function ScholarshipsContent() {
                 }
               >
                 {isMutating ? <Spinner className="mr-2" /> : null}
-                {editTarget ? "Save Changes" : "Create"}
+                {editTarget ? t("Save Changes", "सुरक्ष") : t("Create", "बनाउनुहोस")}
               </Button>
             </DialogFooter>
           </DialogContent>

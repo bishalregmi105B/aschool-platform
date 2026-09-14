@@ -22,6 +22,10 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
+import { ErrorState } from "@/components/ui/empty-state";
+import { SkeletonStat } from "@/components/ui/skeleton";
+import { formatNepaliCurrency } from "@/lib/nepali-utils";
 
 export default function HRPage() {
   return (
@@ -32,6 +36,7 @@ export default function HRPage() {
 }
 
 function HRContent() {
+  const { t } = useI18n();
   const { data, isLoading, isError, refetch } = useQuery<any>({
     queryKey: ["hr-stats"],
     queryFn: async () => {
@@ -44,17 +49,13 @@ function HRContent() {
   if (isError) {
     return (
       <AOSPage>
-        <AOSPageHeader title="HR & Payroll" />
+        <AOSPageHeader title={t("HR & Payroll", "एचआर र पेरोल")} />
         <AOSPageBody>
           <DataPanel className="max-w-2xl mx-auto">
-            <div className="py-10 text-center space-y-3">
-              <p className="text-sm" style={{ color: "#c42b1c" }}>
-                Failed to load HR dashboard. Please try again.
-              </p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Retry
-              </Button>
-            </div>
+            <ErrorState
+              title={t("Failed to load HR dashboard.", "HR ड्यासबोर्ड लोड गर्न सकिएन।")}
+              onRetry={() => refetch()}
+            />
           </DataPanel>
         </AOSPageBody>
       </AOSPage>
@@ -66,21 +67,19 @@ function HRContent() {
   // KPI values — straight from /hr/stats, never invented.
   const kpis = [
     {
-      label: "Total Staff",
+      label: t("Total Staff", "कुल कर्मचारी"),
       value: s.total_staff ?? "—",
       icon: <Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />,
       color: "var(--w11-accent)",
     },
     {
-      label: "Monthly Payroll",
-      value: s.monthly_payroll
-        ? `Rs. ${Math.round(s.monthly_payroll / 1000)}K`
-        : "—",
+      label: t("Monthly Payroll", "मासिक पेरोल"),
+      value: s.monthly_payroll ? formatNepaliCurrency(s.monthly_payroll) : "—",
       icon: <DollarSign className="h-4 w-4" style={{ color: "#107c10" }} />,
       color: "#107c10",
     },
     {
-      label: "Pending Leaves",
+      label: t("Pending Leaves", "बाँकी बिदा"),
       value: s.pending_leaves ?? "—",
       icon: (
         <Calendar
@@ -91,7 +90,7 @@ function HRContent() {
       color: (s.pending_leaves ?? 0) > 0 ? "#d83b01" : "var(--w11-text-secondary)",
     },
     {
-      label: "Pending Payroll",
+      label: t("Pending Payroll", "बाँकी पेरोल"),
       value: s.pending_payroll ?? "—",
       icon: (
         <ClipboardList
@@ -106,8 +105,8 @@ function HRContent() {
   // Quick navigation links — displayed prominently
   const modules = [
     {
-      title: "Payroll",
-      desc: "Generate, approve and pay monthly salaries",
+      title: t("Payroll", "पेरोल"),
+      desc: t("Generate, approve and pay monthly salaries", "मासिक तलब बनाउने, स्वीकृत र भुक्तानी"),
       href: "/dashboard/hr/payroll",
       icon: DollarSign,
       badge:
@@ -116,17 +115,17 @@ function HRContent() {
       primary: true,
     },
     {
-      title: "Leave Management",
-      desc: "Review and approve staff leave requests",
+      title: t("Leave Management", "बिदा व्यवस्थापन"),
+      desc: t("Review and approve staff leave requests", "कर्मचारी बिदा अनुरोध जाँच र स्वीकृति"),
       href: "/dashboard/hr/leaves",
       icon: Calendar,
-      badge: (s.pending_leaves ?? 0) > 0 ? `${s.pending_leaves} pending` : null,
+      badge: (s.pending_leaves ?? 0) > 0 ? `${s.pending_leaves} ${t("pending", "बाँकी")}` : null,
       badgeTone: "warning",
       primary: false,
     },
     {
-      title: "Staff Attendance",
-      desc: "Track daily staff presence and absences",
+      title: t("Staff Attendance", "कर्मचारी हाजिर"),
+      desc: t("Track daily staff presence and absences", "दैनिक उपस्थिति ट्र्याक"),
       href: "/dashboard/hr/staff-attendance",
       icon: ClipboardList,
       badge: null,
@@ -134,8 +133,8 @@ function HRContent() {
       primary: false,
     },
     {
-      title: "Expenses",
-      desc: "Manage school expense categories and records",
+      title: t("Expenses", "खर्चहरू"),
+      desc: t("Manage school expense categories and records", "खर्च श्रेणी र रेकर्ड"),
       href: "/dashboard/hr/expenses",
       icon: DollarSign,
       badge: null,
@@ -143,8 +142,8 @@ function HRContent() {
       primary: false,
     },
     {
-      title: "Appraisal",
-      desc: "Staff performance evaluation and feedback",
+      title: t("Appraisal", "मूल्यांकन"),
+      desc: t("Staff performance evaluation and feedback", "कार्यगुण मूल्यांकन र प्रतिक्रिया"),
       href: "/dashboard/hr/appraisal",
       icon: Star,
       badge: null,
@@ -152,8 +151,8 @@ function HRContent() {
       primary: false,
     },
     {
-      title: "Payroll Settings",
-      desc: "Configure allowances, deductions and tax rates",
+      title: t("Payroll Settings", "पेरोल सेटिङ"),
+      desc: t("Configure allowances, deductions and tax rates", "भत्ता, कट्टा र कर दर"),
       href: "/dashboard/hr/payroll/settings",
       icon: Settings,
       badge: null,
@@ -166,16 +165,16 @@ function HRContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="HR & Payroll"
+        title={t("HR & Payroll", "एचआर र पेरोल")}
         subtitle={
           isLoading
-            ? "Manage staff salaries, leaves, attendance, and performance"
-            : `${s.total_staff ?? 0} staff · ${s.pending_leaves ?? 0} pending leaves · ${s.pending_payroll ?? 0} pending payroll`
+            ? t("Manage staff salaries, leaves, attendance, and performance", "तलब, बिदा, हाजिर र मूल्यांकन")
+            : `${s.total_staff ?? 0} ${t("staff", "कर्मचारी")} · ${s.pending_leaves ?? 0} ${t("pending leaves", "बाँकी बिदा")} · ${s.pending_payroll ?? 0} ${t("pending payroll", "बाँकी पेरोल")}`
         }
         actions={
           <Link href="/dashboard/hr/payroll">
             <Button>
-              <DollarSign className="h-4 w-4 mr-2" /> Open Payroll
+              <DollarSign className="h-4 w-4 mr-2" /> {t("Open Payroll", "पेरोल खोल्नुहोस्")}
             </Button>
           </Link>
         }
@@ -183,16 +182,17 @@ function HRContent() {
       <AOSPageBody>
         {/* KPI cards */}
         <StatGrid min={180}>
-          {kpis.map((k) => (
-            <KpiCard
-              key={k.label}
-              label={k.label}
-              value={isLoading ? "—" : k.value}
-              color={k.color}
-              icon={k.icon}
-              className={isLoading ? "animate-pulse" : undefined}
-            />
-          ))}
+          {isLoading
+            ? [1, 2, 3, 4].map((i) => <SkeletonStat key={i} />)
+            : kpis.map((k) => (
+                <KpiCard
+                  key={k.label as string}
+                  label={k.label}
+                  value={k.value}
+                  color={k.color}
+                  icon={k.icon}
+                />
+              ))}
         </StatGrid>
 
         {/* Alerts for pending items */}
@@ -204,12 +204,11 @@ function HRContent() {
                 role="status"
               >
                 <p className="text-sm font-medium">
-                  {s.pending_leaves} leave request
-                  {s.pending_leaves > 1 ? "s" : ""} waiting for approval
+                  {s.pending_leaves} {t("leave request(s) waiting for approval", "बिदा अनुरोध स्वीकृतिको पर्खाइमा")}
                 </p>
                 <Link href="/dashboard/hr/leaves">
                   <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
-                    Review <ArrowRight className="h-3 w-3" />
+                    {t("Review", "हेर्नु")} <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </div>
@@ -220,12 +219,11 @@ function HRContent() {
                 role="status"
               >
                 <p className="text-sm font-medium">
-                  {s.pending_payroll} payroll record
-                  {s.pending_payroll > 1 ? "s" : ""} need attention
+                  {s.pending_payroll} {t("payroll records need attention", "पेरोल रेकर्ड जाँच पर्ख")}
                 </p>
                 <Link href="/dashboard/hr/payroll">
                   <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
-                    Process <ArrowRight className="h-3 w-3" />
+                    {t("Process", "प्रशोधन")} <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </div>

@@ -14,11 +14,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useDebounced } from "@/components/ui/filter-bar";
 import {
   AOSPage,
   AOSPageHeader,
   AOSPageBody,
   DataPanel,
+  FilterCommandBar,
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
@@ -32,6 +35,8 @@ export default function DrillsPage() {
 function DrillsContent() {
   const qc = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
+  const { values, setValues, clear, activeCount } = useUrlFilters(["q", "status"]);
+  const statusFilter = values.status || "";
   const [form, setForm] = useState({ title: "", drill_type: "earthquake", scheduled_date: "", duration_minutes: "30", notes: "" });
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -69,6 +74,25 @@ function DrillsContent() {
         </AOSPageBody>
       </AOSPage>
     );
+  }
+
+  const filteredDrills = drills.filter((d: any) => {
+    if (statusFilter && (d.status ?? "scheduled") !== statusFilter) return false;
+    const q = (values.q || "").toLowerCase();
+    if (q && !((d.title || "") + (d.drill_type || d.type || "")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Drill calendar (plan 34#39): upcoming drills grouped by month, soonest first.
+  const now = Date.now();
+  const upcoming = filteredDrills
+    .filter((d: any) => d.scheduled_date && new Date(d.scheduled_date).getTime() >= now - 86400000)
+    .sort((a: any, b: any) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+  const months = new Map<string, any[]>();
+  for (const d of upcoming) {
+    const key = new Date(d.scheduled_date).toLocaleDateString("en", { month: "long", year: "numeric" });
+    if (!months.has(key)) months.set(key, []);
+    months.get(key)!.push(d);
   }
 
   const DRILL_COLUMNS: Column<any>[] = [
@@ -110,12 +134,52 @@ function DrillsContent() {
         }
       />
       <AOSPageBody>
+        {months.size > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            {Array.from(months.entries()).slice(0, 3).map(([month, list]) => (
+              <DataPanel key={month} title={<span className="flex items-center gap-2"><Calendar className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />{month}</span>}>
+                <ul className="win11-listview" style={{ margin: "-8px -8px" }}>
+                  {list.map((d: any) => (
+                    <li key={d.id} style={{ cursor: "default" }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-medium truncate">{d.title}</div>
+                        <div className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+                          {displayBS(d.scheduled_date)} · {d.duration_minutes ? `${d.duration_minutes} min` : ""}
+                        </div>
+                      </div>
+                      <span className="win11-chip subtle capitalize">{d.drill_type ?? d.type}</span>
+                    </li>
+                  ))}
+                </ul>
+              </DataPanel>
+            ))}
+          </div>
+        )}
+
+        <FilterCommandBar>
+          <AdvancedSelect
+            className="w-40"
+            value={statusFilter}
+            onChange={(v) => setValues({ status: v === "scheduled" ? "" : v })}
+            clearable
+            placeholder="All statuses"
+            options={[
+              { value: "scheduled", label: "Scheduled" },
+              { value: "completed", label: "Completed" },
+              { value: "missed", label: "Missed" },
+            ]}
+          />
+          {activeCount > 0 && <Button variant="ghost" size="sm" onClick={clear}>Clear</Button>}
+        </FilterCommandBar>
+
         <DataPanel bodyClassName="p-0">
           <DataTable
             columns={DRILL_COLUMNS}
-            rows={drills}
+            rows={filteredDrills}
             rowKey={(d: any) => d.id}
             searchable
+            searchValue={values.q || ""}
+            onSearchChange={(v) => setValues({ q: v })}
             searchPlaceholder="Search drills…"
             exportFileName="drills"
             empty={{ icon: Plus, title: "No drills scheduled", body: "Schedule evacuation drills to stay prepared.", action: { label: "Schedule Drill", onClick: () => setShowDialog(true) } }}

@@ -41,7 +41,7 @@ import {
   Sparkles, ChevronDown, Plus, FileJson, X, Copy, Trash2, FileOutput,
   LayoutTemplate, Upload, Search, Grid3x3, Magnet, Layers, MoreVertical,
   Compass, Type, Paintbrush, Database, Shapes, Image as LucideImage,
-  FileDown, FileImage, Code2, PanelTop,
+  FileDown, FileImage, Code2, PanelTop, Printer, Keyboard, CircleCheck, CircleDashed, Loader2,
 } from "lucide-react";
 
 import PropertiesPanel from "./PropertiesPanel";
@@ -52,6 +52,7 @@ import LayersPanel     from "./LayersPanel";
 import GraphicsPanel   from "./GraphicsPanel";
 import ExplorePanel    from "./ExplorePanel";
 import { VersionHistoryButton } from "./VersionHistoryButton";
+import { ShortcutsHelpDialog, type ShortcutGroup } from "./ShortcutsHelp";
 
 const SHAPE_SVGS: Record<string, React.ReactNode> = {
   rect: <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>,
@@ -79,6 +80,35 @@ const BG_PRESETS = [
 ];
 
 type SidebarIconDef = { id: DesignerPanel; Icon: React.ComponentType<{ className?: string }>; label: string };
+
+// Verified keymap (lib/designer/shortcuts.ts) — the "?" overlay only lists
+// shortcuts that are actually wired (wave-J rule: advertise real keys).
+const DESIGNER_SHORTCUTS: ShortcutGroup[] = [
+  { title: "Edit", items: [
+    { keys: ["Ctrl", "Z"], label: "Undo" },
+    { keys: ["Ctrl", "⇧", "Z"], label: "Redo" },
+    { keys: ["Ctrl", "C"], label: "Copy" },
+    { keys: ["Ctrl", "V"], label: "Paste (incl. system images)" },
+    { keys: ["Ctrl", "D"], label: "Duplicate" },
+    { keys: ["Del"], label: "Delete selection" },
+    { keys: ["Ctrl", "G"], label: "Group / ungroup (⇧)" },
+  ]},
+  { title: "Arrange", items: [
+    { keys: ["Ctrl", "]"], label: "Bring to front" },
+    { keys: ["Ctrl", "["], label: "Send to back" },
+    { keys: ["↑↓←→"], label: "Nudge 1px (⇧ = 10px)" },
+    { keys: ["PgUp", "PgDn"], label: "Previous / next page" },
+  ]},
+  { title: "View & panels", items: [
+    { keys: ["Ctrl", "0"], label: "Zoom to fit" },
+    { keys: ["Ctrl", "+"], label: "Zoom in / out (−)" },
+    { keys: ["T"], label: "Text panel" },
+    { keys: ["M"], label: "Shapes panel" },
+    { keys: ["L"], label: "Layers panel" },
+    { keys: ["Ctrl", "S"], label: "Save design" },
+    { keys: ["?"], label: "This help" },
+  ]},
+];
 const SIDEBAR_ICONS: SidebarIconDef[] = [
   { id: "explore",    Icon: Compass,        label: "Explore"   },
   { id: "templates",  Icon: LayoutTemplate, label: "Templates" },
@@ -138,6 +168,11 @@ export default function CanvasEditor() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const overlayRef   = useRef<HTMLCanvasElement>(null);
   const canvas       = useCanvas(canvasRef, overlayRef);
+  // Latest-canvas-commands ref — lets the heavy side panels be React.memo'd
+  // with *stable* callbacks, so zoom/drag/store ticks no longer re-render
+  // the Explore/Graphics template grids (wave-J perf pass).
+  const canvasApiRef = useRef(canvas);
+  canvasApiRef.current = canvas;
   const { exportPDF, exportPNG, exportPagesZip, exportPPTX, exportSVG } = useExport();
 
   // export quality — multiplier over the 96dpi logical canvas (3.125 = 300 DPI)
@@ -154,6 +189,7 @@ export default function CanvasEditor() {
   const toggleSnapping = useDesignerStore((s) => s.toggleSnapping);
   const showGrid = useDesignerStore((s) => s.showGrid);
   const setDirty = useDesignerStore((s) => s.setDirty);
+  const dirty = useDesignerStore((s) => s.dirty);
   const canUndo = useDesignerStore((s) => s.canUndo);
   const canRedo = useDesignerStore((s) => s.canRedo);
 
@@ -163,9 +199,16 @@ export default function CanvasEditor() {
   const [bgColor, setBgColor]         = useState("#ffffff");
   const [imgUrlInput, setImgUrlInput] = useState("");
   const [tplSearch, setTplSearch]     = useState("");
+  const [tplCat, setTplCat]           = useState<string>("all");
   const [ctxMenu, setCtxMenu]         = useState<ContextMenuState | null>(null);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showDesignPicker, setShowDesignPicker] = useState(false);
+  // save-state pill (top bar) — timestamp of the last successful save
+  const [savedAt, setSavedAt]         = useState<Date | null>(null);
+  // "?" / Ctrl+/ shortcut overlay
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  // empty-canvas guidance overlay (new user: "Start from a template / blank")
+  const [emptyCanvas, setEmptyCanvas] = useState(true);
 
   const templateLoadedRef = useRef(false);
   const docLoadedRef      = useRef(false);
@@ -270,7 +313,9 @@ export default function CanvasEditor() {
   /** Route a template into the right surface: writer docs open the writer,
    *  multi-page canvas JSON loads as pages, single-page into the canvas.
    *  editor_type is the single source of truth (mirrors the landing page and
-   *  /templates page so a click anywhere routes the same way). */
+   *  /templates page so a click anywhere routes the same way).
+   *  STABLE (deps omit `canvas` — reads through canvasApiRef) so the memoized
+   *  gallery panels never re-render on editor ticks. */
   const loadTemplate = useCallback((tpl: any) => {
     setDocName(tpl.name);
     setTemplateIdState(tpl.id);
@@ -280,19 +325,55 @@ export default function CanvasEditor() {
       toast.info(`${tpl.name} opens in the Writer`);
       return;
     }
+    const c = canvasApiRef.current;
     if (tpl.canvas_json && Object.keys(tpl.canvas_json).length > 0) {
       if (tpl.canvas_json.version === "multi-page") {
-        canvas.loadJSON(tpl.canvas_json as any);
+        c.loadJSON(tpl.canvas_json as any);
       } else {
-        canvas.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
+        c.loadFromTemplateJson(tpl.canvas_json, tpl.width, tpl.height);
       }
     } else {
-      canvas.loadPreset(tpl.id, tpl.category, tpl.page_size);
+      c.loadPreset(tpl.id, tpl.category, tpl.page_size);
       toast.info(`${tpl.page_size ?? "Custom"} canvas ready — build from the left panels`);
     }
     // re-fit whenever a template changes the page size
-    setTimeout(() => canvas.zoomToFit(), 120);
-  }, [canvas, router]);
+    setTimeout(() => c.zoomToFit(), 120);
+  }, [router]);
+
+  // Stable panel handlers (same reason as loadTemplate — see canvasApiRef).
+  const onAddIcon = useCallback((svg: string, color?: string) => canvasApiRef.current.addSVG(svg, {}, color), []);
+  const onAddPhoto = useCallback((url: string) => canvasApiRef.current.addImage(url, { width: 260 }), []);
+  const onAddQr = useCallback((v: string) => canvasApiRef.current.addQR(v), []);
+  const onAddWatermark = useCallback((t: string) => canvasApiRef.current.addWatermark(t), []);
+  const onInsertToken = useCallback((token: string) => {
+    const c = canvasApiRef.current;
+    const fc = (window as any).__activeCanvas;
+    const obj = fc?.getActiveObject();
+    if (!fc || !obj || !["textbox", "text", "i-text"].includes(String(obj.type).toLowerCase())) {
+      // no text selected → add a new token text layer
+      c.addText(token, { fontSize: 14 });
+      toast.info(`Added ${token} as a new text layer`);
+      return;
+    }
+    if (obj.isEditing) {
+      // insert at the textarea cursor
+      const ta = obj.hiddenTextarea;
+      if (ta) {
+        const start = ta.selectionStart ?? obj.text.length;
+        const end = ta.selectionEnd ?? obj.text.length;
+        obj.set({ text: obj.text.slice(0, start) + token + obj.text.slice(end) });
+        obj.fire("changed");
+      } else {
+        obj.set({ text: obj.text + token });
+      }
+    } else {
+      obj.set({ text: obj.text + token });
+      obj.fire("changed");
+    }
+    fc.requestRenderAll();
+    c.snapshot();
+    toast.success(`Inserted ${token}`);
+  }, []);
 
   useEffect(() => {
     if (!bulkSessionId || docLoadedRef.current || !canvas.isReady) return;
@@ -325,6 +406,7 @@ export default function CanvasEditor() {
     onSuccess: (data) => {
       toast.success("Design saved");
       setDirty(false);
+      setSavedAt(new Date());
       if (!docId && data?.id) router.replace(`/dashboard/designer/editor?doc=${data.id}`);
     },
     onError: () => toast.error("Failed to save"),
@@ -420,6 +502,26 @@ export default function CanvasEditor() {
     }
   }, [docName, canvas, exportPDF, exportPNG, exportPagesZip, dpiScale, exportJpeg]);
 
+  /** Print the current page: render the canvas to a hi-res PNG and open the
+   *  browser print dialog in a clean popup (no shell chrome). */
+  const handlePrint = useCallback(() => {
+    const fc = (window as any).__activeCanvas;
+    if (!fc) { toast.error("Canvas not ready"); return; }
+    try {
+      const url = fc.toDataURL({ format: "png", multiplier: 2 });
+      const w = window.open("", "_blank", "width=900,height=700");
+      if (!w) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
+      w.document.write(
+        `<html><head><title>${encodeURIComponent(docName)}</title>` +
+        `<style>@page{margin:0}html,body{margin:0;padding:0}img{width:100%;display:block}</style>` +
+        `</head><body><img src="${url}" onload="setTimeout(()=>{window.print();},120)"/></body></html>`,
+      );
+      w.document.close();
+    } catch {
+      toast.error("Print failed");
+    }
+  }, [docName]);
+
   /** Design import via the vault: fetch the picked file's text, then load it. */
   const handleDesignSelect = async (files: ManagedFile[]) => {
     const mf = files[0];
@@ -472,6 +574,7 @@ export default function CanvasEditor() {
       togglePanel: (p) => setActivePanel(p),
       nextPage: () => canvas.goToPage(Math.min(canvas.currentPageIdx + 1, canvas.pages.length - 1)),
       prevPage: () => canvas.goToPage(Math.max(canvas.currentPageIdx - 1, 0)),
+      help: () => setShowShortcuts((s) => !s),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas.isReady, zoom, canvas.currentPageIdx, canvas.pages.length]);
@@ -640,10 +743,36 @@ export default function CanvasEditor() {
     setCtxMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  const filteredTemplates = useMemo(
-    () => allTemplates.filter((t: any) => !tplSearch || t.name.toLowerCase().includes(tplSearch.toLowerCase())),
-    [allTemplates, tplSearch],
-  );
+  const tplCategories = useMemo(() => {
+    const set = new Set<string>();
+    (allTemplates as any[]).forEach((t: any) => { if (t.category) set.add(t.category); });
+    return Array.from(set).sort();
+  }, [allTemplates]);
+
+  const filteredTemplates = useMemo(() => {
+    const q = tplSearch.trim().toLowerCase();
+    return (allTemplates as any[]).filter((t: any) => {
+      if (q && !t.name.toLowerCase().includes(q)) return false;
+      if (tplCat !== "all" && t.category !== tplCat) return false;
+      return true;
+    });
+  }, [allTemplates, tplSearch, tplCat]);
+
+  // track empty-canvas for the guidance overlay (re-reads on object add/remove)
+  useEffect(() => {
+    const fc = canvas.fabricCanvas;
+    if (!fc) return;
+    const read = () => setEmptyCanvas(fc.getObjects().length === 0);
+    read();
+    fc.on("object:added", read);
+    fc.on("object:removed", read);
+    fc.on("canvas:cleared", read);
+    return () => {
+      fc.off("object:added", read);
+      fc.off("object:removed", read);
+      fc.off("canvas:cleared", read);
+    };
+  }, [canvas.fabricCanvas, canvas.pages, canvas.currentPageIdx, dirty]);
 
   // ── data fill (tokens → textboxes + image placeholders) ──────────
   const applyDataFields = useCallback((fields: Record<string, string>) => {
@@ -718,18 +847,18 @@ export default function CanvasEditor() {
     if (pendingImages.length > 0) {
       Promise.allSettled(pendingImages).then(() => {
         fc.requestRenderAll();
-        canvas.snapshot();
+        canvasApiRef.current.snapshot();
       });
     }
 
     if (changed > 0) {
       fc.renderAll();
-      if (pendingImages.length === 0) canvas.snapshot();
+      if (pendingImages.length === 0) canvasApiRef.current.snapshot();
       toast.success(`Applied data to ${changed} layer${changed > 1 ? "s" : ""}`);
     } else {
       toast.info("No placeholders found. Use {field_name} tokens in text or image layers.");
     }
-  }, [canvas]);
+  }, []);
 
   const currentSizeName = Object.entries(PAGE_SIZES).find(
     ([, v]) => v.width === canvas.currentPageSettings?.width && v.height === canvas.currentPageSettings?.height
@@ -857,12 +986,53 @@ export default function CanvasEditor() {
             </>
           )}
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            {/* save-state pill — "Unsaved" / "Saving…" / "Saved ✓ HH:MM" */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="flex items-center gap-1 h-7 px-2 rounded-[var(--w11-radius-full)] text-[10px] font-semibold select-none"
+                  style={
+                    saveMutation.isPending
+                      ? { background: "var(--w11-accent-light)", color: "var(--w11-accent)" }
+                      : dirty
+                        ? { background: "rgba(217,119,6,0.16)", color: "#d97706" }
+                        : { background: "rgba(22,163,74,0.14)", color: "#16a34a" }
+                  }
+                >
+                  {saveMutation.isPending ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
+                  ) : dirty ? (
+                    <><CircleDashed className="h-3 w-3" /> Unsaved</>
+                  ) : savedAt ? (
+                    <><CircleCheck className="h-3 w-3" /> Saved {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>
+                  ) : (
+                    <><CircleCheck className="h-3 w-3" /> Nothing to save</>
+                  )}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {dirty ? "Unsaved changes — Ctrl+S saves" : savedAt ? `Last saved ${savedAt.toLocaleTimeString()}` : "This design has no changes yet"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowShortcuts(true)} title="Keyboard shortcuts (?)">
+                  <Keyboard className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Keyboard shortcuts (?)</TooltipContent>
+            </Tooltip>
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setShowAI(!showAI); setActivePanel(null); }}>
               <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--w11-accent)" }} /> AI
             </Button>
-            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              <Save className="h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="sm" className="h-7 text-xs gap-1" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                  <Save className="h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Save design (Ctrl+S)</TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" /></Button>
@@ -909,7 +1079,8 @@ export default function CanvasEditor() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                {/* ── Export options ── */}
+                {/* ── Export options — grouped by medium (wave-J) ── */}
+                <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Print &amp; PDF</div>
                 <DropdownMenuItem disabled={exporting} onClick={() => serverPdfMutation.mutate()}>
                   <FileOutput className="h-4 w-4 mr-2.5 text-red-500 shrink-0" />
                   <div>
@@ -924,6 +1095,14 @@ export default function CanvasEditor() {
                     <div className="text-[10px] text-[var(--w11-text-tertiary)]">Browser-rendered · instant</div>
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuItem disabled={exporting} onClick={handlePrint}>
+                  <Printer className="h-4 w-4 mr-2.5 text-slate-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium">Print</div>
+                    <div className="text-[10px] text-[var(--w11-text-tertiary)]">Browser print dialog · current page</div>
+                  </div>
+                </DropdownMenuItem>
+                <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Image</div>
                 <DropdownMenuItem disabled={exporting} onClick={() => handleExport("png")}>
                   <FileImage className="h-4 w-4 mr-2.5 text-blue-500 shrink-0" />
                   <div>
@@ -933,6 +1112,7 @@ export default function CanvasEditor() {
                     </div>
                   </div>
                 </DropdownMenuItem>
+                <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Slides &amp; vector</div>
                 <DropdownMenuItem disabled={exporting} onClick={() => {
                   const fc = (window as any).__activeCanvas;
                   if (!fc) { toast.error("Canvas not ready"); return; }
@@ -1031,9 +1211,9 @@ export default function CanvasEditor() {
 
                 {activePanel === "explore" && (
                   <ExplorePanel
-                    onLoadTemplate={(tpl) => loadTemplate(tpl)}
-                    onAddIcon={(svg, color) => canvas.addSVG(svg, {}, color)}
-                    onAddPhoto={(url) => canvas.addImage(url, { width: 260 })}
+                    onLoadTemplate={loadTemplate}
+                    onAddIcon={onAddIcon}
+                    onAddPhoto={onAddPhoto}
                   />
                 )}
 
@@ -1043,10 +1223,35 @@ export default function CanvasEditor() {
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--w11-text-tertiary)] pointer-events-none" />
                       <Input placeholder="Search templates…" value={tplSearch} onChange={(e) => setTplSearch(e.target.value)} className="pl-8 h-8 text-xs rounded-[var(--w11-radius-md)]" />
                     </div>
+                    {/* Category chips — same filter grammar as the hub & writer
+                        gallery (wave-J: cards + preview + search + category) */}
+                    <div className="flex flex-wrap gap-1.5 -mt-1">
+                      {["all", ...tplCategories].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setTplCat(c)}
+                          className="win11-chip !text-[10px] !px-2 !py-0.5"
+                          style={
+                            tplCat === c
+                              ? { borderColor: "var(--w11-accent)", background: "var(--w11-accent-light)", color: "var(--w11-accent)" }
+                              : { color: "var(--w11-text-secondary)" }
+                          }
+                        >
+                          {c === "all" ? "All" : c.replace(/_/g, " ")}
+                        </button>
+                      ))}
+                    </div>
                     {filteredTemplates.length === 0 ? (
                       <div className="text-center py-8 px-4 rounded-[var(--w11-radius-lg)] border border-dashed border-[var(--w11-border-default)]">
                         <div className="text-xs text-[var(--w11-text-secondary)] font-medium">No templates found</div>
-                        <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-1">Try another search keyword</div>
+                        <div className="text-[10px] text-[var(--w11-text-tertiary)] mt-1">
+                          {tplSearch || tplCat !== "all" ? (
+                            <button className="underline hover:text-[var(--w11-accent)]" onClick={() => { setTplSearch(""); setTplCat("all"); }}>
+                              Clear search &amp; filter
+                            </button>
+                          ) : "Try another search keyword"}
+                        </div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2.5">
@@ -1174,9 +1379,9 @@ export default function CanvasEditor() {
 
                 {activePanel === "graphics" && (
                   <GraphicsPanel
-                    onAddQr={(v) => canvas.addQR(v)}
-                    onAddWatermark={(t) => canvas.addWatermark(t)}
-                    onAddIcon={(svg, color) => canvas.addSVG(svg, {}, color)}
+                    onAddQr={onAddQr}
+                    onAddWatermark={onAddWatermark}
+                    onAddIcon={onAddIcon}
                   />
                 )}
 
@@ -1212,34 +1417,7 @@ export default function CanvasEditor() {
                 {activePanel === "data" && (
                   <DataFillPanel
                     onApply={applyDataFields}
-                    onInsertToken={(token) => {
-                      const fc = (window as any).__activeCanvas;
-                      const obj = fc?.getActiveObject();
-                      if (!fc || !obj || !["textbox", "text", "i-text"].includes(String(obj.type).toLowerCase())) {
-                        // no text selected → add a new token text layer
-                        canvas.addText(token, { fontSize: 14 });
-                        toast.info(`Added ${token} as a new text layer`);
-                        return;
-                      }
-                      if (obj.isEditing) {
-                        // insert at the textarea cursor
-                        const ta = obj.hiddenTextarea;
-                        if (ta) {
-                          const start = ta.selectionStart ?? obj.text.length;
-                          const end = ta.selectionEnd ?? obj.text.length;
-                          obj.set({ text: obj.text.slice(0, start) + token + obj.text.slice(end) });
-                          obj.fire("changed");
-                        } else {
-                          obj.set({ text: obj.text + token });
-                        }
-                      } else {
-                        obj.set({ text: obj.text + token });
-                        obj.fire("changed");
-                      }
-                      fc.requestRenderAll();
-                      canvas.snapshot();
-                      toast.success(`Inserted ${token}`);
-                    }}
+                    onInsertToken={onInsertToken}
                   />
                 )}
 
@@ -1339,6 +1517,34 @@ export default function CanvasEditor() {
                       opacity: 0.18,
                     }} />
                 )}
+                {/* Empty-canvas guidance (new user, wave-J): start from a
+                    template or drop the first element — non-blocking */}
+                {emptyCanvas && !showAI && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                    <div
+                      className="pointer-events-auto rounded-[var(--w11-radius-lg)] border px-5 py-4 text-center max-w-[70%] backdrop-blur-sm"
+                      style={{
+                        background: "var(--w11-acrylic-bg)",
+                        borderColor: "var(--w11-border-default)",
+                        boxShadow: "var(--w11-elevation-flyout)",
+                      }}
+                    >
+                      <p className="text-sm font-semibold text-[var(--w11-text-primary)]">Start your design</p>
+                      <p className="text-[11px] text-[var(--w11-text-secondary)] mt-1">
+                        Pick a school template (ID cards, certificates, calendars) — or start blank.
+                      </p>
+                      <div className="flex gap-2 justify-center mt-3">
+                        <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setActivePanel("templates")}>
+                          <LayoutTemplate className="h-3.5 w-3.5" /> Templates
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => canvas.addText("Double-click to edit")}>
+                          <Type className="h-3.5 w-3.5" /> Add text
+                        </Button>
+                      </div>
+                      <p className="text-[9px] text-[var(--w11-text-tertiary)] mt-2.5">Press ? for keyboard shortcuts</p>
+                    </div>
+                  </div>
+                )}
                 <canvas ref={overlayRef} className="absolute left-0 top-0 pointer-events-none"
                   width={canvas.canvasSize?.width ?? 794}
                   height={canvas.canvasSize?.height ?? 1123}
@@ -1372,17 +1578,42 @@ export default function CanvasEditor() {
               </>
             ) : (
               <>
-                <div className="px-3 py-2 border-b border-[var(--w11-border-subtle)] shrink-0 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[var(--w11-text-secondary)]">
-                    {canvas.selectedObject ? "Properties" : "Page Settings"}
+                <div className="px-3 py-2 border-b border-[var(--w11-border-subtle)] shrink-0 flex items-center justify-between gap-2">
+                  {/* Header CONFIRMS what is selected (audit §6 live bug 2:
+                      the panel never told you which object you had) */}
+                  <span className="text-xs font-semibold text-[var(--w11-text-secondary)] truncate">
+                    {canvas.selectedObject
+                      ? `Properties — ${String(canvas.selectedObject.name || canvas.selectedObject.text?.slice(0, 18) || canvas.selectedObject.type)}`
+                      : "Page Settings"}
                   </span>
-                  <span className="text-[10px] text-[var(--w11-text-tertiary)] flex items-center gap-1"><Layers className="h-3 w-3" />{activePanel === "layers" ? "Layers panel left" : ""}</span>
+                  {canvas.selectedObject && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="commandbar-button !h-5 !min-h-0 px-1.5 text-[9px] uppercase font-semibold tracking-wide text-[var(--w11-text-tertiary)]"
+                          style={{ borderRadius: "var(--w11-radius-sm)" }}
+                          onClick={() => { setActivePanel("layers"); setShowAI(false); }}
+                        >
+                          Layers
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Open the layers panel</TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
                 <div className="flex-1 overflow-y-auto"><PropertiesPanel canvas={canvas} /></div>
               </>
             )}
           </div>
         </div>
+
+        <ShortcutsHelpDialog
+          open={showShortcuts}
+          onClose={() => setShowShortcuts(false)}
+          title="Canvas editor — keyboard shortcuts"
+          groups={DESIGNER_SHORTCUTS}
+        />
       </div>
     </TooltipProvider>
   );

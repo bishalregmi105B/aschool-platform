@@ -20,12 +20,14 @@ import {
   AOSPageBody,
   FormSection,
 } from "@/components/aos/kit/page-kit";
+import { useI18n } from "@/lib/i18n";
 
 export default function UploadResourcesPage() {
   return <PluginGate slug="elibrary"><UploadContent /></PluginGate>;
 }
 
 function UploadContent() {
+  const { t } = useI18n();
   const [form, setForm] = useState({ title: "", type: "past_paper", subject: "", class_name: "", year: "", exam_type: "final", description: "" });
   const [file, setFile] = useState<ManagedFile | null>(null);
   const [uploaded, setUploaded] = useState(false);
@@ -85,8 +87,8 @@ function UploadContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Upload className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Upload Resources"
-        subtitle="Upload past papers, e-books, or OER resources"
+        title={t("Upload Resources", "स्रोत अपलोड")}
+        subtitle={t("Upload past papers, e-books, or OER resources", "पुराना प्रश्नपत्र, इ-पुस्तक वा OER स्रोत अपलोड गर्नुहोस्")}
       />
       <AOSPageBody>
         <div className="space-y-4 max-w-2xl">
@@ -98,7 +100,7 @@ function UploadContent() {
             </div>
           )}
 
-          <FormSection title="Resource Details">
+          <FormSection title={t("Resource Details", "स्रोत विवरण")}>
             <div className="space-y-4">
               <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. SEE Mathematics 2079 Question Paper" /></div>
               <div className="grid grid-cols-2 gap-4">
@@ -128,7 +130,7 @@ function UploadContent() {
             </div>
           </FormSection>
 
-          <FormSection title="Resource File">
+          <FormSection title={t("Resource File", "स्रोत फाइल")}>
             <div
               className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors"
               style={{ borderColor: "var(--w11-border-default)" }}
@@ -142,7 +144,7 @@ function UploadContent() {
               ) : (
                 <>
                   <FolderOpen className="h-10 w-10 mx-auto mb-3" style={{ color: "var(--w11-accent)" }} />
-                  <p className="font-medium">Choose from the file manager</p>
+                  <p className="font-medium">{t("Choose from the file manager", "फाइल म्यानेजरबाट छान्नुहोस्")}</p>
                   <p className="text-sm mt-1 text-[color:var(--w11-text-secondary)]">Pick an existing vault file or upload a new one — PDF, DOCX, images</p>
                 </>
               )}
@@ -150,7 +152,7 @@ function UploadContent() {
           </FormSection>
 
           <Button className="w-full" onClick={() => upload.mutate()} disabled={upload.isPending || !file || !form.title}>
-            {upload.isPending ? <Spinner /> : <><Upload className="h-4 w-4 mr-2" />Publish Resource</>}
+            {upload.isPending ? <Spinner /> : <><Upload className="h-4 w-4 mr-2" />{t("Publish Resource", "स्रोत प्रकाशित गर्नुहोस्")}</>}
           </Button>
         </div>
       </AOSPageBody>

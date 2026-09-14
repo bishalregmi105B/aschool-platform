@@ -21,8 +21,16 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Table2, Trophy, Printer, GraduationCap,
+  Table2, Trophy, Printer, GraduationCap, FileText,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { PrintStyles, PrintRegion, PrintTwinButton } from "../print-twin";
 
 // ── Types (GET /exams/<id>/tabulation and /merit-list) ──────────────────────
 interface TabulationSubjectCell {
@@ -84,10 +92,24 @@ const RESULT_TONE: Record<string, string> = {
 };
 
 function TabulationContent() {
+  const { t } = useI18n();
   const [examId, setExamId] = useState("");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("all");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("sheet");
+  // Wave C: the sheet/merit switch is URL state (?tab=) over the fixed Tabs
+  // component (plan 33-1 + G1) — deep-linkable, keyboard-navigable.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const activeTab: ActiveTab = routeParams.get("tab") === "merit" ? "merit" : "sheet";
+  const setTab = (v: string) => {
+    const pathname = windowRoute?.pathname ?? "/dashboard/exams/tabulation";
+    const next = new URLSearchParams(routeParams.toString());
+    if (v === "sheet") next.delete("tab");
+    else next.set("tab", v);
+    const qs = next.toString();
+    navigate(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   const { data: exams } = useQuery({
     queryKey: ["exams"],
@@ -165,21 +187,32 @@ function TabulationContent() {
 
   const payload = tabulation.data;
   const gradeChart = payload?.grade_chart || [];
+  const examName = payload?.exam?.name || (exams || []).find((e: { id: string; name: string }) => e.id === examId)?.name || "";
+  const printTitle = `${activeTab === "sheet" ? "Tabulation Sheet" : "Merit List"} — ${examName || "Exam"}`;
 
   return (
     <AOSPage>
+      <PrintStyles />
       <AOSPageHeader
         icon={<Table2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Tabulation Sheet"
-        subtitle="Students × subjects grid with totals, GPA, result and merit order"
+        title={t("Tabulation Sheet", "टाकुली पाना")}
+        subtitle={t("Students × subjects grid with totals, GPA, result and merit order", "विद्यार्थी × विषय ग्रिड — कुल, GPA, परिणाम र मेरिट क्रम")}
         actions={
-          <Button
-            variant="outline"
-            disabled={!isReady || (activeTab === "sheet" ? !payload?.rows?.length : !merit.data?.rows?.length)}
-            onClick={() => openPrint(activeTab === "sheet" ? "tabulation" : "merit-list")}
-          >
-            <Printer className="h-4 w-4 mr-2" /> Print
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="no-print"
+              disabled={!isReady}
+              onClick={() => openPrint(activeTab === "sheet" ? "tabulation" : "merit-list")}
+            >
+              <FileText className="h-4 w-4 mr-2" /> {t("Server copy", "सर्भर प्रत")}
+            </Button>
+            <PrintTwinButton
+              title={printTitle}
+              disabled={!isReady || (activeTab === "sheet" ? !payload?.rows?.length : !merit.data?.rows?.length)}
+            />
+          </>
         }
       />
       <AOSPageBody className="space-y-4">
@@ -227,28 +260,16 @@ function TabulationContent() {
           </div>
         </FilterCommandBar>
 
-        {/* Tabs */}
+        {/* Tabs — win11-tablist (G1-wired), URL-backed. Panels below stay
+            conditionally rendered (each owns a query); the strip is purely
+            the tab control. */}
         {isReady && (
-          <div className="border-b border-[var(--w11-border-subtle)] flex gap-0">
-            {(
-              [
-                { id: "sheet", label: "Tabulation Sheet" },
-                { id: "merit", label: "Merit List" },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-[var(--w11-accent)] text-[color:var(--w11-accent)]"
-                    : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <Tabs value={activeTab} onValueChange={setTab} className="w-full">
+            <TabsList>
+              <TabsTrigger value="sheet">{t("Tabulation Sheet", "टाकुली पाना")}</TabsTrigger>
+              <TabsTrigger value="merit">{t("Merit List", "मेरिट सूची")}</TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
 
         {/* Grade legend strip */}
@@ -272,8 +293,13 @@ function TabulationContent() {
           </div>
         )}
 
-        {/* ── Tabulation sheet ─────────────────────────────────────────────── */}
+        {/* ── Tabulation sheet (print twin region) ────────────────────────── */}
         {isReady && activeTab === "sheet" && (
+          <PrintRegion>
+            <div className="hidden print:block mb-2">
+              <p className="font-bold text-lg">{examName || "Examination"} — Tabulation Sheet</p>
+              <p className="text-xs">Class: {(classes || []).find((c: { id: string; name: string }) => c.id === classId)?.name || "—"}</p>
+            </div>
           <DataPanel bodyClassName="p-0">
             {tabulation.isLoading ? (
               <PageLoader />
@@ -383,10 +409,15 @@ function TabulationContent() {
               </div>
             )}
           </DataPanel>
+          </PrintRegion>
         )}
 
-        {/* ── Merit list ───────────────────────────────────────────────────── */}
+        {/* ── Merit list (print twin region) ──────────────────────────────── */}
         {isReady && activeTab === "merit" && (
+          <PrintRegion>
+            <div className="hidden print:block mb-2">
+              <p className="font-bold text-lg">{merit.data?.exam?.name || examName || "Examination"} — Merit List</p>
+            </div>
           <DataPanel bodyClassName="p-0">
             {merit.isLoading ? (
               <PageLoader />
@@ -446,6 +477,7 @@ function TabulationContent() {
               </Table>
             )}
           </DataPanel>
+          </PrintRegion>
         )}
       </AOSPageBody>
     </AOSPage>

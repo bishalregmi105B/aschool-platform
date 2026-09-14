@@ -19,7 +19,8 @@ import {
   StatusChip,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { Monitor, Plus, RefreshCw } from "lucide-react";
+import { Monitor, Plus, RefreshCw, KeyRound, Trash2 } from "lucide-react";
+import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function BiometricDevicesPage() {
   return <PluginGate slug="biometric"><DevicesContent /></PluginGate>;
@@ -27,6 +28,8 @@ export default function BiometricDevicesPage() {
 
 function DevicesContent() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  const [hideIds, setHideIds] = useState<Set<string>>(new Set());
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({ name: "", ip_address: "", port: "4370", location: "", serial_number: "" });
   // The backend returns the device API key exactly once (only its SHA-256
@@ -64,6 +67,34 @@ function DevicesContent() {
     onError: () => toast.error("Sync failed"),
   });
 
+  // POST /devices/<id>/regenerate-key returns the new key exactly once too.
+  const regenerateKey = useMutation({
+    mutationFn: async (id: string) => (await api.post(`/attendance/biometric/devices/${id}/regenerate-key`)).data,
+    onSuccess: (res) => {
+      const d = res?.data ?? res;
+      if (d?.api_key) setNewKey({ name: d.name ?? "Device", apiKey: d.api_key });
+      qc.invalidateQueries({ queryKey: ["biometric-devices"] });
+    },
+    onError: () => toast.error("Failed to regenerate key"),
+  });
+
+  const removeDevice = async (d: any) => {
+    const ok = await confirm({
+      title: "Remove device",
+      body: `Remove ${d.name}? The device stops ingesting punches immediately and its key is revoked.`,
+      confirmLabel: "Remove",
+      tone: "danger",
+    });
+    if (!ok) return;
+    undoableDelete({
+      label: d.name || "device",
+      commit: async () => { await api.delete(`/attendance/biometric/devices/${d.id}`); },
+      optimistic: () => setHideIds((ids) => new Set(ids).add(d.id)),
+      rollback: () => setHideIds((ids) => { const n = new Set(ids); n.delete(d.id); return n; }),
+    });
+    qc.invalidateQueries({ queryKey: ["biometric-devices"] });
+  };
+
   const DEVICE_COLUMNS: Column<any>[] = [
     { key: "name", label: "Name", sortable: true, value: (d) => d.name ?? "", render: (d) => <span className="font-medium flex items-center gap-2"><Monitor className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />{d.name}</span> },
     { key: "endpoint", label: "IP Address", value: (d) => `${d.ip_address ?? ""}:${d.port ?? 4370}`, render: (d) => <span className="font-mono">{d.ip_address}:{d.port ?? 4370}</span> },
@@ -76,9 +107,18 @@ function DevicesContent() {
       label: "Actions",
       noExport: true,
       render: (d) => (
-        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); syncDevice.mutate(d.id); }} disabled={syncDevice.isPending}>
-          <RefreshCw className="h-3 w-3 mr-1" />Sync
-        </Button>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="outline" onClick={() => syncDevice.mutate(d.id)} disabled={syncDevice.isPending}>
+            <RefreshCw className="h-3 w-3 mr-1" />Sync
+          </Button>
+          <Button size="sm" variant="ghost" aria-label="Regenerate API key" title="Regenerate API key"
+            onClick={() => regenerateKey.mutate(d.id)} disabled={regenerateKey.isPending}>
+            <KeyRound className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="ghost" aria-label="Remove device" onClick={() => removeDevice(d)}>
+            <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -99,7 +139,7 @@ function DevicesContent() {
         <DataPanel bodyClassName="p-0">
           <DataTable
             columns={DEVICE_COLUMNS}
-            rows={devices}
+            rows={devices.filter((d: any) => !hideIds.has(String(d.id)))}
             rowKey={(d: any) => d.id}
             searchable
             searchPlaceholder="Search devices…"

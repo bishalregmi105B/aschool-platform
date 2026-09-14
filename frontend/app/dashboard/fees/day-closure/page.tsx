@@ -21,8 +21,12 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
-  FilterCommandBar, DataPanel, AOSModuleLoadingState,
+  FilterCommandBar, DataPanel, StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { ErrorState } from "@/components/ui/empty-state";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { useI18n } from "@/lib/i18n";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { useAuth } from "@/lib/auth-context";
@@ -113,11 +117,14 @@ export default function DayClosurePage() {
 }
 
 function DayClosureContent() {
+  const { t } = useI18n();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
-  const [dateBS, setDateBS] = useState<string>(todayBS());
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["date"]);
+  const dateBS = urlFilters.date || todayBS();
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [closuresPage, setClosuresPage] = useState(1);
 
@@ -172,7 +179,8 @@ function DayClosureContent() {
       setNotes("");
       const diff = Number(res?.difference || 0);
       toast.success(
-        `Day closed. Counted ${formatNepaliCurrency(res?.counted_total || 0)} vs expected ${formatNepaliCurrency(res?.expected_total || 0)} (${diff === 0 ? "balanced" : diff > 0 ? "over" : "short"} ${formatNepaliCurrency(Math.abs(diff))}).`,
+        t(`Day closed. Counted ${formatNepaliCurrency(res?.counted_total || 0)} vs expected ${formatNepaliCurrency(res?.expected_total || 0)} (${diff === 0 ? "balanced" : diff > 0 ? "over" : "short"} ${formatNepaliCurrency(Math.abs(diff))}).`,
+           `दिन बंद भए। गरेको ${formatNepaliCurrency(res?.counted_total || 0)} / अपेक्षित ${formatNepaliCurrency(res?.expected_total || 0)} (${diff === 0 ? "बराबर" : diff > 0 ? "बढी" : "कम"} ${formatNepaliCurrency(Math.abs(diff))}).`),
       );
     },
     onError: (e: any) =>
@@ -187,7 +195,7 @@ function DayClosureContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fee-day-book"] });
       queryClient.invalidateQueries({ queryKey: ["fee-day-closures"] });
-      toast.success("Closure reopened — the counter is unlocked for this date.");
+      toast.success(t("Closure reopened — the counter is unlocked for this date.", "दुबारा खुल्न — क्ष खुल्न छ।"));
     },
     onError: (e: any) =>
       toast.error(e?.response?.data?.error || e?.message || "Could not reopen"),
@@ -218,25 +226,25 @@ function DayClosureContent() {
   const CLOSURE_COLUMNS: Column<ClosureListRow>[] = [
     {
       key: "closure_date_bs",
-      label: "Date (BS)",
+      label: t("Date (BS)", "मिति"),
       sortable: true,
       value: (r) => r.closure_date_bs,
       render: (r) => formatNepaliDate(r.closure_date_bs),
     },
     {
       key: "status",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (r) => r.status,
       render: (r) => (
         <Badge variant={r.status === "closed" ? "success" : "warning"}>
           {r.status === "closed" ? (
             <span className="flex items-center gap-1">
-              <Lock className="h-3 w-3" /> Closed
+              <Lock className="h-3 w-3" /> {t("Closed", "बंद")}
             </span>
           ) : (
             <span className="flex items-center gap-1">
-              <LockOpen className="h-3 w-3" /> Open
+              <LockOpen className="h-3 w-3" /> {t("Open", "खुल्न")}
             </span>
           )}
         </Badge>
@@ -244,7 +252,7 @@ function DayClosureContent() {
     },
     {
       key: "expected_total",
-      label: "Expected",
+      label: t("Expected", "अपेक्षित"),
       align: "right",
       sortable: true,
       value: (r) => r.expected_total,
@@ -252,7 +260,7 @@ function DayClosureContent() {
     },
     {
       key: "counted_total",
-      label: "Counted",
+      label: t("Counted", "गरेको"),
       align: "right",
       sortable: true,
       value: (r) => r.counted_total,
@@ -260,7 +268,7 @@ function DayClosureContent() {
     },
     {
       key: "difference",
-      label: "Difference",
+      label: t("Difference", "फरक"),
       align: "right",
       sortable: true,
       value: (r) => r.difference,
@@ -278,14 +286,14 @@ function DayClosureContent() {
           }
         >
           {r.difference === 0
-            ? "Balanced"
+            ? t("Balanced", "बराबर")
             : `${r.difference > 0 ? "+" : ""}${formatNepaliCurrency(r.difference)}`}
         </span>
       ),
     },
     {
       key: "notes",
-      label: "Notes",
+      label: t("Notes", "टिप्पणी"),
       hidden: true,
       value: (r) => r.notes ?? "",
       render: (r) => <span className="text-xs text-[color:var(--w11-text-secondary)]">{r.notes || "—"}</span>,
@@ -301,25 +309,46 @@ function DayClosureContent() {
             variant="outline"
             className="h-7 gap-1 text-xs"
             disabled={reopen.isPending}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              reopen.mutate(r.id);
+              const ok = await confirm({
+                title: t("Reopen this day's closure?", "दिन बंद दुबारा खोल्ने?"),
+                body: t("Reopening unlocks the counter for this collector and date; new payments will be allowed again.", "दुबारा खोल्दा यस क्ष/मितिमा नयाँ भुक्तान लग्ने अनुमति फिर्तिन्छ।"),
+                confirmLabel: t("Reopen", "दुबारा खोल्नु"),
+              });
+              if (ok) reopen.mutate(r.id);
             }}
           >
-            <RotateCcw className="h-3 w-3" /> Reopen
+            <RotateCcw className="h-3 w-3" /> {t("Reopen", "दुबारा")}
           </Button>
         ) : null,
     },
   ];
 
-  if (dayBook.isLoading) return <AOSPage><AOSModuleLoadingState label="Loading day book…" /></AOSPage>;
+  if (dayBook.isLoading)
+    return (
+      <AOSPage>
+        <AOSPageHeader title={t("Day Book & Closure", "दिनको क्ष")} />
+        <AOSPageBody className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="win11-card h-24 animate-pulse" style={{ margin: 0 }} />
+            ))}
+          </div>
+          <div className="win11-card h-52 animate-pulse" style={{ margin: 0 }} />
+        </AOSPageBody>
+      </AOSPage>
+    );
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Banknote className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Day Book & Closure"
-        subtitle={`The counter's take for one BS date — then lock it with a closure${dayIsClosed ? " · day is closed" : ""}`}
+        title={t("Day Book & Closure", "दिनको क्ष")}
+        subtitle={t(
+          `The counter's take for one BS date — then lock it with a closure${dayIsClosed ? " · day is closed" : ""}`,
+          `यस मितिको उगम — ${dayIsClosed ? "दिन बंद छ" : "बंद गर्न"}`
+        )}
         actions={
           <Button
             onClick={() => setShowCloseDialog(true)}
@@ -327,11 +356,11 @@ function DayClosureContent() {
           >
             {dayIsClosed ? (
               <>
-                <Lock className="h-4 w-4 mr-2" /> Day Closed
+                <Lock className="h-4 w-4 mr-2" /> {t("Day Closed", "दिन बंद")}
               </>
             ) : (
               <>
-                <Banknote className="h-4 w-4 mr-2" /> Close Day
+                <Banknote className="h-4 w-4 mr-2" /> {t("Close Day", "बंद गर्नु")}
               </>
             )}
           </Button>
@@ -340,11 +369,11 @@ function DayClosureContent() {
       <AOSPageBody className="space-y-4">
         <FilterCommandBar>
           <div className="space-y-1">
-            <Label className="text-xs">Date (BS)</Label>
+            <Label className="text-xs">{t("Date (BS)", "मिति (BS)")}</Label>
             <BSDateInput
               value={dateBS}
               onChange={(v) => {
-                setDateBS(v);
+                setUrlFilters({ date: v });
                 setClosuresPage(1);
               }}
               emit="bs"
@@ -354,21 +383,21 @@ function DayClosureContent() {
         </FilterCommandBar>
 
         {dayBook.isError ? (
-          <div className="win11-card flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <p className="text-sm text-[#c42b1c]">Failed to load the day book. Please try again.</p>
-            <Button variant="outline" size="sm" onClick={() => dayBook.refetch()}>
-              Retry
-            </Button>
+          <div className="win11-card">
+            <ErrorState
+              title={t("Failed to load the day book.", "दिनको क्ष लोड सकिएन।")}
+              onRetry={() => dayBook.refetch()}
+            />
           </div>
         ) : (
           <>
             {/* Day summary */}
             <StatGrid className="mb-0" min={200}>
               <KpiCard
-                label="Grand Total"
+                label={t("Grand Total", "जम्मा कुल")}
                 value={formatNepaliCurrency(book?.grand_total || 0)}
                 icon={<Wallet className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-                footnote={`${book?.collections_count ?? 0} collection(s) on ${book?.date_bs || dateBS} BS`}
+                footnote={`${book?.collections_count ?? 0} × ${t("payments", "भुक्तान")} · ${book?.date_bs || dateBS} BS`}
               />
               {(book?.by_method ?? []).slice(0, 3).map((m) => (
                 <KpiCard
@@ -381,21 +410,21 @@ function DayClosureContent() {
               ))}
               {(book?.by_method?.length ?? 0) === 0 && (
                 <div className="win11-card md:col-span-3 flex items-center justify-center py-8 text-sm text-[color:var(--w11-text-secondary)]">
-                  No payments recorded for this date yet.
+                  {t("No payments recorded for this date yet.", "यस मितिमा भुक्तान छेन।")}
                 </div>
               )}
             </StatGrid>
 
             {/* Collector breakdown + closure state */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DataPanel title="By Collector">
+              <DataPanel title={t("By Collector", "उगमहरणकर्तवी अनुसर")}>
                 {(book?.by_user ?? []).length ? (
                   <div className="divide-y divide-[var(--w11-border-subtle)]">
                     {book!.by_user.map((u) => (
                       <div key={u.user_id || "unknown"} className="py-2.5 flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">{u.user_name}</p>
-                          <p className="text-xs text-[color:var(--w11-text-secondary)]">{u.count} payment(s)</p>
+                          <p className="text-xs text-[color:var(--w11-text-secondary)]">{u.count} {t("payment(s)", "भुक्तान")}</p>
                         </div>
                         <p className="text-sm font-bold">
                           {formatNepaliCurrency(u.amount || 0)}
@@ -405,7 +434,7 @@ function DayClosureContent() {
                   </div>
                 ) : (
                   <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                    No collections recorded for this date.
+                    {t("No collections recorded for this date.", "यस मितिको कुनै उगम छेन।")}
                   </p>
                 )}
               </DataPanel>
@@ -413,8 +442,8 @@ function DayClosureContent() {
               <DataPanel
                 title={
                   <span className="flex items-center gap-2">
-                    Closure State
-                    {dayIsClosed && <Badge variant="success">Closed</Badge>}
+                    {t("Closure State", "बंद अवस्था")}
+                    {dayIsClosed && <StatusChip status="paid" label={t("Closed", "बंद")} />}
                   </span>
                 }
               >
@@ -424,10 +453,10 @@ function DayClosureContent() {
                       <div key={c.id} className="py-2.5 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">
-                            {c.status === "closed" ? "Closed" : "Open"}
+                            {c.status === "closed" ? t("Closed", "बंद") : t("Open", "खुल्न")}
                           </p>
                           <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                            Counted {formatNepaliCurrency(c.counted_total || 0)} / Expected{" "}
+                            {t("Counted", "गरेको")} {formatNepaliCurrency(c.counted_total || 0)} / {t("Expected", "अपेक्षित")}{" "}
                             {formatNepaliCurrency(c.expected_total || 0)}
                           </p>
                         </div>
@@ -440,7 +469,7 @@ function DayClosureContent() {
                           }
                         >
                           {c.difference === 0
-                            ? "Balanced"
+                            ? t("Balanced", "बराबर")
                             : `${c.difference > 0 ? "+" : ""}${formatNepaliCurrency(c.difference)}`}
                         </p>
                       </div>
@@ -448,20 +477,20 @@ function DayClosureContent() {
                   </div>
                 ) : (
                   <p className="py-6 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                    This day has not been closed yet.
+                    {t("This day has not been closed yet.", "यस दिन अहिनै बंद भईएको छेन।")}
                   </p>
                 )}
               </DataPanel>
             </div>
 
             {/* Closures history for this date */}
-            <DataPanel title={`Closures for ${formatNepaliDate(dateBS)}`}>
+            <DataPanel title={`${t("Closures for", "बंद हरु")} ${formatNepaliDate(dateBS)}`}>
               <DataTable<ClosureListRow>
                 columns={CLOSURE_COLUMNS}
                 rows={closures.data?.closures ?? []}
                 rowKey={(r) => r.id}
                 loading={closures.isLoading}
-                error={closures.isError ? "Failed to load closures." : undefined}
+                error={closures.isError ? t("Failed to load closures.", "बंद लोड सकिएन।") : undefined}
                 onRetry={() => closures.refetch()}
                 pagination={
                   closures.data?.meta
@@ -479,8 +508,8 @@ function DayClosureContent() {
                 dense
                 empty={{
                   icon: Banknote,
-                  title: "No closures for this date",
-                  body: "Use “Close Day” to count the till and lock the date.",
+                  title: t("No closures for this date", "यस मितिको बंद छेन"),
+                  body: t("Use Close Day to count the till and lock the date.", "क्ष गनेर दिन बंद गर्नु।"),
                 }}
               />
             </DataPanel>
@@ -491,21 +520,20 @@ function DayClosureContent() {
         <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Close Day — {formatNepaliDate(dateBS)}</DialogTitle>
+              <DialogTitle>{t("Close Day", "दिन बंद")} — {formatNepaliDate(dateBS)}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-[color:var(--w11-text-secondary)]">
-                Enter the note/coin counts. The counted total is compared against the
-                day-book take for the selected collector. While closed, new cash,
-                cheque and bank entries for this collector and date are refused.
+                {t("Enter the note/coin counts. While closed, new cash/cheque/bank entries for this collector and date are refused.",
+                   "नोट/सिक्का गण्नुहोर। बंद बेलपछ यस क्ष/मितिमा नयाँ नगद भुक्तान लग्ननेछ।")}
               </p>
               <div className="space-y-1">
-                <Label className="text-xs">Collector (optional — defaults to you)</Label>
+                <Label className="text-xs">{t("Collector (defaults to you)", "उगमहरणकर्तवी (अफ्नैदेन्त)")}</Label>
                 <AdvancedSelect
                   value={collectorId}
                   onChange={(v) => setCollectorId(v)}
                   clearable
-                  placeholder="Myself"
+                  placeholder={t("Myself", "अफ्नै")}
                   options={(book?.by_user ?? [])
                     .filter((u) => u.user_id)
                     .map((u) => ({ value: u.user_id as string, label: u.user_name }))}
@@ -514,49 +542,67 @@ function DayClosureContent() {
 
               <div className="rounded-lg border border-[var(--w11-border-subtle)] p-3 space-y-2">
                 <p className="text-xs font-medium text-[color:var(--w11-text-secondary)] uppercase tracking-wide">
-                  Denominations
+                  {t("Denominations", "दरपत्र")}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {allDenomKeys.map((denom) => (
-                    <div key={denom} className="flex items-center gap-1.5">
-                      <span className="w-14 shrink-0 text-right text-[13px] tabular-nums text-[color:var(--w11-text-secondary)]">
-                        Rs. {denom}
-                      </span>
-                      <Input
-                        type="number"
-                        min="0"
-                        inputMode="numeric"
-                        className="h-8"
-                        value={denoms[denom] ?? ""}
-                        onChange={(e) =>
-                          setDenoms((prev) => ({ ...prev, [denom]: e.target.value }))
-                        }
-                        placeholder="0"
-                        aria-label={`Count of Rs. ${denom} notes`}
-                      />
-                      {Number(denom) !== 1 && !DEFAULT_DENOMS.includes(denom) && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 shrink-0"
-                          aria-label={`Remove Rs. ${denom} denomination`}
-                          onClick={() =>
-                            setDenoms((prev) => {
-                              const next = { ...prev };
-                              delete next[denom];
-                              return next;
-                            })
-                          }
-                        >
-                          <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <table className="win11-datagrid w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left">{t("Note", "नोट")}</th>
+                      <th className="text-right">{t("Count", "संख्य")}</th>
+                      <th className="text-right">{t("Subtotal", "जम्मा")}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allDenomKeys.map((denom) => {
+                      const n = parseInt(denoms[denom] || "0", 10) || 0;
+                      return (
+                        <tr key={denom}>
+                          <td className="tabular-nums text-[color:var(--w11-text-secondary)]">Rs. {denom}</td>
+                          <td className="text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              inputMode="numeric"
+                              className="h-7 w-20 text-right tabular-nums ml-auto"
+                              value={denoms[denom] ?? ""}
+                              onChange={(e) =>
+                                setDenoms((prev) => ({ ...prev, [denom]: e.target.value }))
+                              }
+                              placeholder="0"
+                              aria-label={`Count of Rs. ${denom} notes`}
+                            />
+                          </td>
+                          <td className="text-right tabular-nums font-medium">
+                            {n ? formatNepaliCurrency(n * Number(denom)) : "—"}
+                          </td>
+                          <td className="w-8">
+                            {Number(denom) !== 1 && !DEFAULT_DENOMS.includes(denom) && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 shrink-0"
+                                aria-label={`Remove Rs. ${denom} denomination`}
+                                onClick={() =>
+                                  setDenoms((prev) => {
+                                    const next = { ...prev };
+                                    delete next[denom];
+                                    return next;
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" style={{ color: "#c42b1c" }} />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
                 <div className="flex items-end gap-2 pt-1">
                   <div className="space-y-1">
-                    <Label className="text-[11px]">Custom denomination</Label>
+                    <Label className="text-[11px]">{t("Custom denomination", "अफ्नो दरपत्र")}</Label>
                     <Input
                       type="number"
                       min="1"
@@ -575,7 +621,7 @@ function DayClosureContent() {
                       setCustomDenom("");
                     }}
                   >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t("Add", "थप")}
                   </Button>
                 </div>
               </div>
@@ -584,36 +630,47 @@ function DayClosureContent() {
                 className="flex items-center justify-between rounded-lg px-3 py-2"
                 style={{ background: "var(--w11-control-hover)" }}
               >
-                <span className="text-sm font-medium">Counted Total</span>
+                <span className="text-sm font-medium">{t("Counted Total", "गरेको कुल")}</span>
                 <span className="text-lg font-bold tabular-nums">
                   {formatNepaliCurrency(countedTotal)}
                 </span>
               </div>
               {book && (
+                <div
+                  className={`win11-infobar rounded-lg text-sm ${countedTotal - (book.grand_total || 0) === 0 ? "success" : countedTotal - (book.grand_total || 0) > 0 ? "info" : "error"}`}
+                >
+                  {(() => {
+                    const diff = countedTotal - (book.grand_total || 0);
+                    return diff === 0
+                      ? t("Matches the day book.", "दिनको क्षसैँता मिल्यो।")
+                      : `${t(diff > 0 ? "Over by" : "Short by", diff > 0 ? "बढी हो" : "कम छ")} ${formatNepaliCurrency(Math.abs(diff))}`;
+                  })()}
+                </div>
+              )}
+              {book && (
                 <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                  Day-book reference total (all collectors):{" "}
-                  {formatNepaliCurrency(book.grand_total || 0)}. The exact expected
-                  total is computed on save per collector (cash, cheque, bank and QR
-                  payments only).
+                  {t("Reference day-book total:", "ग्राउन्ट क्ष को जम्मा:")}{" "}
+                  {formatNepaliCurrency(book.grand_total || 0)}.{" "}
+                  {t("The exact expected total is computed per collector on save.", "क्ष अनुसर अपेक्षित जम्मा सुरक्षाको बेला मा होर्छ।")}
                 </p>
               )}
               <div className="space-y-1">
-                <Label className="text-xs">Notes (optional)</Label>
+                <Label className="text-xs">{t("Notes (optional)", "टिप्पणी (वैकल्पिक)")}</Label>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  placeholder="e.g. Rs. 200 shortage covered by petty cash"
+                  placeholder={t("e.g. Rs. 200 shortage covered by petty cash", "जस्ताई: रु. 200 कमि सरी रकमबाट")}
                 />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCloseDialog(false)} disabled={closeDay.isPending}>
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
-              <Button onClick={() => closeDay.mutate()} disabled={closeDay.isPending}>
+              <Button onClick={() => closeDay.mutate()} disabled={closeDay.isPending || countedTotal <= 0}>
                 {closeDay.isPending ? <Spinner className="mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
-                Close Day
+                {t("Close Day", "दिन बंद गर्नु")}
               </Button>
             </DialogFooter>
           </DialogContent>

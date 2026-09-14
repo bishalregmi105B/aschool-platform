@@ -10,7 +10,8 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useDebounced, useUrlFilters } from "@/components/ui/filter-bar";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AOSPage,
@@ -60,8 +61,10 @@ const STAFF_ROLE_OPTIONS: Array<{ value: StaffRole; label: string }> = [
 
 export default function StaffPage() {
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const [search, setSearch] = useState("");
+  const { values, setValues } = useUrlFilters(["q"]);
+  const [searchInput, setSearchInput] = useState(values.q || "");
+  const search = useDebounced(searchInput, 250);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [showDialog, setShowDialog] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [form, setForm] = useState<StaffForm>(EMPTY_FORM);
@@ -72,7 +75,7 @@ export default function StaffPage() {
     retry: 1,
   });
 
-  const staff: Staff[] = data?.data || [];
+  const staff: Staff[] = (data?.data || []).filter((st: any) => !hiddenIds.has(st.id));
   const stats = {
     total: staff.length,
     teachers: staff.filter((s: any) => s.role === "teacher").length,
@@ -187,17 +190,12 @@ export default function StaffPage() {
             size="icon"
             onClick={(e) => {
               e.stopPropagation();
-              void (async () => {
-                const ok = await confirm({
-                  title: `Delete ${st.full_name}?`,
-                  body: "The staff account is removed; payroll history is kept.",
-                  confirmLabel: "Delete staff member",
-                  tone: "danger",
-                });
-                if (ok) {
-                  deleteMutation.mutate(st.id);
-                }
-              })();
+              undoableDelete({
+                label: `staff member ${st.full_name}`,
+                commit: async () => { await deleteMutation.mutateAsync(st.id); },
+                optimistic: () => setHiddenIds((prev) => new Set(prev).add(st.id)),
+                rollback: () => setHiddenIds((prev) => { const n = new Set(prev); n.delete(st.id); return n; }),
+              });
             }}
             disabled={deleteMutation.isPending}
           >
@@ -258,6 +256,8 @@ export default function StaffPage() {
             rows={staff}
             rowKey={(st: any) => st.id}
             searchable
+            searchValue={searchInput}
+            onSearchChange={(v) => { setSearchInput(v); setValues({ q: v }); }}
             searchPlaceholder="Search staff..."
             exportFileName="staff"
             dense

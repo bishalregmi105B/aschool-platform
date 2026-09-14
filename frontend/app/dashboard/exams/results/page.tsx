@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PluginGate, usePluginEnabled } from "@/lib/plugins";
@@ -36,6 +36,14 @@ import {
   LayoutTemplate,
   Loader2,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { PrintStyles, PrintRegion, PrintTwinButton } from "../print-twin";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SubjectResult {
@@ -129,9 +137,26 @@ export default function ResultsPage() {
 type ActiveTab = "results" | "marksLedger";
 
 function ResultsContent() {
-  const [examId, setExamId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("results");
+  const { t } = useI18n();
+  // Wave C: exam/class/tab are window-route URL state (plan 33 rule 2) — the
+  // hub's "View Results" link (?exam=<id>) now actually pre-selects, and the
+  // active tab is shareable via ?tab=marksLedger.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const resultsPathname = windowRoute?.pathname ?? "/dashboard/exams/results";
+  const setRouteFilter = (patch: Record<string, string>) => {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    const qs = next.toString();
+    navigate(qs ? `${resultsPathname}?${qs}` : resultsPathname);
+  };
+  const examId = routeParams.get("exam") || "";
+  const classId = routeParams.get("cls") || "";
+  const activeTab: ActiveTab = routeParams.get("tab") === "marksLedger" ? "marksLedger" : "results";
   const [selectedStudent, setSelectedStudent] =
     useState<StudentMarksheet | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -169,24 +194,26 @@ function ResultsContent() {
 
   // When the user picks a class, clear exam selection if it no longer matches
   const handleClassChange = (newClassId: string) => {
-    setClassId(newClassId);
     const currentExam = (exams || []).find(
       (e: { id: string; class_id: string | null }) => e.id === examId,
     );
-    if (currentExam && currentExam.class_id !== newClassId) {
-      setExamId("");
-    }
+    setRouteFilter(
+      currentExam && currentExam.class_id !== newClassId
+        ? { cls: newClassId, exam: "" }
+        : { cls: newClassId },
+    );
   };
 
   // When the user picks an exam, auto-populate class if exam has a class_id
   const handleExamChange = (newExamId: string) => {
-    setExamId(newExamId);
     const chosen = (exams || []).find(
       (e: { id: string; class_id: string | null }) => e.id === newExamId,
     );
-    if (chosen?.class_id && !classId) {
-      setClassId(chosen.class_id);
-    }
+    setRouteFilter(
+      chosen?.class_id && !classId
+        ? { exam: newExamId, cls: chosen.class_id }
+        : { exam: newExamId },
+    );
   };
 
   const { data: results, isLoading: loadingResults, isError: resultsError, refetch: refetchResults } = useQuery({
@@ -339,14 +366,22 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
       : null;
 
   const isReady = !!examId && !!classId;
+  const examNameForPrint =
+    (results && (results[0] as StudentResult)?.class_name ? `${(exams || []).find((e: { id: string; name: string }) => e.id === examId)?.name || "Exam"}` : "Exam");
 
   return (
     <AOSPage>
+      <PrintStyles />
       <AOSPageHeader
-        title="Exam Results"
-        subtitle="Class-wise results, grade sheets and individual marksheets"
+        title={t("Exam Results", "परीक्षा नतिजा")}
+        subtitle={t("Class-wise results, grade sheets and individual marksheets", "कक्षागत नतिजा, ग्रेड सिट र व्यक्तिगत अंकपत्र")}
         actions={
-          isReady && hasDesigner ? (
+          <>
+            <PrintTwinButton
+              title={`${activeTab === "marksLedger" ? "Grade Sheet" : "Exam Results"} — ${examNameForPrint}`}
+              disabled={!isReady}
+            />
+            {isReady && hasDesigner ? (
             <div className="flex items-center gap-3 flex-wrap">
               {/* Bulk generate — any result template, merged PDF or ZIP */}
               <Button
@@ -413,7 +448,8 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                 </Button>
               </div>
             </div>
-          ) : undefined
+            ) : null}
+          </>
         }
       />
       <AOSPageBody className="space-y-4">
@@ -480,35 +516,26 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
           </StatGrid>
         )}
 
-        {/* Tabs */}
+        {/* Tabs — fixed win11 tablist (G1), URL state via ?tab= */}
         {isReady && (
           <>
-            <div className="border-b border-[var(--w11-border-subtle)]">
-              <nav className="-mb-px flex gap-0">
-                {(
-                  [
-                    { id: "results", label: "Student Results", icon: FileText },
-                    { id: "marksLedger", label: "Marks Ledger", icon: TableIcon },
-                  ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.id
-                        ? "border-[var(--w11-accent)] text-[color:var(--w11-accent)]"
-                        : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)] hover:border-[var(--w11-border-strong)]"
-                    }`}
-                  >
-                    <tab.icon className="h-4 w-4" />
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setRouteFilter({ tab: v === "results" ? "" : v })}
+              className="w-full"
+            >
+              <TabsList>
+                <TabsTrigger value="results">{t("Student Results", "विद्यार्थी नतिजा")}</TabsTrigger>
+                <TabsTrigger value="marksLedger">{t("Marks Ledger", "अँक बहीया")}</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            {/* Results Table */}
+            {/* Results Table (print twin region) */}
             {activeTab === "results" && (
+              <PrintRegion>
+                <div className="hidden print:block mb-2">
+                  <p className="font-bold text-lg">{examNameForPrint} — Class Results</p>
+                </div>
               <DataPanel bodyClassName="p-0">
                 {resultsError ? (
                   <div className="flex flex-col items-center py-12 space-y-3">
@@ -536,11 +563,16 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                   />
                 )}
               </DataPanel>
+              </PrintRegion>
             )}
 
-            {/* Marks Ledger */}
+            {/* Marks Ledger (print twin region) */}
             {activeTab === "marksLedger" && (
               <div className="space-y-3">
+                <PrintRegion>
+                  <div className="hidden print:block mb-2">
+                    <p className="font-bold text-lg">{gradeSheet?.exam_name || examNameForPrint} — Grade Sheet ({gradeSheet?.class_name || ""})</p>
+                  </div>
                 <DataPanel bodyClassName="p-0">
                   <div className="overflow-auto">
                     {gradeSheetError ? (
@@ -649,6 +681,7 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                     )}
                   </div>
                 </DataPanel>
+                </PrintRegion>
               </div>
             )}
           </>
@@ -681,8 +714,8 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                 </button>
               </div>
 
-              {/* Modal body */}
-              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+                {/* Modal body (print twin region) */}
+                <PrintRegion className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-lg p-3 text-center" style={{ background: "var(--w11-control-hover)" }}>
@@ -806,7 +839,7 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                     </p>
                   </div>
                 )}
-              </div>
+              </PrintRegion>
 
               {/* Modal footer */}
               <div className="border-t border-[var(--w11-border-subtle)] px-6 py-3 flex justify-between items-center">
@@ -819,6 +852,12 @@ ${htmlPages.map((p) => `<div class="aschool-page">${p}</div>`).join("\n")}
                     ` (${selectedStudent.failed_subjects} subject${selectedStudent.failed_subjects > 1 ? "s" : ""} failed)`}
                 </span>
                 <div className="flex gap-2">
+                  {/* Per-student print twin (16.6: "add print-twin + per-student print") */}
+                  <PrintTwinButton
+                    title={`Marksheet — ${selectedStudent.student_name}`}
+                    variant="default"
+                    label="Print"
+                  />
                   {hasDesigner && (
                     <Button
                       size="sm"

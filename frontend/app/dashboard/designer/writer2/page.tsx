@@ -44,10 +44,11 @@ import { writerJsonToWriterDoc } from "@/lib/designer/writer-doc-convert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, Save, Download, ChevronDown, FileOutput, FileText, Braces, Loader2, BookOpen, LayoutTemplate,
+  Printer, Code2, Keyboard,
 } from "lucide-react";
 
 import { Ribbon } from "@/components/writer/ribbon";
@@ -55,13 +56,15 @@ import { FindReplaceDialog, WordArtDialog, HeaderFooterDialog } from "@/componen
 import { WriterRuler, StatusBar } from "@/components/writer/chrome";
 import { WriterTemplatesDialog, type WriterTemplate } from "@/components/writer/TemplatesDialog";
 import { WriterSidePanel, type WriterCitation } from "@/components/writer/ResearchPanel";
+import { EditorErrorBoundary } from "@/components/designer/EditorErrorBoundary";
+import { ShortcutsHelpDialog, type ShortcutGroup } from "@/components/designer/ShortcutsHelp";
 import type { WriterCtx, WordCounts } from "@/components/writer/context";
 import { FindReplaceExtension, setFindState } from "@/lib/writer/findReplace";
 import { PaginationExtension, computePagination, applyPagination, PAGE_GAP } from "@/lib/writer/pagination";
 import { WriterParagraphFormat, PageBreak, FloatingBoxNode, WriterImage, WriterCommentMark, TrackInsertMark, TrackDeleteMark } from "@/lib/writer/editorKit";
 import { exportDocx, downloadBlob, slugifyName } from "@/lib/writer/exportDocx";
 import {
-  mergeSettings, pageGeometry, ALL_FONTS, WORDART_STYLES,
+  mergeSettings, pageGeometry, ALL_FONTS, WORDART_STYLES, LOCAL_NEPALI_FONTS, DEVANAGARI_FONTS,
 } from "@/lib/writer/settings";
 import type { WriterSettings, ShapeKind } from "@/lib/writer/settings";
 
@@ -162,10 +165,40 @@ const TOKEN_CSS = `
 }
 `;
 
+// Verified shortcuts the ribbon/dialogs actually honour — the "?" help
+// overlay only lists these (wave-J: never advertise keys that don't exist).
+const isEditableTarget = (t: EventTarget | null) =>
+  t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+
+const WRITER_SHORTCUTS: ShortcutGroup[] = [
+  { title: "Formatting", items: [
+    { keys: ["Ctrl", "B"], label: "Bold" },
+    { keys: ["Ctrl", "I"], label: "Italic" },
+    { keys: ["Ctrl", "U"], label: "Underline" },
+    { keys: ["Ctrl", "⇧", "X"], label: "Strikethrough" },
+    { keys: ["Ctrl", "⇧", "8"], label: "Bullet list" },
+    { keys: ["Ctrl", "⇧", "7"], label: "Numbered list" },
+  ]},
+  { title: "Document", items: [
+    { keys: ["Ctrl", "Z"], label: "Undo" },
+    { keys: ["Ctrl", "⇧", "Z"], label: "Redo" },
+    { keys: ["Ctrl", "S"], label: "Save to cloud" },
+    { keys: ["Ctrl", "F"], label: "Find & replace" },
+    { keys: ["Ctrl", "Enter"], label: "Page break" },
+  ]},
+  { title: "View", items: [
+    { keys: ["Esc"], label: "Exit focus mode" },
+    { keys: ["?"], label: "This help" },
+  ]},
+];
+
 export default function WriterPage() {
   return (
     <PluginGate slug="design_studio">
-      <WriterContent />
+      {/* TipTap init crash → friendly infobar + reload (wave-J) */}
+      <EditorErrorBoundary editorName="The document writer" freshHref="/dashboard/designer/writer">
+        <WriterContent />
+      </EditorErrorBoundary>
     </PluginGate>
   );
 }
@@ -193,6 +226,12 @@ function WriterContent() {
   const [hasTallBlock, setHasTallBlock] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [counts, setCounts] = useState<WordCounts>({ words: 0, chars: 0, paras: 0, pages: 1, page: 1 });
+  // save-state for the status bar pill: Saving… → Saved ✓ HH:MM
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  // "?" shortcut help overlay
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  // new-user empty-state card dismiss ("Write blank")
+  const [emptyDismissed, setEmptyDismissed] = useState(false);
 
   // dialogs
   const [findOpen, setFindOpen] = useState(false);
@@ -295,13 +334,15 @@ function WriterContent() {
   });
 
   function loadGoogleFont(family: string) {
+    // Preeti/Kalimati render from the school PC — never fetch from Google.
+    if (LOCAL_NEPALI_FONTS.includes(family)) return;
     const id = `gfont-${family.replace(/\s+/g, "-")}`;
     if (document.getElementById(id)) return;
     if (!ALL_FONTS.includes(family)) return;
     const link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
-    const devanagari = family.includes("Devanagari") || family === "Mukta" || family === "Hind";
+    const devanagari = DEVANAGARI_FONTS.includes(family);
     link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700&display=swap${devanagari ? "&subset=devanagari" : ""}`;
     document.head.appendChild(link);
   }
@@ -378,12 +419,15 @@ function WriterContent() {
     toast.success(`Template loaded: ${tpl.name}`);
   }, [editor]);
 
-  // keep editor base font in sync with settings
+  // keep editor base font in sync with settings — Devanagari families get
+  // Mukta as the next fallback so Nepali text survives on machines that
+  // don't have Preeti/Kalimati installed (wave-J).
   useEffect(() => {
     if (!editor) return;
     loadGoogleFont(settings.font);
     const el = editor.view.dom as HTMLElement;
-    el.style.fontFamily = `'${settings.font}',Arial,sans-serif`;
+    const deva = DEVANAGARI_FONTS.includes(settings.font);
+    el.style.fontFamily = `'${settings.font}',${deva ? "'Mukta'," : ""}Arial,sans-serif`;
     el.style.fontSize = `${settings.fontSize}pt`;
   }, [editor, settings.font, settings.fontSize]);
 
@@ -419,6 +463,7 @@ function WriterContent() {
     },
     onSuccess: (data) => {
       setDirty(false);
+      setSavedAt(new Date());
       toast.success("Document saved");
       if (!docId && data?.id) router(`/dashboard/designer/writer?doc=${data.id}`);
     },
@@ -507,18 +552,31 @@ function WriterContent() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  // focus mode Esc exit + Ctrl+F find
+  // focus mode Esc exit + Ctrl+F find + Ctrl+S save + ? / Ctrl+/ help
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && focusMode) setFocusMode(false);
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setFindShowReplace(false);
         setFindOpen(true);
       }
+      // Ctrl+S saves (Word muscle memory; the 3.6s round-trip shows in the pill)
+      if (mod && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveMutation.mutate();
+      }
+      // Ctrl+/ always; "?" only outside the editor so typing a question
+      // mark never opens the overlay
+      if ((mod && e.key === "/") || (e.key === "?" && !isEditableTarget(e.target))) {
+        e.preventDefault();
+        setShowShortcuts((s) => !s);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMode]);
 
   // ── pagination + counts — event driven (update / resize / settings) ─
@@ -877,6 +935,15 @@ function WriterContent() {
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Word Document
         </span>
         <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Keyboard shortcuts (?)"
+            onClick={() => setShowShortcuts(true)}
+          >
+            <Keyboard className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />
+          </Button>
           {/* ghost = 11.css `subtle` — commandbar hover, token-driven */}
           <Button
             variant="ghost"
@@ -918,7 +985,8 @@ function WriterContent() {
                 <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-border">
+            <DropdownMenuContent align="end" className="w-60 rounded-xl shadow-lg border-border">
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Documents</div>
               <DropdownMenuItem onClick={doExportDocx} disabled={exporting} className="gap-2 cursor-pointer">
                 {exporting ? <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--w11-accent)" }} /> : <FileText className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
                 <div className="flex flex-col">
@@ -933,14 +1001,14 @@ function WriterContent() {
                   <span className="text-[10px] text-muted-foreground">Server-rendered with fonts</span>
                 </div>
               </DropdownMenuItem>
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--w11-text-tertiary)]">Print &amp; source</div>
               <DropdownMenuItem onClick={() => window.print()} className="gap-2 cursor-pointer">
-                <Download className="h-4 w-4 text-amber-500" />
+                <Printer className="h-4 w-4 text-amber-500" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-xs">Browser Print / PDF</span>
                   <span className="text-[10px] text-muted-foreground">Quick browser print</span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {
                 const html = `<html><head><meta charset="utf-8"><style>body{font-family:'${settings.font}',Arial;}</style></head><body>${editor.getHTML()}</body></html>`;
                 const blob = new Blob([html], { type: "text/html" });
@@ -948,8 +1016,8 @@ function WriterContent() {
                 a.href = URL.createObjectURL(blob);
                 a.download = `${slugifyName(docName)}.html`;
                 a.click();
-              }} className="text-xs">
-                Export raw HTML
+              }} className="text-xs gap-2">
+                <Code2 className="h-4 w-4 text-violet-500" /> Export raw HTML
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1028,7 +1096,37 @@ function WriterContent() {
       )}
 
       {/* Page canvas — paginated page bands with a single editor surface */}
-      <div ref={scrollRef} className="flex-1 overflow-auto print:overflow-visible">
+      <div ref={scrollRef} className="relative flex-1 overflow-auto print:overflow-visible">
+        {/* New-user empty state: the placeholder text in the page says
+            "start writing" — this card offers the faster path (wave-J). */}
+        {counts.words === 0 && !dirty && !emptyDismissed && (
+          <div className="absolute left-1/2 -translate-x-1/2 top-4 z-20 print:hidden pointer-events-none">
+            <div
+              className="pointer-events-auto flex items-center gap-3 rounded-[var(--w11-radius-lg)] border px-4 py-2.5 backdrop-blur-sm"
+              style={{
+                background: "var(--w11-acrylic-bg)",
+                borderColor: "var(--w11-border-default)",
+                boxShadow: "var(--w11-elevation-flyout)",
+              }}
+            >
+              <BookOpen className="h-4 w-4 shrink-0" style={{ color: "var(--w11-accent)" }} />
+              <span className="text-xs" style={{ color: "var(--w11-text-primary)" }}>
+                Start from a school template — or just begin typing on the blank page.
+              </span>
+              <Button size="sm" variant="outline" className="h-6 text-[11px] gap-1 shrink-0" onClick={() => setTemplatesOpen(true)}>
+                <LayoutTemplate className="h-3 w-3" /> Templates
+              </Button>
+              <button
+                type="button"
+                className="text-[10px] underline shrink-0"
+                style={{ color: "var(--w11-text-secondary)" }}
+                onClick={() => { setEmptyDismissed(true); editor.commands.focus("start"); }}
+              >
+                Write blank
+              </button>
+            </div>
+          </div>
+        )}
         <div
           style={{
             width: pw * zoomScale,
@@ -1108,7 +1206,14 @@ function WriterContent() {
       </div>
 
       {/* Status bar */}
-      <StatusBar counts={counts} zoom={zoom} setZoom={setZoom} dirty={dirty} />
+      <StatusBar
+        counts={counts}
+        zoom={zoom}
+        setZoom={setZoom}
+        dirty={dirty}
+        saving={saveMutation.isPending}
+        savedAt={savedAt}
+      />
 
       {/* Research / AI drawer */}
       {sidePanel === "research" && (
@@ -1144,6 +1249,12 @@ function WriterContent() {
         onClose={() => setTemplatesOpen(false)}
         onPick={applyTemplate}
         activeTemplateId={activeTemplateKey}
+      />
+      <ShortcutsHelpDialog
+        open={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        title="Writer — keyboard shortcuts"
+        groups={WRITER_SHORTCUTS}
       />
     </div>
   );

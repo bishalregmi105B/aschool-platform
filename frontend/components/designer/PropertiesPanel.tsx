@@ -10,6 +10,7 @@
  * win11 scope, so no scope of its own is needed.
  */
 import React, { useEffect, useState, useCallback } from "react";
+import { ChevronRight } from "lucide-react";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -21,11 +22,16 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { PAGE_SIZES, PageMargins } from "@/lib/hooks/useCanvas";
 
-// ── Google Fonts available in the picker ──────────────────────────────────────
+// ── Fonts available in the picker ─────────────────────────────────────────
 const SYSTEM_FONTS = [
   "Arial", "Georgia", "Times New Roman", "Courier New",
   "Verdana", "Trebuchet MS", "Impact", "Comic Sans MS",
 ];
+
+// Legacy Nepali typing fonts (Preeti/Kalimati) ship with school PCs in
+// Nepal, NOT with Google Fonts — they render from the local machine, so the
+// loader must never try to fetch them (audit 5.6 / wave-J).
+const LOCAL_NEPALI_FONTS = ["Preeti", "Kalimati"];
 
 const GOOGLE_FONTS = [
   // Devanagari first — this is a Nepal product; certificates, ID cards and
@@ -38,34 +44,58 @@ const GOOGLE_FONTS = [
   "Dancing Script", "Pacifico", "Caveat", "Satisfy",
 ];
 
-const ALL_FONTS = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
+const DEVANAGARI_FONTS = ["Mukta", "Noto Sans Devanagari", "Hind", "Yatra One", "Baloo 2", ...LOCAL_NEPALI_FONTS];
+const isDevanagari = (f: string) => DEVANAGARI_FONTS.includes(f);
 
-/** Fluent section card: control surface + subtle border + soft radius. */
-function SectionCard({ title, children, className = "" }: {
-  title?: string; children: React.ReactNode; className?: string;
+const ALL_FONTS = [...SYSTEM_FONTS, ...LOCAL_NEPALI_FONTS, ...GOOGLE_FONTS];
+
+/** Fluent section card — win11-expander collapse feel (wave-J A6 properties
+ *  spec: sectioned Layout / Fill / Stroke / Text with chevron collapse). */
+function SectionCard({ title, children, className = "", defaultOpen = true }: {
+  title?: string; children: React.ReactNode; className?: string; defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (!title) {
+    return (
+      <div
+        className={`rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] space-y-2.5 ${className}`}
+        style={{ background: "var(--w11-control-bg)" }}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div
-      className={`rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] space-y-2.5 ${className}`}
+      className={`rounded-[var(--w11-radius-lg)] border border-[var(--w11-border-subtle)] ${className}`}
       style={{ background: "var(--w11-control-bg)" }}
     >
-      {title && (
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--w11-text-tertiary)]">
-          {title}
-        </div>
-      )}
-      {children}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left rounded-[var(--w11-radius-lg)] hover:bg-[var(--w11-control-hover)] transition-colors"
+        style={{ transitionDuration: "var(--w11-transition-fast)" }}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--w11-text-tertiary)]">{title}</span>
+        <ChevronRight className={`h-3.5 w-3.5 text-[var(--w11-text-tertiary)] transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && <div className="px-2.5 pb-2.5 space-y-2.5">{children}</div>}
     </div>
   );
 }
 
 function loadGoogleFont(family: string) {
+  // Preeti/Kalimati are locally-installed legacy Nepali fonts — never fetch
+  // them from Google (404 noise + CSP hits).
+  if (LOCAL_NEPALI_FONTS.includes(family)) return;
   const id = `gfont-${family.replace(/\s+/g, "-")}`;
   if (document.getElementById(id)) return;
   const link = document.createElement("link");
   link.id = id;
   link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700&display=swap`;
+  const devanagari = isDevanagari(family);
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700&display=swap${devanagari ? "&subset=devanagari" : ""}`;
   document.head.appendChild(link);
 }
 
@@ -100,9 +130,9 @@ export default function PropertiesPanel({ canvas }: Props) {
   return (
     <div className="p-3 space-y-3.5 text-sm overflow-y-auto h-full custom-scrollbar text-[var(--w11-text-primary)]">
 
-      {/* Position & Size */}
-      <SectionCard title="Transform & Dimensions">
-        <div className="grid grid-cols-2 gap-2">
+      {/* Position & Size — collapsible "Layout" section (wave-J A6 spec) */}
+      <SectionCard title="Layout">
+        <div className="grid grid-cols-2 gap-2 [font-variant-numeric:tabular-nums]">
           {[
             ["X", "left"],
             ["Y", "top"],
@@ -150,28 +180,40 @@ export default function PropertiesPanel({ canvas }: Props) {
 
       {/* ── Text properties ──────────────────────────────── */}
       {isText && (
-        <SectionCard title="Text & Typography" className="space-y-3">
+        <SectionCard title="Text">
           {/* Font family */}
           <div>
             <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Font Family</Label>
             <Select value={obj.fontFamily ?? "Arial"} onValueChange={(v) => {
-              if (GOOGLE_FONTS.includes(v)) loadGoogleFont(v);
-              set({ fontFamily: v });
+              loadGoogleFont(v);
+              // Devanagari matras + descenders need more vertical room than
+              // Latin — when a Nepali font is picked, lift a tight line
+              // height to a safe 1.6 so Nepali text never clips (wave-J).
+              const patch: Record<string, any> = { fontFamily: v };
+              if (isDevanagari(v) && (obj.lineHeight ?? 1.4) < 1.55) patch.lineHeight = 1.6;
+              set(patch);
             }}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent className="max-h-64">
-                <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold">System Fonts</div>
+                <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold">Nepali (local fonts — Preeti/Kalimati)</div>
+                {LOCAL_NEPALI_FONTS.map(f => (
+                  <SelectItem key={f} value={f} style={{ fontFamily: `'${f}', ${f}, sans-serif` }}>{f}</SelectItem>
+                ))}
+                <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold mt-1">System Fonts</div>
                 {SYSTEM_FONTS.map(f => (
                   <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>
                 ))}
                 <div className="px-2 py-1 text-[10px] text-[var(--w11-text-tertiary)] font-semibold mt-1">Google Fonts</div>
                 {GOOGLE_FONTS.map(f => (
                   <SelectItem key={f} value={f}>
-                    <span style={{ fontFamily: SYSTEM_FONTS.includes(f) ? f : undefined }}>{f}</span>
+                    <span style={{ fontFamily: isDevanagari(f) ? `'${f}'` : (SYSTEM_FONTS.includes(f) ? f : undefined) }}>{f}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <div className="text-[9px] text-[var(--w11-text-tertiary)] mt-1">
+              Preeti/Kalimati render from the school PC; Mukta downloads on demand.
+            </div>
           </div>
 
           {/* Size + color */}
@@ -264,10 +306,10 @@ export default function PropertiesPanel({ canvas }: Props) {
         </SectionCard>
       )}
 
-      {/* ── Shape properties ─────────────────────────────── */}
+      {/* ── Shape properties — split Fill / Stroke (wave-J A6) ── */}
       {isShape && (
-        <SectionCard title="Shape & Style" className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+        <>
+          <SectionCard title="Fill">
             <div>
               <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Fill</Label>
               <div className="flex items-center gap-2 p-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
@@ -278,54 +320,58 @@ export default function PropertiesPanel({ canvas }: Props) {
                 <span className="text-[10px] font-mono uppercase text-[var(--w11-text-tertiary)] truncate">{typeof obj.fill === "string" ? obj.fill : "Color"}</span>
               </div>
             </div>
-            <div>
-              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Stroke</Label>
-              <div className="flex items-center gap-2 p-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
-                style={{ background: "var(--w11-control-bg)" }}>
-                <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
-                  value={obj.stroke ?? "#000000"}
-                  onChange={(e) => set({ stroke: e.target.value })} />
-                <span className="text-[10px] font-mono uppercase text-[var(--w11-text-tertiary)] truncate">{obj.stroke || "None"}</span>
+            {obj.type === "rect" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Corner Radius</Label>
+                  <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)] [font-variant-numeric:tabular-nums]">{obj.rx ?? 0}px</span>
+                </div>
+                <Slider min={0} max={60} step={1} value={[obj.rx ?? 0]}
+                  onValueChange={([v]) => set({ rx: v, ry: v })} />
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-2 border-t border-[var(--w11-border-subtle)]">
+              <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Drop Shadow</Label>
+              <Switch checked={!!obj.shadow}
+                onCheckedChange={(v) => {
+                  if (v) {
+                    import("fabric").then(({ Shadow }) => {
+                      obj.set({ shadow: new Shadow({ color: "rgba(0,0,0,0.25)", blur: 12, offsetX: 4, offsetY: 4 }) });
+                      obj.canvas?.renderAll(); refresh();
+                    });
+                  } else { set({ shadow: null }); }
+                }} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Stroke">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)] mb-1 block">Stroke</Label>
+                <div className="flex items-center gap-2 p-1.5 rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)]"
+                  style={{ background: "var(--w11-control-bg)" }}>
+                  <input type="color" className="h-6 w-8 rounded-[var(--w11-radius-sm)] border-0 cursor-pointer block p-0"
+                    value={obj.stroke ?? "#000000"}
+                    onChange={(e) => set({ stroke: e.target.value })} />
+                  <span className="text-[10px] font-mono uppercase text-[var(--w11-text-tertiary)] truncate">{obj.stroke || "None"}</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Width</Label>
+                  <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)] [font-variant-numeric:tabular-nums]">{obj.strokeWidth ?? 0}px</span>
+                </div>
+                <Slider min={0} max={20} step={1} value={[obj.strokeWidth ?? 0]}
+                  onValueChange={([v]) => set({ strokeWidth: v })} />
               </div>
             </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Stroke Width</Label>
-              <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj.strokeWidth ?? 0}px</span>
-            </div>
-            <Slider min={0} max={20} step={1} value={[obj.strokeWidth ?? 0]}
-              onValueChange={([v]) => set({ strokeWidth: v })} />
-          </div>
-          {obj.type === "rect" && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label className="text-[10px] font-medium text-[var(--w11-text-secondary)]">Corner Radius</Label>
-                <span className="text-[10px] font-mono font-semibold text-[var(--w11-text-primary)]">{obj.rx ?? 0}px</span>
-              </div>
-              <Slider min={0} max={60} step={1} value={[obj.rx ?? 0]}
-                onValueChange={([v]) => set({ rx: v, ry: v })} />
-            </div>
-          )}
-          {/* Shadow */}
-          <div className="flex items-center justify-between pt-2 border-t border-[var(--w11-border-subtle)]">
-            <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Drop Shadow</Label>
-            <Switch checked={!!obj.shadow}
-              onCheckedChange={(v) => {
-                if (v) {
-                  import("fabric").then(({ Shadow }) => {
-                    obj.set({ shadow: new Shadow({ color: "rgba(0,0,0,0.25)", blur: 12, offsetX: 4, offsetY: 4 }) });
-                    obj.canvas?.renderAll(); refresh();
-                  });
-                } else { set({ shadow: null }); }
-              }} />
-          </div>
-        </SectionCard>
+          </SectionCard>
+        </>
       )}
 
       {/* ── Image properties ─────────────────────────────── */}
       {isImage && (
-        <SectionCard title="Image Filters & Effects" className="space-y-3">
+        <SectionCard title="Image Filters & Effects">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-medium text-[var(--w11-text-primary)]">Lock Aspect Ratio</Label>
             <Switch checked={!!obj.lockUniScaling}

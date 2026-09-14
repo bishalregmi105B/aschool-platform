@@ -18,6 +18,8 @@ import { BSDateInput } from "@/components/ui/bs-date-input";
 import {
   AOSPage, AOSPageHeader, AOSPageBody, DataPanel, AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n";
 import {
   CalendarRange,
   CalendarCheck,
@@ -63,7 +65,9 @@ export default function FeeStructurePage() {
 }
 
 function FeeStructureContent() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [showDialog, setShowDialog] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchClassId, setBatchClassId] = useState("");
@@ -124,10 +128,22 @@ function FeeStructureContent() {
     onError: (error: any) => toast.error(error?.response?.data?.error || "Failed to apply fee structure"),
   });
 
-  const remove = useMutation({
-    mutationFn: async (id: string) => api.delete(`/fees/structures/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["fee-structures"] }); toast.success("Deleted"); },
-  });
+  const removeStructure = (st: FeeStructure) => {
+    undoableDelete({
+      label: `${t("structure", "संरचना")} "${st.name}"`,
+      optimistic: () => setHiddenIds((prev) => new Set(prev).add(st.id)),
+      rollback: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          next.delete(st.id);
+          return next;
+        }),
+      commit: async () => {
+        await api.delete(`/fees/structures/${st.id}`);
+        queryClient.invalidateQueries({ queryKey: ["fee-structures"] });
+      },
+    });
+  };
 
   const batchMonthly = useMutation({
     mutationFn: async (classId?: string) =>
@@ -148,7 +164,7 @@ function FeeStructureContent() {
   const STRUCTURE_COLUMNS: Column<FeeStructure>[] = [
     {
       key: "name",
-      label: "Name",
+      label: t("Name", "नाम"),
       sortable: true,
       value: (s) => s.name,
       render: (s) => (
@@ -159,38 +175,38 @@ function FeeStructureContent() {
         </div>
       ),
     },
-    { key: "fee_type", label: "Type", sortable: true, value: (s) => s.fee_type, render: (s) => <Badge variant="outline">{formatLabel(s.fee_type)}</Badge> },
-    { key: "class_name", label: "Class", sortable: true, value: (s) => s.class_name ?? "", render: (s) => s.class_name || "All" },
-    { key: "amount", label: "Amount", align: "right", sortable: true, value: (s) => s.amount, render: (s) => <>Rs. {s.amount?.toLocaleString()}</> },
+    { key: "fee_type", label: t("Type", "प्रकार"), sortable: true, value: (s) => s.fee_type, render: (s) => <Badge variant="outline">{formatLabel(s.fee_type)}</Badge> },
+    { key: "class_name", label: t("Class", "कक्षा"), sortable: true, value: (s) => s.class_name ?? "", render: (s) => s.class_name || t("All", "सबै") },
+    { key: "amount", label: t("Amount", "रकम"), align: "right", sortable: true, value: (s) => s.amount, render: (s) => <span className="tabular-nums">Rs. {s.amount?.toLocaleString()}</span> },
     {
       key: "frequency",
-      label: "Frequency",
+      label: t("Frequency", "आवृत्ति"),
       sortable: true,
       value: (s) => s.frequency,
       render: (s) => (
         <div>
           <p>{formatLabel(s.frequency)}</p>
-          <p className="text-xs text-[color:var(--w11-text-secondary)]">Due day: {s.due_day || "—"}</p>
+          <p className="text-xs text-[color:var(--w11-text-secondary)]">{t("Due day", "मिति")}: {s.due_day || "—"}</p>
         </div>
       ),
     },
     {
       key: "applied",
-      label: "Effective",
+      label: t("Effective", "लागू अवस्था"),
       sortable: true,
       value: (s) => s.applied_count ?? 0,
       render: (s) => (
         <div className="space-y-1">
           <Badge variant={s.applied_count ? "success" : "secondary"}>
-            {s.applied_count ? "Active Now" : "Template Only"}
+            {s.applied_count ? t("Active Now", "अहिले सक्रिय") : t("Template Only", "डहाँचा मात्र")}
           </Badge>
           <p className="text-xs text-[color:var(--w11-text-secondary)]">
-            {s.applied_count ? `${s.applied_count} billed` : "Not billed yet"}
+            {s.applied_count ? `${s.applied_count} ${t("billed", "बिजक")}` : t("Not billed yet", "अहैले बिल छेन")}
           </p>
         </div>
       ),
     },
-    { key: "is_optional", label: "Optional", value: (s) => (s.is_optional ? "optional" : "required"), render: (s) => (s.is_optional ? <Badge variant="secondary">Optional</Badge> : "Required") },
+    { key: "is_optional", label: t("Optional", "वैकल्पिक"), value: (s) => (s.is_optional ? "optional" : "required"), render: (s) => (s.is_optional ? <Badge variant="secondary">{t("Optional", "वैकल्पिक")}</Badge> : t("Required", "अनिवार्य")) },
     {
       key: "actions",
       label: "",
@@ -198,12 +214,12 @@ function FeeStructureContent() {
       render: (s) => (
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setInstallmentsFor(s); }}>
-            <CalendarRange className="h-3.5 w-3.5 mr-1" /> Installments
+            <CalendarRange className="h-3.5 w-3.5 mr-1" /> {t("Installments", "किस्ता")}
           </Button>
           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); apply.mutate(s.id); }} disabled={apply.isPending}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Apply Now
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t("Apply Now", "अहिले लागू")}
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeStructure(s); }} aria-label={t("Delete structure", "संरचना मेटाउनुहोस")}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
         </div>
       ),
     },
@@ -213,55 +229,59 @@ function FeeStructureContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Banknote className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Fee Structure"
-        subtitle={`${structures.length} structures · Define reusable fee templates for each class and academic year`}
+        title={t("Fee Structure", "शुल्क संरचना")}
+        subtitle={t(
+          `${structures.length} structures · Define reusable fee templates for each class and academic year`,
+          `${structures.length} संरचना · कक्षा र शैक्षिक वर्ष अनुसर डहाँचा`
+        )}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
-              <Banknote className="h-4 w-4 mr-2" /> Generate Monthly Fees
+              <Banknote className="h-4 w-4 mr-2" /> {t("Generate Monthly Fees", "मासिक शुल्क")}
             </Button>
-            <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> Add Structure</Button>
+            <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> {t("Add Structure", "संरचना थप्नुहोस")}</Button>
           </div>
         }
       />
       <AOSPageBody className="space-y-4">
         <DataPanel>
-          <p className="text-sm text-[color:var(--w11-text-secondary)]">
-            New fee structures now create the current pending dues immediately for matching active students. Use Apply Now for older templates or to sync the current cycle again.
-          </p>
+          <div className="win11-infobar info">
+            {t("New fee structures bill matching active students immediately for the current cycle. Use Apply Now to sync older templates.",
+               "नयाँ संरचनाले मिल्न सक्रिय विद्यार्थीलाई तुरन्त बाप़ गर्दा बनाऊँ।")}
+          </div>
         </DataPanel>
 
         <DataPanel>
           <DataTable<FeeStructure>
             columns={STRUCTURE_COLUMNS}
-            rows={structures}
+            rows={structures.filter((st) => !hiddenIds.has(st.id))}
             rowKey={(s) => s.id}
             searchable
-            searchPlaceholder="Search structures…"
+            searchPlaceholder={t("Search structures…", "संरचना खोज्नुहोस…")}
             exportFileName="fee-structures"
-            empty={{ icon: Banknote, title: "No fee structures defined", body: "Add your first structure — new ones bill matching students immediately." }}
+            empty={{ icon: Banknote, title: t("No fee structures defined", "कुनै संरचना छेन"), body: t("Add your first structure — new ones bill matching students immediately.", "पहिलो संरचना थप्नुहोस।") }}
           />
         </DataPanel>
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add Fee Structure</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t("Add Fee Structure", "नयाँ शुल्क संरचना")}</DialogTitle></DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Monthly Tuition" /></div>
+              <div className="space-y-2"><Label>{t("Name", "नाम")}</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("e.g. Monthly Tuition", "जस्ताई: मासिक शुल्क")} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Type</Label>
+                  <Label>{t("Type", "प्रकार")}</Label>
                   <AdvancedSelect
             value={form.fee_type}
             onChange={(v) => setForm({ ...form, fee_type: v })}
             options={[{ value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' }, { value: 'exam', label: 'Exam' }, { value: 'transport', label: 'Transport' }, { value: 'hostel', label: 'Hostel' }, { value: 'library', label: 'Library' }, { value: 'lab', label: 'Lab' }, { value: 'sports', label: 'Sports' }, { value: 'other', label: 'Other' }]}
           />
                 </div>
-                <div className="space-y-2"><Label>Amount (Rs.)</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+                <div className="space-y-2"><Label>{t("Amount (Rs.)", "रकम (रु.)")}</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Class</Label>
+                  <Label>{t("Class", "कक्षा")}</Label>
                   <AdvancedSelect
             value={form.class_id}
             onChange={(v) => setForm({ ...form, class_id: v })}
@@ -269,7 +289,7 @@ function FeeStructureContent() {
           />
                 </div>
                 <div className="space-y-2">
-                  <Label>Frequency</Label>
+                  <Label>{t("Frequency", "आवृत्ति")}</Label>
                   <AdvancedSelect
             value={form.frequency}
             onChange={(v) => setForm({ ...form, frequency: v })}
@@ -277,10 +297,10 @@ function FeeStructureContent() {
           />
                 </div>
               </div>
-              <div className="space-y-2"><Label>Due Day of Cycle</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
-              <FormCheckbox label="Optional fee" checked={form.is_optional} onCheckedChange={(v) => setForm({ ...form, is_optional: v })} />
+              <div className="space-y-2"><Label>{t("Due Day of Cycle", "चक्रको मिति")}</Label><Input type="number" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} min="1" max="28" /></div>
+              <FormCheckbox label={t("Optional fee", "वैकल्पिक शुल्क")} checked={form.is_optional} onCheckedChange={(v) => setForm({ ...form, is_optional: v })} />
             </div>
-            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} Create Structure</Button></DialogFooter>
+            <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.name.trim() || !form.amount || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : null} {t("Create Structure", "संरचना बनाउनुहोस")}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -288,31 +308,30 @@ function FeeStructureContent() {
         <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Generate Monthly Fees</DialogTitle>
+              <DialogTitle>{t("Generate Monthly Fees", "मासिक शुल्क बनाउनुहोस")}</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-[color:var(--w11-text-secondary)]">
-              This will generate pending fee records for all active students based on
-              their active fee structures for the current billing cycle. Existing records
-              are skipped (safe to re-run).
+              {t("This bills every active student per their structures for the current cycle. Existing records are skipped — safe to re-run.",
+                 "यसले हरेक सक्रिय विद्यार्थीलाई तिन्का संरचनाअनुसर बाप़ गर्दा बनईँ।")}
             </p>
             <div className="space-y-2">
-              <Label>Filter by Class (optional)</Label>
+              <Label>{t("Filter by Class (optional)", "कक्षा अनुसर (वैकल्पिक)")}</Label>
               <AdvancedSelect
                 value={batchClassId}
                 onChange={(v) => setBatchClassId(v)}
                 clearable
-                placeholder="All Classes"
+                placeholder={t("All Classes", "सबै कक्षा")}
                 options={(classes || []).map((c: any) => ({ value: c.id, label: c.name }))}
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowBatchDialog(false)}>{t("Cancel", "रद्द")}</Button>
               <Button
                 onClick={() => batchMonthly.mutate(batchClassId || undefined)}
                 disabled={batchMonthly.isPending}
               >
                 {batchMonthly.isPending ? <Spinner className="mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-                Generate Now
+                {t("Generate Now", "अहिले बनाउनुहोस")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -353,6 +372,7 @@ function InstallmentsDialog({
   structure: FeeStructure | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<InstallmentRow[]>([]);
   const [confirmApply, setConfirmApply] = useState(false);
@@ -452,7 +472,7 @@ function InstallmentsDialog({
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Installment Schedule — {structure?.name}
+              {t("Installment Schedule", "किस्ता तालिका")} — {structure?.name}
             </DialogTitle>
           </DialogHeader>
           {isLoading ? (
@@ -463,23 +483,23 @@ function InstallmentsDialog({
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <Badge variant={balanced ? "success" : "destructive"}>
-                  {balanced ? "Balanced" : `Off by Rs. ${Math.abs(scheduledTotal - structureTotal).toLocaleString()}`}
+                  {balanced ? t("Balanced", "बराबर") : `${t("Off by", "कम/बढी")} Rs. ${Math.abs(scheduledTotal - structureTotal).toLocaleString()}`}
                 </Badge>
                 <span className="text-[color:var(--w11-text-secondary)]">
-                  Scheduled <strong>Rs. {scheduledTotal.toLocaleString()}</strong> of{" "}
-                  <strong>Rs. {structureTotal.toLocaleString()}</strong> structure total
+                  {t("Scheduled", "तालिका")} <strong className="tabular-nums">Rs. {scheduledTotal.toLocaleString()}</strong> {t("of", "/")}{" "}
+                  <strong className="tabular-nums">Rs. {structureTotal.toLocaleString()}</strong> {t("structure total", "कुल संरचना")}
                 </span>
                 {hasGenerated && (
-                  <Badge variant="warning">Applied — schedule is locked</Badge>
+                  <Badge variant="warning">{t("Applied — schedule is locked", "लागू भइसक्यो — तालिका निर्र्ढल")}</Badge>
                 )}
               </div>
 
               <div className="space-y-2">
                 <div className="grid grid-cols-[2rem_1fr_9rem_11rem_2rem] gap-2 text-xs font-medium text-[color:var(--w11-text-secondary)]">
                   <span>#</span>
-                  <span>Label</span>
-                  <span>Amount (Rs.)</span>
-                  <span>Due Date (BS)</span>
+                  <span>{t("Label", "नाम")}</span>
+                  <span>{t("Amount (Rs.)", "रकम")}</span>
+                  <span>{t("Due Date (BS)", "मिति (बि.सं.)")}</span>
                   <span />
                 </div>
                 {rows.map((row, idx) => (
@@ -525,7 +545,7 @@ function InstallmentsDialog({
                 ))}
                 {rows.length === 0 && (
                   <p className="py-4 text-center text-sm text-[color:var(--w11-text-secondary)]">
-                    No installments yet — add rows below to split the structure total.
+                    {t("No installments yet — add rows to split the structure total.", "किस्ता छैन — कुल रकम बाँड्न पंक्ति थप्नुहोस्।")}
                   </p>
                 )}
                 <Button
@@ -545,27 +565,26 @@ function InstallmentsDialog({
                     ]);
                   }}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Installment
+                  <Plus className="h-3.5 w-3.5 mr-1" /> {t("Add Installment", "किस्ता थप्नुहोस्")}
                 </Button>
               </div>
 
               <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                The schedule must sum to the structure total (Rs. {structureTotal.toLocaleString()}).
-                BS due dates land on each generated bill. Saving does not touch
-                students — use “Apply to Students” to bill the split.
+                {t("The schedule must sum to the structure total (Rs. {n}). Saving does not touch students — use Apply to Students to bill the split.".replace("{n}", structureTotal.toLocaleString()),
+                   "किस्ताको जम्मा संरचनाको कुल रकम (रु. {n}) सँग बराबर हुनुपर्छ। सुरक्षित गर्दा विद्यार्थीमा असर पर्दैन — बाँड्न Apply to Students चलाउनुहोस्।".replace("{n}", structureTotal.toLocaleString()))}
               </p>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={save.isPending || applySchedule.isPending}>
-              Close
+              {t("Close", "बन्द")}
             </Button>
             <Button
               variant="outline"
               disabled={!balanced || rows.length === 0 || hasGenerated || save.isPending}
               onClick={() => save.mutate()}
             >
-              {save.isPending ? <Spinner className="mr-2" /> : null} Save Schedule
+              {save.isPending ? <Spinner className="mr-2" /> : null} {t("Save Schedule", "तालिका सुरक्षित")}
             </Button>
             <Button
               disabled={!balanced || rows.length === 0 || save.isPending || applySchedule.isPending}
@@ -576,7 +595,7 @@ function InstallmentsDialog({
               ) : (
                 <CalendarCheck className="h-4 w-4 mr-2" />
               )}
-              Apply to Students
+              {t("Apply to Students", "विद्यार्थीलाई लागू")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -586,7 +605,7 @@ function InstallmentsDialog({
       <Dialog open={confirmApply} onOpenChange={setConfirmApply}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Apply Installments to Students?</DialogTitle>
+            <DialogTitle>{t("Apply Installments to Students?", "किस्ता विद्यार्थीलाई लागू गर्ने?")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm text-[color:var(--w11-text-secondary)]">
             <p>
@@ -602,11 +621,11 @@ function InstallmentsDialog({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmApply(false)} disabled={applySchedule.isPending}>
-              Cancel
+              {t("Cancel", "रद्द")}
             </Button>
             <Button onClick={() => applySchedule.mutate()} disabled={applySchedule.isPending}>
               {applySchedule.isPending ? <Spinner className="mr-2" /> : <CalendarCheck className="h-4 w-4 mr-2" />}
-              Generate Installment Bills
+              {t("Generate Installment Bills", "किस्ता बीजक बनाउनुहोस्")}
             </Button>
           </DialogFooter>
         </DialogContent>

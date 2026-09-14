@@ -9,9 +9,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/files/FilePicker";
 import type { ManagedFile } from "@/lib/services/files.service";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageLoader, Spinner } from "@/components/ui/spinner";
 import {
@@ -26,9 +23,11 @@ import {
 
 import {
   PlusCircle, FileText, Brain, Paperclip, X, Download, CheckCircle2,
-  Clock, Users, Trash2, Eye, Pencil, FolderOpen,
+  Clock, Users, Trash2, Eye, Pencil, FolderOpen, Inbox,
 } from "lucide-react";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AOSPage,
   AOSPageHeader,
@@ -38,6 +37,12 @@ import {
   DataPanel,
   StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
 
 interface Assignment {
   id: string;
@@ -85,8 +90,26 @@ function AssignmentsContent() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const { user } = useAuth();
+  const { t } = useI18n();
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
   const [showFilePicker, setShowFilePicker] = useState(false);
+  // Wave C (plan 34-29): list becomes A1 + tabs Given / Grading / Graded,
+  // with the active tab in the URL (?tab=) per the 33-2 route-tab rule.
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const tab: "given" | "grading" | "graded" =
+    (["grading", "graded"].includes(routeParams.get("tab") || "")
+      ? (routeParams.get("tab") as "grading" | "graded")
+      : "given");
+  const setTab = (v: string) => {
+    const pathname = windowRoute?.pathname ?? "/dashboard/assignments";
+    const next = new URLSearchParams(routeParams.toString());
+    if (v === "given") next.delete("tab");
+    else next.set("tab", v);
+    const qs = next.toString();
+    navigate(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   // Dialog states
   const [showCreate, setShowCreate] = useState(false);
@@ -261,8 +284,8 @@ function AssignmentsContent() {
       <AOSPage>
         <AOSPageHeader
           icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-          title="Assignments"
-          subtitle="Create, distribute, and grade student assignments"
+          title={t("Assignments", "असाइनमेन्ट")}
+          subtitle={t("Create, distribute, and grade student assignments", "असाइनमेन्ट बनाउनुहोस्, बाँड्नुहोस् र जाँच गर्नुहोस्")}
         />
         <AOSPageBody>
           <DataPanel className="max-w-2xl mx-auto">
@@ -276,19 +299,111 @@ function AssignmentsContent() {
     );
 
   const allAssignments = assignments || [];
+  const isGraded = (a: Assignment) => a.status === "graded" || a.status === "closed" || a.status === "past";
+  const buckets = {
+    given: allAssignments.filter((a) => !isGraded(a)),
+    grading: allAssignments.filter((a) => !isGraded(a) && (a.submitted_count ?? 0) > 0),
+    graded: allAssignments.filter(isGraded),
+  };
+  const tabRows = tab === "grading" ? buckets.grading : tab === "graded" ? buckets.graded : buckets.given;
   const stats = {
     total: allAssignments.length,
     active: allAssignments.filter((a) => a.status === "active").length,
     closed: allAssignments.filter((a) => a.status === "past" || a.status === "closed" || a.status === "graded").length,
   };
 
+  const ASSIGNMENT_COLUMNS: Column<Assignment>[] = [
+    {
+      key: "title",
+      label: t("Assignment", "असाइनमेन्ट"),
+      sortable: true,
+      value: (a) => a.title,
+      render: (a) => (
+        <div>
+          <p className="font-medium">{a.title}</p>
+          {a.description && (
+            <p className="text-xs text-[color:var(--w11-text-secondary)] truncate max-w-xs">{a.description}</p>
+          )}
+          {a.attachment_urls && a.attachment_urls.length > 0 && (
+            <div className="flex items-center gap-1 mt-1">
+              <Paperclip className="h-3 w-3 text-[color:var(--w11-text-secondary)]" />
+              <span className="text-xs text-[color:var(--w11-text-secondary)]">{a.attachment_urls.length} {t("file(s)", "फाइल")}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "class",
+      label: t("Class / Subject", "कक्षा / विषय"),
+      sortable: true,
+      value: (a) => a.class_name ?? "",
+      render: (a) => (
+        <div>
+          <p className="text-sm">{a.class_name || "—"}</p>
+          {a.subject_name && <p className="text-xs text-[color:var(--w11-text-secondary)]">{a.subject_name}</p>}
+        </div>
+      ),
+    },
+    { key: "due", label: t("Due Date", "म्याद"), sortable: true, value: (a) => a.due_date_bs || a.due_date || "", render: (a) => <span className="text-sm">{displayDate(a.due_date_bs, a.due_date)}</span> },
+    { key: "marks", label: t("Marks", "अंक"), align: "right", sortable: true, value: (a) => a.total_marks || 0, render: (a) => <span className="text-sm">{a.total_marks}</span> },
+    { key: "status", label: t("Status", "अवस्था"), sortable: true, value: (a) => a.status, render: (a) => <StatusChip status={a.status === "graded" ? "completed" : a.status} /> },
+    {
+      key: "submissions",
+      label: t("Submissions", "पेश भेट"),
+      align: "right",
+      sortable: true,
+      value: (a) => a.submitted_count ?? 0,
+      render: (a) => (
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSubmissionsFor(a)}>
+          <Users className="h-3 w-3 mr-1" />
+          {a.submitted_count ?? t("View", "हेर्नुहोस्")}
+        </Button>
+      ),
+      noExport: true,
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      align: "right",
+      render: (a) => (
+        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={t("Edit", "सम्पादन")} onClick={() => openEdit(a)}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-[#c42b1c]"
+            aria-label={t("Delete", "मेटाउनुहोस्")}
+            onClick={() => {
+              void (async () => {
+                const ok = await confirm({
+                  title: t("Delete this assignment?", "यो असाइनमेन्ट मेटाउने?"),
+                  body: t("Submissions attached to it stay in the record.", "यसमा पेस भएका उत्तरहरू रेकर्डमा रहनेछन्।"),
+                  confirmLabel: t("Delete assignment", "मेटाउनुहोस्"),
+                  tone: "danger",
+                });
+                if (ok) deleteMut.mutate(a.id);
+              })();
+            }}
+            disabled={!isAdmin}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <AOSPage>
       {/* Header */}
       <AOSPageHeader
         icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Assignments"
-        subtitle="Create, distribute, and grade student assignments"
+        title={t("Assignments", "असाइनमेन्ट")}
+        subtitle={t("Create, distribute, and grade student assignments", "असाइनमेन्ट बनाउनुहोस्, बाँड्नुहोस् र जाँच गर्नुहोस्")}
         actions={
           <Button
             onClick={() => {
@@ -297,112 +412,50 @@ function AssignmentsContent() {
               setShowCreate(true);
             }}
           >
-            <PlusCircle className="h-4 w-4 mr-2" /> New Assignment
+            <PlusCircle className="h-4 w-4 mr-2" /> {t("New Assignment", "नयाँ असाइनमेन्ट")}
           </Button>
         }
       />
       <AOSPageBody>
         {/* Stats */}
         <StatGrid min={180}>
-          <KpiCard label="Total" value={stats.total} icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
-          <KpiCard label="Active" value={stats.active} color="#9d5d00" icon={<Clock className="h-5 w-5" style={{ color: "#9d5d00" }} />} />
-          <KpiCard label="Closed / Graded" value={stats.closed} icon={<CheckCircle2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label={t("Total", "कुल")} value={stats.total} icon={<FileText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
+          <KpiCard label={t("Active", "चालु")} value={stats.active} color="#9d5d00" icon={<Clock className="h-5 w-5" style={{ color: "#9d5d00" }} />} />
+          <KpiCard label={t("Closed / Graded", "बन्द / जाँचिएको")} value={stats.closed} icon={<CheckCircle2 className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
         </StatGrid>
 
-        {/* Assignments Table */}
-        <DataPanel bodyClassName="p-0 pt-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Assignment</TableHead>
-                <TableHead>Class / Subject</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Marks</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Submissions</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {allAssignments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-[color:var(--w11-text-secondary)]">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No assignments yet. Create your first assignment.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                allAssignments.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{a.title}</p>
-                        {a.description && (
-                          <p className="text-xs text-[color:var(--w11-text-secondary)] truncate max-w-xs">{a.description}</p>
-                        )}
-                        {a.attachment_urls && a.attachment_urls.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Paperclip className="h-3 w-3 text-[color:var(--w11-text-secondary)]" />
-                            <span className="text-xs text-[color:var(--w11-text-secondary)]">{a.attachment_urls.length} file(s)</span>
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm">{a.class_name || "—"}</p>
-                      {a.subject_name && (
-                        <p className="text-xs text-[color:var(--w11-text-secondary)]">{a.subject_name}</p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{displayDate(a.due_date_bs, a.due_date)}</TableCell>
-                    <TableCell className="text-sm">{a.total_marks}</TableCell>
-                    <TableCell>
-                      <StatusChip status={a.status === "graded" ? "completed" : a.status} />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        onClick={() => setSubmissionsFor(a)}
-                      >
-                        <Users className="h-3 w-3 mr-1" />
-                        {a.submitted_count ?? "View"}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(a)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-[#c42b1c]"
-                          onClick={() => {
-                            void (async () => {
-                              const ok = await confirm({
-                                title: "Delete this assignment?",
-                                body: "Submissions attached to it stay in the record.",
-                                confirmLabel: "Delete assignment",
-                                tone: "danger",
-                              });
-                              if (ok) deleteMut.mutate(a.id);
-                            })();
-                          }}
-                          title={isAdmin ? "Delete" : "Delete (admins only)"}
-                          disabled={!isAdmin}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </DataPanel>
+        {/* Tabs (Given / Grading / Graded) — win11-tablist, URL state */}
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
+          <TabsList className="mb-3">
+            <TabsTrigger value="given" badge={buckets.given.length || undefined}>
+              {t("Given", "दिएको")}
+            </TabsTrigger>
+            <TabsTrigger value="grading" badge={buckets.grading.length || undefined}>
+              {t("Grading", "जाँच हुँदै")}
+            </TabsTrigger>
+            <TabsTrigger value="graded" badge={buckets.graded.length || undefined}>
+              {t("Graded", "जाँच सकिएको")}
+            </TabsTrigger>
+          </TabsList>
+          <DataPanel bodyClassName="p-0">
+            <DataTable<Assignment>
+              columns={ASSIGNMENT_COLUMNS}
+              rows={tabRows}
+              rowKey={(a) => a.id}
+              searchable
+              searchPlaceholder={t("Search assignments…", "असाइनमेन्ट खोज्नुहोस्…")}
+              exportFileName={`assignments-${tab}`}
+              empty={
+                tab === "grading"
+                  ? { icon: Inbox, title: t("Nothing waiting to grade", "जाँच बाँकी छैन"), body: t("Submissions appear here once students submit.", "विद्यार्थीले पेस गरेपछि यहाँ देखिन्छ।") }
+                  : tab === "graded"
+                  ? { icon: CheckCircle2, title: t("No graded assignments yet", "अझै जाँचिएको छैन"), body: t("Close or grade an assignment to see it here.", "असाइनमेन्ट बन्द/जाँच गरेपछि यहाँ देखिन्छ।") }
+                  : { icon: FileText, title: t("No assignments yet", "अझै असाइनमेन्ट छैन"), body: t("Create your first assignment to distribute it to a class.", "पहिलो असाइनमेन्ट बनाउनुहोस्।"), action: { label: t("New Assignment", "नयाँ असाइनमेन्ट"), onClick: () => { resetForm(); setEditAssignment(null); setShowCreate(true); } } }
+              }
+            />
+          </DataPanel>
+        </Tabs>
+
 
       {/* ── Create / Edit Dialog ── */}
       <Dialog

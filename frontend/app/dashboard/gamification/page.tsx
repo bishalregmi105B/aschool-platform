@@ -29,6 +29,8 @@ import {
   StatGrid,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { MetricCard } from "@/components/ui/metric-card";
 
 // Quick links — the gamification manifest ui.nav.subitems.
 const QUICK_LINKS = [
@@ -179,22 +181,30 @@ function GamificationContent() {
           })}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-[color:var(--w11-border-subtle)] pb-2 mb-4">
-          <Button variant={tab === "leaderboard" ? "default" : "ghost"} size="sm" onClick={() => setTab("leaderboard")}>
-            <Trophy className="h-4 w-4 mr-1" /> Leaderboard
-          </Button>
-          <Button variant={tab === "badges" ? "default" : "ghost"} size="sm" onClick={() => setTab("badges")}>
-            <Medal className="h-4 w-4 mr-1" /> Badges
-          </Button>
-          <Button variant={tab === "houses" ? "default" : "ghost"} size="sm" onClick={() => setTab("houses")}>
-            <Users className="h-4 w-4 mr-1" /> Houses
-          </Button>
-        </div>
+        {/* Tabs — proper win11-tablist grammar (plan G1/33), not a button strip */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList variant="underline" className="mb-4">
+            <TabsTrigger value="leaderboard" badge={leaderboard?.length}>
+              <Trophy className="h-4 w-4 mr-1" /> Leaderboard
+            </TabsTrigger>
+            <TabsTrigger value="badges" badge={badges?.length}>
+              <Medal className="h-4 w-4 mr-1" /> Badges
+            </TabsTrigger>
+            <TabsTrigger value="houses" badge={houses?.length}>
+              <Users className="h-4 w-4 mr-1" /> Houses
+            </TabsTrigger>
+          </TabsList>
 
-        {tab === "leaderboard" && <LeaderboardTab data={leaderboard || []} />}
-        {tab === "badges" && <BadgesTab data={badges || []} />}
-        {tab === "houses" && <HousesTab data={houses || []} />}
+          <TabsContent value="leaderboard">
+            <LeaderboardTab data={leaderboard || []} />
+          </TabsContent>
+          <TabsContent value="badges">
+            <BadgesTab data={badges || []} />
+          </TabsContent>
+          <TabsContent value="houses">
+            <HousesTab data={houses || []} loading={houseLoading} />
+          </TabsContent>
+        </Tabs>
       </AOSPageBody>
     </AOSPage>
   );
@@ -331,7 +341,7 @@ function BadgesTab({ data }: { data: BadgeItem[] }) {
   );
 }
 
-function HousesTab({ data }: { data: House[] }) {
+function HousesTab({ data, loading }: { data: House[]; loading?: boolean }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -385,20 +395,19 @@ function HousesTab({ data }: { data: House[] }) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {data.length === 0 ? (
-          <p className="col-span-full text-center py-8 text-[color:var(--w11-text-secondary)]">No houses yet</p>
+          <p className="col-span-full text-center py-8 text-[color:var(--w11-text-secondary)]">
+            {loading ? "Loading houses…" : "No houses yet"}
+          </p>
         ) : (
+          /* House scores as MetricCards (spec: gamification — houses as MetricCards). */
           data.map((house) => (
-            <div key={house.id} className="win11-card overflow-hidden" style={{ marginBottom: 0 }}>
-              <div className="h-2" style={{ backgroundColor: house.color }} />
-              <div className="pt-4">
-                <h3 className="font-bold text-lg text-[color:var(--w11-text-primary)]">{house.name}</h3>
-                <p className="text-sm italic text-[color:var(--w11-text-secondary)]">{house.motto || "—"}</p>
-                <div className="mt-3 flex items-center gap-1">
-                  <Trophy className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />
-                  <span className="font-bold text-lg text-[color:var(--w11-text-primary)]">{house.total_points || 0}</span>
-                  <span className="text-sm text-[color:var(--w11-text-secondary)]">points</span>
-                </div>
-              </div>
+            <div key={house.id} style={{ borderTop: `3px solid ${house.color || "var(--w11-accent)"}` }}>
+              <MetricCard
+                label={house.name}
+                value={house.total_points || 0}
+                denominator="pts"
+                footnote={house.motto || undefined}
+              />
             </div>
           ))
         )}

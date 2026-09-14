@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type BusInfo = {
@@ -26,10 +27,11 @@ type BusLocation = {
 
 /** Parent → Bus. Backed by GET /parent/bus-info + /parent/bus-location/<bus_id>. */
 export default function ParentBusPage() {
+  const { selectedId, childParam } = useSelectedChild();
   const info = useQuery({
-    queryKey: ["parent-bus-info"],
+    queryKey: ["parent-bus-info", selectedId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<BusInfo[] | BusInfo>>("/parent/bus-info");
+      const res = await api.get<ApiResponse<BusInfo[] | BusInfo>>(`/parent/bus-info${childParam ? `?${childParam}` : ""}`);
       const payload = res.data.data;
       return Array.isArray(payload) ? payload[0] : payload;
     },
@@ -52,6 +54,7 @@ export default function ParentBusPage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Bus Tracker" />
       <Card>
         <CardHeader><CardTitle>{info.data?.bus_number || info.data?.name || "Assigned bus"}</CardTitle></CardHeader>

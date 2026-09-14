@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
+/**
+ * Students / Transfers — A1 registry + A3 dialog (plan Part 34 row 1).
+ *
+ * Kept anatomy: AOSPageHeader with the single primary action (New
+ * Transfer), debounced search now mirrored to the URL (?q=) so a filtered
+ * transfer ledger is shareable, StatusChip instead of raw badges, honest
+ * filtered-empty vs never-used states, ErrorState + retry. Create dialog:
+ * 4 fields (student, type, destination, reason), Enter-to-submit, disabled
+ * until a student is chosen. Endpoints/payload unchanged.
+ */
+
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
-import { ArrowLeftRight, Plus, Search } from "lucide-react";
+import { useDebounced } from "@/components/ui/filter-bar";
+import { ErrorState } from "@/components/ui/empty-state";
+import { ArrowLeftRight, Plus } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import {
+  AOSPage, AOSPageHeader, AOSPageBody, DataPanel, StatusChip,
+} from "@/components/aos/kit/page-kit";
+import { useI18n } from "@/lib/i18n";
 
 interface StudentOption {
   id: string;
@@ -36,15 +56,16 @@ interface TransferRow {
   created_at?: string;
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  tc: "Transfer Certificate",
-  withdrawal: "Withdrawal",
-  migration: "Migration",
-};
-
 export default function TransfersPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/students/transfers";
+
+  const [search, setSearch] = useState(routeParams.get("q") ?? "");
+  const debouncedSearch = useDebounced(search, 300);
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState({
     student_id: "",
@@ -53,9 +74,25 @@ export default function TransfersPage() {
     destination_school: "",
   });
 
+  // Mirror the settled search into the window URL (→ address bar).
+  const urlQ = routeParams.get("q") ?? "";
+  useEffect(() => {
+    if (debouncedSearch === urlQ) return;
+    const next = new URLSearchParams(routeParams.toString());
+    if (debouncedSearch) next.set("q", debouncedSearch);
+    else next.delete("q");
+    navigate(`${pathname}?${next.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["transfers", search],
-    queryFn: async () => { const r = await api.get("/students/transfers", { params: { search: search || undefined } }); return r.data; },
+    queryKey: ["transfers", debouncedSearch],
+    queryFn: async () => {
+      const r = await api.get("/students/transfers", {
+        params: { search: debouncedSearch || undefined },
+      });
+      return r.data;
+    },
   });
 
   const { data: studentOptions } = useQuery({
@@ -75,100 +112,160 @@ export default function TransfersPage() {
       queryClient.invalidateQueries({ queryKey: ["transfers"] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setShowDialog(false);
-      toast.success("Transfer initiated — student marked transferred out");
+      setForm({ student_id: "", transfer_type: "tc", reason: "", destination_school: "" });
+      toast.success(
+        t("Transfer initiated — student marked transferred out", "स्थानान्तरण सुरु — विद्यार्थी 'बाहिरिएको' चिन्ह")
+      );
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { error?: string } } };
-      toast.error(e?.response?.data?.error || "Failed to create transfer");
+      toast.error(e?.response?.data?.error || t("Failed to create transfer", "स्थानान्तरण बनेन"));
     },
   });
 
-  if (isLoading) return <PageLoader />;
-  if (isError)
-    return (
-      <div className="max-w-2xl mx-auto p-6 space-y-3">
-        <p className="text-sm text-destructive">Failed to load transfers. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
+  const TYPE_LABEL: Record<string, string> = {
+    tc: t("Transfer Certificate", "स्थानान्तरण प्रमाणपत्र"),
+    withdrawal: t("Withdrawal", "विदारी"),
+    migration: t("Migration", "स्थानान्तरण"),
+  };
 
-  const TRANSFER_COLUMNS: Column<any>[] = [
+  const TRANSFER_COLUMNS: Column<TransferRow>[] = [
     {
       key: "student",
-      label: "Student",
+      label: t("Student", "विद्यार्थी"),
       sortable: true,
-      value: (t) => t.student_name ?? "",
-      render: (t) => (
+      value: (row) => row.student_name ?? "",
+      render: (row) => (
         <span className="font-medium">
-          {t.student_name || "—"}
-          {t.student_code && <span className="ml-2 text-xs text-muted-foreground">{t.student_code}</span>}
+          {row.student_name || "—"}
+          {row.student_code && <span className="ml-2 text-xs text-muted-foreground">{row.student_code}</span>}
         </span>
       ),
     },
-    { key: "type", label: "Type", sortable: true, value: (t) => t.transfer_type ?? "", render: (t) => <Badge variant="outline">{TYPE_LABEL[t.transfer_type] || t.transfer_type}</Badge> },
-    { key: "reason", label: "Reason", value: (t) => t.reason ?? "", render: (t) => t.reason || "—" },
-    { key: "destination_school", label: "Destination", value: (t) => t.destination_school ?? "", render: (t) => t.destination_school || "—" },
-    { key: "created_at", label: "Date", sortable: true, value: (t) => t.created_at ?? "", render: (t) => (t.created_at ? displayBS(t.created_at) : "—") },
-    { key: "status", label: "Status", sortable: true, value: (t) => t.status ?? "", render: (t) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
+    { key: "type", label: t("Type", "प्रकार"), sortable: true, value: (row) => row.transfer_type ?? "", render: (row) => <StatusChip status={row.transfer_type} label={TYPE_LABEL[row.transfer_type] || row.transfer_type} /> },
+    { key: "reason", label: t("Reason", "कारण"), value: (row) => row.reason ?? "", render: (row) => row.reason || "—" },
+    { key: "destination_school", label: t("Destination", "गन्तव्य"), value: (row) => row.destination_school ?? "", render: (row) => row.destination_school || "—" },
+    { key: "created_at", label: t("Date", "मिति"), sortable: true, value: (row) => row.created_at ?? "", render: (row) => (row.created_at ? displayBS(row.created_at) : "—") },
+    { key: "status", label: t("Status", "अवस्था"), sortable: true, value: (row) => row.status ?? "", render: (row) => <StatusChip status={String(row.status)} /> },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Student Transfers</h1><p className="text-muted-foreground">Transfer certificates and student withdrawals</p></div>
-        <Button onClick={() => setShowDialog(true)}><Plus className="h-4 w-4 mr-2" /> New Transfer</Button>
-      </div>
+    <AOSPage>
+      <AOSPageHeader
+        icon={<ArrowLeftRight className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+        title={t("Student Transfers", "विद्यार्थी स्थानान्तरण")}
+        subtitle={t(
+          "Transfer certificates and student withdrawals",
+          "स्थानान्तरण प्रमाणपत्र र विद्यार्थी विदारी",
+        )}
+        actions={
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" /> {t("New Transfer", "नयाँ स्थानान्तरण")}
+          </Button>
+        }
+      />
+      <AOSPageBody>
+        <DataPanel bodyClassName="p-0">
+          {isError ? (
+            <ErrorState
+              body={t("Failed to load transfers.", "स्थानान्तरण लोड हुन सकेन।")}
+              onRetry={() => void refetch()}
+            />
+          ) : (
+            <DataTable<TransferRow>
+              columns={TRANSFER_COLUMNS}
+              rows={transfers}
+              rowKey={(row) => row.id}
+              loading={isLoading}
+              searchable
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder={t(
+                "Search transfers by student name or ID...",
+                "नाम वा आईडीले खोज्नुहोस्…",
+              )}
+              exportFileName="student-transfers"
+              empty={
+                debouncedSearch
+                  ? {
+                      icon: ArrowLeftRight,
+                      title: t("No transfers match this search", "यस खोजसँग मिल्दा भेटिएन"),
+                      body: t("Clear the search to see the full ledger.", "पूरी खाता हेर्न खोज हटाउनुहोस्।"),
+                      action: { label: t("Clear search", "खोज हटाउनुहोस्"), onClick: () => setSearch("") },
+                    }
+                  : {
+                      icon: ArrowLeftRight,
+                      title: t("No transfers yet", "अझै स्थानान्तरण छैन"),
+                      body: t("Issue transfer certificates and record withdrawals here.", "TC र विदारी यहाँ दर्ता हुन्छ।"),
+                      action: { label: t("New Transfer", "नयाँ स्थानान्तरण"), onClick: () => setShowDialog(true) },
+                    }
+              }
+            />
+          )}
+        </DataPanel>
 
-      <Card>
-        <CardHeader className="pb-0"><CardTitle className="text-base">Transfer Records</CardTitle></CardHeader>
-        <CardContent className="pt-4">
-          <DataTable
-            columns={TRANSFER_COLUMNS}
-            rows={transfers}
-            rowKey={(t) => t.id}
-            searchable
-            searchValue={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search transfers by student name or ID..."
-            exportFileName="student-transfers"
-            empty={{ icon: ArrowLeftRight, title: "No transfers found", body: "Issue transfer certificates and record withdrawals here." }}
-          />
-        </CardContent>
-      </Card>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Initiate Transfer</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Student *</Label>
-              <AdvancedSelect
-                value={form.student_id}
-                onChange={(v) => setForm({ ...form, student_id: v })}
-                clearable
-                searchable
-                placeholder="Select a student…"
-                options={(studentOptions || []).map((s) => ({
-                  value: s.id,
-                  label: `${s.first_name} ${s.last_name}${s.class_name ? ` — ${s.class_name}` : ""}${s.student_id ? ` (${s.student_id})` : ""}`,
-                }))}
-              />
-              <p className="text-xs text-muted-foreground">Only active students at your school are listed.</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Transfer Type</Label>
-              <AdvancedSelect
-          value={form.transfer_type}
-          onChange={(v) => setForm({ ...form, transfer_type: v })}
-          options={[{ value: 'tc', label: 'Transfer Certificate' }, { value: 'withdrawal', label: 'Withdrawal' }, { value: 'migration', label: 'Migration' }]}
-        />
-            </div>
-            <div className="space-y-2"><Label>Destination School</Label><Input value={form.destination_school} onChange={(e) => setForm({ ...form, destination_school: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>
-          </div>
-          <DialogFooter><Button onClick={() => create.mutate()} disabled={!form.student_id || create.isPending}>{create.isPending ? <Spinner className="mr-2" /> : <ArrowLeftRight className="h-4 w-4 mr-2" />} Create Transfer</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>{t("Initiate Transfer", "स्थानान्तरण सुरु")}</DialogTitle>
+            </DialogHeader>
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (form.student_id) create.mutate();
+              }}
+            >
+              <div className="space-y-2">
+                <Label>{t("Student", "विद्यार्थी")} *</Label>
+                <AdvancedSelect
+                  value={form.student_id}
+                  onChange={(v) => setForm({ ...form, student_id: v ?? "" })}
+                  clearable
+                  searchable
+                  placeholder={t("Select a student…", "विद्यार्थी छान्नुहोस्…")}
+                  options={(studentOptions || []).map((s) => ({
+                    value: s.id,
+                    label: `${s.first_name} ${s.last_name}${s.class_name ? ` — ${s.class_name}` : ""}${s.student_id ? ` (${s.student_id})` : ""}`,
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("Only active students at your school are listed.", "तपाईंको विद्यालयका सक्रिय विद्यार्थी मात्र।")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("Transfer Type", "प्रकार")}</Label>
+                <AdvancedSelect
+                  value={form.transfer_type}
+                  onChange={(v) => setForm({ ...form, transfer_type: v ?? "tc" })}
+                  options={[
+                    { value: "tc", label: t("Transfer Certificate", "स्थानान्तरण प्रमाणपत्र") },
+                    { value: "withdrawal", label: t("Withdrawal", "विदारी") },
+                    { value: "migration", label: t("Migration", "स्थानान्तरण") },
+                  ]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("Destination School", "गन्तव्य विद्यालय")}</Label>
+                <Input value={form.destination_school} onChange={(e) => setForm({ ...form, destination_school: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("Reason", "कारण")}</Label>
+                <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+                  {t("Cancel", "रद्द")}
+                </Button>
+                <Button type="submit" disabled={!form.student_id || create.isPending}>
+                  {create.isPending ? <Spinner className="mr-2" /> : <ArrowLeftRight className="h-4 w-4 mr-2" />}
+                  {t("Create Transfer", "स्थानान्तरण बनाउनुहोस्")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </AOSPageBody>
+    </AOSPage>
   );
 }

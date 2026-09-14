@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { PrintButton, PrintArea } from "../../analytics/analytics-kit";
 import {
   AOSPage,
   AOSPageHeader,
@@ -122,12 +123,16 @@ export default function ExpenseReportsPage() {
         title="Expense Reports"
         subtitle="Financial breakdown of school expenditures"
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={distribution.length === 0}>
-            <Download className="h-4 w-4 mr-2" /> Export CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportCsv} disabled={distribution.length === 0}>
+              <Download className="h-4 w-4 mr-2" /> Export CSV
+            </Button>
+            <PrintButton />
+          </div>
         }
       />
       <AOSPageBody>
+        <PrintArea className="space-y-4">
         <FilterCommandBar>
           <div className="space-y-2 w-64">
             <Label>Time Period</Label>
@@ -166,7 +171,9 @@ export default function ExpenseReportsPage() {
 
           <DataPanel title="Expense Distribution">
             {distribution.length === 0 ? (
-              <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">No expense distribution available.</p>
+              <p className="text-center py-8 text-[color:var(--w11-text-secondary)]">
+                No expenses recorded for this period — approve an expense request to see the distribution.
+              </p>
             ) : (
               <div className="space-y-4">
                 {distribution.map((item) => (
@@ -188,6 +195,7 @@ export default function ExpenseReportsPage() {
             )}
           </DataPanel>
         </div>
+        </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

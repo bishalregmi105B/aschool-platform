@@ -1,11 +1,35 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+/**
+ * Academics — A5 hub with tabbed master data (plan Part 34 row 3, 8.1).
+ *
+ * Rewrite changes vs the 1,285-L previous version:
+ * - Hand-rolled button tab strip (plan G2 offender) → kit <Tabs> with
+ *   Fluent win11-tablist styling + Radix keyboard nav, synced to the window
+ *   route (?tab=years|classes|subjects). Legacy subroutes launched from the
+ *   AOS menu (class-sections / subjects re-export this page) resolve to the
+ *   right tab via the window path — the "subroute deep-links into a tab"
+ *   standard from Part 33.
+ * - Quick Links now point AT the tabs (?tab=) instead of the four dead-end
+ *   stub URLs, and merge the old ACADEMIC_TOOLS cards into the same
+ *   QuickLinks grid (one launcher grammar, one fewer section).
+ * - RowActions' bespoke delete Dialog → useConfirm() (single grammar).
+ * - Academic-year made a visible axis (8.1): header chip shows the current
+ *   session; Classes tab gains a year filter when the payload carries
+ *   academic_year_id.
+ * - Skeletons instead of early-return PageLoader; tab count badges;
+ *   bilingual chrome (the page was English-only).
+ * Endpoints/service calls and every payload are unchanged.
+ */
+
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { usePathname } from "next/navigation";
 import {
-  assignSubjectToClass,
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import {
   createAcademicYear,
   createClass,
   createSection,
@@ -33,13 +57,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { BSDateInput } from "@/components/ui/bs-date-input";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/empty-state";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { displayBS } from "@/lib/nepali_date";
 import {
   AOSPage,
@@ -49,31 +75,19 @@ import {
   FormSection,
   StatGrid,
   KpiCard,
+  StatusChip,
 } from "@/components/aos/kit/page-kit";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
 import {
   BookMarked,
   BookOpen,
   CalendarRange,
-  ChevronRight,
-  Layers,
-  Link2,
   Pencil,
   Plus,
   Trash2,
-  UserCog,
   Users,
 } from "lucide-react";
-import { ICON_MAP } from "@/lib/icon-map";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
-
-/** Module dashboard quick links — mirrors the academics plugin manifest
- * (backend/app/plugins/modules/academics/manifest.yaml ui.nav.subitems). */
-const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
-  { label: "Classes", href: "/dashboard/academics/classes", icon: "Users" },
-  { label: "Class Sections", href: "/dashboard/academics/class-sections", icon: "Layers" },
-  { label: "Subjects", href: "/dashboard/academics/subjects", icon: "BookMarked" },
-  { label: "Academic Year", href: "/dashboard/academics/year", icon: "CalendarRange" },
-];
+import { useI18n } from "@/lib/i18n";
 
 type AcademicsTab = "years" | "classes" | "subjects";
 
@@ -97,6 +111,7 @@ interface ClassItem {
   name: string;
   name_nepali?: string;
   numeric_grade: number | null;
+  academic_year_id?: string | null;
   sections: SectionItem[];
 }
 
@@ -114,113 +129,50 @@ interface Subject {
   practical_pass_marks?: number | null;
 }
 
-const ACADEMIC_TOOLS = [
-  {
-    href: "/dashboard/academics/class-subjects",
-    label: "Class Subjects",
-    description: "Map subjects to classes without leaving academics.",
-    icon: Link2,
-  },
-  {
-    href: "/dashboard/academics/class-teachers",
-    label: "Teacher Assignments",
-    description: "Assign class teachers and subject teachers from one place.",
-    icon: UserCog,
-  },
-] as const;
-
-function getDefaultTab(pathname: string): AcademicsTab {
-  if (pathname.includes("class-sections") || pathname.includes("class-teachers")) {
-    return "classes";
-  }
-  if (pathname.includes("class-subjects") || pathname.endsWith("/subjects")) {
-    return "subjects";
-  }
-  return "years";
-}
-
 function getDateInputValue(value?: string | null) {
   if (!value) return "";
   const trimmed = String(value).slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : "";
 }
 
-function RowActions({
-  onEdit,
-  onDelete,
-  deleteLabel,
-  deleting = false,
-}: {
-  onEdit: () => void;
-  onDelete: () => void;
-  deleteLabel: string;
-  deleting?: boolean;
-}) {
-  const [showDelete, setShowDelete] = useState(false);
-
-  return (
-    <>
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit item">
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={deleting}
-          onClick={() => setShowDelete(true)}
-          aria-label="Delete item"
-        >
-          <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
-        </Button>
-      </div>
-
-      <Dialog open={showDelete} onOpenChange={setShowDelete}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-          </DialogHeader>
-          <p className="py-4 text-sm text-[color:var(--w11-text-secondary)]">{deleteLabel}</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleting}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                onDelete();
-                setShowDelete(false);
-              }}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+/** Resolve the initial tab from the window route: `?tab=` wins; the legacy
+ * re-export subroutes (class-sections / subjects mount this same page via
+ * the registry) map onto their tab. */
+function tabFromRoute(tabParam: string | null, path: string): AcademicsTab {
+  if (tabParam === "years" || tabParam === "classes" || tabParam === "subjects") {
+    return tabParam;
+  }
+  if (path.includes("class-sections") || path.includes("class-teachers")) return "classes";
+  if (path.endsWith("/subjects")) return "subjects";
+  return "years";
 }
 
 export default function AcademicsPage() {
-  const pathname = usePathname();
-  const [tab, setTab] = useState<AcademicsTab>(() => getDefaultTab(pathname));
+  const { t } = useI18n();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const routeParams = useAOSRouteParams();
 
-  useEffect(() => {
-    setTab(getDefaultTab(pathname));
-  }, [pathname]);
+  const tab = tabFromRoute(routeParams.get("tab"), windowRoute?.pathname ?? "/dashboard/academics");
+
+  function setTab(next: AcademicsTab) {
+    const base = windowRoute?.pathname?.endsWith("/academics")
+      ? windowRoute.pathname
+      : "/dashboard/academics";
+    navigate(`${base}?tab=${next}`);
+  }
 
   // Dashboard KPI queries — same query keys as the tabs below, so the counts
   // double as pre-warmed tab data (no extra fetches beyond what tabs load).
-  const { data: yearsData, isLoading: yearsLoading } = useQuery({
+  const { data: yearsData } = useQuery({
     queryKey: ["academic-years"],
     queryFn: fetchAcademicYears,
   });
-  const { data: classesData, isLoading: classesLoading } = useQuery({
+  const { data: classesData } = useQuery({
     queryKey: ["classes"],
     queryFn: fetchClasses,
   });
-  const { data: subjectsData, isLoading: subjectsLoading } = useQuery({
+  const { data: subjectsData } = useQuery({
     queryKey: ["subjects"],
     queryFn: fetchSubjects,
   });
@@ -235,128 +187,134 @@ export default function AcademicsPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<BookOpen className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Academics"
-        subtitle={`${classes.length} classes · ${sectionsCount} sections · ${subjects.length} subjects · ${years.length} academic years`}
+        title={t("Academics", "शैक्षिक संरचना")}
+        subtitle={t(
+          `${classes.length} classes · ${sectionsCount} sections · ${subjects.length} subjects · ${years.length} academic years`,
+          `${classes.length} कक्षा · ${sectionsCount} सेक्सन · ${subjects.length} विषय · ${years.length} शैक्षिक वर्ष`,
+        )}
+        actions={
+          currentYear ? (
+            <StatusChip status="active" label={`${t("Session", "सत्र")}: ${currentYear.name}`} />
+          ) : (
+            <StatusChip status="pending" label={t("No current session", "वर्तमान सत्र छैन")} />
+          )
+        }
       />
       <AOSPageBody>
-        {/* Module dashboard — KPIs + quick links before the tabs */}
+        {/* Launcher row — tabs + the two mapping subpages, all in one grid */}
+        <QuickLinks
+          section="Academics"
+          className="mb-4"
+          links={[
+            { label: t("Academic Years", "शैक्षिक वर्ष"), href: "/dashboard/academics?tab=years", icon: "CalendarRange" },
+            { label: t("Classes & Sections", "कक्षा र सेक्सन"), href: "/dashboard/academics?tab=classes", icon: "Users" },
+            { label: t("Subjects", "विषयहरू"), href: "/dashboard/academics?tab=subjects", icon: "BookMarked" },
+            { label: t("Class Subjects", "कक्षा-विषय"), href: "/dashboard/academics/class-subjects", icon: "Link2" },
+            { label: t("Class Teachers", "कक्षा-शिक्षक"), href: "/dashboard/academics/class-teachers", icon: "UserCog" },
+          ]}
+        />
+
         <StatGrid min={170}>
           <KpiCard
-            label="Academic Years"
-            value={yearsLoading ? "—" : years.length}
+            label={t("Academic Years", "शैक्षिक वर्ष")}
+            value={yearsData ? years.length : "—"}
             icon={<BookOpen className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
           />
           <KpiCard
-            label="Current Year"
+            label={t("Current Year", "वर्तमान वर्ष")}
             value={currentYear?.name ?? "—"}
-            footnote={currentYear ? "set as current" : "none marked current"}
+            footnote={currentYear ? t("set as current", "वर्तमान") : t("none marked current", "कुनै छैन")}
             icon={<CalendarRange className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             color="var(--w11-text-primary)"
           />
           <KpiCard
-            label="Classes"
-            value={classesLoading ? "—" : classes.length}
-            denominator={`/ ${sectionsCount} sections`}
+            label={t("Classes", "कक्षा")}
+            value={classesData ? classes.length : "—"}
+            denominator={`/ ${sectionsCount} ${t("sections", "सेक्सन")}`}
             icon={<Users className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
             color="var(--w11-text-primary)"
           />
           <KpiCard
-            label="Subjects"
-            value={subjectsLoading ? "—" : subjects.length}
+            label={t("Subjects", "विषय")}
+            value={subjectsData ? subjects.length : "—"}
             icon={<BookMarked className="h-4 w-4" style={{ color: "#107c10" }} />}
             color="#107c10"
           />
         </StatGrid>
 
-        <DataPanel title="Academics Quick Links" bodyClassName="p-3" className="mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", margin: 0 }}
-                  >
-                    <div
-                      className="flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: "44px",
-                        height: "44px",
-                        borderRadius: "10px",
-                        background: SECTION_GRADIENTS.Academics,
-                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon size={22} strokeWidth={2.2} />
-                    </div>
-                    <span
-                      className="text-[13px] font-semibold leading-tight"
-                      style={{ color: "var(--w11-text-primary)" }}
-                    >
-                      {l.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </DataPanel>
+        {/* Fluent pivot tabs — kit Tabs, URL-synced, keyboard-navigable */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as AcademicsTab)}>
+          <TabsList variant="underline">
+            <TabsTrigger value="years" badge={years.length || undefined}>
+              {t("Academic Years", "शैक्षिक वर्ष")}
+            </TabsTrigger>
+            <TabsTrigger value="classes" badge={classes.length || undefined}>
+              {t("Classes & Sections", "कक्षा र सेक्सन")}
+            </TabsTrigger>
+            <TabsTrigger value="subjects" badge={subjects.length || undefined}>
+              {t("Subjects", "विषयहरू")}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Fluent pivot tabs */}
-        <div className="flex gap-1 mb-4 border-b border-[var(--w11-border-subtle)]">
-          {[
-            { key: "years" as const, label: "Academic Years", icon: BookOpen },
-            { key: "classes" as const, label: "Classes & Sections", icon: Users },
-            { key: "subjects" as const, label: "Subjects", icon: BookMarked },
-          ].map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
-                tab === item.key
-                  ? "border-[var(--w11-accent)] text-[color:var(--w11-text-primary)]"
-                  : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-3 mb-4 md:grid-cols-2">
-          {ACADEMIC_TOOLS.map((tool) => (
-            <Link key={tool.href} href={tool.href} className="group">
-              <div className="win11-card flex items-start gap-3 p-4 transition-colors hover:border-[var(--w11-accent)]">
-                <div
-                  className="rounded-[var(--w11-radius-md)] p-2"
-                  style={{ background: "var(--w11-accent-light)", color: "var(--w11-accent)" }}
-                >
-                  <tool.icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold group-hover:text-[color:var(--w11-accent)]">
-                    {tool.label}
-                  </div>
-                  <p className="text-sm text-[color:var(--w11-text-secondary)]">{tool.description}</p>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {tab === "years" && <AcademicYearsTab />}
-        {tab === "classes" && <ClassesTab />}
-        {tab === "subjects" && <SubjectsTab />}
+          <TabsContent value="years" className="mt-4">
+            <AcademicYearsTab />
+          </TabsContent>
+          <TabsContent value="classes" className="mt-4">
+            <ClassesTab years={years} />
+          </TabsContent>
+          <TabsContent value="subjects" className="mt-4">
+            <SubjectsTab />
+          </TabsContent>
+        </Tabs>
       </AOSPageBody>
     </AOSPage>
   );
 }
 
-function AcademicYearsTab() {
-  const queryClient = useQueryClient();
+function RowActions({
+  onEdit,
+  onDelete,
+  deleteLabel,
+  deleting = false,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  deleteLabel: string;
+  deleting?: boolean;
+}) {
+  const { t } = useI18n();
   const confirm = useConfirm();
+  return (
+    <div className="flex justify-end gap-2">
+      <Button variant="ghost" size="icon" onClick={onEdit} aria-label={t("Edit item", "सम्पादन")}>
+        <Pencil className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={deleting}
+        aria-label={t("Delete item", "मेटाउनुहोस्")}
+        onClick={() => {
+          void (async () => {
+            const ok = await confirm({
+              title: t("Delete?", "मेटाउने?"),
+              body: deleteLabel,
+              confirmLabel: t("Delete", "मेटाउनुहोस्"),
+              tone: "danger",
+            });
+            if (ok) onDelete();
+          })();
+        }}
+      >
+        {deleting ? <Spinner size="sm" /> : <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />}
+      </Button>
+    </div>
+  );
+}
+
+function AcademicYearsTab() {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<AcademicYear | null>(null);
   // E219: Start/End are REQUIRED — a year without dates is meaningless
@@ -390,55 +348,47 @@ function AcademicYearsTab() {
     mutationFn: (payload: Record<string, unknown>) => createAcademicYear(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["academic-years"] });
-      toast.success("Academic year created");
+      toast.success(t("Academic year created", "शैक्षिक वर्ष बन्यो"));
       setShowAdd(false);
     },
-    onError: () => toast.error("Failed to create academic year"),
+    onError: () => toast.error(t("Failed to create academic year", "वर्ष बनेन")),
   });
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => updateAcademicYear(editItem?.id || "", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["academic-years"] });
-      toast.success("Academic year updated");
+      toast.success(t("Academic year updated", "वर्ष अद्यावधिक"));
       setEditItem(null);
     },
-    onError: () => toast.error("Failed to update academic year"),
+    onError: () => toast.error(t("Failed to update academic year", "अद्यावधिक भएन")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (yearId: string) => deleteAcademicYear(yearId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["academic-years"] });
-      toast.success("Academic year deleted");
+      toast.success(t("Academic year deleted", "वर्ष मेटियो"));
     },
-    onError: () => toast.error("Failed to delete academic year"),
+    onError: () => toast.error(t("Failed to delete academic year", "मेटिएन")),
   });
 
-  if (isError)
-    return (
-      <div className="win11-card p-6 text-center space-y-3">
-        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
-  if (isLoading) return <PageLoader />;
+  if (isError) return <ErrorState body={t("Failed to load academic years.", "वर्ष लोड हुन सकेन।")} onRetry={() => void refetch()} />;
+  if (isLoading) return <SkeletonTable rows={5} columns={4} />;
 
   const years = data || [];
 
   const YEAR_COLUMNS: Column<AcademicYear>[] = [
-    { key: "name", label: "Name", sortable: true, value: (y) => y.name, render: (y) => <span className="font-medium">{y.name}</span> },
-    { key: "start_date", label: "Start Date", sortable: true, value: (y) => y.start_date, render: (y) => displayBS(y.start_date) || "-" },
-    { key: "end_date", label: "End Date", sortable: true, value: (y) => y.end_date, render: (y) => displayBS(y.end_date) || "-" },
+    { key: "name", label: t("Name", "नाम"), sortable: true, value: (y) => y.name, render: (y) => <span className="font-medium">{y.name}</span> },
+    { key: "start_date", label: t("Start Date", "सुरु मिति"), sortable: true, value: (y) => y.start_date, render: (y) => displayBS(y.start_date) || "-" },
+    { key: "end_date", label: t("End Date", "अन्त्य मिति"), sortable: true, value: (y) => y.end_date, render: (y) => displayBS(y.end_date) || "-" },
     {
       key: "is_current",
-      label: "Status",
+      label: t("Status", "अवस्था"),
       sortable: true,
       value: (y) => (y.is_current ? "current" : "past"),
       render: (y) => (
-        <Badge variant={y.is_current ? "success" : "secondary"}>
-          {y.is_current ? "Current" : "Past"}
-        </Badge>
+        <StatusChip status={y.is_current ? "active" : "pending"} label={y.is_current ? t("Current", "वर्तमान") : t("Past", "पुरानो")} />
       ),
     },
     {
@@ -446,11 +396,11 @@ function AcademicYearsTab() {
       label: "",
       noExport: true,
       render: (y) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()}>
           <RowActions
             onEdit={() => openYearDialog(y)}
             onDelete={() => deleteMutation.mutate(y.id)}
-            deleteLabel={`Delete academic year "${y.name}"?`}
+            deleteLabel={t(`Delete academic year "${y.name}"? Classes and exams referencing it may fail to load.`, `"${y.name}" वर्ष मेटाउने?`)}
             deleting={deleteMutation.isPending}
           />
         </div>
@@ -461,10 +411,10 @@ function AcademicYearsTab() {
   return (
     <>
       <DataPanel
-        title="Academic Years"
+        title={t("Academic Years", "शैक्षिक वर्ष")}
         actions={
-          <Button onClick={() => openYearDialog(null)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Year
+          <Button size="sm" onClick={() => openYearDialog(null)}>
+            <Plus className="mr-2 h-4 w-4" /> {t("Add Year", "वर्ष थप्नुहोस्")}
           </Button>
         }
         bodyClassName="p-0"
@@ -474,13 +424,13 @@ function AcademicYearsTab() {
           rows={years}
           rowKey={(y) => y.id}
           searchable
-          searchPlaceholder="Search years…"
+          searchPlaceholder={t("Search years…", "वर्ष खोज्नुहोस्…")}
           exportFileName="academic-years"
           empty={{
             icon: BookOpen,
-            title: "No academic years yet",
-            body: "Create your first academic year — everything (classes, exams, fees) hangs off it.",
-            action: { label: "Add Year", onClick: () => openYearDialog(null) },
+            title: t("No academic years yet", "अझै शैक्षिक वर्ष छैन"),
+            body: t("Create your first academic year — everything (classes, exams, fees) hangs off it.", "पहिलो शैक्षिक वर्ष बनाउनुहोस् — सबै कुरा यसमा टाँसिन्छ।"),
+            action: { label: t("Add Year", "वर्ष थप्नुहोस्"), onClick: () => openYearDialog(null) },
           }}
         />
       </DataPanel>
@@ -496,7 +446,7 @@ function AcademicYearsTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Academic Year" : "Add Academic Year"}</DialogTitle>
+            <DialogTitle>{editItem ? t("Edit Academic Year", "वर्ष सम्पादन") : t("Add Academic Year", "वर्ष थप्नुहोस्")}</DialogTitle>
           </DialogHeader>
           <form
             key={editItem?.id || "new-year"}
@@ -505,7 +455,7 @@ function AcademicYearsTab() {
               // E219: a year without Start/End is rejected with feedback
               // (previously it silently saved, leaving the "N/A" row).
               if (!pickedDates.start || !pickedDates.end) {
-                toast.error("Start date and End date are both required");
+                toast.error(t("Start date and End date are both required", "सुरु र अन्त्य मिति अनिवार्य"));
                 return;
               }
               const formData = new FormData(event.currentTarget);
@@ -524,15 +474,15 @@ function AcademicYearsTab() {
             }}
             className="space-y-4"
           >
-            <FormSection title="Year Details">
+            <FormSection title={t("Year Details", "वर्ण विवरण")}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Name *</Label>
+                  <Label>{t("Name", "नाम")} *</Label>
                   <Input name="name" required defaultValue={editItem?.name} placeholder="2082" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Start Date *</Label>
+                    <Label>{t("Start Date", "सुरु मिति")} *</Label>
                     <BSDateInput
                       name="start_date"
                       value={pickedDates.start}
@@ -540,7 +490,7 @@ function AcademicYearsTab() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>End Date *</Label>
+                    <Label>{t("End Date", "अन्त्य मिति")} *</Label>
                     <BSDateInput
                       name="end_date"
                       value={pickedDates.end}
@@ -548,16 +498,16 @@ function AcademicYearsTab() {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                  BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).
+                <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  {t("BS calendar dates (e.g. a school year 2082 runs Baisakh 1, 2082 → Chaitra 30, 2082).", "बि.सं. मिति (२०८२ = बैशाख १ → चैत ३०)।")}
                 </p>
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Checkbox
                     checked={isCurrentYear}
                     onCheckedChange={(v) => setIsCurrentYear(v === true)}
-                    aria-label="Set as current academic year"
+                    aria-label={t("Set as current academic year", "वर्तमान वर्ष तोक्नुहोस्")}
                   />
-                  Set as current academic year
+                  {t("Set as current academic year", "वर्तमान शैक्षिक वर्ष तोक्नुहोस्")}
                 </label>
                 {/* Radix Checkbox doesn't submit — mirror into FormData */}
                 <input type="hidden" name="is_current" value={isCurrentYear ? "on" : ""} />
@@ -572,10 +522,10 @@ function AcademicYearsTab() {
                   setEditItem(null);
                 }}
               >
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? "Update" : "Create"}
+                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? t("Update", "अद्यावधिक") : t("Create", "बनाउनुहोस्")}
               </Button>
             </DialogFooter>
           </form>
@@ -585,13 +535,15 @@ function AcademicYearsTab() {
   );
 }
 
-function ClassesTab() {
-  const queryClient = useQueryClient();
+function ClassesTab({ years }: { years: AcademicYear[] }) {
+  const { t } = useI18n();
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   const [showAddClass, setShowAddClass] = useState(false);
   const [editClass, setEditClass] = useState<ClassItem | null>(null);
   const [addSectionFor, setAddSectionFor] = useState<ClassItem | null>(null);
   const [editSection, setEditSection] = useState<{ klass: ClassItem; section: SectionItem } | null>(null);
+  const [yearFilter, setYearFilter] = useState("");
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["classes"],
@@ -622,10 +574,10 @@ function ClassesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Class created");
+      toast.success(t("Class created", "कक्षा बन्यो"));
       setShowAddClass(false);
     },
-    onError: () => toast.error("Failed to create class"),
+    onError: () => toast.error(t("Failed to create class", "कक्षा बनेन")),
   });
 
   const updateClassMutation = useMutation({
@@ -633,19 +585,19 @@ function ClassesTab() {
       updateClass(payload.id, payload.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Class updated");
+      toast.success(t("Class updated", "कक्षा अद्यावधिक"));
       setEditClass(null);
     },
-    onError: () => toast.error("Failed to update class"),
+    onError: () => toast.error(t("Failed to update class", "अद्यावधिक भएन")),
   });
 
   const deleteClassMutation = useMutation({
     mutationFn: (classId: string) => deleteClass(classId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Class deleted");
+      toast.success(t("Class deleted", "कक्षा मेटियो"));
     },
-    onError: () => toast.error("Failed to delete class"),
+    onError: () => toast.error(t("Failed to delete class", "मेटिएन")),
   });
 
   const createSectionMutation = useMutation({
@@ -653,10 +605,10 @@ function ClassesTab() {
       createSection(payload.classId, payload.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Section created");
+      toast.success(t("Section created", "सेक्सन बन्यो"));
       setAddSectionFor(null);
     },
-    onError: () => toast.error("Failed to create section"),
+    onError: () => toast.error(t("Failed to create section", "सेक्सन बनेन")),
   });
 
   const updateSectionMutation = useMutation({
@@ -664,10 +616,10 @@ function ClassesTab() {
       updateSection(payload.classId, payload.sectionId, payload.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Section updated");
+      toast.success(t("Section updated", "सेक्सन अद्यावधिक"));
       setEditSection(null);
     },
-    onError: () => toast.error("Failed to update section"),
+    onError: () => toast.error(t("Failed to update section", "सेक्सन अद्यावधिक भएन")),
   });
 
   const deleteSectionMutation = useMutation({
@@ -675,41 +627,42 @@ function ClassesTab() {
       deleteSection(payload.classId, payload.sectionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classes"] });
-      toast.success("Section deleted");
+      toast.success(t("Section deleted", "सेक्सन मेटियो"));
     },
-    onError: () => toast.error("Failed to delete section"),
+    onError: () => toast.error(t("Failed to delete section", "सेक्सन मेटिएन")),
   });
 
-  if (isError)
-    return (
-      <div className="win11-card p-6 text-center space-y-3">
-        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
-  if (isLoading) return <PageLoader />;
+  if (isError) return <ErrorState body={t("Failed to load classes.", "कक्षा लोड हुन सकेन।")} onRetry={() => void refetch()} />;
+  if (isLoading) return <SkeletonTable rows={6} columns={3} />;
 
-  const classes = data || [];
+  // The API carries academic_year_id (see PromotionClassOption); ClassDto in
+  // lib predates it — widen locally rather than editing shared lib.
+  const classes = (data || []) as unknown as ClassItem[];
+  // 8.1 year-axis: only offer the filter when the payload actually carries
+  // the year binding (avoids a control that filters everything to none).
+  const hasYearAxis = classes.some((c) => !!c.academic_year_id);
+  const visibleClasses =
+    hasYearAxis && yearFilter ? classes.filter((c) => c.academic_year_id === yearFilter) : classes;
 
   const CLASS_COLUMNS: Column<ClassItem>[] = [
     {
       key: "name",
-      label: "Class",
+      label: t("Class", "कक्षा"),
       sortable: true,
       value: (k) => k.name,
       render: (k) => (
         <div>
           <div className="font-medium">{k.name}</div>
-          <div className="text-xs text-[color:var(--w11-text-secondary)]">
-            Manage sections and teacher assignments from here.
-          </div>
+          {k.name_nepali && (
+            <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>{k.name_nepali}</div>
+          )}
         </div>
       ),
     },
-    { key: "numeric_grade", label: "Grade", align: "right", sortable: true, value: (k) => k.numeric_grade ?? 0, render: (k) => <Badge variant="outline">Grade {k.numeric_grade ?? "-"}</Badge> },
+    { key: "numeric_grade", label: t("Grade", "ग्रेड"), align: "right", sortable: true, value: (k) => k.numeric_grade ?? 0, render: (k) => <span className="text-sm">{k.numeric_grade ?? "-"}</span> },
     {
       key: "sections",
-      label: "Sections",
+      label: t("Sections", "सेक्सन"),
       value: (k) => (k.sections || []).length,
       render: (k) => (
         <div className="space-y-2">
@@ -719,9 +672,9 @@ function ClassesTab() {
               className="flex items-center justify-between rounded-[var(--w11-radius-md)] border border-[var(--w11-border-subtle)] px-3 py-2"
             >
               <div>
-                <div className="font-medium">Section {section.name}</div>
-                <div className="text-xs text-[color:var(--w11-text-secondary)]">
-                  Capacity: {section.capacity ?? "-"}
+                <div className="font-medium">{t("Section", "सेक्सन")} {section.name}</div>
+                <div className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                  {t("Capacity", "अनुमति")}: {section.capacity ?? "-"}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -740,9 +693,9 @@ function ClassesTab() {
                     e.stopPropagation();
                     void (async () => {
                       const ok = await confirm({
-                        title: `Delete section "${section.name}"?`,
-                        body: `It will be removed from ${k.name}. Students stay enrolled in the class.`,
-                        confirmLabel: "Delete section",
+                        title: t(`Delete section "${section.name}"?`, `"${section.name}" सेक्सन मेटाउने?`),
+                        body: t("It will be removed from the class. Students stay enrolled in the class.", "विद्यार्थी कक्षामै रहन्छन्।"),
+                        confirmLabel: t("Delete section", "मेटाउनुहोस्"),
                         tone: "danger",
                       });
                       if (ok) {
@@ -758,10 +711,10 @@ function ClassesTab() {
             </div>
           ))}
           {(k.sections || []).length === 0 && (
-            <div className="text-sm text-[color:var(--w11-text-secondary)]">No sections yet.</div>
+            <div className="text-sm" style={{ color: "var(--w11-text-secondary)" }}>{t("No sections yet.", "सेक्सन छैन।")}</div>
           )}
           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setAddSectionFor(k); }}>
-            <Plus className="mr-2 h-3.5 w-3.5" /> Add Section
+            <Plus className="mr-2 h-3.5 w-3.5" /> {t("Add Section", "सेक्सन थप्नुहोस्")}
           </Button>
         </div>
       ),
@@ -771,11 +724,11 @@ function ClassesTab() {
       label: "",
       noExport: true,
       render: (k) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()}>
           <RowActions
             onEdit={() => setEditClass(k)}
             onDelete={() => deleteClassMutation.mutate(k.id)}
-            deleteLabel={`Delete class "${k.name}"?`}
+            deleteLabel={t(`Delete class "${k.name}"? Only empty classes can be deleted.`, `"${k.name}" मेटाउने?`)}
             deleting={deleteClassMutation.isPending}
           />
         </div>
@@ -788,26 +741,38 @@ function ClassesTab() {
   return (
     <>
       <DataPanel
-        title="Classes & Sections"
+        title={t("Classes & Sections", "कक्षा र सेक्सन")}
         actions={
-          <Button onClick={() => setShowAddClass(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Class
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasYearAxis && (
+              <AdvancedSelect
+                className="w-40"
+                value={yearFilter}
+                onChange={(v) => setYearFilter(v || "")}
+                clearable
+                placeholder={t("All sessions", "सबै सत्र")}
+                options={years.map((y) => ({ value: y.id, label: y.name }))}
+              />
+            )}
+            <Button size="sm" onClick={() => setShowAddClass(true)}>
+              <Plus className="mr-2 h-4 w-4" /> {t("Add Class", "कक्षा थप्नुहोस्")}
+            </Button>
+          </div>
         }
         bodyClassName="p-0"
       >
         <DataTable<ClassItem>
           columns={CLASS_COLUMNS}
-          rows={classes}
+          rows={visibleClasses}
           rowKey={(k) => k.id}
           searchable
-          searchPlaceholder="Search classes…"
+          searchPlaceholder={t("Search classes…", "कक्षा खोज्नुहोस्…")}
           exportFileName="classes-sections"
           empty={{
             icon: Users,
-            title: "No classes created yet",
-            body: "Create your first class — sections and teachers hang off it.",
-            action: { label: "Add Class", onClick: () => setShowAddClass(true) },
+            title: t("No classes created yet", "अझै कक्षा छैन"),
+            body: t("Create your first class — sections and teachers hang off it.", "पहिलो कक्षा बनाउनुहोस् — सेक्सन र शिक्षक यसमा टाँसिन्छ।"),
+            action: { label: t("Add Class", "कक्षा थप्नुहोस्"), onClick: () => setShowAddClass(true) },
           }}
         />
       </DataPanel>
@@ -823,7 +788,7 @@ function ClassesTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editClass ? "Edit Class" : "Add Class"}</DialogTitle>
+            <DialogTitle>{editClass ? t("Edit Class", "कक्षा सम्पादन") : t("Add Class", "कक्षा थप्नुहोस्")}</DialogTitle>
           </DialogHeader>
           <form
             key={editClass?.id || "new-class"}
@@ -850,14 +815,14 @@ function ClassesTab() {
             }}
             className="space-y-4"
           >
-            <FormSection title="Class Details">
+            <FormSection title={t("Class Details", "कक्षा विवरण")}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Class Name</Label>
+                  <Label>{t("Class Name", "कक्षा नाम")}</Label>
                   <Input name="name" required defaultValue={editClass?.name} placeholder="Class 10" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Grade Number</Label>
+                  <Label>{t("Grade Number", "ग्रेड नम्बर")}</Label>
                   <Input
                     name="numeric_grade"
                     type="number"
@@ -870,11 +835,11 @@ function ClassesTab() {
                 {!editClass && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Initial Section</Label>
+                      <Label>{t("Initial Section", "पहिलो सेक्सन")}</Label>
                       <Input name="initial_section_name" placeholder="A" />
                     </div>
                     <div className="space-y-2">
-                      <Label>Section Capacity</Label>
+                      <Label>{t("Section Capacity", "अनुमति संख्या")}</Label>
                       <Input name="initial_section_capacity" type="number" min={1} placeholder="40" />
                     </div>
                   </div>
@@ -890,10 +855,10 @@ function ClassesTab() {
                   setEditClass(null);
                 }}
               >
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button type="submit" disabled={createClassMutation.isPending || updateClassMutation.isPending}>
-                {createClassMutation.isPending || updateClassMutation.isPending ? <Spinner size="sm" /> : editClass ? "Update" : "Create"}
+                {createClassMutation.isPending || updateClassMutation.isPending ? <Spinner size="sm" /> : editClass ? t("Update", "अद्यावधिक") : t("Create", "बनाउनुहोस्")}
               </Button>
             </DialogFooter>
           </form>
@@ -912,8 +877,8 @@ function ClassesTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {sectionDialogItem ? "Edit Section" : "Add Section"}
-              {sectionDialogClass ? ` - ${sectionDialogClass.name}` : ""}
+              {sectionDialogItem ? t("Edit Section", "सेक्सन सम्पादन") : t("Add Section", "सेक्सन थप्नुहोस्")}
+              {sectionDialogClass ? ` — ${sectionDialogClass.name}` : ""}
             </DialogTitle>
           </DialogHeader>
           <form
@@ -943,14 +908,14 @@ function ClassesTab() {
             }}
             className="space-y-4"
           >
-            <FormSection title="Section Details">
+            <FormSection title={t("Section Details", "सेक्सन विवरण")}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Section Name</Label>
+                  <Label>{t("Section Name", "सेक्सन नाम")}</Label>
                   <Input name="name" required defaultValue={sectionDialogItem?.name} placeholder="A" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Capacity</Label>
+                  <Label>{t("Capacity", "अनुमति संख्या")}</Label>
                   <Input
                     name="capacity"
                     type="number"
@@ -969,10 +934,10 @@ function ClassesTab() {
                   setEditSection(null);
                 }}
               >
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button type="submit" disabled={createSectionMutation.isPending || updateSectionMutation.isPending}>
-                {createSectionMutation.isPending || updateSectionMutation.isPending ? <Spinner size="sm" /> : sectionDialogItem ? "Update" : "Create"}
+                {createSectionMutation.isPending || updateSectionMutation.isPending ? <Spinner size="sm" /> : sectionDialogItem ? t("Update", "अद्यावधिक") : t("Create", "बनाउनुहोस्")}
               </Button>
             </DialogFooter>
           </form>
@@ -983,6 +948,7 @@ function ClassesTab() {
 }
 
 function SubjectsTab() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<Subject | null>(null);
@@ -996,56 +962,48 @@ function SubjectsTab() {
     mutationFn: (payload: Record<string, unknown>) => createSubject(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subjects"] });
-      toast.success("Subject created");
+      toast.success(t("Subject created", "विषय बन्यो"));
       setShowAdd(false);
     },
-    onError: () => toast.error("Failed to create subject"),
+    onError: () => toast.error(t("Failed to create subject", "विषय बनेन")),
   });
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => updateSubject(editItem?.id || "", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subjects"] });
-      toast.success("Subject updated");
+      toast.success(t("Subject updated", "विषय अद्यावधिक"));
       setEditItem(null);
     },
-    onError: () => toast.error("Failed to update subject"),
+    onError: () => toast.error(t("Failed to update subject", "अद्यावधिक भएन")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (subjectId: string) => deleteSubject(subjectId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subjects"] });
-      toast.success("Subject deleted");
+      toast.success(t("Subject deleted", "विषय मेटियो"));
     },
-    onError: () => toast.error("Failed to delete subject"),
+    onError: () => toast.error(t("Failed to delete subject", "मेटिएन")),
   });
 
-  if (isError)
-    return (
-      <div className="win11-card p-6 text-center space-y-3">
-        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load data. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
-  if (isLoading) return <PageLoader />;
+  if (isError) return <ErrorState body={t("Failed to load subjects.", "विषय लोड हुन सकेन।")} onRetry={() => void refetch()} />;
+  if (isLoading) return <SkeletonTable rows={6} columns={4} />;
 
   const subjects = data || [];
 
   const SUBJECT_COLUMNS: Column<Subject>[] = [
-    { key: "name", label: "Name", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
-    { key: "code", label: "Code", sortable: true, value: (s) => s.code || "" },
-    { key: "credit_hours", label: "Credit Hours", sortable: true, align: "right", value: (s) => s.credit_hours ?? 0 },
+    { key: "name", label: t("Name", "नाम"), sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
+    { key: "code", label: t("Code", "कोड"), sortable: true, value: (s) => s.code || "" },
+    { key: "credit_hours", label: t("Credit Hours", "क्रेडिट"), sortable: true, align: "right", value: (s) => s.credit_hours ?? 0 },
     {
       key: "marks",
-      label: "Marks",
+      label: t("Marks", "अंक"),
       render: (s) =>
         s.has_practical && (s.practical_full_marks ?? 0) > 0 ? (
           <div className="text-sm leading-tight">
-            <p>
-              Th {s.full_marks ?? 0} / {s.pass_marks ?? 0}
-            </p>
-            <p className="text-[color:var(--w11-text-secondary)]">
+            <p>Th {s.full_marks ?? 0} / {s.pass_marks ?? 0}</p>
+            <p style={{ color: "var(--w11-text-secondary)" }}>
               Pr {s.practical_full_marks} / {s.practical_pass_marks ?? 0}
             </p>
           </div>
@@ -1057,35 +1015,27 @@ function SubjectsTab() {
     },
     {
       key: "is_optional",
-      label: "Type",
+      label: t("Type", "प्रकार"),
       sortable: true,
       value: (s) => (s.is_optional ? "optional" : "compulsory"),
-      render: (s) => (
-        <Badge variant={s.is_optional ? "outline" : "secondary"}>
-          {s.is_optional ? "Optional" : "Compulsory"}
-        </Badge>
-      ),
+      render: (s) => <StatusChip status={s.is_optional ? "pending" : "active"} label={s.is_optional ? t("Optional", "ऐच्छिक") : t("Compulsory", "अनिवार्य")} />,
     },
     {
       key: "has_practical",
-      label: "Practical",
+      label: t("Practical", "प्रायोगिक"),
       value: (s) => (s.has_practical ? "yes" : "no"),
-      render: (s) => (
-        <Badge variant={s.has_practical ? "default" : "secondary"}>
-          {s.has_practical ? "Yes" : "No"}
-        </Badge>
-      ),
+      render: (s) => <span className="text-sm">{s.has_practical ? t("Yes", "छ") : t("No", "छैन")}</span>,
     },
     {
       key: "actions",
       label: "",
       noExport: true,
       render: (s) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()}>
           <RowActions
             onEdit={() => setEditItem(s)}
             onDelete={() => deleteMutation.mutate(s.id)}
-            deleteLabel={`Delete subject "${s.name}"?`}
+            deleteLabel={t(`Delete subject "${s.name}"? Class-subject mappings referencing it will need re-mapping.`, `"${s.name}" विषय मेटाउने?`)}
             deleting={deleteMutation.isPending}
           />
         </div>
@@ -1096,10 +1046,10 @@ function SubjectsTab() {
   return (
     <>
       <DataPanel
-        title="Subjects"
+        title={t("Subjects", "विषयहरू")}
         actions={
-          <Button onClick={() => setShowAdd(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Subject
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            <Plus className="mr-2 h-4 w-4" /> {t("Add Subject", "विषय थप्नुहोस्")}
           </Button>
         }
         bodyClassName="p-0"
@@ -1109,13 +1059,13 @@ function SubjectsTab() {
           rows={subjects}
           rowKey={(s) => s.id}
           searchable
-          searchPlaceholder="Search subjects…"
+          searchPlaceholder={t("Search subjects…", "विषय खोज्नुहोस्…")}
           exportFileName="subjects"
           empty={{
             icon: BookMarked,
-            title: "No subjects yet",
-            body: "Add your first subject to start recording marks.",
-            action: { label: "Add Subject", onClick: () => setShowAdd(true) },
+            title: t("No subjects yet", "अझै विषय छैन"),
+            body: t("Add your first subject to start recording marks.", "अंक भर्न पहिलो विषय थप्नुहोस्।"),
+            action: { label: t("Add Subject", "विषय थप्नुहोस्"), onClick: () => setShowAdd(true) },
           }}
         />
       </DataPanel>
@@ -1131,7 +1081,7 @@ function SubjectsTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Subject" : "Add Subject"}</DialogTitle>
+            <DialogTitle>{editItem ? t("Edit Subject", "विषय सम्पादन") : t("Add Subject", "विषय थप्नुहोस्")}</DialogTitle>
           </DialogHeader>
           <form
             key={editItem?.id || "new-subject"}
@@ -1163,21 +1113,21 @@ function SubjectsTab() {
             }}
             className="space-y-4"
           >
-            <FormSection title="Subject Details">
+            <FormSection title={t("Subject Details", "विषय विवरण")}>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Subject Name</Label>
+                    <Label>{t("Subject Name", "विषयको नाम")}</Label>
                     <Input name="name" required defaultValue={editItem?.name} placeholder="Mathematics" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Code</Label>
+                    <Label>{t("Code", "कोड")}</Label>
                     <Input name="code" required defaultValue={editItem?.code} placeholder="MATH" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Credit Hours</Label>
+                    <Label>{t("Credit Hours", "क्रेडिट घण्टा")}</Label>
                     <Input
                       name="credit_hours"
                       type="number"
@@ -1187,81 +1137,84 @@ function SubjectsTab() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Type</Label>
+                    <Label>{t("Type", "प्रकार")}</Label>
                     <AdvancedSelect
                       name="is_optional"
                       defaultValue={String(Boolean(editItem?.is_optional))}
                       options={[
-                        { value: "false", label: "Compulsory" },
-                        { value: "true", label: "Optional" },
+                        { value: "false", label: t("Compulsory", "अनिवार्य") },
+                        { value: "true", label: t("Optional", "ऐच्छिक") },
                       ]}
                     />
                   </div>
                 </div>
               </div>
             </FormSection>
-            <FormSection title="Marks & Grading">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Full Marks</Label>
-                    <Input
-                      name="full_marks"
-                      type="number"
-                      min={1}
-                      required
-                      defaultValue={editItem?.full_marks ?? 100}
-                    />
+            <details className="win11-expander">
+              <summary>{t("Marks & practical component", "अंक र प्रायोगिक भाग")}</summary>
+              <div className="expander-content">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>{t("Full Marks", "पूर्णांक")}</Label>
+                      <Input
+                        name="full_marks"
+                        type="number"
+                        min={1}
+                        required
+                        defaultValue={editItem?.full_marks ?? 100}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("Pass Marks", "उत्तीर्णांक")}</Label>
+                      <Input
+                        name="pass_marks"
+                        type="number"
+                        min={0}
+                        required
+                        defaultValue={editItem?.pass_marks ?? 32}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Pass Marks</Label>
-                    <Input
-                      name="pass_marks"
-                      type="number"
-                      min={0}
-                      required
-                      defaultValue={editItem?.pass_marks ?? 32}
+                    <Label>{t("Practical Component", "प्रायोगिक भाग")}</Label>
+                    <AdvancedSelect
+                      name="has_practical"
+                      defaultValue={String(Boolean(editItem?.has_practical))}
+                      options={[
+                        { value: "false", label: t("No practical", "छैन") },
+                        { value: "true", label: t("Has practical", "छ") },
+                      ]}
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>{t("Practical Full Marks", "प्रा. पूर्णांक")}</Label>
+                      <Input
+                        name="practical_full_marks"
+                        type="number"
+                        min={0}
+                        defaultValue={editItem?.practical_full_marks ?? ""}
+                        placeholder="25"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("Practical Pass Marks", "प्रा. उत्तीर्णांक")}</Label>
+                      <Input
+                        name="practical_pass_marks"
+                        type="number"
+                        min={0}
+                        defaultValue={editItem?.practical_pass_marks ?? ""}
+                        placeholder="10"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                    {t("Set practical full/pass marks to use subject-specific NEB grading. Leave them empty to keep the legacy exam-level split.", "NEB विषयगत अंकका लागि प्रायोगिक अंक तोक्नुहोस्; खाली परीक्षास्तर विभाजन।")}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Practical Component</Label>
-                  <AdvancedSelect
-                    name="has_practical"
-                    defaultValue={String(Boolean(editItem?.has_practical))}
-                    options={[
-                      { value: "false", label: "No practical" },
-                      { value: "true", label: "Has practical" },
-                    ]}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Practical Full Marks</Label>
-                    <Input
-                      name="practical_full_marks"
-                      type="number"
-                      min={0}
-                      defaultValue={editItem?.practical_full_marks ?? ""}
-                      placeholder="25"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Practical Pass Marks</Label>
-                    <Input
-                      name="practical_pass_marks"
-                      type="number"
-                      min={0}
-                      defaultValue={editItem?.practical_pass_marks ?? ""}
-                      placeholder="10"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-[color:var(--w11-text-secondary)]">
-                  Set practical full/pass marks to use subject-specific NEB grading. Leave them empty to keep the legacy exam-level split.
-                </p>
               </div>
-            </FormSection>
+            </details>
             <DialogFooter>
               <Button
                 type="button"
@@ -1271,10 +1224,10 @@ function SubjectsTab() {
                   setEditItem(null);
                 }}
               >
-                Cancel
+                {t("Cancel", "रद्द")}
               </Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? "Update" : "Create"}
+                {createMutation.isPending || updateMutation.isPending ? <Spinner size="sm" /> : editItem ? t("Update", "अद्यावधिक") : t("Create", "बनाउनुहोस्")}
               </Button>
             </DialogFooter>
           </form>

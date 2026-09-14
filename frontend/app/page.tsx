@@ -15,11 +15,9 @@ import {
   ShieldCheck,
   Smartphone,
   CheckCircle2,
-  Phone,
   Mail,
   MapPin,
   Clock,
-  MessageCircle,
   ChevronRight,
   Building2,
   Award,
@@ -27,16 +25,10 @@ import {
   Fingerprint,
 } from "lucide-react";
 import { SCHOOL_SITE_DOMAIN } from "@/lib/site-domain";
+import { DemoInquiryForm } from "@/components/website/DemoInquiryForm";
 
 const sora = Sora({ subsets: ["latin"], variable: "--font-sora", display: "swap" });
 const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space", display: "swap" });
-
-const trustStats = [
-  { value: "10+", label: "Years Experience" },
-  { value: "400+", label: "Schools & Colleges" },
-  { value: "50K+", label: "Students Together" },
-  { value: "ISO", label: "27001 Certified" },
-];
 
 const features = [
   { icon: GraduationCap, title: "Student Management", desc: "Complete student profiles with photos, documents & history" },
@@ -227,15 +219,15 @@ export default function Home() {
                 <div className="space-y-6 text-white">
                   <span className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--sun)]" />
-                    Nepal&apos;s Trusted School Management Software
+                    BS-native · IEMIS-ready · eSewa &amp; Khalti
                   </span>
                   <h1 className="text-4xl font-bold leading-[1.15] md:text-5xl lg:text-[3.25rem]" style={{ fontFamily: "var(--font-sora)" }}>
-                    Nepal&apos;s Most Reliable<br />
-                    <span className="text-[color:var(--mint)]">School Management</span><br />
-                    Platform
+                    The complete<br />
+                    <span className="text-[color:var(--mint)]">School Operating System</span><br />
+                    for Nepal
                   </h1>
                   <p className="text-base text-white/75 max-w-lg leading-relaxed">
-                    10+ years of experience with 400+ institutions — the complete EdTech solution for Nepali schools, colleges and universities.
+                    Academics, fees, transport, exams and parent communication in one bilingual platform — built for Nepal&apos;s public, community and institutional schools.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Link
@@ -270,39 +262,34 @@ export default function Home() {
                     <a href="https://app.brighternepal.com" className="underline hover:text-white">Web App</a>
                   </div>
 
-                  {/* Trust stats row */}
-                  <div className="flex flex-wrap gap-6 pt-2">
-                    {trustStats.map((s) => (
-                      <div key={s.label}>
-                        <p className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-sora)" }}>{s.value}</p>
-                        <p className="text-xs text-white/60 mt-0.5">{s.label}</p>
-                      </div>
+                  {/* Capability readout — what the product does, not invented counters */}
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
+                    {["Dual BS/AD calendars", "IEMIS import", "eSewa · Khalti · Fonepay", "NEB grade scales"].map((f) => (
+                      <span key={f} className="inline-flex items-center gap-1.5 text-xs font-medium text-white/85">
+                        <CheckCircle2 size={13} className="text-[color:var(--mint)]" /> {f}
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                {/* Hero card / dashboard preview */}
+                {/* Product preview — honest module map, no invented numbers */}
                 <div className="relative rise">
                   <div className="rounded-3xl bg-white p-5 pulse-glow">
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-[10px] text-[color:var(--muted)] uppercase tracking-wide">ASchool Dashboard</p>
-                        <p className="text-base font-bold text-[color:var(--ink)]">Live School Overview</p>
+                        <p className="text-base font-bold text-[color:var(--ink)]">One system · 60 modules</p>
                       </div>
-                      <span className="rounded-full bg-[color:var(--mint)] px-3 py-1 text-[10px] font-bold text-[color:var(--ocean)] uppercase tracking-wide">Live</span>
+                      <span className="rounded-full bg-[color:var(--mint)] px-3 py-1 text-[10px] font-bold text-[color:var(--ocean)] uppercase tracking-wide">BS dates</span>
                     </div>
-                    <div className="grid gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
-                        { label: "Today's Attendance", value: "96%", delta: "▲ 2% vs last week", color: "bg-green-50" },
-                        { label: "Fees Collected", value: "NPR 2.8M", delta: "72% of quarter goal", color: "bg-blue-50" },
-                        { label: "Open Admissions", value: "148", delta: "12 new inquiries today", color: "bg-amber-50" },
-                      ].map((item) => (
-                        <div key={item.label} className={`rounded-2xl ${item.color} px-4 py-3 flex items-center justify-between`}>
-                          <div>
-                            <p className="text-[10px] text-[color:var(--muted)] uppercase tracking-wide">{item.label}</p>
-                            <p className="text-lg font-bold text-[color:var(--ink)]">{item.value}</p>
-                          </div>
-                          <p className="text-[10px] text-[color:var(--muted)] text-right max-w-[100px]">{item.delta}</p>
+                        "Admissions", "Attendance", "Fees & POS",
+                        "Exams & Marks", "Transport GPS", "Library",
+                        "LMS & AI tools", "HR & Payroll", "Website builder",
+                      ].map((m) => (
+                        <div key={m} className="rounded-xl border border-black/8 px-2.5 py-3 text-center">
+                          <p className="text-[11px] font-bold leading-tight text-[color:var(--ink)]">{m}</p>
                         </div>
                       ))}
                     </div>
@@ -315,22 +302,13 @@ export default function Home() {
                       <div className="rounded-2xl border border-black/8 p-3 float" style={{ animationDelay: "1s" }}>
                         <p className="text-[10px] text-[color:var(--muted)]">Parent App</p>
                         <p className="text-xs font-semibold mt-0.5 text-[color:var(--ink)]">Real-time notices</p>
-                        <p className="text-[10px] text-[color:var(--muted)] mt-0.5">Android + iOS</p>
+                        <p className="text-[10px] text-[color:var(--muted)] mt-0.5">Android</p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Trusted by bar */}
-              <div className="mt-12 border-t border-white/15 pt-6">
-                <p className="text-center text-xs text-white/50 uppercase tracking-[0.2em] mb-4">Trusted by Nepal&apos;s Best Institutions</p>
-                <div className="flex flex-wrap justify-center gap-6 text-sm font-semibold text-white/60">
-                  {["Kathmandu Model School", "Xavier International", "Budhanilkantha School", "Lalitpur Secondary", "Capital College", "Trinity International"].map((name) => (
-                    <span key={name}>{name}</span>
-                  ))}
-                </div>
-              </div>
             </div>
           </section>
 
@@ -412,7 +390,7 @@ export default function Home() {
                     { label: "School Website", sub: "Custom domain support", icon: Globe },
                     { label: "Biometric Device", sub: "ZKTeco fingerprint", icon: Fingerprint },
                     { label: "EMIS Reports", sub: "Govt-compliant exports", icon: BarChart3 },
-                    { label: "Data Security", sub: "ISO 27001 certified", icon: ShieldCheck },
+                    { label: "Data Security", sub: "Per-school isolated data", icon: ShieldCheck },
                   ].map(({ label, sub, icon: Icon }) => (
                     <div key={label} className="rounded-2xl border border-black/8 bg-[color:var(--fog)] p-5 text-center feature-card">
                       <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--ocean)] text-white">
@@ -548,58 +526,7 @@ export default function Home() {
                   <p className="mt-3 text-sm text-[color:var(--muted)] leading-relaxed max-w-md">
                     Contact us today and our team will present the best solution for your school or college.
                   </p>
-                  <form className="mt-8 space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="text-xs font-semibold text-[color:var(--ink)] block mb-1.5">School / College Name *</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Green Valley School"
-                          className="w-full rounded-xl border border-black/15 bg-[color:var(--fog)] px-4 py-2.5 text-sm placeholder:text-black/30 focus:outline-none focus:border-[color:var(--ocean)] focus:ring-2 focus:ring-[color:var(--ocean)]/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-[color:var(--ink)] block mb-1.5">Contact Person *</label>
-                        <input
-                          type="text"
-                          placeholder="Your full name"
-                          className="w-full rounded-xl border border-black/15 bg-[color:var(--fog)] px-4 py-2.5 text-sm placeholder:text-black/30 focus:outline-none focus:border-[color:var(--ocean)] focus:ring-2 focus:ring-[color:var(--ocean)]/10"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="text-xs font-semibold text-[color:var(--ink)] block mb-1.5">Phone Number *</label>
-                        <input
-                          type="tel"
-                          placeholder="98XXXXXXXX"
-                          className="w-full rounded-xl border border-black/15 bg-[color:var(--fog)] px-4 py-2.5 text-sm placeholder:text-black/30 focus:outline-none focus:border-[color:var(--ocean)] focus:ring-2 focus:ring-[color:var(--ocean)]/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-[color:var(--ink)] block mb-1.5">District / Location</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Kathmandu"
-                          className="w-full rounded-xl border border-black/15 bg-[color:var(--fog)] px-4 py-2.5 text-sm placeholder:text-black/30 focus:outline-none focus:border-[color:var(--ocean)] focus:ring-2 focus:ring-[color:var(--ocean)]/10"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-[color:var(--ink)] block mb-1.5">Message</label>
-                      <textarea
-                        rows={3}
-                        placeholder="Tell us about your school and requirements..."
-                        className="w-full rounded-xl border border-black/15 bg-[color:var(--fog)] px-4 py-2.5 text-sm placeholder:text-black/30 focus:outline-none focus:border-[color:var(--ocean)] focus:ring-2 focus:ring-[color:var(--ocean)]/10 resize-none"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full rounded-full bg-[color:var(--ocean)] py-3 text-sm font-bold text-white shadow-sm hover:bg-[color:var(--ocean-light)] transition-colors"
-                    >
-                      Send Inquiry →
-                    </button>
-                  </form>
+                  <DemoInquiryForm />
                 </div>
 
                 <div className="space-y-5">
@@ -609,13 +536,13 @@ export default function Home() {
                       <p className="font-bold text-sm">Our Commitment</p>
                     </div>
                     <p className="text-sm text-white/80 leading-relaxed mb-5">
-                      We respond to every inquiry within 24 hours and provide a dedicated onboarding manager for setup.
+                      Send the form or create an account directly — setup is self-serve, and we help schools migrating from other software.
                     </p>
                     <div className="grid gap-3">
                       {[
-                        { label: "24-Hour Response", desc: "Guaranteed reply within 1 business day" },
-                        { label: "Free Setup Support", desc: "We help migrate and configure your data" },
-                        { label: "Training Included", desc: "Staff training sessions at no extra cost" },
+                        { label: "Email & demo calls", desc: "We reply to inquiries personally" },
+                        { label: "Self-serve setup", desc: "Create the workspace yourself in the register wizard" },
+                        { label: "Bilingual by design", desc: "English + नेपाली across the platform" },
                       ].map(({ label, desc }) => (
                         <div key={label} className="flex items-start gap-3">
                           <CheckCircle2 size={14} className="text-[color:var(--mint)] mt-0.5 shrink-0" />
@@ -630,19 +557,23 @@ export default function Home() {
 
                   <div className="rounded-3xl border border-black/8 bg-[color:var(--fog)] p-6 space-y-4">
                     {[
-                      { icon: Phone, label: "Call Us", value: "01-XXXXXXX / 98XXXXXXXX" },
-                      { icon: MessageCircle, label: "WhatsApp", value: "98XXXXXXXX" },
-                      { icon: Mail, label: "Email", value: "info@brighternepal.com" },
+                      { icon: Mail, label: "Email", value: "info@brighternepal.com", href: "mailto:info@brighternepal.com" },
+                      { icon: Globe, label: "Web app", value: "app.brighternepal.com", href: "https://app.brighternepal.com" },
                       { icon: MapPin, label: "Office", value: "Kathmandu, Nepal" },
                       { icon: Clock, label: "Hours", value: "Sun–Fri: 9AM – 5PM" },
-                    ].map(({ icon: Icon, label, value }) => (
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ].map(({ icon: Icon, label, value, href }: any) => (
                       <div key={label} className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-xl bg-[color:var(--ocean)]/8 flex items-center justify-center text-[color:var(--ocean)] shrink-0">
                           <Icon size={14} />
                         </div>
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">{label}</p>
-                          <p className="text-xs font-semibold text-[color:var(--ink)]">{value}</p>
+                          {href ? (
+                            <a href={href} className="text-xs font-semibold hover:underline" style={{ color: "var(--ocean)" }}>{value}</a>
+                          ) : (
+                            <p className="text-xs font-semibold text-[color:var(--ink)]">{value}</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -659,7 +590,7 @@ export default function Home() {
                 <h2 className="text-2xl font-bold" style={{ fontFamily: "var(--font-sora)" }}>
                   Ready to transform your school?
                 </h2>
-                <p className="text-sm text-white/70 mt-1">Join 400+ institutions already running on ASchool.</p>
+                <p className="text-sm text-white/70 mt-1">Create your school workspace — the free plan takes minutes to set up.</p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Link href="/register" className="rounded-full bg-[color:var(--sun)] px-6 py-3 text-sm font-bold text-[color:var(--ink)] hover:brightness-105 transition-all">
@@ -688,11 +619,7 @@ export default function Home() {
                 <p className="text-xs text-white/50 leading-relaxed max-w-xs">
                   Nepal&apos;s comprehensive school management platform connecting academics, finance, and communication.
                 </p>
-                <div className="flex gap-3 pt-1">
-                  {["ISO 27001", "IRD Verified"].map((badge) => (
-                    <span key={badge} className="rounded-full border border-white/15 px-3 py-1 text-[10px] font-semibold text-white/60">{badge}</span>
-                  ))}
-                </div>
+                <p className="text-[10px] font-semibold text-white/45 pt-1">Bikram Sambat first · English + नेपाली throughout</p>
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-3">Platform</p>

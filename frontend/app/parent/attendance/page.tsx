@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 import Link from "next/link";
 
@@ -38,11 +39,12 @@ type ChildAttendancePayload = {
  * get a picker when the API gains a student_id param).
  */
 export default function ParentAttendancePage() {
+  const { selectedId, childParam } = useSelectedChild();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["parent-attendance"],
+    queryKey: ["parent-attendance", selectedId],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ChildAttendancePayload[] | ChildAttendancePayload>>(
-        "/parent/child-attendance"
+        `/parent/child-attendance${childParam ? `?${childParam}` : ""}`
       );
       const payload = res.data.data;
       return Array.isArray(payload) ? payload[0] : payload;
@@ -58,6 +60,7 @@ export default function ParentAttendancePage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Attendance" />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <SummaryTile label="Attendance" value={`${summary.percentage ?? 0}%`} />

@@ -23,9 +23,10 @@ import {
   StatusChip,
 } from "@/components/aos/kit/page-kit";
 import {
-  Bus, CheckCircle2, Circle, CircleDot, Flag, Navigation, Play,
+  Bus, CheckCircle2, Circle, CircleDot, Flag, Navigation, Phone, Play,
   RefreshCw, Square, UserCheck, UserX,
 } from "lucide-react";
+import { StatusTimeline } from "@/components/ui/status-timeline";
 
 interface InstanceStop {
   stop_id: string;
@@ -50,6 +51,7 @@ interface Instance {
   date_bs: string | null;
   direction: "morning" | "afternoon";
   bus: string | null;
+  driver_id: string | null;
   status: "scheduled" | "running" | "completed" | "cancelled";
   started_at: string | null;
   ended_at: string | null;
@@ -131,7 +133,7 @@ function MonitorContent() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["transport-instances", date, status],
     queryFn: async () => {
       const res = await api.get<ApiResponse<{ date: string; instances: Instance[] }>>(
@@ -145,6 +147,12 @@ function MonitorContent() {
 
   const instances: Instance[] = data || [];
   const runningCount = instances.filter((i) => i.status === "running").length;
+  // Newest GPS fix across the fleet — the "last ping" the statusbar reports.
+  const lastPing = instances.reduce<string | null>((acc, i) => {
+    if (!i.last_fix_at) return acc;
+    if (!acc) return i.last_fix_at;
+    return new Date(i.last_fix_at) > new Date(acc) ? i.last_fix_at : acc;
+  }, null);
 
   const errorMessage = errMessage(error);
 
@@ -174,6 +182,42 @@ function MonitorContent() {
         }
       />
       <AOSPageBody>
+        {/* Connection statusbar (plan 32-A6): feed health + newest GPS ping. */}
+        <div className="win11-statusbar mb-3 -mt-1 rounded-md" style={{ height: 26 }}>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{
+                background: errorMessage
+                  ? "#c42b1c"
+                  : isFetching
+                  ? "#d83b01"
+                  : "var(--w11-success, #107c10)",
+              }}
+            />
+            {errorMessage
+              ? t("Feed offline — retry", "फिड अफलाइन — पुनःप्रयास")
+              : isFetching
+              ? t("Refreshing…", "रिफ्रेस हुँदै…")
+              : t("Live feed", "लाइभ फीड")}
+            {t("(20s polling)", "(२० सेकेन्ड पोलिङ)")}
+          </span>
+          <span aria-hidden style={{ color: "var(--w11-text-disabled)" }}>|</span>
+          <span>
+            {t("Last data", "अन्तिम डाटा")}{" "}
+            {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : "—"}
+          </span>
+          <span aria-hidden style={{ color: "var(--w11-text-disabled)" }}>|</span>
+          <span className="inline-flex items-center gap-1">
+            <CircleDot className="h-3 w-3" />
+            {lastPing
+              ? t(`Fleet GPS ${timeAgo(lastPing)}`, `बेड GPS ${timeAgo(lastPing)}`)
+              : t("No GPS fix today", "आज GPS छैन")}
+          </span>
+          <span className="ml-auto" aria-hidden style={{ color: "var(--w11-text-disabled)" }}>|</span>
+          <span>{t(`${runningCount} running`, `${runningCount} चालु`)}</span>
+        </div>
+
         <FilterCommandBar>
           {STATUS_FILTERS.map((f) => (
             <Button
@@ -311,6 +355,18 @@ function InstanceDrawer({
     enabled: open && instanceId !== null,
   });
 
+  // Driver phone for the Call-driver FAB (SBT steal) — lazy per opened run.
+  const { data: driverUser } = useQuery({
+    queryKey: ["transport-run-driver", data?.driver_id],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<{ full_name?: string; phone?: string }>>(
+        `/users/${data!.driver_id}`
+      );
+      return res.data?.data;
+    },
+    enabled: open && Boolean(data?.driver_id),
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["transport-instance", instanceId] });
     queryClient.invalidateQueries({ queryKey: ["transport-instances"] });
@@ -400,14 +456,28 @@ function InstanceDrawer({
                 <span className="text-[12px]" style={{ color: "var(--w11-text-secondary)" }}>
                   {t(`${onboardCount} onboard`, `${onboardCount} बसमा`)}
                 </span>
-                <Button
-                  variant="destructive"
-                  onClick={() => end.mutate()}
-                  disabled={end.isPending}
-                >
-                  {end.isPending ? <Spinner size="sm" className="mr-2" /> : <Square className="h-4 w-4 mr-2" />}
-                  {t("End trip", "ट्रिप समाप्त")}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Call-driver FAB (SBT v2.3 steal) — only when a phone exists. */}
+                  {driverUser?.phone && (
+                    <a
+                      href={`tel:${driverUser.phone}`}
+                      aria-label={t(`Call driver ${driverUser.full_name || ""}`, `ड्राइभरलाई फोन गर्नुहोस्`)}
+                      className="win11-btn accent inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium"
+                      style={{ background: "#107c10", color: "#fff" }}
+                    >
+                      <Phone className="h-4 w-4" />
+                      {t("Call driver", "ड्राइभरलाई फोन")}
+                    </a>
+                  )}
+                  <Button
+                    variant="destructive"
+                    onClick={() => end.mutate()}
+                    disabled={end.isPending}
+                  >
+                    {end.isPending ? <Spinner size="sm" className="mr-2" /> : <Square className="h-4 w-4 mr-2" />}
+                    {t("End trip", "ट्रिप समाप्त")}
+                  </Button>
+                </div>
               </>
             ) : (
               <StatusChip status={statusTone(inst.status)} label={inst.status === "completed" ? t("Completed", "समाप्त") : t("Cancelled", "रद्द")} className="capitalize" />
@@ -422,6 +492,31 @@ function InstanceDrawer({
         <ErrorState size="sm" body={errMessage(error) ?? undefined} onRetry={() => refetch()} />
       ) : !inst ? null : (
         <div className="space-y-6">
+          {/* Run lifecycle (scheduled → running → ended). */}
+          <section>
+            <StatusTimeline
+              orientation="horizontal"
+              currentIndex={
+                inst.status === "cancelled" ? 1 : inst.status === "completed" ? 2 : inst.status === "running" ? 1 : 0
+              }
+              steps={[
+                { label: t("Scheduled", "तालिकाबद्ध"), detail: `${inst.date_bs || inst.date} · ${inst.direction === "morning" ? t("Morning", "बिहान") : t("Afternoon", "दिउँसो")}` },
+                { label: inst.status === "cancelled" ? t("Cancelled", "रद्द") : t("Running", "चालु"), at: inst.started_at, detail: inst.started_at ? undefined : t("Not started", "सुरु भएको छैन") },
+                { label: t("Completed", "समाप्त"), at: inst.ended_at, detail: inst.status === "completed" ? undefined : t("Not ended", "सकिएको छैन") },
+              ]}
+            />
+          </section>
+
+          {/* Missing-number hint (SBT: call FAB needs a phone, else say why). */}
+          {isRunning && inst.driver_id && driverUser && !driverUser.phone && (
+            <p className="win11-infobar warning rounded-md px-3 py-2 text-[12px]">
+              {t(
+                "This driver has no registered phone number — add one in Users to enable Call-driver.",
+                "यस ड्राइभरको दर्ता फोन नम्बर छैन — फोन सक्रिय गर्न Users मा थप्नुहोस्।"
+              )}
+            </p>
+          )}
+
           <section>
             <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
               {t("Stop timeline", "स्टप टाइमलाइन")}

@@ -127,7 +127,7 @@ export default function StudentHomeworkPage() {
         </Card>
         <Card>
           <CardContent className="pt-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-[var(--w11-subtle,rgba(0,0,0,0.05))] text-[var(--w11-accent)] flex items-center justify-center">
               <BookOpen className="h-5 w-5" />
             </div>
             <div>

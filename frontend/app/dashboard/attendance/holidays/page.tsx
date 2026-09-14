@@ -15,7 +15,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PageLoader, Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { useI18n } from "@/lib/i18n";
 import {
   AOSPage,
   AOSPageHeader,
@@ -47,6 +50,7 @@ export default function HolidaysPage() {
 }
 
 function HolidaysContent() {
+  const { t } = useI18n();
   const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Holiday | null>(null);
@@ -91,14 +95,6 @@ function HolidaysContent() {
     onError: () => toast.error("Failed to delete"),
   });
 
-  if (isLoading) return <PageLoader />;
-  if (isError)
-    return (
-      <div className="win11-card p-6 text-center space-y-3">
-        <p className="text-sm" style={{ color: "#c42b1c" }}>Failed to load holidays. Please try again.</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
   const holidays = data || [];
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -124,24 +120,40 @@ function HolidaysContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<CalendarOff className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Holiday List"
-        subtitle="Manage school holidays and vacation days"
+        title={t("Holiday List", "विदा सूची")}
+        subtitle={t("Manage school holidays and vacation days", "विद्यालय विदा र बिदा अवधि")}
         actions={
           <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Add Holiday
+            <Plus className="h-4 w-4 mr-2" /> {t("Add Holiday", "विदा थप्नुहोस्")}
           </Button>
         }
       />
       <AOSPageBody>
+        {isError ? (
+          <ErrorState
+            body={t("Failed to load holidays.", "विदा सूची लोड हुन सकेन।")}
+            onRetry={() => void refetch()}
+          />
+        ) : holidays.length === 0 && !isLoading ? (
+          <div className="win11-card">
+            <EmptyState
+              icon={CalendarOff}
+              title={t("No holidays yet", "अझै विदा छैन")}
+              body={t("Mark festivals and vacations so attendance skips those days.", "पर्व र बिदा यहाँ चिन्ह लगाउनुहोस्।")}
+              action={{ label: t("Add Holiday", "विदा थप्नुहोस्"), onClick: () => setShowAdd(true) }}
+            />
+          </div>
+        ) : (
         <DataPanel bodyClassName="p-0">
+          {isLoading ? <div className="p-4"><SkeletonTable rows={6} columns={5} /></div> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Holiday</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t("Holiday", "विदा")}</TableHead>
+                <TableHead>{t("Date", "मिति")}</TableHead>
+                <TableHead>{t("Type", "प्रकार")}</TableHead>
+                <TableHead>{t("Description", "विवरण")}</TableHead>
+                <TableHead>{t("Actions", " कार्य")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,7 +179,7 @@ function HolidaysContent() {
                         aria-label={`Delete ${h.title}`}
                         disabled={deleteMutation.isPending}
                         onClick={() => {
-                          confirm({ title: "Delete holiday", body: `Delete "${h.title}"?` }).then((ok) => {
+                          confirm({ title: t("Delete holiday", "विदा मेटाउने"), body: t(`Delete "${h.title}"?`, `"${h.title}" मेटाउने?`) }).then((ok) => {
                             if (ok) deleteMutation.mutate(h.id);
                           });
                         }}
@@ -178,18 +190,17 @@ function HolidaysContent() {
                   </TableCell>
                 </TableRow>
               ))}
-              {holidays.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-[color:var(--w11-text-secondary)]">No holidays added yet.</TableCell></TableRow>
-              )}
             </TableBody>
           </Table>
+          )}
         </DataPanel>
+        )}
 
         <Dialog open={showAdd || !!editing} onOpenChange={(open) => { if (!open) { setShowAdd(false); setEditing(null); } }}>
           <DialogContent>
-            <DialogHeader><DialogTitle>{editing ? "Edit Holiday" : "Add Holiday"}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editing ? t("Edit Holiday", "विदा सम्पादन") : t("Add Holiday", "विदा थप्नुहोस्")}</DialogTitle></DialogHeader>
             <form key={editing?.id || "new-holiday"} onSubmit={handleSubmit} className="space-y-4">
-              <FormSection title="Holiday Details">
+              <FormSection title={t("Holiday Details", "विदा विवरण")}>
                 <div className="space-y-4">
                   <div className="space-y-2"><Label>Title</Label><Input name="title" required placeholder="Holiday name" defaultValue={editing?.title} /></div>
                   <div className="grid grid-cols-2 gap-4">

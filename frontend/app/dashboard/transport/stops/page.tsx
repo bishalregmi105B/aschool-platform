@@ -20,6 +20,8 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { MapPin, Plus, Pencil, Trash2 } from "lucide-react";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { DependencyMissingEmptyState } from "@/components/ui/empty-state";
 
 export default function StopsPage() {
   return <PluginGate slug="gps_tracking"><StopsContent /></PluginGate>;
@@ -72,12 +74,6 @@ function StopsContent() {
     onError: (e: any) => toast.error(e?.message === "A route is required for a stop" ? e.message : "Failed to save stop"),
   });
 
-  const remove = useMutation({
-    mutationFn: async (id: string) => (await api.delete(`/transport/stops/${id}`)).data,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["transport-stops"] }); toast.success("Stop removed"); },
-    onError: () => toast.error("Failed to remove stop"),
-  });
-
   const STOP_COLUMNS: Column<any>[] = [
     { key: "sequence_number", label: "#", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span style={{ color: "var(--w11-text-secondary)" }}>{s.sequence_number}</span> },
     { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name ?? "", render: (s) => <div className="flex items-center gap-2 font-medium"><MapPin className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />{s.name}</div> },
@@ -90,7 +86,7 @@ function StopsContent() {
       render: (s) => (
         <span className="text-right space-x-1">
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(s); }}><Pencil className="h-4 w-4" /></Button>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); remove.mutate(s.id); }} disabled={remove.isPending}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); undoableDelete({ label: `stop “${s.name}”`, commit: async () => { await api.delete(`/transport/stops/${s.id}`); queryClient.invalidateQueries({ queryKey: ["transport-stops"] }); } }); }}><Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} /></Button>
         </span>
       ),
     },
@@ -109,6 +105,19 @@ function StopsContent() {
         }
       />
       <AOSPageBody>
+        {((routesData || []) as any[]).length === 0 ? (
+          // Stops are meaningless without a route — point at the prerequisite.
+          <DataPanel>
+            <DependencyMissingEmptyState
+              icon={MapPin}
+              prerequisiteName="Transport routes"
+              setupHref="/dashboard/transport/routes"
+              setupLabel="Create a route first"
+              title="No routes exist yet"
+              body="Every stop belongs to a route. Create a route, then add its stops here."
+            />
+          </DataPanel>
+        ) : (
         <DataPanel bodyClassName="p-0">
           <DataTable
             columns={STOP_COLUMNS}
@@ -120,6 +129,7 @@ function StopsContent() {
             empty={{ icon: MapPin, title: "No stops defined yet", body: "Add stops to build your routes." }}
           />
         </DataPanel>
+        )}
 
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>

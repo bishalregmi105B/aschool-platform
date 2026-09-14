@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
+import { useUrlFilters, useDebounced } from "@/components/ui/filter-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -42,11 +43,20 @@ interface User {
 }
 
 export default function UsersPage() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
+  const { values, setValues } = useUrlFilters(["page", "q", "role"]);
+  const page = Math.max(1, parseInt(values.page || "1", 10) || 1);
+  const [searchInput, setSearchInput] = useState(values.q || "");
+  const search = useDebounced(searchInput, 300);
+  const roleFilter = values.role || "all";
   const [showAdd, setShowAdd] = useState(false);
   const queryClient = useQueryClient();
+
+  // Keep URL in sync with debounced search + role; changing filters resets page.
+  const updateSearch = (v: string) => {
+    setSearchInput(v);
+    if (v !== (values.q || "")) setValues({ q: v, page: "" });
+  };
+  const updateRole = (v: string) => setValues({ role: v === "all" ? "" : v, page: "" });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["users", page, search, roleFilter],
@@ -200,15 +210,15 @@ export default function UsersPage() {
             rowKey={(u) => u.id}
             loading={false}
             searchable
-            searchValue={search}
-            onSearchChange={(v) => { setSearch(v); setPage(1); }}
+            searchValue={searchInput}
+            onSearchChange={updateSearch}
             searchPlaceholder="Search by name, email, or phone..."
             exportFileName="users"
             toolbar={
               <AdvancedSelect
                 className="w-44"
                 value={roleFilter}
-                onChange={(v) => { setRoleFilter(v || "all"); setPage(1); }}
+                onChange={(v) => updateRole(v || "all")}
                 clearable
                 placeholder="All Roles"
                 options={[
@@ -227,7 +237,7 @@ export default function UsersPage() {
               has_next: pagination.has_next,
               has_prev: pagination.has_prev,
             } : undefined}
-            onPageChange={setPage}
+            onPageChange={(n) => setValues({ page: String(n) })}
             empty={{ icon: Users, title: "No users found", body: "Add staff accounts so people can sign in.", action: { label: "Add User", onClick: () => setShowAdd(true) } }}
           />
         </DataPanel>

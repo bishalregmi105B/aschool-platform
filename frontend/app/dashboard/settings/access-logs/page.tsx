@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { PluginGate } from "@/lib/plugins";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
@@ -20,12 +19,10 @@ import {
   X,
 } from "lucide-react";
 import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
   DataPanel,
-  AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
+import { SettingsPage } from "../settings-page";
+import { useAOSRouteParams, useAOSRouterNavigate } from "@/lib/aos-window-route";
 
 /**
  * Access Logs (A-37) — authentication activity per school: logins, failed
@@ -100,10 +97,29 @@ export default function AccessLogsPage() {
 }
 
 function AccessLogsContent() {
-  const [event, setEvent] = useState("");
-  const [userFilter, setUserFilter] = useState<UserOption | null>(null);
-  const [page, setPage] = useState(1);
+  // Filters/pagination live in the window's virtual route so a reload or a
+  // shared view keeps the same slice (plan 33: tabs/filters are URL state).
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const event = routeParams.get("event") ?? "";
+  const userFilter = useMemo<UserOption | null>(() => {
+    const id = routeParams.get("user");
+    if (!id) return null;
+    return { id, full_name: routeParams.get("user_name") || "selected user" };
+  }, [routeParams]);
+  const page = Number(routeParams.get("page") || "1");
   const [perPage, setPerPage] = useState(20);
+
+  const setRoute = (patch: Record<string, string>) => {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    if (!("page" in patch)) next.delete("page");
+    const qs = next.toString();
+    navigate(`/dashboard/settings/access-logs${qs ? `?${qs}` : ""}`);
+  };
 
   const {
     data,
@@ -214,86 +230,84 @@ function AccessLogsContent() {
     []
   );
 
-  if (isLoading && !data) return <AOSModuleLoadingState label="Loading access logs…" />;
-
   return (
-    <AOSPage>
-      <AOSPageHeader
-        icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Access Logs"
-        subtitle="Sign-in activity across the school — logins, failures, lockouts and password changes"
-      />
-      <AOSPageBody>
-        <DataPanel bodyClassName="p-4">
-          <DataTable<AccessLog>
-            columns={columns}
-            rows={logs}
-            rowKey={(l) => l.id}
-            loading={isLoading}
-            error={
-              isError ? "Failed to load access logs. Please try again." : null
-            }
-            onRetry={() => refetch()}
-            toolbar={
-              <div className="flex flex-wrap items-center gap-2">
-                <UserFilterPicker
-                  selected={userFilter}
-                  onSelect={(u) => {
-                    setUserFilter(u);
-                    setPage(1);
-                  }}
-                  onClear={() => {
-                    setUserFilter(null);
-                    setPage(1);
-                  }}
-                />
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {EVENTS.map((e) => (
-                    <button
-                      key={e.value || "all"}
-                      onClick={() => {
-                        setEvent(e.value);
-                        setPage(1);
-                      }}
-                      className={`win11-chip ${event === e.value ? "accent" : ""}`}
-                    >
-                      {e.label}
-                    </button>
-                  ))}
-                </div>
+    <SettingsPage
+      active="access-logs"
+      icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+      title="Access Logs"
+      subtitle="Sign-in activity across the school — logins, failures, lockouts and password changes"
+    >
+      <DataPanel bodyClassName="p-4">
+        <DataTable<AccessLog>
+          columns={columns}
+          rows={logs}
+          rowKey={(l) => l.id}
+          loading={isLoading}
+          error={
+            isError ? "Failed to load access logs. Please try again." : null
+          }
+          onRetry={() => refetch()}
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2">
+              <UserFilterPicker
+                selected={userFilter}
+                onSelect={(u) => {
+                  setRoute({ user: u.id, user_name: u.full_name });
+                }}
+                onClear={() => {
+                  setRoute({ user: "", user_name: "" });
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-1.5">
+                {EVENTS.map((e) => (
+                  <button
+                    key={e.value || "all"}
+                    onClick={() => {
+                      setRoute({ event: e.value });
+                    }}
+                    className={`win11-chip ${event === e.value ? "accent" : ""}`}
+                  >
+                    {e.label}
+                  </button>
+                ))}
               </div>
-            }
-            pagination={
-              meta
-                ? {
-                    page: meta.page,
-                    pages: meta.pages,
-                    total: meta.total,
-                    per_page: meta.per_page,
-                    has_next: meta.has_next,
-                    has_prev: meta.has_prev,
-                  }
-                : undefined
-            }
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPerPage(size);
-              setPage(1);
-            }}
-            empty={{
-              icon: Fingerprint,
-              title: "No access events found",
-              body:
-                event || userFilter
-                  ? "Try clearing the event or user filters."
-                  : "Sign-in events will appear here as users log in.",
-            }}
-            exportFileName="access-logs"
-            dense
-          />
-        </DataPanel>
-      </AOSPageBody>
-    </AOSPage>
+              {(event || userFilter) && (
+                <button className="win11-chip subtle" onClick={() => navigate("/dashboard/settings/access-logs")}>
+                  <X className="h-3 w-3 mr-1" /> Clear filters
+                </button>
+              )}
+            </div>
+          }
+          pagination={
+            meta
+              ? {
+                  page: meta.page,
+                  pages: meta.pages,
+                  total: meta.total,
+                  per_page: meta.per_page,
+                  has_next: meta.has_next,
+                  has_prev: meta.has_prev,
+                }
+              : undefined
+          }
+          onPageChange={(p) => setRoute({ page: String(p) })}
+          onPageSizeChange={(size) => {
+            setPerPage(size);
+            setRoute({ page: "1" });
+          }}
+          empty={{
+            icon: Fingerprint,
+            title: "No access events found",
+            body:
+              event || userFilter
+                ? "Try clearing the event or user filters."
+                : "Sign-in events will appear here as users log in.",
+          }}
+          exportFileName="access-logs"
+          dense
+        />
+      </DataPanel>
+    </SettingsPage>
   );
 }
 

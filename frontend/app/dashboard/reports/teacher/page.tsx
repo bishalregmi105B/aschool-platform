@@ -6,6 +6,7 @@ import { Users, Download, Star, ClipboardCheck, GraduationCap, TrendingUp } from
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { PrintButton, PrintArea } from "../../analytics/analytics-kit";
 import {
   AOSPage,
   AOSPageHeader,
@@ -140,12 +141,16 @@ export default function TeacherReportsPage() {
         title="Teacher Performance Reports"
         subtitle="Analyze staff attendance, classes taken, and evaluations"
         actions={
-          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
-            <Download className="h-4 w-4 mr-2" /> Export Report
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
+              <Download className="h-4 w-4 mr-2" /> Export Report
+            </Button>
+            <PrintButton />
+          </div>
         }
       />
       <AOSPageBody>
+        <PrintArea className="space-y-4">
         <StatGrid min={180}>
           <KpiCard label="Teachers" value={rows.length} icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
           <KpiCard label="Avg Attendance" value={avgAttendance == null ? "—" : `${avgAttendance}%`} icon={<ClipboardCheck className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />} />
@@ -190,8 +195,10 @@ export default function TeacherReportsPage() {
             searchable
             searchPlaceholder="Search teachers…"
             exportFileName="teacher-report"
+            empty={{ icon: Users, title: "No teacher performance data", body: "Record attendance and classes taken to populate this report." }}
           />
         </DataPanel>
+        </PrintArea>
       </AOSPageBody>
     </AOSPage>
   );

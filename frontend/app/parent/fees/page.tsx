@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/empty-state";
 import { api, type ApiResponse } from "@/lib/api";
 import { PortalHeader, SummaryTile } from "@/components/portal/portal-header";
+import { ChildSwitcher, useSelectedChild } from "@/components/portal/child-switcher";
 import { AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 
 type FeeDue = {
@@ -22,10 +23,11 @@ type OutstandingPayload = FeeDue[] | { invoices?: FeeDue[] };
 
 /** Parent → Fees. Backed by GET /parent/outstanding-fees (web payment lands with Phase E). */
 export default function ParentFeesPage() {
+  const { selectedId, childParam } = useSelectedChild();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["parent-outstanding-fees"],
+    queryKey: ["parent-outstanding-fees", selectedId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<OutstandingPayload>>("/parent/outstanding-fees");
+      const res = await api.get<ApiResponse<OutstandingPayload>>(`/parent/outstanding-fees${childParam ? `?${childParam}` : ""}`);
       const payload = res.data.data;
       return Array.isArray(payload) ? payload : payload?.invoices || [];
     },
@@ -42,6 +44,7 @@ export default function ParentFeesPage() {
 
   return (
     <div className="space-y-6">
+      <ChildSwitcher />
       <PortalHeader portal="parent" title="Fees" />
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <SummaryTile label="Outstanding" value={`Rs. ${totalDue.toLocaleString()}`} />

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { EntityPicker } from "@/components/ui/entity-picker";
 import {
   AOSPage,
   AOSPageHeader,
@@ -124,19 +125,37 @@ function AllergiesContent() {
           <DialogContent>
             <DialogHeader><DialogTitle>Update Student Health Profile</DialogTitle></DialogHeader>
             <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input placeholder="Student ID" value={lookupId} onChange={(e) => setLookupId(e.target.value)} />
-                <Button variant="outline" onClick={() => lookupProfile.mutate(lookupId)} disabled={!lookupId || lookupProfile.isPending}>Lookup</Button>
+              <div className="space-y-2">
+                <Label>Student</Label>
+                <EntityPicker
+                  value={lookupId}
+                  onChange={(id) => {
+                    setLookupId(id);
+                    if (id) lookupProfile.mutate(id);
+                  }}
+                  query={{ path: "/students", searchKey: "q", perPage: 20 }}
+                  getOptions={(rows) =>
+                    (rows as any[]).map((s) => ({
+                      value: s.id,
+                      label: s.full_name || `${s.first_name} ${s.last_name}`,
+                      ne: s.full_name_nepali,
+                    }))
+                  }
+                  placeholder="Search student…"
+                />
+                {lookupProfile.isPending && (
+                  <p className="text-xs" style={{ color: "var(--w11-text-tertiary)" }}>Loading profile…</p>
+                )}
               </div>
               {profileData && (
                 <>
                   <div className="space-y-2">
                     <Label>Allergies</Label>
-                    <Input value={profileData.allergies || ""} onChange={(e) => setProfileData({ ...profileData, allergies: e.target.value })} placeholder="e.g. Peanuts, Penicillin" />
+                    <Input value={Array.isArray(profileData.allergies) ? profileData.allergies.join(", ") : (profileData.allergies || "")} onChange={(e) => setProfileData({ ...profileData, allergies: e.target.value })} placeholder="e.g. Peanuts, Penicillin" />
                   </div>
                   <div className="space-y-2">
                     <Label>Medical Conditions</Label>
-                    <Input value={profileData.medical_conditions || ""} onChange={(e) => setProfileData({ ...profileData, medical_conditions: e.target.value })} placeholder="e.g. Asthma, Diabetes" />
+                    <Input value={Array.isArray(profileData.medical_conditions) ? profileData.medical_conditions.join(", ") : (profileData.medical_conditions || "")} onChange={(e) => setProfileData({ ...profileData, medical_conditions: e.target.value })} placeholder="e.g. Asthma, Diabetes" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2"><Label>Blood Group</Label><Input value={profileData.blood_group || ""} onChange={(e) => setProfileData({ ...profileData, blood_group: e.target.value })} /></div>

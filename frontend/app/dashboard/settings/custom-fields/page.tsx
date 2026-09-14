@@ -10,6 +10,15 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +27,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Plus, Trash2, ClipboardList } from "lucide-react";
 import { PluginGate } from "@/lib/plugins";
 import {
-  AOSPage,
-  AOSPageHeader,
-  AOSPageBody,
   FilterCommandBar,
   DataPanel,
   StatusChip,
   AOSModuleLoadingState,
   AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
+import { SettingsPage } from "../settings-page";
 
 interface FieldDef {
   id: string;
@@ -56,6 +64,7 @@ export default function CustomFieldsPage() {
 
 function CustomFieldsInner() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [form, setForm] = useState("student_registration");
   const [editing, setEditing] = useState<FieldDef | null>(null);
   const [creating, setCreating] = useState(false);
@@ -80,45 +89,50 @@ function CustomFieldsInner() {
       toast.success("Field deleted");
       invalidate();
     },
+    onError: () => toast.error("Delete failed"),
   });
 
   const rows = defs.data ?? [];
 
   return (
-    <AOSPage>
-      <AOSPageHeader
-        title="Custom Registration Fields"
-        subtitle="Add fields to registration forms and the public admission wizard"
-        actions={
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="w-4 h-4 mr-1" /> Add field
-          </Button>
-        }
-      />
-      <AOSPageBody>
-        <FilterCommandBar>
-          {FORMS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setForm(f)}
-              className={`win11-chip ${form === f ? "accent" : ""} cursor-pointer`}
-              style={{ textTransform: "capitalize" }}
-            >
-              {f.replace("_", " ")}
-            </button>
-          ))}
-        </FilterCommandBar>
+    <SettingsPage
+      active="custom-fields"
+      icon={<ClipboardList className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
+      title="Custom Registration Fields"
+      subtitle="Extra fields added to enrollment forms — values validate server-side"
+      actions={
+        <Button onClick={() => setCreating(true)}>
+          <Plus className="w-4 h-4 mr-1" /> Add field
+        </Button>
+      }
+    >
+      <FilterCommandBar>
+        {FORMS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setForm(f)}
+            className={`win11-chip ${form === f ? "accent" : ""} cursor-pointer`}
+            style={{ textTransform: "capitalize" }}
+          >
+            {f.replace("_", " ")}
+          </button>
+        ))}
+        <span className="text-[11px]" style={{ color: "var(--w11-text-tertiary)" }}>
+          Fields below apply to the selected form, in list order.
+        </span>
+      </FilterCommandBar>
 
-        {defs.isLoading ? (
-          <AOSModuleLoadingState label="Loading fields…" />
-        ) : rows.length === 0 ? (
-          <DataPanel>
-            <AOSEmptyState
-              title="No custom fields yet"
-              description="Added fields appear on the registration forms and the public admission wizard."
-            />
-          </DataPanel>
-        ) : (
+      {defs.isLoading ? (
+        <AOSModuleLoadingState label="Loading fields…" />
+      ) : rows.length === 0 ? (
+        <DataPanel>
+          <AOSEmptyState
+            title="No custom fields yet"
+            description="Added fields appear on the registration forms and the public admission wizard."
+            action={{ label: "Add first field", onClick: () => setCreating(true) }}
+          />
+        </DataPanel>
+      ) : (
           <DataPanel bodyClassName="p-0">
             <table className="w-full text-sm">
               <thead>
@@ -182,7 +196,15 @@ function CustomFieldsInner() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => remove.mutate(d.id)}
+                        onClick={() => {
+                          confirm({
+                            title: "Delete field",
+                            body: `Delete "${d.label}"? Existing values already saved on students stay in the database but are no longer shown or editable.`,
+                            confirmLabel: "Delete",
+                          }).then((ok) => {
+                            if (ok) remove.mutate(d.id);
+                          });
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -204,8 +226,7 @@ function CustomFieldsInner() {
             }}
           />
         )}
-      </AOSPageBody>
-    </AOSPage>
+    </SettingsPage>
   );
 }
 
@@ -260,52 +281,86 @@ function FieldDialog({
         <DialogHeader>
           <DialogTitle>{existing ? "Edit field" : "New field"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <Input
-            placeholder="Label (English)"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          <Input
-            placeholder="लेबल (नेपाली)"
-            value={labelNepali}
-            onChange={(e) => setLabelNepali(e.target.value)}
-          />
-          <select
-            className="win11-select w-full"
-            value={fieldType}
-            onChange={(e) => setFieldType(e.target.value)}
-          >
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          {(fieldType === "select" || fieldType === "multiselect") && (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="cf-label">Label (English)</Label>
             <Input
-              placeholder="Choices, comma separated (e.g. Red, Blue, Green)"
-              value={choices}
-              onChange={(e) => setChoices(e.target.value)}
+              id="cf-label"
+              placeholder="e.g. Blood Group"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
             />
+            {!label.trim() && (
+              <p className="text-[11px] mt-1" style={{ color: "var(--w11-danger, #c42b1c)" }}>
+                Label is required.
+              </p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="cf-label-ne">Label (नेपाली)</Label>
+            <Input
+              id="cf-label-ne"
+              placeholder="जस्तै: रगत समूह"
+              value={labelNepali}
+              onChange={(e) => setLabelNepali(e.target.value)}
+            />
+            <p className="text-[11px] mt-1" style={{ color: "var(--w11-text-tertiary)" }}>
+              Shown alongside the English label when the form is in Nepali.
+            </p>
+          </div>
+          <div>
+            <Label>Field type</Label>
+            <Select value={fieldType} onValueChange={setFieldType}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {(fieldType === "select" || fieldType === "multiselect") && (
+            <div>
+              <Label htmlFor="cf-choices">Choices</Label>
+              <Input
+                id="cf-choices"
+                placeholder="Comma separated (e.g. Red, Blue, Green)"
+                value={choices}
+                onChange={(e) => setChoices(e.target.value)}
+              />
+            </div>
           )}
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2" style={{ color: "var(--w11-text-primary)" }}>
-              <input
-                type="checkbox"
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="cf-required">Required</Label>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--w11-text-tertiary)" }}>
+                  Registration can&rsquo;t be submitted until this field is filled.
+                </p>
+              </div>
+              <Switch
+                id="cf-required"
                 checked={required}
-                onChange={(e) => setRequired(e.target.checked)}
+                onCheckedChange={setRequired}
               />
-              Required
-            </label>
-            <label className="flex items-center gap-2" style={{ color: "var(--w11-text-primary)" }}>
-              <input
-                type="checkbox"
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="cf-active">Active</Label>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--w11-text-tertiary)" }}>
+                  Inactive fields stop appearing on forms but keep their data.
+                </p>
+              </div>
+              <Switch
+                id="cf-active"
                 checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
+                onCheckedChange={setIsActive}
               />
-              Active
-            </label>
+            </div>
           </div>
         </div>
         <DialogFooter>

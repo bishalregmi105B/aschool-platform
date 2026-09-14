@@ -13,7 +13,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { CalendarOff, CheckCircle2, XCircle, Clock, Download } from "lucide-react";
+import { CalendarOff, CheckCircle2, XCircle, Clock, Download, Check, Plus } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useUrlFilters } from "@/components/ui/filter-bar";
+import { ErrorState } from "@/components/ui/empty-state";
 import { format } from "date-fns";
 import { displayBS } from "@/lib/nepali_date";
 import {
@@ -39,27 +43,50 @@ interface LeaveRequest {
   status: "pending" | "approved" | "rejected" | "cancelled";
 }
 
-const REQUEST_COLUMNS: Column<LeaveRequest>[] = [
-  { key: "staff_name", label: "Staff Name", sortable: true, value: (l) => l.staff_name, render: (l) => <span className="font-medium">{l.staff_name || "Unknown Staff"}</span> },
-  { key: "leave_type", label: "Type", sortable: true, value: (l) => l.leave_type, render: (l) => <span className="capitalize">{l.leave_type}</span> },
-  { key: "duration", label: "Duration", value: (l) => l.start_date, render: (l) => (
+const REQUEST_COLUMNS = (
+  t: (en: string, ne: string) => string,
+  decide: (l: LeaveRequest, status: "approved" | "rejected") => void,
+): Column<LeaveRequest>[] => [
+  { key: "staff_name", label: t("Staff Name", "कर्मचारी नाम"), sortable: true, value: (l) => l.staff_name, render: (l) => <span className="font-medium">{l.staff_name || t("Unknown Staff", "अज्ञात")}</span> },
+  { key: "leave_type", label: t("Type", "प्रकार"), sortable: true, value: (l) => l.leave_type, render: (l) => <span className="capitalize">{l.leave_type}</span> },
+  { key: "duration", label: t("Duration", "अवधि"), value: (l) => l.start_date, render: (l) => (
     <span className="text-sm whitespace-nowrap">
       {l.start_date ? displayBS(l.start_date) : "—"} - {l.end_date ? displayBS(l.end_date) : "—"}
     </span>
   ) },
-  { key: "days", label: "Days", align: "right", sortable: true, value: (l) => l.days ?? 0, render: (l) => l.days || "—" },
-  { key: "reason", label: "Reason", value: (l) => l.reason ?? "", render: (l) => <span className="text-sm max-w-[200px] truncate block" style={{ color: "var(--w11-text-secondary)" }}>{l.reason || "No reason provided"}</span> },
+  { key: "days", label: t("Days", "दिन"), align: "right", sortable: true, value: (l) => l.days ?? 0, render: (l) => l.days || "—" },
+  { key: "reason", label: t("Reason", "कारण"), value: (l) => l.reason ?? "", render: (l) => <span className="text-sm max-w-[200px] truncate block" style={{ color: "var(--w11-text-secondary)" }}>{l.reason || t("No reason provided", "कारण छैन")}</span> },
   {
     key: "status",
-    label: "Status",
+    label: t("Status", "अवस्था"),
     sortable: true,
     value: (l) => l.status,
     render: (l) => <StatusChip status={l.status} className="capitalize" />,
   },
+  {
+    key: "actions",
+    label: t("Actions", "कार्य"),
+    noExport: true,
+    render: (l) =>
+      l.status === "pending" ? (
+        <div className="flex justify-end gap-1">
+          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={(e) => { e.stopPropagation(); decide(l, "approved"); }}>
+            <Check className="h-3 w-3" style={{ color: "#107c10" }} /> {t("Approve", "स्वीकृति")}
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={(e) => { e.stopPropagation(); decide(l, "rejected"); }}>
+            <XCircle className="h-3 w-3" style={{ color: "#c42b1c" }} /> {t("Reject", "अस्वीकृति")}
+          </Button>
+        </div>
+      ) : null,
+  },
 ];
 
 export default function LeaveReportPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { t } = useI18n();
+  const confirm = useConfirm();
+  const { values: urlFilters, setValues: setUrlFilters } = useUrlFilters(["status"]);
+  const statusFilter = urlFilters.status || "all";
+  const setStatusFilter = (v: string) => setUrlFilters({ status: v === "all" ? "" : v });
   // Per-staff aggregate period (server-side /hr/leave-report route).
   const [reportYear, setReportYear] = useState<number>(
     () => new Date().getFullYear(),
@@ -125,9 +152,9 @@ export default function LeaveReportPage() {
       a.download = `leave_report_${period}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Per-staff leave summary exported");
+      toast.success(t("Per-staff leave summary exported", "सारांश निर्यात भयो"));
     } catch {
-      toast.error("Failed to export leave summary");
+      toast.error(t("Failed to export leave summary", "निर्यात गर्न सकिएन"));
     }
   };
 
@@ -136,10 +163,30 @@ export default function LeaveReportPage() {
       api.patch(`/hr/leaves/${id}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-leaves"] });
-      toast.success("Leave status updated");
+      queryClient.invalidateQueries({ queryKey: ["leave-report"] });
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      toast.success(t("Leave status updated", "अवस्था अद्यावधिक भयो"));
     },
-    onError: () => toast.error("Failed to update leave status"),
+    onError: () => toast.error(t("Failed to update leave status", "अद्यावधिक गर्न सकिएन")),
   });
+
+  // Inline pending→approved/rejected with confirm on rejection (plan 34-31).
+  const decide = (l: LeaveRequest, status: "approved" | "rejected") => {
+    const run = () => updateStatusMutation.mutate({ id: l.id, status });
+    if (status === "rejected") {
+      void confirm({
+        title: t("Reject this leave request?", "बिदा अनुरोध अस्वीकृत गर्ने?"),
+        body: t(
+          `Reject ${l.staff_name}'s ${l.days || ""} day(s) leave? They will be notified.`,
+          `${l.staff_name} को ${l.days || ""} दिनको बिदा अस्वीकृत गर्ने?`
+        ),
+        confirmLabel: t("Reject", "अस्वीकृत"),
+        tone: "danger",
+      }).then((ok) => ok && run());
+      return;
+    }
+    run();
+  };
 
   const leaves = allLeaves || [];
   const filtered = useMemo(
@@ -201,20 +248,18 @@ export default function LeaveReportPage() {
     toast.success(`Exported ${filtered.length} row${filtered.length === 1 ? "" : "s"}`);
   };
 
-  if (isLoading) return <AOSModuleLoadingState label="Loading leave report…" />;
+  const columns = REQUEST_COLUMNS(t, decide);
 
   if (isError) {
     return (
       <AOSPage>
-        <AOSPageHeader title="Leave Report & Approvals" />
+        <AOSPageHeader title={t("Leave Report & Approvals", "बिदा प्रतिवेदन")} />
         <AOSPageBody>
           <DataPanel className="max-w-2xl mx-auto">
-            <div className="py-10 text-center space-y-3">
-              <p className="text-sm" style={{ color: "#c42b1c" }}>
-                Failed to load leave requests. Please try again.
-              </p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-            </div>
+            <ErrorState
+              title={t("Failed to load leave requests.", "अनुरोध लोड गर्न सकिएन।")}
+              onRetry={() => refetch()}
+            />
           </DataPanel>
         </AOSPageBody>
       </AOSPage>
@@ -225,31 +270,31 @@ export default function LeaveReportPage() {
     <AOSPage>
       <AOSPageHeader
         icon={<CalendarOff className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Leave Report & Approvals"
-        subtitle={`${leaves.length} requests · ${stats.totalDays} leave days · ${stats.byStatus.pending} pending`}
+        title={t("Leave Report & Approvals", "बिदा प्रतिवेदन र स्वीकृति")}
+        subtitle={`${leaves.length} ${t("requests", "अनुरोध")} · ${stats.totalDays} ${t("leave days", "बिदा दिन")} · ${stats.byStatus.pending} ${t("pending", "बाँकी")}`}
       />
       <AOSPageBody>
         {/* Status summary cards */}
         <StatGrid min={170}>
           <KpiCard
-            label="Total Requests"
+            label={t("Total Requests", "कुल अनुरोध")}
             value={leaves.length}
             icon={<CalendarOff className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
           />
           <KpiCard
-            label="Pending"
+            label={t("Pending", "बाँकी")}
             value={stats.byStatus.pending}
             color="#d83b01"
             icon={<Clock className="h-4 w-4" style={{ color: "#d83b01" }} />}
           />
           <KpiCard
-            label="Approved"
+            label={t("Approved", "स्वीकृत")}
             value={stats.byStatus.approved}
             color="#107c10"
             icon={<CheckCircle2 className="h-4 w-4" style={{ color: "#107c10" }} />}
           />
           <KpiCard
-            label="Rejected"
+            label={t("Rejected", "अस्वीकृत")}
             value={stats.byStatus.rejected}
             color="#c42b1c"
             icon={<XCircle className="h-4 w-4" style={{ color: "#c42b1c" }} />}
@@ -258,12 +303,12 @@ export default function LeaveReportPage() {
 
         {/* Leave-days breakdown by type */}
         <DataPanel
-          title="Leave Days by Type"
+          title={t("Leave Days by Type", "प्रकारअनुसार बिदा दिन")}
           className="mb-4"
         >
           {Object.keys(stats.byType).length === 0 ? (
             <p className="text-sm py-2" style={{ color: "var(--w11-text-secondary)" }}>
-              No leave data yet.
+              {t("No leave data yet.", "अझै बिदा डाटा छैन।")}
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -276,14 +321,14 @@ export default function LeaveReportPage() {
                   <p className="text-sm font-medium capitalize" style={{ color: "var(--w11-text-primary)" }}>{type}</p>
                   <p className="text-2xl font-bold" style={{ color: "var(--w11-text-primary)" }}>{agg.days}</p>
                   <p className="text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-                    days across {agg.requests} request{agg.requests === 1 ? "" : "s"}
+                    {t("days", "दिन")} × {agg.requests}
                   </p>
                 </div>
               ))}
             </div>
           )}
           <p className="mt-4 text-sm" style={{ color: "var(--w11-text-secondary)" }}>
-            Total leave days across all requests: <span className="font-semibold" style={{ color: "var(--w11-text-primary)" }}>{stats.totalDays}</span>
+            {t("Total leave days:", "कुल बिदा दिन:")} <span className="font-semibold tabular-nums" style={{ color: "var(--w11-text-primary)" }}>{stats.totalDays}</span>
           </p>
         </DataPanel>
 
@@ -291,7 +336,7 @@ export default function LeaveReportPage() {
         <DataPanel
           className="mb-4"
           bodyClassName="p-0"
-          title="Leave Days per Staff"
+          title={t("Leave Days per Staff", "कर्मचारीअनुसार बिदा दिन")}
           actions={
             <div className="flex items-center gap-2">
               <Select
@@ -299,10 +344,10 @@ export default function LeaveReportPage() {
                 onValueChange={setReportMonth}
               >
                 <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Whole year" />
+                  <SelectValue placeholder={t("Whole year", "पूरो वर्ष")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Whole year</SelectItem>
+                  <SelectItem value="all">{t("Whole year", "पूरो वर्ष")}</SelectItem>
                   {Array.from({ length: 12 }, (_, i) => (
                     <SelectItem key={i + 1} value={String(i + 1)}>
                       {new Date(2000, i, 1).toLocaleString(undefined, { month: "long" })}
@@ -329,23 +374,23 @@ export default function LeaveReportPage() {
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={exportSummaryCsv} disabled={reportLoading}>
-                <Download className="h-4 w-4 mr-2" /> Export CSV
+                <Download className="h-4 w-4 mr-2" /> {t("Export CSV", "CSV निर्यात")}
               </Button>
             </div>
           }
         >
           <p className="px-4 pt-3 text-xs" style={{ color: "var(--w11-text-secondary)" }}>
-            Aggregated leave totals by type for the selected period
+            {t("Aggregated leave totals by type for the selected period", "चयनित अवधिको प्रकारअनुसार जम्मा")}
           </p>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Staff</TableHead>
-                {reportTypes.map((t) => (
-                  <TableHead key={t} className="capitalize">{t}</TableHead>
+                <TableHead>{t("Staff", "कर्मचारी")}</TableHead>
+                {reportTypes.map((rt) => (
+                  <TableHead key={rt} className="capitalize">{rt}</TableHead>
                 ))}
-                <TableHead>Total Days</TableHead>
-                <TableHead>Requests</TableHead>
+                <TableHead>{t("Total Days", "कुल दिन")}</TableHead>
+                <TableHead>{t("Requests", "अनुरोध")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -358,7 +403,7 @@ export default function LeaveReportPage() {
               ) : staffRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={reportTypes.length + 3} className="text-center py-8" style={{ color: "var(--w11-text-secondary)" }}>
-                    No leave records for this period.
+                    {t("No leave records for this period.", "यस अवधिको रेकर्ड छैन।")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -378,17 +423,17 @@ export default function LeaveReportPage() {
         </DataPanel>
 
         <FilterCommandBar>
-          <span className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>Filter by Status:</span>
+          <span className="text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>{t("Filter by Status:", "अवस्थाअनुसार:")}</span>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="All Statuses" />
+              <SelectValue placeholder={t("All Statuses", "सबै अवस्था")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="all">{t("All Statuses", "सबै अवस्था")}</SelectItem>
+              <SelectItem value="pending">{t("Pending", "बाँकी")}</SelectItem>
+              <SelectItem value="approved">{t("Approved", "स्वीकृत")}</SelectItem>
+              <SelectItem value="rejected">{t("Rejected", "अस्वीकृत")}</SelectItem>
+              <SelectItem value="cancelled">{t("Cancelled", "रद्द")}</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -396,19 +441,20 @@ export default function LeaveReportPage() {
             onClick={exportCsv}
             disabled={filtered.length === 0}
           >
-            <Download className="h-4 w-4 mr-2" /> Export CSV
+            <Download className="h-4 w-4 mr-2" /> {t("Export CSV", "CSV निर्यात")}
           </Button>
         </FilterCommandBar>
 
         <DataPanel bodyClassName="p-0">
           <DataTable<LeaveRequest>
-            columns={REQUEST_COLUMNS}
+            columns={columns}
+            loading={isLoading}
             rows={filtered}
             rowKey={(l) => l.id}
             searchable
-            searchPlaceholder="Search leave requests…"
+            searchPlaceholder={t("Search leave requests…", "खोज्नुहोस्…")}
             exportFileName="leave-requests"
-            empty={{ icon: Download, title: "No leave requests found" }}
+            empty={{ icon: Plus, title: t("No leave requests found", "कुनै अनुरोध भेटिएन"), body: t("Requests from the staff leave page land here.", "स्टाफ बिदा पृष्ठबाट अनुरोध यहाँ आउँछ।") }}
           />
         </DataPanel>
       </AOSPageBody>

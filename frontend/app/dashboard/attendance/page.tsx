@@ -38,9 +38,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import { ICON_MAP } from "@/lib/icon-map";
-import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { BSDateInput } from "@/components/ui/bs-date-input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { QuickLinks } from "@/components/aos/kit/quick-links";
+import { DependencyMissingEmptyState, EmptyState } from "@/components/ui/empty-state";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import {
+  useAOSRouteParams,
+  useAOSRouterNavigate,
+  useAOSWindowRoute,
+} from "@/lib/aos-window-route";
+import { useI18n } from "@/lib/i18n";
 import { MarkHolidayDialog } from "@/components/attendance/mark-holiday-dialog";
 import {
   AOSPage,
@@ -50,18 +58,20 @@ import {
   StatGrid,
   KpiCard,
   DataPanel,
-  AOSEmptyState,
 } from "@/components/aos/kit/page-kit";
 
-/** Module dashboard quick links — mirrors the attendance plugin manifest
- * (backend/app/plugins/modules/attendance/manifest.yaml ui.nav.subitems). */
-const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
-  { label: "Leave Requests", href: "/dashboard/attendance/leave-requests", icon: "ClipboardList" },
-  { label: "Subject Attendance", href: "/dashboard/attendance/subject", icon: "BookOpenCheck" },
-  { label: "Import Attendance", href: "/dashboard/attendance/import", icon: "Upload" },
-  { label: "Monthly Report", href: "/dashboard/attendance/reports", icon: "BarChart3" },
-  { label: "Holiday List", href: "/dashboard/attendance/holidays", icon: "CalendarDays" },
-];
+/**
+ * Wave-A rewrite deltas (the marking interaction itself is corpus-best and
+ * kept untouched per the audit's "keep" list):
+ * - Date/Class/Section + the Mark/View tab now live in the window route
+ *   (?date=&class=&section=&tab=) — shareable, refresh-safe, back-buttoned.
+ * - Hand-rolled tab strip (plan G2) → kit <Tabs> (win11-tablist + keyboard).
+ * - Quick Links panel → kit <QuickLinks>.
+ * - Dependency empty state → shared DependencyMissingEmptyState; bilingual
+ *   chrome via t().
+ * - TODO(rewrite-wave-A): register print-twin (plan 9.5) once AOSPageHeader
+ *   gains the printRef prop — no fake print button until then.
+ */
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type AttendanceStatus = "present" | "absent" | "late" | "leave";
@@ -114,16 +124,33 @@ export default function AttendancePage() {
 function AttendanceContent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { t } = useI18n();
   const isTeacher = user?.role === "teacher";
   const isAdmin = user?.role === "school_admin" || user?.role === "superadmin";
 
-  // ── Filter state ──────────────────────────────────────────────────────────
-  const [date, setDate] = useState(
-    () => new Date().toISOString().split("T")[0],
-  );
-  const [classId, setClassId] = useState("none");
-  const [sectionId, setSectionId] = useState("all");
-  const [activeTab, setActiveTab] = useState<"mark" | "view">("mark");
+  // ── Filter state — URL-backed (window route → address bar) ────────────────
+  const routeParams = useAOSRouteParams();
+  const navigate = useAOSRouterNavigate();
+  const windowRoute = useAOSWindowRoute();
+  const pathname = windowRoute?.pathname ?? "/dashboard/attendance";
+  function setParams(patch: Record<string, string>) {
+    const next = new URLSearchParams(routeParams.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && v !== "none" && v !== "all") next.set(k, v);
+      else next.delete(k);
+    }
+    navigate(`${pathname}?${next.toString()}`);
+  }
+  const date = routeParams.get("date") || new Date().toISOString().split("T")[0];
+  const classId = routeParams.get("class") || "none";
+  const sectionId = routeParams.get("section") || "all";
+  const activeTab: "mark" | "view" = routeParams.get("tab") === "view" ? "view" : "mark";
+  const [dateNonce, setDateNonce] = useState(0);
+  function resetMarks() {
+    setRecords({});
+    setHasChanges(false);
+    setDateNonce((n) => n + 1);
+  }
 
   // ── Records state for mark mode ───────────────────────────────────────────
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
@@ -193,8 +220,12 @@ function AttendanceContent() {
       });
       setRecords(map);
       setHasChanges(false);
+    } else if (dateNonce) {
+      setRecords({});
+      setHasChanges(false);
     }
-  }, [existing, date, classId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing, date, classId, dateNonce]);
 
   // A fresh roster starts with NO status anywhere — the old silent
   // all-present default fabricated attendance for students the teacher
@@ -294,7 +325,10 @@ function AttendanceContent() {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       setHasChanges(false);
       toast.success(
-        `Attendance saved! ${present}/${total} students present (${percentage}%)`,
+        t(
+          `Attendance saved! ${present}/${total} students present (${percentage}%)`,
+          `उपस्थिति सुरक्षित! ${present}/${total} हाजिर (${percentage}%)`
+        ),
       );
     },
     onError: () => toast.error("Failed to save attendance"),
@@ -307,8 +341,8 @@ function AttendanceContent() {
     <AOSPage>
       <AOSPageHeader
         icon={<Users className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Attendance"
-        subtitle="Mark and track student attendance by class"
+        title={t("Attendance", "उपस्थिति")}
+        subtitle={t("Mark and track student attendance by class", "कक्षाअनुसार विद्यार्थी उपस्थिति")}
         actions={
           <>
             {isAdmin && (
@@ -319,13 +353,13 @@ function AttendanceContent() {
                 onClick={() => setHolidayOpen(true)}
               >
                 <CalendarOff className="h-4 w-4" />
-                Mark Holiday
+                {t("Mark Holiday", "विदा तोक्नुहोस्")}
               </Button>
             )}
             <Link href="/dashboard/attendance/reports">
               <Button variant="outline" size="sm" className="gap-1.5">
                 <BarChart3 className="h-4 w-4" />
-                Monthly Reports
+                {t("Monthly Reports", "मासिक प्रतिवेदन")}
               </Button>
             </Link>
           </>
@@ -335,12 +369,12 @@ function AttendanceContent() {
         {/* ── Module dashboard — school-wide KPIs + quick links ──────────── */}
         <StatGrid min={170}>
           <KpiCard
-            label={isTeacher ? "My Classes" : "Classes"}
+            label={isTeacher ? t("My Classes", "मेरा कक्षा") : t("Classes", "कक्षा")}
             value={(classes || []).length}
             icon={<Users className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />}
           />
           <KpiCard
-            label="Sections"
+            label={t("Sections", "सेक्सन")}
             value={(classes || []).reduce((sum: number, c: any) => sum + (c.sections?.length ?? 0), 0)}
             color="var(--w11-text-primary)"
             icon={<Layers className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
@@ -348,7 +382,7 @@ function AttendanceContent() {
           {isAdmin && (
             <>
               <KpiCard
-                label="Attendance Today"
+                label={t("Attendance Today", "आजको उपस्थिति")}
                 value={overview?.summary?.today_pct != null ? `${overview.summary.today_pct}%` : "—"}
                 color={
                   overview?.summary?.today_pct == null ? "var(--w11-text-primary)"
@@ -358,13 +392,13 @@ function AttendanceContent() {
                 icon={<CheckCircle2 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
               />
               <KpiCard
-                label="This Week"
+                label={t("This Week", "यो हप्ता")}
                 value={overview?.summary?.week_pct != null ? `${overview.summary.week_pct}%` : "—"}
                 color="var(--w11-text-primary)"
                 icon={<BarChart3 className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
               />
               <KpiCard
-                label="This Month"
+                label={t("This Month", "यो महिना")}
                 value={overview?.summary?.month_pct != null ? `${overview.summary.month_pct}%` : "—"}
                 color="var(--w11-text-primary)"
                 icon={<TrendingUp className="h-4 w-4" style={{ color: "var(--w11-text-secondary)" }} />}
@@ -373,76 +407,50 @@ function AttendanceContent() {
           )}
         </StatGrid>
 
-        <DataPanel title="Attendance Quick Links" bodyClassName="p-3" className="mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-            {QUICK_LINKS.map((l) => {
-              const Icon = ICON_MAP[l.icon] ?? ChevronRight;
-              return (
-                <Link key={l.href} href={l.href} className="block h-full">
-                  <div
-                    className="win11-card flex items-center gap-3 p-3 h-full transition-colors hover:border-[var(--w11-accent)]"
-                    style={{ cursor: "pointer", margin: 0 }}
-                  >
-                    <div
-                      className="flex items-center justify-center text-white shrink-0"
-                      style={{
-                        width: "44px",
-                        height: "44px",
-                        borderRadius: "10px",
-                        background: SECTION_GRADIENTS.Academics,
-                        boxShadow: "0 8px 16px -4px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      <Icon size={22} strokeWidth={2.2} />
-                    </div>
-                    <span
-                      className="text-[13px] font-semibold leading-tight"
-                      style={{ color: "var(--w11-text-primary)" }}
-                    >
-                      {l.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </DataPanel>
+        <QuickLinks
+          section="Academics"
+          className="mb-4"
+          links={[
+            { label: t("Leave Requests", "बिदा अनुरोध"), href: "/dashboard/attendance/leave-requests", icon: "ClipboardList" },
+            { label: t("Subject Attendance", "विषय उपस्थिति"), href: "/dashboard/attendance/subject", icon: "BookOpenCheck" },
+            { label: t("Import Attendance", "उपस्थिति आयात"), href: "/dashboard/attendance/import", icon: "Upload" },
+            { label: t("Monthly Report", "मासिक प्रतिवेदन"), href: "/dashboard/attendance/reports", icon: "BarChart3" },
+            { label: t("Holiday List", "विदा सूची"), href: "/dashboard/attendance/holidays", icon: "CalendarDays" },
+          ]}
+        />
 
         {/* ── Filter Row ─────────────────────────────────────────────────── */}
         <FilterCommandBar>
           <div className="space-y-1">
             <label className="text-xs font-medium text-[color:var(--w11-text-secondary)]">
-              Date
+              {t("Date", "मिति")}
             </label>
             <BSDateInput
               value={date}
               onChange={(v) => {
-                setDate(v);
-                setRecords({});
-                setHasChanges(false);
+                setParams({ date: v });
+                resetMarks();
               }}
             />
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-medium text-[color:var(--w11-text-secondary)]">
-              Class
+              {t("Class", "कक्षा")}
             </label>
             <Select
               value={classId}
               onValueChange={(v) => {
-                setClassId(v);
-                setSectionId("all");
-                setRecords({});
-                setHasChanges(false);
+                setParams({ class: v, section: "" });
+                resetMarks();
               }}
             >
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select class…" />
+                <SelectValue placeholder={t("Select class…", "कक्षा छान्नुहोस्…")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none" disabled>
-                  — Choose a class —
+                  {t("— Choose a class —", "— कक्षा छान्नुहोस् —")}
                 </SelectItem>
                 {(classes || []).map((c: any) => (
                   <SelectItem key={c.id} value={c.id}>
@@ -455,14 +463,13 @@ function AttendanceContent() {
 
           <div className="space-y-1">
             <label className="text-xs font-medium text-[color:var(--w11-text-secondary)]">
-              Section
+              {t("Section", "सेक्सन")}
             </label>
             <Select
               value={sectionId}
               onValueChange={(v) => {
-                setSectionId(v);
-                setRecords({});
-                setHasChanges(false);
+                setParams({ section: v });
+                resetMarks();
               }}
               disabled={classId === "none" || !sections.length}
             >
@@ -470,7 +477,7 @@ function AttendanceContent() {
                 <SelectValue placeholder="All sections" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sections</SelectItem>
+                <SelectItem value="all">{t("All Sections", "सबै सेक्सन")}</SelectItem>
                 {sections.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}
@@ -483,7 +490,7 @@ function AttendanceContent() {
           {/* Mark all quick buttons */}
           <div className="space-y-1 ml-auto">
             <label className="text-xs font-medium text-[color:var(--w11-text-secondary)]">
-              Quick Mark All
+              {t("Quick Mark All", "सबै छिटो टिप्नुहोस्")}
             </label>
             <div className="flex gap-1">
               <Button
@@ -492,7 +499,7 @@ function AttendanceContent() {
                 onClick={() => markAll("present")}
                 disabled={!isReady || !total}
               >
-                ✓ All Present
+                {t("✓ All Present", "✓ सबै हाजिर")}
               </Button>
               <Button
                 size="sm"
@@ -502,43 +509,36 @@ function AttendanceContent() {
                   // One mis-click here sends absence alerts to every
                   // guardian (push+SMS+in-app) — it must be confirmed.
                   const ok = await confirm({
-                    title: "Mark ALL students absent?",
-                    body: `${total} students will be marked absent and guardians will be notified. This is rarely what you want — use it only when the whole class is genuinely out.`,
-                    confirmLabel: "Mark all absent",
+                    title: t("Mark ALL students absent?", "सबै विद्यार्थी अनुपस्थित टिप्ने?"),
+                    body: t(
+                      `${total} students will be marked absent and guardians will be notified. This is rarely what you want — use it only when the whole class is genuinely out.`,
+                      `${total} विद्यार्थी अनुपस्थित टिपिनेछ र अभिभावकलाई खबर जान्छ।`
+                    ),
+                    confirmLabel: t("Mark all absent", "सबै अनुपस्थित"),
                     tone: "danger",
                   });
                   if (ok) markAll("absent");
                 }}
                 disabled={!isReady || !total}
               >
-                ✗ All Absent
+                {t("✗ All Absent", "✗ सबै अनुपस्थित")}
               </Button>
             </div>
           </div>
         </FilterCommandBar>
 
-        {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+        {/* ── Tabs (kit; G2) — selection syncs to ?tab= ──────────────────── */}
         {isReady && (
-          <div className="flex gap-1 mb-4 border-b border-[var(--w11-border-subtle)]">
-            {(
-              [
-                { id: "mark", label: "Mark Attendance" },
-                { id: "view", label: "Today's Summary" },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-[var(--w11-accent)] text-[color:var(--w11-text-primary)]"
-                    : "border-transparent text-[color:var(--w11-text-secondary)] hover:text-[color:var(--w11-text-primary)]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setParams({ tab: v === "mark" ? "" : v })}
+            className="mb-4"
+          >
+            <TabsList variant="underline">
+              <TabsTrigger value="mark">{t("Mark Attendance", "उपस्थिति टिप्नुहोस्")}</TabsTrigger>
+              <TabsTrigger value="view">{t("Summary", "सारांश")}</TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
 
         {/* ── Not selected state ─────────────────────────────────────────── */}
@@ -547,21 +547,19 @@ function AttendanceContent() {
             {(classes || []).length === 0 ? (
               /* Dependency-chain empty state: attendance is blocked on a
                  class existing — deep-link the unblocking step (audit 5.2a). */
-              <AOSEmptyState
-                icon={<Users className="h-12 w-12" />}
-                title="No classes yet"
-                description="Attendance needs at least one class. Create classes in Academics first."
-                action={
-                  <a href="/dashboard/academics" className="win11-btn accent" style={{ textDecoration: "none" }}>
-                    Create your first class — कक्षा सिर्जना गर्नुहोस्
-                  </a>
-                }
+              <DependencyMissingEmptyState
+                icon={Users}
+                title={t("No classes yet", "अझै कक्षा छैन")}
+                body={t("Attendance needs at least one class. Create classes in Academics first.", "उपस्थितिको लागि कम्तीमा एक कक्षा चाहिन्छ — अकाडेमिक्समा बनाउनुहोस्।")}
+                prerequisiteName={t("Classes", "कक्षा")}
+                setupHref="/dashboard/academics"
+                setupLabel={t("Create your first class — पहिलो कक्षा सिर्जना गर्नुहोस्", "पहिलो कक्षा सिर्जना गर्नुहोस्")}
               />
             ) : (
-              <AOSEmptyState
-                icon={<Users className="h-12 w-12" />}
-                title="Select a class to get started"
-                description="Choose a class above to mark or view attendance"
+              <EmptyState
+                icon={Users}
+                title={t("Select a class to get started", "सुरु गर्न कक्षा छान्नुहोस्")}
+                body={t("Choose a class above to mark or view attendance.", "माथिबाट कक्षा छान्नुहोस्।")}
               />
             )}
           </div>
@@ -570,12 +568,12 @@ function AttendanceContent() {
         {/* ── Summary Strip ─────────────────────────────────────────────── */}
         {isReady && total > 0 && (
           <StatGrid min={120}>
-            <KpiCard label="Total" value={total} />
-            <KpiCard label="Present" value={present} color="#107c10" />
-            <KpiCard label="Absent" value={absent} color="#c42b1c" />
-            <KpiCard label="Late" value={late} color="#d83b01" />
+            <KpiCard label={t("Total", "कुल")} value={total} />
+            <KpiCard label={t("Present", "हाजिर")} value={present} color="#107c10" />
+            <KpiCard label={t("Absent", "अनुपस्थित")} value={absent} color="#c42b1c" />
+            <KpiCard label={t("Late", "ढिला")} value={late} color="#d83b01" />
             <KpiCard
-              label="Attendance %"
+              label={t("Attendance %", "उपस्थिति %")}
               value={`${percentage}%`}
               color={
                 percentage >= 80 ? "#107c10" : percentage >= 60 ? "#d83b01" : "#c42b1c"
@@ -588,14 +586,14 @@ function AttendanceContent() {
         {isReady && activeTab === "mark" && (
           <>
             {studentsLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
-              </div>
+              <SkeletonTable rows={8} columns={3} />
             ) : studentList.length === 0 ? (
               <div className="win11-card">
-                <AOSEmptyState
-                  title="No students found"
-                  description="No students found in this class."
+                <EmptyState
+                  icon={Users}
+                  title={t("No students in this class", "यो कक्षामा विद्यार्थी छैनन्")}
+                  body={t("Enroll students first, then mark attendance.", "पहिले विद्यार्थी भर्ना गर्नुहोस्।")}
+                  action={{ label: t("Add Student", "विद्यार्थी थप्नुहोस्"), href: "/dashboard/students/new" }}
                 />
               </div>
             ) : (
@@ -604,10 +602,10 @@ function AttendanceContent() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-14">Roll</TableHead>
-                        <TableHead>Student Name</TableHead>
+                        <TableHead className="w-14">{t("Roll", "रोल")}</TableHead>
+                        <TableHead>{t("Student Name", "नाम")}</TableHead>
                         <TableHead className="w-[320px]">
-                          Attendance Status
+                          {t("Attendance Status", "अवस्था")}
                         </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -671,11 +669,11 @@ function AttendanceContent() {
                   style={{ boxShadow: "var(--w11-elevation-flyout)" }}
                 >
                   <div className="text-sm text-[color:var(--w11-text-secondary)]">
-                    {present} present, {absent} absent, {late} late, {leave} on
-                    leave
+                    {present} {t("present", "हाजिर")}, {absent} {t("absent", "अनुपस्थित")},{" "}
+                    {late} {t("late", "ढिला")}, {leave} {t("on leave", "बिदामा")}
                     {unmarkedCount > 0 && (
                       <span className="ml-2 font-medium" style={{ color: "#d83b01" }}>
-                        · {unmarkedCount} UNMARKED
+                        · {unmarkedCount} {t("UNMARKED", "अनटिप्दा")}
                       </span>
                     )}
                   </div>
@@ -683,7 +681,10 @@ function AttendanceContent() {
                     onClick={() => {
                       if (unmarkedCount > 0) {
                         toast.error(
-                          `${unmarkedCount} student${unmarkedCount === 1 ? "" : "s"} not marked yet — every student needs an explicit status before saving.`,
+                          t(
+                            `${unmarkedCount} student${unmarkedCount === 1 ? "" : "s"} not marked yet — every student needs an explicit status before saving.`,
+                            `${unmarkedCount} विद्यार्थी अझै टिपिएको छैन — सबैको अवस्था तोक्नुहोस्।`
+                          ),
                         );
                         return;
                       }
@@ -697,7 +698,7 @@ function AttendanceContent() {
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
-                    Save Attendance
+                    {t("Save Attendance", "उपस्थिति सुरक्षित")}
                   </Button>
                 </div>
               </>
@@ -709,20 +710,18 @@ function AttendanceContent() {
         {isReady && activeTab === "view" && (
           <DataPanel bodyClassName="p-0">
             {studentsLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-[color:var(--w11-text-secondary)]" />
-              </div>
+              <SkeletonTable rows={8} columns={3} />
             ) : studentList.length === 0 ? (
-              <div className="py-12 text-center text-[color:var(--w11-text-secondary)]">
-                No students found.
+              <div className="py-12 text-center" style={{ color: "var(--w11-text-secondary)" }}>
+                {t("No students found.", "विद्यार्थी भेटिएन।")}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-14">Roll</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-14">{t("Roll", "रोल")}</TableHead>
+                    <TableHead>{t("Student", "विद्यार्थी")}</TableHead>
+                    <TableHead>{t("Status", "अवस्था")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -748,7 +747,7 @@ function AttendanceContent() {
                             </span>
                           ) : (
                             <span className="text-xs text-[color:var(--w11-text-secondary)]">
-                              Not marked
+                              {t("Not marked", "टिपिएको छैन")}
                             </span>
                           )}
                         </TableCell>

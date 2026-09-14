@@ -25,7 +25,8 @@ import {
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
 import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { undoableDelete } from "@/components/ui/confirm-dialog";
+import { DependencyMissingEmptyState } from "@/components/ui/empty-state";
 
 interface TransportRoute {
   id: string;
@@ -45,7 +46,6 @@ interface BusStop {
 }
 
 export default function PickupPointsPage() {
-  const confirm = useConfirm();
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<BusStop | null>(null);
   const [search, setSearch] = useState("");
@@ -89,15 +89,6 @@ export default function PickupPointsPage() {
     onError: () => toast.error("Failed to update pickup point"),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/transport/stops/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transport-stops"] });
-      toast.success("Pickup point deleted");
-    },
-    onError: () => toast.error("Failed to delete pickup point"),
-  });
-
   const STOP_COLUMNS: Column<BusStop>[] = [
     { key: "sequence_number", label: "Seq", align: "right", sortable: true, value: (s) => s.sequence_number ?? 0, render: (s) => <span style={{ color: "var(--w11-text-secondary)" }}>{s.sequence_number}</span> },
     { key: "name", label: "Stop Name", sortable: true, value: (s) => s.name, render: (s) => <span className="font-medium">{s.name}</span> },
@@ -121,7 +112,13 @@ export default function PickupPointsPage() {
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => {
             e.stopPropagation();
-            confirm({ title: "Delete stop", body: "Are you sure you want to delete this stop?" }).then((ok) => { if (ok) deleteMutation.mutate(s.id); });
+            undoableDelete({
+              label: `stop “${s.name}”`,
+              commit: async () => {
+                await api.delete(`/transport/stops/${s.id}`);
+                queryClient.invalidateQueries({ queryKey: ["transport-stops"] });
+              },
+            });
           }}>
             <Trash2 className="h-4 w-4" style={{ color: "#c42b1c" }} />
           </Button>
@@ -149,6 +146,20 @@ export default function PickupPointsPage() {
         }
       />
       <AOSPageBody>
+        {(routes || []).length === 0 ? (
+          // A pickup point without a route cannot exist — name the prerequisite.
+          <DataPanel>
+            <DependencyMissingEmptyState
+              icon={MapPin}
+              prerequisiteName="Transport routes"
+              setupHref="/dashboard/transport/routes"
+              setupLabel="Create a route first"
+              title="No routes exist yet"
+              body="Pickup points hang off a route. Create a route, then add timed stops here."
+            />
+          </DataPanel>
+        ) : (
+        <>
         <FilterCommandBar>
           <Select value={selectedRouteId} onValueChange={setSelectedRouteId}>
             <SelectTrigger className="w-[200px]">
@@ -174,6 +185,8 @@ export default function PickupPointsPage() {
             empty={{ icon: MapPin, title: "No pickup points found", body: "Add stops with AM/PM arrival times." }}
           />
         </DataPanel>
+        </>
+        )}
 
         <Dialog open={showAdd || !!editItem} onOpenChange={(open) => {
           if (!open) { setShowAdd(false); setEditItem(null); }
