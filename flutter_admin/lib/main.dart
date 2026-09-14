@@ -33,6 +33,19 @@ class ASchoolAdminApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    // P1: tapping a push notification navigates — explicit `route` in the
+    // payload wins, else the type→tab map (deep links finally work).
+    wireNotificationTaps(
+      navigate: (location) => router.go(location),
+      typeRoutes: const {
+        "notice": "/notices",
+      "fee": "/fees",
+      "attendance": "/attendance",
+      "assignment": "/assignments",
+      "exam": "/exams",
+      "emergency": "/emergency",
+      },
+    );
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(

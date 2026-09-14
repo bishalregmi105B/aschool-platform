@@ -15,6 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { matchesMarketplacePluginSearch } from "@/lib/marketplace-search";
 import { formatCurrency } from "@/lib/utils";
 import { SubscribeDialog } from "@/components/app-components/subscribe-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Search, Check, ShoppingCart, Zap, Crown, Building2, Layers, Settings, Store } from "lucide-react";
 import {
   AOSPage,
@@ -61,6 +67,7 @@ interface MarketplacePlugin {
   can_subscribe?: boolean;
   version?: string;
   features?: string[];
+  emoji?: string;
   /** E230: in final testing — card disabled, not installable yet */
   coming_soon?: boolean;
   /** E230: legacy slug kept for alias compatibility (canonical successor exists) */
@@ -161,6 +168,8 @@ export default function MarketplacePage() {
 
   const [subscribeSlug, setSubscribeSlug] = useState<string | null>(null);
   const [checkoutPkg, setCheckoutPkg] = useState<string | null>(null);
+  // App Store detail view (R6b): the card clicked for full features/version.
+  const [detailSlug, setDetailSlug] = useState<string | null>(null);
   // E233: Individual Plugins tab — show what is active for THIS school.
   const [installFilter, setInstallFilter] = useState<
     "all" | "active" | "not_installed"
@@ -292,6 +301,7 @@ export default function MarketplacePage() {
                     onActivate={() => activateMutation.mutate(plugin.slug)}
                     onDeactivate={() => deactivateMutation.mutate(plugin.slug)}
                     onSubscribe={() => setSubscribeSlug(plugin.slug)}
+                    onOpenDetail={() => setDetailSlug(plugin.slug)}
                   />
                 ))}
                 {filtered.length === 0 && (
@@ -329,6 +339,7 @@ export default function MarketplacePage() {
                         onActivate={() => activateMutation.mutate(plugin.slug)}
                         onDeactivate={() => deactivateMutation.mutate(plugin.slug)}
                         onSubscribe={() => setSubscribeSlug(plugin.slug)}
+                        onOpenDetail={() => setDetailSlug(plugin.slug)}
                       />
                     ))}
                   </div>
@@ -349,8 +360,131 @@ export default function MarketplacePage() {
             refreshPlugins();
           }}
         />
+
+        <AppDetailDialog
+          plugin={allPlugins.find((p) => p.slug === detailSlug) || null}
+          onOpenChange={(open) => {
+            if (!open) setDetailSlug(null);
+          }}
+          onInstall={() => {
+            if (detailSlug) installMutation.mutate(detailSlug);
+            setDetailSlug(null);
+          }}
+          onSubscribe={() => {
+            // keep detailSlug — subscribe dialog renders above it
+            setSubscribeSlug(detailSlug);
+          }}
+          busy={
+            installMutation.isPending ||
+            uninstallMutation.isPending ||
+            activateMutation.isPending ||
+            deactivateMutation.isPending
+          }
+        />
       </AOSPageBody>
     </AOSPage>
+  );
+}
+
+/**
+ * App Store detail view (R6b) — the full listing a card title opens: every
+ * feature, version, category, pricing with both cycles, trial terms, and the
+ * same lifecycle actions the card carries. VS Code Marketplace pattern:
+ * the marketplace renders itself entirely from manifest metadata.
+ */
+function AppDetailDialog({
+  plugin,
+  onOpenChange,
+  onInstall,
+  onSubscribe,
+  busy,
+}: {
+  plugin: MarketplacePlugin | null;
+  onOpenChange: (open: boolean) => void;
+  onInstall: () => void;
+  onSubscribe: () => void;
+  busy: boolean;
+}) {
+  if (!plugin) return null;
+  const state = plugin.install_state || (plugin.installed ? "active" : "not_installed");
+  const isActive = state === "active";
+  const isPaid = !plugin.is_free && plugin.price_monthly > 0;
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-lg">
+            {plugin.emoji ? <span aria-hidden="true">{plugin.emoji}</span> : null}
+            {plugin.name}
+            {plugin.name_nepali ? (
+              <span className="font-nepali text-sm font-normal" style={{ color: "var(--w11-text-secondary)" }}>
+                {plugin.name_nepali}
+              </span>
+            ) : null}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed" style={{ color: "var(--w11-text-primary)" }}>
+            {plugin.description}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {isActive ? (
+              <span className="win11-chip success text-xs font-bold uppercase">Active</span>
+            ) : state === "inactive" ? (
+              <span className="win11-chip warning text-xs font-bold uppercase">Inactive</span>
+            ) : (
+              <span className="win11-chip text-xs font-bold uppercase">Not installed</span>
+            )}
+            <Badge variant="outline" className="capitalize">{plugin.category}</Badge>
+            {plugin.version ? <Badge variant="secondary">v{plugin.version}</Badge> : null}
+            {isPaid ? (
+              <Badge variant="secondary" className="font-semibold">
+                {formatCurrency(plugin.price_monthly)}/mo · {formatCurrency(plugin.price_yearly)}/yr
+              </Badge>
+            ) : (
+              <span className="win11-chip success text-xs font-semibold">Free</span>
+            )}
+            {isPaid && plugin.trial_days > 0 && (
+              <span className="win11-chip accent text-xs font-semibold">
+                {plugin.trial_days}-day trial
+              </span>
+            )}
+          </div>
+
+          {plugin.features && plugin.features.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--w11-text-secondary)" }}>
+                What&apos;s included
+              </p>
+              <ul className="space-y-1.5">
+                {plugin.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm" style={{ color: "var(--w11-text-primary)" }}>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--w11-accent)" }} />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!isActive && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button onClick={onInstall} disabled={busy || plugin.coming_soon === true}>
+                {busy ? <Spinner size="sm" /> : isPaid ? "Start trial" : "Install"}
+              </Button>
+              {isPaid && plugin.can_subscribe !== false && (
+                <Button variant="outline" onClick={onSubscribe} disabled={busy}>
+                  Subscribe now
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -571,6 +705,7 @@ function PluginCard({
   onActivate,
   onDeactivate,
   onSubscribe,
+  onOpenDetail,
 }: {
   plugin: MarketplacePlugin;
   busy: boolean;
@@ -579,6 +714,7 @@ function PluginCard({
   onActivate: () => void;
   onDeactivate: () => void;
   onSubscribe: () => void;
+  onOpenDetail: () => void;
 }) {
   const state = plugin.install_state || (plugin.installed ? "active" : "not_installed");
   const isActive = state === "active";
@@ -615,7 +751,20 @@ function PluginCard({
       )}
       <div className="p-6 pb-3">
         <div className="flex items-start justify-between pr-12">
-          <h3 className="text-lg font-semibold" style={{ color: "var(--w11-text-primary)" }}>{plugin.name}</h3>
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="text-left text-lg font-semibold hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--w11-accent)]"
+            style={{ color: "var(--w11-text-primary)" }}
+            aria-label={`View ${plugin.name} details`}
+          >
+            {plugin.name}
+            {plugin.name_nepali ? (
+              <span className="font-nepali ml-2 text-sm font-normal" style={{ color: "var(--w11-text-secondary)" }}>
+                {plugin.name_nepali}
+              </span>
+            ) : null}
+          </button>
         </div>
         <div className="flex items-center gap-2 mt-2">
           {isPaid ? (

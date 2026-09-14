@@ -172,6 +172,7 @@ function CustomFieldsInner() {
       active="custom-fields"
       icon={<ClipboardList className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
       title="Custom Registration Fields"
+        titleNe="अनुकूलन दर्ता फिल्ड"
       subtitle="Extra fields added to enrollment forms — values validate server-side"
       actions={
         <Button onClick={() => setCreating(true)}>

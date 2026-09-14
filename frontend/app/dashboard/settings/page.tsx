@@ -167,6 +167,7 @@ export default function SchoolSettingsPage() {
         active="school"
         icon={<Settings className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="School Settings"
+        titleNe="विद्यालय सेटिङ"
         subtitle="Manage your school profile and configuration"
       >
         <DataPanel className="max-w-2xl mx-auto">

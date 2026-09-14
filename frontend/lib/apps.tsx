@@ -57,6 +57,8 @@ interface PluginContextType {
   sidebarItems: AppSidebarItem[];
   /** Plugin-driven bottom nav items (e.g. Settings, Marketplace) */
   pluginBottomNav: PluginBottomNavItem[];
+  /** Days left on the app's trial (null = not trialing). */
+  trialDaysLeft: (slug: string) => number | null;
 }
 
 // The alias table + display labels now live in li./app-aliases.ts, hydrated
@@ -139,6 +141,19 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
     return plugins.some((p) => p.active && acceptable.has(p.plugin_slug));
   };
 
+  // Trial countdown for the banner (R6a): days left, rounded up; null when
+  // the app isn't trialing. Negative = already expired (backend blocks the
+  // gate server-side; the banner is the honest client-side heads-up).
+  const trialDaysLeft = (slug: string) => {
+    const acceptable = getAcceptablePluginSlugs(slug);
+    const row = plugins.find(
+      (p) => p.active && p.is_trial && acceptable.has(p.plugin_slug),
+    );
+    if (!row?.trial_ends_at) return null;
+    const msLeft = new Date(row.trial_ends_at).getTime() - Date.now();
+    return Math.ceil(msLeft / 86_400_000);
+  };
+
   return (
     <PluginContext.Provider
       value={{
@@ -148,6 +163,7 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
         refreshPlugins,
         sidebarItems,
         pluginBottomNav,
+        trialDaysLeft,
       }}
     >
       {children}
@@ -183,18 +199,55 @@ export function AppGate({
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }) {
-  const { isAppInstalled, isLoading, refreshPlugins } =
+  const { isAppInstalled, isLoading, refreshPlugins, trialDaysLeft } =
     useInstalledApps();
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [installed, setInstalled] = useState(false);
+  const [needsPayment, setNeedsPayment] = useState(false);
   const normalizedSlug = normalizePluginSlug(slug);
 
   if (isLoading)
     return <div className="animate-pulse h-32 bg-muted rounded-lg" />;
 
-  // After inline install, show children
+  // After inline install, show children — with a trial banner when the
+  // installed app is on a ticking trial (R6a: entitlements stay visible).
   if (isAppInstalled(normalizedSlug) || installed) {
+    const daysLeft = trialDaysLeft(normalizedSlug);
+    if (daysLeft !== null && daysLeft <= 7) {
+      return (
+        <div className="space-y-3">
+          <div
+            className="win11-infobar flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs"
+            style={{
+              background: daysLeft <= 2 ? "#fde7e9" : "#fff4ce",
+              color: daysLeft <= 2 ? "#8a1f17" : "#4a3200",
+            }}
+          >
+            <span aria-hidden="true">{daysLeft <= 2 ? "⏳" : "🔔"}</span>
+            {daysLeft > 0 ? (
+              <span>
+                <strong>{getPluginDisplayName(slug)}</strong> trial ends in{" "}
+                {daysLeft} day{daysLeft === 1 ? "" : "s"} — subscribe from the
+                App Store to keep it.
+              </span>
+            ) : (
+              <span>
+                The <strong>{getPluginDisplayName(slug)}</strong> trial has
+                ended — this app may stop responding until you subscribe.
+              </span>
+            )}
+            <a
+              href="/dashboard/marketplace"
+              className="ml-auto font-semibold underline"
+            >
+              Subscribe →
+            </a>
+          </div>
+          {children}
+        </div>
+      );
+    }
     return <>{children}</>;
   }
 
@@ -205,9 +258,10 @@ export function AppGate({
   const handleInstall = async () => {
     setInstalling(true);
     setInstallError(null);
+    setNeedsPayment(false);
     try {
       const res = await api.post("/apps/install", {
-        plugin_slug: normalizedSlug,
+        app_slug: normalizedSlug,
         billing_cycle: "monthly",
       });
       if (res.data.success) {
@@ -217,14 +271,52 @@ export function AppGate({
         setInstallError(res.data.error || "Installation failed");
       }
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data
-          ?.error || "Could not install plugin. Please try again.";
-      setInstallError(msg);
+      const e = err as {
+        response?: { status?: number; data?: { error?: string } };
+      };
+      // 402 = the backend wants payment proof first (subscribe flow).
+      if (e?.response?.status === 402) {
+        setNeedsPayment(true);
+      } else {
+        setInstallError(
+          e?.response?.data?.error ||
+            "Could not install plugin. Please try again.",
+        );
+      }
     } finally {
       setInstalling(false);
     }
   };
+
+  // Upgrade variant (R6a, eSchool SaaS padlock pattern): a paid app the
+  // school hasn't subscribed to shows the tier context + subscribe CTA
+  // instead of a bare install error.
+  if (needsPayment) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl text-center gap-4 min-h-[280px]">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+          🔒
+        </div>
+        <div>
+          <p className="text-lg font-semibold mb-1">
+            {displayName} — Subscription Required
+          </p>
+          <p className="text-muted-foreground text-sm max-w-xs">
+            This app is part of a paid plan. Start a subscription from the App
+            Store — eSewa, Khalti and bank transfer are supported.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <a
+            href={`/dashboard/marketplace?app=${encodeURIComponent(normalizedSlug)}`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
+          >
+            Subscribe in App Store
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl text-center gap-4 min-h-[280px]">
@@ -238,8 +330,8 @@ export function AppGate({
           {displayName} — Not Installed
         </p>
         <p className="text-muted-foreground text-sm max-w-xs">
-          Enable the <strong>{displayName}</strong> plugin to access this
-          feature. Install it from the marketplace — free plugins activate
+          Enable the <strong>{displayName}</strong> app to access this
+          feature. Install it from the App Store — free apps activate
           instantly, paid ones start a trial.
         </p>
       </div>
@@ -269,7 +361,7 @@ export function AppGate({
           href={`/dashboard/marketplace`}
           className="inline-flex items-center px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
         >
-          View in Marketplace
+          View in App Store
         </a>
       </div>
     </div>

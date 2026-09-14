@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
 class HomeworkScreen extends ConsumerStatefulWidget {
@@ -291,6 +292,7 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
   final noteController = TextEditingController();
   final attachmentController = TextEditingController();
   String? _attachmentUrl;
+  bool _uploading = false;
   bool _isSubmitting = false;
 
   @override
@@ -356,37 +358,99 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
   }
 
   Future<void> _showAttachmentDialog() async {
-    attachmentController.text = _attachmentUrl ?? '';
-    await showDialog<void>(
+    // H2: real file attachment. Camera/gallery uploads go through
+    // FileUploadService (same pipeline the teacher app uses); "paste a
+    // link" stays as the fallback for shared drives.
+    final choice = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Attach File URL'),
-        content: TextField(
-          controller: attachmentController,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'File URL',
-            hintText: 'https://example.com/homework.pdf',
-          ),
+        title: const Text('Attach to submission'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Take a photo of your work, pick from gallery, or paste a link.'),
+          ],
         ),
         actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('Camera'),
+            onPressed: () => Navigator.pop(context, 'camera'),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.photo_outlined),
+            label: const Text('Gallery'),
+            onPressed: () => Navigator.pop(context, 'gallery'),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.link),
+            label: const Text('Paste link'),
+            onPressed: () => Navigator.pop(context, 'link'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            onPressed: () {
-              final value = attachmentController.text.trim();
-              setState(() {
-                _attachmentUrl = value.isEmpty ? null : value;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Use Link'),
-          ),
         ],
       ),
     );
+
+    if (choice == 'link') {
+      if (!mounted) return;
+      attachmentController.text = _attachmentUrl ?? '';
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Attach File URL'),
+          content: TextField(
+            controller: attachmentController,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'File URL',
+              hintText: 'https://example.com/homework.pdf',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = attachmentController.text.trim();
+                setState(() {
+                  _attachmentUrl = value.isEmpty ? null : value;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Use Link'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (choice == 'camera' || choice == 'gallery') {
+      setState(() => _uploading = true);
+      try {
+        final uploaded = await FileUploadService.instance.pickAndUploadImage(
+          module: UploadModule.assignments,
+          source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        );
+        if (uploaded != null) {
+          setState(() => _attachmentUrl = uploaded.fileUrl);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _uploading = false);
+      }
+    }
   }
 
   String _attachmentLabel(String url) {
@@ -572,11 +636,19 @@ class _AssignmentDetailViewState extends State<_AssignmentDetailView> {
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: _showAttachmentDialog,
-            icon: const Icon(Icons.upload_file),
-            label: Text(_attachmentUrl == null
-                ? 'Attach File URL'
-                : 'Change Attached File'),
+            onPressed: _uploading ? null : _showAttachmentDialog,
+            icon: _uploading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file),
+            label: Text(_uploading
+                ? 'Uploading…'
+                : _attachmentUrl == null
+                    ? 'Attach photo or file'
+                    : 'Change attached file'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12),
               side: const BorderSide(color: ASchoolTheme.primary),

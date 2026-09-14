@@ -14,6 +14,8 @@ export 'services/crash_reporter.dart';
 export 'services/i18n_service.dart';
 export 'services/server_time_service.dart';
 export 'services/file_upload_service.dart';
+export 'services/driver_audio_coach.dart';
+export 'services/notification_taps.dart';
 
 // Models
 export 'models/models.dart';

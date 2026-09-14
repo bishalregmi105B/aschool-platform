@@ -235,6 +235,7 @@ function AccessLogsContent() {
       active="access-logs"
       icon={<ScrollText className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
       title="Access Logs"
+        titleNe="पहुँच लग"
       subtitle="Sign-in activity across the school — logins, failures, lockouts and password changes"
     >
       <DataPanel bodyClassName="p-4">

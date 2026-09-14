@@ -97,21 +97,33 @@ function SettingsNav({ active }: { active: string }) {
 export function SettingsPage({
   active,
   title,
+  titleNe,
   subtitle,
+  subtitleNe,
   icon,
   actions,
   children,
 }: {
   active: string;
   title: React.ReactNode;
+  /** Devanagari companion — the dual-language signature. */
+  titleNe?: React.ReactNode;
   subtitle?: React.ReactNode;
+  subtitleNe?: React.ReactNode;
   icon?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <AOSPage>
-      <AOSPageHeader icon={icon} title={title} subtitle={subtitle} actions={actions} />
+      <AOSPageHeader
+        icon={icon}
+        title={title}
+        titleNe={titleNe}
+        subtitle={subtitle}
+        subtitleNe={subtitleNe}
+        actions={actions}
+      />
       <AOSPageBody>
         <DetailSplit sidebar={<SettingsNav active={active} />} sidebarWidth="260px">
           {children}

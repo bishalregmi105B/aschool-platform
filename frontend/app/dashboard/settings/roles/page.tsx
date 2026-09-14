@@ -122,6 +122,7 @@ function RolesContent() {
       active="roles"
       icon={<Shield className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
       title="Roles & Permissions"
+        titleNe="भूमिका र अनुमति"
       subtitle={
         <>
           Who uses the school, and what each role can reach

@@ -282,6 +282,7 @@ function IntegrationsContent() {
       active="integrations"
       icon={<Plug className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
       title="Integrations"
+        titleNe="एकीकरण"
       subtitle="Connect payment gateways and communication services to your school"
     >
       <div className="space-y-4">

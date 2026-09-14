@@ -19,6 +19,7 @@
         "flutter_map",
         "flutter_riverpod",
         "flutter_secure_storage",
+        "flutter_tts",
         "freezed_annotation",
         "geolocator",
         "go_router",
@@ -2097,6 +2098,14 @@
         "collection",
         "meta",
         "pub_semver"
+      ]
+    },
+    {
+      "name": "flutter_tts",
+      "version": "4.2.5",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins"
       ]
     }
   ],

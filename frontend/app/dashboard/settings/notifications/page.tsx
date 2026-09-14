@@ -79,6 +79,7 @@ export default function NotificationSettingsPage() {
         active="notifications"
         icon={<Bell className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Notification Settings"
+        titleNe="सूचना सेटिङ"
         subtitle="Control which channels and event types are active for your school"
       >
         <div className="win11-infobar error">

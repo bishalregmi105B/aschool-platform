@@ -103,6 +103,7 @@ class _DriverRunScreenState extends ConsumerState<DriverRunScreen> {
             await repo.startInstance(widget.instanceId);
         _instance = instance;
         _showSnack('Run started', ASchoolTheme.success);
+        await DriverAudioCoach.instance.runStarted();
       });
 
   Future<void> _endRun() async {
@@ -130,6 +131,7 @@ class _DriverRunScreenState extends ConsumerState<DriverRunScreen> {
       _instance = instance;
       if (_gpsActive) await _stopGps();
       _showSnack('Run completed', ASchoolTheme.success);
+      await DriverAudioCoach.instance.runEnded();
     });
   }
 
@@ -147,6 +149,12 @@ class _DriverRunScreenState extends ConsumerState<DriverRunScreen> {
               : '${_name(p)} boarded',
           missed ? ASchoolTheme.warning : ASchoolTheme.success,
         );
+        // Eyes on the road — the voice confirms the action.
+        if (missed) {
+          await DriverAudioCoach.instance.studentMissed(_name(p));
+        } else {
+          await DriverAudioCoach.instance.studentBoarded(_name(p));
+        }
       });
 
   Future<void> _dropOff(InstanceStop stop) => _runOp(() async {
@@ -154,6 +162,7 @@ class _DriverRunScreenState extends ConsumerState<DriverRunScreen> {
         await repo.dropOffAtStop(widget.instanceId, stopId: stop.stopId);
         _showSnack('Dropped off at ${stop.stopName ?? 'stop'}',
             ASchoolTheme.success);
+        await DriverAudioCoach.instance.droppedOff(stop.stopName ?? 'stop');
       });
 
   // ── GPS streaming ───────────────────────────────────────────────────────

@@ -61,6 +61,7 @@ export default function DatabaseBackupPage() {
       active="backup"
       icon={<Database className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
       title="Database Backup"
+      titleNe="डाटाबेस ब्याकअप"
       subtitle="Automated nightly dumps, manual trigger and last-run status"
       actions={
         <div className="flex gap-2">
