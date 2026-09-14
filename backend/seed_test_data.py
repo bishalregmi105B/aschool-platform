@@ -284,7 +284,7 @@ def _ensure_plugins(school: School) -> None:
 
         row = SchoolApp.query.filter_by(
             school_id=school.id,
-            plugin_slug=slug,
+            app_slug=slug,
             is_deleted=False,
         ).first()
         if row:
@@ -293,7 +293,7 @@ def _ensure_plugins(school: School) -> None:
 
         row = SchoolApp(
             school_id=school.id,
-            plugin_slug=slug,
+            app_slug=slug,
             active=True,
             is_trial=False,
             billing_cycle="monthly",
