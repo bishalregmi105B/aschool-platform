@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -47,9 +47,9 @@ interface Template {
 
 export default function TemplatesPage() {
   return (
-    <PluginGate slug="design_studio">
+    <AppGate slug="design_studio">
       <TemplatesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

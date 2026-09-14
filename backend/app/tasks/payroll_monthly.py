@@ -17,7 +17,7 @@ def process_monthly_payroll():
     until an admin fills in allowances/deductions).
     """
     from extensions import db
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.models.hr_payroll import StaffPayroll
     from app.models.user import User
 
@@ -25,8 +25,8 @@ def process_monthly_payroll():
     month = today.strftime("%Y-%m")  # StaffPayroll.month is String(7) YYYY-MM
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="hr_payroll", active=True)
+        db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="hr_payroll", active=True)
         .all()
     )
 

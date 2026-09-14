@@ -18,7 +18,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -42,7 +42,7 @@ const rankIcon = (rank: number) => {
 };
 
 export default function LeaderboardPage() {
-  return <PluginGate slug="gamification"><LeaderboardContent /></PluginGate>;
+  return <AppGate slug="gamification"><LeaderboardContent /></AppGate>;
 }
 
 function LeaderboardContent() {

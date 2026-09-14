@@ -9,7 +9,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,7 +40,7 @@ interface ProgressRow {
 }
 
 export default function StudentProgressPage() {
-  return <PluginGate slug="ai_suite"><ProgressContent /></PluginGate>;
+  return <AppGate slug="ai_suite"><ProgressContent /></AppGate>;
 }
 
 function Header() {

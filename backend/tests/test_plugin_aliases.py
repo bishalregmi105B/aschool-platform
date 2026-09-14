@@ -1,32 +1,32 @@
 """Regression tests for plugin alias compatibility."""
 
-from app.models.plugin import Plugin, SchoolPlugin
-from app.apps.decorators import _acceptable_plugin_slugs
+from app.models.app import App, SchoolApp
+from app.apps.decorators import _acceptable_app_slugs
 from tests.conftest import get_auth_headers
 
 
-def test_acceptable_plugin_slugs_is_single_hop_non_transitive():
+def test_acceptable_app_slugs_is_single_hop_non_transitive():
     # design_studio is its own plugin: no alias may chain into it.
-    assert _acceptable_plugin_slugs("design_studio") == {"design_studio"}
+    assert _acceptable_app_slugs("design_studio") == {"design_studio"}
 
     # Single-hop rename aliases still resolve in both directions,
     # but never chain to a third slug.
-    assert _acceptable_plugin_slugs("digital_content") == {
+    assert _acceptable_app_slugs("digital_content") == {
         "digital_content",
         "elibrary",
     }
-    assert _acceptable_plugin_slugs("elibrary") == {"elibrary", "digital_content"}
-    assert _acceptable_plugin_slugs("library_management") == {
+    assert _acceptable_app_slugs("elibrary") == {"elibrary", "digital_content"}
+    assert _acceptable_app_slugs("library_management") == {
         "library_management",
         "library",
     }
     # portfolio is the deprecated duplicate of student_portfolio (E14):
     # single-hop rename resolves in both directions.
-    assert _acceptable_plugin_slugs("portfolio") == {
+    assert _acceptable_app_slugs("portfolio") == {
         "portfolio",
         "student_portfolio",
     }
-    assert _acceptable_plugin_slugs("student_portfolio") == {
+    assert _acceptable_app_slugs("student_portfolio") == {
         "student_portfolio",
         "portfolio",
     }
@@ -36,7 +36,7 @@ def test_legacy_portfolio_install_passes_canonical_gate(client, db, school, admi
     """A legacy `portfolio` install must still satisfy the canonical
     student_portfolio gate (E14 split-brain reconciliation)."""
     db.session.add(
-        Plugin(
+        App(
             slug="portfolio",
             name="Student Portfolio",
             category="growth",
@@ -45,9 +45,9 @@ def test_legacy_portfolio_install_passes_canonical_gate(client, db, school, admi
         )
     )
     db.session.add(
-        SchoolPlugin(
+        SchoolApp(
             school_id=school.id,
-            plugin_slug="portfolio",
+            app_slug="portfolio",
             active=True,
         )
     )
@@ -67,7 +67,7 @@ def test_design_studio_gate_rejects_elibrary_only_installs(client, db, school, a
     """An elibrary (or digital_content) install must NOT unlock
     design_studio-gated routes (E3 alias-leak regression)."""
     db.session.add(
-        Plugin(
+        App(
             slug="elibrary",
             name="eLibrary",
             category="core",
@@ -76,9 +76,9 @@ def test_design_studio_gate_rejects_elibrary_only_installs(client, db, school, a
         )
     )
     db.session.add(
-        SchoolPlugin(
+        SchoolApp(
             school_id=school.id,
-            plugin_slug="elibrary",
+            app_slug="elibrary",
             active=True,
         )
     )

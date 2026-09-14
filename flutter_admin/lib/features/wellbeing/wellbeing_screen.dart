@@ -61,7 +61,7 @@ class _WellbeingScreenState extends ConsumerState<WellbeingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'wellbeing',
       child: Scaffold(
         appBar: AppBar(

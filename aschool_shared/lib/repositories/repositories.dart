@@ -13,5 +13,5 @@ export 'chat_repository.dart';
 export 'notification_repository.dart';
 export 'transport_repository.dart';
 export 'hr_repository.dart';
-export 'plugin_repository.dart';
+export 'app_repository.dart';
 export 'gallery_repository.dart';

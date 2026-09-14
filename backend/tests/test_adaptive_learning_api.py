@@ -22,16 +22,16 @@ from app.models.academic import Class, Subject
 from app.models.adaptive_learning import LearningPath, MasteryRecord
 from app.models.ai_token import AISchoolQuota
 from app.models.exam import Exam, Marks
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 
 
 def _ensure_plugin_rows(db, slugs):
-    existing = {p.slug for p in Plugin.query.filter(Plugin.slug.in_(slugs)).all()}
+    existing = {p.slug for p in App.query.filter(App.slug.in_(slugs)).all()}
     for slug in slugs:
         if slug not in existing:
             db.session.add(
-                Plugin(
+                App(
                     slug=slug, name=slug.replace("_", " ").title(),
                     category="premium", price_monthly=1499, price_yearly=14990,
                     is_free=False, emoji="🧠", icon="Brain", description="test",
@@ -43,7 +43,7 @@ def _ensure_plugin_rows(db, slugs):
 
 def _install_plugin(db, school, slug="ai_adaptive_learning"):
     _ensure_plugin_rows(db, [slug])
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True, is_trial=False))
+    db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True, is_trial=False))
     db.session.commit()
 
 
@@ -323,7 +323,7 @@ def test_generate_ai_rejects_foreign_student(client, db, school, admin_user):
                   phone_verified=True)
     admin2.set_password("Other@1234")
     _ensure_plugin_rows(db, ["ai_adaptive_learning"])
-    db.session.add(SchoolPlugin(school_id=other.id, plugin_slug="ai_adaptive_learning",
+    db.session.add(SchoolApp(school_id=other.id, app_slug="ai_adaptive_learning",
                                 active=True, is_trial=False))
     db.session.commit()
 

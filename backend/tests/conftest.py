@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import text
 
 from app import create_app
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.user import User
 from extensions import db as _db
@@ -184,7 +184,7 @@ def admin_b_user(db, school_b):
 @pytest.fixture
 def sample_plugin(db):
     """Create a sample published plugin."""
-    p = Plugin(
+    p = App(
         slug="attendance",
         name="Attendance Management",
         category="core",
@@ -205,7 +205,7 @@ def sample_plugin(db):
 @pytest.fixture
 def paid_plugin(db):
     """Create a paid plugin with trial."""
-    p = Plugin(
+    p = App(
         slug="lms",
         name="Learning Management System",
         category="growth",
@@ -226,9 +226,9 @@ def paid_plugin(db):
 @pytest.fixture
 def installed_plugin(db, school, sample_plugin):
     """Install a plugin for the test school."""
-    sp = SchoolPlugin(
+    sp = SchoolApp(
         school_id=school.id,
-        plugin_slug=sample_plugin.slug,
+        app_slug=sample_plugin.slug,
         active=True,
         is_trial=False,
     )

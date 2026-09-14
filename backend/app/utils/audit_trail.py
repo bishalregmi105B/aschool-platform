@@ -22,7 +22,7 @@ AUDITED_TABLES = {
     "staff_payroll",
     "student_scholarships",
     "users",
-    "school_plugins",
+    "school_apps",
 }
 
 # Columns never recorded (secrets / churn)
@@ -237,7 +237,7 @@ def _audited_columns() -> dict:
     from app.models.fee import FeeCollection, FeeReceipt, FeeRefund, StudentScholarship
     from app.models.user import User
     from app.models.hr_payroll import StaffPayroll
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     return {
         Marks: ["theory_marks", "practical_marks", "total_marks", "grade", "gpa", "is_withheld"],
@@ -248,5 +248,5 @@ def _audited_columns() -> dict:
         StudentScholarship: ["discount_value", "is_active"],
         User: ["role", "is_active", "school_id"],
         StaffPayroll: ["basic_salary", "net_salary", "status"],
-        SchoolPlugin: ["active", "is_trial"],
+        SchoolApp: ["active", "is_trial"],
     }

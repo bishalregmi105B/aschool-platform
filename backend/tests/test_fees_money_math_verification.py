@@ -17,18 +17,18 @@ def _login(client):
 
 
 def _install_fees_plugin(db, school):
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug="fees").first()
+    plugin = App.query.filter_by(slug="fees").first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug="fees", name="Fees", category="core", is_free=True,
             is_published=True, version="1.0.0",
         )
         db.session.add(plugin)
         db.session.flush()
     db.session.add(
-        SchoolPlugin(school_id=school.id, plugin_slug="fees", active=True, is_trial=False)
+        SchoolApp(school_id=school.id, app_slug="fees", active=True, is_trial=False)
     )
     db.session.commit()
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import { TrendingUp, Plus, Users } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function ActiveCasesPage() {
-  return <PluginGate slug="incident_management"><ActiveCasesContent /></PluginGate>;
+  return <AppGate slug="incident_management"><ActiveCasesContent /></AppGate>;
 }
 
 /**

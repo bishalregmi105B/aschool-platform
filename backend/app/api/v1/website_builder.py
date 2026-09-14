@@ -7,7 +7,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.website import WebsitePage, WebsiteTheme
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -291,7 +291,7 @@ def get_theme_css(theme_id):
 @website_builder_bp.route("/themes/apply", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def apply_theme():
     """Apply a theme to the school website."""
@@ -319,7 +319,7 @@ def apply_theme():
 @website_builder_bp.route("/status", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 def get_website_status():
     """Return a dashboard-friendly status overview for the website builder."""
     from app.models.school import School
@@ -352,7 +352,7 @@ def get_website_status():
 @website_builder_bp.route("/pages", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 def list_pages():
     """List all website pages for the school."""
     # Backfill: schools that never applied a theme (or predate prebuilt
@@ -369,7 +369,7 @@ def list_pages():
 @website_builder_bp.route("/pages", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def create_page():
     """Create a new website page."""
@@ -390,7 +390,7 @@ def create_page():
 @website_builder_bp.route("/pages/<page_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 def get_page(page_id):
     """Get a specific page with full section data."""
     page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
@@ -430,7 +430,7 @@ def _validate_page_slug(school_id, slug: str, page_id=None) -> str | None:
 @website_builder_bp.route("/pages/<page_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_page(page_id):
     """Update page content and sections (title, slug, layout, publish state).
@@ -481,7 +481,7 @@ def update_page(page_id):
 @website_builder_bp.route("/pages/<page_id>/publish-draft", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def publish_page_draft(page_id):
     """W-02: copy the draft sections to the live page in ONE action."""
@@ -522,7 +522,7 @@ def publish_page_draft(page_id):
 @website_builder_bp.route("/pages/<page_id>/revert-draft", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def revert_page_draft(page_id):
     """W-02 undo/redo: discard the draft and return to the live state."""
@@ -539,7 +539,7 @@ def revert_page_draft(page_id):
 @website_builder_bp.route("/pages/<page_id>/history", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def page_history(page_id):
     """W-02 version history: the last 10 published snapshots."""
@@ -557,7 +557,7 @@ def page_history(page_id):
 @website_builder_bp.route("/pages/<page_id>/history/<int:index>/restore", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def restore_page_history(page_id, index):
     """Restore a historical snapshot INTO THE DRAFT (publish separately)."""
@@ -577,7 +577,7 @@ def restore_page_history(page_id, index):
 @website_builder_bp.route("/pages/<page_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def delete_page(page_id):
     page = WebsitePage.query.filter_by(id=page_id, school_id=g.school_id).first_or_404()
@@ -589,7 +589,7 @@ def delete_page(page_id):
 @website_builder_bp.route("/pages/<page_id>/sections", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def add_page_section(page_id):
     """Add a section to a page backed by the page's JSON section list."""
@@ -612,7 +612,7 @@ def add_page_section(page_id):
 @website_builder_bp.route("/pages/<page_id>/sections/<section_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_page_section(page_id, section_id):
     """Update a single page section."""
@@ -641,7 +641,7 @@ def update_page_section(page_id, section_id):
 @website_builder_bp.route("/pages/<page_id>/sections/<section_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def delete_page_section(page_id, section_id):
     """Delete a single section from a page."""
@@ -657,7 +657,7 @@ def delete_page_section(page_id, section_id):
 @website_builder_bp.route("/pages/<page_id>/sections/<section_id>/reorder", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def reorder_page_section(page_id, section_id):
     """Move a section up or down in the page order."""
@@ -706,7 +706,7 @@ def list_available_sections():
 @website_builder_bp.route("/ai/generate-design", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def ai_generate_design():
     """Generate 3 design variations using AI."""
@@ -731,7 +731,7 @@ def ai_generate_design():
 @website_builder_bp.route("/ai/generate-copy", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def ai_generate_copy():
     """Generate bilingual website copy for all pages."""
@@ -755,7 +755,7 @@ def ai_generate_copy():
 @website_builder_bp.route("/domain", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 def get_domain_config():
     """Get custom domain configuration."""
     from app.models.school import School
@@ -781,7 +781,7 @@ def get_domain_config():
 @website_builder_bp.route("/domain", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_domain():
     """Update custom domain settings."""
@@ -805,7 +805,7 @@ def update_domain():
 @website_builder_bp.route("/domain/verify", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def verify_domain():
     """Compatibility endpoint for the dashboard verification flow — S-09:
@@ -842,7 +842,7 @@ DEFAULT_ROBOTS_TXT = "User-agent: *\nAllow: /"
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
-@plugin_required("website_builder")
+@app_required("website_builder")
 def get_seo_settings():
     """Get SEO settings for the school website.
 
@@ -876,7 +876,7 @@ def get_seo_settings():
 @website_builder_bp.route("/seo", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def update_seo_settings():
     """Update SEO settings.
@@ -976,7 +976,7 @@ def _revalidate_public_site(slug: str) -> None:
 @website_builder_bp.route("/publish", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def publish_website():
     """Publish the school website."""
@@ -1009,7 +1009,7 @@ def publish_website():
 @website_builder_bp.route("/unpublish", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def unpublish_website():
     """Unpublish the school website."""

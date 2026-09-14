@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ const STATUS_META: Record<string, { label: string; status: string }> = {
 };
 
 export default function CustomDomainPage() {
-  return <PluginGate slug="white_label"><DomainContent /></PluginGate>;
+  return <AppGate slug="white_label"><DomainContent /></AppGate>;
 }
 
 interface VerifyResult {

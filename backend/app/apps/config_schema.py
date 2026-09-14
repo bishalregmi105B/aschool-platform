@@ -99,9 +99,9 @@ def load_schema(slug: str) -> Schema | None:
     plugin-contract error, and the settings API answers 500-free by falling
     back to the legacy editor.
     """
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
-    raw = PluginLoader.get_config_schema_raw(slug)  # {} when absent
+    raw = AppLoader.get_config_schema_raw(slug)  # {} when absent
     if not raw:
         return None
     if int(raw.get("schema_version") or 1) < 2:
@@ -206,7 +206,7 @@ def _secret_signer():
 
 
 def encrypt_secret(plaintext: str) -> dict:
-    """Envelope stored in SchoolPlugin.config — plaintext never lands in JSONB."""
+    """Envelope stored in SchoolApp.config — plaintext never lands in JSONB."""
     token = _secret_signer().dumps({"v": 1, "s": plaintext})
     return {
         "__secret__": True,

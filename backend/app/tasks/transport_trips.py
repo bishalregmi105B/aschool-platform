@@ -20,13 +20,13 @@ def publish_transport_instances():
     today."""
     from datetime import date
 
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from extensions import db
 
     school_ids = [
         str(row[0])
-        for row in db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="gps_tracking", active=True)
+        for row in db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="gps_tracking", active=True)
         .all()
     ]
     total = 0
@@ -48,13 +48,13 @@ def force_end_stale_transport():
     """Close running instances whose last GPS fix is older than 4 hours —
     the driver app died mid-trip (SBT's silent failure mode; ours self-
     heals and marks the tail missed)."""
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from extensions import db
 
     school_ids = [
         str(row[0])
-        for row in db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="gps_tracking", active=True)
+        for row in db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="gps_tracking", active=True)
         .all()
     ]
     closed = 0

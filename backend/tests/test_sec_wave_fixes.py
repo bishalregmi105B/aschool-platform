@@ -82,20 +82,20 @@ class TestFeeConfigLeak:
 
 class TestPluginConfigReads:
     def test_installed_hides_config_from_student(self, client, db, school, student_login, admin_user):
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        plugin = Plugin.query.filter_by(slug="attendance").first()
+        plugin = App.query.filter_by(slug="attendance").first()
         if not plugin:
-            plugin = Plugin(slug="attendance", name="Attendance", category="starter",
+            plugin = App(slug="attendance", name="Attendance", category="starter",
                             is_free=True, is_published=True, version="1.0.0")
             db.session.add(plugin)
-        db.session.add(SchoolPlugin(
-            school_id=school.id, plugin_slug="attendance", active=True,
+        db.session.add(SchoolApp(
+            school_id=school.id, app_slug="attendance", active=True,
             is_trial=False, config={"internal_note": "hello"}))
         db.session.commit()
 
         r = client.get(
-            "/api/v1/plugins/installed",
+            "/api/v1/apps/installed",
             headers=get_auth_headers(client, student_login.email, "SecPass@123"),
         )
         assert r.status_code == 200
@@ -107,25 +107,25 @@ class TestPluginConfigReads:
     ):
         """F2/F24: ai_teacher provisions webhook_secret into config without a
         schema `type: secret` field — the envelope sweep must redact it."""
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        plugin = Plugin.query.filter_by(slug="attendance").first()
+        plugin = App.query.filter_by(slug="attendance").first()
         if not plugin:
-            plugin = Plugin(slug="attendance", name="Attendance", category="starter",
+            plugin = App(slug="attendance", name="Attendance", category="starter",
                             is_free=True, is_published=True, version="1.0.0")
             db.session.add(plugin)
         envelope = {"__secret__": True, "ciphertext": "abc", "last4": "xyz9"}
-        db.session.add(SchoolPlugin(
-            school_id=school.id, plugin_slug="attendance", active=True,
+        db.session.add(SchoolApp(
+            school_id=school.id, app_slug="attendance", active=True,
             is_trial=False, config={"webhook_secret": envelope, "plain": "v"}))
         db.session.commit()
 
         r = client.get(
-            "/api/v1/plugins/installed",
+            "/api/v1/apps/installed",
             headers=get_auth_headers(client, admin_user.email, "Test@1234"),
         )
         assert r.status_code == 200
-        att = next(e for e in r.get_json()["data"] if e["plugin_slug"] == "attendance")
+        att = next(e for e in r.get_json()["data"] if e["app_slug"] == "attendance")
         assert att["config"]["webhook_secret"] == {"__secret__": True, "last4": "xyz9"}
         assert "ciphertext" not in att["config"]["webhook_secret"]
         assert att["config"]["plain"] == "v"
@@ -134,17 +134,17 @@ class TestPluginConfigReads:
 class TestTrackingIdValidation:
     @pytest.fixture()
     def basic_website_installed(self, db, school):
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        p = Plugin.query.filter_by(slug="basic_website").first()
+        p = App.query.filter_by(slug="basic_website").first()
         if not p:
-            p = Plugin(
+            p = App(
                 slug="basic_website", name="Basic Website", category="core",
                 is_free=True, is_published=True, version="1.0.0",
             )
             db.session.add(p)
-        db.session.add(SchoolPlugin(
-            school_id=school.id, plugin_slug="basic_website", active=True,
+        db.session.add(SchoolApp(
+            school_id=school.id, app_slug="basic_website", active=True,
             is_trial=False))
         db.session.commit()
 

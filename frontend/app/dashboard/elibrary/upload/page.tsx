@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 export default function UploadResourcesPage() {
-  return <PluginGate slug="elibrary"><UploadContent /></PluginGate>;
+  return <AppGate slug="elibrary"><UploadContent /></AppGate>;
 }
 
 function UploadContent() {

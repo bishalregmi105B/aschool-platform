@@ -87,7 +87,7 @@ class _StudentWellbeingScreenState extends ConsumerState<StudentWellbeingScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'wellbeing',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Student Wellbeing'),

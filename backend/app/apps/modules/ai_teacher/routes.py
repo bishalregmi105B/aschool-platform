@@ -1,6 +1,6 @@
 """AI Teacher plugin routes — lesson lifecycle + mastery + service webhook.
 
-Every route: @jwt_required() @school_required @plugin_required("ai_teacher")
+Every route: @jwt_required() @school_required @app_required("ai_teacher")
 The create-lesson sequence (AT §B.3) runs ALL gates before anything is spent:
 kill switch → tier → role → consent → content resolution (published only,
 422 otherwise) → injection scan → budget reserve → ASchool row → service call.
@@ -20,7 +20,7 @@ from app.models.ai_teacher import (
 from app.models.ai_workbench import SchoolAIToolSettings
 from app.models.student import Student
 from app.apps.config_store import plugin_config_value
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.apps.modules.ai_teacher.service_client import ServiceUnavailableError
 from app.services.ai.workbench import (
     ToolPipelineError,
@@ -208,7 +208,7 @@ def _estimate_lesson_cost_usd(lesson) -> float:
 @ai_teacher_bp.route("/lessons", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 @role_required("superadmin", "school_admin", "teacher", "student")
 @ai_rate_limit()
 def create_lesson():
@@ -441,7 +441,7 @@ def create_lesson():
 @ai_teacher_bp.route("/lessons", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 def list_lessons():
     query = AITeacherLesson.query.filter(
         AITeacherLesson.school_id == g.school_id,
@@ -471,7 +471,7 @@ def list_lessons():
 @ai_teacher_bp.route("/lessons/<uuid:lesson_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 def get_lesson(lesson_id):
     lesson = AITeacherLesson.query.filter_by(
         id=lesson_id, school_id=g.school_id, is_deleted=False
@@ -497,7 +497,7 @@ def get_lesson(lesson_id):
 @ai_teacher_bp.route("/lessons/<uuid:lesson_id>/stop", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 def stop_lesson_route(lesson_id):
     lesson = AITeacherLesson.query.filter_by(
         id=lesson_id, school_id=g.school_id, is_deleted=False
@@ -520,7 +520,7 @@ def stop_lesson_route(lesson_id):
 @ai_teacher_bp.route("/mastery", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 def mastery():
     """Mastery rollup. Students see their own; parents their children;
     staff any student via ?student_id=."""
@@ -564,7 +564,7 @@ def mastery():
 @ai_teacher_bp.route("/usage", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_teacher")
+@app_required("ai_teacher")
 @role_required("superadmin", "school_admin")
 def usage():
     """Per-school minutes + cost rollup for the admin Usage & Cost page."""
@@ -646,7 +646,7 @@ def webhook_lesson_event():
     # the config-map path where the owning school is the one whose ai_teacher
     # plugin-config envelope holds this key_id's secret.
     from app.models.ai_teacher import AITeacherServiceKey
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     key_row = AITeacherServiceKey.query.filter_by(key_id=key_id).first()
     if key_row:
@@ -656,8 +656,8 @@ def webhook_lesson_event():
     elif key_id in secrets_map:
         # Deployment-config key: find the school whose envelope holds it.
         owner = (
-            SchoolPlugin.query.filter_by(plugin_slug="ai_teacher")
-            .order_by(SchoolPlugin.created_at)
+            SchoolApp.query.filter_by(app_slug="ai_teacher")
+            .order_by(SchoolApp.created_at)
             .all()
         )
         key_school_id = None
@@ -826,14 +826,14 @@ def _webhook_secret_for_key(key_id: str) -> str | None:
     None when the key is unknown or the envelope is unreadable (rotated
     platform key) — the caller then 401s honestly."""
     from app.models.ai_teacher import AITeacherServiceKey
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.apps.config_schema import decrypt_secret
 
     key = AITeacherServiceKey.query.filter_by(key_id=key_id).first()
     if not key:
         return None
-    sp = SchoolPlugin.query.filter_by(
-        school_id=key.school_id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=key.school_id, app_slug="ai_teacher"
     ).first()
     envelope = (sp.config or {}).get("webhook_secret") if sp else None
     if not isinstance(envelope, dict):

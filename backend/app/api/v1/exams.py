@@ -13,7 +13,7 @@ from app.models.academic import Class, Section, Subject
 from app.models.exam import Exam, Marks, OnlineExam, OnlineExamAttempt, ReportCard, MarkComponent, GradeScale
 from app.models.school import School
 from app.models.student import Guardian, Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepal_grading import GRADE_TABLE, calculate_gpa, calculate_grade, calculate_subject_grade
 from app.utils.pagination import paginate
@@ -227,7 +227,7 @@ def _mark_is_pass(mark, subject=None, exam=None):
 @exams_bp.route("/grade-table", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_grade_table():
     """Return Nepal NEB grading scale for reference."""
     return success_response(GRADE_TABLE)
@@ -239,7 +239,7 @@ def get_grade_table():
 @exams_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_exams():
     query = Exam.query.filter_by(school_id=g.school_id, is_deleted=False)
     academic_year_id = request.args.get("academic_year_id")
@@ -280,7 +280,7 @@ def list_exams():
 @exams_bp.route("/online", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_online_exams():
     query = OnlineExam.query.filter_by(school_id=g.school_id, is_deleted=False)
     class_id = request.args.get("class_id")
@@ -313,7 +313,7 @@ def list_online_exams():
 @exams_bp.route("/online", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def create_online_exam():
     data = request.get_json(silent=True) or {}
@@ -407,7 +407,7 @@ def create_online_exam():
 @exams_bp.route("/online/<uuid:online_exam_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_online_exam(online_exam_id):
     exam = OnlineExam.query.filter_by(
         id=online_exam_id, school_id=g.school_id, is_deleted=False
@@ -420,7 +420,7 @@ def get_online_exam(online_exam_id):
 @exams_bp.route("/online/<uuid:online_exam_id>/submit", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def submit_online_exam(online_exam_id):
     """Submit an online-exam attempt (S-A2, A-05).
 
@@ -590,7 +590,7 @@ def _get_attempt(exam, student_uuid):
 @exams_bp.route("/online/<uuid:online_exam_id>/start", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def start_online_exam(online_exam_id):
     """Open (or resume) the calling student's attempt.
 
@@ -658,7 +658,7 @@ def start_online_exam(online_exam_id):
 @exams_bp.route("/online/<uuid:online_exam_id>/attempt", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def autosave_online_exam(online_exam_id):
     """Per-question autosave: merge `answers` deltas into the in-progress
     attempt. Answers recorded here survive an app kill and are scored at
@@ -699,7 +699,7 @@ def autosave_online_exam(online_exam_id):
 @exams_bp.route("/online/<uuid:online_exam_id>/take", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def take_online_exam(online_exam_id):
     """Student-facing exam paper: student-safe questions (the answer key
     never leaves the server — V2-01 regression) + attempt state + server
@@ -750,7 +750,7 @@ def take_online_exam(online_exam_id):
 @exams_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def create_exam():
     data = request.get_json(silent=True) or {}
@@ -796,7 +796,7 @@ def create_exam():
 @exams_bp.route("/<uuid:exam_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_exam(exam_id):
     exam = Exam.query.get(exam_id)
     if not exam or exam.is_deleted or str(exam.school_id) != str(g.school_id):
@@ -824,7 +824,7 @@ def get_exam(exam_id):
 @exams_bp.route("/<uuid:exam_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def update_exam(exam_id):
     exam = Exam.query.get(exam_id)
@@ -858,7 +858,7 @@ def update_exam(exam_id):
 @exams_bp.route("/<uuid:exam_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def delete_exam(exam_id):
     exam = Exam.query.get(exam_id)
@@ -875,7 +875,7 @@ def delete_exam(exam_id):
 @exams_bp.route("/<uuid:exam_id>/marks", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_marks(exam_id):
     query = Marks.query.filter_by(
         school_id=g.school_id, exam_id=exam_id, is_deleted=False
@@ -936,7 +936,7 @@ def list_marks(exam_id):
 @exams_bp.route("/<uuid:exam_id>/marks", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def submit_marks(exam_id):
     """Bulk submit marks for an exam with NEB auto-grading."""
@@ -1198,7 +1198,7 @@ def submit_marks(exam_id):
 @exams_bp.route("/<uuid:exam_id>/subjects", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_exam_subjects(exam_id):
     exam = Exam.query.filter_by(
         id=exam_id, school_id=g.school_id, is_deleted=False
@@ -1235,7 +1235,7 @@ def get_exam_subjects(exam_id):
 @exams_bp.route("/results", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_student_results():
     """Compatibility route for Flutter student results."""
     student_id = request.args.get("student_id")
@@ -1281,7 +1281,7 @@ def list_student_results():
 @exams_bp.route("/<uuid:exam_id>/results", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_results(exam_id):
     """Compute NEB-graded results for all students in an exam."""
     class_id = request.args.get("class_id")
@@ -1381,7 +1381,7 @@ def get_results(exam_id):
 @exams_bp.route("/<uuid:exam_id>/grade-sheet", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_grade_sheet(exam_id):
     """Return a class-wide grade sheet matrix: rows=students, cols=subjects."""
     class_id = request.args.get("class_id")
@@ -1547,7 +1547,7 @@ def get_grade_sheet(exam_id):
 @exams_bp.route("/<uuid:exam_id>/marksheet/<uuid:student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_student_marksheet(exam_id, student_id):
     """Return detailed marksheet for a single student (subject-by-subject)."""
     exam = Exam.query.get(exam_id)
@@ -1650,7 +1650,7 @@ def get_student_marksheet(exam_id, student_id):
 @exams_bp.route("/<uuid:exam_id>/marksheet/<uuid:student_id>/html", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_student_marksheet_html(exam_id, student_id):
     """Return rendered HTML marksheet for a single student using the template engine."""
     template_id = request.args.get("template_id", "marksheet")
@@ -1693,7 +1693,7 @@ def get_student_marksheet_html(exam_id, student_id):
 @exams_bp.route("/<uuid:exam_id>/designer-marksheet", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def generate_designer_marksheets(exam_id):
     """Generate marksheets using the Design Studio template engine.
@@ -1744,7 +1744,7 @@ def generate_designer_marksheets(exam_id):
 @exams_bp.route("/<uuid:exam_id>/publish", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def publish_results(exam_id):
     exam = Exam.query.get(exam_id)
@@ -1763,7 +1763,7 @@ def publish_results(exam_id):
 @exams_bp.route("/<uuid:exam_id>/marks/unlock", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def unlock_marks(exam_id):
     """Re-open mark entry after publication (E18-marks-lock).
@@ -1790,7 +1790,7 @@ def unlock_marks(exam_id):
 @exams_bp.route("/<uuid:exam_id>/report-cards/<uuid:student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def get_report_card(exam_id, student_id):
     """Get report card for a student."""
     student = _resolve_accessible_student(student_id)
@@ -1808,7 +1808,7 @@ def get_report_card(exam_id, student_id):
 @exams_bp.route("/<uuid:exam_id>/report-cards", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_report_cards(exam_id):
     """List all report cards for an exam."""
     class_id = request.args.get("class_id")
@@ -1845,7 +1845,7 @@ def list_report_cards(exam_id):
 @exams_bp.route("/<uuid:exam_id>/report-cards", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin")
 def generate_report_cards(exam_id):
     """Trigger report card generation for an exam."""
@@ -1864,7 +1864,7 @@ def generate_report_cards(exam_id):
 @exams_bp.route("/<uuid:exam_id>/bulk-marksheet-pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def bulk_marksheet_pdf(exam_id):
     """Generate a single PDF containing marksheets/grade sheets for all students in a class."""
@@ -1932,7 +1932,7 @@ def bulk_marksheet_pdf(exam_id):
 @exams_bp.route("/<uuid:exam_id>/report-cards/bulk-pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def bulk_report_cards_pdf(exam_id):
     """Render a single PDF containing all report cards for the selected class."""
@@ -2398,7 +2398,7 @@ def _current_user_uuid():
 @exams_bp.route("/<uuid:exam_id>/components", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_mark_components(exam_id):
     """Mark-distribution components per subject for the marks grid columns."""
     exam = Exam.query.get(exam_id)
@@ -2431,7 +2431,7 @@ def list_mark_components(exam_id):
 @exams_bp.route("/<uuid:exam_id>/components", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "teacher")
 def set_mark_components(exam_id):
     """Replace one subject's component distribution for an exam.
@@ -2541,7 +2541,7 @@ def set_mark_components(exam_id):
 @exams_bp.route("/grade-scales", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def list_grade_scales():
     rows = GradeScale.query.filter(
         GradeScale.school_id == g.school_id, GradeScale.is_deleted.is_(False)
@@ -2564,7 +2564,7 @@ def list_grade_scales():
 @exams_bp.route("/grade-scales", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 @role_required("school_admin", "superadmin")
 def create_grade_scale():
     """Create/update a school grading scale. Body: {name, board?, is_default?,
@@ -2728,7 +2728,7 @@ def _tabulation_rows(exam, class_uuid, section_uuid=None):
 @exams_bp.route("/<uuid:exam_id>/tabulation", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def exam_tabulation(exam_id):
     """Tabulation sheet: students × subjects grid + grade legend + totals +
     merit order. `?format=print` returns the HTML print twin."""
@@ -2769,7 +2769,7 @@ def exam_tabulation(exam_id):
 @exams_bp.route("/<uuid:exam_id>/merit-list", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("exams")
+@app_required("exams")
 def exam_merit_list(exam_id):
     """Merit list: students ordered by GPA (absent/NG anywhere → NG result,
     the InfixEdu rule), with the printable HTML twin."""

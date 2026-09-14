@@ -56,7 +56,7 @@ class _ParentELibraryScreenState extends ConsumerState<ParentELibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'elibrary',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Digital Library'),

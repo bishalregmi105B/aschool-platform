@@ -179,7 +179,7 @@ class StudentShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final user = ref.watch(authProvider).user;
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
 
     return Scaffold(
       drawer: Drawer(

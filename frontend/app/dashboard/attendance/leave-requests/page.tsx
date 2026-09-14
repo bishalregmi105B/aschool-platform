@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,9 +67,9 @@ function leaveDays(lr: LeaveRequest): number {
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function LeaveRequestsPage() {
   return (
-    <PluginGate slug="attendance">
+    <AppGate slug="attendance">
       <LeaveRequestsInner />
-    </PluginGate>
+    </AppGate>
   );
 }
 

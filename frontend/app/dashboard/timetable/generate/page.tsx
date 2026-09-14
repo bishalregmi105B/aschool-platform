@@ -18,7 +18,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -74,9 +74,9 @@ interface GenerateResult {
 
 export default function TimetableGeneratePage() {
   return (
-    <PluginGate slug="timetable">
+    <AppGate slug="timetable">
       <GenerateContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

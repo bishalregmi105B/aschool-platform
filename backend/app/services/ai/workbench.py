@@ -351,10 +351,10 @@ def _registry_lookup(tool_key: str):
 
 def _require_plan_tier(tier: str) -> None:
     # The registry's min_plan_tier resolves to the ai_suite bundle (§14.1);
-    # g.installed_plugins is the same gate plugin_required uses (aliases
+    # g.installed_apps is the same gate app_required uses (aliases
     # ai_* → ai_suite already handled there).
     if tier != "free":
-        installed = set(getattr(g, "installed_plugins", None) or [])
+        installed = set(getattr(g, "installed_apps", None) or [])
         if "ai_suite" not in installed:
             raise ToolPipelineError(
                 "This tool requires the AI Suite plan.", 402, blocked=True

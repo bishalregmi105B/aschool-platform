@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 const HOUSE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"];
 
 export default function HousesPage() {
-  return <PluginGate slug="gamification"><HousesContent /></PluginGate>;
+  return <AppGate slug="gamification"><HousesContent /></AppGate>;
 }
 
 function HousesContent() {

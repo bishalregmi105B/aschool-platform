@@ -1,7 +1,7 @@
-"""Plugin per-school config access — dot-path reads over SchoolPlugin.config.
+"""Plugin per-school config access — dot-path reads over SchoolApp.config.
 
 The settings screen (config_schema.yaml + /dashboard/plugins/[slug]/settings)
-writes SchoolPlugin.config; these helpers are how real consumers (celery
+writes SchoolApp.config; these helpers are how real consumers (celery
 tasks, AI routes, the website builder) read those values. Always returns the
 caller's default when the plugin is not installed or the key is missing —
 a config read must never raise into business logic.
@@ -30,24 +30,24 @@ def get_dotted(config: dict | None, dotted_key: str, default=None):
     return node
 
 
-def get_plugin_config(school_id: str, plugin_slug: str) -> dict:
-    """SchoolPlugin.config for (school, slug); {} when absent."""
+def get_plugin_config(school_id: str, app_slug: str) -> dict:
+    """SchoolApp.config for (school, slug); {} when absent."""
     try:
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
 
-        sp = SchoolPlugin.query.filter_by(
-            school_id=str(school_id), plugin_slug=plugin_slug
+        sp = SchoolApp.query.filter_by(
+            school_id=str(school_id), app_slug=app_slug
         ).first()
         return dict(sp.config or {}) if sp and sp.config else {}
     except Exception as e:  # noqa: BLE001 — config reads are best-effort
         logger.warning(
-            "plugin_config(%s, %s) read failed: %s", school_id, plugin_slug, e
+            "plugin_config(%s, %s) read failed: %s", school_id, app_slug, e
         )
         return {}
 
 
 def plugin_config_value(
-    school_id: str, plugin_slug: str, dotted_key: str, default=None
+    school_id: str, app_slug: str, dotted_key: str, default=None
 ):
     """Value of one (possibly nested) plugin-config key, or the default.
 
@@ -57,12 +57,12 @@ def plugin_config_value(
     try:
         from app.apps import config_schema
 
-        resolved = config_schema.resolve_config(plugin_slug, school_id)
+        resolved = config_schema.resolve_config(app_slug, school_id)
         value = get_dotted(resolved, dotted_key, _MISSING)
         return default if value is _MISSING else value
     except Exception:  # noqa: BLE001 — config reads are best-effort
         return get_dotted(
-            get_plugin_config(school_id, plugin_slug), dotted_key, default
+            get_plugin_config(school_id, app_slug), dotted_key, default
         )
 
 

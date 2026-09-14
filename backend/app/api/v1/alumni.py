@@ -7,7 +7,7 @@ from sqlalchemy import distinct, func, or_
 
 from app.models.alumni import Alumni, AlumniDonation, AlumniEvent
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -22,7 +22,7 @@ alumni_bp = Blueprint("alumni", __name__, url_prefix="/alumni")
 @alumni_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 def list_alumni():
     query = Alumni.query.filter_by(school_id=g.school_id, is_deleted=False)
     batch = request.args.get("batch")
@@ -65,7 +65,7 @@ def list_alumni():
 @alumni_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin")
 def create_alumni():
     data = request.get_json(silent=True) or {}
@@ -89,7 +89,7 @@ def create_alumni():
 @alumni_bp.route("/<uuid:alumni_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 def get_alumni(alumni_id):
     alum = Alumni.query.filter_by(id=alumni_id, school_id=g.school_id, is_deleted=False).first()
     if not alum:
@@ -100,7 +100,7 @@ def get_alumni(alumni_id):
 @alumni_bp.route("/<uuid:alumni_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin")
 def update_alumni(alumni_id):
     alum = Alumni.query.filter_by(id=alumni_id, school_id=g.school_id, is_deleted=False).first()
@@ -119,7 +119,7 @@ def update_alumni(alumni_id):
 @alumni_bp.route("/<uuid:alumni_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin")
 def delete_alumni(alumni_id):
     alum = Alumni.query.filter_by(id=alumni_id, school_id=g.school_id, is_deleted=False).first()
@@ -135,7 +135,7 @@ def delete_alumni(alumni_id):
 @alumni_bp.route("/events", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 def list_events():
     query = AlumniEvent.query.filter_by(school_id=g.school_id, is_deleted=False)
     items, meta = paginate(query.order_by(AlumniEvent.event_date.desc()))
@@ -145,7 +145,7 @@ def list_events():
 @alumni_bp.route("/events", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin")
 def create_event():
     data = request.get_json(silent=True) or {}
@@ -169,7 +169,7 @@ def create_event():
 @alumni_bp.route("/events/<uuid:event_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin")
 def update_event(event_id):
     event = AlumniEvent.query.filter_by(
@@ -197,7 +197,7 @@ def update_event(event_id):
 @alumni_bp.route("/donations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin", "accountant")
 def list_donations():
     query = AlumniDonation.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -211,7 +211,7 @@ def list_donations():
 @alumni_bp.route("/donations", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("alumni")
+@app_required("alumni")
 @role_required("superadmin", "school_admin", "accountant")
 def create_donation():
     data = request.get_json(silent=True) or {}

@@ -5,7 +5,7 @@ Discovery order (Odoo-style):
   1. app/plugins/modules/*/manifest.yaml  ← new self-contained module packages
   2. app/plugins/manifests/*.yaml          ← legacy flat manifests (backward compat)
 
-All plugin blueprints are loaded once at startup. The @plugin_required
+All plugin blueprints are loaded once at startup. The @app_required
 decorator handles per-school access control at request time.
 WP-style catalog model (2026-08-30): the plugins DIRECTORY is the catalog
 source of truth. The DB `plugins` table is only a per-school-install-state
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 _VALID_CATEGORIES = {"core", "starter", "growth", "premium", "add_on"}
 
 
-class PluginLoader:
+class AppLoader:
     """Discovers plugin manifests and registers their Flask blueprints.
 
     Supports two discovery paths:
@@ -173,7 +173,7 @@ class PluginLoader:
                 cls._load_manifest(manifest_file, registered, legacy=True)
 
         logger.info(
-            "PluginLoader: %d modules registered (%d from modules/, legacy fills gaps)",
+            "AppLoader: %d modules registered (%d from modules/, legacy fills gaps)",
             len(cls._plugins),
             sum(1 for m in cls._plugins.values() if m.get("_source") == "module"),
         )
@@ -231,7 +231,7 @@ class PluginLoader:
             logger.error("Plugin manifest pointer broken: %s", err)
         if errors:
             logger.error(
-                "PluginLoader: %d broken manifest pointer(s) — fix the listed "
+                "AppLoader: %d broken manifest pointer(s) — fix the listed "
                 "manifest.yaml files", len(errors),
             )
         return errors
@@ -470,7 +470,7 @@ class PluginLoader:
         """
         cls._scan_manifests()
 
-        from app.models.plugin import Plugin
+        from app.models.app import App
         from extensions import db
 
         created = updated = 0
@@ -505,9 +505,9 @@ class PluginLoader:
                 api_blueprint=m.get("api_blueprint"),
             )
 
-            existing = Plugin.query.filter_by(slug=slug).first()
+            existing = App.query.filter_by(slug=slug).first()
             if not existing:
-                plugin = Plugin(slug=slug, is_published=is_published, **fields)
+                plugin = App(slug=slug, is_published=is_published, **fields)
                 db.session.add(plugin)
                 created += 1
                 continue
@@ -523,9 +523,9 @@ class PluginLoader:
 
         # Unpublish mirror rows whose plugin folder/manifest is gone.
         deactivated = 0
-        orphans = Plugin.query.filter(
-            Plugin.slug.notin_(scanned_slugs) if scanned_slugs else Plugin.slug.isnot(None),
-            Plugin.is_published.is_(True),
+        orphans = App.query.filter(
+            App.slug.notin_(scanned_slugs) if scanned_slugs else App.slug.isnot(None),
+            App.is_published.is_(True),
         ).all()
         for row in orphans:
             row.is_published = False
@@ -659,7 +659,7 @@ class PluginLoader:
           nav entry is hidden until release).
         - Alias-aware: an item renders when ANY acceptable slug (itself, its
           alias target, or legacy aliases of it — the same single-hop
-          expansion used by @plugin_required) is installed. This is what
+          expansion used by @app_required) is installed. This is what
           surfaces the single "AI Suite" nav entry for schools that installed
           one of the deprecated individual AI plugins, and canonical entries
           for schools still holding legacy duplicate installs.
@@ -668,7 +668,7 @@ class PluginLoader:
         Reads the normalized `ui.nav` block (`_normalize_manifest`), so v1
         `frontend.sidebar` and v2 `ui.nav` manifests flow through one path.
         """
-        from app.apps.decorators import _acceptable_plugin_slugs
+        from app.apps.decorators import _acceptable_app_slugs
 
         # Merge core + installed, preserving order and deduplicating
         all_slugs: list[str] = list(
@@ -682,7 +682,7 @@ class PluginLoader:
         # + alias target + legacy aliases) intersects the installs — that is
         # what surfaces the single "AI Suite" entry for legacy AI installs.
         for slug in sorted(cls._plugins):
-            if slug not in all_slugs and _acceptable_plugin_slugs(slug) & installed_set:
+            if slug not in all_slugs and _acceptable_app_slugs(slug) & installed_set:
                 all_slugs.append(slug)
 
         sidebar = []
@@ -711,8 +711,8 @@ class PluginLoader:
                 continue
 
             # Installed+active check with single-hop alias expansion — the
-            # same acceptable-slug set @plugin_required accepts.
-            acceptable = _acceptable_plugin_slugs(slug)
+            # same acceptable-slug set @app_required accepts.
+            acceptable = _acceptable_app_slugs(slug)
             if not acceptable & installed_set:
                 continue
 

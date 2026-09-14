@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ function formatLabel(value: string) {
 }
 
 export default function FeeStructurePage() {
-  return <PluginGate slug="fees"><FeeStructureContent /></PluginGate>;
+  return <AppGate slug="fees"><FeeStructureContent /></AppGate>;
 }
 
 function FeeStructureContent() {

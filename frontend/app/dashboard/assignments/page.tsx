@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -80,9 +80,9 @@ function displayDate(bsDate?: string, adDate?: string) {
 
 export default function AssignmentsPage() {
   return (
-    <PluginGate slug="assignments">
+    <AppGate slug="assignments">
       <AssignmentsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

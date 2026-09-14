@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -77,9 +77,9 @@ const REPORT_CARD_COLUMNS: Column<ReportCard>[] = [
 
 export default function ReportCardsPage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <ReportCardsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

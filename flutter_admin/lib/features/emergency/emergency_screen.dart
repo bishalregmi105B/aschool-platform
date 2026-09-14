@@ -75,7 +75,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'emergency',
       child: Scaffold(
         appBar: AppBar(

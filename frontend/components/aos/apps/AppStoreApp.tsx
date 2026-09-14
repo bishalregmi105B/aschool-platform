@@ -21,10 +21,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { api, type ApiResponse } from "@/lib/api";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
-import { SubscribeDialog } from "@/components/plugins/subscribe-dialog";
+import { SubscribeDialog } from "@/components/app-components/subscribe-dialog";
 import { formatCurrency } from "@/lib/utils";
 import {
   AOSModuleLoadingState,
@@ -39,7 +39,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
  * A tabbed shell (220px sidebar) built around the live dashboard pages:
  *   • Store                → embeds /dashboard/marketplace (search, cards,
  *                            SaaS packages, checkout)
- *   • Installed            → embeds /dashboard/plugins (installed management)
+ *   • Installed            → embeds /dashboard/apps (installed management)
  *   • Permissions (admin)  → role-access overview; actual role management
  *                            lives in Settings → Roles (real school roles).
  *
@@ -86,7 +86,7 @@ export interface AppStoreAppProps {
   onLaunchPluginDemo?: (pluginId: string) => void;
 }
 
-// ── Live catalog types (raw /plugins/marketplace payload) ────────────────────
+// ── Live catalog types (raw /apps/marketplace payload) ────────────────────
 
 interface RawMarketplacePlugin {
   slug: string;
@@ -145,7 +145,7 @@ const MarketplaceEmbed = dynamic(() => import("@/app/dashboard/marketplace/page"
   loading: () => <AOSModuleLoadingState label="Loading marketplace…" />,
 });
 
-const InstalledPluginsEmbed = dynamic(() => import("@/app/dashboard/plugins/page"), {
+const InstalledPluginsEmbed = dynamic(() => import("@/app/dashboard/apps/page"), {
   loading: () => <AOSModuleLoadingState label="Loading installed plugins…" />,
 });
 
@@ -311,7 +311,7 @@ function CategoryPluginCard({
         ) : isPaid ? (
           <>
             <Link
-              href={`/dashboard/plugins/${plugin.slug}/settings`}
+              href={`/dashboard/apps/${plugin.slug}/settings`}
               className="subtle"
               style={{
                 fontSize: "12px",
@@ -469,7 +469,7 @@ export default function AppStoreApp({
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { refreshPlugins } = useInstalledPlugins();
+  const { refreshPlugins } = useInstalledApps();
 
   const currentRole: SchoolRole = propRole || (user?.role as SchoolRole) || "student";
   const isAdmin = ADMIN_ROLES.has(user?.role || "") || currentRole === "admin";
@@ -485,7 +485,7 @@ export default function AppStoreApp({
   const { data: catalog, isLoading: isCatalogLoading } = useQuery({
     queryKey: ["aos-store-catalog"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<RawMarketplaceResponse>>("/plugins/marketplace");
+      const res = await api.get<ApiResponse<RawMarketplaceResponse>>("/apps/marketplace");
       const raw = res.data.data;
       const list: RawMarketplacePlugin[] = [];
       if (Array.isArray(raw)) {
@@ -513,7 +513,7 @@ export default function AppStoreApp({
   // Real lifecycle mutations (same endpoints the marketplace page uses).
   const installMutation = useMutation({
     mutationFn: (slug: string) =>
-      api.post("/plugins/install", { plugin_slug: slug, billing_cycle: "monthly" }),
+      api.post("/apps/install", { app_slug: slug, billing_cycle: "monthly" }),
     onSuccess: () => {
       invalidate();
       toast.success("Plugin installed!");
@@ -528,7 +528,7 @@ export default function AppStoreApp({
   });
 
   const activateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/activate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/activate`),
     onSuccess: () => {
       invalidate();
       toast.success("Plugin activated");
@@ -537,7 +537,7 @@ export default function AppStoreApp({
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/deactivate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/deactivate`),
     onSuccess: () => {
       invalidate();
       toast.success("Plugin deactivated");
@@ -546,7 +546,7 @@ export default function AppStoreApp({
   });
 
   const uninstallMutation = useMutation({
-    mutationFn: (slug: string) => api.post("/plugins/uninstall", { plugin_slug: slug }),
+    mutationFn: (slug: string) => api.post("/apps/uninstall", { app_slug: slug }),
     onSuccess: () => {
       invalidate();
       toast.success("Plugin uninstalled — its data is preserved");

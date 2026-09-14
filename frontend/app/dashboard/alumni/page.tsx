@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDebounced, useUrlFilters } from "@/components/ui/filter-bar";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ import { GraduationCap, CalendarDays, UserCheck, Building2, Plus, Mail, Phone, M
 import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function AlumniPage() {
-  return <PluginGate slug="alumni"><AlumniContent /></PluginGate>;
+  return <AppGate slug="alumni"><AlumniContent /></AppGate>;
 }
 
 function AlumniContent() {

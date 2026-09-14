@@ -1,6 +1,6 @@
 "use client";
 
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { AOSPage, AOSPageHeader, AOSPageBody } from "@/components/aos/kit/page-kit";
 import { QuickLinks } from "@/components/aos/kit/quick-links";
 import { FileSpreadsheet } from "lucide-react";
@@ -19,7 +19,7 @@ import { useI18n } from "@/lib/i18n";
 export default function IemisUploadPage() {
   const { t } = useI18n();
   return (
-    <PluginGate slug="iemis_importer">
+    <AppGate slug="iemis_importer">
       <AOSPage>
         <AOSPageHeader
           icon={<FileSpreadsheet className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
@@ -46,6 +46,6 @@ export default function IemisUploadPage() {
           />
         </AOSPageBody>
       </AOSPage>
-    </PluginGate>
+    </AppGate>
   );
 }

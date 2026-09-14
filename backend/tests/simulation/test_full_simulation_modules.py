@@ -13,7 +13,7 @@ import pytest
 
 from app.models.academic import Class, Subject
 from app.models.fee import FeeCollection
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.student import Student
 from app.models.user import User
@@ -31,7 +31,7 @@ REQUIRED_PLUGIN_SLUGS = [
     "library_management",
     "exams",
     "iemis_importer",
-    # hostel routes are plugin_required("hostel") since the campus-ops batch
+    # hostel routes are app_required("hostel") since the campus-ops batch
     # (previously ungated) — the Module-10 simulation needs an active install.
     "hostel",
 ]
@@ -39,10 +39,10 @@ REQUIRED_PLUGIN_SLUGS = [
 
 def _seed_plugin_rows(db, slugs: list[str]) -> None:
     for slug in slugs:
-        if Plugin.query.filter_by(slug=slug).first():
+        if App.query.filter_by(slug=slug).first():
             continue
         db.session.add(
-            Plugin(
+            App(
                 slug=slug,
                 name=slug.replace("_", " ").title(),
                 category="core",
@@ -57,16 +57,16 @@ def _seed_plugin_rows(db, slugs: list[str]) -> None:
 
 def _install_plugins_for_school(db, school: School, slugs: list[str]) -> None:
     for slug in slugs:
-        existing = SchoolPlugin.query.filter_by(
+        existing = SchoolApp.query.filter_by(
             school_id=school.id,
-            plugin_slug=slug,
+            app_slug=slug,
         ).first()
         if existing:
             continue
         db.session.add(
-            SchoolPlugin(
+            SchoolApp(
                 school_id=school.id,
-                plugin_slug=slug,
+                app_slug=slug,
                 active=True,
                 is_trial=False,
             )

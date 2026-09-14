@@ -104,7 +104,7 @@ class _StudentFeesScreenState extends ConsumerState<StudentFeesScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'fees',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'My Fees'),

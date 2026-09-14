@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -20,7 +20,7 @@ import { ICON_MAP } from "@/lib/icon-map";
 import { ChevronRight } from "lucide-react";
 
 export default function CommunicationsPage() {
-  return <PluginGate slug="communications"><CommsContent /></PluginGate>;
+  return <AppGate slug="communications"><CommsContent /></AppGate>;
 }
 
 function CommsContent() {

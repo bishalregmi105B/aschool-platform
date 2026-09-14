@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,9 +77,9 @@ interface MeritRow {
 
 export default function TabulationPage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <TabulationContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

@@ -17,7 +17,7 @@ import RoleSwitcherModal from "@/components/aos/RoleSwitcherModal";
 import NotificationCenter from "@/components/aos/NotificationCenter";
 import QuickSettings from "@/components/aos/QuickSettings";
 import CalendarFlyout from "@/components/aos/CalendarFlyout";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import {
   getAOSAppForModule,
   normalizeAOSModuleId,
@@ -88,7 +88,7 @@ interface OpenWindowOptions {
 
 export default function AOSDesktopShell() {
   const { user } = useAuth();
-  const { sidebarItems, pluginBottomNav } = useInstalledPlugins();
+  const { sidebarItems, pluginBottomNav } = useInstalledApps();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

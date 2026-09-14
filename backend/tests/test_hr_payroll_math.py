@@ -31,11 +31,11 @@ def _staff(db, school):
 
 
 def _install_hr_plugin(db, school):
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug="hr_payroll").first()
+    plugin = App.query.filter_by(slug="hr_payroll").first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug="hr_payroll",
             name="HR & Payroll",
             category="core",
@@ -46,7 +46,7 @@ def _install_hr_plugin(db, school):
         db.session.add(plugin)
         db.session.flush()
     db.session.add(
-        SchoolPlugin(school_id=school.id, plugin_slug="hr_payroll", active=True,
+        SchoolApp(school_id=school.id, app_slug="hr_payroll", active=True,
                      is_trial=False)
     )
     db.session.commit()

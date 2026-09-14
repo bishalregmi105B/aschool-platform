@@ -250,7 +250,7 @@ class _QuickActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
     final quickActions = [
       const _ParentActionItem(
         icon: Icons.fact_check_rounded,

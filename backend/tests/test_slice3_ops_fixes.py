@@ -16,17 +16,17 @@ from tests.conftest import get_auth_headers
 
 
 def _install_plugin(db, school, slug):
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug=slug).first()
+    plugin = App.query.filter_by(slug=slug).first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug=slug, name=slug.title(), category="core",
             is_free=True, is_published=True, version="1.0.0",
         )
         db.session.add(plugin)
         db.session.flush()
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True, is_trial=False))
+    db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True, is_trial=False))
     db.session.commit()
 
 

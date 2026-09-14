@@ -28,7 +28,7 @@ import {
 } from "@/components/aos/AOSIcons";
 import { SchoolRole } from "@/components/aos/types";
 import { api } from "@/lib/api";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { extractAOSModuleSlug, normalizeAOSRoute } from "@/lib/aos-navigation";
 import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
 
@@ -75,7 +75,7 @@ export default function SpotlightSearch({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { sidebarItems } = useInstalledPlugins();
+  const { sidebarItems } = useInstalledApps();
 
   // 300ms Debounce
   useEffect(() => {
@@ -260,7 +260,7 @@ export default function SpotlightSearch({
       : []),
   ], [currentRole, openDestination]);
 
-  // Plugin-derived items from useInstalledPlugins()
+  // Plugin-derived items from useInstalledApps()
   const pluginItems: SpotlightItem[] = useMemo(() => {
     const allItems: SpotlightItem[] = [];
 

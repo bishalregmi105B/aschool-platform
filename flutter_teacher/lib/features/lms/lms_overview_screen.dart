@@ -61,7 +61,7 @@ class _TeacherLmsOverviewScreenState extends State<TeacherLmsOverviewScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'lms',
       child: Scaffold(
         appBar: AppBar(

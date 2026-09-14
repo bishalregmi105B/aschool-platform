@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 from app.models.academic import Class, Section, Subject
 from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -33,7 +33,7 @@ def _safe_ad_to_bs(ad_date):
 @assignments_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 def list_assignments():
     query = Assignment.query.filter_by(school_id=g.school_id, is_deleted=False)
     class_id = request.args.get("class_id")
@@ -50,7 +50,7 @@ def list_assignments():
 @assignments_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def create_assignment():
     data = request.get_json(silent=True) or {}
@@ -106,7 +106,7 @@ def create_assignment():
 @assignments_bp.route("/<assignment_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 def get_assignment(assignment_id):
     aid = _coerce_uuid(assignment_id)
     a = (
@@ -122,7 +122,7 @@ def get_assignment(assignment_id):
 @assignments_bp.route("/<assignment_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def update_assignment(assignment_id):
     aid = _coerce_uuid(assignment_id)
@@ -148,7 +148,7 @@ def update_assignment(assignment_id):
 @assignments_bp.route("/<assignment_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin")
 def delete_assignment(assignment_id):
     aid = _coerce_uuid(assignment_id)
@@ -169,7 +169,7 @@ def delete_assignment(assignment_id):
 @assignments_bp.route("/<assignment_id>/submissions", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 def list_submissions(assignment_id):
     aid = _coerce_uuid(assignment_id)
     assignment = (
@@ -195,7 +195,7 @@ def list_submissions(assignment_id):
 @assignments_bp.route("/<assignment_id>/submit", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 def submit_assignment(assignment_id):
     data = request.get_json(silent=True) or {}
     student = _current_student()
@@ -262,7 +262,7 @@ def submit_assignment(assignment_id):
 @assignments_bp.route("/<assignment_id>/submissions/<sub_id>/grade", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def grade_submission(assignment_id, sub_id):
     aid = _coerce_uuid(assignment_id)
@@ -291,7 +291,7 @@ def grade_submission(assignment_id, sub_id):
 @assignments_bp.route("/submissions/<sub_id>/grade", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def grade_submission_compat(sub_id):
     """Compatibility route used by Flutter shared repository."""
@@ -316,7 +316,7 @@ def grade_submission_compat(sub_id):
 @assignments_bp.route("/<assignment_id>/ai-grade", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("superadmin", "school_admin", "teacher")
 def ai_grade_submission(assignment_id):
     """Use AI auto-grader for a submission."""

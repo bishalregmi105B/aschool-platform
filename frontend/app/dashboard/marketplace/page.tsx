@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { matchesMarketplacePluginSearch } from "@/lib/marketplace-search";
 import { formatCurrency } from "@/lib/utils";
-import { SubscribeDialog } from "@/components/plugins/subscribe-dialog";
+import { SubscribeDialog } from "@/components/app-components/subscribe-dialog";
 import { Search, Check, ShoppingCart, Zap, Crown, Building2, Layers, Settings, Store } from "lucide-react";
 import {
   AOSPage,
@@ -96,7 +96,7 @@ export default function MarketplacePage() {
     initialSearch ? "plugins" : "packages"
   );
   const queryClient = useQueryClient();
-  const { refreshPlugins } = useInstalledPlugins();
+  const { refreshPlugins } = useInstalledApps();
 
   useEffect(() => {
     setSearch(querySearch);
@@ -106,18 +106,18 @@ export default function MarketplacePage() {
   const { data, isLoading } = useQuery({
     queryKey: ["marketplace"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<MarketplaceResponse>>("/plugins/marketplace");
+      const res = await api.get<ApiResponse<MarketplaceResponse>>("/apps/marketplace");
       return normalizeMarketplace(res.data.data);
     },
   });
 
   const installMutation = useMutation({
     mutationFn: (slug: string) =>
-      api.post("/plugins/install", { plugin_slug: slug, billing_cycle: "monthly" }),
+      api.post("/apps/install", { app_slug: slug, billing_cycle: "monthly" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
       refreshPlugins();
-      toast.success("Plugin installed!");
+      toast.success("App installed!");
     },
     onError: (err: unknown) => {
       const msg =
@@ -130,31 +130,31 @@ export default function MarketplacePage() {
 
   const uninstallMutation = useMutation({
     mutationFn: (slug: string) =>
-      api.post("/plugins/uninstall", { plugin_slug: slug }),
+      api.post("/apps/uninstall", { app_slug: slug }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
       refreshPlugins();
-      toast.success("Plugin uninstalled");
+      toast.success("App uninstalled");
     },
     onError: () => toast.error("Uninstall failed"),
   });
 
   const activateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/activate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/activate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
       refreshPlugins();
-      toast.success("Plugin activated");
+      toast.success("App activated");
     },
     onError: () => toast.error("Activate failed"),
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/deactivate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/deactivate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketplace"] });
       refreshPlugins();
-      toast.success("Plugin deactivated");
+      toast.success("App deactivated");
     },
     onError: () => toast.error("Deactivate failed"),
   });
@@ -203,7 +203,7 @@ export default function MarketplacePage() {
           <>
             Install plugins individually or upgrade to a complete SaaS package.{" "}
             <Link
-              href="/dashboard/plugins"
+              href="/dashboard/apps"
               className="underline-offset-4 hover:underline"
               style={{ color: "var(--w11-accent)" }}
             >
@@ -239,7 +239,7 @@ export default function MarketplacePage() {
                   style={{ color: "var(--w11-text-tertiary)" }}
                 />
                 <Input
-                  placeholder="Search plugins..."
+                  placeholder="Search apps..."
                   className="pl-9"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -700,7 +700,7 @@ function PluginCard({
             {isActive && isPaid && !onTrial && (
               <>
                 <Button asChild variant="outline" className="flex-1 m-4">
-                  <Link href={`/dashboard/plugins/${plugin.slug}/settings`}>
+                  <Link href={`/dashboard/apps/${plugin.slug}/settings`}>
                     <Settings className="h-4 w-4 mr-1" />
                     Manage
                   </Link>

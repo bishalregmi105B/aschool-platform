@@ -34,15 +34,15 @@ def send_daily_absent_alerts():
     from extensions import db
     from app.models.school import School
     from app.models.attendance import Attendance, SubjectAttendance
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from datetime import date
 
     today = date.today()
 
     # Get schools with attendance plugin active
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="attendance", active=True)
+        db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="attendance", active=True)
         .all()
     )
 

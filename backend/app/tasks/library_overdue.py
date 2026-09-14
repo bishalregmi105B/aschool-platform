@@ -14,18 +14,18 @@ def check_overdue_books():
     """
     from extensions import db
     from app.models.library import BookIssue
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from datetime import date
 
     today = date.today()
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
+        db.session.query(SchoolApp.school_id)
         .filter(
             # the plugin was renamed library → library_management; both row
             # generations exist across deployments
-            SchoolPlugin.plugin_slug.in_(["library", "library_management"]),
-            SchoolPlugin.active == True,  # noqa: E712
+            SchoolApp.app_slug.in_(["library", "library_management"]),
+            SchoolApp.active == True,  # noqa: E712
         )
         .all()
     )

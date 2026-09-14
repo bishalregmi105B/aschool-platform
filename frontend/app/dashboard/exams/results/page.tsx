@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate, usePluginEnabled } from "@/lib/plugins";
+import { AppGate, useAppEnabled } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -128,9 +128,9 @@ interface StudentMarksheet {
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function ResultsPage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <ResultsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 
@@ -166,7 +166,7 @@ function ResultsContent() {
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  const hasDesigner = usePluginEnabled("design_studio");
+  const hasDesigner = useAppEnabled("design_studio");
 
   const { data: exams } = useQuery({
     queryKey: ["exams"],

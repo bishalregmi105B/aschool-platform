@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -25,7 +25,7 @@ import { ToolCatalog, AI_TOOLS } from "./_components/tool-catalog";
 
 export default function AIToolsPage() {
   return (
-    <PluginGate slug="ai_suite">
+    <AppGate slug="ai_suite">
       <AOSPage>
         <AOSPageHeader
           icon={<Sparkles className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
@@ -43,6 +43,6 @@ export default function AIToolsPage() {
           <ToolCatalog />
         </AOSPageBody>
       </AOSPage>
-    </PluginGate>
+    </AppGate>
   );
 }

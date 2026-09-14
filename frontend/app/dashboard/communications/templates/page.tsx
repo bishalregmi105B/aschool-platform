@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
 import { Plus, Copy, Trash2, FileText } from "lucide-react";
 
 export default function TemplatesPage() {
-  return <PluginGate slug="communications"><TemplatesContent /></PluginGate>;
+  return <AppGate slug="communications"><TemplatesContent /></AppGate>;
 }
 
 function TemplatesContent() {

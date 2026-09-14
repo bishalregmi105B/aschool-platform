@@ -34,7 +34,7 @@ from app.models.library import Book, BookIssue, BookTransaction
 from app.models.lms import Course, Enrollment, Lesson, StudyMaterial, Topic
 from app.models.notice import Notice
 from app.models.notification import PushNotification, SMSLog, WhatsAppMessage
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import Plugin, SchoolApp
 from app.models.school import School
 from app.models.student import Guardian, Student
 from app.models.timetable import TimetableSlot
@@ -282,7 +282,7 @@ def _ensure_plugins(school: School) -> None:
             print(f"WARN: plugin '{slug}' not found in plugins table; skipping install")
             continue
 
-        row = SchoolPlugin.query.filter_by(
+        row = SchoolApp.query.filter_by(
             school_id=school.id,
             plugin_slug=slug,
             is_deleted=False,
@@ -291,7 +291,7 @@ def _ensure_plugins(school: School) -> None:
             row.active = True
             continue
 
-        row = SchoolPlugin(
+        row = SchoolApp(
             school_id=school.id,
             plugin_slug=slug,
             active=True,

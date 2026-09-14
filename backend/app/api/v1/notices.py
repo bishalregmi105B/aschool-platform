@@ -6,7 +6,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.models.notice import Notice, Event
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -43,7 +43,7 @@ def _bs_or_none(ad_date):
 @notices_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 def list_notices():
     """List notices for the current school."""
     query = Notice.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -77,7 +77,7 @@ def list_notices():
 @notices_bp.route("/<uuid:notice_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 def get_notice(notice_id):
     """Get a single notice."""
     notice = Notice.query.get(notice_id)
@@ -89,7 +89,7 @@ def get_notice(notice_id):
 @notices_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin", "teacher", "staff")
 def create_notice():
     """Create a new notice."""
@@ -117,7 +117,7 @@ def create_notice():
 @notices_bp.route("/<uuid:notice_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin", "teacher", "staff")
 def update_notice(notice_id):
     """Update a notice."""
@@ -134,7 +134,7 @@ def update_notice(notice_id):
 @notices_bp.route("/<uuid:notice_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin")
 def delete_notice(notice_id):
     """Delete a notice."""
@@ -151,7 +151,7 @@ def delete_notice(notice_id):
 @notices_bp.route("/events", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 def list_events():
     """List school events."""
     query = Event.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -168,7 +168,7 @@ def list_events():
 @notices_bp.route("/events", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin", "teacher", "staff")
 def create_event():
     """Create a school event."""
@@ -200,7 +200,7 @@ def create_event():
 @notices_bp.route("/events/<uuid:event_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin", "teacher", "staff")
 def update_event(event_id):
     """Update a school event."""
@@ -226,7 +226,7 @@ def update_event(event_id):
 @notices_bp.route("/events/<uuid:event_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("school_admin")
 def delete_event(event_id):
     """Delete a school event."""

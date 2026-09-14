@@ -24,7 +24,7 @@ import {
   Sparkles, GraduationCap, Layers3, Brain, Play, ArrowRight, ShieldAlert, BookOpenCheck, ClipboardList,
 } from "lucide-react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/aos/kit/page-kit";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
@@ -101,7 +101,7 @@ function useRiskAlerts() {
 function TeacherTab() {
   const lessons = useLessons();
   return (
-    <PluginGate slug="ai_teacher">
+    <AppGate slug="ai_teacher">
       <div className="space-y-4">
         <div className="win11-card" style={{ marginBottom: 0 }}>
           <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -165,7 +165,7 @@ function TeacherTab() {
           )}
         </DataPanel>
       </div>
-    </PluginGate>
+    </AppGate>
   );
 }
 
@@ -339,7 +339,7 @@ export default function AiHubPage() {
   };
 
   return (
-    <PluginGate slug="ai_suite">
+    <AppGate slug="ai_suite">
       <AOSPage>
         <AOSPageHeader
           icon={<Sparkles className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
@@ -372,6 +372,6 @@ export default function AiHubPage() {
           </Tabs>
         </AOSPageBody>
       </AOSPage>
-    </PluginGate>
+    </AppGate>
   );
 }

@@ -13,7 +13,7 @@ the dispatcher itself checks min_plan_tier per tool).
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.services.ai.workbench import AIWorkbenchOrchestrator, ToolPipelineError
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
@@ -31,7 +31,7 @@ def _serialize_tool(row, settings=None):
 @workbench_bp.route("/generate/<tool_key>", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher", "student", "parent")
 def generate_with_tool(tool_key):
     """The single generic entry-point for every ai_workbench tool."""
@@ -49,7 +49,7 @@ def generate_with_tool(tool_key):
 @workbench_bp.route("/tools", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def list_tools():
     """Catalog for /dashboard/ai-workbench — grouped by category."""
     from app.models.ai_workbench import AIToolRegistry, SchoolAIToolSettings
@@ -97,7 +97,7 @@ def tool_nutrition(tool_key):
 @workbench_bp.route("/tools/<tool_key>/settings", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def get_tool_settings(tool_key):
     from app.models.ai_workbench import SchoolAIToolSettings
@@ -118,7 +118,7 @@ def get_tool_settings(tool_key):
 @workbench_bp.route("/tools/<tool_key>/settings", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def update_tool_settings(tool_key):
     """AW-05: kill switch + field overrides take effect within one request
@@ -181,7 +181,7 @@ def get_generation(generation_id):
 @workbench_bp.route("/moderation/flags", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def moderation_flags():
     """Counselor review queue — unresolved flags, critical first."""
@@ -223,7 +223,7 @@ def moderation_flags():
 @workbench_bp.route("/moderation/flags/<uuid:flag_id>/resolve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def resolve_flag(flag_id):
     from app.models.ai_workbench import ModerationFlag
@@ -248,7 +248,7 @@ def resolve_flag(flag_id):
 @workbench_bp.route("/library", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def list_library():
     """Saved AI artifacts. private = own only; school = whole school;
     district/public_template need explicit visibility."""
@@ -287,7 +287,7 @@ def list_library():
 @workbench_bp.route("/library", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def save_to_library():
     from app.models.ai_workbench import AIContentLibraryItem
     from extensions import db
@@ -321,7 +321,7 @@ def save_to_library():
 @workbench_bp.route("/library/<uuid:item_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def delete_library_item(item_id):
     from app.models.ai_workbench import AIContentLibraryItem
     from extensions import db
@@ -351,7 +351,7 @@ def _can_review_iep(user) -> bool:
 @workbench_bp.route("/iep", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def draft_iep():
     """Generate an IEP DRAFT (status stays draft — never active on create).
@@ -428,7 +428,7 @@ def draft_iep():
 @workbench_bp.route("/iep/<uuid:plan_id>/review", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def review_iep(plan_id):
     """Reviewer action: activate/reject a draft. Gate: principal,
     special_ed_coordinator, superadmin, or explicit can_review_iep."""
@@ -475,7 +475,7 @@ def review_iep(plan_id):
 @workbench_bp.route("/iep", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def list_ieps():
     from app.models.ai_workbench import IEPPlan
 

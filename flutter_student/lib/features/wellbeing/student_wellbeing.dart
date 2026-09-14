@@ -55,7 +55,7 @@ class _StudentWellbeingState extends ConsumerState<StudentWellbeing> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'wellbeing',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Wellbeing'),

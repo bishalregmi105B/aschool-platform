@@ -6,7 +6,7 @@ E41: the plugin was published with a full web UI
 calling `/incidents/management/*` — zero such routes existed. This blueprint
 implements the management tier on top of the base `incidents` plugin
 (`app/api/v1/incidents.py`, which keeps its own routes — nothing duplicated):
-every management route is gated @plugin_required("incident_management"),
+every management route is gated @app_required("incident_management"),
 tenant-scoped to g.school_id, and reads/writes the same Incident rows.
 
 Routes (mounted under /api/v1/incidents/management):
@@ -40,7 +40,7 @@ from app.models.incident import Incident, WitnessStatement
 from app.models.incident_management import IncidentEscalation, IncidentWorkflowEvent
 from app.models.student import Student
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -81,7 +81,7 @@ TYPE_MAP = {
 @incident_management_bp.route("/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 def overview():
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     month_start = datetime(now.year, now.month, 1)
@@ -123,7 +123,7 @@ def overview():
 @incident_management_bp.route("/active", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 def active_cases():
     query = Incident.query.filter_by(
         school_id=g.school_id, is_deleted=False
@@ -145,7 +145,7 @@ def active_cases():
 @incident_management_bp.route("/escalations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 def escalations():
     """Open escalated cases (resolved/closed ones drop off the worklist)."""
     rows = (
@@ -172,7 +172,7 @@ def escalations():
 @incident_management_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin", "teacher")
 def create_case():
     data = request.get_json(silent=True) or {}
@@ -233,7 +233,7 @@ def create_case():
 @incident_management_bp.route("/<uuid:incident_id>/assign", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin")
 def assign_case(incident_id):
     incident = _get_incident(incident_id)
@@ -269,7 +269,7 @@ def assign_case(incident_id):
 @incident_management_bp.route("/<uuid:incident_id>/status", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin")
 def change_status(incident_id):
     incident = _get_incident(incident_id)
@@ -304,7 +304,7 @@ def change_status(incident_id):
 @incident_management_bp.route("/<uuid:incident_id>/escalate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin")
 def escalate_case(incident_id):
     incident = _get_incident(incident_id)
@@ -383,7 +383,7 @@ def escalate_case(incident_id):
 @incident_management_bp.route("/<uuid:incident_id>/resolve", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin")
 def resolve_case(incident_id):
     incident = _get_incident(incident_id)
@@ -405,7 +405,7 @@ def resolve_case(incident_id):
 @incident_management_bp.route("/<uuid:incident_id>/conference", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 @role_required("superadmin", "school_admin")
 def schedule_conference(incident_id):
     incident = _get_incident(incident_id)
@@ -442,7 +442,7 @@ def schedule_conference(incident_id):
 @incident_management_bp.route("/<uuid:incident_id>/audit", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 def audit_trail(incident_id):
     if not _get_incident(incident_id):
         return error_response("Incident not found", 404)
@@ -462,7 +462,7 @@ def audit_trail(incident_id):
 @incident_management_bp.route("/reports", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incident_management")
+@app_required("incident_management")
 def reports():
     period = request.args.get("period", "this_month")
     now = datetime.now(timezone.utc).replace(tzinfo=None)

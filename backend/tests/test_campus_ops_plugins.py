@@ -18,7 +18,7 @@ import uuid as _uuid
 
 import pytest
 
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.student import Student
 from app.models.user import User
@@ -39,10 +39,10 @@ CAMPUS_PLUGINS = (
 
 
 def _seed_plugin(db, slug):
-    exists = Plugin.query.filter_by(slug=slug).first()
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    plugin = Plugin(
+    plugin = App(
         slug=slug,
         name=slug.replace("_", " ").title(),
         category="growth",
@@ -61,9 +61,9 @@ def admin_headers(client, db, school, admin_user):
     for slug in CAMPUS_PLUGINS:
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(
+            SchoolApp(
                 school_id=school.id,
-                plugin_slug=slug,
+                app_slug=slug,
                 active=True,
                 is_trial=False,
             )
@@ -514,7 +514,7 @@ def test_plugin_gate_toggles_incidents_and_wellbeing(client, db, admin_headers):
     resp = client.get("/api/v1/incidents", headers=admin_headers)
     assert resp.status_code == 200
 
-    sp = SchoolPlugin.query.filter_by(plugin_slug="incidents").first()
+    sp = SchoolApp.query.filter_by(app_slug="incidents").first()
     sp.active = False
     db.session.commit()
     # g.installed_plugins is cached for 300 s (school:{id}:plugins) — a direct
@@ -540,14 +540,14 @@ def test_incident_management_only_install_fails_base_gate(client, db, admin_user
     for slug in ("incident_management",):
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(school_id=admin_user.school_id, plugin_slug=slug,
+            SchoolApp(school_id=admin_user.school_id, app_slug=slug,
                          active=True, is_trial=False)
         )
     db.session.commit()
     headers = get_auth_headers(client, "admin@test.edu.np", "Test@1234")
     resp = client.get("/api/v1/incidents", headers=headers)
     assert resp.status_code == 403
-    assert resp.get_json()["data"]["plugin_slug"] == "incidents"
+    assert resp.get_json()["data"]["app_slug"] == "incidents"
 
 
 def test_extension_endpoints_are_wired(client, admin_headers):

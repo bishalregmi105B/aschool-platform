@@ -83,7 +83,7 @@ class _VisitorScreenState extends ConsumerState<VisitorScreen> {
     final insideCount =
         _visitors.where((v) => v['checked_out_at'] == null).length;
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'visitor_management',
       child: Scaffold(
         appBar: AppBar(

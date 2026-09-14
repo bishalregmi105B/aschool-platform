@@ -3,7 +3,7 @@
 from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
 from extensions import db
@@ -17,7 +17,7 @@ design_studio_bp = Blueprint("design_studio", __name__, url_prefix="/design-stud
 @design_studio_bp.route("/data-sources", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 def list_data_sources():
     """List available data source types for template auto-fill."""
     sources = [
@@ -112,7 +112,7 @@ def list_data_sources():
 @design_studio_bp.route("/data-sources/<source_type>/records", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 def list_source_records(source_type):
     """Return records for a data source type, with template field mappings."""
     from app.models.academic import Class, Section
@@ -370,7 +370,7 @@ def list_source_records(source_type):
 @design_studio_bp.route("/templates", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 def list_templates():
     """List available document templates."""
     from app.services.designer.template_engine import TemplateEngineService
@@ -400,7 +400,7 @@ def list_templates():
 @design_studio_bp.route("/templates", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin")
 def save_template():
     """Create or update a school-specific template override."""
@@ -417,7 +417,7 @@ def save_template():
 @design_studio_bp.route("/render", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def render_document():
     """Render a single document from a template."""
@@ -473,7 +473,7 @@ def render_document():
 @design_studio_bp.route("/bulk/id-cards", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin")
 def bulk_id_cards():
     """Generate ID cards for all students in a class."""
@@ -494,7 +494,7 @@ def bulk_id_cards():
 @design_studio_bp.route("/bulk/marksheets", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def bulk_marksheets():
     """Generate marksheets for all students in a class for an exam.
@@ -526,7 +526,7 @@ def bulk_marksheets():
 @design_studio_bp.route("/generate/results", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_results():
     """Result/marksheet bulk generation: exam + class(es) + template → PDF.
@@ -686,7 +686,7 @@ def generate_results():
 @design_studio_bp.route("/bulk/admit-cards", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin")
 def bulk_admit_cards():
     """Generate admit cards for all students (optionally one class) for an exam."""
@@ -708,7 +708,7 @@ def bulk_admit_cards():
 @design_studio_bp.route("/bulk/certificates", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin")
 def bulk_certificates():
     """Generate certificates (character/transfer/merit/participation) for a class."""
@@ -728,7 +728,7 @@ def bulk_certificates():
 @design_studio_bp.route("/bulk/attendance-ledger", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def bulk_attendance_ledger():
     """Generate the monthly attendance ledger for a class (pages of 20 rows)."""
@@ -753,7 +753,7 @@ def bulk_attendance_ledger():
 @design_studio_bp.route("/ai/question-paper", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_question_paper():
     """AI-generate an exam paper."""
@@ -775,7 +775,7 @@ def generate_question_paper():
 @design_studio_bp.route("/ai/lesson-plan", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def generate_lesson_plan():
     """AI-generate a lesson plan."""
@@ -795,7 +795,7 @@ def generate_lesson_plan():
 @design_studio_bp.route("/ai/insights", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def get_ai_insights():
     """Get AI-powered school insights report."""
@@ -808,7 +808,7 @@ def get_ai_insights():
 @design_studio_bp.route("/ai/risk-students", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin")
 def get_risk_students():
     """Get AI-calculated at-risk student list."""
@@ -821,7 +821,7 @@ def get_risk_students():
 @design_studio_bp.route("/ai/homework-help", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def homework_help():
     """AI homework helper (Socratic tutoring)."""
     from app.services.ai.homework_helper import HomeworkHelperService
@@ -843,7 +843,7 @@ def homework_help():
 @design_studio_bp.route("/documents", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def list_documents():
     """List saved canvas documents for this school."""
@@ -858,7 +858,7 @@ def list_documents():
 @design_studio_bp.route("/documents", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def save_document():
     """Create or update a canvas document."""
@@ -888,7 +888,7 @@ def save_document():
 @design_studio_bp.route("/documents/<doc_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def get_document(doc_id):
     """Fetch a saved canvas document."""
@@ -903,7 +903,7 @@ def get_document(doc_id):
 @design_studio_bp.route("/documents/<doc_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def delete_document(doc_id):
     """Soft-delete a canvas document."""
@@ -921,7 +921,7 @@ def delete_document(doc_id):
 @design_studio_bp.route("/ai/suggest", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def ai_suggest():
     """
@@ -1016,7 +1016,7 @@ Rules:
 @design_studio_bp.route("/ai/agent", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def ai_agent():
     """AI chat endpoint that returns executable editor actions.
@@ -1116,7 +1116,7 @@ def ai_agent():
 @design_studio_bp.route("/writer/research", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def writer_research():
     """Internet research for the Writer: search + fetch readable sources.
@@ -1186,7 +1186,7 @@ def writer_research():
 @design_studio_bp.route("/export/pdf", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def export_document_pdf():
     """Render a saved designer document (or template+data) to print-ready PDF.
@@ -1257,7 +1257,7 @@ def export_document_pdf():
 @design_studio_bp.route("/export/bulk-pdf", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def export_bulk_pdf():
     """One print-ready PDF from pre-generated bulk items.
@@ -1362,7 +1362,7 @@ def _impose_sheet(pages_html: list[str], payload: dict) -> str:
 @design_studio_bp.route("/documents/<doc_id>/revisions", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def list_document_revisions(doc_id):
     """Version history — last 10 saves of a designer document."""
@@ -1374,7 +1374,7 @@ def list_document_revisions(doc_id):
 @design_studio_bp.route("/documents/revisions/<revision_id>/restore", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def restore_document_revision(revision_id):
     """Restore a revision: the document's current state is snapshotted first,
@@ -1442,7 +1442,7 @@ def template_thumbnail(template_key):
 @design_studio_bp.route("/writer/export-docx", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("design_studio")
+@app_required("design_studio")
 @role_required("superadmin", "school_admin", "teacher")
 def export_writer_docx():
     """Export a writer2 (TipTap) document to .docx.

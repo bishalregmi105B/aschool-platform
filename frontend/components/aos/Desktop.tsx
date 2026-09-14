@@ -21,7 +21,7 @@ import {FolderPlus,
  GripHorizontal,
  X,
  Check} from "lucide-react";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { getAOSAppForModule, SECTION_GRADIENTS, type AOSApp } from "@/lib/aos-app-adapter";
 import { useAOSNavigate } from "@/lib/aos-window-route";
 import { useAOSUserSettings } from "@/lib/aos-settings";
@@ -965,7 +965,7 @@ export default function Desktop({
   const folderMode = resolvedFolders !== undefined;
 
   // Dynamic apps from plugins if externalApps not passed
-  const { sidebarItems, installedPlugins } = useInstalledPlugins();
+  const { sidebarItems, installedPlugins } = useInstalledApps();
 
   // Installed plugin slugs: installed+active plugins ∪ sidebar-visible ones.
   const installedSlugs = useMemo(() => {

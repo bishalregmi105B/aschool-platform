@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,7 @@ import {
 } from "@/lib/aos-window-route";
 
 export default function PastPapersPage() {
-  return <PluginGate slug="elibrary"><PastPapersContent /></PluginGate>;
+  return <AppGate slug="elibrary"><PastPapersContent /></AppGate>;
 }
 
 function PastPapersContent() {

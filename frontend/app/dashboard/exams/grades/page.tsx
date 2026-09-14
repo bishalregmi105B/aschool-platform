@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -30,9 +30,9 @@ const GRADE_COLUMNS: Column<Grade>[] = [
 
 export default function ExamGradesPage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <ExamGradesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

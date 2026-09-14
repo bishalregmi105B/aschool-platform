@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +73,9 @@ const POINT_CATEGORIES = ["academic", "behavior", "sports", "attendance", "gener
 
 export default function GamificationPage() {
   return (
-    <PluginGate slug="gamification">
+    <AppGate slug="gamification">
       <GamificationContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

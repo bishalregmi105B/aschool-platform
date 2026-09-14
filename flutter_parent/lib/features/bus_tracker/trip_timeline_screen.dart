@@ -48,7 +48,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   Widget build(BuildContext context) {
     final detail = ref.watch(transportInstanceDetailProvider(widget.instanceId));
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'gps_tracking',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Trip Timeline'),

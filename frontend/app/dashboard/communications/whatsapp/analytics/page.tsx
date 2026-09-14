@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,9 +87,9 @@ interface WhatsAppAnalytics {
 
 export default function WhatsAppAnalyticsPage() {
   return (
-    <PluginGate slug="whatsapp_bot">
+    <AppGate slug="whatsapp_bot">
       <WhatsAppAnalyticsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

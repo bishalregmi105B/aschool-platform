@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { revalidateSchoolSite } from "@/lib/revalidate";
 import { schoolSiteUrl } from "@/lib/site-domain";
 import { Button } from "@/components/ui/button";
@@ -52,9 +52,9 @@ export default function WebsiteBuilderPage() {
   // website_builder is a paid premium plugin — gate the page like the other
   // premium plugin pages (it was previously reachable ungated).
   return (
-    <PluginGate slug="website_builder">
+    <AppGate slug="website_builder">
       <WebsiteBuilderContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

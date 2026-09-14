@@ -13,7 +13,7 @@ def update_student_streaks():
     Only processes schools with the 'gamification' plugin active.
     """
     from extensions import db
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.models.gamification import StudentBadge, Badge
     from app.models.attendance import Attendance
     from datetime import date, timedelta
@@ -22,8 +22,8 @@ def update_student_streaks():
     yesterday = today - timedelta(days=1)
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="gamification", active=True)
+        db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="gamification", active=True)
         .all()
     )
 

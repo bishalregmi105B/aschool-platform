@@ -10,7 +10,7 @@ import {
   X,
   Monitor,
 } from "lucide-react";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import {
   getAOSAppForModule,
   normalizeAOSModuleId,
@@ -79,7 +79,7 @@ export default function MobileExperience({
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   const [timeStr, setTimeStr] = useState("");
 
-  const { sidebarItems, pluginBottomNav } = useInstalledPlugins();
+  const { sidebarItems, pluginBottomNav } = useInstalledApps();
   const { user } = useAuth();
   const { settings: aosSettings } = useAOSUserSettings();
   const serverTime = useServerTime();

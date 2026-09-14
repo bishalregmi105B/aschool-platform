@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Tag, Palette, Globe, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -28,7 +28,7 @@ const QUICK_LINKS = [
 ];
 
 export default function WhiteLabelPage() {
-  return <PluginGate slug="white_label"><WhiteLabelContent /></PluginGate>;
+  return <AppGate slug="white_label"><WhiteLabelContent /></AppGate>;
 }
 
 function WhiteLabelContent() {

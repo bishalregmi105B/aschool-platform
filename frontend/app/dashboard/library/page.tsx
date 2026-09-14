@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -57,9 +57,9 @@ interface BookIssue {
 
 export default function LibraryPage() {
   return (
-    <PluginGate slug="library">
+    <AppGate slug="library">
       <LibraryContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

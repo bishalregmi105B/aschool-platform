@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from app.models.fee import FeeCollection, FeeRefund
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.webhook import ProcessedWebhookEvent
 from tests.conftest import get_auth_headers

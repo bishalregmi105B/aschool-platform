@@ -12,7 +12,7 @@ class ShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.user;
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
     final location = GoRouterState.of(context).matchedLocation;
     final useLocalAppBar = _usesLocalAppBar(location);
 

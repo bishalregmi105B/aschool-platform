@@ -64,7 +64,7 @@ class _AdmissionScreenState extends ConsumerState<AdmissionScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'admission',
       child: Scaffold(
         appBar: AppBar(

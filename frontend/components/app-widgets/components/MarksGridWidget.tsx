@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { ComponentWidgetProps } from "@/lib/plugin-widgets/registry";
+import type { ComponentWidgetProps } from "@/lib/app-widgets/registry";
 
 interface MarkRow {
   student_id: string;

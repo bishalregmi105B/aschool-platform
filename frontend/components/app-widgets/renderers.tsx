@@ -15,13 +15,13 @@ import {
   interpolate,
   resolveToken,
   type BindingScope,
-} from "@/lib/plugin-widgets/bindings";
+} from "@/lib/app-widgets/bindings";
 import type {
   ColumnSpec,
   ListItemSpec,
   StatItemSpec,
   WidgetSpec,
-} from "@/lib/plugin-widgets/types";
+} from "@/lib/app-widgets/types";
 
 /**
  * Generic renderers for `renderer: spec` widgets.

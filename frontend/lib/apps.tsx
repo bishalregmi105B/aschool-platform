@@ -9,7 +9,7 @@ import {
   hydratePluginAliases,
   normalizePluginSlug as resolveSlug,
   type PluginAliasPayload,
-} from "./plugin-aliases";
+} from "./app-aliases";
 
 export interface InstalledPlugin {
   plugin_slug: string;
@@ -22,7 +22,7 @@ export interface InstalledPlugin {
 }
 
 /** A single sidebar nav item driven from plugin YAML manifest */
-export interface PluginSidebarItem {
+export interface AppSidebarItem {
   slug: string;
   label: string;
   label_nepali: string | null;
@@ -44,23 +44,23 @@ export interface PluginBottomNavItem {
 }
 
 interface PluginSidebarResponse {
-  items: PluginSidebarItem[];
+  items: AppSidebarItem[];
   bottom_nav: PluginBottomNavItem[];
 }
 
 interface PluginContextType {
   installedPlugins: InstalledPlugin[];
-  isPluginInstalled: (slug: string) => boolean;
+  isAppInstalled: (slug: string) => boolean;
   isLoading: boolean;
   refreshPlugins: () => Promise<void>;
   /** Plugin-driven sidebar items from YAML manifests */
-  sidebarItems: PluginSidebarItem[];
+  sidebarItems: AppSidebarItem[];
   /** Plugin-driven bottom nav items (e.g. Settings, Marketplace) */
   pluginBottomNav: PluginBottomNavItem[];
 }
 
-// The alias table + display labels now live in lib/plugin-aliases.ts, hydrated
-// from GET /plugins/aliases so the client can never drift from the backend's
+// The alias table + display labels now live in li./app-aliases.ts, hydrated
+// from GET /apps/aliases so the client can never drift from the backend's
 // effective map (three hand-kept copies used to disagree after every merge).
 
 /** Re-exported for the many pages that import it from here. */
@@ -82,7 +82,7 @@ const PluginContext = createContext<PluginContextType | undefined>(undefined);
 export function PluginProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
-  const [sidebarItems, setSidebarItems] = useState<PluginSidebarItem[]>([]);
+  const [sidebarItems, setSidebarItems] = useState<AppSidebarItem[]>([]);
   const [pluginBottomNav, setPluginBottomNav] = useState<PluginBottomNavItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -93,9 +93,9 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
       // as a fallback, so a failure degrades gating to yesterday's table
       // rather than ungating pages.
       const [installedRes, sidebarRes, aliasRes] = await Promise.allSettled([
-        api.get<ApiResponse<InstalledPlugin[]>>("/plugins/installed"),
-        api.get<ApiResponse<PluginSidebarResponse>>("/plugins/sidebar"),
-        api.get<ApiResponse<PluginAliasPayload>>("/plugins/aliases"),
+        api.get<ApiResponse<InstalledPlugin[]>>("/apps/installed"),
+        api.get<ApiResponse<PluginSidebarResponse>>("/apps/sidebar"),
+        api.get<ApiResponse<PluginAliasPayload>>("/apps/aliases"),
       ]);
 
       if (
@@ -134,7 +134,7 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated]);
 
-  const isPluginInstalled = (slug: string) => {
+  const isAppInstalled = (slug: string) => {
     const acceptable = getAcceptablePluginSlugs(slug);
     return plugins.some((p) => p.active && acceptable.has(p.plugin_slug));
   };
@@ -143,7 +143,7 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
     <PluginContext.Provider
       value={{
         installedPlugins: plugins,
-        isPluginInstalled,
+        isAppInstalled,
         isLoading,
         refreshPlugins,
         sidebarItems,
@@ -155,26 +155,26 @@ export function PluginProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useInstalledPlugins() {
+export function useInstalledApps() {
   const context = useContext(PluginContext);
   if (!context)
-    throw new Error("useInstalledPlugins must be used within PluginProvider");
+    throw new Error("useInstalledApps must be used within PluginProvider");
   return context;
 }
 
 /** Boolean convenience hook: is the given plugin installed?
  *  (Single source of truth — the duplicate lib/plugin-gate.tsx was removed.) */
-export function usePluginEnabled(pluginSlug: string): boolean {
-  const { isPluginInstalled } = useInstalledPlugins();
-  return isPluginInstalled(pluginSlug);
+export function useAppEnabled(pluginSlug: string): boolean {
+  const { isAppInstalled } = useInstalledApps();
+  return isAppInstalled(pluginSlug);
 }
 
 /**
- * PluginGate — wraps content that requires a specific plugin to be installed.
+ * AppGate — wraps content that requires a specific plugin to be installed.
  * If the plugin is not installed, shows an upgrade prompt with a one-click
  * install button (for school_admin / superadmin).
  */
-export function PluginGate({
+export function AppGate({
   slug,
   children,
   fallback,
@@ -183,8 +183,8 @@ export function PluginGate({
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }) {
-  const { isPluginInstalled, isLoading, refreshPlugins } =
-    useInstalledPlugins();
+  const { isAppInstalled, isLoading, refreshPlugins } =
+    useInstalledApps();
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [installed, setInstalled] = useState(false);
@@ -194,7 +194,7 @@ export function PluginGate({
     return <div className="animate-pulse h-32 bg-muted rounded-lg" />;
 
   // After inline install, show children
-  if (isPluginInstalled(normalizedSlug) || installed) {
+  if (isAppInstalled(normalizedSlug) || installed) {
     return <>{children}</>;
   }
 
@@ -206,7 +206,7 @@ export function PluginGate({
     setInstalling(true);
     setInstallError(null);
     try {
-      const res = await api.post("/plugins/install", {
+      const res = await api.post("/apps/install", {
         plugin_slug: normalizedSlug,
         billing_cycle: "monthly",
       });

@@ -11,7 +11,7 @@ class StudentDashboard extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final currentStudent = ref.watch(currentStudentProvider).value;
     final dashboardState = ref.watch(dashboardProvider);
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
 
     final fullName = (currentStudent?.fullName ?? user?.fullName ?? '').trim();
     final firstName =

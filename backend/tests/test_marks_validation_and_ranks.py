@@ -10,7 +10,7 @@ import pytest
 
 from app.models.academic import Class, Section, Subject
 from app.models.exam import Marks
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from extensions import db as _db
@@ -20,10 +20,10 @@ PLUGIN_SLUGS = ("exams",)
 
 
 def _seed_plugin(db, slug):
-    exists = Plugin.query.filter_by(slug=slug).first()
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    p = Plugin(
+    p = App(
         slug=slug,
         name=slug.replace("_", " ").title(),
         category="core",
@@ -42,7 +42,7 @@ def exam_setup(client, db, school, admin_user):
     for slug in PLUGIN_SLUGS:
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True, is_trial=False)
+            SchoolApp(school_id=school.id, app_slug=slug, active=True, is_trial=False)
         )
     db.session.commit()
 

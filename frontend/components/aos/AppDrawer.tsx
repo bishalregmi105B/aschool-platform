@@ -19,7 +19,7 @@ import {
 } from "@/components/aos/AOSIcons";
 import { Search, X, Grid, Sparkles, Folder, ChevronLeft } from "lucide-react";
 import { SchoolRole, EducationalPlugin } from "@/components/aos/types";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { getAOSAppForModule, SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
@@ -58,7 +58,7 @@ export default function AppDrawer({
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
 
-  const { sidebarItems, installedPlugins } = useInstalledPlugins();
+  const { sidebarItems, installedPlugins } = useInstalledApps();
   const { lang } = useI18n();
 
   const allApps: AppDrawerItem[] = useMemo(() => {
@@ -219,7 +219,7 @@ export default function AppDrawer({
         desc: p.description,
       }));
 
-    // Add plugin sidebar items from useInstalledPlugins() — keyed with a
+    // Add plugin sidebar items from useInstalledApps() — keyed with a
     // plugin- prefix: core apps above can share the same slug (e.g.
     // "timetable"), and React keys must stay unique across the merged list.
     // Manifest Nepali labels render when the i18n language is "ne".

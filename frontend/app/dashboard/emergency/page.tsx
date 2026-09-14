@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -34,7 +34,7 @@ import {
 import { AlertTriangle, Layers, MapPin, Send, Siren, Shield, Phone } from "lucide-react";
 
 export default function EmergencyPage() {
-  return <PluginGate slug="emergency"><EmergencyContent /></PluginGate>;
+  return <AppGate slug="emergency"><EmergencyContent /></AppGate>;
 }
 
 function EmergencyContent() {

@@ -10,7 +10,7 @@ Pins the money-sacred behaviours runtime-proven by tmp_payments_verify.py:
   - Amount mismatch vs the initiated charge -> 409, nothing recorded.
   - Overpayment with no initiation anchor -> 409, nothing recorded.
   - Stripe checkout.session.completed activates the plugin paid (the missing
-    SchoolPlugin import used to 500 on every valid event).
+    SchoolApp import used to 500 on every valid event).
   - Initiate routes persist a PaymentInitiation BEFORE the redirect and use
     the REGISTERED /webhooks/* callback paths (the old /api/v1 prefix 404ed).
 """
@@ -23,7 +23,7 @@ import time
 import pytest
 
 from app.models.fee import FeeCollection, FeeReceipt, PaymentInitiation
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 
 
 # ─────────────────────────── helpers ───────────────────────────
@@ -89,13 +89,13 @@ def _admin_headers(client, db, school):
 
 
 def _fees_plugin(db, school):
-    plugin = Plugin.query.filter_by(slug="fees").first()
+    plugin = App.query.filter_by(slug="fees").first()
     if not plugin:
-        plugin = Plugin(slug="fees", name="Fees", category="starter", price_monthly=399,
+        plugin = App(slug="fees", name="Fees", category="starter", price_monthly=399,
                         price_yearly=3990, is_free=False, is_published=True, version="1.0.0")
         db.session.add(plugin)
         db.session.commit()
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="fees",
+    db.session.add(SchoolApp(school_id=school.id, app_slug="fees",
                                 active=True, is_trial=False))
     db.session.commit()
 
@@ -416,7 +416,7 @@ def _stripe_session_event(school_id, slug="lms", cycle="monthly"):
     return json.dumps({
         "id": "evt_test_1", "object": "event", "type": "checkout.session.completed",
         "data": {"object": {"id": "cs_test_1", "object": "checkout.session",
-                            "metadata": {"school_id": str(school_id), "plugin_slug": slug,
+                            "metadata": {"school_id": str(school_id), "app_slug": slug,
                                          "billing_cycle": cycle}}},
     })
 
@@ -425,9 +425,9 @@ def test_stripe_valid_event_activates_plugin_paid_once(client, db, school, monke
     pytest.importorskip("stripe")
     from app import create_app as _c  # noqa: F401  (app already created by fixture)
 
-    plugin = Plugin.query.filter_by(slug="lms").first()
+    plugin = App.query.filter_by(slug="lms").first()
     if not plugin:
-        plugin = Plugin(slug="lms", name="LMS", category="growth", price_monthly=799,
+        plugin = App(slug="lms", name="LMS", category="growth", price_monthly=799,
                         price_yearly=7990, is_free=False, is_published=True, version="1.0.0")
         db.session.add(plugin)
         db.session.commit()
@@ -437,7 +437,7 @@ def test_stripe_valid_event_activates_plugin_paid_once(client, db, school, monke
     r = client.post("/webhooks/stripe", data=payload, content_type="application/json",
                     headers=_stripe_headers(payload, "whsec_test_secret"))
     assert r.status_code == 200, r.get_json()
-    sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
+    sp = SchoolApp.query.filter_by(school_id=school.id, app_slug="lms").one()
     assert sp.active is True
     assert sp.is_trial is False
     assert sp.billing_cycle == "monthly"
@@ -446,7 +446,7 @@ def test_stripe_valid_event_activates_plugin_paid_once(client, db, school, monke
     r = client.post("/webhooks/stripe", data=payload, content_type="application/json",
                     headers=_stripe_headers(payload, "whsec_test_secret"))
     assert r.status_code == 200
-    assert SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").count() == 1
+    assert SchoolApp.query.filter_by(school_id=school.id, app_slug="lms").count() == 1
 
     client.application.config["STRIPE_WEBHOOK_SECRET"] = ""
 

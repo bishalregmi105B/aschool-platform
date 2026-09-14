@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/models/plugin_manifest.dart';
-import 'package:aschool_shared/services/plugin_provider.dart';
-import 'package:aschool_shared/widgets/plugin_gate.dart';
+import 'package:aschool_shared/services/app_provider.dart';
+import 'package:aschool_shared/widgets/app_gate.dart';
 
 void main() {
-  group('PluginGate Widget', () {
+  group('AppGate Widget', () {
     Widget buildTestApp({
       required String pluginSlug,
       required Widget child,
@@ -15,13 +15,13 @@ void main() {
     }) {
       return ProviderScope(
         overrides: [
-          pluginProvider.overrideWith((_) {
+          appProvider.overrideWith((_) {
             return _FakePluginNotifier(pluginState);
           }),
         ],
         child: MaterialApp(
           home: Scaffold(
-            body: PluginGate(
+            body: AppGate(
               pluginSlug: pluginSlug,
               child: child,
               fallback: fallback,
@@ -102,11 +102,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            pluginProvider.overrideWith((_) => notifier),
+            appProvider.overrideWith((_) => notifier),
           ],
           child: const MaterialApp(
             home: Scaffold(
-              body: PluginGate(
+              body: AppGate(
                 pluginSlug: 'lms',
                 child: Text('LMS Active'),
               ),

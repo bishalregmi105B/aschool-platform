@@ -6,7 +6,7 @@ from sqlalchemy.orm import aliased
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -55,7 +55,7 @@ def _handled_inbound_ids(school_id, phones=None):
 @whatsapp_bot_bp.route("/config", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 def get_bot_config():
     """Get WhatsApp bot configuration for the school."""
     from app.models.notification import WhatsAppBotConfig
@@ -81,7 +81,7 @@ def get_bot_config():
 @whatsapp_bot_bp.route("/config", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin")
 def update_bot_config():
     from app.models.notification import WhatsAppBotConfig
@@ -103,7 +103,7 @@ def update_bot_config():
 @whatsapp_bot_bp.route("/auto-replies", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 def list_auto_replies():
     """Get configured auto-reply rules."""
     from app.models.notification import WhatsAppBotConfig
@@ -115,7 +115,7 @@ def list_auto_replies():
 @whatsapp_bot_bp.route("/auto-replies", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin")
 def add_auto_reply():
     """Add a new auto-reply rule."""
@@ -144,7 +144,7 @@ def add_auto_reply():
 @whatsapp_bot_bp.route("/auto-replies/<int:rule_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin")
 def update_auto_reply(rule_id):
     """Edit an auto-reply rule (E211). `rule_id` is the rule's 0-based index —
@@ -176,7 +176,7 @@ def update_auto_reply(rule_id):
 @whatsapp_bot_bp.route("/auto-replies/<int:rule_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin")
 def delete_auto_reply(rule_id):
     """Delete an auto-reply rule (E211) by 0-based index."""
@@ -199,7 +199,7 @@ def delete_auto_reply(rule_id):
 @whatsapp_bot_bp.route("/conversations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 def list_conversations():
     """WhatsApp conversations grouped by parent phone, newest activity first.
 
@@ -278,7 +278,7 @@ def list_conversations():
 @whatsapp_bot_bp.route("/conversations/<phone>/messages", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 def list_conversation_messages(phone):
     """Full message history of one WhatsApp conversation (oldest first)."""
     from app.models.notification import WhatsAppMessage
@@ -325,7 +325,7 @@ def list_conversation_messages(phone):
 @whatsapp_bot_bp.route("/analytics", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 def get_analytics():
     """Real counts from whatsapp_messages — no synthetic numbers.
 
@@ -447,7 +447,7 @@ def get_analytics():
 @whatsapp_bot_bp.route("/send", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin", "teacher")
 def send_message():
     """Send a WhatsApp message to a specific number."""
@@ -487,7 +487,7 @@ def send_message():
 @whatsapp_bot_bp.route("/send-bulk", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("whatsapp_bot")
+@app_required("whatsapp_bot")
 @role_required("superadmin", "school_admin")
 def send_bulk_message():
     """Send bulk WhatsApp messages."""

@@ -73,13 +73,13 @@ def cleanup_stale_applications(school_id: str, stale_days: int = 90):
 @celery.task(name="dispatch_admission_followups", queue="default")
 def dispatch_admission_followups():
     """Fan-out admission follow-ups to all active schools."""
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     from extensions import db
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="admission", active=True)
+        db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="admission", active=True)
         .all()
     )
     for (school_id,) in active_schools:

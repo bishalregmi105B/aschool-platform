@@ -6,19 +6,19 @@ import 'exceptions.dart';
 
 /// Plugin marketplace / install repository.
 ///
-/// Backend routes (`backend/app/api/v1/plugins.py`, prefix `/plugins`):
-/// - GET  /plugins/marketplace
-/// - POST /plugins/install   body {"plugin_slug": ..., "billing_cycle": ...}
-/// - POST /plugins/uninstall body {"plugin_slug": ...}
+/// Backend routes (`backend/app/api/v1/apps.py`, prefix `/plugins`):
+/// - GET  /apps/marketplace
+/// - POST /apps/install   body {"plugin_slug": ..., "billing_cycle": ...}
+/// - POST /apps/uninstall body {"plugin_slug": ...}
 ///
 /// Note: install/uninstall take the slug in the body — there is no
 /// POST /plugins/{slug}/install or DELETE /plugins/{slug}/uninstall.
-class PluginRepository {
+class AppRepository {
   /// Browse the published plugin catalog; entries carry `is_installed`
   /// for the current school.
   Future<List<PluginManifest>> loadMarketplace() async {
     try {
-      final response = await ApiClient.instance.get('/plugins/marketplace');
+      final response = await ApiClient.instance.get('/apps/marketplace');
       final data = _unwrap(response, 'Failed to load marketplace');
       return (data is List ? data : const [])
           .whereType<Map>()
@@ -33,7 +33,7 @@ class PluginRepository {
   /// Server-side restricted to superadmin/school_admin.
   Future<void> install(String slug, {String billingCycle = 'monthly'}) async {
     try {
-      await ApiClient.instance.post('/plugins/install', data: {
+      await ApiClient.instance.post('/apps/install', data: {
         'plugin_slug': slug,
         'billing_cycle': billingCycle,
       });
@@ -46,7 +46,7 @@ class PluginRepository {
   /// Server-side restricted to superadmin/school_admin.
   Future<void> uninstall(String slug) async {
     try {
-      await ApiClient.instance.post('/plugins/uninstall',
+      await ApiClient.instance.post('/apps/uninstall',
           data: {'plugin_slug': slug});
     } on DioException catch (e) {
       throw _fromDio(e, 'Uninstall failed');

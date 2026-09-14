@@ -16,7 +16,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { PageLoader } from "@/components/ui/spinner";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { EditorErrorBoundary } from "@/components/designer/EditorErrorBoundary";
 
 // Load the heavy canvas component only on the client (fabric is browser-only)
@@ -27,12 +27,12 @@ const CanvasEditor = dynamic(() => import("@/components/designer/CanvasEditor"),
 
 export default function EditorPage() {
   return (
-    <PluginGate slug="design_studio">
+    <AppGate slug="design_studio">
       <EditorErrorBoundary editorName="The canvas editor" freshHref="/dashboard/designer/editor">
         <Suspense fallback={<PageLoader />}>
           <CanvasEditor />
         </Suspense>
       </EditorErrorBoundary>
-    </PluginGate>
+    </AppGate>
   );
 }

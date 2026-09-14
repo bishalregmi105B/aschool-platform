@@ -7,7 +7,7 @@ from flask_jwt_extended import jwt_required
 
 from app.models.user import User
 from app.models.visitor import Visitor, VisitorAppointment
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -22,7 +22,7 @@ visitor_bp = Blueprint("visitor", __name__, url_prefix="/visitors")
 @visitor_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 def list_visitors():
     query = Visitor.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -48,7 +48,7 @@ def list_visitors():
 @visitor_bp.route("/checkin", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 @role_required("superadmin", "school_admin", "staff")
 def checkin_visitor():
     data = request.get_json(silent=True) or {}
@@ -87,7 +87,7 @@ def checkin_visitor():
 @visitor_bp.route("/<uuid:visitor_id>/checkout", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 @role_required("superadmin", "school_admin", "staff")
 def checkout_visitor(visitor_id):
     visitor = Visitor.query.filter_by(
@@ -111,7 +111,7 @@ def checkout_visitor(visitor_id):
 @visitor_bp.route("/badge/<badge_code>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 def lookup_badge(badge_code):
     """Badge scan lookup — resolve a printed badge/QR code to its visitor.
 
@@ -135,7 +135,7 @@ def lookup_badge(badge_code):
 @visitor_bp.route("/appointments", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 def list_appointments():
     query = VisitorAppointment.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -148,7 +148,7 @@ def list_appointments():
 @visitor_bp.route("/appointments", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 @role_required("superadmin", "school_admin", "staff")
 def create_appointment():
     data = request.get_json(silent=True) or {}
@@ -189,7 +189,7 @@ def create_appointment():
 @visitor_bp.route("/appointments/<uuid:appt_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 @role_required("superadmin", "school_admin", "staff")
 def update_appointment(appt_id):
     appt = VisitorAppointment.query.filter_by(
@@ -230,7 +230,7 @@ def update_appointment(appt_id):
 @visitor_bp.route("/appointments/<uuid:appt_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("visitor_management")
+@app_required("visitor_management")
 @role_required("superadmin", "school_admin")
 def approve_appointment(appt_id):
     from flask_jwt_extended import get_jwt

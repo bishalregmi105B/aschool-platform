@@ -6,7 +6,7 @@ import { Bot, MessageSquare, Phone, Send, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -41,9 +41,9 @@ interface ConversationMessage {
 
 export default function WhatsAppConversationsPage() {
   return (
-    <PluginGate slug="whatsapp_bot">
+    <AppGate slug="whatsapp_bot">
       <WhatsAppConversationsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -35,7 +35,7 @@ import { ICON_MAP } from "@/lib/icon-map";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 
 /** Module dashboard quick links — mirrors the admission plugin manifest
- * (backend/app/plugins/modules/admission/manifest.yaml ui.nav.subitems). */
+ * (backend/app/apps/modules/admission/manifest.yaml ui.nav.subitems). */
 const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
   { label: "Online Applications", href: "/dashboard/admission/registrations", icon: "FileText" },
   { label: "Seat Caps", href: "/dashboard/admission/seats", icon: "ListOrdered" },
@@ -110,9 +110,9 @@ function statusLabel(s: string) {
 
 export default function AdmissionPage() {
   return (
-    <PluginGate slug="admission">
+    <AppGate slug="admission">
       <AdmissionContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

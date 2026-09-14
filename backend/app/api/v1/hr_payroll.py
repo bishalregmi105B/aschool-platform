@@ -13,7 +13,7 @@ from app.models.hr_payroll import (
     StaffPayroll,
 )
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -25,7 +25,7 @@ hr_payroll_bp = Blueprint("hr_payroll", __name__, url_prefix="/hr")
 @hr_payroll_bp.route("/stats", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def hr_stats():
     total_staff = User.query.filter(
@@ -86,7 +86,7 @@ def hr_stats():
 @hr_payroll_bp.route("/payroll", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def list_payroll():
     query = StaffPayroll.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -105,7 +105,7 @@ def list_payroll():
 @hr_payroll_bp.route("/payroll", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def create_payroll():
     data = request.get_json(silent=True) or {}
@@ -178,7 +178,7 @@ def create_payroll():
 @hr_payroll_bp.route("/payroll/generate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def generate_payroll():
     data = request.get_json(silent=True) or {}
@@ -200,7 +200,7 @@ def generate_payroll():
     #     "allowances": [{"name": "Transport", "percentage": 5} | {"amount": n}, ...],
     #     "deductions": [...same shapes...],
     #   }
-    # The hr_payroll plugin's own per-school config (SchoolPlugin.config,
+    # The hr_payroll plugin's own per-school config (SchoolApp.config,
     # readable via app.apps.config_store) overrides that block when it
     # carries a non-empty "payroll" section, so plugin-level settings win.
     from app.models.school import School
@@ -309,7 +309,7 @@ def generate_payroll():
 @hr_payroll_bp.route("/payroll/<uuid:payroll_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def update_payroll(payroll_id):
     payroll = StaffPayroll.query.filter_by(
@@ -380,7 +380,7 @@ def update_payroll(payroll_id):
 @hr_payroll_bp.route("/payroll/<uuid:payroll_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def approve_payroll(payroll_id):
     payroll = StaffPayroll.query.filter_by(
@@ -398,7 +398,7 @@ def approve_payroll(payroll_id):
 @hr_payroll_bp.route("/payroll/<uuid:payroll_id>/payslip", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 def download_payslip(payroll_id):
     """Generate and download a payslip PDF for a staff member."""
     from io import BytesIO
@@ -538,7 +538,7 @@ td.amount {{ text-align: right; font-family: monospace; }}
 @hr_payroll_bp.route("/payroll/<uuid:payroll_id>/pay", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def mark_paid(payroll_id):
     from datetime import datetime
@@ -565,7 +565,7 @@ def mark_paid(payroll_id):
 @hr_payroll_bp.route("/payroll/bulk-action", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def bulk_payroll_action():
     """Bulk approve / mark-paid for one month's payroll rows.
@@ -649,7 +649,7 @@ def bulk_payroll_action():
 @hr_payroll_bp.route("/leave", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 def list_leave():
     query = StaffLeave.query.filter_by(school_id=g.school_id, is_deleted=False)
     user_id = request.args.get("user_id")
@@ -665,7 +665,7 @@ def list_leave():
 @hr_payroll_bp.route("/leaves", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 def list_leave_plural():
     return list_leave()
 
@@ -673,7 +673,7 @@ def list_leave_plural():
 @hr_payroll_bp.route("/leave", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 def apply_leave():
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
@@ -716,7 +716,7 @@ def apply_leave():
 @hr_payroll_bp.route("/leave/<uuid:leave_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def approve_leave(leave_id):
     from datetime import datetime
@@ -747,7 +747,7 @@ def approve_leave(leave_id):
 @hr_payroll_bp.route("/leaves/<uuid:leave_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def update_leave_status(leave_id):
     leave = StaffLeave.query.filter_by(
@@ -773,7 +773,7 @@ def update_leave_status(leave_id):
 @hr_payroll_bp.route("/leaves/report", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def leave_report():
     """Per-staff leave aggregates for a month or a whole year.
@@ -909,7 +909,7 @@ def leave_report():
 @hr_payroll_bp.route("/appraisals", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def list_appraisals():
     query = StaffAppraisal.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -925,7 +925,7 @@ def list_appraisals():
 @hr_payroll_bp.route("/appraisals", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def create_appraisal():
     data = request.get_json(silent=True) or {}
@@ -985,7 +985,7 @@ def create_appraisal():
 @hr_payroll_bp.route("/appraisals/<uuid:appraisal_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin")
 def update_appraisal(appraisal_id):
     appraisal = StaffAppraisal.query.filter_by(
@@ -1021,7 +1021,7 @@ def update_appraisal(appraisal_id):
 @hr_payroll_bp.route("/expense-categories", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def list_expense_categories():
     categories = (
@@ -1040,7 +1040,7 @@ def list_expense_categories():
 @hr_payroll_bp.route("/expense-categories", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def create_expense_category():
     data = request.get_json(silent=True) or {}
@@ -1059,7 +1059,7 @@ def create_expense_category():
 @hr_payroll_bp.route("/expense-categories/<uuid:cat_id>", methods=["PUT", "DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def update_expense_category(cat_id):
     cat = ExpenseCategory.query.filter_by(
@@ -1087,7 +1087,7 @@ def update_expense_category(cat_id):
 @hr_payroll_bp.route("/expenses", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def list_expenses():
     query = Expense.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -1112,7 +1112,7 @@ def list_expenses():
 @hr_payroll_bp.route("/expenses", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def create_expense():
     data = request.get_json(silent=True) or {}
@@ -1168,7 +1168,7 @@ def create_expense():
 @hr_payroll_bp.route("/expenses/<uuid:expense_id>", methods=["PUT", "DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("hr_payroll")
+@app_required("hr_payroll")
 @role_required("superadmin", "school_admin", "accountant")
 def update_expense(expense_id):
     expense = Expense.query.filter_by(

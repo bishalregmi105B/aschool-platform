@@ -2,7 +2,7 @@
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.services.ai import extensions as ext
 from app.utils.decorators import school_required
 from app.utils.response import success_response, error_response
@@ -18,7 +18,7 @@ ext.register_pd_routes(extensions_bp)
 @extensions_bp.route("/qti/export", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def qti_export():
     """QTI 3.0 export over the school's question bank (AW-11)."""
     from app.models.question_bank import QuestionBankItem

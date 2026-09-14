@@ -6,7 +6,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.emergency import EmergencyAlert, EmergencyHeadcount, EvacuationPlan
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -21,7 +21,7 @@ emergency_bp = Blueprint("emergency", __name__, url_prefix="/emergency")
 @emergency_bp.route("/alerts", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 def list_alerts():
     query = EmergencyAlert.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -34,7 +34,7 @@ def list_alerts():
 @emergency_bp.route("/alerts", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 @role_required("superadmin", "school_admin")
 def trigger_alert():
     data = request.get_json(silent=True) or {}
@@ -70,7 +70,7 @@ def trigger_alert():
 @emergency_bp.route("/alerts/<uuid:alert_id>/resolve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 @role_required("superadmin", "school_admin")
 def resolve_alert(alert_id):
     alert = EmergencyAlert.query.filter_by(
@@ -94,7 +94,7 @@ def resolve_alert(alert_id):
 @emergency_bp.route("/plans", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 def list_plans():
     query = EvacuationPlan.query.filter_by(school_id=g.school_id, is_deleted=False)
     items, meta = paginate(query.order_by(EvacuationPlan.name))
@@ -104,7 +104,7 @@ def list_plans():
 @emergency_bp.route("/plans", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 @role_required("superadmin", "school_admin")
 def create_plan():
     data = request.get_json(silent=True) or {}
@@ -122,7 +122,7 @@ def create_plan():
 @emergency_bp.route("/plans/<uuid:plan_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 @role_required("superadmin", "school_admin")
 def update_plan(plan_id):
     plan = EvacuationPlan.query.filter_by(
@@ -141,7 +141,7 @@ def update_plan(plan_id):
 @emergency_bp.route("/plans/<uuid:plan_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 @role_required("superadmin", "school_admin")
 def delete_plan(plan_id):
     plan = EvacuationPlan.query.filter_by(
@@ -159,7 +159,7 @@ def delete_plan(plan_id):
 @emergency_bp.route("/alerts/<uuid:alert_id>/headcount", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 def list_headcounts(alert_id):
     query = EmergencyHeadcount.query.filter_by(
         alert_id=alert_id, school_id=g.school_id, is_deleted=False
@@ -171,7 +171,7 @@ def list_headcounts(alert_id):
 @emergency_bp.route("/alerts/<uuid:alert_id>/headcount", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("emergency")
+@app_required("emergency")
 def submit_headcount(alert_id):
     alert = EmergencyAlert.query.filter_by(
         id=alert_id, school_id=g.school_id, is_deleted=False

@@ -8,25 +8,25 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
-// ─── Mock PluginGate ───
+// ─── Mock AppGate ───
 
-// We test PluginGate's rendering behavior by mocking the useInstalledPlugins hook
+// We test AppGate's rendering behavior by mocking the useInstalledApps hook
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ isAuthenticated: true, user: { role: "school_admin" }, isLoading: false }),
 }));
 
 const mockIsPluginInstalled = jest.fn();
-jest.mock("@/lib/plugins", () => {
-  const actual = jest.requireActual("@/lib/plugins");
+jest.mock("@/lib/apps", () => {
+  const actual = jest.requireActual("@/lib/apps");
   return {
     ...actual,
-    useInstalledPlugins: () => ({
+    useInstalledApps: () => ({
       installedPlugins: [],
-      isPluginInstalled: mockIsPluginInstalled,
+      isAppInstalled: mockIsPluginInstalled,
       isLoading: false,
       refreshPlugins: jest.fn(),
     }),
-    PluginGate: ({ slug, children, fallback }: { slug: string; children: React.ReactNode; fallback?: React.ReactNode }) => {
+    AppGate: ({ slug, children, fallback }: { slug: string; children: React.ReactNode; fallback?: React.ReactNode }) => {
       if (mockIsPluginInstalled(slug)) {
         return <>{children}</>;
       }
@@ -41,8 +41,8 @@ jest.mock("@/lib/plugins", () => {
   };
 });
 
-describe("PluginGate", () => {
-  const { PluginGate } = require("@/lib/plugins");
+describe("AppGate", () => {
+  const { AppGate } = require("@/lib/apps");
 
   beforeEach(() => {
     mockIsPluginInstalled.mockReset();
@@ -51,9 +51,9 @@ describe("PluginGate", () => {
   it("renders children when plugin is installed", () => {
     mockIsPluginInstalled.mockReturnValue(true);
     render(
-      <PluginGate slug="lms">
+      <AppGate slug="lms">
         <div data-testid="lms-content">LMS Content</div>
-      </PluginGate>
+      </AppGate>
     );
     expect(screen.getByTestId("lms-content")).toBeInTheDocument();
   });
@@ -61,9 +61,9 @@ describe("PluginGate", () => {
   it("renders fallback when plugin is not installed", () => {
     mockIsPluginInstalled.mockReturnValue(false);
     render(
-      <PluginGate slug="lms">
+      <AppGate slug="lms">
         <div>LMS Content</div>
-      </PluginGate>
+      </AppGate>
     );
     expect(screen.getByTestId("plugin-required")).toBeInTheDocument();
     expect(screen.getByText(/Plugin Required: lms/)).toBeInTheDocument();
@@ -72,9 +72,9 @@ describe("PluginGate", () => {
   it("renders custom fallback when provided", () => {
     mockIsPluginInstalled.mockReturnValue(false);
     render(
-      <PluginGate slug="gps_tracking" fallback={<div data-testid="custom">Custom message</div>}>
+      <AppGate slug="gps_tracking" fallback={<div data-testid="custom">Custom message</div>}>
         <div>GPS Content</div>
-      </PluginGate>
+      </AppGate>
     );
     expect(screen.getByTestId("custom")).toBeInTheDocument();
   });
@@ -96,7 +96,7 @@ describe("ApiResponse type", () => {
 
 describe("InstalledPlugin type", () => {
   it("has correct structure", () => {
-    const plugin: import("@/lib/plugins").InstalledPlugin = {
+    const plugin: import("@/lib/apps").InstalledPlugin = {
       plugin_slug: "attendance",
       active: true,
       installed_at: "2024-01-01T00:00:00Z",
@@ -111,7 +111,7 @@ describe("InstalledPlugin type", () => {
 });
 
 describe("plugin slug aliases", () => {
-  const { normalizePluginSlug, getPluginDisplayName } = require("@/lib/plugins");
+  const { normalizePluginSlug, getPluginDisplayName } = require("@/lib/apps");
 
   it("normalizes legacy dashboard slugs to installed plugin slugs", () => {
     expect(normalizePluginSlug("hr")).toBe("hr_payroll");

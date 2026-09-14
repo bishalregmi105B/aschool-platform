@@ -11,7 +11,7 @@ from datetime import date
 import pytest
 
 from app.models.academic import Class
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.transport import (
     Bus,
@@ -31,9 +31,9 @@ from tests.conftest import get_auth_headers
 def transport_env(client, db, school, admin_user):
     """gps_tracking plugin + route with 2 stops (one assigned to a student)
     + bus + driver-user + one trip (every day, morning)."""
-    db.session.add(Plugin(slug="gps_tracking", name="GPS Tracking", category="core",
+    db.session.add(App(slug="gps_tracking", name="GPS Tracking", category="core",
                           is_free=True, is_published=True))
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="gps_tracking", active=True))
+    db.session.add(SchoolApp(school_id=school.id, app_slug="gps_tracking", active=True))
     klass = Class(school_id=school.id, name="Class 5")
     db.session.add(klass)
     db.session.flush()

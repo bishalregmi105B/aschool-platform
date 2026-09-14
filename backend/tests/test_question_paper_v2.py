@@ -7,7 +7,7 @@ and generated papers persist.
 import pytest
 
 from app.models.academic import Class, Subject
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.question_bank import GeneratedPaper, PaperBlueprint, QuestionBankItem
 from extensions import db as _db
 from tests.conftest import get_auth_headers
@@ -15,12 +15,12 @@ from tests.conftest import get_auth_headers
 
 @pytest.fixture
 def bank_env(client, db, school, admin_user):
-    p = Plugin.query.filter_by(slug="ai_tools").first()
+    p = App.query.filter_by(slug="ai_tools").first()
     if not p:
-        p = Plugin(slug="ai_tools", name="AI Tools", category="premium",
+        p = App(slug="ai_tools", name="AI Tools", category="premium",
                    is_free=True, is_published=True, version="1.0.0", emoji="🤖")
         db.session.add(p)
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="ai_tools", active=True, is_trial=False))
+    db.session.add(SchoolApp(school_id=school.id, app_slug="ai_tools", active=True, is_trial=False))
     klass = Class(school_id=school.id, name="Ten")
     db.session.add(klass)
     db.session.flush()

@@ -14,7 +14,7 @@ class DismissalQrScreen extends ConsumerWidget {
     final selectedChildId = ref.watch(selectedChildIdForApiProvider);
     final state = ref.watch(parentDismissalProvider(selectedChildId));
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'dismissal',
       child: Scaffold(
         appBar: AppBar(

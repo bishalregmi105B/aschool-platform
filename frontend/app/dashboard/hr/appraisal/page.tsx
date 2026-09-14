@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { Star, Plus } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 export default function AppraisalPage() {
-  return <PluginGate slug="hr"><AppraisalContent /></PluginGate>;
+  return <AppGate slug="hr"><AppraisalContent /></AppGate>;
 }
 
 function AppraisalContent() {

@@ -12,15 +12,15 @@ def rebuild_all_sitemaps():
     Only processes schools with 'basic_website' or 'website_builder' plugin.
     """
     from extensions import db
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.models.school import School, SchoolWebsite
     from app.utils.tenant_url import school_site_url
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
+        db.session.query(SchoolApp.school_id)
         .filter(
-            SchoolPlugin.plugin_slug.in_(["basic_website", "website_builder"]),
-            SchoolPlugin.active.is_(True),
+            SchoolApp.app_slug.in_(["basic_website", "website_builder"]),
+            SchoolApp.active.is_(True),
         )
         .distinct()
         .all()

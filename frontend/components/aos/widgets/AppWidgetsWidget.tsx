@@ -1,7 +1,7 @@
 "use client";
 
 import { Puzzle } from "lucide-react";
-import { WidgetSlot } from "@/components/plugin-widgets/PluginWidgetHost";
+import { WidgetSlot } from "@/components/app-widgets/AppWidgetHost";
 import { DataPanel } from "@/components/aos/kit/page-kit";
 import type { AOSWidgetProps } from "./shared";
 
@@ -12,7 +12,7 @@ import type { AOSWidgetProps } from "./shared";
  * skeletons), so this widget only arranges the dashboard.main and
  * dashboard.side slots side by side.
  */
-export default function PluginWidgetsWidget({ compact = false }: AOSWidgetProps) {
+export default function AppWidgetsWidget({ compact = false }: AOSWidgetProps) {
   return (
     <DataPanel
       title={

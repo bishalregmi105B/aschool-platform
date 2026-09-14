@@ -10,7 +10,7 @@ from app.models.attendance import Attendance
 from app.models.notice import Notice
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from app.utils.teacher_scope import teacher_allowed_class_ids, teacher_class_teacher_class_ids
@@ -110,7 +110,7 @@ def teacher_timetable():
 @teacher_bp.route("/assignments", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("teacher", "school_admin", "superadmin")
 def teacher_assignments():
     assignments = Assignment.query.filter_by(
@@ -124,7 +124,7 @@ def teacher_assignments():
 @teacher_bp.route("/assignments", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("assignments")
+@app_required("assignments")
 @role_required("teacher", "school_admin", "superadmin")
 def create_teacher_assignment():
     """Create an assignment for one of the teacher's classes."""
@@ -230,7 +230,7 @@ def _class_dict(klass):
 @jwt_required()
 @school_required
 @role_required("teacher", "school_admin", "superadmin")
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def teacher_wellbeing():
     """Recent mood check-ins + alerts + summary for the teacher app.
 
@@ -441,7 +441,7 @@ def _coerce_uuid(value):
 @teacher_bp.route("/portfolios", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("student_portfolio")
+@app_required("student_portfolio")
 def teacher_portfolios():
     """Portfolio summaries for the students this teacher teaches (B-05).
 

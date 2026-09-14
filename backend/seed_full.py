@@ -5,17 +5,17 @@ Usage:
     python seed_full.py
 
 WP-style plugin model (2026-08-30): this script seeds NO plugin catalog.
-The plugins directory is the catalog source of truth; PluginLoader.
+The plugins directory is the catalog source of truth; AppLoader.
 refresh_registry() (also run at app startup) mirrors it into the `plugins`
 table. Demo-school plugin installs are STATE only, resolved through
-install_plugin() against registry-backed mirror rows.
+install_app() against registry-backed mirror rows.
 """
 from app import create_app
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.models.school import School
 from app.models.user import User
-from app.apps.billing import install_plugin
-from app.apps.loader import PluginLoader
+from app.apps.billing import install_app
+from app.apps.loader import AppLoader
 from extensions import db
 
 # Demo school gets the free (core) + starter tiers of the REGISTRY — slugs
@@ -52,19 +52,19 @@ def seed_demo_school_full():
         print("✅ Demo school created (slug: demo)")
 
     # Registry ids only — the catalog mirror was synced at app startup (and
-    # is re-synced here defensively); installs are pure SchoolPlugin state.
-    PluginLoader.refresh_registry()
+    # is re-synced here defensively); installs are pure SchoolApp state.
+    AppLoader.refresh_registry()
     target_slugs = [
         slug
-        for slug, m in PluginLoader.get_all_manifests().items()
+        for slug, m in AppLoader.get_all_manifests().items()
         if (m.get("category") or "core") in DEMO_INSTALL_TIERS
         and bool(m.get("published", True))
     ]
     installed = 0
     for slug in target_slugs:
-        sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug=slug).first()
+        sp = SchoolApp.query.filter_by(school_id=school.id, plugin_slug=slug).first()
         if not sp:
-            result = install_plugin(str(school.id), slug)
+            result = install_app(str(school.id), slug)
             if "error" not in result:
                 installed += 1
 

@@ -22,20 +22,20 @@ from app.models.library import (
     StocktakeItem,
     StocktakeSession,
 )
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
 
 
 def _install(db, school):
-    if not Plugin.query.filter_by(slug="library_management").first():
-        db.session.add(Plugin(
+    if not App.query.filter_by(slug="library_management").first():
+        db.session.add(App(
             slug="library_management", name="Library Management",
             category="starter", is_free=True, is_published=True,
         ))
-    if not SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="library_management").first():
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="library_management", active=True))
+    if not SchoolApp.query.filter_by(school_id=school.id, app_slug="library_management").first():
+        db.session.add(SchoolApp(school_id=school.id, app_slug="library_management", active=True))
     db.session.commit()
 
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { useMemo } from "react";
 import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function CatalogPage() {
-  return <PluginGate slug="library"><CatalogContent /></PluginGate>;
+  return <AppGate slug="library"><CatalogContent /></AppGate>;
 }
 
 interface BookForm {

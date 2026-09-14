@@ -6,7 +6,7 @@ import { Bot, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimePicker } from "@/components/ui/time-picker";
@@ -73,9 +73,9 @@ function normalizeSettings(raw: unknown): AiSettings {
 
 export default function WhatsAppAiSettingsPage() {
   return (
-    <PluginGate slug="whatsapp_bot">
+    <AppGate slug="whatsapp_bot">
       <WhatsAppAiSettingsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 
@@ -84,7 +84,7 @@ function WhatsAppAiSettingsContent() {
   const [local, setLocal] = useState<AiSettings | null>(null);
 
   // Persisted to the whatsapp_bot PLUGIN config (SchoolPlugin.config["ai_settings"])
-  // — GET/PUT /plugins/whatsapp_bot/config — so the settings travel with the
+  // — GET/PUT /apps/whatsapp_bot/config — so the settings travel with the
   // plugin install like every other WP-style plugin setting.
   const {
     data: config,
@@ -94,7 +94,7 @@ function WhatsAppAiSettingsContent() {
   } = useQuery<Record<string, unknown>>({
     queryKey: ["whatsapp-plugin-config"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse>("/plugins/whatsapp_bot/config");
+      const res = await api.get<ApiResponse>("/apps/whatsapp_bot/config");
       return (res.data.data as Record<string, unknown>) || {};
     },
     retry: 1,
@@ -108,7 +108,7 @@ function WhatsAppAiSettingsContent() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: AiSettings) =>
-      (await api.put("/plugins/whatsapp_bot/config", { ai_settings: payload })).data,
+      (await api.put("/apps/whatsapp_bot/config", { ai_settings: payload })).data,
     onSuccess: () => {
       toast.success("AI settings saved");
       queryClient.invalidateQueries({ queryKey: ["whatsapp-plugin-config"] });

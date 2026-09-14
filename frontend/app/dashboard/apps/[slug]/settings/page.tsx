@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useAOSPathParam } from "@/lib/aos-window-route";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { getPluginDisplayName } from "@/lib/plugins";
+import { getPluginDisplayName } from "@/lib/apps";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,11 @@ import {
 
 /**
  * Per-plugin settings — a friendly form over SchoolPlugin.config (audit E166),
- * saved via PUT /plugins/<slug>/config (JSON-dict validated, size-capped,
+ * saved via PUT /apps/<slug>/config (JSON-dict validated, size-capped,
  * works while the plugin is active OR deactivated; 404 once uninstalled).
  *
  * WP-style schema mode (2026-08-30): when the plugin ships a
- * config_schema.yaml (GET /plugins/<slug>/config-schema → {has_schema,
+ * config_schema.yaml (GET /apps/<slug>/config-schema → {has_schema,
  * fields}), the declared fields render first as typed controls (dot-path
  * keys address nested config, e.g. ai_settings.working_hours.start); any
  * config keys NOT covered by the schema still get the generic editor below.
@@ -263,7 +263,7 @@ export default function PluginSettingsPage() {
     queryKey: ["plugins-config", slug],
     queryFn: async () => {
       const res = await api.get<ApiResponse<Record<string, unknown>>>(
-        `/plugins/${slug}/config`
+        `/apps/${slug}/config`
       );
       return res.data.data || {};
     },
@@ -277,7 +277,7 @@ export default function PluginSettingsPage() {
     queryKey: ["plugin-config-schema", slug],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ConfigSchema & { schema_version?: number }>>(
-        `/plugins/${slug}/config-schema`
+        `/apps/${slug}/config-schema`
       );
       return res.data.data || null;
     },
@@ -367,7 +367,7 @@ export default function PluginSettingsPage() {
       // actually dropped — the default backend semantics merge over the old
       // config and would keep them).
       const res = await api.put<ApiResponse<Record<string, unknown>>>(
-        `/plugins/${slug}/config?replace=1`,
+        `/apps/${slug}/config?replace=1`,
         payload
       );
       return res.data;
@@ -558,7 +558,7 @@ export default function PluginSettingsPage() {
           subtitle="Per-school configuration for this plugin"
           actions={
             <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/plugins">
+              <Link href="/dashboard/apps">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Installed Plugins
               </Link>
@@ -600,7 +600,7 @@ export default function PluginSettingsPage() {
         }
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/plugins">
+            <Link href="/dashboard/apps">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Installed Plugins
             </Link>

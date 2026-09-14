@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.models.student import Student
 from app.models.transport import Route, Bus, BusStop, GPSLog
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import (
@@ -41,7 +41,7 @@ def _coerce_transport_uuid(value):
 @transport_bp.route("/routes", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_routes():
     query = Route.query.filter_by(school_id=g.school_id, is_deleted=False)
     if request.args.get("active"):
@@ -53,7 +53,7 @@ def list_routes():
 @transport_bp.route("/routes", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def create_route():
     data = request.get_json(silent=True) or {}
@@ -73,7 +73,7 @@ def create_route():
 @transport_bp.route("/routes/<uuid:route_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def update_route(route_id):
     route = Route.query.filter_by(id=route_id, school_id=g.school_id, is_deleted=False).first()
@@ -90,7 +90,7 @@ def update_route(route_id):
 @transport_bp.route("/routes/<uuid:route_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def delete_route(route_id):
     route = Route.query.filter_by(id=route_id, school_id=g.school_id, is_deleted=False).first()
@@ -106,7 +106,7 @@ def delete_route(route_id):
 @transport_bp.route("/buses", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_buses():
     query = Bus.query.filter_by(school_id=g.school_id, is_deleted=False)
     if request.args.get("route_id"):
@@ -118,7 +118,7 @@ def list_buses():
 @transport_bp.route("/buses", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def create_bus():
     data = request.get_json(silent=True) or {}
@@ -150,7 +150,7 @@ def create_bus():
 @transport_bp.route("/buses/<uuid:bus_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def update_bus(bus_id):
     bus = Bus.query.filter_by(id=bus_id, school_id=g.school_id, is_deleted=False).first()
@@ -181,7 +181,7 @@ def update_bus(bus_id):
 @transport_bp.route("/stops", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_stops():
     query = BusStop.query.filter_by(school_id=g.school_id, is_deleted=False)
     route_id = request.args.get("route_id")
@@ -194,7 +194,7 @@ def list_stops():
 @transport_bp.route("/stops", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def create_stop():
     data = request.get_json(silent=True) or {}
@@ -228,7 +228,7 @@ def create_stop():
 @transport_bp.route("/stops/<uuid:stop_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def update_stop(stop_id):
     stop = BusStop.query.filter_by(id=stop_id, school_id=g.school_id, is_deleted=False).first()
@@ -255,7 +255,7 @@ def update_stop(stop_id):
 @transport_bp.route("/stops/<uuid:stop_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin")
 def delete_stop(stop_id):
     stop = BusStop.query.filter_by(id=stop_id, school_id=g.school_id, is_deleted=False).first()
@@ -271,7 +271,7 @@ def delete_stop(stop_id):
 @transport_bp.route("/gps-logs", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_gps_logs():
     query = GPSLog.query.filter_by(school_id=g.school_id, is_deleted=False)
     bus_id = request.args.get("bus_id")
@@ -284,7 +284,7 @@ def list_gps_logs():
 @transport_bp.route("/gps-logs", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def ingest_gps(self=None):
     """Accept GPS data from ESP32 devices."""
     data = request.get_json(silent=True) or {}
@@ -455,7 +455,7 @@ def _instance_dict(i, with_stops=False, with_passengers=False):
 @transport_bp.route("/trips", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_trips():
     from app.models.transport import TransportTrip
 
@@ -472,7 +472,7 @@ def list_trips():
 @transport_bp.route("/trips", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager")
 def create_trip():
     from app.models.transport import TransportTrip
@@ -521,7 +521,7 @@ def create_trip():
 @transport_bp.route("/trips/<uuid:trip_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager")
 def update_trip(trip_id):
     from app.models.transport import TransportTrip
@@ -556,7 +556,7 @@ def update_trip(trip_id):
 @transport_bp.route("/trips/<uuid:trip_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager")
 def delete_trip(trip_id):
     from app.models.transport import TransportTrip
@@ -573,7 +573,7 @@ def delete_trip(trip_id):
 @transport_bp.route("/instances", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def list_instances():
     """Daily run monitor. `?date=YYYY-MM-DD` (AD) or `?date_bs=`, default
     today; `?status=`; drivers see only their own instances."""
@@ -626,7 +626,7 @@ def _transport_today():
 @transport_bp.route("/instances/<uuid:instance_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def get_instance(instance_id):
     """Full run view: stops + passengers. Parents may only read instances
     their children ride."""
@@ -660,7 +660,7 @@ def get_instance(instance_id):
 @transport_bp.route("/instances/<uuid:instance_id>/start", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager", "teacher")
 def start_instance(instance_id):
     """Driver starts the run. Driver ownership is enforced (SBT's
@@ -687,7 +687,7 @@ def start_instance(instance_id):
 @transport_bp.route("/instances/<uuid:instance_id>/end", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager", "teacher")
 def end_instance_route(instance_id):
     """End the run — refused while any student is still onboard (409 with
@@ -719,7 +719,7 @@ def end_instance_route(instance_id):
 @transport_bp.route("/instances/<uuid:instance_id>/position", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def post_instance_position(instance_id):
     """Driver-phone GPS ingest (throttled server-side to one fix per 3 s
     per instance; faster clients just get their extras dropped)."""
@@ -777,7 +777,7 @@ def post_instance_position(instance_id):
 @transport_bp.route("/instances/<uuid:instance_id>/pickup", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager", "teacher")
 def pickup_student(instance_id):
     """Board (or miss) one student: body {student_id, missed?: bool,
@@ -810,7 +810,7 @@ def pickup_student(instance_id):
 @transport_bp.route("/instances/<uuid:instance_id>/dropoff", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager", "teacher")
 def dropoff_students(instance_id):
     """Bulk drop-off at a stop: body {stop_id?} — everyone onboard whose end
@@ -832,7 +832,7 @@ def dropoff_students(instance_id):
 @transport_bp.route("/notification-prefs", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def get_notification_prefs():
     """Per-student transport notification toggles (parent/ admin read).
     Parents see their own children; missing rows are the defaults."""
@@ -869,7 +869,7 @@ def get_notification_prefs():
 @transport_bp.route("/notification-prefs", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 def update_notification_prefs():
     """Upsert one student's toggles. Parents may only set their own
     children's."""
@@ -936,7 +936,7 @@ def _transport_scoped_student_ids():
 @transport_bp.route("/reports/missed-pickups", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager")
 def missed_pickups_report():
     """Missed-pickup register (A-42): ride_status=2 rows over a date range."""
@@ -983,7 +983,7 @@ def missed_pickups_report():
 @transport_bp.route("/reports/trip-history", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gps_tracking")
+@app_required("gps_tracking")
 @role_required("superadmin", "school_admin", "transport_manager")
 def trip_history_report():
     """Per-instance post-mortem (A-42): stops visited on time vs late,

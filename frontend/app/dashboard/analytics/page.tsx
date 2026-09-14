@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, Users, DollarSign, BookOpen, ChevronRight } from "lucide-react";
@@ -132,9 +132,9 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           <TabsContent value="compare">
-            <PluginGate slug="ai_suite">
+            <AppGate slug="ai_suite">
               <BenchmarkCompare />
-            </PluginGate>
+            </AppGate>
           </TabsContent>
         </Tabs>
       </AOSPageBody>

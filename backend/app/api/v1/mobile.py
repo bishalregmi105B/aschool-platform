@@ -7,7 +7,7 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required, verify_j
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.notice import Notice
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.models.school import School
 from app.models.student import Guardian, Student
 from app.models.user import User
@@ -27,14 +27,14 @@ def bootstrap():
     user_id = claims.get("sub")
 
     plugins = [
-        item.plugin_slug
-        for item in SchoolPlugin.query.filter_by(school_id=g.school_id, active=True, is_deleted=False).all()
+        item.app_slug
+        for item in SchoolApp.query.filter_by(school_id=g.school_id, active=True, is_deleted=False).all()
     ]
 
     payload = {
         "role": role,
         "school_id": str(g.school_id),
-        "installed_plugins": plugins,
+        "installed_apps": plugins,
         "visibility": _visibility_for_role(role, plugins),
         "dashboard": _dashboard_for_role(role, user_id),
     }
@@ -188,8 +188,8 @@ def _dashboard_for_role(role: str | None, user_id: str | None) -> dict:
     return {}
 
 
-def _visibility_for_role(role: str | None, installed_plugins: list[str]) -> dict:
-    plugin_set = set(installed_plugins or [])
+def _visibility_for_role(role: str | None, installed_apps: list[str]) -> dict:
+    plugin_set = set(installed_apps or [])
     bus_enabled = "bus_tracking" in plugin_set or "gps_tracking" in plugin_set
 
     if role == "student":
@@ -473,10 +473,10 @@ def _build_visibility(
 ) -> dict:
     enabled_modules = {
         module
-        for module, plugin_slug, allowed
+        for module, app_slug, allowed
         in rules
         if (allowed is None or allowed)
-        and (plugin_slug is None or plugin_slug in plugin_set)
+        and (app_slug is None or app_slug in plugin_set)
     }
 
     filtered_sections = []

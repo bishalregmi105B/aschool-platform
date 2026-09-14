@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -28,7 +28,7 @@ const CHECKLIST: Array<{ label: string; fix: string; test: (s: any) => boolean }
 ];
 
 export default function DisasterPage() {
-  return <PluginGate slug="disaster_management"><DisasterContent /></PluginGate>;
+  return <AppGate slug="disaster_management"><DisasterContent /></AppGate>;
 }
 
 function DisasterContent() {

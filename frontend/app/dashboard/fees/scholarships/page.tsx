@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -52,9 +52,9 @@ const DEFAULT_FORM = {
 
 export default function ScholarshipsPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <ScholarshipsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

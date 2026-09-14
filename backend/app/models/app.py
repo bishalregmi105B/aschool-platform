@@ -1,4 +1,4 @@
-"""Plugin system models."""
+"""App ecosystem models — catalog, installs, usage."""
 from sqlalchemy import (
     ARRAY,
     Boolean,
@@ -20,10 +20,10 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
 
-class Plugin(BaseModel):
-    """Master plugin registry — managed by ASchool super admin."""
+class App(BaseModel):
+    """Master app catalog — mirrored from the apps/ directory scan."""
 
-    __tablename__ = "plugins"
+    __tablename__ = "apps"
 
     slug = Column(String(100), unique=True, nullable=False)
     name = Column(String(200), nullable=False)
@@ -33,7 +33,7 @@ class Plugin(BaseModel):
     icon = Column(String(50))
     emoji = Column(String(10))
     category = Column(
-        Enum("core", "starter", "growth", "premium", "add_on", name="plugin_category"),
+        Enum("core", "starter", "growth", "premium", "add_on", name="app_category"),
         nullable=False,
     )
 
@@ -76,17 +76,17 @@ class Plugin(BaseModel):
     # school_id is NULL — platform-level record
 
 
-class SchoolPlugin(BaseModel):
+class SchoolApp(BaseModel):
     """Per-school plugin installation record."""
 
-    __tablename__ = "school_plugins"
-    __table_args__ = (UniqueConstraint("school_id", "plugin_slug"),)
+    __tablename__ = "school_apps"
+    __table_args__ = (UniqueConstraint("school_id", "app_slug"),)
 
     school_id = Column(
         UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False, index=True
     )
-    plugin_slug = Column(
-        String(100), ForeignKey("plugins.slug"), nullable=False, index=True
+    app_slug = Column(
+        String(100), ForeignKey("apps.slug"), nullable=False, index=True
     )
 
     # Status
@@ -107,20 +107,25 @@ class SchoolPlugin(BaseModel):
     config = Column(JSONB, default=dict)
 
     # Relationships
-    plugin = relationship("Plugin")
-    school = relationship("School", backref="installed_plugins")
+    plugin = relationship("App")
+    school = relationship("School", backref="installed_apps")
 
 
-class PluginUsageLog(BaseModel):
+class AppUsageLog(BaseModel):
     """Track API calls per plugin per school for usage-based billing."""
 
-    __tablename__ = "plugin_usage_logs"
+    __tablename__ = "app_usage_logs"
 
     school_id = Column(
         UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False, index=True
     )
-    plugin_slug = Column(String(100), nullable=False, index=True)
+    app_slug = Column(String(100), nullable=False, index=True)
     action = Column(String(100))
     usage_count = Column(Integer, default=1)
     usage_date = Column(Date, default=func.current_date())
     cost = Column(Numeric(10, 2), default=0)
+
+
+# ── Legacy aliases (plugins→apps rename, 2026-09) ──────────────────────────
+# Keep old import paths working while tests/callers migrate.
+Plugin = App

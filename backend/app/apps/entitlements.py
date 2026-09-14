@@ -1,7 +1,7 @@
 """Plan entitlements — single source of truth for plan tier → plugin access.
 
 School.plan (free/starter/growth/enterprise) maps to cumulative plugin tier
-categories (Plugin.category enum: core, starter, growth, premium, add_on):
+categories (App.category enum: core, starter, growth, premium, add_on):
 
     free        → core, add_on
     starter     → core, add_on, starter
@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime, timezone
 
 from extensions import db
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def plan_tiers(plan: str | None) -> list[str]:
     return PLAN_PLUGIN_TIERS[normalize_plan(plan)]
 
 
-def plan_plugin_slugs(plan: str | None) -> list[str]:
+def plan_app_slugs(plan: str | None) -> list[str]:
     """Slugs of published catalog plugins the plan is entitled to, tier-ordered.
 
     Mirrors the marketplace visibility rule (and ensure_free_plugins below):
@@ -64,26 +64,26 @@ def plan_plugin_slugs(plan: str | None) -> list[str]:
     the manifest must be consulted too, else e.g. an enterprise plan would
     auto-install conferences/gps_tracking/whatsapp_bot ahead of launch.
     """
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
     tiers = plan_tiers(plan)
     plugins = (
-        Plugin.query.filter(Plugin.category.in_(tiers), Plugin.is_published.is_(True))
+        App.query.filter(App.category.in_(tiers), App.is_published.is_(True))
         .order_by(
             db.case(
                 {tier: idx for idx, tier in enumerate(tiers)},
-                value=Plugin.category,
+                value=App.category,
                 else_=len(tiers),
             ),
-            Plugin.slug,
+            App.slug,
         )
         .all()
     )
     return [
         p.slug
         for p in plugins
-        if not (PluginLoader.get_manifest(p.slug) or {}).get("coming_soon")
-        and not (PluginLoader.get_manifest(p.slug) or {}).get("deprecated")
+        if not (AppLoader.get_manifest(p.slug) or {}).get("coming_soon")
+        and not (AppLoader.get_manifest(p.slug) or {}).get("deprecated")
     ]
 
 
@@ -96,8 +96,8 @@ def grant_plan_plugins(school_id: str, plan: str | None) -> list[dict]:
     free-tier (core/add_on) plugins. Returns the list of grant dicts.
     """
     granted: list[dict] = []
-    for slug in plan_plugin_slugs(plan):
-        sp = SchoolPlugin.query.filter_by(school_id=school_id, plugin_slug=slug).first()
+    for slug in plan_app_slugs(plan):
+        sp = SchoolApp.query.filter_by(school_id=school_id, app_slug=slug).first()
         if sp and sp.active:
             continue  # already installed (possibly a real purchase) — do not clobber
         if sp:
@@ -108,9 +108,9 @@ def grant_plan_plugins(school_id: str, plan: str | None) -> list[dict]:
             sp.trial_ends_at = None
             sp.next_billing_date = None
         else:
-            sp = SchoolPlugin(
+            sp = SchoolApp(
                 school_id=school_id,
-                plugin_slug=slug,
+                app_slug=slug,
                 active=True,
                 billing_cycle="monthly",
                 is_trial=False,
@@ -121,7 +121,7 @@ def grant_plan_plugins(school_id: str, plan: str | None) -> list[dict]:
             db.session.add(sp)
         granted.append(
             {
-                "plugin_slug": slug,
+                "app_slug": slug,
                 "is_trial": sp.is_trial,
                 "trial_ends_at": None,
             }
@@ -138,21 +138,21 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
 
     For every catalog plugin whose tier category falls inside the school's
     plan tier set (free → core+add_on; starter/growth/enterprise are the
-    cumulative sets — see PLAN_PLUGIN_TIERS) that has NO SchoolPlugin row
+    cumulative sets — see PLAN_PLUGIN_TIERS) that has NO SchoolApp row
     yet, create one ACTIVE row as a plan entitlement: is_trial=False,
     trial_ends_at=None, next_billing_date=None — never a trial row (the
     school pays for the plan, not per-plugin trials).
 
     Existing rows are NEVER touched: an admin's deactivated/uninstalled
     choice and any stored config are preserved. Soft-deleted rows are
-    resurrected instead of re-inserted (the (school_id, plugin_slug) unique
+    resurrected instead of re-inserted (the (school_id, app_slug) unique
     constraint would reject a duplicate).
 
     Catalog visibility matches the marketplace exactly: the REGISTRY
-    (PluginLoader manifests) is the source of truth, merged with the
+    (AppLoader manifests) is the source of truth, merged with the
     `plugins` mirror rows under the same delisting rule as
     api/v1/plugins._catalog_entries(); coming-soon and deprecated slugs are
-    never auto-granted (install_plugin refuses coming-soon installs too).
+    never auto-granted (install_app refuses coming-soon installs too).
 
     Cheap + idempotent: at most 2-3 queries (mirror rows, existing install
     rows, School.plan when the caller did not supply it) and a bulk insert
@@ -161,10 +161,10 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
     superadmin school create) and lazily from the marketplace / installed
     plugins list endpoints so pre-existing schools self-heal on first load.
 
-    Returns the list of grant dicts ({plugin_slug, is_trial, trial_ends_at})
+    Returns the list of grant dicts ({app_slug, is_trial, trial_ends_at})
     for rows created (or resurrected) by this call.
     """
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
     # Accept a School instance OR a bare school_id (str/UUID).
     if hasattr(school, "id"):
@@ -186,9 +186,9 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
     #    a manifest entry is offered unless BOTH the manifest and the mirror
     #    row agree it is delisted; published mirror rows without a manifest
     #    are offered as fallbacks. One query for all mirror rows.
-    manifests = PluginLoader.get_all_manifests()
+    manifests = AppLoader.get_all_manifests()
     mirror_by_slug: dict[str, Plugin] = {
-        p.slug: p for p in Plugin.query.filter(Plugin.is_deleted.is_(False)).all()
+        p.slug: p for p in App.query.filter(App.is_deleted.is_(False)).all()
     }
 
     entitled: set[str] = set()
@@ -218,20 +218,20 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
         return []
 
     # 2. Existing install rows for this school (ANY state) — one query.
-    existing = SchoolPlugin.query.filter(
-        SchoolPlugin.school_id == school_uuid,
-        SchoolPlugin.plugin_slug.in_(entitled),
+    existing = SchoolApp.query.filter(
+        SchoolApp.school_id == school_uuid,
+        SchoolApp.app_slug.in_(entitled),
     ).all()
-    by_slug = {sp.plugin_slug: sp for sp in existing}
+    by_slug = {sp.app_slug: sp for sp in existing}
 
     granted: list[dict] = []
     for slug in sorted(entitled):
         sp = by_slug.get(slug)
         if sp is None:
             db.session.add(
-                SchoolPlugin(
+                SchoolApp(
                     school_id=school_uuid,
-                    plugin_slug=slug,
+                    app_slug=slug,
                     active=True,
                     billing_cycle="monthly",
                     is_trial=False,
@@ -254,7 +254,7 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
             # leave the row exactly as the school's admins left it.
             continue
         granted.append(
-            {"plugin_slug": slug, "is_trial": False, "trial_ends_at": None}
+            {"app_slug": slug, "is_trial": False, "trial_ends_at": None}
         )
 
     if not granted:

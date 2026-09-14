@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth-context";
-import { PluginProvider } from "@/lib/plugins";
+import { PluginProvider } from "@/lib/apps";
 import { I18nProvider } from "@/lib/i18n";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 

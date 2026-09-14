@@ -61,9 +61,9 @@ class PluginState {
 
   /// Get plugin config by slug.
   ///
-  /// Config comes from the backend `GET /plugins/installed` response (each
+  /// Config comes from the backend `GET /apps/installed` response (each
   /// row carries the school's `SchoolPlugin.config` JSON — see
-  /// backend/app/api/v1/plugins.py). It is cached with the plugin list in
+  /// backend/app/api/v1/apps.py). It is cached with the plugin list in
   /// secure storage, so it survives restarts and offline starts. Returns
   /// null when the plugin is not installed/known; an installed plugin with
   /// no stored config yields the empty map the API sends.
@@ -143,7 +143,7 @@ class PluginNotifier extends StateNotifier<PluginState> {
     var nextVisibleModules = state.visibleModules;
 
     try {
-      final response = await ApiClient.instance.get('/plugins/installed');
+      final response = await ApiClient.instance.get('/apps/installed');
       if (response.statusCode == 200 && response.data['success'] == true) {
         final data = response.data['data'];
         final rawPlugins =
@@ -207,7 +207,7 @@ class PluginNotifier extends StateNotifier<PluginState> {
   }
 }
 
-final pluginProvider =
+final appProvider =
     StateNotifierProvider<PluginNotifier, PluginState>((ref) {
   return PluginNotifier(ref);
 });

@@ -15,7 +15,7 @@ from app.models.lms import (
     StudyMaterial,
     Topic,
 )
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -29,7 +29,7 @@ lms_bp = Blueprint("lms", __name__, url_prefix="/lms")
 @lms_bp.route("/courses", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_courses():
     query = Course.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -43,7 +43,7 @@ def list_courses():
 @lms_bp.route("/courses", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_course():
     data = request.get_json(silent=True) or {}
@@ -62,7 +62,7 @@ def create_course():
 @lms_bp.route("/courses/<course_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def get_course(course_id):
     course = Course.query.filter_by(id=course_id, school_id=g.school_id).first_or_404()
     data = _course_dict(course)
@@ -76,7 +76,7 @@ def get_course(course_id):
 @lms_bp.route("/courses/<course_id>/lessons", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_lesson(course_id):
     data = request.get_json(silent=True) or {}
@@ -99,7 +99,7 @@ def create_lesson(course_id):
 @lms_bp.route("/lessons", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_lessons():
     """Compatibility route for Flutter: list lessons by class/subject/section."""
     query = Lesson.query.join(Course).filter(
@@ -121,7 +121,7 @@ def list_lessons():
 @lms_bp.route("/lessons", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_lesson_compat():
     """Create a lesson from Flutter's class/subject-oriented workflow."""
@@ -144,7 +144,7 @@ def create_lesson_compat():
 @lms_bp.route("/lessons/<lesson_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def update_lesson(lesson_id):
     lesson = Lesson.query.filter_by(
@@ -164,7 +164,7 @@ def update_lesson(lesson_id):
 @lms_bp.route("/topics", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_topics():
     lesson_id = request.args.get("lesson_id")
     query = Topic.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -177,7 +177,7 @@ def list_topics():
 @lms_bp.route("/topics", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_topic():
     data = request.get_json(silent=True) or {}
@@ -198,7 +198,7 @@ def create_topic():
 @lms_bp.route("/materials", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_study_materials():
     topic_id = request.args.get("topic_id")
     lesson_id = request.args.get("lesson_id")
@@ -214,7 +214,7 @@ def list_study_materials():
 @lms_bp.route("/live-classes", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_live_classes():
     """Live classes for the school — serves the Flutter admin/teacher apps.
 
@@ -258,7 +258,7 @@ def _live_class_dict(lc):
 @lms_bp.route("/materials", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_study_material():
     data = request.get_json(silent=True) or {}
@@ -285,7 +285,7 @@ def create_study_material():
 @lms_bp.route("/courses/<course_id>/quizzes", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def list_quizzes(course_id):
     quizzes = Quiz.query.filter_by(
         course_id=course_id, school_id=g.school_id
@@ -296,7 +296,7 @@ def list_quizzes(course_id):
 @lms_bp.route("/courses/<course_id>/quizzes", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 @role_required("superadmin", "school_admin", "teacher")
 def create_quiz(course_id):
     data = request.get_json(silent=True) or {}
@@ -330,7 +330,7 @@ def _score_quiz(quiz, answers: dict) -> tuple:
 @lms_bp.route("/quizzes/<quiz_id>/attempt", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def submit_quiz_attempt(quiz_id):
     quiz = Quiz.query.filter_by(
         id=quiz_id, school_id=g.school_id, is_deleted=False
@@ -361,7 +361,7 @@ def submit_quiz_attempt(quiz_id):
 @lms_bp.route("/courses/<course_id>/enroll", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def enroll_student(course_id):
     data = request.get_json(silent=True) or {}
     course = Course.query.filter_by(
@@ -394,7 +394,7 @@ def enroll_student(course_id):
 @lms_bp.route("/courses/<course_id>/progress", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def get_progress(course_id):
     student_id = request.args.get("student_id", _current_user_id())
     enrollment = Enrollment.query.filter_by(
@@ -414,7 +414,7 @@ def get_progress(course_id):
 @lms_bp.route("/courses/<course_id>/progress", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("lms")
+@app_required("lms")
 def record_progress(course_id):
     """Mark lesson progress for a student.
 

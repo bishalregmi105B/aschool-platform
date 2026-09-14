@@ -69,17 +69,17 @@ class TestWebsiteConfigWrite:
     def test_put_config_rejects_color_payload(
         self, client, db, school, admin_user
     ):
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        p = Plugin.query.filter_by(slug="basic_website").first()
+        p = App.query.filter_by(slug="basic_website").first()
         if not p:
-            p = Plugin(
+            p = App(
                 slug="basic_website", name="Basic Website", category="core",
                 is_free=True, is_published=True, version="1.0.0", emoji="🌐",
             )
             db.session.add(p)
         db.session.add(
-            SchoolPlugin(school_id=school.id, plugin_slug="basic_website", active=True, is_trial=False)
+            SchoolApp(school_id=school.id, app_slug="basic_website", active=True, is_trial=False)
         )
         db.session.commit()
 

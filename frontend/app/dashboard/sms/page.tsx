@@ -6,7 +6,7 @@ import { useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n";
 import { displayBS } from "@/lib/nepali_date";
@@ -81,9 +81,9 @@ interface SmsStats {
 
 export default function SmsPage() {
   return (
-    <PluginGate slug="sms_notifications">
+    <AppGate slug="sms_notifications">
       <SmsPageContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

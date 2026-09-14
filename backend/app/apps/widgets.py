@@ -42,12 +42,12 @@ def reset_cache() -> None:
 
 def _widget_file(slug: str) -> Path | None:
     """Path to a plugin's widgets.yaml, honouring `ui.widgets_ref`."""
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
-    folder = PluginLoader.get_module_dir(slug)
+    folder = AppLoader.get_module_dir(slug)
     if folder is None:
         return None
-    manifest = PluginLoader.get_manifest(slug) or {}
+    manifest = AppLoader.get_manifest(slug) or {}
     ref = (manifest.get("ui") or {}).get("widgets_ref") or manifest.get("widgets_ref")
     candidate = folder / str(ref) if ref else folder / "widgets.yaml"
     return candidate if candidate.exists() else None
@@ -114,7 +114,7 @@ def _normalize_widget(slug: str, entry: dict) -> dict:
 
     return {
         "id": f"{slug}.{entry['key']}",
-        "plugin_slug": slug,
+        "app_slug": slug,
         "key": entry["key"],
         "title": entry.get("title") or entry["key"].replace("_", " ").title(),
         "title_i18n": entry.get("title_i18n"),
@@ -143,10 +143,10 @@ def _normalize_widget(slug: str, entry: dict) -> dict:
 
 def all_widgets() -> list[dict]:
     """Every widget declared by every scanned plugin (ungated)."""
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
     out: list[dict] = []
-    for slug in PluginLoader.get_all_manifests():
+    for slug in AppLoader.get_all_manifests():
         out.extend(load_plugin_widgets(slug))
     return out
 
@@ -161,19 +161,19 @@ def widgets_for(
     """The widgets a specific caller is allowed to render, slot-ordered.
 
     Filters, in order: plugin installed+active (alias-aware, matching
-    `@plugin_required`), soft `requires_plugins`, surface, slot, role, and
+    `@app_required`), soft `requires_plugins`, surface, slot, role, and
     permissions when the caller supplies a permission set.
     """
-    from app.apps.decorators import _acceptable_plugin_slugs
-    from app.apps.loader import PluginLoader
+    from app.apps.decorators import _acceptable_app_slugs
+    from app.apps.loader import AppLoader
 
     installed = {str(s) for s in installed_slugs}
     allowed: list[dict] = []
 
-    for slug in PluginLoader.get_all_manifests():
-        if not (_acceptable_plugin_slugs(slug) & installed):
+    for slug in AppLoader.get_all_manifests():
+        if not (_acceptable_app_slugs(slug) & installed):
             continue
-        manifest = PluginLoader.get_manifest(slug) or {}
+        manifest = AppLoader.get_manifest(slug) or {}
         if manifest.get("deprecated") or manifest.get("coming_soon"):
             continue
         for widget in load_plugin_widgets(slug):
@@ -184,7 +184,7 @@ def widgets_for(
             missing_dep = [
                 dep
                 for dep in widget["requires_plugins"]
-                if not (_acceptable_plugin_slugs(dep) & installed)
+                if not (_acceptable_app_slugs(dep) & installed)
             ]
             if missing_dep:
                 continue

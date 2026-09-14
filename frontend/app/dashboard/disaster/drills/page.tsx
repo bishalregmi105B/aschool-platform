@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import { Calendar, Plus } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function DrillsPage() {
-  return <PluginGate slug="disaster_management"><DrillsContent /></PluginGate>;
+  return <AppGate slug="disaster_management"><DrillsContent /></AppGate>;
 }
 
 function DrillsContent() {

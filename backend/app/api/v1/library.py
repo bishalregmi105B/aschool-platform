@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 from app.models.library import Book, BookIssue
 from app.models.student import Student
 from app.apps.config_store import plugin_config_value
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, no_content_response, success_response
@@ -17,13 +17,13 @@ from extensions import db
 
 library_bp = Blueprint("library", __name__, url_prefix="/library")
 
-# School-level policy is NOT hardcoded — it lives in SchoolPlugin.config,
+# School-level policy is NOT hardcoded — it lives in SchoolApp.config,
 # edited at Settings → Installed Plugins → Library Management → Settings
 # (schema: app/plugins/modules/library_management/config_schema.yaml). The
 # values below are only the *fallback defaults* (mirroring the schema) used
 # when a school has not configured the key.
 PLUGIN_SLUG = "library_management"
-# Legacy slug kept for pre-rename SchoolPlugin rows (see PLUGIN_SLUG_ALIASES
+# Legacy slug kept for pre-rename SchoolApp rows (see PLUGIN_SLUG_ALIASES
 # in app/plugins/decorators.py) — read as a fallback so old installs still
 # pick up their configured values without a migration.
 _LEGACY_PLUGIN_SLUG = "library"  # legacy installs keep their config visible
@@ -73,7 +73,7 @@ def _overdue_days(issue) -> int:
 @library_bp.route("/books", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def list_books():
     query = Book.query.filter_by(school_id=g.school_id, is_deleted=False)
     category = request.args.get("category")
@@ -92,7 +92,7 @@ def list_books():
 @library_bp.route("/books", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def create_book():
     data = request.get_json(silent=True) or {}
@@ -110,7 +110,7 @@ def create_book():
 @library_bp.route("/books/<book_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def update_book(book_id):
     book = Book.query.filter_by(id=book_id, school_id=g.school_id).first_or_404()
@@ -125,7 +125,7 @@ def update_book(book_id):
 @library_bp.route("/books/<book_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin")
 def delete_book(book_id):
     book = Book.query.filter_by(id=book_id, school_id=g.school_id).first_or_404()
@@ -139,7 +139,7 @@ def delete_book(book_id):
 @library_bp.route("/issues", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def list_issues():
     query = BookIssue.query.filter_by(school_id=g.school_id)
     # FC-A05: _issue_dict touches book.title and student.first/last_name per
@@ -171,7 +171,7 @@ def list_issues():
 @library_bp.route("/issues", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def issue_book():
     data = request.get_json(silent=True) or {}
@@ -251,7 +251,7 @@ def issue_book():
 @library_bp.route("/issues/<issue_id>/return", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def return_book(issue_id):
     issue = (
@@ -388,7 +388,7 @@ def _issue_dict(i):
 @library_bp.route("/settings", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def library_settings():
     """Fine + circulation policy for this school.
 
@@ -416,7 +416,7 @@ def library_settings():
 @library_bp.route("/teacher/library", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("teacher", "school_admin", "superadmin")
 def teacher_library():
     """Single call for the teacher app: catalog summary + active issues + overdue.
@@ -583,7 +583,7 @@ def _serialize_fine(f):
 @library_bp.route("/books/<book_id>/copies", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def list_copies(book_id):
     copies = (
         BookCopy.query.filter_by(school_id=g.school_id, book_id=book_id, is_deleted=False)
@@ -596,7 +596,7 @@ def list_copies(book_id):
 @library_bp.route("/books/<book_id>/copies", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def add_copies(book_id):
     """Add N copies to a book; updates the header aggregates."""
@@ -627,7 +627,7 @@ def add_copies(book_id):
 @library_bp.route("/copies/<copy_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def update_copy(copy_id):
     copy = BookCopy.query.filter_by(id=copy_id, school_id=g.school_id).first_or_404()
@@ -644,7 +644,7 @@ def update_copy(copy_id):
 @library_bp.route("/copies/scan/<barcode>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def scan_copy(barcode):
     """Resolve a barcode/accession number to copy + book + active issue —
     the single endpoint behind every scanner (web desk + mobile)."""
@@ -677,7 +677,7 @@ def scan_copy(barcode):
 @library_bp.route("/racks", methods=["GET", "POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def racks():
     if request.method == "GET":
         rows = BookRack.query.filter_by(school_id=g.school_id, is_deleted=False).all()
@@ -702,7 +702,7 @@ def racks():
 @library_bp.route("/issues/<issue_id>/renew", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def renew_issue(issue_id):
     """Renew an issued book: push the due date by loan_days, up to
@@ -732,7 +732,7 @@ def renew_issue(issue_id):
 @library_bp.route("/issues/<issue_id>/mark-lost", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def mark_issue_lost(issue_id):
     """Mark a book lost: closes the issue, flags the copy, creates a
@@ -771,7 +771,7 @@ def mark_issue_lost(issue_id):
 @library_bp.route("/books/<book_id>/reservations", methods=["GET", "POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def reservations(book_id):
     if request.method == "GET":
         rows = (
@@ -816,7 +816,7 @@ def reservations(book_id):
 @library_bp.route("/reservations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def list_reservations():
     """All reservations for the school (holds management page)."""
     query = BookReservation.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -836,7 +836,7 @@ def list_reservations():
 @library_bp.route("/reservations/<res_id>/ready", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def reservation_ready(res_id):
     """Mark a hold ready for pickup: reserve an available copy and notify."""
@@ -866,7 +866,7 @@ def reservation_ready(res_id):
 @library_bp.route("/reservations/<res_id>/collect", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def reservation_collect(res_id):
     """Convert a ready hold into an actual issue at the desk."""
@@ -902,7 +902,7 @@ def reservation_collect(res_id):
 @library_bp.route("/reservations/<res_id>/cancel", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def reservation_cancel(res_id):
     res = BookReservation.query.filter_by(id=res_id, school_id=g.school_id).first_or_404()
     if res.status in ("collected", "cancelled"):
@@ -924,7 +924,7 @@ def reservation_cancel(res_id):
 @library_bp.route("/fines", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def list_fines():
     query = BookFine.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -954,7 +954,7 @@ def list_fines():
 @library_bp.route("/fines/<fine_id>/pay", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def pay_fine(fine_id):
     """Collect a fine payment (cash at the desk; gateway refs recorded)."""
@@ -992,7 +992,7 @@ def pay_fine(fine_id):
 @library_bp.route("/fines/<fine_id>/waive", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin")
 def waive_fine(fine_id):
     """Principal/admin waiver — requires a reason (audit trail)."""
@@ -1019,7 +1019,7 @@ def waive_fine(fine_id):
 @library_bp.route("/stocktakes", methods=["GET", "POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def stocktakes():
     if request.method == "GET":
         rows = (
@@ -1054,7 +1054,7 @@ def stocktakes():
 @library_bp.route("/stocktakes/<session_id>/scan", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def stocktake_scan(session_id):
     """Record one scanned barcode. First scan of a copy = found; a barcode
@@ -1102,7 +1102,7 @@ def stocktake_scan(session_id):
 @library_bp.route("/stocktakes/<session_id>/close", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def stocktake_close(session_id):
     """Close a session: every non-weeded/non-lost copy not scanned comes back
@@ -1155,7 +1155,7 @@ def stocktake_close(session_id):
 @library_bp.route("/stocktakes/<session_id>/items", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def stocktake_items(session_id):
     outcome = request.args.get("outcome")
     query = StocktakeItem.query.filter_by(session_id=session_id, is_deleted=False)
@@ -1184,7 +1184,7 @@ def stocktake_items(session_id):
 @library_bp.route("/vendors", methods=["GET", "POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def vendors():
     if request.method == "GET":
         rows = BookVendor.query.filter_by(school_id=g.school_id, is_deleted=False).all()
@@ -1210,7 +1210,7 @@ def vendors():
 @library_bp.route("/purchase-orders", methods=["GET", "POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def purchase_orders():
     if request.method == "GET":
         rows = (
@@ -1267,7 +1267,7 @@ def purchase_orders():
 @library_bp.route("/purchase-orders/<po_id>/receive", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def receive_po(po_id):
     """Receive a PO: creates catalog copies for received quantities and
@@ -1334,7 +1334,7 @@ def receive_po(po_id):
 @library_bp.route("/reports/<report_name>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 @role_required("superadmin", "school_admin", "teacher")
 def library_reports(report_name):
     """Circulation/popularity/overdue/fines/dead-stock reports."""

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -332,8 +332,8 @@ function BrandingContent() {
 
 export default function BrandingPage() {
   return (
-    <PluginGate slug="white_label">
+    <AppGate slug="white_label">
       <BrandingContent />
-    </PluginGate>
+    </AppGate>
   );
 }

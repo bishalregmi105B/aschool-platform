@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required
 from app.models.gamification import Badge, StudentBadge, PointsLog, House, Reward
 from app.models.student import Student
 from app.models.academic import Class
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -20,7 +20,7 @@ gamification_bp = Blueprint("gamification", __name__, url_prefix="/gamification"
 @gamification_bp.route("/badges", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 def list_badges():
     query = Badge.query.filter_by(school_id=g.school_id, is_deleted=False)
     items, meta = paginate(query.order_by(Badge.name))
@@ -30,7 +30,7 @@ def list_badges():
 @gamification_bp.route("/badges", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin")
 def create_badge():
     data = request.get_json(silent=True) or {}
@@ -49,7 +49,7 @@ def create_badge():
 @gamification_bp.route("/badges/<uuid:badge_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin")
 def update_badge(badge_id):
     badge = Badge.query.filter_by(id=badge_id, school_id=g.school_id, is_deleted=False).first()
@@ -70,7 +70,7 @@ def update_badge(badge_id):
 @gamification_bp.route("/points", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin", "teacher")
 def award_points():
     data = request.get_json(silent=True) or {}
@@ -104,7 +104,7 @@ def award_points():
 @gamification_bp.route("/points/<uuid:student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 def student_points(student_id):
     query = PointsLog.query.filter_by(
         school_id=g.school_id, student_id=student_id, is_deleted=False
@@ -126,7 +126,7 @@ def student_points(student_id):
 @gamification_bp.route("/award-badge", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin", "teacher")
 def award_badge():
     data = request.get_json(silent=True) or {}
@@ -170,7 +170,7 @@ def award_badge():
 @gamification_bp.route("/leaderboard", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 def leaderboard():
     from sqlalchemy import func
     results = (
@@ -209,7 +209,7 @@ def leaderboard():
 @gamification_bp.route("/houses", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 def list_houses():
     items = House.query.filter_by(school_id=g.school_id, is_deleted=False).order_by(
         House.total_points.desc()
@@ -220,7 +220,7 @@ def list_houses():
 @gamification_bp.route("/houses", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin")
 def create_house():
     data = request.get_json(silent=True) or {}
@@ -241,7 +241,7 @@ def create_house():
 @gamification_bp.route("/rewards", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 def list_rewards():
     items = Reward.query.filter_by(school_id=g.school_id, is_deleted=False, is_active=True).all()
     return success_response([_reward_dict(r) for r in items])
@@ -250,7 +250,7 @@ def list_rewards():
 @gamification_bp.route("/rewards", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("gamification")
+@app_required("gamification")
 @role_required("superadmin", "school_admin")
 def create_reward():
     data = request.get_json(silent=True) or {}

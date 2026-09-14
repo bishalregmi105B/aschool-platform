@@ -443,7 +443,7 @@ def auto_generate_monthly_fees():
     Only fires for schools with the 'fees' plugin active.
     """
     import nepali_datetime
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from extensions import db
 
     today_bs = nepali_datetime.date.today()
@@ -455,8 +455,8 @@ def auto_generate_monthly_fees():
     year_bs = str(today_bs.year)
 
     active_schools = (
-        db.session.query(SchoolPlugin.school_id)
-        .filter_by(plugin_slug="fees", active=True)
+        db.session.query(SchoolApp.school_id)
+        .filter_by(app_slug="fees", active=True)
         .all()
     )
 

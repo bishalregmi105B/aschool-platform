@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,9 +116,9 @@ interface Pagination extends PaginationMeta {}
 
 export default function NoticesPage() {
   return (
-    <PluginGate slug="notices">
+    <AppGate slug="notices">
       <NoticesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

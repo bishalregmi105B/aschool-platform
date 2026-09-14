@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -71,9 +71,9 @@ const isActive = (a: HostelAllocation) => !(a.status === "checked_out" || a.chec
 
 export default function HostelPage() {
   return (
-    <PluginGate slug="hostel">
+    <AppGate slug="hostel">
       <HostelContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

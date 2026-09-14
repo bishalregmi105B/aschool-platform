@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +73,9 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function ExamSchedulePage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <ExamScheduleContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

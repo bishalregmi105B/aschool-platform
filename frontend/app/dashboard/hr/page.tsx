@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -29,9 +29,9 @@ import { formatNepaliCurrency } from "@/lib/nepali-utils";
 
 export default function HRPage() {
   return (
-    <PluginGate slug="hr">
+    <AppGate slug="hr">
       <HRContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

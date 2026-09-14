@@ -48,7 +48,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'fees',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Invoices'),
@@ -252,7 +252,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'fees',
       child: Scaffold(
         appBar: CustomAppBar(title: _invoice?.title ?? 'Invoice'),

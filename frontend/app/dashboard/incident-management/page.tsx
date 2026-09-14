@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -18,7 +18,7 @@ import { ShieldAlert, AlertOctagon, TrendingUp, FileText } from "lucide-react";
 import Link from "next/link";
 
 export default function IncidentManagementPage() {
-  return <PluginGate slug="incident_management"><IncidentMgmtContent /></PluginGate>;
+  return <AppGate slug="incident_management"><IncidentMgmtContent /></AppGate>;
 }
 
 function IncidentMgmtContent() {

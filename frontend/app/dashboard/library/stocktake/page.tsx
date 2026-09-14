@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -31,7 +31,7 @@ interface StocktakeSession {
 }
 
 export default function StocktakePage() {
-  return <PluginGate slug="library"><StocktakeContent /></PluginGate>;
+  return <AppGate slug="library"><StocktakeContent /></AppGate>;
 }
 
 function StocktakeContent() {

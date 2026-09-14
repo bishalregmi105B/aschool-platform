@@ -15,7 +15,7 @@ from app.models.portfolio import StudentPortfolio, PortfolioItem
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
 from app.models.wellbeing import MoodEntry
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import created_response, success_response, error_response
@@ -417,7 +417,7 @@ def student_timetable():
 @student_app_bp.route("/library", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def student_library():
     student = _current_student()
     if not student:
@@ -492,7 +492,7 @@ def student_library():
 @student_app_bp.route("/library/request", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("library_management")
+@app_required("library_management")
 def student_library_request():
     student = _current_student()
     if not student:
@@ -543,7 +543,7 @@ def student_library_request():
 @student_app_bp.route("/elibrary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 def student_elibrary():
     books = Book.query.filter_by(school_id=g.school_id, is_deleted=False).order_by(Book.title.asc()).all()
     payload = [
@@ -863,7 +863,7 @@ def student_achievements():
 @student_app_bp.route("/wellbeing", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def student_wellbeing():
     student = _current_student()
     if not student:
@@ -901,7 +901,7 @@ def student_wellbeing():
 @student_app_bp.route("/wellbeing/mood", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def submit_student_mood():
     student = _current_student()
     if not student:

@@ -1,12 +1,12 @@
 from app.models.academic import Class
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from tests.conftest import get_auth_headers
 
 
 def _enable_design_studio(db, school):
     db.session.add(
-        Plugin(
+        App(
             slug="design_studio",
             name="Design Studio",
             category="growth",
@@ -15,9 +15,9 @@ def _enable_design_studio(db, school):
         )
     )
     db.session.add(
-        SchoolPlugin(
+        SchoolApp(
             school_id=school.id,
-            plugin_slug="design_studio",
+            app_slug="design_studio",
             active=True,
         )
     )

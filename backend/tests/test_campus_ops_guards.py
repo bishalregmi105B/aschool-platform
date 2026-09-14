@@ -2,7 +2,7 @@
 
 Covers the fixes applied while runtime-verifying library_management, elibrary,
 hostel, health_records, emergency, incidents, gamification and wellbeing:
-- hostel: plugin_required gates (previously entirely ungated) + allocation guards
+- hostel: app_required gates (previously entirely ungated) + allocation guards
 - library: due_date NOT NULL default + student_id guard
 - health_records / emergency / incidents / gamification / wellbeing:
   unvalidated-FK 500 guards (E17 pattern), enum guards, mood student resolution
@@ -17,7 +17,7 @@ import pytest
 
 from app.extensions import db as _db
 from app.models.academic import Class
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.models.student import Student
 from tests.conftest import get_auth_headers
 
@@ -30,11 +30,11 @@ BOGUS = str(uuid.uuid4())
 @pytest.fixture
 def ops_school(db):
     """School with all campus-ops plugins installed."""
-    from app.models.plugin import Plugin
+    from app.models.app import App
     from app.models.school import School
 
     # the testing DB truncates `plugins` — seed the catalog rows first
-    # (SchoolPlugin.plugin_slug has a FK to plugins.slug)
+    # (SchoolApp.app_slug has a FK to plugins.slug)
     names = {
         "library_management": "Library Management",
         "elibrary": "E-Library & Digital Content",
@@ -46,8 +46,8 @@ def ops_school(db):
         "wellbeing": "Student Wellbeing",
     }
     for slug, name in names.items():
-        if not Plugin.query.filter_by(slug=slug).first():
-            db.session.add(Plugin(slug=slug, name=name, category="growth",
+        if not App.query.filter_by(slug=slug).first():
+            db.session.add(App(slug=slug, name=name, category="growth",
                                   price_monthly=199, price_yearly=1999,
                                   is_free=False, is_published=True, version="1.0.0"))
     db.session.commit()
@@ -65,7 +65,7 @@ def ops_school(db):
     db.session.add(s)
     db.session.flush()
     for slug in CAMPUS_OPS:
-        db.session.add(SchoolPlugin(school_id=s.id, plugin_slug=slug, active=True, is_trial=False))
+        db.session.add(SchoolApp(school_id=s.id, app_slug=slug, active=True, is_trial=False))
     db.session.commit()
     return s
 
@@ -359,9 +359,9 @@ def test_student_app_campus_ops_routes_are_plugin_gated(client, app, db, ops_set
     stu_headers = get_auth_headers(client, student_user.email, "Test@1234")
 
     # strip every campus-ops plugin -> all three feature areas must 403
-    SchoolPlugin.query.filter(
-        SchoolPlugin.school_id == ops_setup["school"].id,
-        SchoolPlugin.plugin_slug.in_(CAMPUS_OPS),
+    SchoolApp.query.filter(
+        SchoolApp.school_id == ops_setup["school"].id,
+        SchoolApp.app_slug.in_(CAMPUS_OPS),
     ).delete(synchronize_session=False)
     db.session.commit()
     # g.installed_plugins is cached under school:{id}:plugins (300 s) — a
@@ -373,7 +373,7 @@ def test_student_app_campus_ops_routes_are_plugin_gated(client, app, db, ops_set
     assert client.get("/api/v1/student/wellbeing", headers=stu_headers).status_code == 403
 
     # restore wellbeing only -> wellbeing opens, library stays gated
-    db.session.add(SchoolPlugin(school_id=ops_setup["school"].id, plugin_slug="wellbeing",
+    db.session.add(SchoolApp(school_id=ops_setup["school"].id, app_slug="wellbeing",
                                 active=True, is_trial=False))
     db.session.commit()
     cache.delete(f"school:{ops_setup['school'].id}:plugins")

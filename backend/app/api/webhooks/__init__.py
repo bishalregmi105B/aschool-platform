@@ -523,7 +523,7 @@ def stripe_webhook():
         return error_response("Invalid signature", 400)
 
     if event.type == "checkout.session.completed":
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
         from app.models.webhook import ProcessedWebhookEvent
 
         session = event.data.object
@@ -541,11 +541,11 @@ def stripe_webhook():
             db.session.rollback()
             return success_response({"received": True, "duplicate": True})
 
-        # We expect metadata to contain school_id and plugin_slug/package_id
+        # We expect metadata to contain school_id and app_slug/package_id
         school_id = session.metadata.get("school_id")
-        plugin_slug = session.metadata.get("plugin_slug")
+        app_slug = session.metadata.get("app_slug")
 
-        if school_id and plugin_slug:
+        if school_id and app_slug:
             # school_id comes from provider metadata — it must reference a
             # real school, or the payload is bogus/malicious.
             from app.models.school import School
@@ -556,7 +556,7 @@ def stripe_webhook():
                     "Stripe webhook: metadata school_id %r does not match a "
                     "school — plugin %r NOT activated",
                     school_id,
-                    plugin_slug,
+                    app_slug,
                 )
                 # Commit the event marker and ACK: this payload can never
                 # become valid, so retrying serves nothing.
@@ -565,15 +565,15 @@ def stripe_webhook():
 
             # slug must be a published catalog plugin (never an arbitrary
             # string that happens to match a gate).
-            from app.models.plugin import Plugin
+            from app.models.app import App
 
-            catalog_plugin = Plugin.query.filter_by(
-                slug=plugin_slug, is_published=True, is_deleted=False
+            catalog_plugin = App.query.filter_by(
+                slug=app_slug, is_published=True, is_deleted=False
             ).first()
             if catalog_plugin is None:
                 current_app.logger.error(
-                    "Stripe webhook: plugin_slug %r is not a published plugin",
-                    plugin_slug,
+                    "Stripe webhook: app_slug %r is not a published plugin",
+                    app_slug,
                 )
                 db.session.commit()
                 return success_response({"received": True, "ignored": "unknown_plugin"})
@@ -581,13 +581,13 @@ def stripe_webhook():
             billing_cycle = session.metadata.get("billing_cycle")
             if billing_cycle not in ("monthly", "yearly"):
                 billing_cycle = "monthly"
-            existing = SchoolPlugin.query.filter_by(
-                school_id=school_id, plugin_slug=plugin_slug
+            existing = SchoolApp.query.filter_by(
+                school_id=school_id, app_slug=app_slug
             ).first()
             if not existing:
-                existing = SchoolPlugin(
+                existing = SchoolApp(
                     school_id=school_id,
-                    plugin_slug=plugin_slug,
+                    app_slug=app_slug,
                     active=True,
                     is_trial=False,  # payment verified by Stripe signature
                     billing_cycle=billing_cycle,
@@ -601,7 +601,7 @@ def stripe_webhook():
                 existing.billing_cycle = billing_cycle
             db.session.commit()
             current_app.logger.info(
-                f"Activated paid plugin {plugin_slug} for school {school_id} "
+                f"Activated paid plugin {app_slug} for school {school_id} "
                 f"(cycle={billing_cycle})"
             )
 

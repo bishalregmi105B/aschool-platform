@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { Sparkles, Loader2, X, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { cn } from "@/lib/utils";
 
 export interface AiFieldSchema {
@@ -220,7 +220,7 @@ export function AiFormAssist(props: {
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <PluginGate slug="ai_suite" fallback={null}>
+    <AppGate slug="ai_suite" fallback={null}>
       <div className="mb-4 flex justify-end">
         <AiAssistTrigger onClick={() => setOpen((o) => !o)} />
       </div>
@@ -234,6 +234,6 @@ export function AiFormAssist(props: {
           setOpen={setOpen}
         />
       )}
-    </PluginGate>
+    </AppGate>
   );
 }

@@ -7,7 +7,7 @@ from flask_jwt_extended import jwt_required
 from app.models.conference import PTConference, ConferenceSlot, ConferenceNotes
 from app.models.student import Student
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -45,7 +45,7 @@ def _bs_or_none(value):
 @conferences_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 def list_conferences():
     query = PTConference.query.filter_by(school_id=g.school_id, is_deleted=False)
     if request.args.get("active"):
@@ -80,7 +80,7 @@ def _valid_uuid(value) -> bool:
 @conferences_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 @role_required("superadmin", "school_admin")
 def create_conference():
     data = request.get_json(silent=True) or {}
@@ -130,7 +130,7 @@ def create_conference():
 @conferences_bp.route("/<uuid:conf_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 @role_required("superadmin", "school_admin")
 def update_conference(conf_id):
     conf = PTConference.query.filter_by(
@@ -177,7 +177,7 @@ def update_conference(conf_id):
 @conferences_bp.route("/<uuid:conf_id>/slots", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 def list_slots(conf_id):
     query = ConferenceSlot.query.filter_by(
         conference_id=conf_id, school_id=g.school_id, is_deleted=False
@@ -195,7 +195,7 @@ def list_slots(conf_id):
 @conferences_bp.route("/<uuid:conf_id>/slots", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 @role_required("superadmin", "school_admin", "teacher")
 def create_slots(conf_id):
     """Teacher creates available time slots."""
@@ -252,7 +252,7 @@ def create_slots(conf_id):
 @conferences_bp.route("/slots/<uuid:slot_id>/book", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 def book_slot(slot_id):
     """Parent books an available slot."""
     # with_for_update: row-level lock so two concurrent bookings of the same
@@ -319,7 +319,7 @@ def book_slot(slot_id):
 @conferences_bp.route("/slots/<uuid:slot_id>/cancel", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 def cancel_booking(slot_id):
     slot = ConferenceSlot.query.filter_by(
         id=slot_id, school_id=g.school_id, is_deleted=False
@@ -361,7 +361,7 @@ def _notes_participant(slot) -> bool:
 @conferences_bp.route("/slots/<uuid:slot_id>/notes", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 def get_notes(slot_id):
     slot = ConferenceSlot.query.filter_by(
         id=slot_id, school_id=g.school_id, is_deleted=False
@@ -381,7 +381,7 @@ def get_notes(slot_id):
 @conferences_bp.route("/slots/<uuid:slot_id>/notes", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("conferences")
+@app_required("conferences")
 @role_required("superadmin", "school_admin", "teacher")
 def save_notes(slot_id):
     slot = ConferenceSlot.query.filter_by(

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Sparkles, AlertTriangle, Calendar } from "lucide-react";
@@ -44,7 +44,7 @@ interface SolverResult {
 
 export default function TimetablePage() {
   return (
-    <PluginGate slug="ai_suite"><TimetableContent /></PluginGate>
+    <AppGate slug="ai_suite"><TimetableContent /></AppGate>
   );
 }
 

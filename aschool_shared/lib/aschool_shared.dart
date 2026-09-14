@@ -5,7 +5,7 @@ library aschool_shared;
 export 'services/api_client.dart';
 export 'services/auth_service.dart';
 export 'services/academic_data_service.dart';
-export 'services/plugin_provider.dart';
+export 'services/app_provider.dart';
 export 'services/notification_service.dart';
 export 'services/socket_service.dart';
 export 'services/notices_service.dart';
@@ -27,7 +27,7 @@ export 'providers/providers.dart';
 // Widgets
 export 'widgets/feature_locked_screen.dart';
 export 'widgets/login_screen.dart';
-export 'widgets/plugin_gate.dart';
+export 'widgets/app_gate.dart';
 export 'widgets/loading_shimmer.dart';
 export 'widgets/notice_board_widgets.dart';
 export 'widgets/module_screen_template.dart';

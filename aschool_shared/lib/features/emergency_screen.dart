@@ -4,7 +4,7 @@ import '../services/api_client.dart';
 import '../widgets/error_container.dart';
 import '../widgets/loading_shimmer.dart';
 import '../widgets/no_data_container.dart';
-import '../widgets/plugin_gate.dart';
+import '../widgets/app_gate.dart';
 
 /// Shared emergency alerts viewer used by teacher, parent and student apps.
 ///
@@ -17,7 +17,7 @@ class EmergencyAlertsScreen extends StatefulWidget {
   final int perPage;
   final String emptyTitle;
   final String emptySubtitle;
-  final bool usePluginGate;
+  final bool useAppGate;
   final bool allowHeadcount;
   final bool showActiveBanner;
 
@@ -27,7 +27,7 @@ class EmergencyAlertsScreen extends StatefulWidget {
     this.perPage = 20,
     this.emptyTitle = 'No Alerts',
     this.emptySubtitle = 'No emergency alerts at this time.',
-    this.usePluginGate = false,
+    this.useAppGate = false,
     this.allowHeadcount = false,
     this.showActiveBanner = false,
   });
@@ -123,8 +123,8 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
       body: _buildBody(),
     );
 
-    if (!widget.usePluginGate) return screen;
-    return PluginGate(pluginSlug: 'emergency', child: screen);
+    if (!widget.useAppGate) return screen;
+    return AppGate(pluginSlug: 'emergency', child: screen);
   }
 
   Widget _buildBody() {

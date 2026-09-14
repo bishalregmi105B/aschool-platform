@@ -16,7 +16,7 @@ class _AiToolsScreenState extends ConsumerState<AiToolsScreen> {
   Widget build(BuildContext context) {
     // Backend ai-tools endpoints are gated on the `ai_tools` plugin
     // (manifests/ai_tools.yaml), not `ai_insights`.
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'ai_tools',
       child: ListView(
         padding: const EdgeInsets.all(16),

@@ -19,7 +19,7 @@ class TeacherDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(teacherDashboardProvider);
     final user = ref.watch(authProvider).user;
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
 
     return PullToRefresh(
       onRefresh: () => ref.refresh(teacherDashboardProvider.future),

@@ -79,7 +79,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'gamification',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Achievements & Points'),

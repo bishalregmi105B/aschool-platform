@@ -12,7 +12,7 @@ from app.models.attendance import Attendance
 from app.models.exam import Exam, Marks, ReportCard
 from app.models.fee import FeeCollection
 from app.models.notice import Event, Notice
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
@@ -69,7 +69,7 @@ def _overview_payload(school_id):
         User.is_deleted.is_(False),
         User.is_active.is_(True),
     ).count()
-    active_plugins = SchoolPlugin.query.filter_by(
+    active_plugins = SchoolApp.query.filter_by(
         school_id=school_id, active=True, is_deleted=False
     ).count()
 
@@ -605,16 +605,16 @@ def superadmin_dashboard():
         .all()
     )
     plugin_rows = (
-        db.session.query(SchoolPlugin.plugin_slug, func.count(SchoolPlugin.id))
-        .filter(SchoolPlugin.is_deleted.is_(False), SchoolPlugin.active.is_(True))
-        .group_by(SchoolPlugin.plugin_slug)
-        .order_by(func.count(SchoolPlugin.id).desc())
+        db.session.query(SchoolApp.app_slug, func.count(SchoolApp.id))
+        .filter(SchoolApp.is_deleted.is_(False), SchoolApp.active.is_(True))
+        .group_by(SchoolApp.app_slug)
+        .order_by(func.count(SchoolApp.id).desc())
         .limit(5)
         .all()
     )
     plugin_names = {
         plugin.slug: plugin.name
-        for plugin in Plugin.query.filter_by(is_deleted=False).all()
+        for plugin in App.query.filter_by(is_deleted=False).all()
     }
 
     return success_response(

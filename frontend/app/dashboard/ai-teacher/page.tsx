@@ -25,7 +25,7 @@ import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { StatusTimeline } from "@/components/ui/status-timeline";
 import { QuickLinks } from "@/components/aos/kit/quick-links";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { api, type ApiResponse } from "@/lib/api";
 import { GraduationCap, History, Play, ShieldAlert, TrendingUp, DollarSign, ArrowLeft } from "lucide-react";
 import {
@@ -387,7 +387,7 @@ export default function AiTeacherPage() {
   const [activeLesson, setActiveLesson] = useState<Lesson | undefined>();
 
   return (
-    <PluginGate slug="ai_teacher">
+    <AppGate slug="ai_teacher">
       <AOSPage>
         <AOSPageHeader
           icon={<GraduationCap className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
@@ -425,6 +425,6 @@ export default function AiTeacherPage() {
           </DataPanel>
         </AOSPageBody>
       </AOSPage>
-    </PluginGate>
+    </AppGate>
   );
 }

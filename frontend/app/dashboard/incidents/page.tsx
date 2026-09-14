@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -51,7 +51,7 @@ const SEVERITY_TONE: Record<string, string> = {
 };
 
 export default function IncidentsPage() {
-  return <PluginGate slug="incidents"><IncidentsContent /></PluginGate>;
+  return <AppGate slug="incidents"><IncidentsContent /></AppGate>;
 }
 
 function IncidentsContent() {
@@ -256,9 +256,9 @@ function IncidentsContent() {
 function WorkflowTab() {
   const { t } = useI18n();
   return (
-    <PluginGate slug="incident_management">
+    <AppGate slug="incident_management">
       <WorkflowContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

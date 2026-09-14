@@ -3,8 +3,8 @@
  *
  * The alias table used to be transcribed by hand in three places
  * (`lib/plugins.tsx`, `lib/api.ts`, and the backend's
- * `app/plugins/decorators.py`), and the copies drifted every time two plugins
- * merged. The backend now serves the effective map at `GET /plugins/aliases`
+ * `app/apps/decorators.py`), and the copies drifted every time two plugins
+ * merged. The backend now serves the effective map at `GET /apps/aliases`
  * (manifest `aliases:` ∪ the hardcoded table); this module caches it and keeps
  * the literals below only as an offline/SSR fallback so a failed fetch degrades
  * to yesterday's behaviour instead of ungating everything.
@@ -15,7 +15,7 @@
  * plugin's routes.
  */
 
-/** Offline fallback. Mirrors app/plugins/decorators.py PLUGIN_SLUG_ALIASES. */
+/** Offline fallback. Mirrors app/apps/decorators.py PLUGIN_SLUG_ALIASES. */
 export const FALLBACK_PLUGIN_ALIASES: Record<string, string> = {
   communications: "sms_notifications",
   hr: "hr_payroll",

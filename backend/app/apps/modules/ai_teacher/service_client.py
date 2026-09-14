@@ -180,15 +180,15 @@ def stop_lesson(lesson) -> None:
     Uses the plaintext webhook secret from the school's encrypted plugin
     config envelope — the shim verifies our HMAC with the same secret.
     """
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.apps.config_schema import decrypt_secret
 
     key = _service_key(lesson.school_id)
     base = _base_url(str(lesson.school_id))
     if not key or not base or not lesson.service_session_id:
         return  # nothing live service-side
-    sp = SchoolPlugin.query.filter_by(
-        school_id=lesson.school_id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=lesson.school_id, app_slug="ai_teacher"
     ).first()
     envelope = (sp.config or {}).get("webhook_secret") if sp else None
     secret = decrypt_secret(envelope) if isinstance(envelope, dict) else None
@@ -210,15 +210,15 @@ def get_session_state(lesson) -> dict | None:
 
     Returns None when the service is unreachable or not configured so the
     reconciler closes stale rows locally (never fake a measured state)."""
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.apps.config_schema import decrypt_secret
 
     key = _service_key(lesson.school_id)
     base = _base_url(str(lesson.school_id))
     if not key or not base or not lesson.service_session_id:
         return None
-    sp = SchoolPlugin.query.filter_by(
-        school_id=lesson.school_id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=lesson.school_id, app_slug="ai_teacher"
     ).first()
     envelope = (sp.config or {}).get("webhook_secret") if sp else None
     secret = decrypt_secret(envelope) if isinstance(envelope, dict) else None
@@ -257,11 +257,11 @@ def create_session(school_id, lesson, context_document: dict, callback_url: str,
     if not secret:
         # Shim accepts HMAC with the provisioned secret; hooks keep only the
         # encrypted envelope, so decrypt it here.
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
         from app.apps.config_schema import decrypt_secret
 
-        sp = SchoolPlugin.query.filter_by(
-            school_id=school_id, plugin_slug="ai_teacher"
+        sp = SchoolApp.query.filter_by(
+            school_id=school_id, app_slug="ai_teacher"
         ).first()
         envelope = (sp.config or {}).get("webhook_secret") if sp else None
         secret = decrypt_secret(envelope) if isinstance(envelope, dict) else ""

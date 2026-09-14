@@ -31,7 +31,7 @@ from app.services.chat_service import (
     send_message as persist_chat_message,
 )
 from app.models.wellbeing import CounselorNote, MoodEntry
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import error_response, success_response
@@ -976,7 +976,7 @@ def parent_book_conference_slot(conference_id):
 @jwt_required()
 @school_required
 @role_required("parent", "school_admin", "superadmin")
-@plugin_required("health_records")
+@app_required("health_records")
 def parent_child_health():
     """Ward-scoped child health data for the parent app.
 
@@ -1078,7 +1078,7 @@ def parent_child_health():
 @jwt_required()
 @school_required
 @role_required("parent", "school_admin", "superadmin")
-@plugin_required("student_portfolio")
+@app_required("student_portfolio")
 def parent_portfolio():
     """Ward-scoped portfolio entries + summary for the parent app."""
     from app.models.portfolio import PortfolioItem, StudentPortfolio
@@ -1139,7 +1139,7 @@ def parent_portfolio():
 @jwt_required()
 @school_required
 @role_required("parent", "school_admin", "superadmin")
-@plugin_required("elibrary")
+@app_required("elibrary")
 def parent_elibrary():
     """School e-library catalogue (books / past papers / OER resources) for
     the parent app. Read-only and scoped to the school."""

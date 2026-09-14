@@ -17,7 +17,7 @@ from app.models.fee import (
     FeeOfflineSubmission,
     PaymentInitiation,
 )
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from tests.conftest import get_auth_headers
 
@@ -25,9 +25,9 @@ from tests.conftest import get_auth_headers
 @pytest.fixture
 def fees_env(client, db, school, admin_user):
     """fees plugin installed + auth headers + one class with one student."""
-    db.session.add(Plugin(slug="fees", name="Fees", category="core", is_free=True,
+    db.session.add(App(slug="fees", name="Fees", category="core", is_free=True,
                           is_published=True))
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="fees", active=True))
+    db.session.add(SchoolApp(school_id=school.id, app_slug="fees", active=True))
     from app.models.academic import Class
 
     klass = Class(school_id=school.id, name="Class 10")

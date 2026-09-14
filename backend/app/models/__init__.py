@@ -1,7 +1,7 @@
 """Models package — import all models so Alembic can discover them."""
 from app.models.base import BaseModel, SchoolModel  # noqa: F401
 from app.models.school import School, SchoolWebsite, SchemeGrade, SchoolReceiptCounter  # noqa: F401
-from app.models.plugin import Plugin, SchoolPlugin, PluginUsageLog  # noqa: F401
+from app.models.app import App, SchoolApp, AppUsageLog  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_aos_settings import UserAOSSettings  # noqa: F401
 from app.models.user_access_log import UserAccessLog  # noqa: F401

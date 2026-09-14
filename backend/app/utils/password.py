@@ -14,7 +14,7 @@ Scheme (configurable per school via the User Management plugin, slug
     parent         p{roll}.{first}{last4}            p12.ram4821
     staff/other    {first}.{last4}                   sita.4821
 
-Config keys (SchoolPlugin.config of plugin slug ``users``, read via
+Config keys (SchoolApp.config of plugin slug ``users``, read via
 app.apps.config_store.plugin_config_value):
 
     credentials.student_pattern   → student pattern override

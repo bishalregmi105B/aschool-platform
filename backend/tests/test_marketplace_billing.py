@@ -1,5 +1,5 @@
 """Tests for marketplace trial / subscribe endpoints and stub delisting."""
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from tests.conftest import get_auth_headers
 
 
@@ -15,7 +15,7 @@ def _seed_plugin(db, slug="lms", **kwargs):
         version="1.0.0",
     )
     defaults.update(kwargs)
-    plugin = Plugin(**defaults)
+    plugin = App(**defaults)
     db.session.add(plugin)
     db.session.commit()
     return plugin
@@ -43,31 +43,31 @@ def test_trial_then_subscribe_flow(client, db, school):
     headers = _admin(client, db, school)
     _seed_plugin(db)
 
-    trial = client.post("/api/v1/plugins/lms/trial", headers=headers)
+    trial = client.post("/api/v1/apps/lms/trial", headers=headers)
     assert trial.status_code == 201
     body = trial.get_json()["data"]
     assert body["is_trial"] is True
 
     # Second trial must be refused.
-    again = client.post("/api/v1/plugins/lms/trial", headers=headers)
+    again = client.post("/api/v1/apps/lms/trial", headers=headers)
     assert again.status_code == 409
 
     # E5: without payment proof the activation must be refused (402) and the
     # install must stay a trial — never silently marked paid.
     sub = client.post(
-        "/api/v1/plugins/lms/subscribe",
+        "/api/v1/apps/lms/subscribe",
         json={"billing_cycle": "yearly"},
         headers=headers,
     )
     assert sub.status_code == 402
-    sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
+    sp = SchoolApp.query.filter_by(school_id=school.id, app_slug="lms").one()
     assert sp.is_trial is True
 
     # P-05/B3: an UNVERIFIABLE payment reference must NOT activate either —
     # only a gateway-verified reference (khalti with school credentials) or
     # a signature-verified Stripe webhook activates a paid subscription.
     sub = client.post(
-        "/api/v1/plugins/lms/subscribe",
+        "/api/v1/apps/lms/subscribe",
         json={
             "billing_cycle": "yearly",
             "payment": {"provider": "stripe", "transaction_id": "pi_test_123"},
@@ -76,7 +76,7 @@ def test_trial_then_subscribe_flow(client, db, school):
     )
     assert sub.status_code == 402
     assert "could not be verified" in sub.get_json()["error"]
-    sp = SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="lms").one()
+    sp = SchoolApp.query.filter_by(school_id=school.id, app_slug="lms").one()
     assert sp.is_trial is True, "unverified reference must not flip to paid"
 
 
@@ -94,18 +94,18 @@ def test_unpublished_stub_plugins_cannot_be_installed(client, db, school):
 
     for slug in ("social_hub", "ai_grading"):
         resp = client.post(
-            "/api/v1/plugins/install",
-            json={"plugin_slug": slug},
+            "/api/v1/apps/install",
+            json={"app_slug": slug},
             headers=headers,
         )
         assert resp.status_code in (400, 404), f"{slug} install should fail"
 
-        market = client.get("/api/v1/plugins/marketplace", headers=headers)
+        market = client.get("/api/v1/apps/marketplace", headers=headers)
         slugs = {p["slug"] for p in market.get_json()["data"]}
         assert slug not in slugs
 
 
 def test_trial_on_unknown_plugin_404(client, db, school):
     headers = _admin(client, db, school)
-    resp = client.post("/api/v1/plugins/does_not_exist/trial", headers=headers)
+    resp = client.post("/api/v1/apps/does_not_exist/trial", headers=headers)
     assert resp.status_code == 404

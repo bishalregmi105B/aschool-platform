@@ -28,7 +28,7 @@ from app.models.school import School
 from app.models.school_chain import SchoolChain, SchoolChainMember
 from app.models.student import Student
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -200,7 +200,7 @@ def _branch_metrics(members, start: date, end: date):
 @multi_branch_bp.route("/chain/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def chain_overview():
     """Per-branch rollup (students, staff, performance) for the owner's chain."""
@@ -245,7 +245,7 @@ def chain_overview():
 @multi_branch_bp.route("/chain/dashboard", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def chain_dashboard():
     """Unified dashboard: chain totals + per-branch cards for this month."""
@@ -287,7 +287,7 @@ def chain_dashboard():
 @multi_branch_bp.route("/chain/analytics", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def chain_analytics():
     """Period metrics (with change vs previous period) + branch rankings."""
@@ -388,7 +388,7 @@ def chain_analytics():
 @multi_branch_bp.route("/branches", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def list_branches():
     """Branch registry for the owner's chain. Non-chain schools get an empty list."""
@@ -410,7 +410,7 @@ def list_branches():
 @multi_branch_bp.route("/branches", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def create_branch():
     """Create a branch: either a new School tenant, or link an existing school
@@ -527,7 +527,7 @@ def _owned_member_or_error(member_id):
 @multi_branch_bp.route("/branches/<member_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def update_branch(member_id):
     """Update branch registry fields; name/address/phone/email write through
@@ -579,7 +579,7 @@ def update_branch(member_id):
 @multi_branch_bp.route("/branches/<member_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("multi_branch")
+@app_required("multi_branch")
 @role_required("superadmin", "school_admin")
 def remove_branch(member_id):
     """Unlink a branch from the chain. The School tenant itself is not deleted."""

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -77,9 +77,9 @@ const STATUS_FILTERS: Array<{ value: string; label: string; ne: string }> = [
 
 export default function FeeInvoicesPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <InvoicesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

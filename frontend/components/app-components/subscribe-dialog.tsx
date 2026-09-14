@@ -33,7 +33,7 @@ import { formatCurrency } from "@/lib/utils";
 
 /**
  * SubscribeDialog — collects the payment proof the backend requires
- * (POST /plugins/<slug>/subscribe returns 402 without
+ * (POST /apps/<slug>/subscribe returns 402 without
  * {"payment": {"provider", "transaction_id"}} — audit E5). Manual/offline
  * payment flows record the provider transaction reference here; Stripe
  * webhook activations remain the automated path.
@@ -70,7 +70,7 @@ export function SubscribeDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/plugins/${plugin!.slug}/subscribe`, {
+      const res = await api.post(`/apps/${plugin!.slug}/subscribe`, {
         billing_cycle: billingCycle,
         payment: { provider, transaction_id: transactionId.trim() },
       });

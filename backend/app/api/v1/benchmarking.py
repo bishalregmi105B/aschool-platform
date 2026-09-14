@@ -18,7 +18,7 @@ from sqlalchemy import case, func
 
 from app.api.v1.analytics import _overview_payload, _school_metric_averages
 from app.models.school import School
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import success_response
 
@@ -31,7 +31,7 @@ RANKINGS_CACHE_TTL = 600
 @benchmarking_bp.route("/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("school_admin", "teacher")
 def overview():
     school = School.query.get(g.school_id)
@@ -228,7 +228,7 @@ def db_query_latest_exam_ids(school_ids):
 @benchmarking_bp.route("/rankings", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("school_admin", "teacher")
 def rankings():
     """Anonymous cohort rankings (top 20).

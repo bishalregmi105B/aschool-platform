@@ -19,7 +19,7 @@ import {
 } from "@/components/aos/AOSIcons";
 import { LayoutGrid, Layers, Sparkles } from "lucide-react";
 import { WindowInstance, SchoolRole, EducationalPlugin } from "@/components/aos/types";
-import { useInstalledPlugins, PluginSidebarItem } from "@/lib/plugins";
+import { useInstalledApps, AppSidebarItem } from "@/lib/apps";
 import { getAOSAppForModule, normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
 
@@ -43,7 +43,7 @@ interface DockProps {
   pinnedAppIds?: string[];
   plugins?: EducationalPlugin[];
   dynamicApps?: DynamicDockApp[];
-  sidebarItems?: PluginSidebarItem[];
+  sidebarItems?: AppSidebarItem[];
 }
 
 interface DockButtonProps {
@@ -114,7 +114,7 @@ export default function Dock({
   const [bouncingId, setBouncingId] = useState<string | null>(null);
 
   // Hook into installed plugins if sidebarItems not directly passed
-  const { sidebarItems: contextSidebarItems } = useInstalledPlugins();
+  const { sidebarItems: contextSidebarItems } = useInstalledApps();
   const effectiveSidebar = sidebarItems || contextSidebarItems || [];
 
   // Icon dimension based on user setting

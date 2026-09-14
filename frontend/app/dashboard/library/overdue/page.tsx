@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import type { PaginationMeta } from "@/components/ui/pagination";
@@ -21,7 +21,7 @@ import { AlertCircle, BookOpen, RotateCcw } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function OverduePage() {
-  return <PluginGate slug="library"><OverdueContent /></PluginGate>;
+  return <AppGate slug="library"><OverdueContent /></AppGate>;
 }
 
 function OverdueContent() {

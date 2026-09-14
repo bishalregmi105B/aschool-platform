@@ -18,7 +18,7 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { VaultImageField } from "@/components/files/VaultImageField";
 import {
   DataPanel,
@@ -67,8 +67,8 @@ type AdvancedValues = { configJson: string };
 
 export default function SchoolSettingsPage() {
   const queryClient = useQueryClient();
-  const { isPluginInstalled } = useInstalledPlugins();
-  const hasWebsiteBuilder = isPluginInstalled("website_builder");
+  const { isAppInstalled } = useInstalledApps();
+  const hasWebsiteBuilder = isAppInstalled("website_builder");
 
   const { data: school, isLoading, isError, refetch } = useQuery({
     queryKey: ["school-settings"],

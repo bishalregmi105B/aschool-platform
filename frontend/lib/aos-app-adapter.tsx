@@ -1,7 +1,7 @@
 import React from "react";
 import { ICON_MAP } from "@/lib/icon-map";
 import * as AOSIcons from "@/components/aos/AOSIcons";
-import { type PluginSidebarItem } from "@/lib/plugins";
+import { type AppSidebarItem } from "@/lib/apps";
 
 export interface AOSApp {
   id: string;
@@ -130,7 +130,7 @@ const SLUG_TO_DEDICATED_AOS_ICON: Record<string, React.ComponentType<{ size?: nu
   hr: AOSIcons.AOSFinanceIcon,
 };
 
-export function getAOSAppForModule(item: PluginSidebarItem, iconSize = 48): AOSApp {
+export function getAOSAppForModule(item: AppSidebarItem, iconSize = 48): AOSApp {
   const moduleId = normalizeAOSModuleId(item.slug, item.route);
   const isHeavy = HEAVY_MODULE_SLUGS.has(moduleId);
   const { width: defaultWidth, height: defaultHeight } = getDefaultWindowSize(moduleId);

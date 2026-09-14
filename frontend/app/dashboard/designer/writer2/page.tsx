@@ -38,7 +38,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useWin11Scope } from "@/lib/win11-scope";
 import { writerJsonToWriterDoc } from "@/lib/designer/writer-doc-convert";
 import { Button } from "@/components/ui/button";
@@ -194,12 +194,12 @@ const WRITER_SHORTCUTS: ShortcutGroup[] = [
 
 export default function WriterPage() {
   return (
-    <PluginGate slug="design_studio">
+    <AppGate slug="design_studio">
       {/* TipTap init crash → friendly infobar + reload (wave-J) */}
       <EditorErrorBoundary editorName="The document writer" freshHref="/dashboard/designer/writer">
         <WriterContent />
       </EditorErrorBoundary>
-    </PluginGate>
+    </AppGate>
   );
 }
 

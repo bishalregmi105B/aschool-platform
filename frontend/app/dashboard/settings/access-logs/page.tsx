@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
@@ -90,9 +90,9 @@ const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
 
 export default function AccessLogsPage() {
   return (
-    <PluginGate slug="settings_core">
+    <AppGate slug="settings_core">
       <AccessLogsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

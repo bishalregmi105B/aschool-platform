@@ -54,7 +54,7 @@ class _DismissalScreenState extends State<DismissalScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'dismissal',
       child: Scaffold(
         appBar: AppBar(

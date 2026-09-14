@@ -160,7 +160,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                   path: '/emergency',
                   builder: (_, __) => const EmergencyAlertsScreen(
-                    usePluginGate: true,
+                    useAppGate: true,
                     allowHeadcount: true,
                     emptyTitle: 'No Active Alerts',
                     emptySubtitle:

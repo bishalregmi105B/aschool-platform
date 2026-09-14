@@ -36,7 +36,7 @@ class _TeacherShellScreenState extends ConsumerState<TeacherShellScreen> {
     final canPop = GoRouter.of(context).canPop();
     final useLocalAppBar = _usesLocalAppBar(location);
     final user = ref.watch(authProvider).user;
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
     final drawerSections = _buildDrawerSections(plugins);
 
     return Scaffold(

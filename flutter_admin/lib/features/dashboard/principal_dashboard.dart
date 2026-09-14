@@ -228,7 +228,7 @@ class _PrincipalDashboardState extends ConsumerState<PrincipalDashboard> {
 
   Widget _buildQuickActions() {
     return Consumer(builder: (context, ref, _) {
-      final plugins = ref.watch(pluginProvider);
+      final plugins = ref.watch(appProvider);
       return LayoutBuilder(
         builder: (context, constraints) {
           final columns = _gridColumns(constraints.maxWidth);

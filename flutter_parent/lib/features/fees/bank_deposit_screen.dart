@@ -128,7 +128,7 @@ class _BankDepositScreenState extends ConsumerState<BankDepositScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'fees',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Bank / Cheque Deposit'),

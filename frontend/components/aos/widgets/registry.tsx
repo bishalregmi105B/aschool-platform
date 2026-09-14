@@ -18,8 +18,8 @@ import {
   Bus,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useInstalledPlugins } from "@/lib/plugins";
-import { getAcceptablePluginSlugs } from "@/lib/plugin-aliases";
+import { useInstalledApps } from "@/lib/apps";
+import { getAcceptablePluginSlugs } from "@/lib/app-aliases";
 import type { AOSWidgetProps } from "./shared";
 import KpiOverviewWidget from "./KpiOverviewWidget";
 import FeeSummaryWidget from "./FeeSummaryWidget";
@@ -29,7 +29,7 @@ import RecentNoticesWidget from "./RecentNoticesWidget";
 import NotificationsWidget from "./NotificationsWidget";
 import StorageWidget from "./StorageWidget";
 import QuickLaunchWidget from "./QuickLaunchWidget";
-import PluginWidgetsWidget from "./PluginWidgetsWidget";
+import AppWidgetsWidget from "./AppWidgetsWidget";
 import FeesCollectionChartWidget from "./FeesCollectionChartWidget";
 import AttendanceWeekWidget from "./AttendanceWeekWidget";
 import LibraryCheckoutsWidget from "./LibraryCheckoutsWidget";
@@ -178,7 +178,7 @@ export const AOS_WIDGETS: AOSWidgetDefinition[] = [
     icon: <Puzzle className="h-4 w-4" style={{ color: "var(--w11-accent)" }} />,
     scope: "system",
     defaultSpan: 3,
-    Component: PluginWidgetsWidget,
+    Component: AppWidgetsWidget,
   },
   {
     key: "fees-collection-chart",
@@ -330,7 +330,7 @@ export function useWidgetAvailability(): {
 } {
   const { user } = useAuth();
   const role = user?.role;
-  const { installedPlugins, sidebarItems } = useInstalledPlugins();
+  const { installedPlugins, sidebarItems } = useInstalledApps();
 
   const installedSlugs = useMemo(() => {
     const slugs = new Set<string>();

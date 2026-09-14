@@ -1,4 +1,4 @@
-"""Plugin trial expiry — deactivates SchoolPlugin installs whose trial ended."""
+"""Plugin trial expiry — deactivates SchoolApp installs whose trial ended."""
 import logging
 from datetime import datetime, timezone
 
@@ -11,23 +11,23 @@ logger = logging.getLogger(__name__)
 def expire_trials():
     """Run hourly: deactivate plugin installs whose trial period has ended.
 
-    A SchoolPlugin row is trial-expired when is_trial is True and
+    A SchoolApp row is trial-expired when is_trial is True and
     trial_ends_at is in the past. Deactivation (active=False) removes the
     plugin from the request-scoped installed-plugins list, ending unpaid
     trial access. The per-school plugin cache is invalidated for every
     affected school so the change takes effect immediately.
     """
     from extensions import cache, db
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     now = datetime.now(timezone.utc)
 
     rows = (
-        SchoolPlugin.query.filter(
-            SchoolPlugin.active.is_(True),
-            SchoolPlugin.is_trial.is_(True),
-            SchoolPlugin.trial_ends_at.isnot(None),
-            SchoolPlugin.trial_ends_at < now,
+        SchoolApp.query.filter(
+            SchoolApp.active.is_(True),
+            SchoolApp.is_trial.is_(True),
+            SchoolApp.trial_ends_at.isnot(None),
+            SchoolApp.trial_ends_at < now,
         )
         .all()
     )
@@ -41,14 +41,14 @@ def expire_trials():
             logger.info(
                 "Expired trial: school=%s plugin=%s trial_ended_at=%s",
                 sp.school_id,
-                sp.plugin_slug,
+                sp.app_slug,
                 sp.trial_ends_at,
             )
         except Exception:
             logger.exception(
                 "Failed to expire trial for school=%s plugin=%s",
                 sp.school_id,
-                sp.plugin_slug,
+                sp.app_slug,
             )
 
     if expired_school_ids:

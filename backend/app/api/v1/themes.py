@@ -3,7 +3,7 @@
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
 
@@ -43,7 +43,7 @@ def preview_css(theme_id):
 @themes_bp.route("/apply", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("website_builder")
+@app_required("website_builder")
 @role_required("superadmin", "school_admin")
 def apply_theme():
     from app.services.website.theme_engine import ThemeEngineService

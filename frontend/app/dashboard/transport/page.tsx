@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { useAOSRouteParams, useAOSRouterNavigate } from "@/lib/aos-window-route";
@@ -63,9 +63,9 @@ interface BusItem {
 
 export default function TransportPage() {
   return (
-    <PluginGate slug="gps_tracking">
+    <AppGate slug="gps_tracking">
       <TransportContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

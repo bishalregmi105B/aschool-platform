@@ -28,7 +28,7 @@ from app.models.fee import (
 )
 from app.models.school import School
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import (
@@ -153,7 +153,7 @@ PAYMENT_METHOD_KEYS = tuple(DEFAULT_PAYMENT_METHODS.keys())
 @fees_bp.route("/types", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_fee_types():
     """List fee types for the school. Falls back to defaults if none exist."""
     from app.models.fee import FeeType
@@ -181,7 +181,7 @@ def list_fee_types():
 @fees_bp.route("/types", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def create_fee_type():
     """Create a custom fee type."""
@@ -210,7 +210,7 @@ def create_fee_type():
 @fees_bp.route("/types/<uuid:type_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def update_fee_type(type_id):
     """Update a fee type."""
@@ -237,7 +237,7 @@ def update_fee_type(type_id):
 @fees_bp.route("/types/<uuid:type_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def delete_fee_type(type_id):
     """Soft-delete a fee type."""
@@ -260,7 +260,7 @@ def delete_fee_type(type_id):
 @fees_bp.route("/payment-methods", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def get_payment_methods():
     """Return school-level payment method configuration.
 
@@ -284,7 +284,7 @@ def get_payment_methods():
 @fees_bp.route("/payment-methods", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def update_payment_methods():
     """Update school-level payment method configuration."""
@@ -332,7 +332,7 @@ def update_payment_methods():
 @fees_bp.route("/payment-methods/upload-qr", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def upload_qr_image():
     """Upload a QR code image for a payment method.
@@ -394,7 +394,7 @@ def upload_qr_image():
 @fees_bp.route("/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def get_fees_summary():
     """Aggregate fee summary for the school overview dashboard."""
     from app.models.academic import Class
@@ -556,7 +556,7 @@ def get_fees_summary():
 @fees_bp.route("/recent", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def list_recent_fees():
     """Return the most recent fee payment receipts for the school."""
@@ -593,7 +593,7 @@ def list_recent_fees():
 @fees_bp.route("/outstanding", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def list_outstanding_fees():
     """Return unpaid / partially-paid fee collections (defaulters)."""
@@ -647,7 +647,7 @@ def list_outstanding_fees():
 @fees_bp.route("/structures", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_fee_structures():
     """List fee structures for the school."""
     query = FeeStructure.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -668,7 +668,7 @@ def list_fee_structures():
 @fees_bp.route("/structures", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def create_fee_structure():
     """Create a fee structure."""
@@ -736,7 +736,7 @@ def create_fee_structure():
 @fees_bp.route("/structures/<uuid:structure_id>/apply", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def apply_fee_structure(structure_id):
     """Apply a fee structure to the current billing cycle."""
@@ -757,7 +757,7 @@ def apply_fee_structure(structure_id):
 @fees_bp.route("/batch-monthly", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def batch_monthly_billing():
     """Generate current-cycle fee collections for all active structures.
@@ -809,7 +809,7 @@ def batch_monthly_billing():
 @fees_bp.route("/scholarships", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def list_scholarships():
     """List all active scholarships/discounts for the school, optionally filtered by student."""
@@ -826,7 +826,7 @@ def list_scholarships():
 @fees_bp.route("/scholarships", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def create_scholarship():
     """Create a scholarship/discount for a student."""
@@ -871,7 +871,7 @@ def create_scholarship():
 @fees_bp.route("/scholarships/<uuid:scholarship_id>", methods=["PUT", "PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def update_scholarship(scholarship_id):
     """Update a scholarship/discount."""
@@ -906,7 +906,7 @@ def update_scholarship(scholarship_id):
 @fees_bp.route("/scholarships/<uuid:scholarship_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def delete_scholarship(scholarship_id):
     """Delete (soft) a scholarship/discount."""
@@ -943,7 +943,7 @@ def _scholarship_dict(sc):
 @fees_bp.route("/structures/<uuid:structure_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def delete_fee_structure(structure_id):
     structure = FeeStructure.query.filter_by(
@@ -1034,7 +1034,7 @@ def _collections_filtered_query():
 @fees_bp.route("/collections", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_collections():
     """List fee collections."""
     query = _collections_filtered_query()
@@ -1047,7 +1047,7 @@ def list_collections():
 @fees_bp.route("/collections/export", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def export_collections_csv():
     """Export fee collections as CSV, honoring the same filters as
     GET /fees/collections (student_id, class_id, section_id, search, status,
@@ -1132,7 +1132,7 @@ def export_collections_csv():
 @fees_bp.route("/defaulters", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def list_defaulters():
     """Students with outstanding fee collections."""
@@ -1183,7 +1183,7 @@ def list_defaulters():
 @fees_bp.route("/defaulters/<uuid:student_id>/remind", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def remind_defaulter(student_id):
     """Send ONE fee-reminder SMS to a student's primary guardian.
@@ -1226,7 +1226,7 @@ def remind_defaulter(student_id):
 @fees_bp.route("/collections", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def create_collection():
     """Create a fee bill for a student."""
@@ -1307,7 +1307,7 @@ def create_collection():
 @fees_bp.route("/collections/<uuid:collection_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def update_collection(collection_id):
     """Adjust a fee bill without recording a new payment."""
@@ -1378,7 +1378,7 @@ def update_collection(collection_id):
 @fees_bp.route("/collections/<uuid:collection_id>/pay", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant")
 def record_payment(collection_id):
     """Record a payment against a fee collection.
@@ -1557,7 +1557,7 @@ def record_payment(collection_id):
 @fees_bp.route("/collections/<uuid:collection_id>/receipt", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def get_collection_receipt(collection_id):
     """Return the latest receipt for a fee collection."""
     receipt = (
@@ -1577,7 +1577,7 @@ def get_collection_receipt(collection_id):
 @fees_bp.route("/receipts/<uuid:receipt_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def get_receipt(receipt_id):
     """Return a receipt record."""
     receipt = FeeReceipt.query.filter_by(
@@ -1593,7 +1593,7 @@ def get_receipt(receipt_id):
 @fees_bp.route("/receipts/<uuid:receipt_id>/pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def download_receipt_pdf(receipt_id):
     """Generate a printable PDF fee receipt."""
     receipt = FeeReceipt.query.filter_by(
@@ -1629,7 +1629,7 @@ def download_receipt_pdf(receipt_id):
 @fees_bp.route("/students/<uuid:student_id>/statement/pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin", "accountant")
 def download_student_statement_pdf(student_id):
     """Generate a printable PDF account statement for one student.
@@ -1817,7 +1817,7 @@ def _statement_pdf_html(student, collections):
 @fees_bp.route("/collections/<uuid:collection_id>/pay-online", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def initiate_online_payment(collection_id):
     """Initiate eSewa/Khalti online payment."""
     return _initiate_online_payment(collection_id, request.get_json(silent=True) or {})
@@ -1826,7 +1826,7 @@ def initiate_online_payment(collection_id):
 @fees_bp.route("/initiate-payment", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def initiate_parent_payment():
     """Initiate an online payment from the parent Flutter app."""
     data = request.get_json(silent=True) or {}
@@ -1963,7 +1963,7 @@ def _initiate_online_payment(collection_id, data):
 @fees_bp.route("/collections/<uuid:collection_id>/refund", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("superadmin", "school_admin")
 def refund_payment(collection_id):
     """Initiate a refund for an online fee payment (Khalti only currently).
@@ -3166,7 +3166,7 @@ def _invoice_dict(invoice, with_lines=False):
 @fees_bp.route("/invoices", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_invoices():
     """Per-student bill documents (grouped FeeCollection lines)."""
     query = FeeInvoice.query.filter(
@@ -3196,7 +3196,7 @@ def list_invoices():
 @fees_bp.route("/invoices/<uuid:invoice_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def get_invoice(invoice_id):
     invoice = FeeInvoice.query.filter_by(
         id=invoice_id, school_id=g.school_id, is_deleted=False
@@ -3211,7 +3211,7 @@ def get_invoice(invoice_id):
 @fees_bp.route("/structures/<uuid:structure_id>/installments", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_installments(structure_id):
     structure = FeeStructure.query.filter_by(
         id=structure_id, school_id=g.school_id, is_deleted=False
@@ -3245,7 +3245,7 @@ def list_installments(structure_id):
 @fees_bp.route("/structures/<uuid:structure_id>/installments", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def set_installments(structure_id):
     """Replace the structure's installment schedule.
@@ -3333,7 +3333,7 @@ def set_installments(structure_id):
 @fees_bp.route("/structures/<uuid:structure_id>/installments/apply", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def apply_installments(structure_id):
     """Generate one bill (FeeCollection) per installment per matched student.
@@ -3476,7 +3476,7 @@ def _student_year_balance(school_id, student_id, year_bs):
 @fees_bp.route("/carry-forward/preview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def carry_forward_preview():
     """Signed per-student balances for a from-year (what year-close would roll)."""
@@ -3527,7 +3527,7 @@ def carry_forward_preview():
 @fees_bp.route("/carry-forward/apply", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def carry_forward_apply():
     """Roll selected signed balances into the new academic year.
@@ -3668,7 +3668,7 @@ def carry_forward_apply():
 @fees_bp.route("/carry-forward/log", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def carry_forward_log():
     query = FeeCarryForwardLog.query.filter(
@@ -3700,7 +3700,7 @@ def carry_forward_log():
 @fees_bp.route("/receivables/aging", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def receivables_aging():
     """Accounts-receivable aging: outstanding balances bucketed by days past
@@ -3868,7 +3868,7 @@ def _accrue_fines_core(school_id: str, as_of_bs: str | None = None) -> dict:
 @fees_bp.route("/fines/accrue", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def accrue_fines():
     """Accrue late fines per the school's fine policy (School.settings
@@ -3897,7 +3897,7 @@ def accrue_fines():
 @fees_bp.route("/fines/settings", methods=["GET", "PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "superadmin")
 def fines_settings():
     """Read/update the school's late-fine policy (School.settings)."""
@@ -3927,7 +3927,7 @@ def fines_settings():
 @fees_bp.route("/reports/fines", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def fines_report():
     """Fines collected/accrued grouped by class and BS month."""
@@ -3958,7 +3958,7 @@ def fines_report():
 @fees_bp.route("/reports/waivers", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def waivers_report():
     """Waivers/discounts granted (scholarships + credits) grouped by class
@@ -4015,7 +4015,7 @@ def _offline_submission_dict(sub):
 @fees_bp.route("/offline-submissions", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def create_offline_submission():
     """Parent/student/teacher submits a bank-transfer or cheque slip for
     review. Money is NOT applied here — an admin approves."""
@@ -4099,7 +4099,7 @@ def create_offline_submission():
 @fees_bp.route("/offline-submissions", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def list_offline_submissions():
     """Admins see everything (filter by status); parents/students see their
     own submissions only."""
@@ -4140,7 +4140,7 @@ def list_offline_submissions():
 @fees_bp.route("/offline-submissions/<uuid:submission_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def approve_offline_submission(submission_id):
     """Approve a slip: record the payment through the SAME desk-collection
@@ -4256,7 +4256,7 @@ def approve_offline_submission(submission_id):
 @fees_bp.route("/offline-submissions/<uuid:submission_id>/reject", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def reject_offline_submission(submission_id):
     sub = FeeOfflineSubmission.query.filter_by(
@@ -4294,7 +4294,7 @@ def reject_offline_submission(submission_id):
 @fees_bp.route("/day-book", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def day_book():
     """Collections grouped by payment method (and collector) for one BS date
@@ -4383,7 +4383,7 @@ def day_book():
 @fees_bp.route("/day-closures", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def close_day():
     """Close the counter for one collector + BS date: the day book total is
@@ -4472,7 +4472,7 @@ def close_day():
 @fees_bp.route("/day-closures", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def list_day_closures():
     query = FeeDayClosure.query.filter(
@@ -4506,7 +4506,7 @@ def list_day_closures():
 @fees_bp.route("/day-closures/<uuid:closure_id>/reopen", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "superadmin")
 def reopen_day(closure_id):
     """Admin-only reopen — every reopen is stamped with who and when."""
@@ -4529,7 +4529,7 @@ def reopen_day(closure_id):
 @fees_bp.route("/receipt-numbering", methods=["GET", "PUT"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "superadmin")
 def receipt_numbering():
     """School-configurable receipt series (prefix + zero-pad). The sequence
@@ -4565,7 +4565,7 @@ def receipt_numbering():
 @fees_bp.route("/payments/sweep-pending", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 @role_required("school_admin", "accountant", "superadmin")
 def sweep_pending_payments():
     """Fail stale gateway initiations: a PaymentInitiation stuck in
@@ -4608,7 +4608,7 @@ def sweep_pending_payments():
 @fees_bp.route("/students/<uuid:student_id>/nudge-parent", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("fees")
+@app_required("fees")
 def nudge_parent(student_id):
     """Student (or admin on their behalf) asks the guardians to pay
     outstanding fees — an in-app notification per guardian account with the

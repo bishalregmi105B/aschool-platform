@@ -4,7 +4,7 @@ import re as _re
 from uuid import UUID
 
 from celery.schedules import crontab
-from flask import Flask, g, jsonify, request
+from flask import Blueprint, Flask, g, jsonify, request
 
 from config import config
 from extensions import cache, celery, cors, db, init_redis, jwt, limiter, migrate, socketio
@@ -414,7 +414,7 @@ def create_app(config_name: str | None = None) -> Flask:
         g.current_user_id = None
         g.current_user = None
         g.role = None
-        g.installed_plugins = []
+        g.installed_apps = []
 
         from app.models.school import School
 
@@ -567,7 +567,7 @@ def create_app(config_name: str | None = None) -> Flask:
         if plugins is None:
             from datetime import datetime, timezone
 
-            from app.models.plugin import SchoolPlugin
+            from app.models.app import SchoolApp
 
             now = datetime.now(timezone.utc)
 
@@ -580,24 +580,38 @@ def create_app(config_name: str | None = None) -> Flask:
                     ends = ends.replace(tzinfo=timezone.utc)
                 return ends < now
 
-            rows = SchoolPlugin.query.filter_by(
+            rows = SchoolApp.query.filter_by(
                 school_id=school.id, active=True
             ).all()
             # Defense-in-depth: even if a row is still active=True (e.g. the
             # hourly expire_trials beat task has not run yet), exclude
             # trial-expired installs so unpaid trials stop granting access.
             plugins = [
-                sp.plugin_slug
+                sp.app_slug
                 for sp in rows
                 if not _trial_expired(sp)
             ]
             cache.set(cache_key, plugins, timeout=300)
-        g.installed_plugins = plugins
+        g.installed_apps = plugins
 
     # Register core blueprint
     from app.api.v1 import api_v1_bp
 
     app.register_blueprint(api_v1_bp, url_prefix="/api/v1")
+
+    # Legacy URL alias: /api/v1/plugins/* → the apps blueprint. The plugins→
+    # apps rename (2026-09) moved the canonical prefix to /api/v1/apps; this
+    # alias keeps deployed Flutter apps and bookmarked links working until
+    # they migrate. Registered with a distinct blueprint name to avoid the
+    # duplicate-registration error while sharing the same view functions.
+    from app.api.v1.apps import apps_bp as _apps_bp
+
+    _plugins_alias_bp = Blueprint(
+        "plugins_legacy_alias", __name__, url_prefix="/api/v1/plugins"
+    )
+    for rule in list(_apps_bp.deferred_functions):
+        _plugins_alias_bp.deferred_functions.append(rule)
+    app.register_blueprint(_plugins_alias_bp)
 
     # Register webhook blueprint
     from app.api.webhooks import webhooks_bp
@@ -605,9 +619,9 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(webhooks_bp, url_prefix="/webhooks")
 
     # Load plugins
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
-    PluginLoader.discover_and_register(app)
+    AppLoader.discover_and_register(app)
 
     # Designer templates: the templates.json registry auto-rebuilds from
     # folder metadata at startup (folders are the authoring source; the
@@ -631,7 +645,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # context (Flask-SQLAlchemy 3 session) — create_app does not push one.
     try:
         with app.app_context():
-            PluginLoader.refresh_registry()
+            AppLoader.refresh_registry()
     except Exception as e:  # noqa: BLE001 — startup resilience
         app.logger.error("Plugin registry refresh failed at startup: %s", e)
 

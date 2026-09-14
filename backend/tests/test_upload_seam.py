@@ -14,7 +14,7 @@ import io
 
 import pytest
 
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.utils.file_upload import safe_storage_key
 
 from tests.conftest import get_auth_headers
@@ -23,9 +23,9 @@ from tests.conftest import get_auth_headers
 @pytest.fixture
 def files_plugin(db, school):
     """The upload route is plugin-gated (file_management) — install it."""
-    sp = SchoolPlugin(
+    sp = SchoolApp(
         school_id=school.id,
-        plugin_slug="file_management",
+        app_slug="file_management",
         active=True,
         is_trial=False,
     )

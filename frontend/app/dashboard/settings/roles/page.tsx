@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAOSRouteParams, useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { toast } from "sonner";
-import { PluginGate, type PluginSidebarItem } from "@/lib/plugins";
+import { AppGate, type AppSidebarItem } from "@/lib/apps";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ import { SettingsPage } from "../settings-page";
  * Roles & Permissions — B-17 rewrite. Live per-role counts from
  * GET /users/stats, a per-role users drawer (GET /users?role=…) with
  * toggle-active + force-password-change actions, and a read-only view of
- * what the signed-in role can see (derived from GET /plugins/sidebar).
+ * what the signed-in role can see (derived from GET /apps/sidebar).
  */
 
 interface RoleCounts {
@@ -80,9 +80,9 @@ function roleLabel(role: string): string {
 
 export default function RolesPage() {
   return (
-    <PluginGate slug="settings_core">
+    <AppGate slug="settings_core">
       <RolesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 
@@ -421,7 +421,7 @@ function RoleUsersSheet({ role, onClose }: { role: string | null; onClose: () =>
 /* ── Read-only permission matrix ───────────────────────────────────────── */
 
 interface SidebarResponse {
-  items: PluginSidebarItem[];
+  items: AppSidebarItem[];
 }
 
 function PermissionsMatrix() {
@@ -435,7 +435,7 @@ function PermissionsMatrix() {
   } = useQuery({
     queryKey: ["plugins-sidebar"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<SidebarResponse>>("/plugins/sidebar");
+      const res = await api.get<ApiResponse<SidebarResponse>>("/apps/sidebar");
       return res.data.data;
     },
     retry: 1,
@@ -444,7 +444,7 @@ function PermissionsMatrix() {
   const items = sidebar?.items ?? [];
 
   const sections = useMemo(() => {
-    const map = new Map<string, PluginSidebarItem[]>();
+    const map = new Map<string, AppSidebarItem[]>();
     for (const item of items) {
       const key = item.section || "General";
       const list = map.get(key) ?? [];

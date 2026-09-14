@@ -20,7 +20,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { AiResultView } from "@/components/ai/ai-result-view";
 import { api, type ApiResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -385,8 +385,8 @@ function WorkbenchContent() {
 
 export default function AIWorkbenchPage() {
   return (
-    <PluginGate slug="ai_suite">
+    <AppGate slug="ai_suite">
       <WorkbenchContent />
-    </PluginGate>
+    </AppGate>
   );
 }

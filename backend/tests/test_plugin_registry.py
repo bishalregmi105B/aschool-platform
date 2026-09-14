@@ -11,9 +11,9 @@ import pytest
 from sqlalchemy import inspect, text
 
 from app.api.v1.plugins import _catalog_entries
-from app.models.plugin import Plugin, SchoolPlugin
-from app.apps.billing import install_plugin, uninstall_plugin
-from app.apps.loader import PluginLoader
+from app.models.app import App, SchoolApp
+from app.apps.billing import install_app, uninstall_app
+from app.apps.loader import AppLoader
 
 # The plugin blueprints moved into their module folders (routes.py).
 # social_ads lived here too until W0 (2026-09-04) deleted the plugin outright;
@@ -56,8 +56,8 @@ DELISTED_SLUGS = {
 
 class TestRegistryRefresh:
     def test_scan_finds_the_full_directory(self):
-        PluginLoader._scan_manifests()
-        scanned = PluginLoader.get_all_manifests()
+        AppLoader._scan_manifests()
+        scanned = AppLoader.get_all_manifests()
         # The directory is the catalog — both module packages and legacy
         # manifests are scanned (modules take precedence on slug clashes).
         # 47 on-disk after the W0 deletions; keep a floor, not a ceiling.
@@ -67,38 +67,38 @@ class TestRegistryRefresh:
             assert slug in scanned, f"missing {slug}"
 
     def test_deleted_plugins_are_gone_from_the_directory(self):
-        PluginLoader._scan_manifests()
-        scanned = PluginLoader.get_all_manifests()
+        AppLoader._scan_manifests()
+        scanned = AppLoader.get_all_manifests()
         for slug in ("social_ads", "social_hub", "digital_content",
                      "advanced_analytics"):
             assert slug not in scanned, f"{slug} manifest must be deleted"
 
     def test_refresh_upserts_mirror_for_every_scanned_slug(self, db):
-        result = PluginLoader.refresh_registry()
-        rows = {p.slug: p for p in Plugin.query.all()}
-        assert result["scanned"] == len(PluginLoader.get_all_manifests())
-        for slug in PluginLoader.get_all_manifests():
+        result = AppLoader.refresh_registry()
+        rows = {p.slug: p for p in App.query.all()}
+        assert result["scanned"] == len(AppLoader.get_all_manifests())
+        for slug in AppLoader.get_all_manifests():
             assert slug in rows, f"mirror row missing for {slug}"
         assert result["created"] >= 0
 
     def test_refresh_is_idempotent(self, db):
-        PluginLoader.refresh_registry()
-        second = PluginLoader.refresh_registry()
+        AppLoader.refresh_registry()
+        second = AppLoader.refresh_registry()
         assert second["created"] == 0
         assert second["deactivated"] == 0
-        assert second["scanned"] == len(PluginLoader.get_all_manifests())
+        assert second["scanned"] == len(AppLoader.get_all_manifests())
         # No duplicate rows were minted.
-        assert Plugin.query.count() == second["scanned"]
+        assert App.query.count() == second["scanned"]
 
     def test_delisted_manifests_are_unpublished_in_mirror(self, db):
         """Manifests with published:false (or deleted outright) never show in
         the catalog, and any stale mirror row is unpublished by the refresh.
         On a fresh DB the deleted slugs have no row at all — either way the
         catalog must not offer them."""
-        PluginLoader.refresh_registry()
+        AppLoader.refresh_registry()
         entries = {e["slug"] for e in _catalog_entries()}
         for slug in DELISTED_SLUGS:
-            row = Plugin.query.filter_by(slug=slug).first()
+            row = App.query.filter_by(slug=slug).first()
             if row is not None:  # stale row from an older deploy
                 assert row.is_published is False, f"{slug} must be delisted"
             assert slug not in entries, f"{slug} must not be listed"
@@ -106,7 +106,7 @@ class TestRegistryRefresh:
     def test_vanished_folder_is_unpublished_by_refresh(self, db):
         """A mirror row whose plugin folder/manifest is gone gets delisted
         (never deleted — history preserved) by the next refresh."""
-        ghost = Plugin(
+        ghost = App(
             slug="ghost_plugin_from_2019",
             name="Ghost",
             category="starter",
@@ -118,8 +118,8 @@ class TestRegistryRefresh:
         entries_before = {e["slug"] for e in _catalog_entries()}
         assert "ghost_plugin_from_2019" in entries_before  # fallback until refresh
 
-        PluginLoader.refresh_registry()
-        row = Plugin.query.filter_by(slug="ghost_plugin_from_2019").first()
+        AppLoader.refresh_registry()
+        row = App.query.filter_by(slug="ghost_plugin_from_2019").first()
         assert row is not None  # never dropped
         assert row.is_published is False
         assert "ghost_plugin_from_2019" not in {e["slug"] for e in _catalog_entries()}
@@ -127,9 +127,9 @@ class TestRegistryRefresh:
         db.session.commit()
 
     def test_mirror_additively_syncs_manifest_fields(self, db):
-        PluginLoader.refresh_registry()
-        m = PluginLoader.get_manifest("attendance")
-        row = Plugin.query.filter_by(slug="attendance").first()
+        AppLoader.refresh_registry()
+        m = AppLoader.get_manifest("attendance")
+        row = App.query.filter_by(slug="attendance").first()
         assert row.name == (m.get("name") or "attendance")
         assert float(row.price_monthly) == float(m.get("price_monthly") or 0)
 
@@ -139,9 +139,9 @@ class TestRegistryRefresh:
 
 class TestCatalogEntries:
     def test_marketplace_catalog_lists_published_registry(self, db):
-        PluginLoader.refresh_registry()
+        AppLoader.refresh_registry()
         entries = {e["slug"]: e for e in _catalog_entries()}
-        for slug, m in PluginLoader.get_all_manifests().items():
+        for slug, m in AppLoader.get_all_manifests().items():
             if slug in DELISTED_SLUGS:
                 assert slug not in entries, f"delisted {slug} must not be offered"
                 continue
@@ -155,8 +155,8 @@ class TestCatalogEntries:
             assert key in sample
 
     def test_manifest_values_win_over_mirror_drift(self, db):
-        PluginLoader.refresh_registry()
-        row = Plugin.query.filter_by(slug="attendance").first()
+        AppLoader.refresh_registry()
+        row = App.query.filter_by(slug="attendance").first()
         row.description = "STALE MIRROR DRIFT"
         db.session.commit()
         entry = {e["slug"]: e for e in _catalog_entries()}["attendance"]
@@ -169,7 +169,7 @@ class TestCatalogEntries:
 class TestModuleHooks:
     def test_hooks_discoverable_for_all_moved_modules(self):
         for slug in MOVED_MODULES:
-            hooks = PluginLoader.get_hooks(slug)
+            hooks = AppLoader.get_hooks(slug)
             assert hooks is not None, f"hooks module missing for {slug}"
             assert callable(getattr(hooks, "activate", None))
             assert callable(getattr(hooks, "deactivate", None))
@@ -186,7 +186,7 @@ class TestModuleHooks:
         SchoolChain.__table__.drop(db.engine, checkfirst=True)
         assert not inspect(db.engine).has_table("school_chains")
 
-        hooks = PluginLoader.get_hooks("multi_branch")
+        hooks = AppLoader.get_hooks("multi_branch")
         hooks.activate(db)
         insp = inspect(db.engine)
         assert insp.has_table("school_chains")
@@ -197,7 +197,7 @@ class TestModuleHooks:
 
     def test_deactivate_hook_is_a_noop(self, db):
         for slug in MOVED_MODULES:
-            hooks = PluginLoader.get_hooks(slug)
+            hooks = AppLoader.get_hooks(slug)
             assert hooks.deactivate(db) is None
 
     def test_white_label_uninstall_removes_only_owned_config_key(self, db):
@@ -214,7 +214,7 @@ class TestModuleHooks:
         db.session.add(school)
         db.session.commit()
 
-        hooks = PluginLoader.get_hooks("white_label")
+        hooks = AppLoader.get_hooks("white_label")
         hooks.uninstall(db)
         db.session.expire_all()
         settings = School.query.get(school.id).settings
@@ -222,25 +222,25 @@ class TestModuleHooks:
         assert settings["keep_me"] == 1  # non-module keys untouched
 
     def test_install_uninstall_runs_hooks_and_install_state(self, db, school):
-        """install → SchoolPlugin row + activate hook (tables ensured);
+        """install → SchoolApp row + activate hook (tables ensured);
         uninstall → row stamped uninstalled, data tables kept."""
-        PluginLoader.refresh_registry()
+        AppLoader.refresh_registry()
 
-        result = install_plugin(str(school.id), "multi_branch")
+        result = install_app(str(school.id), "multi_branch")
         assert "error" not in result
         assert inspect(db.engine).has_table("school_chains")
-        sp = SchoolPlugin.query.filter_by(
-            school_id=school.id, plugin_slug="multi_branch"
+        sp = SchoolApp.query.filter_by(
+            school_id=school.id, app_slug="multi_branch"
         ).first()
         assert sp is not None and sp.active
 
-        result = uninstall_plugin(str(school.id), "multi_branch")
+        result = uninstall_app(str(school.id), "multi_branch")
         assert "error" not in result
         db.session.expire_all()
-        sp = SchoolPlugin.query.filter_by(
-            school_id=school_id_helper(), plugin_slug="multi_branch"
-        ).first() if False else SchoolPlugin.query.filter_by(
-            school_id=school.id, plugin_slug="multi_branch"
+        sp = SchoolApp.query.filter_by(
+            school_id=school_id_helper(), app_slug="multi_branch"
+        ).first() if False else SchoolApp.query.filter_by(
+            school_id=school.id, app_slug="multi_branch"
         ).first()
         assert sp.uninstalled_at is not None
         # WP keeps data on uninstall — tables stay.
@@ -290,7 +290,7 @@ class TestMovedBlueprints:
         from tests.conftest import get_auth_headers
 
         headers = get_auth_headers(client, admin_user.email, "Test@1234")
-        resp = client.get("/api/v1/plugins/attendance/config-schema", headers=headers)
+        resp = client.get("/api/v1/apps/attendance/config-schema", headers=headers)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
         assert data["slug"] == "attendance"
@@ -301,7 +301,7 @@ class TestMovedBlueprints:
         # A plugin without a schema falls back to the generic editor.
         # `alumni` ships no config_schema.yaml (library_management does — it
         # gained one in 3d327eb, which is why this assertion used to fail).
-        resp = client.get("/api/v1/plugins/alumni/config-schema", headers=headers)
+        resp = client.get("/api/v1/apps/alumni/config-schema", headers=headers)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
         assert data["has_schema"] is False and data["fields"] == []
@@ -312,16 +312,16 @@ class TestMovedBlueprints:
         from tests.conftest import get_auth_headers
 
         admin_headers = get_auth_headers(client, admin_user.email, "Test@1234")
-        resp = client.post("/api/v1/plugins/refresh-registry", headers=admin_headers)
+        resp = client.post("/api/v1/apps/refresh-registry", headers=admin_headers)
         assert resp.status_code == 403
 
         super_headers = get_auth_headers(client, superadmin_user.email, "SuperSecret@1")
-        resp = client.post("/api/v1/plugins/refresh-registry", headers=super_headers)
+        resp = client.post("/api/v1/apps/refresh-registry", headers=super_headers)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
-        assert data["scanned"] == len(PluginLoader.get_all_manifests())
+        assert data["scanned"] == len(AppLoader.get_all_manifests())
         # Idempotent: a second refresh creates nothing (the first call — or
         # app startup — has already mirrored the directory).
-        second = client.post("/api/v1/plugins/refresh-registry", headers=super_headers)
+        second = client.post("/api/v1/apps/refresh-registry", headers=super_headers)
         assert second.status_code == 200
         assert second.get_json()["data"]["created"] == 0

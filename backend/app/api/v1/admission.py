@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from app.models.admission import AdmissionInquiry, AdmissionApplication
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -52,7 +52,7 @@ def _parse_date_value(value):
 @admission_bp.route("/inquiries", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def list_inquiries():
     query = AdmissionInquiry.query.filter_by(school_id=g.school_id)
     status = request.args.get("status")
@@ -66,7 +66,7 @@ def list_inquiries():
 @admission_bp.route("/inquiries", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def create_inquiry():
     data = request.get_json(silent=True) or {}
     inquiry = AdmissionInquiry(school_id=g.school_id)
@@ -81,7 +81,7 @@ def create_inquiry():
 @admission_bp.route("/inquiries/<inquiry_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def update_inquiry(inquiry_id):
     inquiry = AdmissionInquiry.query.filter_by(id=inquiry_id, school_id=g.school_id).first_or_404()
@@ -114,7 +114,7 @@ def update_inquiry(inquiry_id):
 @admission_bp.route("/applications", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def list_applications():
     query = AdmissionApplication.query.filter_by(school_id=g.school_id)
     status = request.args.get("status")
@@ -131,7 +131,7 @@ def list_applications():
 @admission_bp.route("/applications", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def create_application():
     data = request.get_json(silent=True) or {}
     # admission_applications.student_name is NOT NULL — validate up front so a
@@ -190,7 +190,7 @@ EDITABLE_APPLICATION_FIELDS = (
 @admission_bp.route("/applications/<app_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def update_application(app_id):
     """Edit application details (only before the accepted stage)."""
@@ -234,7 +234,7 @@ def update_application(app_id):
 @admission_bp.route("/applications/<app_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def get_application(app_id):
     """Application detail — everything the detail dialog / edit form shows."""
     app_uuid = _parse_uuid(app_id)
@@ -269,7 +269,7 @@ VALID_APPLICATION_STATUSES = (*PIPELINE_ORDER, *SIDE_STATUSES)
 @admission_bp.route("/applications/<app_id>/status", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def update_application_status(app_id):
     """Move application through pipeline: submitted → under_review → shortlisted → interview → accepted → enrolled (rejected/waitlisted are side-states)."""
@@ -324,7 +324,7 @@ def update_application_status(app_id):
 @admission_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 def admission_dashboard():
     """Admission funnel summary."""
     from sqlalchemy import func
@@ -420,7 +420,7 @@ def _registration_dict(r):
 @admission_bp.route("/registrations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin", "teacher")
 def list_registrations():
     from app.models.admission import AdmissionRegistration
@@ -453,7 +453,7 @@ def list_registrations():
 @admission_bp.route("/registrations/<uuid:registration_id>/review", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def review_registration(registration_id):
     from app.models.admission import AdmissionRegistration
@@ -477,7 +477,7 @@ def review_registration(registration_id):
 @admission_bp.route("/registrations/<uuid:registration_id>/convert", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def convert_registration_route(registration_id):
     """Approve → provision in ONE transaction, gated by the class's
@@ -525,7 +525,7 @@ def convert_registration_route(registration_id):
     try:
         from app.models.fee import FeeCollection
 
-        installed = set(getattr(g, "installed_plugins", None) or [])
+        installed = set(getattr(g, "installed_apps", None) or [])
         if "fees" in installed and reg.applied_class_id:
             amount = data.get("admission_fee_amount")
             if amount:
@@ -559,7 +559,7 @@ def _admission_fee_amount(value):
 @admission_bp.route("/seats", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin", "teacher")
 def list_seats():
     from app.models.academic import Class
@@ -593,7 +593,7 @@ def list_seats():
 @admission_bp.route("/seats", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("admission")
+@app_required("admission")
 @role_required("superadmin", "school_admin")
 def upsert_seat():
     from app.models.academic import Class

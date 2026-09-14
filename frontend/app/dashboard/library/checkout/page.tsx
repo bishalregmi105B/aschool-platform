@@ -10,7 +10,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ import { BookMarked, RotateCcw, ScanLine, Search, BookOpen, RefreshCw } from "lu
 import { displayBS } from "@/lib/nepali_date";
 
 export default function CheckoutPage() {
-  return <PluginGate slug="library"><CheckoutContent /></PluginGate>;
+  return <AppGate slug="library"><CheckoutContent /></AppGate>;
 }
 
 /** Barcode-first desk helper: scan a copy barcode and the backend resolves

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,7 @@ import {
 } from "@/lib/aos-window-route";
 
 export default function ELibraryPage() {
-  return <PluginGate slug="elibrary"><ELibraryContent /></PluginGate>;
+  return <AppGate slug="elibrary"><ELibraryContent /></AppGate>;
 }
 
 function ELibraryContent() {

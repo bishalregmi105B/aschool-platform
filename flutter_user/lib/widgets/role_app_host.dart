@@ -54,7 +54,7 @@ class StaffAppWithTransport extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     const app = teacher_app.ASchoolTeacherApp();
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'gps_tracking',
       fallback: app,
       child: Stack(

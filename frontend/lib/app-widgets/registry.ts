@@ -41,7 +41,7 @@ export const COMPONENT_WIDGETS: Record<
   // keyboard-first spreadsheet with per-cell validation — not expressible as a
   // declarative spec, which is exactly what this registry is for.
   "exams/MarksGrid": dynamic(
-    () => import("@/components/plugin-widgets/components/MarksGridWidget"),
+    () => import("@/components/app-widgets/components/MarksGridWidget"),
     { ssr: false }
   ),
 };

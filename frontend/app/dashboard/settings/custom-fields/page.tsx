@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Plus, Trash2, ClipboardList } from "lucide-react";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import {
   FilterCommandBar,
   DataPanel,
@@ -56,9 +56,9 @@ const TYPES = ["text", "textarea", "number", "date", "select", "multiselect", "c
 
 export default function CustomFieldsPage() {
   return (
-    <PluginGate slug="settings_core">
+    <AppGate slug="settings_core">
       <CustomFieldsInner />
-    </PluginGate>
+    </AppGate>
   );
 }
 

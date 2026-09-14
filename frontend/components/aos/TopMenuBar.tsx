@@ -24,7 +24,7 @@ import { normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 import { DEFAULT_TOPBAR_ITEMS } from "@/lib/aos-settings";
 import { toast } from "sonner";
 
-/** Module info the menu bar needs (structural subset of PluginSidebarItem). */
+/** Module info the menu bar needs (structural subset of AppSidebarItem). */
 export interface TopMenuBarNavItem {
   slug: string;
   label: string;

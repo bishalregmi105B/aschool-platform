@@ -6,7 +6,7 @@ import { ImageIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -56,9 +56,9 @@ const emptyForm: SliderForm = {
 
 export default function SlidersPage() {
   return (
-    <PluginGate slug="notices">
+    <AppGate slug="notices">
       <SlidersContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

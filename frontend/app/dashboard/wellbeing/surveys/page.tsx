@@ -18,7 +18,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -47,7 +47,7 @@ interface SurveyQuestion {
 }
 
 export default function SurveysPage() {
-  return <PluginGate slug="wellbeing"><SurveysContent /></PluginGate>;
+  return <AppGate slug="wellbeing"><SurveysContent /></AppGate>;
 }
 
 function SurveysContent() {

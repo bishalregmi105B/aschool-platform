@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -43,7 +43,7 @@ import {
 import { displayBS } from "@/lib/nepali_date";
 
 export default function CounselorPage() {
-  return <PluginGate slug="wellbeing"><CounselorContent /></PluginGate>;
+  return <AppGate slug="wellbeing"><CounselorContent /></AppGate>;
 }
 
 function CounselorContent() {

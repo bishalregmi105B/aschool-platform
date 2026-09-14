@@ -18,7 +18,7 @@ class _StudentExamsScreenState extends ConsumerState<StudentExamsScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(examsProvider);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'exams',
       child: Scaffold(
         appBar: const CustomAppBar(

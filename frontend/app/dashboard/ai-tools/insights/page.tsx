@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, TrendingUp, TrendingDown, AlertTriangle, Users, DollarSign, BookOpen, Activity, Brain } from "lucide-react";
 import Link from "next/link";
@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function InsightsPage() {
   return (
-    <PluginGate slug="ai_suite"><InsightsContent /></PluginGate>
+    <AppGate slug="ai_suite"><InsightsContent /></AppGate>
   );
 }
 

@@ -8,7 +8,7 @@ E40: the plugin was published with working emergency-tier routes
 `/emergency/seismic-alerts` — none of which existed.
 
 Routes (mounted under /api/v1/emergency to match the frontend calls; all
-gated @plugin_required("disaster_management"), tenant-scoped to g.school_id):
+gated @app_required("disaster_management"), tenant-scoped to g.school_id):
   GET    /emergency/drills                      list (?status, ?upcoming=true, ?drill_type)
   POST   /emergency/drills                      schedule a drill (admin)
   GET    /emergency/drills/<id>                 drill detail + participations
@@ -37,7 +37,7 @@ from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.disaster_management import DisasterDrill, DrillParticipation
 from app.models.emergency import EmergencyAlert, EvacuationPlan
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -62,7 +62,7 @@ USGS_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 @disaster_management_bp.route("/drills", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 def list_drills():
     query = DisasterDrill.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -87,7 +87,7 @@ def list_drills():
 @disaster_management_bp.route("/drills", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 @role_required("superadmin", "school_admin")
 def create_drill():
     data = request.get_json(silent=True) or {}
@@ -121,7 +121,7 @@ def create_drill():
 @disaster_management_bp.route("/drills/<uuid:drill_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 def get_drill(drill_id):
     drill = _get_drill(drill_id)
     if not drill:
@@ -136,7 +136,7 @@ def get_drill(drill_id):
 @disaster_management_bp.route("/drills/<uuid:drill_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 @role_required("superadmin", "school_admin")
 def update_drill(drill_id):
     drill = _get_drill(drill_id)
@@ -179,7 +179,7 @@ def update_drill(drill_id):
 @disaster_management_bp.route("/drills/<uuid:drill_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 @role_required("superadmin", "school_admin")
 def delete_drill(drill_id):
     drill = _get_drill(drill_id)
@@ -197,7 +197,7 @@ def delete_drill(drill_id):
 )
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 def list_participations(drill_id):
     if not _get_drill(drill_id):
         return error_response("Drill not found", 404)
@@ -217,7 +217,7 @@ def list_participations(drill_id):
 )
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 @role_required("superadmin", "school_admin", "teacher")
 def record_participation(drill_id):
     if not _get_drill(drill_id):
@@ -283,7 +283,7 @@ def record_participation(drill_id):
 @disaster_management_bp.route("/disaster/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 def disaster_overview():
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     year_start = datetime(now.year, 1, 1)
@@ -404,7 +404,7 @@ def _readiness_score(now, active_plans, completed_last_year, last_completed_at, 
 @disaster_management_bp.route("/seismic-alerts", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("disaster_management")
+@app_required("disaster_management")
 def seismic_alerts():
     result = _fetch_seismic_events()
     payload = {"alerts": result["alerts"]}

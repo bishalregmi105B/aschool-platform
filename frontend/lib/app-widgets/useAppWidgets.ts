@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * usePluginWidgets — fetch the widget specs for a slot, and the data for one.
+ * useAppWidgets — fetch the widget specs for a slot, and the data for one.
  *
  * Two hooks, deliberately separate:
- *   * `usePluginWidgets(slot)` asks the server which widgets this school/role may
+ *   * `useAppWidgets(slot)` asks the server which widgets this school/role may
  *     render there. One request per slot, cached by react-query.
  *   * `useWidgetData(widget)` fetches that widget's own endpoint, honouring its
  *     declared refresh mode and cache TTL.
@@ -24,7 +24,7 @@ import {
 } from "./bindings";
 import type { WidgetSpec, WidgetsResponse } from "./types";
 
-export function usePluginWidgets(
+export function useAppWidgets(
   slot: string,
   surface: "web" | "mobile" = "web",
   enabled = true
@@ -35,7 +35,7 @@ export function usePluginWidgets(
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const res = await api.get<ApiResponse<WidgetsResponse>>(
-        "/plugins/widgets",
+        "/apps/widgets",
         { params: { surface, slot } }
       );
       if (!res.data.success) throw new Error("Could not load widgets");

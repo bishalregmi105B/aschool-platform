@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2, UserCheck, Globe } from "lucide-react";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import {
   AOSPage,
   AOSPageHeader,
@@ -61,9 +61,9 @@ const STATUS_TONES: Record<string, string> = {
 
 export default function RegistrationsPage() {
   return (
-    <PluginGate slug="admission">
+    <AppGate slug="admission">
       <RegistrationsInner />
-    </PluginGate>
+    </AppGate>
   );
 }
 

@@ -9,7 +9,7 @@ from sqlalchemy import String, func
 from app.models.academic import Class, Section
 from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest, SubjectAttendance
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -22,7 +22,7 @@ attendance_bp = Blueprint("attendance", __name__, url_prefix="/attendance")
 @attendance_bp.route("/mark", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def mark_attendance():
     """Mark attendance for students in a class/section."""
@@ -168,7 +168,7 @@ def mark_attendance():
 @attendance_bp.route("/submit", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def submit_attendance_compat():
     """Compatibility route used by Flutter repositories."""
@@ -178,7 +178,7 @@ def submit_attendance_compat():
 @attendance_bp.route("/students/<class_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def list_students_for_attendance(class_id):
     if g.role == "teacher" and g.user_id:
@@ -213,7 +213,7 @@ def list_students_for_attendance(class_id):
 @attendance_bp.route("/student/<student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def list_student_attendance(student_id):
     query = Attendance.query.filter_by(
         school_id=g.school_id,
@@ -232,7 +232,7 @@ def list_student_attendance(student_id):
 @attendance_bp.route("/student/<student_id>/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def student_attendance_summary(student_id):
     records = Attendance.query.filter_by(
         school_id=g.school_id,
@@ -260,7 +260,7 @@ def student_attendance_summary(student_id):
 @attendance_bp.route("/list", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def list_attendance():
     """Get attendance records with filters."""
     query = Attendance.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -305,7 +305,7 @@ def list_attendance():
 @attendance_bp.route("/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def attendance_summary():
     """Get attendance summary for a date/class."""
     attendance_date = _parse_date(request.args.get("date")) or date.today()
@@ -358,7 +358,7 @@ def attendance_summary():
 @attendance_bp.route("/school-overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin")
 def school_attendance_overview():
     """Aggregated school-wide attendance: today/week/month percentages and per-class breakdown."""
@@ -440,7 +440,7 @@ def school_attendance_overview():
 @attendance_bp.route("/teachers/mark", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin")
 def mark_teacher_attendance():
     """Mark attendance for teachers/staff."""
@@ -507,7 +507,7 @@ def mark_teacher_attendance():
 @attendance_bp.route("/teachers/list", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin")
 def list_teacher_attendance():
     """Get teacher/staff attendance records."""
@@ -529,7 +529,7 @@ def list_teacher_attendance():
 @attendance_bp.route("/me", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def my_attendance():
     """The current staff member's own attendance records.
 
@@ -551,7 +551,7 @@ def my_attendance():
 @attendance_bp.route("/leave-requests", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def list_leave_requests():
     """List leave requests."""
     query = LeaveRequest.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -568,7 +568,7 @@ def list_leave_requests():
 @attendance_bp.route("/leave-requests", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def create_leave_request():
     """Submit a leave request."""
     data = request.get_json(silent=True) or {}
@@ -604,7 +604,7 @@ def create_leave_request():
 @attendance_bp.route("/leave-requests/<uuid:request_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def approve_leave_request(request_id):
     """Approve a staff leave request.
@@ -658,7 +658,7 @@ def _upsert_teacher_leave_attendance(lr: LeaveRequest):
 @attendance_bp.route("/leave-requests/<uuid:request_id>/reject", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def reject_leave_request(request_id):
     """Reject a leave request, persisting the reviewer's note."""
@@ -810,7 +810,7 @@ def _parse_bs_or_ad_date(value):
 @attendance_bp.route("/subject/mark", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def mark_subject_attendance():
     """Mark subject-wise attendance for one class+subject+date.
@@ -907,7 +907,7 @@ def mark_subject_attendance():
 @attendance_bp.route("/subject/list", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def list_subject_attendance():
     """The subject register for one class+subject+date (or a date range)."""
     class_uuid = _coerce_uuid(request.args.get("class_id"))
@@ -950,7 +950,7 @@ def list_subject_attendance():
 @attendance_bp.route("/subject/report", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def subject_attendance_report():
     """Per-student attendance percentage per subject over a range (the
     subject-average report the monthly print register complements)."""
@@ -1006,7 +1006,7 @@ def subject_attendance_report():
 @attendance_bp.route("/holiday", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "superadmin")
 def mark_holiday():
     """Record a holiday in the register (A-33): every active student of the
@@ -1064,7 +1064,7 @@ def mark_holiday():
 @attendance_bp.route("/register/print", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 def attendance_register_print():
     """Monthly register print twin (A-04): a student × day grid for one BS
     month, P/A/L/H(half)/L(eave)/H(oliday) cells, printable HTML."""
@@ -1161,7 +1161,7 @@ td.abs{{background:#fde8e8;color:#b91c1c;font-weight:700}} td.hol{{background:#e
 @attendance_bp.route("/import/preview", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def attendance_import_preview():
     """Step 1+2 of the 3-step import UX (A-28): validate entries and return
@@ -1173,7 +1173,7 @@ def attendance_import_preview():
 @attendance_bp.route("/import/commit", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("attendance")
+@app_required("attendance")
 @role_required("school_admin", "teacher")
 def attendance_import_commit():
     """Step 3: apply the validated rows (same payload the preview returned)."""

@@ -60,7 +60,7 @@ class _ParentPortfolioScreenState extends ConsumerState<ParentPortfolioScreen> {
       'project'
     ];
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'student_portfolio',
       child: Scaffold(
         appBar: const CustomAppBar(title: "Child's Portfolio"),

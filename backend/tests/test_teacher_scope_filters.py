@@ -2,7 +2,7 @@
 
 from app.models.academic import Class, Subject
 from app.models.exam import Exam
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
@@ -25,9 +25,9 @@ def _create_teacher(db, school, phone, email, full_name):
 
 
 def _install_plugin_for_school(db, school, slug, name):
-    plugin = Plugin.query.filter_by(slug=slug).first()
+    plugin = App.query.filter_by(slug=slug).first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug=slug,
             name=name,
             category="core",
@@ -38,14 +38,14 @@ def _install_plugin_for_school(db, school, slug, name):
         db.session.add(plugin)
         db.session.flush()
 
-    school_plugin = SchoolPlugin.query.filter_by(
+    school_plugin = SchoolApp.query.filter_by(
         school_id=school.id,
-        plugin_slug=slug,
+        app_slug=slug,
     ).first()
     if not school_plugin:
-        school_plugin = SchoolPlugin(
+        school_plugin = SchoolApp(
             school_id=school.id,
-            plugin_slug=slug,
+            app_slug=slug,
             active=True,
             is_trial=False,
         )

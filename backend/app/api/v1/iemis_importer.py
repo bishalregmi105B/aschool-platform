@@ -26,7 +26,7 @@ from typing import Any
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.apps.entitlements import StudentCapExceededError
 from app.services.student_numbers import ensure_student_numbers
 from app.utils.decorators import role_required, school_required
@@ -961,7 +961,7 @@ def _detect_format(file_bytes: bytes) -> str | None:
 @iemis_importer_bp.route("/formats", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 def list_formats():
     """Return supported IEMIS formats with column maps."""
     return success_response(
@@ -983,7 +983,7 @@ def list_formats():
 @iemis_importer_bp.route("/template", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 def download_template():
     """Download a ready-to-fill IEMIS import template (.xlsx).
 
@@ -1054,7 +1054,7 @@ def download_template():
 @iemis_importer_bp.route("/validate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 # "data_entry" is not a user_role enum value (app/models/user.py:26-38), so it
 # never granted anybody access — dropped rather than silently widened.
 @role_required("school_admin")
@@ -1111,7 +1111,7 @@ def validate_import():
 @iemis_importer_bp.route("/import", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 @role_required("school_admin")  # see /validate — "data_entry" was a phantom role
 def run_import():
     """Execute the IEMIS import — parses file and writes to database."""
@@ -1213,7 +1213,7 @@ def run_import():
 @iemis_importer_bp.route("/history", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 def import_history():
     """List all IEMIS imports for this school."""
     from app.utils.pagination import paginate
@@ -1226,7 +1226,7 @@ def import_history():
 @iemis_importer_bp.route("/history/<uuid:log_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("iemis_importer")
+@app_required("iemis_importer")
 def import_history_detail(log_id):
     """Get detail of a single import job."""
     log = IemisImportLog.query.filter_by(

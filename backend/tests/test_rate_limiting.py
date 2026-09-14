@@ -6,7 +6,7 @@
 """
 import pytest
 
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from extensions import db as _db
 from tests.conftest import get_auth_headers
 
@@ -43,15 +43,15 @@ class TestPublicFormRateLimit:
 
 @pytest.fixture
 def ai_admin(client, db, school, admin_user):
-    p = Plugin.query.filter_by(slug="ai_tools").first()
+    p = App.query.filter_by(slug="ai_tools").first()
     if not p:
-        p = Plugin(
+        p = App(
             slug="ai_tools", name="AI Tools", category="premium",
             is_free=True, is_published=True, version="1.0.0", emoji="🤖",
         )
         _db.session.add(p)
     _db.session.add(
-        SchoolPlugin(school_id=school.id, plugin_slug="ai_tools", active=True, is_trial=False)
+        SchoolApp(school_id=school.id, app_slug="ai_tools", active=True, is_trial=False)
     )
     _db.session.commit()
     return get_auth_headers(client, "admin@test.edu.np", "Test@1234")

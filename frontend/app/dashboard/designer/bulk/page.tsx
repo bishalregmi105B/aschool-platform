@@ -5,7 +5,7 @@ import { useAOSRouteParams } from "@/lib/aos-window-route";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -58,9 +58,9 @@ function currentBsMonth(): number {
 
 export default function BulkPage() {
   return (
-    <PluginGate slug="design_studio">
+    <AppGate slug="design_studio">
       <BulkContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

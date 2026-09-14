@@ -11,7 +11,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,7 @@ const PO_TONE: Record<string, "subtle" | "warning" | "success" | "error"> = {
 };
 
 export default function AcquisitionPage() {
-  return <PluginGate slug="library"><AcquisitionContent /></PluginGate>;
+  return <AppGate slug="library"><AcquisitionContent /></AppGate>;
 }
 
 function AcquisitionContent() {

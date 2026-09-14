@@ -8,7 +8,7 @@ import pytest
 
 from app.models.attendance import Attendance
 from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.models.student import Student
 from extensions import db
 from tests.conftest import get_auth_headers
@@ -16,18 +16,18 @@ from tests.conftest import get_auth_headers
 
 def _install_biometric(db, school):
     """Create the published catalog plugin (FK target) + install it for school."""
-    from app.models.plugin import Plugin
+    from app.models.app import App
 
-    if not Plugin.query.filter_by(slug="biometric").first():
-        db.session.add(Plugin(
+    if not App.query.filter_by(slug="biometric").first():
+        db.session.add(App(
             slug="biometric", name="Biometric Integration", category="premium",
             price_monthly=1999, price_yearly=19999, is_free=False, trial_days=7,
             emoji="✋", icon="Fingerprint", description="ZKTeco fingerprint attendance",
             is_published=True, version="1.0.0",
         ))
         db.session.flush()
-    db.session.add(SchoolPlugin(
-        school_id=school.id, plugin_slug="biometric", active=True, is_trial=False,
+    db.session.add(SchoolApp(
+        school_id=school.id, app_slug="biometric", active=True, is_trial=False,
     ))
     db.session.commit()
 
@@ -291,7 +291,7 @@ def test_tenant_isolation_second_school_cannot_touch_device(client, db, school, 
     other_admin.set_password("Test@1234")
     db.session.add(other_admin)
     # Plugin catalog row already exists from device_setup's install.
-    db.session.add(SchoolPlugin(school_id=other.id, plugin_slug="biometric", active=True, is_trial=False))
+    db.session.add(SchoolApp(school_id=other.id, app_slug="biometric", active=True, is_trial=False))
     db.session.commit()
 
     # Fresh client: the primary client now carries the first admin's auth

@@ -94,7 +94,7 @@ def activate(db) -> None:
 
 def _provision_school(db, school_id) -> None:
     from app.models.ai_teacher import AITeacherServiceKey
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
     from app.apps.config_schema import encrypt_secret
     from app.apps.modules.ai_teacher.service_client import provision_tenant
 
@@ -113,8 +113,8 @@ def _provision_school(db, school_id) -> None:
         # AITeacherServiceKey holds) can never verify a MAC. Store an
         # ENCRYPTED envelope in the plugin config; the webhook handler
         # decrypts it per request. Plaintext is still shown exactly once.
-        sp = SchoolPlugin.query.filter_by(
-            school_id=school_id, plugin_slug="ai_teacher"
+        sp = SchoolApp.query.filter_by(
+            school_id=school_id, app_slug="ai_teacher"
         ).first()
         if sp is not None:
             cfg = dict(sp.config or {})
@@ -185,13 +185,13 @@ def _register_workbench_tool(db) -> None:
 def _apply_default_config(db) -> None:
     from flask import current_app
 
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     school_id = current_app.config.get("ASCHOOL_ACTIVATING_SCHOOL_ID")
     if not school_id:
         return
-    sp = SchoolPlugin.query.filter_by(
-        school_id=school_id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=school_id, app_slug="ai_teacher"
     ).first()
     if sp is None:
         return
@@ -243,7 +243,7 @@ def uninstall(db) -> None:
     from flask import current_app
 
     from app.models.ai_teacher import AITeacherServiceKey
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
     school_id = current_app.config.get("ASCHOOL_ACTIVATING_SCHOOL_ID")
     if not school_id:
@@ -253,8 +253,8 @@ def uninstall(db) -> None:
         school_id=school_id, revoked_at=None
     ).all():
         key.revoked_at = now
-    sp = SchoolPlugin.query.filter_by(
-        school_id=school_id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=school_id, app_slug="ai_teacher"
     ).first()
     if sp and sp.config:
         sp.config = {k: v for k, v in sp.config.items() if k == "last_payment"}

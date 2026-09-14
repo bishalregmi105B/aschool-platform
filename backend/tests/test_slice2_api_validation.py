@@ -26,17 +26,17 @@ from app.api.v1.analytics import _overview_payload
 from app.models.academic import Class, Section, Subject
 from app.models.fee import FeeCollection
 from app.models.gamification import PointsLog
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
 
 
 def _seed_plugin(db, slug):
-    exists = Plugin.query.filter_by(slug=slug).first()
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    plugin = Plugin(
+    plugin = App(
         slug=slug,
         name=slug.replace("_", " ").title(),
         category="growth",
@@ -52,11 +52,11 @@ def _seed_plugin(db, slug):
 
 def _install_plugin(db, school_id, slug):
     _seed_plugin(db, slug)
-    row = SchoolPlugin.query.filter_by(
-        school_id=school_id, plugin_slug=slug
+    row = SchoolApp.query.filter_by(
+        school_id=school_id, app_slug=slug
     ).first()
     if not row:
-        row = SchoolPlugin(school_id=school_id, plugin_slug=slug, active=True)
+        row = SchoolApp(school_id=school_id, app_slug=slug, active=True)
         db.session.add(row)
         db.session.commit()
     return row

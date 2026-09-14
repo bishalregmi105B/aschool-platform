@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
 import { toast } from "sonner";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +43,9 @@ interface Holiday {
 
 export default function HolidaysPage() {
   return (
-    <PluginGate slug="notices">
+    <AppGate slug="notices">
       <HolidaysContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

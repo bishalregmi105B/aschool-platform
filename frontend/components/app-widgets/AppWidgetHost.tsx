@@ -5,12 +5,12 @@ import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
-  usePluginWidgets,
+  useAppWidgets,
   useWidgetData,
-} from "@/lib/plugin-widgets/usePluginWidgets";
-import { resolveComponentWidget } from "@/lib/plugin-widgets/registry";
-import type { WidgetSpec } from "@/lib/plugin-widgets/types";
-import type { BindingScope, WidgetContext } from "@/lib/plugin-widgets/bindings";
+} from "@/lib/app-widgets/useAppWidgets";
+import { resolveComponentWidget } from "@/lib/app-widgets/registry";
+import type { WidgetSpec } from "@/lib/app-widgets/types";
+import type { BindingScope, WidgetContext } from "@/lib/app-widgets/bindings";
 import {
   ChartWidget,
   ListWidget,
@@ -199,7 +199,7 @@ export function WidgetSlot({
   grid = true,
   className,
 }: WidgetSlotProps) {
-  const { widgets, isLoading } = usePluginWidgets(id);
+  const { widgets, isLoading } = useAppWidgets(id);
 
   if (isLoading) {
     return (

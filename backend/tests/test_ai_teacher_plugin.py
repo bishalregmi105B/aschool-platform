@@ -36,43 +36,43 @@ def teacher_with_email(db, school):
 @pytest.fixture()
 def ai_teacher_installed(db, school):
     """Install ai_teacher for the test school — needs a mirror row first
-    (school_plugins.plugin_slug FKs plugins.slug)."""
-    from app.models.plugin import Plugin, SchoolPlugin
+    (school_plugins.app_slug FKs plugins.slug)."""
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug="ai_teacher").first()
+    plugin = App.query.filter_by(slug="ai_teacher").first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug="ai_teacher", name="AI Teacher", category="premium",
             is_free=False, is_published=True, version="1.0.0",
         )
         db.session.add(plugin)
         db.session.flush()
-    sp = SchoolPlugin.query.filter_by(
-        school_id=school.id, plugin_slug="ai_teacher"
+    sp = SchoolApp.query.filter_by(
+        school_id=school.id, app_slug="ai_teacher"
     ).first()
     if not sp:
-        sp = SchoolPlugin(
-            school_id=school.id, plugin_slug="ai_teacher", active=True,
+        sp = SchoolApp(
+            school_id=school.id, app_slug="ai_teacher", active=True,
             is_trial=False,
         )
         db.session.add(sp)
 
     # teaching-content routes gate nepal_curriculum (D3 packaging)
-    nc = SchoolPlugin.query.filter_by(
-        school_id=school.id, plugin_slug="nepal_curriculum"
+    nc = SchoolApp.query.filter_by(
+        school_id=school.id, app_slug="nepal_curriculum"
     ).first()
     if not nc:
-        plugin_nc = Plugin.query.filter_by(slug="nepal_curriculum").first()
+        plugin_nc = App.query.filter_by(slug="nepal_curriculum").first()
         if not plugin_nc:
-            plugin_nc = Plugin(
+            plugin_nc = App(
                 slug="nepal_curriculum", name="Nepal Curriculum",
                 category="starter", is_free=False, is_published=True,
                 version="1.0.0",
             )
             db.session.add(plugin_nc)
             db.session.flush()
-        db.session.add(SchoolPlugin(
-            school_id=school.id, plugin_slug="nepal_curriculum", active=True,
+        db.session.add(SchoolApp(
+            school_id=school.id, app_slug="nepal_curriculum", active=True,
             is_trial=False))
     db.session.commit()
     return sp
@@ -206,15 +206,15 @@ class TestTeachingContentCRUD:
 
 class TestCreateLessonGates:
     def _install_ai_suite(self, db, school):
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        if not Plugin.query.filter_by(slug="ai_suite").first():
-            db.session.add(Plugin(
+        if not App.query.filter_by(slug="ai_suite").first():
+            db.session.add(App(
                 slug="ai_suite", name="AI Suite", category="premium",
                 is_free=False, is_published=True, version="1.0.0"))
             db.session.flush()
-        if not SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="ai_suite").first():
-            db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="ai_suite",
+        if not SchoolApp.query.filter_by(school_id=school.id, app_slug="ai_suite").first():
+            db.session.add(SchoolApp(school_id=school.id, app_slug="ai_suite",
                                         active=True, is_trial=False))
             db.session.commit()
 

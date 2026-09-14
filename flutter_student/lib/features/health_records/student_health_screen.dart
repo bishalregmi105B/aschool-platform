@@ -101,7 +101,7 @@ class _StudentHealthScreenState extends ConsumerState<StudentHealthScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'health_records',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Health Records'),

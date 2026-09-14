@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import { BSDateInput } from "@/components/ui/bs-date-input";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function VaccinationsPage() {
-  return <PluginGate slug="health_records"><VaccinationsContent /></PluginGate>;
+  return <AppGate slug="health_records"><VaccinationsContent /></AppGate>;
 }
 
 function VaccinationsContent() {

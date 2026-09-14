@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/plugin_provider.dart';
+import '../services/app_provider.dart';
 import '../theme/app_theme.dart';
 
 class DynamicBottomNav extends ConsumerWidget {
@@ -19,7 +19,7 @@ class DynamicBottomNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
 
     final visiblePluginTabs =
         pluginTabs.where((tab) => plugins.isInstalled(tab.pluginSlug)).toList();

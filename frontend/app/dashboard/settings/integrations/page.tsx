@@ -13,7 +13,7 @@ import { Plug, QrCode, X, FolderOpen, MessageSquare, Info } from "lucide-react";
 import Image from "next/image";
 import { FilePicker } from "@/components/files/FilePicker";
 import type { ManagedFile } from "@/lib/services/files.service";
-import { PluginGate, useInstalledPlugins } from "@/lib/plugins";
+import { AppGate, useInstalledApps } from "@/lib/apps";
 import { DataPanel, StatusChip, AOSModuleLoadingState } from "@/components/aos/kit/page-kit";
 import { SettingsPage } from "../settings-page";
 import { SettingsSection, SettingField, useSectionSave } from "../settings-section";
@@ -31,7 +31,7 @@ import {
  *    /fees/payment-methods. There is NO backend "test connection" endpoint,
  *    so cards are display/edit only (no fake "Test" button — plan 31.0).
  *  • Communication channels — WhatsApp / SMS are driven by their own plugins,
- *    so this section links to the REAL config pages (via useInstalledPlugins)
+ *    so this section links to the REAL config pages (via useInstalledApps)
  *    instead of showing hardcoded fake "connected" toggles.
  */
 
@@ -233,7 +233,7 @@ function PaymentMethodCard({
 
 function IntegrationsContent() {
   const queryClient = useQueryClient();
-  const { isPluginInstalled } = useInstalledPlugins();
+  const { isAppInstalled } = useInstalledApps();
 
   const { data: paymentConfig, isLoading } = useQuery({
     queryKey: ["settings-payment-methods"],
@@ -324,7 +324,7 @@ function IntegrationsContent() {
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             {channels.map((ch) => {
-              const installed = isPluginInstalled(ch.slug);
+              const installed = isAppInstalled(ch.slug);
               return (
                 <div key={ch.slug} className="win11-card flex items-start gap-3">
                   <div className="min-w-0 flex-1">
@@ -352,8 +352,8 @@ function IntegrationsContent() {
 
 export default function IntegrationsPage() {
   return (
-    <PluginGate slug="settings_core">
+    <AppGate slug="settings_core">
       <IntegrationsContent />
-    </PluginGate>
+    </AppGate>
   );
 }

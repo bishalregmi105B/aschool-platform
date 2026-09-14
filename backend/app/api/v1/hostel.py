@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required
 from app.extensions import db
 from app.models.hostel import Hostel, HostelRoom, HostelAllocation
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.response import success_response, created_response, no_content_response, error_response
 from app.utils.decorators import school_required, role_required
 
@@ -70,7 +70,7 @@ def _alloc_dict(a: HostelAllocation) -> dict:
 @hostel_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 def list_hostels():
     """List all hostels for the school."""
     hostels = Hostel.query.filter_by(school_id=g.school_id, is_deleted=False).all()
@@ -80,7 +80,7 @@ def list_hostels():
 @hostel_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def create_hostel():
     data = request.get_json() or {}
@@ -103,7 +103,7 @@ def create_hostel():
 @hostel_bp.route("/<uuid:hostel_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def update_hostel(hostel_id):
     hostel = Hostel.query.filter_by(id=hostel_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -118,7 +118,7 @@ def update_hostel(hostel_id):
 @hostel_bp.route("/<uuid:hostel_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def delete_hostel(hostel_id):
     hostel = Hostel.query.filter_by(id=hostel_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -131,7 +131,7 @@ def delete_hostel(hostel_id):
 @hostel_bp.route("/rooms", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 def list_rooms():
     """List all rooms, optionally filtered by hostel."""
     hostel_id = request.args.get("hostel_id")
@@ -145,7 +145,7 @@ def list_rooms():
 @hostel_bp.route("/rooms", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def create_room():
     data = request.get_json() or {}
@@ -170,7 +170,7 @@ def create_room():
 @hostel_bp.route("/rooms/<uuid:room_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def update_room(room_id):
     room = HostelRoom.query.filter_by(id=room_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -185,7 +185,7 @@ def update_room(room_id):
 @hostel_bp.route("/rooms/<uuid:room_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def delete_room(room_id):
     room = HostelRoom.query.filter_by(id=room_id, school_id=g.school_id, is_deleted=False).first_or_404()
@@ -198,7 +198,7 @@ def delete_room(room_id):
 @hostel_bp.route("/allocations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 def list_allocations():
     """List all active hostel allocations."""
     status = request.args.get("status", "active")
@@ -215,7 +215,7 @@ def list_allocations():
 @hostel_bp.route("/allocations", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def create_allocation():
     """Allocate a student to a room."""
@@ -261,7 +261,7 @@ def create_allocation():
 @hostel_bp.route("/allocations/<uuid:alloc_id>/checkout", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 @role_required("school_admin")
 def checkout_allocation(alloc_id):
     """Mark a student as checked out from hostel."""
@@ -283,7 +283,7 @@ def checkout_allocation(alloc_id):
 @hostel_bp.route("/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("hostel")
+@app_required("hostel")
 def hostel_summary():
     """Return occupancy summary for all hostels."""
     hostels = Hostel.query.filter_by(school_id=g.school_id, is_deleted=False, is_active=True).all()

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -35,9 +35,9 @@ const LiveBusMap = dynamic(
 
 export default function TransportMapPage() {
   return (
-    <PluginGate slug="gps_tracking">
+    <AppGate slug="gps_tracking">
       <MapContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

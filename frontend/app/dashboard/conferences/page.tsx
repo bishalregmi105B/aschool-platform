@@ -27,7 +27,7 @@ import {
   AOSEmptyState,
   AOSModuleLoadingState,
 } from "@/components/aos/kit/page-kit";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Plus, CalendarCheck } from "lucide-react";
 import { StatusTimeline } from "@/components/ui/status-timeline";
@@ -54,9 +54,9 @@ function displayConferenceDate(bsDate?: string, adDate?: string) {
 
 export default function ConferencesPage() {
   return (
-    <PluginGate slug="conferences">
+    <AppGate slug="conferences">
       <ConferencesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

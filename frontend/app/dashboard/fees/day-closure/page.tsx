@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -110,9 +110,9 @@ function formatMethod(method: string) {
 
 export default function DayClosurePage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <DayClosureContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

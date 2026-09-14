@@ -14,7 +14,7 @@ endpoint accepts it and defers with an honest 501 until then.
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 
@@ -24,7 +24,7 @@ capture_bp = Blueprint("capture", __name__, url_prefix="/capture")
 @capture_bp.route("/voice", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def voice_capture():
     """Audio upload → transcript → structured draft. NEVER auto-commits."""
@@ -110,7 +110,7 @@ def voice_capture():
 @capture_bp.route("/confirm", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def confirm_capture():
     """Commit the reviewed draft. The payload here is what the HUMAN

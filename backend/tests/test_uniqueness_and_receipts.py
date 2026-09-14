@@ -111,15 +111,15 @@ class TestMarksUniqueness:
         """A submit_marks POST whose check-then-insert misses (as it does in
         a concurrent race) hits the unique index → clear 409, no double row,
         no 500."""
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
         for slug in ("exams",):
-            p = Plugin.query.filter_by(slug=slug).first()
+            p = App.query.filter_by(slug=slug).first()
             if not p:
-                p = Plugin(slug=slug, name="Exams", category="core", is_free=True,
+                p = App(slug=slug, name="Exams", category="core", is_free=True,
                            is_published=True, version="1.0.0", emoji="📝")
                 db.session.add(p)
-            db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True, is_trial=False))
+            db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True, is_trial=False))
         db.session.commit()
 
         klass = __import__("app.models.academic", fromlist=["Class"]).Class(

@@ -1,6 +1,6 @@
 "use client";
 
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -77,8 +77,8 @@ function BenchmarkingContent() {
 
 export default function BenchmarkingPage() {
   return (
-    <PluginGate slug="ai_suite">
+    <AppGate slug="ai_suite">
       <BenchmarkingContent />
-    </PluginGate>
+    </AppGate>
   );
 }

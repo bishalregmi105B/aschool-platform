@@ -67,7 +67,7 @@ class _ChildHealthScreenState extends State<ChildHealthScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'health_records',
       child: Scaffold(
         appBar: AppBar(

@@ -23,11 +23,11 @@ from tests.conftest import get_auth_headers
 
 
 def _install_exams_plugin(db, school):
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug="exams").first()
+    plugin = App.query.filter_by(slug="exams").first()
     if not plugin:
-        plugin = Plugin(
+        plugin = App(
             slug="exams",
             name="Examinations",
             category="core",
@@ -38,7 +38,7 @@ def _install_exams_plugin(db, school):
         db.session.add(plugin)
         db.session.flush()
     db.session.add(
-        SchoolPlugin(school_id=school.id, plugin_slug="exams", active=True, is_trial=False)
+        SchoolApp(school_id=school.id, app_slug="exams", active=True, is_trial=False)
     )
     db.session.commit()
 

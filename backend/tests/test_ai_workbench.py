@@ -22,19 +22,19 @@ from app.models.ai_workbench import (
     ModerationFlag,
     SchoolAIToolSettings,
 )
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from extensions import db as _db
 from tests.conftest import get_auth_headers
 
 
 @pytest.fixture
 def wb_env(client, db, school, admin_user):
-    p = Plugin.query.filter_by(slug="ai_suite").first()
+    p = App.query.filter_by(slug="ai_suite").first()
     if not p:
-        p = Plugin(slug="ai_suite", name="AI Suite", category="premium",
+        p = App(slug="ai_suite", name="AI Suite", category="premium",
                    is_free=True, is_published=True, version="1.0.0", emoji="🤖")
         db.session.add(p)
-    db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="ai_suite", active=True, is_trial=False))
+    db.session.add(SchoolApp(school_id=school.id, app_slug="ai_suite", active=True, is_trial=False))
     db.session.commit()
 
     from app.services.ai.workbench_seed import seed_workbench_tools

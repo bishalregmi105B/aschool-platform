@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2, Armchair } from "lucide-react";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import {
   AOSPage,
   AOSPageHeader,
@@ -31,9 +31,9 @@ interface SeatRow {
 
 export default function SeatsPage() {
   return (
-    <PluginGate slug="admission">
+    <AppGate slug="admission">
       <SeatsInner />
-    </PluginGate>
+    </AppGate>
   );
 }
 

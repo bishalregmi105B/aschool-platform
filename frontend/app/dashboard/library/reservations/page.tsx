@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ interface Reservation {
 }
 
 export default function ReservationsPage() {
-  return <PluginGate slug="library"><ReservationsContent /></PluginGate>;
+  return <AppGate slug="library"><ReservationsContent /></AppGate>;
 }
 
 function ReservationsContent() {

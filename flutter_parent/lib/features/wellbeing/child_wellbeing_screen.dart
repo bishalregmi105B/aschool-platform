@@ -12,7 +12,7 @@ class ChildWellbeingScreen extends ConsumerWidget {
     final selectedChildId = ref.watch(selectedChildIdForApiProvider);
     final state = ref.watch(parentWellbeingProvider(selectedChildId));
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'wellbeing',
       child: state.when(
         loading: () => const LoadingShimmer(),

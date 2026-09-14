@@ -23,17 +23,17 @@ import uuid as _uuid
 import pytest
 
 from app.models.notification import InAppNotification, SMSLog, WhatsAppBotConfig
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
 
 
 def _seed_plugin(db, slug):
-    exists = Plugin.query.filter_by(slug=slug).first()
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    plugin = Plugin(
+    plugin = App(
         slug=slug,
         name=slug.replace("_", " ").title(),
         category="starter" if slug in ("sms_notifications", "whatsapp_bot") else "growth",
@@ -58,9 +58,9 @@ def admin_headers(client, db, school, admin_user):
     ):
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(
+            SchoolApp(
                 school_id=school.id,
-                plugin_slug=slug,
+                app_slug=slug,
                 active=True,
                 is_trial=False,
             )
@@ -569,8 +569,8 @@ def test_current_user_resolved_for_header_auth(client, db, school, admin_user):
     """Endpoints reading g.current_user must not 500 for X-School-Slug
     (mobile-style) requests — the user is resolved before school context."""
     _seed_plugin(db, "sms_notifications")
-    db.session.add(SchoolPlugin(school_id=school.id,
-                                plugin_slug="sms_notifications", active=True))
+    db.session.add(SchoolApp(school_id=school.id,
+                                app_slug="sms_notifications", active=True))
     db.session.commit()
 
     u = User.query.filter_by(role="school_admin").first()

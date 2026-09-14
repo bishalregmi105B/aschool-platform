@@ -122,13 +122,13 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
     }
 
     if (_busData == null) {
-      return const PluginGate(
+      return const AppGate(
         pluginSlug: 'bus_tracking',
         child: Center(child: Text('Bus tracking not available')),
       );
     }
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'bus_tracking',
       child: Column(
         children: [

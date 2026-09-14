@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,9 +59,9 @@ const VALID_STATUSES = ["present", "absent", "late", "half_day", "leave", "holid
 
 export default function AttendanceImportPage() {
   return (
-    <PluginGate slug="attendance">
+    <AppGate slug="attendance">
       <ImportContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

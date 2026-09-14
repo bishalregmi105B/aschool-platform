@@ -12,7 +12,7 @@ class PTConferenceScreen extends ConsumerWidget {
     final selectedChildId = ref.watch(selectedChildIdForApiProvider);
     final state = ref.watch(parentConferencesProvider(selectedChildId));
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'conferences',
       child: Scaffold(
         appBar: AppBar(

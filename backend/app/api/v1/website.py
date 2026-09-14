@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 from app.models.school import School, SchoolWebsite
 from app.models.notice import Notice
 from app.models.website import WebsitePage
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from sqlalchemy import or_
 
@@ -378,7 +378,7 @@ def get_public_website_by_domain():
 @website_bp.route("/config", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_website")
+@app_required("basic_website")
 @role_required("school_admin")
 def get_website_config():
     """Get website configuration for admin editing."""
@@ -404,7 +404,7 @@ def get_website_config():
 @website_bp.route("/config", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("basic_website")
+@app_required("basic_website")
 @role_required("school_admin")
 def update_website_config():
     """Update website configuration."""

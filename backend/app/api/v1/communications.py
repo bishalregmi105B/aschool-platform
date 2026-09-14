@@ -24,7 +24,7 @@ from app.services.chat_service import (
     parse_user_id,
     send_message as persist_chat_message,
 )
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -130,7 +130,7 @@ def send_chat_message():
 @communications_bp.route("/stats", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 def get_stats():
     total_messages = (
         db.session.query(func.count(SMSLog.id))
@@ -171,7 +171,7 @@ def get_stats():
 @communications_bp.route("/templates", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 def list_templates():
     templates = (
         NotificationTemplate.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -184,7 +184,7 @@ def list_templates():
 @communications_bp.route("/templates", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def create_template():
     data = request.get_json(silent=True) or {}
@@ -215,7 +215,7 @@ def create_template():
 @communications_bp.route("/templates/<uuid:template_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def delete_template(template_id):
     template = NotificationTemplate.query.filter_by(
@@ -234,7 +234,7 @@ def delete_template(template_id):
 @communications_bp.route("/broadcast", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def send_broadcast():
     data = request.get_json(silent=True) or {}
@@ -586,7 +586,7 @@ def _broadcast_whatsapp(message: str, audience: str, class_id: str | None):
 @communications_bp.route("/diary/categories", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 def list_diary_categories():
     query = DiaryCategory.query.filter_by(school_id=g.school_id, is_deleted=False)
     active = request.args.get("active")
@@ -599,7 +599,7 @@ def list_diary_categories():
 @communications_bp.route("/diary/categories", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("superadmin", "school_admin", "teacher")
 def create_diary_category():
     data = request.get_json(silent=True) or {}
@@ -621,7 +621,7 @@ def create_diary_category():
 @communications_bp.route("/diary/categories/<uuid:category_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("superadmin", "school_admin", "teacher")
 def update_diary_category(category_id):
     category = DiaryCategory.query.filter_by(
@@ -643,7 +643,7 @@ def update_diary_category(category_id):
 @communications_bp.route("/diary/categories/<uuid:category_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("superadmin", "school_admin", "teacher")
 def delete_diary_category(category_id):
     category = DiaryCategory.query.filter_by(
@@ -661,7 +661,7 @@ def delete_diary_category(category_id):
 @communications_bp.route("/diary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 def list_diary_entries():
     query = DiaryEntry.query.filter_by(school_id=g.school_id, is_deleted=False)
     for key in ("student_id", "class_id", "section_id", "category_id"):
@@ -678,7 +678,7 @@ def list_diary_entries():
 @communications_bp.route("/diary", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("notices")
+@app_required("notices")
 @role_required("superadmin", "school_admin", "teacher")
 def create_diary_entry():
     data = request.get_json(silent=True) or {}

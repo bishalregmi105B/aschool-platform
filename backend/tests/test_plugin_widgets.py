@@ -8,7 +8,7 @@ tests assert absence from the payload, not a flag on it.
 
 import pytest
 
-from app.apps.loader import PluginLoader
+from app.apps.loader import AppLoader
 from app.apps.widgets import (
     default_layout,
     load_plugin_widgets,
@@ -20,7 +20,7 @@ from app.apps.widgets import (
 @pytest.fixture(autouse=True)
 def _scan():
     reset_cache()
-    PluginLoader._scan_manifests()
+    AppLoader._scan_manifests()
     yield
     reset_cache()
 
@@ -36,7 +36,7 @@ class TestLoading:
     def test_ids_are_namespaced_by_slug(self):
         for widget in load_plugin_widgets("fees"):
             assert widget["id"] == f"fees.{widget['key']}"
-            assert widget["plugin_slug"] == "fees"
+            assert widget["app_slug"] == "fees"
 
     def test_shorthand_slots_are_normalized(self):
         """A slot may be a bare string in YAML; the payload is always objects."""
@@ -86,7 +86,7 @@ class TestGate:
     def test_alias_install_satisfies_the_canonical_slug(self):
         """A school holding a legacy slug still gets the canonical widgets.
 
-        Same single-hop alias semantics as @plugin_required, so an ai_tools-era
+        Same single-hop alias semantics as @app_required, so an ai_tools-era
         install is not silently stripped of its dashboard.
         """
         ids = {w["id"] for w in widgets_for(["library"], "school_admin", "web")}
@@ -138,10 +138,10 @@ class TestEndpointOwnership:
             "sms_notifications": {"communications", "sms"},
             "hr_payroll": {"hr"},
             # ai_suite is a bundle: the ai_tools/workbench/tutor blueprints are
-            # all gated with plugin_required("ai_suite").
+            # all gated with app_required("ai_suite").
             "ai_suite": {"ai-tools", "ai", "tutor", "benchmarking"},
         }
-        for slug in PluginLoader.get_all_manifests():
+        for slug in AppLoader.get_all_manifests():
             for widget in load_plugin_widgets(slug):
                 endpoint = (widget.get("data") or {}).get("endpoint")
                 if not endpoint:
@@ -184,7 +184,7 @@ class TestEndpointOwnership:
                     return True
             return False
 
-        for slug in PluginLoader.get_all_manifests():
+        for slug in AppLoader.get_all_manifests():
             for widget in load_plugin_widgets(slug):
                 endpoint = (widget.get("data") or {}).get("endpoint")
                 if not endpoint:
@@ -204,7 +204,7 @@ class TestSpecContract:
 
     @staticmethod
     def _spec_widgets():
-        for slug in PluginLoader.get_all_manifests():
+        for slug in AppLoader.get_all_manifests():
             for widget in load_plugin_widgets(slug):
                 if widget.get("renderer") == "spec":
                     yield widget
@@ -240,7 +240,7 @@ class TestSpecContract:
 
 class TestWidgetsEndpoint:
     def test_requires_auth(self, client):
-        resp = client.get("/api/v1/plugins/widgets")
+        resp = client.get("/api/v1/apps/widgets")
         assert resp.status_code in (401, 422)
 
     def test_returns_only_installed_widgets(self, client, db, school, admin_user):
@@ -248,26 +248,26 @@ class TestWidgetsEndpoint:
 
         headers = get_auth_headers(client, admin_user.email, "Test@1234")
         resp = client.get(
-            "/api/v1/plugins/widgets?surface=web&slot=dashboard.main",
+            "/api/v1/apps/widgets?surface=web&slot=dashboard.main",
             headers=headers,
         )
         assert resp.status_code == 200
         data = resp.get_json()["data"]
         assert data["surface"] == "web"
         assert data["slot"] == "dashboard.main"
-        returned = {w["plugin_slug"] for w in data["widgets"]}
+        returned = {w["app_slug"] for w in data["widgets"]}
         # Whatever came back, every plugin must be one the school actually has.
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
 
         installed = {
-            sp.plugin_slug
-            for sp in SchoolPlugin.query.filter_by(
+            sp.app_slug
+            for sp in SchoolApp.query.filter_by(
                 school_id=school.id, active=True
             ).all()
         }
-        from app.apps.decorators import _acceptable_plugin_slugs
+        from app.apps.decorators import _acceptable_app_slugs
 
         for slug in returned:
-            assert _acceptable_plugin_slugs(slug) & installed, (
+            assert _acceptable_app_slugs(slug) & installed, (
                 f"{slug} widgets served to a school that has not installed it"
             )

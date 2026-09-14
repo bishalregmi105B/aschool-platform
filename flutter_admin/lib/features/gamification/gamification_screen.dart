@@ -60,7 +60,7 @@ class _GamificationScreenState extends ConsumerState<GamificationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'gamification',
       child: Scaffold(
         appBar: AppBar(

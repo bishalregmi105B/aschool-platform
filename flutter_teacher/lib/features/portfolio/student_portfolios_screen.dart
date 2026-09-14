@@ -117,7 +117,7 @@ class _StudentPortfoliosScreenState
       'project'
     ];
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'student_portfolio',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Student Portfolios'),

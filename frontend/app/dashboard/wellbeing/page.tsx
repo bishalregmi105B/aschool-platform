@@ -22,7 +22,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { useAOSRouterNavigate } from "@/lib/aos-window-route";
 import { toast } from "sonner";
@@ -78,9 +78,9 @@ interface MoodEntry {
 
 export default function WellbeingPage() {
   return (
-    <PluginGate slug="wellbeing">
+    <AppGate slug="wellbeing">
       <WellbeingContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

@@ -1,7 +1,7 @@
 """
 Plugin access control decorators.
 
-@plugin_required('lms') — use on ALL plugin route handlers.
+@app_required('lms') — use on ALL plugin route handlers.
 Checks if the requesting school has the plugin installed + active.
 """
 
@@ -42,9 +42,9 @@ PLUGIN_SLUG_ALIASES = {
     "advanced_analytics": "ai_suite",
     # NOTE: no "social_hub" entry — the plugin was WITHDRAWN from the catalog
     # (E230: unpublished + deprecated, unused, moderation liability). Its
-    # routes stay mounted and gated @plugin_required("social_hub") so the
+    # routes stay mounted and gated @app_required("social_hub") so the
     # schools that already installed it keep working off their own
-    # SchoolPlugin row; the feature is not replaced by any other plugin, so
+    # SchoolApp row; the feature is not replaced by any other plugin, so
     # aliasing it would silently hand its routes to another product.
     # NOTE: no "design_studio" entry — it is its own published plugin
     # (growth, NPR 499), a different feature from the e-library pair.
@@ -53,7 +53,7 @@ PLUGIN_SLUG_ALIASES = {
 }
 
 
-def _acceptable_plugin_slugs(plugin_slug: str) -> set[str]:
+def _acceptable_app_slugs(app_slug: str) -> set[str]:
     """Return all equivalent slugs accepted for a requested plugin slug.
 
     Expansion is single-hop only: the requested slug, its direct alias
@@ -62,20 +62,20 @@ def _acceptable_plugin_slugs(plugin_slug: str) -> set[str]:
     unlock a third plugin's routes.
 
     The map consulted is the EFFECTIVE one — the table above merged with
-    every manifest's `aliases:` declaration (`PluginLoader.alias_map`), so a
+    every manifest's `aliases:` declaration (`AppLoader.alias_map`), so a
     plugin can ship its own legacy slugs without editing this file. The merge
     only ever adds `legacy → canonical` pairs, so the single-hop property is
     preserved by construction. Falls back to the table alone if the loader is
     unavailable (import cycles during early boot, bare unit tests).
     """
-    requested = str(plugin_slug or "").strip()
+    requested = str(app_slug or "").strip()
     if not requested:
         return set()
 
     try:
-        from app.apps.loader import PluginLoader
+        from app.apps.loader import AppLoader
 
-        alias_map = PluginLoader.alias_map()
+        alias_map = AppLoader.alias_map()
     except Exception:  # noqa: BLE001 — gating must never depend on the loader
         alias_map = PLUGIN_SLUG_ALIASES
 
@@ -92,13 +92,13 @@ def _acceptable_plugin_slugs(plugin_slug: str) -> set[str]:
     return accepted
 
 
-def plugin_required(plugin_slug: str):
+def app_required(app_slug: str):
     """Decorator: ensures the current school has the plugin installed and active."""
 
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            installed = getattr(g, "installed_plugins", None)
+            installed = getattr(g, "installed_apps", None)
             if not installed:
                 return (
                     jsonify(
@@ -109,15 +109,15 @@ def plugin_required(plugin_slug: str):
                     403,
                 )
 
-            acceptable = _acceptable_plugin_slugs(plugin_slug)
+            acceptable = _acceptable_app_slugs(app_slug)
             if not any(slug in installed for slug in acceptable):
                 return (
                     jsonify(
                         success=False,
-                        error=f"Plugin '{plugin_slug}' is not installed",
+                        error=f"Plugin '{app_slug}' is not installed",
                         data={
-                            "plugin_slug": plugin_slug,
-                            "install_url": f"/marketplace/{plugin_slug}",
+                            "app_slug": app_slug,
+                            "install_url": f"/marketplace/{app_slug}",
                             "message": "Install this plugin from the marketplace.",
                         },
                     ),
@@ -131,27 +131,27 @@ def plugin_required(plugin_slug: str):
     return decorator
 
 
-def _school_has_plugin(school_id: str, plugin_slug: str) -> bool:
+def _school_has_plugin(school_id: str, app_slug: str) -> bool:
     """Helper: check if a school has a specific plugin installed.
 
-    Safe to call from within request context (uses g.installed_plugins) or
+    Safe to call from within request context (uses g.installed_apps) or
     out-of-band (falls back to DB query if g is not available).
     """
     from flask import g as _g
 
     # Fast path: already in request context
-    installed = getattr(_g, "installed_plugins", None)
+    installed = getattr(_g, "installed_apps", None)
     if installed is not None:
-        return plugin_slug in installed
+        return app_slug in installed
 
     # Fallback: direct DB query (e.g. called from Celery task context)
     try:
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
 
         return (
-            SchoolPlugin.query.filter_by(
+            SchoolApp.query.filter_by(
                 school_id=school_id,
-                plugin_slug=plugin_slug,
+                app_slug=app_slug,
                 active=True,
             ).first()
             is not None

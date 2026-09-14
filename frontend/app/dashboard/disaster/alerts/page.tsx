@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -16,7 +16,7 @@ import { Bell, AlertTriangle, Info } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function SeismicAlertsPage() {
-  return <PluginGate slug="disaster_management"><AlertsContent /></PluginGate>;
+  return <AppGate slug="disaster_management"><AlertsContent /></AppGate>;
 }
 
 function AlertsContent() {

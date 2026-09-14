@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
@@ -49,9 +49,9 @@ import {
 
 export default function FeeReportsPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <ReportsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

@@ -4,7 +4,7 @@ overrides, and admin-app theme (premium plugin, NPR 2999)."""
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.services.website import white_label as wl
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
@@ -27,7 +27,7 @@ def _school_or_error():
 @white_label_bp.route("/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 def overview():
     """Checklist data for the white-label overview page."""
     school, err = _school_or_error()
@@ -66,7 +66,7 @@ def overview():
 @white_label_bp.route("/domain", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 def get_domain():
     """Custom-domain configuration + the DNS records the school must create."""
     school, err = _school_or_error()
@@ -78,7 +78,7 @@ def get_domain():
 @white_label_bp.route("/domain", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 @role_required("superadmin", "school_admin")
 def request_domain():
     """Save/replace the custom-domain request; verification resets to pending."""
@@ -101,7 +101,7 @@ def request_domain():
 @white_label_bp.route("/domain/verify", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 @role_required("superadmin", "school_admin")
 def verify_domain():
     """Run a REAL DNS lookup (CNAME/A) of the saved domain — never a stub success."""
@@ -121,7 +121,7 @@ def verify_domain():
 @white_label_bp.route("/branding", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 def get_branding():
     """Effective branding overrides (school identity, colors, logo, flags)."""
     return success_response(wl.WhiteLabelService.get_branding(g.school_id))
@@ -130,7 +130,7 @@ def get_branding():
 @white_label_bp.route("/branding", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 @role_required("superadmin", "school_admin")
 def update_branding():
     """Update branding; writes through to SchoolWebsite.customizations and
@@ -151,7 +151,7 @@ def update_branding():
 @white_label_bp.route("/theme", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 def get_theme():
     """Admin-app appearance overrides for this school."""
     return success_response(wl.WhiteLabelService.get_theme(g.school_id))
@@ -160,7 +160,7 @@ def get_theme():
 @white_label_bp.route("/theme", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("white_label")
+@app_required("white_label")
 @role_required("superadmin", "school_admin")
 def update_theme():
     """Persist admin-app theme overrides (mode, sidebar, colors, density)."""

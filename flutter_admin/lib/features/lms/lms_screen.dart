@@ -59,7 +59,7 @@ class _LmsScreenState extends ConsumerState<LmsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'lms',
       child: Scaffold(
         appBar: AppBar(

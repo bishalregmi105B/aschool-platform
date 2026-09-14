@@ -18,10 +18,10 @@ _listeners: dict[str, list] = defaultdict(list)
 _event_plugin_map: dict[str, str] = {}
 
 
-def register_plugin_events(plugin_slug: str, event_prefixes: list[str]):
+def register_plugin_events(app_slug: str, event_prefixes: list[str]):
     """Register which plugin owns which event prefixes."""
     for prefix in event_prefixes:
-        _event_plugin_map[prefix] = plugin_slug
+        _event_plugin_map[prefix] = app_slug
 
 
 def on(event_name: str):
@@ -35,15 +35,15 @@ def on(event_name: str):
     return decorator
 
 
-def _school_has_plugin(school_id: str, plugin_slug: str) -> bool:
+def _school_has_plugin(school_id: str, app_slug: str) -> bool:
     """Check if a school has a specific plugin installed and active."""
     try:
-        from app.models.plugin import SchoolPlugin
+        from app.models.app import SchoolApp
         from extensions import db
 
-        record = SchoolPlugin.query.filter_by(
+        record = SchoolApp.query.filter_by(
             school_id=school_id,
-            plugin_slug=plugin_slug,
+            app_slug=app_slug,
             active=True,
         ).first()
         return record is not None

@@ -9,20 +9,20 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.apps.billing import (
-    activate_plugin,
-    deactivate_plugin,
+    activate_app,
+    deactivate_app,
     effective_trial_days,
-    install_plugin,
+    install_app,
     plugin_is_free,
-    uninstall_plugin,
+    uninstall_app,
 )
 from app.apps.entitlements import ensure_free_plugins
 from app.apps import config_schema as plugin_config_schema
 
 from datetime import datetime, timedelta, timezone
-from app.apps.loader import PluginLoader
+from app.apps.loader import AppLoader
 from app.utils.decorators import role_required, school_required
 from app.utils.response import (
     created_response,
@@ -33,7 +33,7 @@ from extensions import db
 
 logger = logging.getLogger(__name__)
 
-plugins_bp = Blueprint("plugins", __name__, url_prefix="/plugins")
+apps_bp = Blueprint("apps", __name__, url_prefix="/apps")
 
 # Schema-lite config validation (E163, plugin-architecture batch — FIX_STATUS
 # §14): JSON object only, capped size,
@@ -49,7 +49,7 @@ def _coming_soon_guard(slug: str) -> str | None:
     only NEW activations are blocked while the plugin is in final testing.
     Returns the user-facing message, or None when the plugin is installable.
     """
-    manifest = PluginLoader.get_manifest(slug) or {}
+    manifest = AppLoader.get_manifest(slug) or {}
     if manifest.get("coming_soon"):
         return (
             f"'{manifest.get('name', slug)}' is in final testing — releasing "
@@ -67,10 +67,10 @@ def _core_plugin_guard(slug: str) -> str | None:
     message when `slug` is core (manifest category first, mirror row
     fallback), or None when the plugin is freely manageable.
     """
-    manifest = PluginLoader.get_manifest(slug) or {}
+    manifest = AppLoader.get_manifest(slug) or {}
     category = manifest.get("category")
     if not category:
-        row = Plugin.query.filter_by(slug=slug, is_deleted=False).first()
+        row = App.query.filter_by(slug=slug, is_deleted=False).first()
         category = row.category if row else None
     if (category or "").lower() == "core":
         name = manifest.get("name") or slug
@@ -81,7 +81,7 @@ def _core_plugin_guard(slug: str) -> str | None:
     return None
 
 
-def _run_plugin_hook(plugin_slug: str, hook_name: str) -> None:
+def _run_plugin_hook(app_slug: str, hook_name: str) -> None:
     """Run a plugin's lifecycle hook (activate/deactivate/uninstall) if present.
 
     WP-style: hooks are the module's own code — table creation on activate,
@@ -90,20 +90,20 @@ def _run_plugin_hook(plugin_slug: str, hook_name: str) -> None:
     broken plugin cannot take the marketplace down.
     """
     try:
-        module = PluginLoader.get_hooks(plugin_slug)
+        module = AppLoader.get_hooks(app_slug)
         fn = getattr(module, hook_name, None) if module else None
         if fn is None:
             return
         fn(db)
-        logger.info("Plugin '%s': %s hook ran", plugin_slug, hook_name)
+        logger.info("Plugin '%s': %s hook ran", app_slug, hook_name)
     except Exception as e:  # noqa: BLE001 — hooks are never fatal
         logger.warning(
-            "Plugin '%s': %s hook failed (ignored): %s", plugin_slug, hook_name, e
+            "Plugin '%s': %s hook failed (ignored): %s", app_slug, hook_name, e
         )
 
 
-def _install_state(sp: SchoolPlugin | None) -> str:
-    """WP-style lifecycle state derived from the SchoolPlugin row.
+def _install_state(sp: SchoolApp | None) -> str:
+    """WP-style lifecycle state derived from the SchoolApp row.
 
     active → "active"; deactivated (active=False, never uninstalled) →
     "inactive"; uninstalled (or no row) → "not_installed".
@@ -113,7 +113,7 @@ def _install_state(sp: SchoolPlugin | None) -> str:
     return "active" if sp.active else "inactive"
 
 
-def _trial_days_left(sp: SchoolPlugin | None) -> int | None:
+def _trial_days_left(sp: SchoolApp | None) -> int | None:
     """Whole days left on the row's trial (0 once ended); None when not a trial."""
     if sp is None or not sp.is_trial or sp.trial_ends_at is None:
         return None
@@ -132,9 +132,9 @@ def _catalog_entries() -> list[dict]:
     ratings, stats, sort order). Mirror rows for slugs no longer in the
     registry act as a fallback until the next refresh unpublishes them.
     """
-    manifests = PluginLoader.get_all_manifests()
+    manifests = AppLoader.get_all_manifests()
     rows_by_slug: dict[str, Plugin] = {
-        p.slug: p for p in Plugin.query.filter_by(is_deleted=False).all()
+        p.slug: p for p in App.query.filter_by(is_deleted=False).all()
     }
 
     entries: list[dict] = []
@@ -240,13 +240,13 @@ def _ensure_provisioned() -> None:
         logger.warning("Plugin lazy-provisioning failed: %s", e)
 
 
-@plugins_bp.route("/marketplace", methods=["GET"])
+@apps_bp.route("/marketplace", methods=["GET"])
 @jwt_required()
 def marketplace():
     """Browse available plugins as a flat list.
 
     Reads the plugin REGISTRY (directory scan) merged with per-school
-    SchoolPlugin state; the DB `plugins` table is only a mirror/fallback.
+    SchoolApp state; the DB `plugins` table is only a mirror/fallback.
     Lazily backfills missing plan-tier plugins first so pre-existing
     schools see their free plugins as ACTIVE without hand-installing.
     """
@@ -271,11 +271,11 @@ def marketplace():
     # Check which are installed for the current school. All rows (active AND
     # deactivated) are loaded so the WP-style lifecycle state can be reported;
     # uninstalled rows (uninstalled_at set) count as not installed.
-    installs_by_slug: dict[str, SchoolPlugin] = {}
+    installs_by_slug: dict[str, SchoolApp] = {}
     if g.get("school_id"):
-        rows = SchoolPlugin.query.filter_by(school_id=g.school_id).all()
+        rows = SchoolApp.query.filter_by(school_id=g.school_id).all()
         installs_by_slug = {
-            sp.plugin_slug: sp
+            sp.app_slug: sp
             for sp in rows
             if sp.uninstalled_at is None
         }
@@ -344,7 +344,7 @@ def marketplace():
     return success_response(result)
 
 
-@plugins_bp.route("/sidebar", methods=["GET"])
+@apps_bp.route("/sidebar", methods=["GET"])
 @jwt_required()
 @school_required
 def get_sidebar_config():
@@ -354,10 +354,10 @@ def get_sidebar_config():
     core items (Dashboard, Academics, Students, etc.).
     """
     role = g.role or "school_admin"
-    installed_slugs = g.installed_plugins or []
-    items = PluginLoader.get_frontend_sidebar(installed_slugs, role)
+    installed_slugs = g.installed_apps or []
+    items = AppLoader.get_frontend_sidebar(installed_slugs, role)
     # Also include any bottom-nav plugin items so the client can handle them
-    bottom_items = PluginLoader.get_bottom_nav_items(installed_slugs, role)
+    bottom_items = AppLoader.get_bottom_nav_items(installed_slugs, role)
     return success_response(
         {
             "items": items,
@@ -366,17 +366,17 @@ def get_sidebar_config():
     )
 
 
-@plugins_bp.route("/installed", methods=["GET"])
+@apps_bp.route("/installed", methods=["GET"])
 @jwt_required()
 @school_required
-def installed_plugins():
+def installed_apps():
     # F2/F7: config blobs (incl. secret envelopes) reach admins only —
     # other roles get install state without the config payload.
     """Get all installed plugins for the current school."""
     # Lazy backfill first (idempotent, no-op when fully provisioned) so
     # pre-existing schools get their plan-tier plugins ACTIVE on first load.
     _ensure_provisioned()
-    installed = SchoolPlugin.query.filter_by(
+    installed = SchoolApp.query.filter_by(
         school_id=g.school_id, active=True, is_deleted=False
     ).all()
 
@@ -384,7 +384,7 @@ def installed_plugins():
     result = []
     for sp in installed:
         entry = {
-            "plugin_slug": sp.plugin_slug,
+            "app_slug": sp.app_slug,
             "active": sp.active,
             "installed_at": sp.installed_at.isoformat()
             if sp.installed_at
@@ -400,7 +400,7 @@ def installed_plugins():
         }
         if is_admin:
             try:
-                schema = plugin_config_schema.load_schema(sp.plugin_slug)
+                schema = plugin_config_schema.load_schema(sp.app_slug)
             except ValueError:
                 schema = None
             entry["config"] = plugin_config_schema.redact_config(
@@ -411,26 +411,26 @@ def installed_plugins():
     return success_response(result)
 
 
-@plugins_bp.route("/install", methods=["POST"])
+@apps_bp.route("/install", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
 def install():
     """Install a plugin for the current school."""
     data = request.get_json(silent=True) or {}
-    plugin_slug = data.get("plugin_slug")
+    app_slug = data.get("app_slug") or data.get("plugin_slug")
     billing_cycle = data.get("billing_cycle", "monthly")
 
-    if not plugin_slug:
-        return error_response("plugin_slug is required", 400)
+    if not app_slug:
+        return error_response("app_slug is required", 400)
 
     # E230: coming-soon plugins cannot be activated yet (409 — the plugin
     # exists in the catalog, the request is understood, but is not allowed).
-    coming_soon = _coming_soon_guard(str(plugin_slug))
+    coming_soon = _coming_soon_guard(str(app_slug))
     if coming_soon:
         return error_response(coming_soon, 409)
 
-    result = install_plugin(str(g.school_id), plugin_slug, billing_cycle)
+    result = install_app(str(g.school_id), app_slug, billing_cycle)
     if "error" in result:
         status = (
             409
@@ -441,13 +441,13 @@ def install():
         return error_response(result["error"], status)
 
     # WP-style activation hook: the module creates its tables/defaults after
-    # the SchoolPlugin row exists. Logged-not-fatal on failure.
-    _run_plugin_hook(plugin_slug, "activate")
+    # the SchoolApp row exists. Logged-not-fatal on failure.
+    _run_plugin_hook(app_slug, "activate")
 
     return created_response(result)
 
 
-@plugins_bp.route("/<slug>/trial", methods=["POST"])
+@apps_bp.route("/<slug>/trial", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -456,7 +456,7 @@ def start_trial(slug):
 
     409 if the plugin is already installed or its trial was already used.
     """
-    plugin = Plugin.query.filter_by(
+    plugin = App.query.filter_by(
         slug=slug, is_published=True, is_deleted=False
     ).first()
     if not plugin:
@@ -466,8 +466,8 @@ def start_trial(slug):
     if coming_soon:
         return error_response(coming_soon, 409)
 
-    existing = SchoolPlugin.query.filter_by(
-        school_id=g.school_id, plugin_slug=slug
+    existing = SchoolApp.query.filter_by(
+        school_id=g.school_id, app_slug=slug
     ).first()
     if existing and existing.active:
         return error_response(f"Plugin '{slug}' is already installed", 409)
@@ -490,17 +490,17 @@ def start_trial(slug):
     else:
         # Dependency check still applies for trials.
         for dep_slug in (plugin.depends_on or []):
-            dep = SchoolPlugin.query.filter_by(
-                school_id=g.school_id, plugin_slug=dep_slug, active=True
+            dep = SchoolApp.query.filter_by(
+                school_id=g.school_id, app_slug=dep_slug, active=True
             ).first()
             if not dep:
                 return error_response(
                     f"Dependency not met: '{dep_slug}' must be installed first",
                     409,
                 )
-        sp = SchoolPlugin(
+        sp = SchoolApp(
             school_id=g.school_id,
-            plugin_slug=slug,
+            app_slug=slug,
             active=True,
             billing_cycle="monthly",
             is_trial=True,
@@ -513,7 +513,7 @@ def start_trial(slug):
 
     db.session.commit()
 
-    # Trial installs mint a SchoolPlugin row too — run the activation hook.
+    # Trial installs mint a SchoolApp row too — run the activation hook.
     _run_plugin_hook(slug, "activate")
 
     from app.apps.billing import _invalidate_plugin_cache
@@ -522,7 +522,7 @@ def start_trial(slug):
 
     return created_response(
         {
-            "plugin_slug": slug,
+            "app_slug": slug,
             "is_trial": True,
             "trial_days": trial_days,
             "trial_ends_at": sp.trial_ends_at.isoformat() if sp.trial_ends_at else None,
@@ -530,7 +530,7 @@ def start_trial(slug):
     )
 
 
-@plugins_bp.route("/<slug>/subscribe", methods=["POST"])
+@apps_bp.route("/<slug>/subscribe", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -551,7 +551,7 @@ def subscribe(slug):
          "payment": {"provider": "stripe|esewa|khalti|fonepay",
                      "transaction_id": "<provider ref>"}}
     (flat payment_provider / payment_transaction_id keys also accepted).
-    The reference is stored on SchoolPlugin.config["last_payment"] for
+    The reference is stored on SchoolApp.config["last_payment"] for
     auditing; provider-side verification is NOT attempted (no billing
     integration — out of scope). Signature-verified Stripe webhooks
     (app/api/webhooks/__init__.py) remain the other paid-activation path.
@@ -562,7 +562,7 @@ def subscribe(slug):
     if billing_cycle not in ("monthly", "yearly"):
         return error_response("billing_cycle must be 'monthly' or 'yearly'", 400)
 
-    plugin = Plugin.query.filter_by(
+    plugin = App.query.filter_by(
         slug=slug, is_published=True, is_deleted=False
     ).first()
     if not plugin:
@@ -628,18 +628,18 @@ def subscribe(slug):
             402,
         )
 
-    sp = SchoolPlugin.query.filter_by(
-        school_id=g.school_id, plugin_slug=slug
+    sp = SchoolApp.query.filter_by(
+        school_id=g.school_id, app_slug=slug
     ).first()
 
     now = datetime.now(timezone.utc)
     period = timedelta(days=365) if billing_cycle == "yearly" else timedelta(days=30)
 
     if not sp:
-        # Dependency/conflict checks mirror install_plugin for parity.
+        # Dependency/conflict checks mirror install_app for parity.
         for dep_slug in (plugin.depends_on or []):
-            dep = SchoolPlugin.query.filter_by(
-                school_id=g.school_id, plugin_slug=dep_slug, active=True
+            dep = SchoolApp.query.filter_by(
+                school_id=g.school_id, app_slug=dep_slug, active=True
             ).first()
             if not dep:
                 return error_response(
@@ -647,8 +647,8 @@ def subscribe(slug):
                     409,
                 )
         for conflict_slug in (plugin.conflicts_with or []):
-            conflict = SchoolPlugin.query.filter_by(
-                school_id=g.school_id, plugin_slug=conflict_slug, active=True
+            conflict = SchoolApp.query.filter_by(
+                school_id=g.school_id, app_slug=conflict_slug, active=True
             ).first()
             if conflict:
                 return error_response(
@@ -657,10 +657,10 @@ def subscribe(slug):
                     409,
                 )
         # First-ever install via subscribe: create the row directly as PAID —
-        # never through install_plugin, which would mint a trial first.
-        sp = SchoolPlugin(
+        # never through install_app, which would mint a trial first.
+        sp = SchoolApp(
             school_id=g.school_id,
-            plugin_slug=slug,
+            app_slug=slug,
             active=True,
             billing_cycle=billing_cycle,
             is_trial=False,
@@ -669,12 +669,12 @@ def subscribe(slug):
         db.session.add(sp)
     elif sp.uninstalled_at is not None or not sp.active:
         # Reactivate an uninstalled/deactivated row as PAID — including rows
-        # whose trial EXPIRED (install_plugin refuses those, which would
+        # whose trial EXPIRED (install_app refuses those, which would
         # deadlock subscribe: its refusal message says "subscribe to install
         # it again").
         for dep_slug in (plugin.depends_on or []):
-            dep = SchoolPlugin.query.filter_by(
-                school_id=g.school_id, plugin_slug=dep_slug, active=True
+            dep = SchoolApp.query.filter_by(
+                school_id=g.school_id, app_slug=dep_slug, active=True
             ).first()
             if not dep:
                 return error_response(
@@ -710,7 +710,7 @@ def subscribe(slug):
 
     db.session.commit()
 
-    # First-ever paid install mints the SchoolPlugin row — run the activation
+    # First-ever paid install mints the SchoolApp row — run the activation
     # hook (idempotent: table creation is checkfirst).
     _run_plugin_hook(slug, "activate")
 
@@ -720,7 +720,7 @@ def subscribe(slug):
 
     return success_response(
         {
-            "plugin_slug": slug,
+            "app_slug": slug,
             "billing_cycle": billing_cycle,
             "price_monthly": float(plugin.price_monthly or 0),
             "price_yearly": float(plugin.price_yearly or 0),
@@ -734,37 +734,37 @@ def subscribe(slug):
     )
 
 
-@plugins_bp.route("/uninstall", methods=["POST"])
+@apps_bp.route("/uninstall", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
 def uninstall():
     """Uninstall (soft) a plugin from the current school."""
     data = request.get_json(silent=True) or {}
-    plugin_slug = data.get("plugin_slug")
+    app_slug = data.get("app_slug") or data.get("plugin_slug")
 
-    if not plugin_slug:
-        return error_response("plugin_slug is required", 400)
+    if not app_slug:
+        return error_response("app_slug is required", 400)
 
     # Core plugins ship with every plan and the dashboard/sidebar depends on
     # them — uninstalling one would break the school shell.
-    core_guard = _core_plugin_guard(str(plugin_slug))
+    core_guard = _core_plugin_guard(str(app_slug))
     if core_guard:
         return error_response(core_guard, 400)
 
-    result = uninstall_plugin(str(g.school_id), plugin_slug)
+    result = uninstall_app(str(g.school_id), app_slug)
     if "error" in result:
         return error_response(result["error"], 400)
 
     # WP-style uninstall hook: modules remove only their own config rows —
     # data tables are kept (WordPress keeps data on uninstall too). Logged-
     # not-fatal on failure.
-    _run_plugin_hook(plugin_slug, "uninstall")
+    _run_plugin_hook(app_slug, "uninstall")
 
     return success_response(result)
 
 
-@plugins_bp.route("/<slug>/activate", methods=["POST"])
+@apps_bp.route("/<slug>/activate", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -774,11 +774,11 @@ def activate(slug):
     Idempotent on already-active installs (200 with already_active=True);
     404 when no install row exists or the plugin was uninstalled.
     """
-    result = activate_plugin(str(g.school_id), slug)
+    result = activate_app(str(g.school_id), slug)
     if "error" in result:
         message = result["error"]
-        sp = SchoolPlugin.query.filter_by(
-            school_id=g.school_id, plugin_slug=slug
+        sp = SchoolApp.query.filter_by(
+            school_id=g.school_id, app_slug=slug
         ).first()
         if sp is None or sp.uninstalled_at is not None:
             return error_response(message, 404)
@@ -787,7 +787,7 @@ def activate(slug):
     return success_response({**result, "active": True, "already_active": False})
 
 
-@plugins_bp.route("/<slug>/deactivate", methods=["POST"])
+@apps_bp.route("/<slug>/deactivate", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -795,7 +795,7 @@ def deactivate(slug):
     """WP-style deactivate: disable a plugin WITHOUT uninstalling it.
 
     The install row (config, trial state, billing) is preserved; the plugin
-    disappears from g.installed_plugins so its gated routes 403 immediately.
+    disappears from g.installed_apps so its gated routes 403 immediately.
     Idempotent on already-deactivated installs; 404 when never installed.
     CORE-category plugins cannot be deactivated (400) — they are the base
     toolset every school's dashboard and sidebar depends on.
@@ -807,10 +807,10 @@ def deactivate(slug):
     if core_guard:
         return error_response(core_guard, 400)
 
-    result = deactivate_plugin(str(g.school_id), slug)
+    result = deactivate_app(str(g.school_id), slug)
     if "error" in result:
-        sp = SchoolPlugin.query.filter_by(
-            school_id=g.school_id, plugin_slug=slug
+        sp = SchoolApp.query.filter_by(
+            school_id=g.school_id, app_slug=slug
         ).first()
         if sp is None or sp.uninstalled_at is not None:
             return error_response(result["error"], 404)
@@ -823,7 +823,7 @@ def deactivate(slug):
     return success_response({**result, "active": False, "already_inactive": False})
 
 
-@plugins_bp.route("/<slug>/config", methods=["GET"])
+@apps_bp.route("/<slug>/config", methods=["GET"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -833,8 +833,8 @@ def get_plugin_config(slug):
     Readable while the plugin is installed (active OR deactivated) — WP-style
     settings stay inspectable for a disabled plugin; 404 once uninstalled.
     """
-    sp = SchoolPlugin.query.filter_by(
-        school_id=g.school_id, plugin_slug=slug
+    sp = SchoolApp.query.filter_by(
+        school_id=g.school_id, app_slug=slug
     ).first()
     if not sp or sp.uninstalled_at is not None:
         return error_response(f"Plugin '{slug}' is not installed", 404)
@@ -848,7 +848,7 @@ def get_plugin_config(slug):
     )
 
 
-@plugins_bp.route("/<slug>/config", methods=["PUT"])
+@apps_bp.route("/<slug>/config", methods=["PUT"])
 @jwt_required()
 @school_required
 @role_required("superadmin", "school_admin")
@@ -865,8 +865,8 @@ def update_plugin_config(slug):
     ?replace=1 to REPLACE the whole config with the payload (needed to drop
     deleted keys — the settings page sends the full dict with this flag).
     """
-    sp = SchoolPlugin.query.filter_by(
-        school_id=g.school_id, plugin_slug=slug
+    sp = SchoolApp.query.filter_by(
+        school_id=g.school_id, app_slug=slug
     ).first()
     if not sp or sp.uninstalled_at is not None:
         return error_response(f"Plugin '{slug}' is not installed", 404)
@@ -915,8 +915,8 @@ def update_plugin_config(slug):
     if schema is not None:
         # requires_plugins visibility needs the school's installed-slug set.
         installed = {
-            row.plugin_slug
-            for row in SchoolPlugin.query.filter_by(
+            row.app_slug
+            for row in SchoolApp.query.filter_by(
                 school_id=g.school_id, uninstalled_at=None
             ).all()
         }
@@ -944,7 +944,7 @@ def update_plugin_config(slug):
     )
 
 
-@plugins_bp.route("/refresh-registry", methods=["POST"])
+@apps_bp.route("/refresh-registry", methods=["POST"])
 @jwt_required()
 @role_required("superadmin")
 def refresh_registry():
@@ -955,14 +955,14 @@ def refresh_registry():
     folders created published, vanished folders unpublished). Superadmin-only.
     """
     try:
-        result = PluginLoader.refresh_registry()
+        result = AppLoader.refresh_registry()
     except Exception as e:  # noqa: BLE001 — reported, never crashes the API
         logger.error("refresh-registry failed: %s", e)
         return error_response(f"Registry refresh failed: {e}", 500)
     return success_response(result)
 
 
-@plugins_bp.route("/<slug>/config-schema", methods=["GET"])
+@apps_bp.route("/<slug>/config-schema", methods=["GET"])
 @jwt_required()
 def get_plugin_config_schema(slug):
     """Settings-screen definition for a plugin (from its config_schema.yaml).
@@ -971,7 +971,7 @@ def get_plugin_config_schema(slug):
     is upgraded in memory. `fields` is empty when the plugin carries no
     schema — the settings UI then falls back to the generic key/value editor.
     """
-    manifest = PluginLoader.get_manifest(slug)
+    manifest = AppLoader.get_manifest(slug)
     if not manifest:
         return error_response(f"Plugin '{slug}' not found", 404)
     try:
@@ -986,7 +986,7 @@ def get_plugin_config_schema(slug):
                 "has_schema": False,
                 "schema_version": 1,
                 "groups": [],
-                "fields": PluginLoader.get_config_schema(slug),
+                "fields": AppLoader.get_config_schema(slug),
             }
         )
     body = plugin_config_schema.schema_for_role(schema, g.role)
@@ -994,7 +994,7 @@ def get_plugin_config_schema(slug):
     return success_response(body)
 
 
-@plugins_bp.route("/<slug>/migrate-config", methods=["POST"])
+@apps_bp.route("/<slug>/migrate-config", methods=["POST"])
 @jwt_required()
 @school_required
 @role_required("superadmin")
@@ -1012,8 +1012,8 @@ def migrate_plugin_config(slug):
     if schema is None:
         return error_response(f"Plugin '{slug}' has no config schema", 404)
 
-    rows = SchoolPlugin.query.filter_by(
-        plugin_slug=slug, uninstalled_at=None
+    rows = SchoolApp.query.filter_by(
+        app_slug=slug, uninstalled_at=None
     ).all()
     migrated = 0
     already_current = 0
@@ -1041,7 +1041,7 @@ def migrate_plugin_config(slug):
     )
 
 
-@plugins_bp.route("/widgets", methods=["GET"])
+@apps_bp.route("/widgets", methods=["GET"])
 @jwt_required()
 @school_required
 def plugin_widgets():
@@ -1060,7 +1060,7 @@ def plugin_widgets():
     slot = request.args.get("slot") or None
     role = g.role or "school_admin"
     widgets = widgets_for(
-        installed_slugs=g.installed_plugins or [],
+        installed_slugs=g.installed_apps or [],
         role=role,
         surface=surface,
         slot=slot,
@@ -1076,7 +1076,7 @@ def plugin_widgets():
     )
 
 
-@plugins_bp.route("/aliases", methods=["GET"])
+@apps_bp.route("/aliases", methods=["GET"])
 @jwt_required()
 def plugin_aliases():
     """Effective slug-alias map + display labels, served from the manifests.
@@ -1085,16 +1085,16 @@ def plugin_aliases():
     and a PLUGIN_LABELS dict; the two drifted every time a plugin merged. The
     client now fetches this and keeps its literals only as an offline
     fallback. `aliases` is legacy→canonical, single-hop (see
-    PluginLoader.alias_map).
+    AppLoader.alias_map).
     """
-    aliases = PluginLoader.alias_map()
+    aliases = AppLoader.alias_map()
     labels = {
         slug: (m.get("name") or slug.replace("_", " "))
-        for slug, m in PluginLoader.get_all_manifests().items()
+        for slug, m in AppLoader.get_all_manifests().items()
     }
     labels_nepali = {
         slug: m.get("name_nepali")
-        for slug, m in PluginLoader.get_all_manifests().items()
+        for slug, m in AppLoader.get_all_manifests().items()
         if m.get("name_nepali")
     }
     return success_response(
@@ -1106,7 +1106,7 @@ def plugin_aliases():
     )
 
 
-@plugins_bp.route("/registry", methods=["GET"])
+@apps_bp.route("/registry", methods=["GET"])
 @jwt_required()
 @role_required("superadmin")
 def plugin_registry():
@@ -1118,7 +1118,7 @@ def plugin_registry():
     """
     from app.apps.validator import validate_all
 
-    manifests = PluginLoader.get_all_manifests()
+    manifests = AppLoader.get_all_manifests()
     findings = validate_all()
     by_slug: dict[str, list[dict]] = {}
     for f in findings:
@@ -1160,7 +1160,7 @@ def plugin_registry():
     )
 
 
-@plugins_bp.route("/<slug>/health", methods=["GET"])
+@apps_bp.route("/<slug>/health", methods=["GET"])
 @jwt_required()
 @role_required("superadmin")
 def plugin_health(slug):
@@ -1171,7 +1171,7 @@ def plugin_health(slug):
     health_check reports ok=True with detail="no health check declared" —
     absence of a check is not a failure.
     """
-    manifest = PluginLoader.get_manifest(slug)
+    manifest = AppLoader.get_manifest(slug)
     if not manifest:
         return error_response(f"Plugin '{slug}' not found", 404)
     target = (manifest.get("capabilities") or {}).get("health_check") or manifest.get(

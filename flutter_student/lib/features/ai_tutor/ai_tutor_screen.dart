@@ -100,7 +100,7 @@ class _AITutorScreenState extends ConsumerState<AITutorScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'ai_tutor',
       child: Column(
         children: [

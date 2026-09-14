@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { StatusChip } from "@/components/aos/kit/page-kit";
@@ -29,7 +29,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 export default function AttendanceReportsPage() {
-  return <PluginGate slug="attendance"><ReportsContent /></PluginGate>;
+  return <AppGate slug="attendance"><ReportsContent /></AppGate>;
 }
 
 function ReportsContent() {

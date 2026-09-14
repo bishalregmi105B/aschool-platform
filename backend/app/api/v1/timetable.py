@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 from app.models.academic import Class, Section, Subject
 from app.models.timetable import TimetableSlot
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -24,7 +24,7 @@ MAX_TIMETABLE_SLOTS = 5000
 @timetable_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 def get_timetable():
     """Get timetable, optionally filtered by class/section/teacher/day."""
     query = TimetableSlot.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -52,7 +52,7 @@ def get_timetable():
 @timetable_bp.route("/teacher/<teacher_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 def get_teacher_timetable_compat(teacher_id):
     query = TimetableSlot.query.filter_by(
         school_id=g.school_id,
@@ -65,7 +65,7 @@ def get_teacher_timetable_compat(teacher_id):
 @timetable_bp.route("/generate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 @role_required("superadmin", "school_admin")
 def generate_timetable():
     """Auto-generate a clash-free timetable using AI solver."""
@@ -92,7 +92,7 @@ def generate_timetable():
 @timetable_bp.route("/save", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 @role_required("superadmin", "school_admin")
 def save_timetable():
     """Save a generated timetable to the database.
@@ -131,7 +131,7 @@ def save_timetable():
 @timetable_bp.route("/slots", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 @role_required("superadmin", "school_admin")
 def create_slot():
     """Manually create a single timetable slot.
@@ -267,7 +267,7 @@ def create_slot():
 @timetable_bp.route("/slots/<slot_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("timetable")
+@app_required("timetable")
 @role_required("superadmin", "school_admin")
 def delete_slot(slot_id):
     slot_uuid = _coerce_uuid(slot_id)

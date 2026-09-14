@@ -9,7 +9,7 @@ import {
   type MarksConfigExam,
   type MarksConfigSubject,
 } from "@/lib/exam-mark-config";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,11 +28,11 @@ import {
   AOSPage, AOSPageHeader, AOSPageBody, KpiCard, StatGrid,
   FilterCommandBar, DataPanel,
 } from "@/components/aos/kit/page-kit";
-import { usePluginWidgets } from "@/lib/plugin-widgets/usePluginWidgets";
+import { useAppWidgets } from "@/lib/app-widgets/useAppWidgets";
 import {
   resolveComponentWidget,
   type ComponentWidgetProps,
-} from "@/lib/plugin-widgets/registry";
+} from "@/lib/app-widgets/registry";
 import { Save, ClipboardList, CheckCircle2, XCircle, ArrowLeft, Layers, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -107,9 +107,9 @@ function nebGrade(pct: number): { grade: string; gpa: number; color: string } {
 
 export default function MarksPage() {
   return (
-    <PluginGate slug="exams">
+    <AppGate slug="exams">
       <MarksContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 
@@ -344,7 +344,7 @@ function MarksContent() {
   // system serves it for this slot we render THAT instead of the page's
   // fallback table. Same endpoint, same gating — just a better grid, and a
   // school without the widget deployment keeps the fallback.
-  const { widgets } = usePluginWidgets("plugin_page.main");
+  const { widgets } = useAppWidgets("plugin_page.main");
   const marksWidget = widgets.find((w) => w.key === "marks_entry_grid");
   const MarksGrid = resolveComponentWidget(marksWidget?.component);
 

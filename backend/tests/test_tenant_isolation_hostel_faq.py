@@ -10,17 +10,17 @@ from tests.conftest import get_auth_headers
 
 
 def _install_hostel_plugin(db, school):
-    """The hostel routes are plugin-gated (plugin_required("hostel")); both the
+    """The hostel routes are plugin-gated (app_required("hostel")); both the
     owner and the cross-tenant school need an active install so the isolation
     assertions exercise ownership scoping, not the entitlement gate."""
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    if not Plugin.query.filter_by(slug="hostel").first():
-        db.session.add(Plugin(slug="hostel", name="Hostel Management", category="growth",
+    if not App.query.filter_by(slug="hostel").first():
+        db.session.add(App(slug="hostel", name="Hostel Management", category="growth",
                               price_monthly=0, price_yearly=0, is_free=True, is_published=True))
         db.session.flush()
-    if not SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug="hostel").first():
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug="hostel",
+    if not SchoolApp.query.filter_by(school_id=school.id, app_slug="hostel").first():
+        db.session.add(SchoolApp(school_id=school.id, app_slug="hostel",
                                     active=True, is_trial=False))
     db.session.commit()
 

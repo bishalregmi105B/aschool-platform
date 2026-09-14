@@ -13,18 +13,18 @@ import uuid as _uuid
 import pytest
 
 from app.models.dismissal import AuthorizedPickup
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
 
 
 def _seed_plugin(db, slug):
-    """Insert a minimal published Plugin row so SchoolPlugin's slug FK passes."""
-    exists = Plugin.query.filter_by(slug=slug).first()
+    """Insert a minimal published Plugin row so SchoolApp's slug FK passes."""
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    plugin = Plugin(
+    plugin = App(
         slug=slug,
         name=slug.replace("_", " ").title(),
         category="growth",
@@ -48,9 +48,9 @@ def admin_headers(client, db, school, admin_user):
     ):
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(
+            SchoolApp(
                 school_id=school.id,
-                plugin_slug=slug,
+                app_slug=slug,
                 active=True,
                 is_trial=False,
             )

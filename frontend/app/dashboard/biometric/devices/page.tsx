@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { Monitor, Plus, RefreshCw, KeyRound, Trash2 } from "lucide-react";
 import { useConfirm, undoableDelete } from "@/components/ui/confirm-dialog";
 
 export default function BiometricDevicesPage() {
-  return <PluginGate slug="biometric"><DevicesContent /></PluginGate>;
+  return <AppGate slug="biometric"><DevicesContent /></AppGate>;
 }
 
 function DevicesContent() {

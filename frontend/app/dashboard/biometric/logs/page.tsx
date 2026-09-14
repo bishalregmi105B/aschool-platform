@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useUrlFilters } from "@/components/ui/filter-bar";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
@@ -19,7 +19,7 @@ import { ScrollText } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function BiometricLogsPage() {
-  return <PluginGate slug="biometric"><LogsContent /></PluginGate>;
+  return <AppGate slug="biometric"><LogsContent /></AppGate>;
 }
 
 function LogsContent() {

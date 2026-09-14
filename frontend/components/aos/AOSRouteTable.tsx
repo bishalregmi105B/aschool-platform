@@ -196,8 +196,8 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "notifications__matrix": dynamic(() => import("@/app/dashboard/notifications/matrix/page"), { loading: AOSModuleLoading }), // /dashboard/notifications/matrix
   "parents": dynamic(() => import("@/app/dashboard/parents/page"), { loading: AOSModuleLoading }), // /dashboard/parents
   "parents__[id]": dynamic(() => import("@/app/dashboard/parents/[id]/page"), { loading: AOSModuleLoading }), // /dashboard/parents/[id]
-  "plugins": dynamic(() => import("@/app/dashboard/plugins/page"), { loading: AOSModuleLoading }), // /dashboard/plugins
-  "plugins__[slug]__settings": dynamic(() => import("@/app/dashboard/plugins/[slug]/settings/page"), { loading: AOSModuleLoading }), // /dashboard/plugins/[slug]/settings
+  "plugins": dynamic(() => import("@/app/dashboard/apps/page"), { loading: AOSModuleLoading }), // /dashboard/apps
+  "plugins__[slug]__settings": dynamic(() => import("@/app/dashboard/apps/[slug]/settings/page"), { loading: AOSModuleLoading }), // /dashboard/apps/[slug]/settings
   "portfolio": dynamic(() => import("@/app/dashboard/portfolio/page"), { loading: AOSModuleLoading }), // /dashboard/portfolio
   "profile": dynamic(() => import("@/app/dashboard/profile/page"), { loading: AOSModuleLoading }), // /dashboard/profile
   "reports": dynamic(() => import("@/app/dashboard/reports/page"), { loading: AOSModuleLoading }), // /dashboard/reports
@@ -278,7 +278,7 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "students__{id}": dynamic(() => import("@/app/dashboard/students/[id]/page"), { loading: AOSModuleLoading }),
   "parents__{id}": dynamic(() => import("@/app/dashboard/parents/[id]/page"), { loading: AOSModuleLoading }),
   "exams__{id}": dynamic(() => import("@/app/dashboard/exams/[id]/page"), { loading: AOSModuleLoading }),
-  "plugins__{slug}__settings": dynamic(() => import("@/app/dashboard/plugins/[slug]/settings/page"), { loading: AOSModuleLoading }),
+  "plugins__{slug}__settings": dynamic(() => import("@/app/dashboard/apps/[slug]/settings/page"), { loading: AOSModuleLoading }),
 };
 
 /** Map a /dashboard route path to its route-table key. */

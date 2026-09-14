@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function DefaultersPage() {
-  return <PluginGate slug="fees"><DefaultersContent /></PluginGate>;
+  return <AppGate slug="fees"><DefaultersContent /></AppGate>;
 }
 
 function DefaultersContent() {

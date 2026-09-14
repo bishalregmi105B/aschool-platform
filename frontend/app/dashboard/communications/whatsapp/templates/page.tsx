@@ -6,7 +6,7 @@ import { MessageSquare, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,9 +38,9 @@ const emptyDraft = { keyword: "", response: "", match_type: "contains" };
 
 export default function WhatsAppTemplatesPage() {
   return (
-    <PluginGate slug="whatsapp_bot">
+    <AppGate slug="whatsapp_bot">
       <WhatsAppTemplatesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

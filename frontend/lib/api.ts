@@ -1,5 +1,5 @@
 import axios from "axios";
-import { normalizePluginSlug } from "./plugin-aliases";
+import { normalizePluginSlug } from "./app-aliases";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "";

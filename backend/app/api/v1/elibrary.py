@@ -4,7 +4,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.digital_content import DigitalBook, OERResource, PastPaper
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db
@@ -15,7 +15,7 @@ elibrary_bp = Blueprint("elibrary", __name__, url_prefix="/elibrary")
 @elibrary_bp.route("/books", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 def list_books():
     query = DigitalBook.query.filter_by(school_id=g.school_id, is_deleted=False)
     search = request.args.get("search")
@@ -36,7 +36,7 @@ def list_books():
 @elibrary_bp.route("/books", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 @role_required("superadmin", "school_admin", "teacher")
 def create_book():
     data = request.get_json(silent=True) or {}
@@ -57,7 +57,7 @@ def create_book():
 @elibrary_bp.route("/papers", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 def list_papers():
     papers = (
         PastPaper.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -70,7 +70,7 @@ def list_papers():
 @elibrary_bp.route("/papers", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 @role_required("superadmin", "school_admin", "teacher")
 def create_paper():
     """Register a past paper — file bytes go through POST /files/upload first,
@@ -97,7 +97,7 @@ def create_paper():
 @elibrary_bp.route("/resources", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 def list_resources():
     resources = (
         OERResource.query.filter_by(school_id=g.school_id, is_deleted=False)
@@ -110,7 +110,7 @@ def list_resources():
 @elibrary_bp.route("/resources", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("elibrary")
+@app_required("elibrary")
 @role_required("superadmin", "school_admin", "teacher")
 def create_resource():
     """Register an OER resource — file bytes go through POST /files/upload first,

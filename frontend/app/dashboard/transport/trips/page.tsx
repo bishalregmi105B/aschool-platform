@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
@@ -107,9 +107,9 @@ function errMessage(err: unknown): string | null {
 
 export default function TripsPage() {
   return (
-    <PluginGate slug="gps_tracking">
+    <AppGate slug="gps_tracking">
       <TripsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

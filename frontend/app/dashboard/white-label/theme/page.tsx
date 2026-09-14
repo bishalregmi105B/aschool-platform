@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { AdvancedSelect } from "@/components/ui/advanced-select";
 import { AlertCircle, Palette } from "lucide-react";
@@ -269,8 +269,8 @@ function ThemeContent() {
 
 export default function ThemePage() {
   return (
-    <PluginGate slug="white_label">
+    <AppGate slug="white_label">
       <ThemeContent />
-    </PluginGate>
+    </AppGate>
   );
 }

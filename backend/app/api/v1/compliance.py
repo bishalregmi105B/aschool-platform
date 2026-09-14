@@ -5,7 +5,7 @@ from flask import Blueprint, g, redirect, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.models.compliance import ComplianceReport, EMISExport, AuditLog
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import (
     _backend as _storage_backend,
@@ -25,7 +25,7 @@ compliance_bp = Blueprint("compliance", __name__, url_prefix="/compliance")
 @compliance_bp.route("/reports", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 def list_reports():
     query = ComplianceReport.query.filter_by(school_id=g.school_id, is_deleted=False)
     report_type = request.args.get("type")
@@ -38,7 +38,7 @@ def list_reports():
 @compliance_bp.route("/reports", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 @role_required("superadmin", "school_admin")
 def create_report():
     data = request.get_json(silent=True) or {}
@@ -54,7 +54,7 @@ def create_report():
 @compliance_bp.route("/reports/<uuid:report_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 @role_required("superadmin", "school_admin")
 def update_report(report_id):
     report = ComplianceReport.query.filter_by(
@@ -79,7 +79,7 @@ def update_report(report_id):
 @compliance_bp.route("/reports/generate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 @role_required("superadmin", "school_admin")
 def generate_report():
     """Auto-generate a compliance report from school data."""
@@ -124,7 +124,7 @@ def generate_report():
 @compliance_bp.route("/emis", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 def list_emis_exports():
     query = EMISExport.query.filter_by(school_id=g.school_id, is_deleted=False)
     items, meta = paginate(query.order_by(EMISExport.generated_at.desc()))
@@ -134,7 +134,7 @@ def list_emis_exports():
 @compliance_bp.route("/emis/generate", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 @role_required("superadmin", "school_admin")
 def generate_emis():
     """Generate EMIS-compatible export data."""
@@ -156,7 +156,7 @@ def generate_emis():
 @compliance_bp.route("/emis/<uuid:export_id>/download", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 def download_emis_export(export_id):
     """Download the persisted EMIS CSV file for an export.
 
@@ -211,7 +211,7 @@ def _storage_key_from_url(url: str):
 @compliance_bp.route("/audit-logs", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("compliance")
+@app_required("compliance")
 @role_required("superadmin", "school_admin")
 def list_audit_logs():
     query = AuditLog.query.filter_by(school_id=g.school_id, is_deleted=False)

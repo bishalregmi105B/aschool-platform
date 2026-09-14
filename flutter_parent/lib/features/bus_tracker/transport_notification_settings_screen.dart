@@ -54,7 +54,7 @@ class _TransportNotificationSettingsScreenState
     final prefsAsync = ref.watch(transportPrefsProvider);
     final dashboardAsync = ref.watch(parentDashboardProvider);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'gps_tracking',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Transport Alerts'),

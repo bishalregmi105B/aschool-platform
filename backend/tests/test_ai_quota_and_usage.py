@@ -20,17 +20,17 @@ from app.models.attendance import Attendance
 from app.models.exam import Exam, Marks
 from app.models.fee import FeeCollection
 from app.models.incident import Incident
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 
 
 def _ensure_plugin_rows(db, slugs):
     """The truncated test DB has no plugin catalog — create minimal rows first."""
-    existing = {p.slug for p in Plugin.query.filter(Plugin.slug.in_(slugs)).all()}
+    existing = {p.slug for p in App.query.filter(App.slug.in_(slugs)).all()}
     for slug in slugs:
         if slug not in existing:
             db.session.add(
-                Plugin(
+                App(
                     slug=slug, name=slug.replace("_", " ").title(), category="premium",
                     price_monthly=999, price_yearly=9999, is_free=False,
                     emoji="🤖", icon="Sparkles", description="test", is_published=True,
@@ -59,7 +59,7 @@ def _fake_provider(calls, text_payload="{}"):
 def _setup_ai_school(db, school, admin_user, plugins=("ai_tools",)):
     _ensure_plugin_rows(db, plugins)
     for slug in plugins:
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True, is_trial=False))
+        db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True, is_trial=False))
     db.session.commit()
     token = create_access_token(
         identity=str(admin_user.id),

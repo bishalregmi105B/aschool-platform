@@ -12,7 +12,7 @@ import pytest
 from app.models.academic import Class, Section, Subject
 from app.models.attendance import Attendance, SubjectAttendance
 from app.models.exam import Exam, GradeScale, MarkComponent, Marks, OnlineExam, OnlineExamAttempt
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from tests.conftest import get_auth_headers
 
@@ -21,9 +21,9 @@ from tests.conftest import get_auth_headers
 def exam_env(client, db, school, admin_user, teacher_user):
     """exams + attendance plugins, one class/section/subject, one student."""
     for slug in ("exams", "attendance"):
-        db.session.add(Plugin(slug=slug, name=slug.title(), category="core",
+        db.session.add(App(slug=slug, name=slug.title(), category="core",
                               is_free=True, is_published=True))
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True))
+        db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True))
     klass = Class(school_id=school.id, name="Class 10")
     db.session.add(klass)
     db.session.flush()

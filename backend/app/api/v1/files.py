@@ -26,7 +26,7 @@ from flask import Blueprint, g, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.models.file import FileFolder, ManagedFile
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import VirusDetectedError, delete_file, generate_presigned_url, safe_storage_key, upload_file
 from app.utils.pagination import paginate
@@ -90,7 +90,7 @@ def _detect_file_type(mime: str) -> str:
 @files_bp.route("/folders", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def list_folders():
     """List folders for the school, optionally filtered by parent_id."""
     parent_id = request.args.get("parent_id") or None
@@ -106,7 +106,7 @@ def list_folders():
 @files_bp.route("/folders", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def create_folder():
     """Create a new folder."""
     data = request.get_json(silent=True) or {}
@@ -128,7 +128,7 @@ def create_folder():
 @files_bp.route("/folders/<uuid:folder_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 @role_required("school_admin", "teacher")
 def rename_folder(folder_id):
     """Rename a folder."""
@@ -149,7 +149,7 @@ def rename_folder(folder_id):
 @files_bp.route("/folders/<uuid:folder_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 @role_required("school_admin", "teacher")
 def delete_folder(folder_id):
     """Soft-delete a folder. Files inside are unlinked (folder_id set to NULL)."""
@@ -168,7 +168,7 @@ def delete_folder(folder_id):
 @files_bp.route("/upload", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def upload():
     """Upload one or more files to the school's storage."""
     if "file" not in request.files and "files" not in request.files:
@@ -258,7 +258,7 @@ def upload():
 @files_bp.route("/", methods=["GET"], strict_slashes=False)
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def list_files():
     """List files for the school with optional filters.
 
@@ -310,7 +310,7 @@ def list_files():
 @files_bp.route("/<uuid:file_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def get_file(file_id):
     f = ManagedFile.query.filter_by(id=file_id, school_id=g.school_id, is_deleted=False).first()
     if not f:
@@ -323,7 +323,7 @@ def get_file(file_id):
 @files_bp.route("/<uuid:file_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def update_file(file_id):
     f = ManagedFile.query.filter_by(id=file_id, school_id=g.school_id, is_deleted=False).first()
     if not f:
@@ -342,7 +342,7 @@ def update_file(file_id):
 @files_bp.route("/<uuid:file_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 @role_required("school_admin", "teacher", "accountant")
 def delete_file_record(file_id):
     f = ManagedFile.query.filter_by(id=file_id, school_id=g.school_id, is_deleted=False).first()
@@ -369,7 +369,7 @@ def delete_file_record(file_id):
 @files_bp.route("/<uuid:file_id>/presigned", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def get_presigned(file_id):
     f = ManagedFile.query.filter_by(id=file_id, school_id=g.school_id, is_deleted=False).first()
     if not f:
@@ -392,7 +392,7 @@ def get_presigned(file_id):
 @files_bp.route("/usage", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def storage_usage():
     """Return storage usage summary broken down by file type."""
     from sqlalchemy import func
@@ -503,7 +503,7 @@ def _search_pexels(q: str, page: int, per_page: int):
 @files_bp.route("/stock-search", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def stock_search():
     """Proxy search to Unsplash or Pexels.
     ?q=query&source=unsplash|pexels&page=1&per_page=20
@@ -529,7 +529,7 @@ def stock_search():
 @files_bp.route("/stock-import", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("file_management")
+@app_required("file_management")
 def stock_import():
     """Download a stock image URL and save it to the school's file library."""
     from urllib.parse import urlparse

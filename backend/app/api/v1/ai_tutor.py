@@ -6,7 +6,7 @@ students + staff, per-turn metering through the hub.
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.services.ai.tutor_engine import TutorEngine
 from app.services.ai.workbench import ToolPipelineError
 from app.utils.decorators import role_required, school_required
@@ -18,7 +18,7 @@ tutor_bp = Blueprint("tutor", __name__, url_prefix="/tutor")
 @tutor_bp.route("/plans", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def create_plan():
     """Create a tutor session plan. Students plan for themselves; staff plan
     for any student in their school."""
@@ -90,7 +90,7 @@ def create_plan():
 @tutor_bp.route("/sessions", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def start_session():
     from app.models.ai_workbench import TutorSessionPlan
     from extensions import db
@@ -111,7 +111,7 @@ def start_session():
 @tutor_bp.route("/sessions/<uuid:session_id>/turn", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def tutor_turn(session_id):
     from app.models.ai_workbench import TutorSession
 
@@ -137,7 +137,7 @@ def tutor_turn(session_id):
 @tutor_bp.route("/sessions/<uuid:session_id>/close", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def close_session(session_id):
     from app.models.ai_workbench import TutorSession
 
@@ -154,7 +154,7 @@ def close_session(session_id):
 @tutor_bp.route("/sessions/<uuid:session_id>/messages", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 def session_messages(session_id):
     """Transcript — visible to the student and school staff (AW-07
     guardian-visible transcripts read this via the parent portal)."""
@@ -187,7 +187,7 @@ def session_messages(session_id):
 @tutor_bp.route("/students/<uuid:student_id>/monitor", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("ai_suite")
+@app_required("ai_suite")
 @role_required("superadmin", "school_admin", "teacher")
 def tutor_monitor(student_id):
     """Teacher aggregate monitor (poll, v1): session counts + recent topics."""

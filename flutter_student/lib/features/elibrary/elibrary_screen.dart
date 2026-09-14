@@ -55,7 +55,7 @@ class _ELibraryScreenState extends ConsumerState<ELibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'elibrary',
       child: Column(
         children: [

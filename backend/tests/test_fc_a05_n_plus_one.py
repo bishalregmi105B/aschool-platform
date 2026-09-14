@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import event
 
 from app.models.library import Book, BookIssue
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.student import Student
 from app.models.user import User
 from tests.conftest import get_auth_headers
@@ -39,14 +39,14 @@ def _make_student(db, school, first, last, phone):
 
 
 def _install(db, school, slug):
-    if not Plugin.query.filter_by(slug=slug).first():
-        db.session.add(Plugin(
+    if not App.query.filter_by(slug=slug).first():
+        db.session.add(App(
             slug=slug, name=slug.replace("_", " ").title(),
             category="starter", is_free=True, is_published=True,
         ))
         db.session.commit()
-    if not SchoolPlugin.query.filter_by(school_id=school.id, plugin_slug=slug).first():
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True))
+    if not SchoolApp.query.filter_by(school_id=school.id, app_slug=slug).first():
+        db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True))
         db.session.commit()
 
 

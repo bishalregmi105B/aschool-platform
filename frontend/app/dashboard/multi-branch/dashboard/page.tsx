@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Users, BookOpen, DollarSign } from "lucide-react";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/components/aos/kit/page-kit";
 
 export default function ChainDashboardPage() {
-  return <PluginGate slug="multi_branch"><ChainDashboardContent /></PluginGate>;
+  return <AppGate slug="multi_branch"><ChainDashboardContent /></AppGate>;
 }
 
 function ChainDashboardContent() {

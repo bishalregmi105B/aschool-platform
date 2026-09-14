@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { sanitizeHtml } from "@/lib/sanitize";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,9 +22,9 @@ export default function OnlineExamQuestionsPage() {
   return (
     // The generator endpoint (/design-studio/ai/question-paper) is gated by the
     // e-library plugin on the backend (canonical slug elibrary).
-    <PluginGate slug="elibrary">
+    <AppGate slug="elibrary">
       <QuestionsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

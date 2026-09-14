@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { toast } from "sonner";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -67,9 +67,9 @@ interface Lesson {
 
 export default function LmsPage() {
   return (
-    <PluginGate slug="lms">
+    <AppGate slug="lms">
       <LmsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

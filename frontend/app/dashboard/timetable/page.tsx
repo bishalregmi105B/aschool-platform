@@ -22,7 +22,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SkeletonTable } from "@/components/ui/skeleton";
@@ -76,9 +76,9 @@ const DAYS_NE = ["आइतबार", "सोमबार", "मङ्लबा
 
 export default function TimetablePage() {
   return (
-    <PluginGate slug="timetable">
+    <AppGate slug="timetable">
       <TimetableContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

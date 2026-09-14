@@ -2,7 +2,7 @@
 import pytest
 
 from app.models.fee import FeeCollection
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.school_chain import SchoolChain, SchoolChainMember
 from app.models.student import Student
@@ -12,9 +12,9 @@ from tests.conftest import get_auth_headers
 
 
 def _install_plugin(school_id):
-    if not Plugin.query.filter_by(slug="multi_branch").first():
+    if not App.query.filter_by(slug="multi_branch").first():
         db.session.add(
-            Plugin(
+            App(
                 slug="multi_branch",
                 name="Multi-Branch Chain",
                 category="premium",
@@ -26,8 +26,8 @@ def _install_plugin(school_id):
         )
         db.session.flush()
     db.session.add(
-        SchoolPlugin(
-            school_id=school_id, plugin_slug="multi_branch", active=True, is_trial=False
+        SchoolApp(
+            school_id=school_id, app_slug="multi_branch", active=True, is_trial=False
         )
     )
     db.session.commit()

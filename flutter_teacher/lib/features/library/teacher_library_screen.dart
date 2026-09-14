@@ -79,7 +79,7 @@ class _TeacherLibraryScreenState extends ConsumerState<TeacherLibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'library_management',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Library'),

@@ -39,7 +39,7 @@ import { ICON_MAP } from "@/lib/icon-map";
 import { SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
 
 /** Module dashboard quick links — mirrors the teachers plugin manifest
- * (backend/app/plugins/manifests/teachers.yaml ui.nav.subitems). */
+ * (backend/app/apps/manifests/teachers.yaml ui.nav.subitems). */
 const QUICK_LINKS: Array<{ label: string; href: string; icon: string }> = [
   { label: "Bulk Upload", href: "/dashboard/teachers/bulk-upload", icon: "Upload" },
 ];

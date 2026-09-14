@@ -3,8 +3,8 @@
 WP-style plugin model (2026-08-30): the plugins DIRECTORY is the catalog
 source of truth. This script NEVER seeds plugin catalog rows — the DB
 `plugins` table is only a mirror of the scanned manifests, kept in sync by
-PluginLoader.refresh_registry() (also runs on every app startup). The demo
-school's SchoolPlugin installs are created through install_plugin() against
+AppLoader.refresh_registry() (also runs on every app startup). The demo
+school's SchoolApp installs are created through install_app() against
 those registry-backed rows; only install STATE lives in the DB.
 """
 import uuid
@@ -13,8 +13,8 @@ from app import create_app
 from extensions import db
 from app.models.school import School
 from app.models.user import User
-from app.apps.billing import install_plugin
-from app.apps.loader import PluginLoader
+from app.apps.billing import install_app
+from app.apps.loader import AppLoader
 
 CORE_PLUGINS = ["attendance", "notices", "academics", "basic_reports", "basic_website"]
 
@@ -27,7 +27,7 @@ def seed():
         # scan — NOT seeding; identical to what runs at app startup). This
         # guarantees the mirror rows exist before the demo installs below on
         # a fresh database, and self-heals a stale DB idempotently.
-        result = PluginLoader.refresh_registry()
+        result = AppLoader.refresh_registry()
         print(
             f"✓ Registry synced from plugins directory: "
             f"{result['scanned']} scanned, {result['created']} created, "
@@ -56,12 +56,12 @@ def seed():
             print("✓ Created demo school (slug=demo)")
 
         # 3. Demo install STATE only — every slug resolves against the
-        # registry-backed mirror rows via install_plugin (never a catalog
+        # registry-backed mirror rows via install_app (never a catalog
         # insert). Runs even when the school already existed so a re-seed
         # tops up any missing core install.
         installed = 0
         for slug in CORE_PLUGINS:
-            result = install_plugin(str(demo.id), slug)
+            result = install_app(str(demo.id), slug)
             if "error" not in result:
                 installed += 1
         print(f"✓ Demo school install state: {installed} core plugins ensured")

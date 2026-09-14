@@ -5,7 +5,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.inventory import Asset, AssetAuditLog, ProcurementRequest
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -20,7 +20,7 @@ inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 @inventory_bp.route("/assets", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def list_assets():
     query = Asset.query.filter_by(school_id=g.school_id, is_deleted=False)
     category = request.args.get("category")
@@ -36,7 +36,7 @@ def list_assets():
 @inventory_bp.route("/assets", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 @role_required("superadmin", "school_admin", "staff")
 def create_asset():
     data = request.get_json(silent=True) or {}
@@ -87,7 +87,7 @@ def create_asset():
 @inventory_bp.route("/assets/<uuid:asset_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def get_asset(asset_id):
     asset = Asset.query.filter_by(id=asset_id, school_id=g.school_id, is_deleted=False).first()
     if not asset:
@@ -98,7 +98,7 @@ def get_asset(asset_id):
 @inventory_bp.route("/assets/<uuid:asset_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 @role_required("superadmin", "school_admin", "staff")
 def update_asset(asset_id):
     asset = Asset.query.filter_by(id=asset_id, school_id=g.school_id, is_deleted=False).first()
@@ -161,7 +161,7 @@ def update_asset(asset_id):
 @inventory_bp.route("/assets/<uuid:asset_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 @role_required("superadmin", "school_admin")
 def delete_asset(asset_id):
     asset = Asset.query.filter_by(id=asset_id, school_id=g.school_id, is_deleted=False).first()
@@ -174,7 +174,7 @@ def delete_asset(asset_id):
 @inventory_bp.route("/assets/scan/<string:qr_code>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def scan_asset(qr_code):
     """Look up asset by QR code."""
     asset = Asset.query.filter_by(
@@ -191,7 +191,7 @@ def scan_asset(qr_code):
 @inventory_bp.route("/procurement", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def list_procurement():
     query = ProcurementRequest.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -204,7 +204,7 @@ def list_procurement():
 @inventory_bp.route("/procurement", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def create_procurement():
     data = request.get_json(silent=True) or {}
     claims = get_jwt()
@@ -233,7 +233,7 @@ def create_procurement():
 @inventory_bp.route("/procurement/<uuid:pr_id>/approve", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 @role_required("superadmin", "school_admin")
 def approve_procurement(pr_id):
     pr = ProcurementRequest.query.filter_by(
@@ -264,7 +264,7 @@ def approve_procurement(pr_id):
 @inventory_bp.route("/assets/<uuid:asset_id>/audit", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 def list_audit_log(asset_id):
     query = AssetAuditLog.query.filter_by(
         asset_id=asset_id, school_id=g.school_id, is_deleted=False
@@ -276,7 +276,7 @@ def list_audit_log(asset_id):
 @inventory_bp.route("/assets/<uuid:asset_id>/audit", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("inventory")
+@app_required("inventory")
 @role_required("superadmin", "school_admin", "staff")
 def create_audit_entry(asset_id):
     asset = Asset.query.filter_by(

@@ -6,7 +6,7 @@ import { ImageIcon, Plus, Upload } from "lucide-react";
 import Link from "next/link";
 
 import { api, ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   AOSPage,
@@ -33,9 +33,9 @@ export default function GalleryPage() {
     // E125: every /files/* endpoint is gated by the file_management plugin
     // (files.py @plugin_required("file_management")) — gating this page by
     // `notices` let schools with notices-but-no-file-management hit a raw 403.
-    <PluginGate slug="file_management">
+    <AppGate slug="file_management">
       <GalleryContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

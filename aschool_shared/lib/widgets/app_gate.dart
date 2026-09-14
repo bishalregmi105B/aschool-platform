@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/plugin_provider.dart';
+import '../services/app_provider.dart';
 
-/// PluginGate — Conditionally renders child widget based on plugin installation status.
+/// AppGate — Conditionally renders child widget based on plugin installation status.
 ///
 /// Usage:
 /// ```dart
-/// PluginGate(
+/// AppGate(
 ///   pluginSlug: 'lms',
 ///   child: LMSDashboard(),
 ///   fallback: PluginPromoCard(slug: 'lms'),
 /// )
 /// ```
-class PluginGate extends ConsumerWidget {
+class AppGate extends ConsumerWidget {
   final String pluginSlug;
   final Widget child;
   final Widget? fallback;
 
-  const PluginGate({
+  const AppGate({
     super.key,
     required this.pluginSlug,
     required this.child,
@@ -26,7 +26,7 @@ class PluginGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
 
     if (plugins.isInstalled(pluginSlug)) {
       return child;

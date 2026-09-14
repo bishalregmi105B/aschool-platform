@@ -11,7 +11,7 @@ import {
   type ImportPreview,
   type ImportLog,
 } from "@/lib/services/iemis.service";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,9 +74,9 @@ const FORMAT_LABELS: Record<string, { en: string; ne: string }> = {
 
 export default function IemisImportPage() {
   return (
-    <PluginGate slug="iemis_importer">
+    <AppGate slug="iemis_importer">
       <IemisImportContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

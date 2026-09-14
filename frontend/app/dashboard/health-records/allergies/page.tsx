@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 import { AlertTriangle, Plus } from "lucide-react";
 
 export default function AllergiesPage() {
-  return <PluginGate slug="health_records"><AllergiesContent /></PluginGate>;
+  return <AppGate slug="health_records"><AllergiesContent /></AppGate>;
 }
 
 function AllergiesContent() {

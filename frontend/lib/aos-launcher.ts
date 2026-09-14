@@ -1,5 +1,5 @@
 import { normalizeAOSModuleId, type AOSApp } from "@/lib/aos-app-adapter";
-import type { PluginSidebarItem } from "@/lib/plugins";
+import type { AppSidebarItem } from "@/lib/apps";
 
 /**
  * Desktop folder model — user-organizable app groups (macOS-style) persisted
@@ -31,7 +31,7 @@ export function slugifyFolderName(name: string): string {
  * manifest. First occurrence wins (subitems can normalize to their parent).
  */
 function buildSectionByModuleId(
-  sidebarItems: PluginSidebarItem[]
+  sidebarItems: AppSidebarItem[]
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const item of sidebarItems) {
@@ -54,7 +54,7 @@ function buildSectionByModuleId(
  */
 export function getDefaultFolders(
   apps: AOSApp[],
-  sidebarItems: PluginSidebarItem[] = []
+  sidebarItems: AppSidebarItem[] = []
 ): AOSDesktopFolder[] {
   const sectionByModuleId = buildSectionByModuleId(sidebarItems);
 

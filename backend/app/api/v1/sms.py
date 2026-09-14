@@ -3,7 +3,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.notification import SMSLog, NotificationTemplate
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -15,7 +15,7 @@ sms_bp = Blueprint("sms", __name__, url_prefix="/sms")
 @sms_bp.route("/send", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def send_sms():
     """Queue an SMS for sending via Sparrow SMS.
@@ -86,7 +86,7 @@ def _valid_phone(phone: str) -> bool:
 @sms_bp.route("/history", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 def sms_history():
     query = SMSLog.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -102,7 +102,7 @@ def sms_history():
 @sms_bp.route("/templates", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 def list_templates():
     query = NotificationTemplate.query.filter_by(
         school_id=g.school_id, is_deleted=False
@@ -114,7 +114,7 @@ def list_templates():
 @sms_bp.route("/templates", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 @role_required("superadmin", "school_admin")
 def create_template():
     data = request.get_json(silent=True) or {}
@@ -149,7 +149,7 @@ def create_template():
 @sms_bp.route("/stats", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("sms_notifications")
+@app_required("sms_notifications")
 def sms_stats():
     from datetime import date as _date
 
@@ -178,10 +178,10 @@ def sms_stats():
     # every card showed "—". Remaining credits = purchased top-ups (plugin
     # config key "credits_topup") minus credits spent on sent messages; a
     # live Sparrow gateway balance wins when the integration is configured.
-    from app.models.plugin import SchoolPlugin
+    from app.models.app import SchoolApp
 
-    sp = SchoolPlugin.query.filter_by(
-        school_id=g.school_id, plugin_slug="sms_notifications"
+    sp = SchoolApp.query.filter_by(
+        school_id=g.school_id, app_slug="sms_notifications"
     ).first()
     topup = float((sp.config or {}).get("credits_topup") or 0) if sp else 0.0
     credits_available = max(0.0, topup - float(credits_used or 0))

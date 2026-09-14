@@ -20,7 +20,7 @@ from app.models.attendance import Attendance
 from app.models.exam import Exam, Marks
 from app.models.fee import FeeCollection
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.report_pdf import build_report_html, fmt_npr, render_report_pdf
 from app.utils.response import error_response, success_response
@@ -259,7 +259,7 @@ def _report_export_response(pdf_bytes: bytes, filename: str, extra: dict | None 
 @reports_bp.route("/attendance/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "teacher")
 def attendance_report():
     """Attendance summary report for a date range."""
@@ -377,7 +377,7 @@ def _attendance_per_student(school_id, start_date, end_date, class_id=None):
 @reports_bp.route("/fees/collection", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "accountant")
 def fee_collection_report():
     """Fee collection report for a date range."""
@@ -411,7 +411,7 @@ def fee_collection_report():
 @reports_bp.route("/exams/results", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "teacher")
 def exam_results_report():
     """Exam results summary report."""
@@ -434,7 +434,7 @@ def exam_results_report():
 @reports_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin")
 def dashboard_report():
     """School dashboard summary stats."""
@@ -489,7 +489,7 @@ def _generate_pdf(html: str):
 @reports_bp.route("/attendance/summary/pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "teacher")
 def attendance_report_pdf():
     """PDF export of the attendance summary report."""
@@ -581,7 +581,7 @@ def attendance_report_pdf():
 @reports_bp.route("/fees/collection/pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "accountant")
 def fee_collection_report_pdf():
     """PDF export of the fee collection summary report."""
@@ -664,7 +664,7 @@ def fee_collection_report_pdf():
 @reports_bp.route("/exams/results/pdf", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("basic_reports")
+@app_required("basic_reports")
 @role_required("school_admin", "teacher")
 def exam_results_report_pdf():
     """PDF export of the exam results summary report."""

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,9 +80,9 @@ const YEARS = Array.from({ length: 16 }, (_, i) => 2075 + i);
 
 export default function CarryForwardPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <CarryForwardContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

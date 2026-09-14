@@ -26,7 +26,7 @@ import {
 import { SchoolRole, SCHOOL_PROFILES } from "../RoleSwitcherModal";
 import { AOSSettingsIcon } from "../AOSIcons";
 import { useAuth } from "@/lib/auth-context";
-import { useInstalledPlugins } from "@/lib/plugins";
+import { useInstalledApps } from "@/lib/apps";
 import { getAOSAppForModule } from "@/lib/aos-app-adapter";
 import {
   getStorageUsage,
@@ -181,7 +181,7 @@ export default function SettingsApp({
   onTogglePinApp,
 }: SettingsAppProps) {
   const { user } = useAuth();
-  const { sidebarItems } = useInstalledPlugins();
+  const { sidebarItems } = useInstalledApps();
   const [activeCategory, setActiveCategory] = useState("personalization");
   const [mobileActiveSection, setMobileActiveSection] = useState<string | null>(null);
   const [platformSection, setPlatformSection] = useState<PlatformSectionId>("notifications");

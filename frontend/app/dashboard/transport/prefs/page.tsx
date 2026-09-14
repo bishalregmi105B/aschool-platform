@@ -13,7 +13,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Bell, MapPin, Search } from "lucide-react";
@@ -82,7 +82,7 @@ function errMessage(err: unknown): string | null {
 }
 
 export default function TransportPrefsPage() {
-  return <PluginGate slug="gps_tracking"><PrefsContent /></PluginGate>;
+  return <AppGate slug="gps_tracking"><PrefsContent /></AppGate>;
 }
 
 function PrefsContent() {

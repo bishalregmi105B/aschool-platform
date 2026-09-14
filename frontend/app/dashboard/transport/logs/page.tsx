@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
 import { Activity, Bus } from "lucide-react";
 
 export default function GpsLogsPage() {
-  return <PluginGate slug="gps_tracking"><GpsLogsContent /></PluginGate>;
+  return <AppGate slug="gps_tracking"><GpsLogsContent /></AppGate>;
 }
 
 function GpsLogsContent() {

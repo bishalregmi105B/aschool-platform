@@ -13,7 +13,7 @@ STATICALLY_MOUNTED_MODULES = {
     "app.api.v1.users",
     "app.api.v1.students",
     "app.api.v1.staff",
-    "app.api.v1.plugins",
+    "app.api.v1.apps",
     "app.api.v1.academics",
     "app.api.v1.analytics",
     "app.api.v1.mobile",
@@ -57,7 +57,7 @@ from app.api.v1.super_admin import super_admin_bp
 from app.api.v1.users import users_bp
 from app.api.v1.students import students_bp
 from app.api.v1.staff import staff_bp
-from app.api.v1.plugins import plugins_bp
+from app.api.v1.apps import apps_bp
 from app.api.v1.academics import academics_bp
 from app.api.v1.analytics import analytics_bp
 from app.api.v1.mobile import mobile_bp
@@ -73,7 +73,7 @@ api_v1_bp.register_blueprint(super_admin_bp)
 api_v1_bp.register_blueprint(users_bp)
 api_v1_bp.register_blueprint(students_bp)
 api_v1_bp.register_blueprint(staff_bp)
-api_v1_bp.register_blueprint(plugins_bp)
+api_v1_bp.register_blueprint(apps_bp)
 api_v1_bp.register_blueprint(academics_bp)
 api_v1_bp.register_blueprint(analytics_bp)
 api_v1_bp.register_blueprint(mobile_bp)
@@ -111,7 +111,7 @@ api_v1_bp.register_blueprint(elibrary_bp)
 api_v1_bp.register_blueprint(benchmarking_bp)
 api_v1_bp.register_blueprint(design_studio_bp)
 
-# Additional plugin API routes are registered dynamically by PluginLoader.discover_and_register()
+# Additional plugin API routes are registered dynamically by AppLoader.discover_and_register()
 # See: app/plugins/loader.py
 # Plugin blueprints: attendance_bp, notices_bp, fees_bp, exams_bp, reports_bp, website_bp, etc.
 
@@ -119,7 +119,7 @@ api_v1_bp.register_blueprint(design_studio_bp)
 # ai_tools/ai_tutor/ai_insights MODULES but their routes never moved — this
 # blueprint hosts /ai-tools/* (lesson-plan, flashcards, question-paper v2,
 # remarks, insights, question-bank …) and must stay mounted; access gating is
-# @plugin_required("ai_suite") per route (ai_suite owns the gate, not this file).
+# @app_required("ai_suite") per route (ai_suite owns the gate, not this file).
 from app.api.v1.ai_tools import ai_tools_bp
 api_v1_bp.register_blueprint(ai_tools_bp)
 
@@ -148,43 +148,43 @@ from app.api.v1.hostel import hostel_bp
 api_v1_bp.register_blueprint(hostel_bp)
 
 # White-Label Branding — custom domain + branding overrides (premium plugin;
-# routes self-gate via @plugin_required("white_label"))
+# routes self-gate via @app_required("white_label"))
 from app.api.v1.white_label import white_label_bp
 api_v1_bp.register_blueprint(white_label_bp)
 
 # Multi-Branch Chain — org/branch registry + cross-branch analytics (premium
-# plugin; routes self-gate via @plugin_required("multi_branch"))
+# plugin; routes self-gate via @app_required("multi_branch"))
 from app.api.v1.multi_branch import multi_branch_bp
 api_v1_bp.register_blueprint(multi_branch_bp)
 
 # Biometric Integration — ZKTeco-style fingerprint device management, keyed
 # punch ingestion, health monitoring (premium plugin; routes self-gate via
-# @plugin_required("biometric"); device endpoints auth via X-Device-Key)
+# @app_required("biometric"); device endpoints auth via X-Device-Key)
 from app.api.v1.biometric import biometric_bp
 api_v1_bp.register_blueprint(biometric_bp)
 
 # AI Adaptive Learning — per-student learning paths + mastery records
 # (part of the ai_suite bundle; routes self-gate via
-# @plugin_required("ai_suite"); LLM calls go through AITokenHub with a
+# @app_required("ai_suite"); LLM calls go through AITokenHub with a
 # labeled deterministic fallback)
 from app.api.v1.adaptive_learning import adaptive_learning_bp
 api_v1_bp.register_blueprint(adaptive_learning_bp)
 
 # Social Ads / Social Hub were WITHDRAWN and deleted (dedup audit 2026-09-04:
 # unpublished, zero UI, declared integrations never existed). Their tables
-# are dropped by migration e8b1c4d6a9f2; SchoolPlugin rows are unpublished
+# are dropped by migration e8b1c4d6a9f2; SchoolApp rows are unpublished
 # by the registry refresh because the manifests are gone.
 
 # Disaster Management — drills + participation + overview + seismic alerts
 # (premium plugin; premium tier of `emergency`. Routes mount under
 # /emergency to match the frontend calls and self-gate via
-# @plugin_required("disaster_management"); emergency models reused)
+# @app_required("disaster_management"); emergency models reused)
 from app.api.v1.disaster_management import disaster_management_bp
 api_v1_bp.register_blueprint(disaster_management_bp)
 
 # Incident Management — assignment/workflow/escalation/analytics on top of
 # the base incidents plugin (growth plugin; routes self-gate via
-# @plugin_required("incident_management"); no base /incidents route duplicated)
+# @app_required("incident_management"); no base /incidents route duplicated)
 from app.api.v1.incident_management import incident_management_bp
 api_v1_bp.register_blueprint(incident_management_bp)
 
@@ -207,7 +207,7 @@ api_v1_bp.register_blueprint(extensions_bp)
 
 # AI Teacher plugin (Phase C) — admin-entered teaching content: sections →
 # versions → bilingual blocks, publish workflow, school-override chain.
-# Routes self-gate @plugin_required("ai_teacher"); the AI runtime reads
+# Routes self-gate @app_required("ai_teacher"); the AI runtime reads
 # published snapshots, it never writes here.
 from app.api.v1.teaching_content import teaching_content_bp
 api_v1_bp.register_blueprint(teaching_content_bp)

@@ -62,7 +62,7 @@ class _DesignStudioScreenState extends ConsumerState<DesignStudioScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'design_studio',
       child: Scaffold(
         appBar: AppBar(

@@ -12,7 +12,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ interface PathRow {
 }
 
 export default function LearningPathsPage() {
-  return <PluginGate slug="ai_suite"><LearningPathsContent /></PluginGate>;
+  return <AppGate slug="ai_suite"><LearningPathsContent /></AppGate>;
 }
 
 function Header() {

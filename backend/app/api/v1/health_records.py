@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 
 from app.models.health_records import HealthProfile, MedicalVisit, Immunization
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -18,7 +18,7 @@ health_records_bp = Blueprint("health_records", __name__, url_prefix="/health-re
 @health_records_bp.route("/profiles", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 def list_health_profiles():
     """List existing health profiles for the school (the Allergies & Conditions
     registry page lists students from here, not from medical visits)."""
@@ -38,7 +38,7 @@ def list_health_profiles():
 @health_records_bp.route("/students/<student_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 def get_health_profile(student_id):
     profile = HealthProfile.query.filter_by(student_id=student_id, school_id=g.school_id).first()
     if not profile:
@@ -49,7 +49,7 @@ def get_health_profile(student_id):
 @health_records_bp.route("/students/<student_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 @role_required("superadmin", "school_admin", "teacher")
 def update_health_profile(student_id):
     data = request.get_json(silent=True) or {}
@@ -76,7 +76,7 @@ def update_health_profile(student_id):
 @health_records_bp.route("/visits", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 def list_medical_visits():
     query = MedicalVisit.query.filter_by(school_id=g.school_id)
     student_id = request.args.get("student_id")
@@ -90,7 +90,7 @@ def list_medical_visits():
 @health_records_bp.route("/visits", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 @role_required("superadmin", "school_admin", "teacher")
 def create_medical_visit():
     data = request.get_json(silent=True) or {}
@@ -113,7 +113,7 @@ def create_medical_visit():
 @health_records_bp.route("/immunizations", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 def list_immunizations():
     student_id = request.args.get("student_id")
     query = Immunization.query.filter_by(school_id=g.school_id)
@@ -126,7 +126,7 @@ def list_immunizations():
 @health_records_bp.route("/immunizations", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("health_records")
+@app_required("health_records")
 @role_required("superadmin", "school_admin", "teacher")
 def record_immunization():
     data = request.get_json(silent=True) or {}

@@ -26,7 +26,7 @@ import { Loader2, Sparkles, Copy, Bookmark, ChevronRight, Download, Clock } from
 import Link from "next/link";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { AiResultView } from "@/components/ai/ai-result-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,9 +115,9 @@ function defaultToText(data: unknown): string {
 
 export function AiToolPage(props: AiToolPageProps) {
   return (
-    <PluginGate slug="ai_suite">
+    <AppGate slug="ai_suite">
       <AiToolPageContent {...props} />
-    </PluginGate>
+    </AppGate>
   );
 }
 

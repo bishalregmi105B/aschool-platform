@@ -15,16 +15,16 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.models.disaster_management import DisasterDrill
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.emergency import EmergencyAlert, EvacuationPlan
 from tests.conftest import get_auth_headers
 
 
 def _seed_plugin(db, slug):
-    exists = Plugin.query.filter_by(slug=slug).first()
+    exists = App.query.filter_by(slug=slug).first()
     if exists:
         return exists
-    plugin = Plugin(
+    plugin = App(
         slug=slug, name=slug.replace("_", " ").title(), category="premium",
         price_monthly=999, price_yearly=9990, is_free=False, is_published=True,
     )
@@ -38,7 +38,7 @@ def admin_headers(client, db, school, admin_user):
     for slug in ("emergency", "disaster_management"):
         _seed_plugin(db, slug)
         db.session.add(
-            SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True,
+            SchoolApp(school_id=school.id, app_slug=slug, active=True,
                          is_trial=False)
         )
     db.session.commit()
@@ -190,7 +190,7 @@ def test_gate_flip_blocks_disaster_routes(client, db, admin_headers):
 
     r = client.get("/api/v1/emergency/drills", headers=admin_headers)
     assert r.status_code == 200
-    sp = SchoolPlugin.query.filter_by(plugin_slug="disaster_management").first()
+    sp = SchoolApp.query.filter_by(app_slug="disaster_management").first()
     sp.active = False
     db.session.commit()
     cache.delete(f"school:{sp.school_id}:plugins")

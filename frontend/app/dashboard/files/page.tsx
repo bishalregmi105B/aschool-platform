@@ -65,7 +65,7 @@ import {
   type StockPhoto,
   uploadFilesToFolder,
 } from "@/lib/services/files.service";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -116,9 +116,9 @@ function fileIcon(file: ManagedFile, large = false) {
 
 export default function FilesPage() {
   return (
-    <PluginGate slug="file_management">
+    <AppGate slug="file_management">
       <FilesContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

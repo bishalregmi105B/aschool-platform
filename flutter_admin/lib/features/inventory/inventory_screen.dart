@@ -175,7 +175,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         )
         .toList();
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'inventory',
       child: Scaffold(
         appBar: AppBar(

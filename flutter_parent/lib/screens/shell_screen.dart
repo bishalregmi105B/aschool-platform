@@ -13,7 +13,7 @@ class ParentShellScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
-    final plugins = ref.watch(pluginProvider);
+    final plugins = ref.watch(appProvider);
     final user = ref.watch(authProvider).user;
     final drawerSections = _buildDrawerSections(plugins);
 

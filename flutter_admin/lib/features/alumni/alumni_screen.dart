@@ -59,7 +59,7 @@ class _AlumniScreenState extends ConsumerState<AlumniScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'alumni',
       child: Scaffold(
         appBar: AppBar(

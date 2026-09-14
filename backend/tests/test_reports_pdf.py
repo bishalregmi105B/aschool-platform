@@ -21,11 +21,11 @@ from tests.conftest import get_auth_headers
 @pytest.fixture
 def reports_school(db, school, admin_user):
     """School with the basic_reports plugin installed for admin_user."""
-    from app.models.plugin import Plugin, SchoolPlugin
+    from app.models.app import App, SchoolApp
 
-    plugin = Plugin.query.filter_by(slug="basic_reports").first()
+    plugin = App.query.filter_by(slug="basic_reports").first()
     if plugin is None:
-        plugin = Plugin(
+        plugin = App(
             slug="basic_reports",
             name="Basic Reports",
             category="core",
@@ -39,9 +39,9 @@ def reports_school(db, school, admin_user):
         db.session.add(plugin)
         db.session.flush()
 
-    sp = SchoolPlugin(
+    sp = SchoolApp(
         school_id=school.id,
-        plugin_slug="basic_reports",
+        app_slug="basic_reports",
         active=True,
         is_trial=False,
     )

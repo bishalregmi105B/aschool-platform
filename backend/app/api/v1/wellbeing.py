@@ -7,7 +7,7 @@ from sqlalchemy import case, func
 
 from app.models.wellbeing import MoodEntry, CounselorNote, WellbeingSurvey
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -24,7 +24,7 @@ _NEGATIVE_MOODS = ("sad", "anxious", "angry")
 @wellbeing_bp.route("/mood", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def list_mood_entries():
     query = MoodEntry.query.filter_by(school_id=g.school_id)
     student_id = request.args.get("student_id")
@@ -38,7 +38,7 @@ def list_mood_entries():
 @wellbeing_bp.route("/mood", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def submit_mood():
     """Students submit daily mood check-in."""
     data = request.get_json(silent=True) or {}
@@ -95,7 +95,7 @@ def submit_mood():
 @wellbeing_bp.route("/mood/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def mood_summary():
     """Aggregate mood summary for a class or school."""
     days = int(request.args.get("days", 7))
@@ -120,7 +120,7 @@ def mood_summary():
 @wellbeing_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 @role_required("superadmin", "school_admin", "teacher")
 def wellbeing_dashboard():
     """Per-class wellbeing rollup.
@@ -199,7 +199,7 @@ def wellbeing_dashboard():
 @wellbeing_bp.route("/alerts", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 @role_required("superadmin", "school_admin", "teacher")
 def wellbeing_alerts():
     """Students whose latest mood in the window is negative — the admin
@@ -247,7 +247,7 @@ def wellbeing_alerts():
 @wellbeing_bp.route("/counselor-notes", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 @role_required("superadmin", "school_admin", "teacher")
 def list_counselor_notes():
     query = CounselorNote.query.filter_by(school_id=g.school_id)
@@ -262,7 +262,7 @@ def list_counselor_notes():
 @wellbeing_bp.route("/counselor-notes", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 @role_required("superadmin", "school_admin", "teacher")
 def create_counselor_note():
     data = request.get_json(silent=True) or {}
@@ -288,7 +288,7 @@ def create_counselor_note():
 @wellbeing_bp.route("/surveys", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 def list_surveys():
     query = WellbeingSurvey.query.filter_by(school_id=g.school_id)
     items, meta = paginate(query)
@@ -298,7 +298,7 @@ def list_surveys():
 @wellbeing_bp.route("/surveys", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("wellbeing")
+@app_required("wellbeing")
 @role_required("superadmin", "school_admin")
 def create_survey():
     data = request.get_json(silent=True) or {}

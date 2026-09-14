@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { Send, MessageSquare, Mail, Phone, Radio } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 export default function BroadcastPage() {
-  return <PluginGate slug="communications"><BroadcastContent /></PluginGate>;
+  return <AppGate slug="communications"><BroadcastContent /></AppGate>;
 }
 
 function BroadcastContent() {

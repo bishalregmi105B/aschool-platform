@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy import func
 
 from extensions import db
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.student import Student
 from app.models.user import User
@@ -23,8 +23,8 @@ def overview():
     active_schools = School.query.filter_by(is_deleted=False, is_active=True).count()
     total_users = User.query.filter_by(is_deleted=False).count()
     total_students = Student.query.filter_by(is_deleted=False).count()
-    total_plugins = Plugin.query.filter_by(is_deleted=False).count()
-    total_installs = SchoolPlugin.query.filter_by(is_deleted=False).count()
+    total_plugins = App.query.filter_by(is_deleted=False).count()
+    total_installs = SchoolApp.query.filter_by(is_deleted=False).count()
 
     return success_response(
         {
@@ -71,12 +71,12 @@ def schools():
         .all()
     ) if school_ids else {}
     plugin_counts = dict(
-        db.session.query(SchoolPlugin.school_id, func.count(SchoolPlugin.id))
+        db.session.query(SchoolApp.school_id, func.count(SchoolApp.id))
         .filter(
-            SchoolPlugin.school_id.in_(school_ids),
-            SchoolPlugin.is_deleted.is_(False),
+            SchoolApp.school_id.in_(school_ids),
+            SchoolApp.is_deleted.is_(False),
         )
-        .group_by(SchoolPlugin.school_id)
+        .group_by(SchoolApp.school_id)
         .all()
     ) if school_ids else {}
 
@@ -111,20 +111,20 @@ def school_detail(school_id):
         .group_by(User.role)
         .all()
     )
-    installs = SchoolPlugin.query.filter_by(
+    installs = SchoolApp.query.filter_by(
         school_id=school.id, is_deleted=False
     ).all()
     plugin_names = {
         p.slug: p.name
-        for p in Plugin.query.filter(
-            Plugin.slug.in_([i.plugin_slug for i in installs]),
-            Plugin.is_deleted.is_(False),
+        for p in App.query.filter(
+            App.slug.in_([i.app_slug for i in installs]),
+            App.is_deleted.is_(False),
         ).all()
     } if installs else {}
     data["plugins"] = [
         {
-            "slug": install.plugin_slug,
-            "name": plugin_names.get(install.plugin_slug, install.plugin_slug),
+            "slug": install.app_slug,
+            "name": plugin_names.get(install.app_slug, install.app_slug),
             "active": install.active,
             "is_trial": install.is_trial,
         }
@@ -160,7 +160,7 @@ def set_school_status(school_id):
 @jwt_required()
 @superadmin_required
 def plugins():
-    plugins = Plugin.query.filter_by(is_deleted=False).order_by(Plugin.sort_order.asc(), Plugin.name.asc()).all()
+    plugins = App.query.filter_by(is_deleted=False).order_by(App.sort_order.asc(), App.name.asc()).all()
     return success_response(
         [
             {

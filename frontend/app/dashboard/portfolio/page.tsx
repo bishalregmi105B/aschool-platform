@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Award, BadgeCheck, Plus, Search, Star, Trophy, Users, Loader2, X, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,9 +58,9 @@ interface Credential {
 
 export default function PortfolioPage() {
   return (
-    <PluginGate slug="student_portfolio">
+    <AppGate slug="student_portfolio">
       <PortfolioContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

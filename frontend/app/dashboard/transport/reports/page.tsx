@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BSDateInput } from "@/components/ui/bs-date-input";
@@ -61,9 +61,9 @@ function errMessage(err: unknown): string | null {
 
 export default function TransportReportsPage() {
   return (
-    <PluginGate slug="gps_tracking">
+    <AppGate slug="gps_tracking">
       <ReportsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

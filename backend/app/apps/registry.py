@@ -1,6 +1,6 @@
-"""Compatibility registry wrapper around PluginLoader."""
+"""Compatibility registry wrapper around AppLoader."""
 
-from app.apps.loader import PluginLoader
+from app.apps.loader import AppLoader
 
 
 class PluginRegistry:
@@ -8,12 +8,12 @@ class PluginRegistry:
 
     @staticmethod
     def get(slug: str) -> dict | None:
-        return PluginLoader.get_manifest(slug)
+        return AppLoader.get_manifest(slug)
 
     @staticmethod
     def all() -> dict:
-        return PluginLoader.get_all_manifests()
+        return AppLoader.get_all_manifests()
 
     @staticmethod
     def sidebar(installed_slugs: list[str], user_role: str) -> list[dict]:
-        return PluginLoader.get_frontend_sidebar(installed_slugs, user_role)
+        return AppLoader.get_frontend_sidebar(installed_slugs, user_role)

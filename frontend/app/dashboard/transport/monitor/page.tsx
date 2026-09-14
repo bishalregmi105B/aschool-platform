@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { useI18n } from "@/lib/i18n";
 import { useServerTime } from "@/lib/use-server-time";
 import { toast } from "sonner";
@@ -120,9 +120,9 @@ function errMessage(err: unknown, fallback?: string): string | null {
 
 export default function MonitorPage() {
   return (
-    <PluginGate slug="gps_tracking">
+    <AppGate slug="gps_tracking">
       <MonitorContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

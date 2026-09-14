@@ -54,7 +54,7 @@ class _StudentLMSState extends ConsumerState<StudentLMS>
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'lms',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'LMS'),

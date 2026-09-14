@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -89,9 +89,9 @@ function rowsToComponents(rows: ComponentRow[]): Record<string, number> {
  */
 export default function PayrollPage() {
   return (
-    <PluginGate slug="hr">
+    <AppGate slug="hr">
       <PayrollContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

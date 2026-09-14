@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
-/// AI-powered school analytics dashboard (PluginGate: basic_reports)
+/// AI-powered school analytics dashboard (AppGate: basic_reports)
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
 
@@ -44,7 +44,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'basic_reports',
       child: _loading
           ? const LoadingShimmer()

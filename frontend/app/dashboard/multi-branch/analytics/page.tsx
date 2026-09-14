@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, TrendingDown, Award } from "lucide-react";
@@ -20,7 +20,7 @@ import {
 } from "@/components/aos/kit/page-kit";
 
 export default function ChainAnalyticsPage() {
-  return <PluginGate slug="multi_branch"><ChainAnalyticsContent /></PluginGate>;
+  return <AppGate slug="multi_branch"><ChainAnalyticsContent /></AppGate>;
 }
 
 function ChainAnalyticsContent() {

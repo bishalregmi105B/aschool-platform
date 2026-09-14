@@ -111,7 +111,7 @@ export const AOS_MODULE_COMPONENTS: Record<string, React.ComponentType<any>> = {
 
   // ── Platform Administration & System ──────────────────────────────────────
   // marketplace & plugins both land in the unified AOS Store (Store / Installed
-  // tabs). Deep subroutes (e.g. /dashboard/plugins/<slug>/settings) still
+  // tabs). Deep subroutes (e.g. /dashboard/apps/<slug>/settings) still
   // resolve to their exact pages first via AOSRouteTable.
   marketplace: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),
   plugins: dynamic(() => import("./apps/AppStoreApp"), { loading: AOSModuleLoading }),

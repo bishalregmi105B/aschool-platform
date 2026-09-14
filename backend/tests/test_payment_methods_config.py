@@ -1,7 +1,7 @@
 """Tests for centralized fee payment method configuration."""
 
 from app.models.fee import FeeCollection
-from app.models.plugin import Plugin, SchoolPlugin
+from app.models.app import App, SchoolApp
 from app.models.school import School
 from app.models.student import Student
 from tests.conftest import get_auth_headers
@@ -9,7 +9,7 @@ from tests.conftest import get_auth_headers
 
 def _install_fees_plugin(db, school):
     db.session.add(
-        Plugin(
+        App(
             slug="fees",
             name="Fees",
             category="core",
@@ -18,9 +18,9 @@ def _install_fees_plugin(db, school):
         )
     )
     db.session.add(
-        SchoolPlugin(
+        SchoolApp(
             school_id=school.id,
-            plugin_slug="fees",
+            app_slug="fees",
             active=True,
         )
     )

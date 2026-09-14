@@ -1,8 +1,8 @@
 /**
  * Widget spec types — the client-side mirror of `widgets.yaml`.
  *
- * The server hands these through `GET /plugins/widgets` already normalized
- * (`app/plugins/widgets.py::_normalize_widget`), so the client never sees the
+ * The server hands these through `GET /apps/widgets` already normalized
+ * (`app/apps/widgets.py::_normalize_widget`), so the client never sees the
  * shorthand forms authors write in YAML.
  */
 

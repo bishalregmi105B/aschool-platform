@@ -30,7 +30,7 @@ import {
  *
  * Data comes from the live marketplace catalog, which reports the WP-style
  * lifecycle state (install_state: not_installed | active | inactive) for
- * every plugin — including DEACTIVATED installs, which GET /plugins/installed
+ * every plugin — including DEACTIVATED installs, which GET /apps/installed
  * (active-only) does not return. No local price literals: prices, trial
  * state and names all come from the API.
  */
@@ -72,7 +72,7 @@ export default function InstalledPluginsPage() {
     queryKey: ["marketplace"],
     queryFn: async () => {
       const res = await api.get<ApiResponse<MarketplacePlugin[]>>(
-        "/plugins/marketplace"
+        "/apps/marketplace"
       );
       return res.data.data || [];
     },
@@ -80,30 +80,30 @@ export default function InstalledPluginsPage() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["marketplace"] });
-    queryClient.invalidateQueries({ queryKey: ["plugins-config"] });
+    queryClient.invalidateQueries({ queryKey: ["apps-config"] });
   };
 
   const activateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/activate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/activate`),
     onSuccess: () => {
       invalidate();
-      toast.success("Plugin activated");
+      toast.success("App activated");
     },
     onError: () => toast.error("Activate failed"),
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (slug: string) => api.post(`/plugins/${slug}/deactivate`),
+    mutationFn: (slug: string) => api.post(`/apps/${slug}/deactivate`),
     onSuccess: () => {
       invalidate();
-      toast.success("Plugin deactivated");
+      toast.success("App deactivated");
     },
     onError: () => toast.error("Deactivate failed"),
   });
 
   const uninstallMutation = useMutation({
     mutationFn: (slug: string) =>
-      api.post("/plugins/uninstall", { plugin_slug: slug }),
+      api.post("/apps/uninstall", { app_slug: slug }),
     onSuccess: () => {
       invalidate();
       toast.success("Plugin uninstalled — its data is preserved");
@@ -134,7 +134,7 @@ export default function InstalledPluginsPage() {
   const PLUGIN_COLUMNS: Column<any>[] = [
     {
       key: "name",
-      label: "Plugin",
+      label: "App",
       sortable: true,
       value: (p) => p.name ?? "",
       render: (p) => (
@@ -194,7 +194,7 @@ export default function InstalledPluginsPage() {
       render: (p) => (
         <div className="flex items-center justify-end gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/plugins/${p.slug}/settings`}>
+            <Link href={`/dashboard/apps/${p.slug}/settings`}>
               <Settings className="h-3.5 w-3.5 mr-1" />
               Settings
             </Link>
@@ -203,11 +203,11 @@ export default function InstalledPluginsPage() {
             variant="outline"
             size="sm"
             disabled={busy}
-            title="Uninstall (plugin data is preserved)"
+            title="Uninstall (app data is preserved)"
             onClick={(e) => {
               e.stopPropagation();
               confirm({
-                title: "Uninstall plugin",
+                title: "Uninstall app",
                 body: `Uninstall ${p.name}? Its data is preserved and it can be reinstalled later.`,
                 confirmLabel: "Uninstall",
               }).then((ok) => {
@@ -224,16 +224,16 @@ export default function InstalledPluginsPage() {
     },
   ];
 
-  if (isLoading) return <AOSModuleLoadingState label="Loading plugins…" />;
+  if (isLoading) return <AOSModuleLoadingState label="Loading apps…" />;
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Plug className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
-        title="Installed Plugins"
+        title="Installed Apps"
         subtitle={
           <>
-            {installed.length} plugin{installed.length === 1 ? "" : "s"}{" "}
+            {installed.length} app{installed.length === 1 ? "" : "s"}{" "}
             installed. Deactivate to disable a plugin without losing its data —
             uninstall removes it but keeps the data too.
           </>
@@ -252,7 +252,7 @@ export default function InstalledPluginsPage() {
           {installed.length === 0 ? (
             <AOSEmptyState
               icon={<Store className="h-10 w-10" />}
-              title="No plugins installed yet"
+              title="No apps installed yet"
               description={
                 <>
                   Browse the{" "}

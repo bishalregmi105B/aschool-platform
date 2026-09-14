@@ -54,7 +54,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'student_portfolio',
       child: Scaffold(
         appBar: const CustomAppBar(title: 'Achievements'),

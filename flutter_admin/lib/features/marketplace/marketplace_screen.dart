@@ -11,7 +11,7 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 }
 
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
-  final PluginRepository _repo = PluginRepository();
+  final AppRepository _repo = AppRepository();
   List<PluginManifest> _plugins = [];
   String _filter = 'all';
   bool _loading = true;
@@ -211,9 +211,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   }
 
   void _showDetail(PluginManifest p) {
-    // Per-school plugin config fetched/cached via pluginProvider
+    // Per-school plugin config fetched/cached via appProvider
     // (SchoolPlugin.config on the backend).
-    final config = ref.read(pluginProvider).getConfig(p.slug);
+    final config = ref.read(appProvider).getConfig(p.slug);
     final lastPayment = config?['last_payment'];
     showModalBottomSheet(
       context: context,
@@ -286,8 +286,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     );
   }
 
-  /// Backend contract (`api/v1/plugins.py`): POST /plugins/install and
-  /// POST /plugins/uninstall both take {"plugin_slug": ...} in the body —
+  /// Backend contract (`api/v1/plugins.py`): POST /apps/install and
+  /// POST /apps/uninstall both take {"plugin_slug": ...} in the body —
   /// there is no /plugins/{slug}/install or DELETE .../uninstall.
   Future<void> _togglePlugin(PluginManifest p, bool install) async {
     Navigator.pop(context);

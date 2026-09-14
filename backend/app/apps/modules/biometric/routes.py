@@ -3,7 +3,7 @@ management for ZKTeco-style fingerprint attendance terminals.
 
 Two auth realms, deliberately separate:
 
-1. School-admin endpoints (JWT + @plugin_required("biometric")) — register
+1. School-admin endpoints (JWT + @app_required("biometric")) — register
    devices, monitor health, retry unmapped punches, read sync logs.
 2. Device endpoints (NO JWT) — the device authenticates with a per-device
    API key in the `X-Device-Key` header (only its SHA-256 hash is stored).
@@ -38,9 +38,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.models.attendance import Attendance
 from app.models.biometric import BiometricDevice, BiometricPunch, BiometricSyncLog
-from app.models.plugin import SchoolPlugin
+from app.models.app import SchoolApp
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.rate_limiter import device_rate_limit
 from app.utils.response import created_response, error_response, success_response
@@ -84,8 +84,8 @@ def _device_from_key():
 def _plugin_active_for(school_id) -> bool:
     """Direct DB check (devices have no JWT/subdomain context), trial-aware —
     mirrors the request-path gate in app.__init__._set_school_context."""
-    row = SchoolPlugin.query.filter_by(
-        school_id=school_id, plugin_slug="biometric", active=True
+    row = SchoolApp.query.filter_by(
+        school_id=school_id, app_slug="biometric", active=True
     ).first()
     if not row:
         return False
@@ -268,7 +268,7 @@ def _device_or_404(device_id):
 @biometric_bp.route("/overview", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 def overview():
     """Dashboard overview: device fleet health + today's punch pipeline."""
     now_utc = datetime.now(timezone.utc)
@@ -319,7 +319,7 @@ def overview():
 @biometric_bp.route("/devices", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 def list_devices():
     """List registered devices with computed health status."""
     now_utc = datetime.now(timezone.utc)
@@ -332,7 +332,7 @@ def list_devices():
 @biometric_bp.route("/devices", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 @role_required("school_admin")
 def create_device():
     """Register a device. The per-device API key is returned ONCE (only its
@@ -384,7 +384,7 @@ def create_device():
 @biometric_bp.route("/devices/<uuid:device_id>", methods=["PATCH"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 @role_required("school_admin")
 def update_device(device_id):
     """Update device configuration (name, network, location, active flag)."""
@@ -437,7 +437,7 @@ def update_device(device_id):
 @biometric_bp.route("/devices/<uuid:device_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 @role_required("school_admin")
 def delete_device(device_id):
     """Soft-delete a device. Its punch history is retained for audit."""
@@ -457,7 +457,7 @@ def delete_device(device_id):
 @biometric_bp.route("/devices/<uuid:device_id>/regenerate-key", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 @role_required("school_admin")
 def regenerate_key(device_id):
     """Replace a device's API key (e.g. after compromise). New key shown once."""
@@ -481,7 +481,7 @@ def regenerate_key(device_id):
 @biometric_bp.route("/devices/<uuid:device_id>/sync", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 @role_required("school_admin")
 def sync_device(device_id):
     """Manual sync: re-map this device's pending/unmapped punches to students
@@ -535,7 +535,7 @@ def sync_device(device_id):
 @biometric_bp.route("/logs", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 def list_logs():
     """Sync logs (ingest batches + manual syncs), newest first."""
     query = BiometricSyncLog.for_school(g.school_id)
@@ -554,7 +554,7 @@ def list_logs():
 @biometric_bp.route("/punches", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("biometric")
+@app_required("biometric")
 def list_punches():
     """Recent raw punches (monitoring/debugging unmapped ids)."""
     query = BiometricPunch.for_school(g.school_id)

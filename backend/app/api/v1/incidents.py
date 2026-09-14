@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 from app.models.incident import Incident, WitnessStatement, IncidentAction
 from app.models.student import Student
 from app.models.user import User
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -20,7 +20,7 @@ incidents_bp = Blueprint("incidents", __name__, url_prefix="/incidents")
 @incidents_bp.route("", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 def list_incidents():
     query = Incident.query.filter_by(school_id=g.school_id, is_deleted=False)
     status = request.args.get("status")
@@ -43,7 +43,7 @@ def list_incidents():
 @incidents_bp.route("", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 @role_required("superadmin", "school_admin", "teacher")
 def create_incident():
     data = request.get_json(silent=True) or {}
@@ -100,7 +100,7 @@ def create_incident():
 @incidents_bp.route("/<uuid:incident_id>", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 def get_incident(incident_id):
     incident = Incident.query.filter_by(
         id=incident_id, school_id=g.school_id, is_deleted=False
@@ -113,7 +113,7 @@ def get_incident(incident_id):
 @incidents_bp.route("/<uuid:incident_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 @role_required("superadmin", "school_admin")
 def update_incident(incident_id):
     incident = Incident.query.filter_by(
@@ -143,7 +143,7 @@ def update_incident(incident_id):
 @incidents_bp.route("/<uuid:incident_id>/statements", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 def list_statements(incident_id):
     items = WitnessStatement.query.filter_by(
         incident_id=incident_id, school_id=g.school_id, is_deleted=False
@@ -154,7 +154,7 @@ def list_statements(incident_id):
 @incidents_bp.route("/<uuid:incident_id>/statements", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 @role_required("superadmin", "school_admin", "teacher")
 def add_statement(incident_id):
     incident = Incident.query.filter_by(
@@ -185,7 +185,7 @@ def add_statement(incident_id):
 @incidents_bp.route("/<uuid:incident_id>/actions", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 def list_actions(incident_id):
     items = IncidentAction.query.filter_by(
         incident_id=incident_id, school_id=g.school_id, is_deleted=False
@@ -196,7 +196,7 @@ def list_actions(incident_id):
 @incidents_bp.route("/<uuid:incident_id>/actions", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("incidents")
+@app_required("incidents")
 @role_required("superadmin", "school_admin")
 def add_action(incident_id):
     incident = Incident.query.filter_by(

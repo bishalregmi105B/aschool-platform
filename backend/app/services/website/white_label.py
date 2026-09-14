@@ -11,7 +11,7 @@ Where the data lives and who consumes it (write-through, no duplicate source):
                                                (display name, tagline, footer text, sender
                                                name, hide-branding flag, font family).
 
-Uninstall behavior: consistent with the platform's soft-uninstall (``uninstall_plugin``
+Uninstall behavior: consistent with the platform's soft-uninstall (``uninstall_app``
 sets active=False and reports ``data_preserved: True`` — nothing is destroyed). The
 branding-REMOVAL capabilities (hide "Powered by ASchool", custom display name, footer
 text, sender name) only apply while the plugin is active; after uninstall the platform

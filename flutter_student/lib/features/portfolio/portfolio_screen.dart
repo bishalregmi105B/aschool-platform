@@ -78,7 +78,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final fullName = (user?.fullName ?? '').trim();
     final firstInitial = fullName.isNotEmpty ? fullName[0].toUpperCase() : 'S';
 
-    return PluginGate(
+    return AppGate(
       pluginSlug: 'student_portfolio',
       child: _loading
           ? const LoadingShimmer()

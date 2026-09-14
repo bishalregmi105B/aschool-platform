@@ -14,11 +14,11 @@ from tests.conftest import get_auth_headers
 @pytest.fixture
 def env(client, db, school, admin_user):
     for slug in ("admission", "fees", "settings_core"):
-        from app.models.plugin import Plugin, SchoolPlugin
+        from app.models.app import App, SchoolApp
 
-        db.session.add(Plugin(slug=slug, name=slug.title(), category="core",
+        db.session.add(App(slug=slug, name=slug.title(), category="core",
                               is_free=True, is_published=True))
-        db.session.add(SchoolPlugin(school_id=school.id, plugin_slug=slug, active=True))
+        db.session.add(SchoolApp(school_id=school.id, app_slug=slug, active=True))
     db.session.commit()
     return {
         "headers": get_auth_headers(client, "admin@test.edu.np", "Test@1234"),

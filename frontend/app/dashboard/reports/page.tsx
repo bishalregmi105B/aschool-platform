@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api, type ApiResponse } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/spinner";
 import Link from "next/link";
@@ -75,9 +75,9 @@ const WARN = "#9d5d00";
 
 export default function ReportsPage() {
   return (
-    <PluginGate slug="basic_reports">
+    <AppGate slug="basic_reports">
       <ReportsContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

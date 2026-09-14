@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 } from "@/components/aos/kit/page-kit";
 
 export default function RewardsPage() {
-  return <PluginGate slug="gamification"><RewardsContent /></PluginGate>;
+  return <AppGate slug="gamification"><RewardsContent /></AppGate>;
 }
 
 function RewardsContent() {

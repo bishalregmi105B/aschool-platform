@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,7 @@ const REPORTS = [
 type ReportKey = (typeof REPORTS)[number]["key"];
 
 export default function LibraryReportsPage() {
-  return <PluginGate slug="library"><ReportsContent /></PluginGate>;
+  return <AppGate slug="library"><ReportsContent /></AppGate>;
 }
 
 function ReportsContent() {

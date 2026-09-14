@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { api, type ApiResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,9 +49,9 @@ interface ClassItem {
 
 export default function DiaryPage() {
   return (
-    <PluginGate slug="notices">
+    <AppGate slug="notices">
       <DiaryContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

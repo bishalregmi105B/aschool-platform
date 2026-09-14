@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -239,9 +239,9 @@ function accountToStudentOption(
 
 export default function FeeCollectPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <CollectContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

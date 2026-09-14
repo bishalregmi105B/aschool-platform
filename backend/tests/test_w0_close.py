@@ -9,13 +9,13 @@ Covers the W0-close items from UNIFIED_ROADMAP v3 §5 B1:
 
 import pytest
 
-from app.apps.decorators import _acceptable_plugin_slugs
+from app.apps.decorators import _acceptable_app_slugs
 
 # ── Gate canonicalization ──────────────────────────────────────────────────
 
 
 def _gated_slugs_from_source() -> set[str]:
-    """Every slug passed to @plugin_required( in backend source."""
+    """Every slug passed to @app_required( in backend source."""
     import re
     from pathlib import Path
 
@@ -28,7 +28,7 @@ def _gated_slugs_from_source() -> set[str]:
             line.split("#")[0] if not line.strip().startswith("#") else ""
             for line in py.read_text().splitlines()
         )
-        for m in re.finditer(r'plugin_required\(\s*"([^"]+)"', code):
+        for m in re.finditer(r'app_required\(\s*"([^"]+)"', code):
             slugs.add(m.group(1))
     return slugs
 
@@ -44,20 +44,20 @@ def test_ai_suite_gate_accepts_every_legacy_install():
     """An install of ANY legacy AI slug must pass an ai_suite gate, and an
     ai_suite install must pass a legacy gate (bidirectional single-hop)."""
     for gate in ("ai_suite", "ai_tools", "ai_adaptive_learning", "benchmarking"):
-        accepted = _acceptable_plugin_slugs(gate)
+        accepted = _acceptable_app_slugs(gate)
         assert "ai_suite" in accepted, f"{gate} gate does not accept ai_suite"
 
 
 def test_every_gate_slug_is_canonical_or_alias_resolvable():
     """Each gated slug must either be a manifest slug or alias-map to one."""
-    from app.apps.loader import PluginLoader
+    from app.apps.loader import AppLoader
 
-    PluginLoader._scan_manifests()
-    aliases = PluginLoader.alias_map()
-    known = set(PluginLoader.get_all_manifests())
+    AppLoader._scan_manifests()
+    aliases = AppLoader.alias_map()
+    known = set(AppLoader.get_all_manifests())
     for slug in _gated_slugs_from_source():
         assert slug in known or slug in aliases, (
-            f"@plugin_required('{slug}') is neither a manifest slug nor an alias"
+            f"@app_required('{slug}') is neither a manifest slug nor an alias"
         )
 
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -51,9 +51,9 @@ const money = (n: number | null | undefined) =>
 
 export default function FeeAgingPage() {
   return (
-    <PluginGate slug="fees">
+    <AppGate slug="fees">
       <AgingContent />
-    </PluginGate>
+    </AppGate>
   );
 }
 

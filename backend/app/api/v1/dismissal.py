@@ -6,7 +6,7 @@ from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.dismissal import AuthorizedPickup, DismissalRecord
 from app.models.student import Student
-from app.apps.decorators import plugin_required
+from app.apps.decorators import app_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -21,7 +21,7 @@ dismissal_bp = Blueprint("dismissal", __name__, url_prefix="/dismissal")
 @dismissal_bp.route("/authorized", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 def list_authorized():
     query = AuthorizedPickup.query.filter_by(school_id=g.school_id, is_deleted=False)
     student_id = request.args.get("student_id")
@@ -34,7 +34,7 @@ def list_authorized():
 @dismissal_bp.route("/authorized", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 @role_required("superadmin", "school_admin", "parent")
 def create_authorized():
     data = request.get_json(silent=True) or {}
@@ -59,7 +59,7 @@ def create_authorized():
 @dismissal_bp.route("/authorized/<uuid:pickup_id>", methods=["PUT"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 @role_required("superadmin", "school_admin", "parent")
 def update_authorized(pickup_id):
     pickup = AuthorizedPickup.query.filter_by(
@@ -78,7 +78,7 @@ def update_authorized(pickup_id):
 @dismissal_bp.route("/authorized/<uuid:pickup_id>", methods=["DELETE"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 @role_required("superadmin", "school_admin", "parent")
 def delete_authorized(pickup_id):
     pickup = AuthorizedPickup.query.filter_by(
@@ -96,7 +96,7 @@ def delete_authorized(pickup_id):
 @dismissal_bp.route("/records", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 def list_records():
     query = DismissalRecord.query.filter_by(school_id=g.school_id, is_deleted=False)
     student_id = request.args.get("student_id")
@@ -123,7 +123,7 @@ def list_records():
 @dismissal_bp.route("/records", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 @role_required("superadmin", "school_admin", "teacher")
 def create_record():
     data = request.get_json(silent=True) or {}
@@ -146,7 +146,7 @@ def create_record():
 @dismissal_bp.route("/verify-qr", methods=["POST"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 def verify_qr():
     """Verify a QR code for pickup and auto-create dismissal record.
 
@@ -272,7 +272,7 @@ def _record_dict(r):
 @dismissal_bp.route("/summary", methods=["GET"])
 @jwt_required()
 @school_required
-@plugin_required("dismissal")
+@app_required("dismissal")
 def dismissal_summary():
     """Today's dismissal rollup for the admin app overview tab (B-09)."""
     from datetime import date as date_cls

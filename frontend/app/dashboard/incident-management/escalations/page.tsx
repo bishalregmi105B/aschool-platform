@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PluginGate } from "@/lib/plugins";
+import { AppGate } from "@/lib/apps";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { CheckCircle, TrendingUp } from "lucide-react";
 import { displayBS } from "@/lib/nepali_date";
 
 export default function EscalationsPage() {
-  return <PluginGate slug="incident_management"><EscalationsContent /></PluginGate>;
+  return <AppGate slug="incident_management"><EscalationsContent /></AppGate>;
 }
 
 function EscalationsContent() {
