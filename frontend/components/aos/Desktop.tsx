@@ -243,8 +243,18 @@ function DesktopIconTile({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${label}${selected ? " — selected. Press Enter to open." : ". Press Enter to open."}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onKeyDown={(e) => {
+        // Desktop convention: single click selects, Enter opens.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onDoubleClick(e as unknown as React.MouseEvent);
+        }
+      }}
       onContextMenu={onContextMenu}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -278,7 +288,7 @@ function DesktopIconTile({
           : {}),
         ...style,
       }}
-      className="win11-desktop-icon"
+      className="win11-desktop-icon win11-desktop-icon-focusable"
     >
       <div style={{ filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.45))" }}>{icon}</div>
       <span

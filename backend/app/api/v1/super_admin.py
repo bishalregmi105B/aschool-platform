@@ -2,13 +2,15 @@
 
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
+from sqlalchemy import func
 
+from extensions import db
 from app.models.plugin import Plugin, SchoolPlugin
 from app.models.school import School
 from app.models.student import Student
 from app.models.user import User
 from app.utils.decorators import superadmin_required
-from app.utils.response import success_response
+from app.utils.response import error_response, success_response
 
 super_admin_bp = Blueprint("super_admin", __name__, url_prefix="/super-admin")
 
@@ -47,7 +49,111 @@ def schools():
     if search:
         query = query.filter(School.name.ilike(f"%{search}%"))
     schools = query.order_by(School.created_at.desc()).all()
-    return success_response([school.to_dict() for school in schools])
+
+    # Tenant-list counts in three grouped queries — not N+1.
+    school_ids = [s.id for s in schools]
+    student_counts = dict(
+        db.session.query(Student.school_id, func.count(Student.id))
+        .filter(
+            Student.school_id.in_(school_ids),
+            Student.is_deleted.is_(False),
+        )
+        .group_by(Student.school_id)
+        .all()
+    ) if school_ids else {}
+    user_counts = dict(
+        db.session.query(User.school_id, func.count(User.id))
+        .filter(
+            User.school_id.in_(school_ids),
+            User.is_deleted.is_(False),
+        )
+        .group_by(User.school_id)
+        .all()
+    ) if school_ids else {}
+    plugin_counts = dict(
+        db.session.query(SchoolPlugin.school_id, func.count(SchoolPlugin.id))
+        .filter(
+            SchoolPlugin.school_id.in_(school_ids),
+            SchoolPlugin.is_deleted.is_(False),
+        )
+        .group_by(SchoolPlugin.school_id)
+        .all()
+    ) if school_ids else {}
+
+    payload = []
+    for school in schools:
+        data = school.to_dict()
+        data["student_count"] = student_counts.get(school.id, 0)
+        data["user_count"] = user_counts.get(school.id, 0)
+        data["plugin_count"] = plugin_counts.get(school.id, 0)
+        payload.append(data)
+    return success_response(payload)
+
+
+@super_admin_bp.route("/schools/<school_id>", methods=["GET"])
+@jwt_required()
+@superadmin_required
+def school_detail(school_id):
+    school = School.query.filter_by(id=school_id, is_deleted=False).first()
+    if not school:
+        return error_response("School not found", 404)
+
+    data = school.to_dict()
+    data["student_count"] = Student.query.filter_by(
+        school_id=school.id, is_deleted=False
+    ).count()
+    data["user_count"] = User.query.filter_by(
+        school_id=school.id, is_deleted=False
+    ).count()
+    data["users_by_role"] = dict(
+        db.session.query(User.role, func.count(User.id))
+        .filter(User.school_id == school.id, User.is_deleted.is_(False))
+        .group_by(User.role)
+        .all()
+    )
+    installs = SchoolPlugin.query.filter_by(
+        school_id=school.id, is_deleted=False
+    ).all()
+    plugin_names = {
+        p.slug: p.name
+        for p in Plugin.query.filter(
+            Plugin.slug.in_([i.plugin_slug for i in installs]),
+            Plugin.is_deleted.is_(False),
+        ).all()
+    } if installs else {}
+    data["plugins"] = [
+        {
+            "slug": install.plugin_slug,
+            "name": plugin_names.get(install.plugin_slug, install.plugin_slug),
+            "active": install.active,
+            "is_trial": install.is_trial,
+        }
+        for install in installs
+    ]
+    return success_response(data)
+
+
+@super_admin_bp.route("/schools/<school_id>/status", methods=["PATCH"])
+@jwt_required()
+@superadmin_required
+def set_school_status(school_id):
+    """Activate or suspend a tenant. Suspension is the dunning lever: a
+    suspended school's users are blocked at login by the auth layer."""
+    data = request.get_json(silent=True) or {}
+    is_active = data.get("is_active")
+    if not isinstance(is_active, bool):
+        return error_response("is_active (boolean) is required", 400)
+
+    school = School.query.filter_by(id=school_id, is_deleted=False).first()
+    if not school:
+        return error_response("School not found", 404)
+
+    school.is_active = is_active
+    school.status = "active" if is_active else "suspended"
+    db.session.commit()
+    return success_response(
+        {"id": str(school.id), "is_active": school.is_active, "status": school.status}
+    )
 
 
 @super_admin_bp.route("/plugins", methods=["GET"])

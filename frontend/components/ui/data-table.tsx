@@ -46,6 +46,13 @@ export interface Column<T> {
   /** Excluded from CSV export (e.g. an actions column). */
   noExport?: boolean;
   className?: string;
+  /**
+   * Double-click to edit in place (marks-entry grid pattern). Requires
+   * `onCellEdit` on the table. Commit on Enter/blur, cancel on Escape.
+   */
+  editable?: boolean;
+  /** Input type for the inline editor (defaults to text). */
+  editType?: "text" | "number";
 }
 
 export interface BulkAction<T> {
@@ -98,8 +105,31 @@ export interface DataTableProps<T> {
   /** Right-aligned toolbar content (page-specific filters, actions). */
   toolbar?: React.ReactNode;
   className?: string;
-  /** Compact row height for dense operational grids. */
+  /** Compact row height for dense operational grids (initial density). */
   dense?: boolean;
+
+  /**
+   * Group rows under sticky headers (students by class, fees by month).
+   * Rows should already be ordered so groups are contiguous — grouping
+   * does not re-sort. Group headers show the label and row count.
+   */
+  groupBy?: (row: T) => string;
+
+  /**
+   * Provide to enable double-click inline cell editing on columns marked
+   * `editable`. Called with the committed value (Enter or blur; Escape
+   * cancels without calling).
+   */
+  onCellEdit?: (row: T, columnKey: string, value: string) => void | Promise<void>;
+
+  /**
+   * Adds a Print button: hides app chrome via @media print and prints the
+   * table with all rows currently rendered (fetch more rows first when
+   * server-paginating if you need the full dataset).
+   */
+  printable?: boolean;
+  /** Title shown above the table in the printed document. */
+  printTitle?: string;
 }
 
 function defaultValue<T>(row: T, column: Column<T>): string | number | null {
@@ -148,6 +178,10 @@ export function DataTable<T>({
   toolbar,
   className,
   dense,
+  groupBy,
+  onCellEdit,
+  printable,
+  printTitle,
 }: DataTableProps<T>) {
   const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(
     () => new Set(columns.filter((c) => c.hidden).map((c) => c.key))
@@ -158,6 +192,12 @@ export function DataTable<T>({
     direction: "asc" | "desc";
   } | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = React.useState(false);
+  // Runtime density: the `dense` prop is the initial value, the toolbar
+  // toggle lets each user pick what fits their screen.
+  const [compact, setCompact] = React.useState(Boolean(dense));
+  // Inline edit: the cell being edited (row key + column key) and its draft.
+  const [editing, setEditing] = React.useState<{ rowKey: string; colKey: string } | null>(null);
+  const [editDraft, setEditDraft] = React.useState("");
 
   const serverSorted = Boolean(onSortChange);
   const activeSort = serverSorted ? sort ?? null : clientSort;
@@ -194,6 +234,35 @@ export function DataTable<T>({
     else setClientSort(next);
   };
 
+  // Contiguous group runs — rows are expected pre-ordered by the caller.
+  const groups = React.useMemo(() => {
+    if (!groupBy) return null;
+    const out: { label: string; entries: { row: T; index: number }[] }[] = [];
+    displayRows.forEach((row, index) => {
+      const label = groupBy(row);
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.entries.push({ row, index });
+      else out.push({ label, entries: [{ row, index }] });
+    });
+    return out;
+  }, [displayRows, groupBy]);
+
+  const beginEdit = (row: T, column: Column<T>) => {
+    if (!column.editable || !onCellEdit) return;
+    setEditing({ rowKey: rowKey(row), colKey: column.key });
+    setEditDraft(String(defaultValue(row, column) ?? ""));
+  };
+
+  const commitEdit = (row: T, column: Column<T>) => {
+    if (!editing || editing.rowKey !== rowKey(row) || editing.colKey !== column.key)
+      return;
+    const original = String(defaultValue(row, column) ?? "");
+    setEditing(null);
+    if (editDraft !== original) onCellEdit?.(row, column.key, editDraft);
+  };
+
+  const handlePrint = () => window.print();
+
   const allSelected =
     displayRows.length > 0 && displayRows.every((r) => selected.has(rowKey(r)));
 
@@ -229,10 +298,99 @@ export function DataTable<T>({
   const isSelectedRow = (key: string) =>
     activeRowKey === key || selected.has(key);
 
+  const renderRow = (row: T, index: number) => {
+    const key = rowKey(row);
+    return (
+      <TableRow
+        key={key}
+        data-state={isSelectedRow(key) ? "selected" : undefined}
+        className={cn(
+          isSelectedRow(key) && "selected",
+          onRowClick && "cursor-pointer"
+        )}
+        onClick={
+          onRowClick
+            ? (e) => {
+                // Never hijack a click meant for a control.
+                const target = e.target as HTMLElement;
+                if (target.closest("button,a,input,label,[role=checkbox]"))
+                  return;
+                onRowClick(row);
+              }
+            : undefined
+        }
+        tabIndex={onRowClick ? 0 : undefined}
+        onKeyDown={
+          onRowClick
+            ? (e) => {
+                if (e.key === "Enter") onRowClick(row);
+              }
+            : undefined
+        }
+      >
+        {selectable && (
+          <TableCell>
+            <Checkbox
+              checked={selected.has(key)}
+              onCheckedChange={() =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key);
+                  else next.add(key);
+                  return next;
+                })
+              }
+              aria-label="Select row"
+            />
+          </TableCell>
+        )}
+        {visibleColumns.map((c) => {
+          const isEditingThis =
+            editing !== null && editing.rowKey === key && editing.colKey === c.key;
+          if (isEditingThis) {
+            return (
+              <TableCell
+                key={c.key}
+                style={{ textAlign: c.align ?? "left" }}
+                className={cn(c.className, "p-1")}
+              >
+                <Input
+                  type={c.editType ?? "text"}
+                  value={editDraft}
+                  autoFocus
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onBlur={() => commitEdit(row, c)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEdit(row, c);
+                    else if (e.key === "Escape") setEditing(null);
+                  }}
+                  aria-label={`Edit ${c.label}`}
+                  className="h-7 w-full max-w-[140px] text-[13px]"
+                />
+              </TableCell>
+            );
+          }
+          return (
+            <TableCell
+              key={c.key}
+              style={{ textAlign: c.align ?? "left" }}
+              className={cn(c.className, c.editable && onCellEdit && "editable-cell")}
+              onDoubleClick={() => beginEdit(row, c)}
+            >
+              {c.render
+                ? c.render(row, index)
+                : (defaultValue(row, c) ?? "—")}
+            </TableCell>
+          );
+        })}
+      </TableRow>
+    );
+  };
+
   return (
     <div className={cn("space-y-2", className)}>
-      {(searchable || toolbar || exportFileName || columns.length > 4) && (
-        <div className="win11-commandbar flex flex-wrap items-center">
+      {(searchable || toolbar || exportFileName || printable || columns.length > 4) && (
+        <div className="win11-commandbar no-print flex flex-wrap items-center">
           {searchable && (
             <div className="win11-searchbox w-full max-w-[240px]">
               <Input
@@ -299,6 +457,27 @@ export function DataTable<T>({
                 Export CSV
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="commandbar-button h-8 border-0 bg-transparent px-2.5 text-[12px] font-normal shadow-none hover:bg-transparent"
+              onClick={() => setCompact((v) => !v)}
+              aria-pressed={compact}
+              title="Toggle row density"
+            >
+              {compact ? "Comfortable rows" : "Compact rows"}
+            </Button>
+            {printable && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="commandbar-button h-8 border-0 bg-transparent px-2.5 text-[12px] font-normal shadow-none hover:bg-transparent"
+                onClick={handlePrint}
+                disabled={displayRows.length === 0}
+              >
+                Print
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -330,7 +509,13 @@ export function DataTable<T>({
         </div>
       )}
 
-      <Table className={dense ? "compact" : undefined}>
+      {printable && printTitle && (
+        <div className="print-only text-[15px] font-semibold text-black">
+          {printTitle}
+        </div>
+      )}
+      <div className="print-area">
+      <Table className={compact ? "compact" : undefined}>
         <TableHeader>
           <TableRow>
             {selectable && (
@@ -416,68 +601,26 @@ export function DataTable<T>({
 
             {!loading &&
               !error &&
-              displayRows.map((row, index) => {
-                const key = rowKey(row);
-                return (
-                  <TableRow
-                    key={key}
-                    data-state={isSelectedRow(key) ? "selected" : undefined}
-                    className={cn(
-                      isSelectedRow(key) && "selected",
-                      onRowClick && "cursor-pointer"
-                    )}
-                    onClick={
-                      onRowClick
-                        ? (e) => {
-                            // Never hijack a click meant for a control.
-                            const target = e.target as HTMLElement;
-                            if (target.closest("button,a,input,label,[role=checkbox]"))
-                              return;
-                            onRowClick(row);
-                          }
-                        : undefined
-                    }
-                    tabIndex={onRowClick ? 0 : undefined}
-                    onKeyDown={
-                      onRowClick
-                        ? (e) => {
-                            if (e.key === "Enter") onRowClick(row);
-                          }
-                        : undefined
-                    }
-                  >
-                    {selectable && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selected.has(key)}
-                          onCheckedChange={() =>
-                            setSelected((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(key)) next.delete(key);
-                              else next.add(key);
-                              return next;
-                            })
-                          }
-                          aria-label="Select row"
-                        />
-                      </TableCell>
-                    )}
-                    {visibleColumns.map((c) => (
-                      <TableCell
-                        key={c.key}
-                        style={{ textAlign: c.align ?? "left" }}
-                        className={cn(c.className)}
-                      >
-                        {c.render
-                          ? c.render(row, index)
-                          : (defaultValue(row, c) ?? "—")}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
+              (groups
+                ? groups.map((group) => (
+                    <React.Fragment key={group.label}>
+                      <TableRow className="group-row sticky top-[var(--table-header-h,36px)] z-[1] bg-[var(--w11-surface-solid)]">
+                        <TableCell colSpan={colSpan} className="py-1.5">
+                          <span className="text-[12px] font-semibold text-[var(--w11-text-primary)]">
+                            {group.label}
+                          </span>
+                          <span className="ml-2 text-[11px] text-[var(--w11-text-secondary)]">
+                            {group.entries.length}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                      {group.entries.map(({ row, index }) => renderRow(row, index))}
+                    </React.Fragment>
+                  ))
+                : displayRows.map((row, index) => renderRow(row, index)))}
           </TableBody>
         </Table>
+      </div>
 
       {pagination && onPageChange && (
         <Pagination

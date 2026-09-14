@@ -29,7 +29,13 @@ function listPages(dir: string): string[] {
 
 function assertRealData(file: string) {
   const src = read(file);
-  const wired = src.includes("useQuery") || src.includes("useStudentData");
+  // Pages may encapsulate their queries in portal hooks (useSelectedChild
+  // wraps react-query and exposes dash.isLoading/refetch) — count those as
+  // wired. The banned marker remains the placeholder stub component.
+  const wired =
+    src.includes("useQuery") ||
+    src.includes("useStudentData") ||
+    src.includes("useSelectedChild");
   expect(wired && !src.includes("PortalSectionPage")).toBe(true);
 }
 
@@ -111,17 +117,27 @@ describe("parent portal", () => {
 });
 
 describe("teacher portal", () => {
-  it("attendance/marks/timetable/notices re-export the dashboard pages", () => {
-    for (const [slug, target] of [
-      ["attendance", "dashboard/attendance/page"],
-      ["marks", "dashboard/exams/marks/page"],
-      ["timetable", "dashboard/timetable/teacher/page"],
-      ["notices", "dashboard/notices/page"],
-    ] as const) {
+  // Wave-I de-re-exported the teacher portal: each page is now a real,
+  // teacher-scoped page (own queries, own pickers) instead of a one-line
+  // re-export of the admin screen. Assert the new contract: the page is
+  // substantive (not a re-export stub) and fetches real data.
+  const teacherPages = [
+    "attendance",
+    "marks",
+    "timetable",
+    "notices",
+  ] as const;
+
+  it("attendance/marks/timetable/notices are real teacher-scoped pages", () => {
+    for (const slug of teacherPages) {
+      const src = read(join(APP, "teacher", slug, "page.tsx"));
+      const isReExportStub =
+        /^import\s+.*from\s+"@/m.test(src) &&
+        /^export\s+(default\s+)?\{?\s*\w+\s*\}?;?\s*$/m.test(src.trim()) &&
+        src.split("\n").length <= 5;
+      expect(isReExportStub).toBe(false);
       expect(
-        read(join(APP, "teacher", slug, "page.tsx")).includes(
-          `../../${target}`
-        )
+        src.includes("useQuery") || src.includes("useTeacher")
       ).toBe(true);
     }
   });

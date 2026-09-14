@@ -178,3 +178,72 @@
   user-select: none;
 }
 
+
+/* ── AOS Shell Keyboard Accessibility ──────────────────────────────────────
+   Dock items are role="button" with tabIndex — they need a visible focus
+   ring so keyboard users can see where they are on the desktop. */
+.dock-app-item-focusable {
+  cursor: pointer;
+}
+.dock-app-item-focusable:focus-visible {
+  outline: 2px solid var(--w11-accent, #0078d4);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Desktop icons share the same keyboard affordance as dock items. */
+.win11-desktop-icon-focusable:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: -1px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ── DataTable print mode ──────────────────────────────────────────────────
+   The "print twin" discipline: only the marked .print-area reaches paper.
+   The visibility trick (not display:none) keeps layout stable in the
+   arbitrarily-nested AOS window/portal trees. */
+.print-only { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff;
+    color: #000;
+  }
+  .print-only { display: block; }
+  .no-print { display: none !important; }
+  .print-area table { font-size: 11px; }
+  .print-area .group-row { break-after: avoid; }
+}
+
+/* Editable cell affordance — subtle dotted underline, only on hover. */
+.editable-cell:hover::after {
+  content: "✎";
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+/* PageHeader print letterhead — injected into the print target at print time. */
+.print-letterhead {
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.print-letterhead h2 { font-size: 16px; font-weight: 700; color: #000; margin: 0; }
+.print-letterhead p { font-size: 12px; color: #333; margin: 2px 0 0; }
+.print-letterhead p:empty { display: none; }
+.print-footer {
+  margin-top: 16px;
+  border-top: 1px solid #999;
+  padding-top: 6px;
+  font-size: 10px;
+  color: #555;
+  text-align: center;
+}

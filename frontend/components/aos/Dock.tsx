@@ -45,6 +45,42 @@ interface DockProps {
   sidebarItems?: PluginSidebarItem[];
 }
 
+interface DockButtonProps {
+  label: string;
+  pressed?: boolean;
+  className?: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+/**
+ * Keyboard/ARIA-accessible dock item. Dock icons are buttons semantically —
+ * role=button + tabIndex + Enter/Space activation + aria-pressed running
+ * state — so keyboard-only users can Tab through the dock and open apps
+ * without a mouse. The visible tooltip stays mouse-only (aria-label carries
+ * the name for screen readers).
+ */
+function DockButton({ label, pressed, className, onClick, children }: DockButtonProps) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-pressed={pressed}
+      className={`dock-app-item dock-app-item-focusable ${className || ""}`}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Dock({
   windows,
   activeWindowId,
@@ -200,26 +236,28 @@ export default function Dock({
     <div className="macos-dock-wrapper">
       <div className="macos-dock">
         {/* AOS Launcher Button */}
-        <div
-          className={`dock-app-item ${isStartOpen ? "dock-bounce" : ""}`}
+        <DockButton
+          label="AOS Academic Hub — open launcher"
+          pressed={isStartOpen}
+          className={isStartOpen ? "dock-bounce" : ""}
           onClick={onToggleStart}
         >
-          <div className="dock-tooltip">AOS Academic Hub</div>
+          <div className="dock-tooltip" aria-hidden="true">AOS Academic Hub</div>
           <div className="dock-icon-wrapper" style={{ width: `${iconPx}px`, height: `${iconPx}px` }}>
             <AOSLogo size={iconPx} />
           </div>
           {isStartOpen && (
             <div className="dock-dot" style={{ background: accentColor, boxShadow: `0 0 8px ${accentColor}` }} />
           )}
-        </div>
+        </DockButton>
 
         {/* Launchpad / App Drawer */}
         {onToggleAppDrawer && (
-          <div
-            className="dock-app-item"
+          <DockButton
+            label="App Drawer & Library"
             onClick={onToggleAppDrawer}
           >
-            <div className="dock-tooltip">App Drawer & Library</div>
+            <div className="dock-tooltip" aria-hidden="true">App Drawer & Library</div>
             <div
               className="dock-icon-wrapper"
               style={{
@@ -236,16 +274,16 @@ export default function Dock({
             >
               <LayoutGrid size={Math.round(iconPx * 0.52)} />
             </div>
-          </div>
+          </DockButton>
         )}
 
         {/* Multitasking App Switcher */}
         {onToggleAppSwitcher && (
-          <div
-            className="dock-app-item"
+          <DockButton
+            label="App Viewer & Switcher"
             onClick={onToggleAppSwitcher}
           >
-            <div className="dock-tooltip">App Viewer & Switcher</div>
+            <div className="dock-tooltip" aria-hidden="true">App Viewer & Switcher</div>
             <div
               className="dock-icon-wrapper"
               style={{
@@ -262,7 +300,7 @@ export default function Dock({
             >
               <Layers size={Math.round(iconPx * 0.52)} />
             </div>
-          </div>
+          </DockButton>
         )}
 
         {/* Vertical Separator */}
@@ -276,12 +314,14 @@ export default function Dock({
           const isBouncing = bouncingId === app.id;
 
           return (
-            <div
+            <DockButton
               key={app.id}
-              className={`dock-app-item ${isBouncing ? "dock-bounce" : ""}`}
+              label={`${app.title}${isOpen ? (isFocused ? " — focused" : " — running") : ""}`}
+              pressed={isOpen}
+              className={isBouncing ? "dock-bounce" : ""}
               onClick={() => handleAppClick(app.id)}
             >
-              <div className="dock-tooltip">{app.title}</div>
+              <div className="dock-tooltip" aria-hidden="true">{app.title}</div>
               <div
                 className="dock-icon-wrapper"
                 style={{
@@ -303,7 +343,7 @@ export default function Dock({
                   }}
                 />
               )}
-            </div>
+            </DockButton>
           );
         })}
 
@@ -318,12 +358,14 @@ export default function Dock({
               const isBouncing = bouncingId === win.id;
 
               return (
-                <div
+                <DockButton
                   key={win.id}
-                  className={`dock-app-item ${isBouncing ? "dock-bounce" : ""}`}
+                  label={`${app.title} (Running)${isFocused ? " — focused" : ""}`}
+                  pressed
+                  className={isBouncing ? "dock-bounce" : ""}
                   onClick={() => handleAppClick(win.id)}
                 >
-                  <div className="dock-tooltip">{app.title} (Running)</div>
+                  <div className="dock-tooltip" aria-hidden="true">{app.title} (Running)</div>
                   <div
                     className="dock-icon-wrapper"
                     style={{
@@ -340,7 +382,7 @@ export default function Dock({
                       boxShadow: isFocused ? `0 0 6px ${accentColor}` : undefined,
                     }}
                   />
-                </div>
+                </DockButton>
               );
             })}
           </>

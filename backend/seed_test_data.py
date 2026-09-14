@@ -51,6 +51,58 @@ from extensions import db
 RNG = random.Random(20260505)
 SEED_TAG = "[SEED-TEST]"
 
+# ── Synthetic Nepali name pools (demo realism — no real-person data) ──────
+# Names are picked deterministically from the counter so re-runs produce
+# identical data (idempotent lookups keep working).
+NEPALI_MALE_FIRST = [
+    "Aarav", "Bibek", "Chandra", "Dipesh", "Saurav", "Nabin", "Prakash",
+    "Rajesh", "Sanjay", "Suman", "Suresh", "Kiran", "Manish", "Niraj",
+    "Prabin", "Roshan", "Sandeep", "Bikash", "Deepak", "Hari", "Krishna",
+    "Lokesh", "Madhav", "Nimesh", "Pradeep", "Ramesh", "Shyam", "Umesh",
+]
+NEPALI_FEMALE_FIRST = [
+    "Aarati", "Anisha", "Bina", "Chanda", "Dipti", "Gita", "Kabita",
+    "Laxmi", "Manisha", "Nisha", "Pooja", "Pratima", "Rita", "Sabitri",
+    "Sarita", "Shreya", "Sunita", "Tara", "Uma", "Nirmala", "Rina",
+    "Samjhana", "Shanti", "Sushmita", "Kajal", "Muna", "Nita", "Rekha",
+]
+NEPALI_LAST = [
+    "Sharma", "Adhikari", "Gurung", "Tamang", "Shrestha", "Rai", "Thapa",
+    "Magar", "Bhandari", "Karki", "Acharya", "Basnet", "Bhattarai",
+    "Dahal", "Ghale", "Joshi", "Khadka", "Lama", "Nepal", "Pandey",
+    "Poudel", "Rana", "Sherpa", "Subedi", "Uprety",
+]
+NEPALI_MALE_FIRST_NE = [
+    "आरव", "विवेक", "चन्द्र", "दिपेश", "सौरव", "नविन", "प्रकाश", "राजेश",
+    "संजय", "सुमन", "सुरेश", "किरण", "मनिष", "निराज", "प्रविण", "रोशन",
+]
+NEPALI_FEMALE_FIRST_NE = [
+    "आरती", "अनिशा", "विना", "चन्दा", "दिप्ती", "गीता", "कविता", "लक्ष्मी",
+    "मनिषा", "निशा", "पूजा", "प्रतिमा", "रिता", "सावित्री", "सरिता", "श्रेया",
+]
+NEPALI_LAST_NE = [
+    "शर्मा", "अधिकारी", "गुरुङ", "तामाङ", "श्रेष्ठ", "राई", "थापा", "मगर",
+    "भण्डारी", "कार्की", "आचार्य", "वस्नेत", "भट्टराई", "दाहाल", "जोशी", "क्षेत्री",
+]
+OCCUPATIONS = [
+    "Farmer", "Teacher", "Business", "Driver", "Housewife",
+    "Government Service", "Abroad Employment", "Shopkeeper",
+]
+DISTRICTS_POOL = ["Kathmandu", "Lalitpur", "Bhaktapur", "Kavre", "Dhading", "Sindhupalchok"]
+BLOOD_GROUPS_POOL = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+
+
+def _nepali_name(counter: int) -> tuple[str, str, str, str, str]:
+    """Deterministic (english_first, english_last, nepali_first, nepali_last,
+    gender) for a sequential counter — stable across re-runs."""
+    r = random.Random(9000 + counter)
+    male = r.random() < 0.5
+    first = r.choice(NEPALI_MALE_FIRST if male else NEPALI_FEMALE_FIRST)
+    last = r.choice(NEPALI_LAST)
+    first_ne = r.choice(NEPALI_MALE_FIRST_NE if male else NEPALI_FEMALE_FIRST_NE)
+    last_ne = r.choice(NEPALI_LAST_NE)
+    return first, last, first_ne, last_ne, ("male" if male else "female")
+
 
 REQUIRED_PLUGIN_SLUGS = [
     "academics",
@@ -361,13 +413,15 @@ def _ensure_teacher(school: School, idx: int) -> User:
             teacher.set_password(expected_teacher_password)
         return teacher
 
+    first, last, first_ne, last_ne, gender = _nepali_name(500 + idx)
     teacher = User(
         school_id=school.id,
         role="teacher",
-        full_name=f"Teacher {idx}",
+        full_name=f"{first} {last}",
+        full_name_nepali=f"{first_ne} {last_ne}",
         phone=phone,
         email=email,
-        gender="male" if idx % 2 == 0 else "female",
+        gender=gender,
         is_active=True,
         phone_verified=True,
     )
@@ -452,11 +506,13 @@ def _ensure_students_and_guardians(
                     phone=student_phone,
                     is_deleted=False,
                 ).first()
+                first, last, first_ne, last_ne, gender = _nepali_name(student_counter)
                 if not user:
                     user = User(
                         school_id=school.id,
                         role="student",
-                        full_name=f"Student {student_counter}",
+                        full_name=f"{first} {last}",
+                        full_name_nepali=f"{first_ne} {last_ne}",
                         phone=student_phone,
                         email=student_email,
                         is_active=True,
@@ -472,11 +528,17 @@ def _ensure_students_and_guardians(
                     is_deleted=False,
                 ).first()
                 if not student:
+                    demo_r = random.Random(7000 + student_counter)
+                    birth_year = 2026 - (5 + klass.numeric_grade) - (student_counter % 2)
+                    dob = date(birth_year, demo_r.randint(1, 12), demo_r.randint(1, 28))
+                    district = demo_r.choice(DISTRICTS_POOL)
                     student = Student(
                         school_id=school.id,
                         user_id=user.id,
-                        first_name="Student",
-                        last_name=str(student_counter),
+                        first_name=first,
+                        first_name_nepali=first_ne,
+                        last_name=last,
+                        last_name_nepali=last_ne,
                         student_id=student_id,
                         roll_number=roll,
                         class_id=klass.id,
@@ -484,7 +546,22 @@ def _ensure_students_and_guardians(
                         academic_year_id=year.id,
                         academic_year=year.name,
                         status="active",
-                        gender="male" if student_counter % 2 == 0 else "female",
+                        gender=gender,
+                        dob_ad=dob,
+                        nationality="Nepali",
+                        blood_group=demo_r.choice(BLOOD_GROUPS_POOL),
+                        mother_tongue=demo_r.choice(
+                            ["Nepali", "Nepali", "Nepali", "Tamang", "Newari"]
+                        ),
+                        permanent_province="Bagmati",
+                        permanent_district=district,
+                        permanent_municipality="Kathmandu Metropolitan City",
+                        permanent_ward=str(demo_r.randint(1, 32)),
+                        address={
+                            "street": f"Ward {demo_r.randint(1, 32)}, {district}",
+                            "district": district,
+                            "province": "Bagmati",
+                        },
                         admission_number=f"ADM-{student_code}",
                         admission_date_ad=date.today() - timedelta(days=300),
                     )
@@ -508,11 +585,27 @@ def _ensure_students_and_guardians(
                     phone=parent_phone,
                     is_deleted=False,
                 ).first()
+                g_relation_r = random.Random(4000 + parent_counter)
+                parent_relation = "father" if parent_counter % 2 == 0 else "mother"
+                # Guardian name gender matches the relation so demo data reads naturally.
+                if parent_relation == "father":
+                    g_first = g_relation_r.choice(NEPALI_MALE_FIRST)
+                    g_first_ne = g_relation_r.choice(NEPALI_MALE_FIRST_NE)
+                else:
+                    g_first = g_relation_r.choice(NEPALI_FEMALE_FIRST)
+                    g_first_ne = g_relation_r.choice(NEPALI_FEMALE_FIRST_NE)
+                # Last names are gender-neutral in Nepal — reuse the deterministic pick.
+                _, g_last, _, g_last_ne, _ = _nepali_name(4000 + parent_counter)
+                g_occupation = g_relation_r.choice(
+                    OCCUPATIONS if parent_relation == "father"
+                    else ["Housewife", "Teacher", "Business", "Government Service", "Farmer", "Shopkeeper"]
+                )
                 if not parent:
                     parent = User(
                         school_id=school.id,
                         role="parent",
-                        full_name=f"Parent {parent_counter}",
+                        full_name=f"{g_first} {g_last}",
+                        full_name_nepali=f"{g_first_ne} {g_last_ne}",
                         phone=parent_phone,
                         email=parent_email,
                         is_active=True,
@@ -543,9 +636,11 @@ def _ensure_students_and_guardians(
                         student_id=student.id,
                         user_id=parent.id,
                         full_name=parent.full_name,
+                        full_name_nepali=parent.full_name_nepali,
                         phone=parent.phone,
-                        relation="father" if parent_counter % 2 == 0 else "mother",
+                        relation=parent_relation,
                         is_primary=True,
+                        occupation=random.Random(6000 + parent_counter).choice(OCCUPATIONS),
                     )
                     db.session.add(guardian)
 
