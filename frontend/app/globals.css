@@ -108,11 +108,8 @@
   background: hsl(var(--sidebar-bg-active));
 }
 
-/* Nepali font support */
-@font-face {
-  font-family: "Mukta";
-  src: url("https://fonts.googleapis.com/css2?family=Mukta:wght@200;300;400;500;600;700;800&display=swap");
-}
+/* Nepali font support is loaded via next/font/google in layout.tsx (--font-mukta) */
+
 
 /* ── Compact content area — IEMIS-style dense layout ─────────────────────── */
 /* Applied to main content via .compact-content wrapper in dashboard-layout    */
