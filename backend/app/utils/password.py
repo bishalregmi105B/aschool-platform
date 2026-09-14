@@ -15,7 +15,7 @@ Scheme (configurable per school via the User Management plugin, slug
     staff/other    {first}.{last4}                   sita.4821
 
 Config keys (SchoolPlugin.config of plugin slug ``users``, read via
-app.plugins.config_store.plugin_config_value):
+app.apps.config_store.plugin_config_value):
 
     credentials.student_pattern   → student pattern override
     credentials.parent_pattern    → parent pattern override
@@ -191,7 +191,7 @@ def _patterns_for(school_id) -> dict:
             g._default_password_patterns = cache
         key = str(school_id)
         if key not in cache:
-            from app.plugins.config_store import plugin_config_value
+            from app.apps.config_store import plugin_config_value
 
             resolved = {}
             for role, config_key in _CONFIG_KEYS.items():

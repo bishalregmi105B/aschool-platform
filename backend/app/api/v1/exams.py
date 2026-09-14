@@ -13,7 +13,7 @@ from app.models.academic import Class, Section, Subject
 from app.models.exam import Exam, Marks, OnlineExam, OnlineExamAttempt, ReportCard, MarkComponent, GradeScale
 from app.models.school import School
 from app.models.student import Guardian, Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepal_grading import GRADE_TABLE, calculate_gpa, calculate_grade, calculate_subject_grade
 from app.utils.pagination import paginate
@@ -392,7 +392,7 @@ def create_online_exam():
     db.session.add(exam)
     db.session.commit()
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school(
             "exams.scheduled",
@@ -536,7 +536,7 @@ def submit_online_exam(online_exam_id):
             409,
         )
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit(
         "online_exam.submitted",
@@ -785,7 +785,7 @@ def create_exam():
     db.session.add(exam)
     db.session.commit()
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school("exams.scheduled", school_id=str(g.school_id), exam_id=str(exam.id))
     except Exception:
@@ -1182,7 +1182,7 @@ def submit_marks(exam_id):
             409,
         )
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit("exams.marks_entered", school_id=str(g.school_id), exam_id=str(exam_id))
 
@@ -1701,7 +1701,7 @@ def generate_designer_marksheets(exam_id):
     Requires both 'exams' and 'design_studio' plugins to be active.
     Returns rendered HTML/canvas for each student.
     """
-    from app.plugins.decorators import _school_has_plugin
+    from app.apps.decorators import _school_has_plugin
 
     if not _school_has_plugin(str(g.school_id), "design_studio"):
         return error_response(
@@ -1753,7 +1753,7 @@ def publish_results(exam_id):
     exam.status = "result_published"
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit("exams.result_published", school_id=str(g.school_id), exam_id=str(exam_id))
 

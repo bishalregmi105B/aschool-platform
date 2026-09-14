@@ -331,7 +331,7 @@ def whatsapp_incoming():
     verification runs whenever WHATSAPP_APP_SECRET is configured.
     """
     from app.models.notification import WhatsAppBotConfig, WhatsAppMessage
-    from app.plugins.events import emit_for_school
+    from app.apps.events import emit_for_school
     from app.services.communications.whatsapp_cloud import WhatsAppCloudService
 
     payload_bytes = request.get_data()
@@ -605,7 +605,7 @@ def stripe_webhook():
                 f"(cycle={billing_cycle})"
             )
 
-            from app.plugins.billing import _invalidate_plugin_cache
+            from app.apps.billing import _invalidate_plugin_cache
 
             _invalidate_plugin_cache(str(school_id))
 
@@ -781,7 +781,7 @@ def _finalize_fee_payment(collection, gateway, amount, transaction_id, initiatio
     db.session.commit()
 
     try:
-        from app.plugins.events import emit
+        from app.apps.events import emit
         emit(
             "fees.collected",
             school_id=str(collection.school_id),

@@ -2,7 +2,7 @@
 import pytest
 
 from app.models.plugin import Plugin, SchoolPlugin
-from app.plugins.billing import install_plugin, uninstall_plugin
+from app.apps.billing import install_plugin, uninstall_plugin
 
 
 class TestInstallPlugin:

@@ -6,7 +6,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.models.notice import Notice, Event
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -108,7 +108,7 @@ def create_notice():
     db.session.commit()
 
     # Emit event
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit("notice.published", school_id=str(g.school_id), notice_id=str(notice.id))
 
     return created_response(_notice_dict(notice))

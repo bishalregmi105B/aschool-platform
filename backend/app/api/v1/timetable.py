@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 from app.models.academic import Class, Section, Subject
 from app.models.timetable import TimetableSlot
 from app.models.user import User
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -81,7 +81,7 @@ def generate_timetable():
         start_time=data.get("start_time", "10:00"),
     )
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school("timetable.generated", school_id=str(g.school_id))
     except Exception:
@@ -120,7 +120,7 @@ def save_timetable():
     saved = TimetableSolverService.save_timetable(g.school_id, data)
     db.session.commit()
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school("timetable.generated", school_id=str(g.school_id))
     except Exception:

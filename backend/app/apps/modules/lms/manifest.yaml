@@ -1,0 +1,64 @@
+slug: lms
+name: Learning Management System
+name_nepali: शिक्षण व्यवस्थापन प्रणाली
+category: growth
+price_monthly: 149
+price_yearly: 1490
+emoji: 📹
+icon: MonitorPlay
+version: 1.0.0
+description: Live classes via Jitsi, recorded class library, course builder, AI adaptive
+  learning paths, student watch analytics
+tasks: null
+depends_on:
+- attendance
+- academics
+conflicts_with: []
+events:
+  emits:
+  listens:
+  - attendance.marked
+  - exams.result_published
+capabilities:
+  api_blueprint: app.api.v1.lms
+  models_module: app.models.lms
+  services:
+  - app.services.lms.video_service
+  - app.services.ai.adaptive_learning
+ui:
+  nav:
+    route: /dashboard/lms
+    section: Learning
+    label: LMS
+    label_nepali: एल.एम.एस
+    icon: MonitorPlay
+    visible_to:
+    - school_admin
+    - teacher
+    - student
+  aos:
+    about: "Deliver classes online — live Jitsi classes, a recorded class library, course builder, and student watch analytics."
+mobile:
+  admin:
+    feature_folder: lms
+    tabs:
+    - Course Management
+    - Live Class Schedule
+  teacher:
+    feature_folder: lms
+    tabs:
+    - My Courses
+    - Start Live Class
+    - Recordings
+  parent:
+    feature_folder: lms
+    tabs:
+    - Child's Courses
+    - Watch History
+  student:
+    feature_folder: lms
+    tabs:
+    - My Courses
+    - Live Classes
+    - Recordings
+schema_version: 2

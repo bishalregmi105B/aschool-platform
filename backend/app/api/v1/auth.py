@@ -660,7 +660,7 @@ def register_school():
     # No trial rows are ever created at signup (E1/E1b).
     plugins_granted: list[dict] = []
     try:
-        from app.plugins.entitlements import ensure_free_plugins
+        from app.apps.entitlements import ensure_free_plugins
         plugins_granted = ensure_free_plugins(school, plan=plan)
     except Exception:
         current_app.logger.exception(

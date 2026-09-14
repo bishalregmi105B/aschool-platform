@@ -15,7 +15,7 @@ from app.models.lms import (
     StudyMaterial,
     Topic,
 )
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response

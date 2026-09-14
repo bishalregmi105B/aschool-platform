@@ -38,8 +38,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithOtp: (phone: string, otp: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  loginWithOtp: (phone: string, otp: string) => Promise<User>;
   sendOtp: (phone: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -91,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(typeof res.data.error === "string" ? res.data.error : "Login failed");
       }
       setUser(res.data.data.user);
+      return res.data.data.user;
     } catch (err: unknown) {
       throw new Error(extractErrorMessage(err, "Login failed"));
     }
@@ -117,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(typeof res.data.error === "string" ? res.data.error : "OTP verification failed");
       }
       setUser(res.data.data.user);
+      return res.data.data.user;
     } catch (err: unknown) {
       throw new Error(extractErrorMessage(err, "OTP verification failed"));
     }

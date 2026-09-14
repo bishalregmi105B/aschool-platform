@@ -605,7 +605,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(webhooks_bp, url_prefix="/webhooks")
 
     # Load plugins
-    from app.plugins.loader import PluginLoader
+    from app.apps.loader import PluginLoader
 
     PluginLoader.discover_and_register(app)
 
@@ -666,7 +666,7 @@ def create_app(config_name: str | None = None) -> Flask:
     register_audit_listeners()
 
     # Register cross-plugin event listeners
-    from app.plugins import listeners  # noqa: F401 — registers @on() handlers
+    from app.apps import listeners  # noqa: F401 — registers @on() handlers
 
     # Socket.IO rooms for realtime events (join_school / leave_school)
     from app import realtime  # noqa: F401 — registers socketio.on() handlers

@@ -288,6 +288,15 @@ export function getDefaultHomeWidgets(role: string | undefined): string[] {
   if (role === "teacher") {
     return ["today-schedule", "attendance-today", "recent-notices", "quick-launch"];
   }
+  if (role === "student") {
+    // Timetable-today + assignments-due + notices — the "what do I do next"
+    // board. Falls back gracefully where a widget is unavailable.
+    return ["today-schedule", "recent-notices", "notifications", "quick-launch"];
+  }
+  if (role === "parent") {
+    // Child status board: notices first (school→home channel), then the rest.
+    return ["recent-notices", "notifications", "quick-launch"];
+  }
   return ["recent-notices", "notifications", "quick-launch"];
 }
 

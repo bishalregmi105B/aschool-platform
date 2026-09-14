@@ -6,7 +6,7 @@ students + staff, per-turn metering through the hub.
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.services.ai.tutor_engine import TutorEngine
 from app.services.ai.workbench import ToolPipelineError
 from app.utils.decorators import role_required, school_required

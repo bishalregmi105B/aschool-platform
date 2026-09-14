@@ -388,7 +388,7 @@ def create_class():
 
     db.session.commit()
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school("academics.class_created", school_id=str(g.school_id), class_id=str(cls.id))
     except Exception:

@@ -1,0 +1,70 @@
+slug: library_management
+name: Library Management
+name_nepali: पुस्तकालय व्यवस्थापन
+category: starter
+price_monthly: 99
+price_yearly: 990
+emoji: 📚
+icon: Library
+version: 1.0.0
+description: Book catalog, issue/return, overdue tracking
+depends_on: []
+conflicts_with: []
+events:
+  emits:
+  - library.issued
+  - library.returned
+  - library.overdue
+  - library.hold_requested
+  - library.hold_ready
+  - library.fine_created
+  - library.fine_paid
+  listens: []
+capabilities:
+  api_blueprint: app.api.v1.library
+  models_module: app.models.library
+ui:
+  nav:
+    route: /library
+    section: Learning
+    label: Library
+    label_nepali: पुस्तकालय
+    icon: Library
+    visible_to:
+    - school_admin
+    - teacher
+    - student
+    subitems:
+    - label: Catalog
+      route: /library/catalog
+    - label: Issue/Return
+      route: /library/checkout
+    - label: Overdue
+      route: /library/overdue
+      visible_to:
+      - school_admin
+    - label: Holds
+      route: /library/reservations
+    - label: Fines
+      route: /library/fines
+      visible_to:
+      - school_admin
+    - label: Stock-take
+      route: /library/stocktake
+    - label: Reports
+      route: /library/reports
+  aos:
+    about: "Run the school library — catalog, issue and return, holds, overdue tracking, fines, and stock-takes."
+mobile:
+  admin:
+    feature_folder: library
+    tabs:
+    - Catalog
+    - Transactions
+    - Overdue
+  student:
+    feature_folder: library
+    tabs:
+    - Browse
+    - My Books
+schema_version: 2

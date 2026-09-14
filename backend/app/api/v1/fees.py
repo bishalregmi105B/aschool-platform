@@ -28,7 +28,7 @@ from app.models.fee import (
 )
 from app.models.school import School
 from app.models.student import Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import (
@@ -1536,7 +1536,7 @@ def record_payment(collection_id):
             _recompute_invoice_status(invoice)
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit(
         "fees.collected",
@@ -4219,7 +4219,7 @@ def approve_offline_submission(submission_id):
     sub.review_notes = str(approve_body.get("review_notes") or "")[:500] or None
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit(
         "fees.collected",

@@ -111,7 +111,7 @@ def get_student(student_id):
 
 from app.models.student import Guardian, Student
 from app.models.user import User
-from app.plugins.entitlements import student_cap_error
+from app.apps.entitlements import student_cap_error
 from app.services.student_numbers import ensure_student_numbers
 from app.utils.password import generate_default_password
 

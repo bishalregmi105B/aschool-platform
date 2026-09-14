@@ -8,8 +8,8 @@ tests assert absence from the payload, not a flag on it.
 
 import pytest
 
-from app.plugins.loader import PluginLoader
-from app.plugins.widgets import (
+from app.apps.loader import PluginLoader
+from app.apps.widgets import (
     default_layout,
     load_plugin_widgets,
     reset_cache,
@@ -265,7 +265,7 @@ class TestWidgetsEndpoint:
                 school_id=school.id, active=True
             ).all()
         }
-        from app.plugins.decorators import _acceptable_plugin_slugs
+        from app.apps.decorators import _acceptable_plugin_slugs
 
         for slug in returned:
             assert _acceptable_plugin_slugs(slug) & installed, (

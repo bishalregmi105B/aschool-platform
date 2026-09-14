@@ -21,6 +21,7 @@ import { LayoutGrid, Layers, Sparkles } from "lucide-react";
 import { WindowInstance, SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins, PluginSidebarItem } from "@/lib/plugins";
 import { getAOSAppForModule, normalizeAOSModuleId } from "@/lib/aos-app-adapter";
+import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
 
 interface DynamicDockApp {
   id: string;
@@ -168,7 +169,7 @@ export default function Dock({
 
   // Add active plugins into appCatalog
   plugins.forEach((p) => {
-    if (p.isInstalled && p.isActive && (p.allowedRoles.includes(currentRole) || currentRole === "admin")) {
+    if (p.isInstalled && p.isActive && (p.allowedRoles.includes(currentRole) || isAdminLike(currentRole))) {
       appCatalog[p.id] = {
         id: p.id,
         title: p.name,
@@ -221,8 +222,8 @@ export default function Dock({
   // Filter pinned apps that exist and are authorized
   const visiblePinnedApps = pinnedAppIds
     .filter((id) => {
-      if (id === "admin" && currentRole !== "admin") return false;
-      if (id === "finance" && currentRole !== "accountant" && currentRole !== "admin") return false;
+      if (id === "admin" && !isAdminLike(currentRole)) return false;
+      if (id === "finance" && !isAccountantLike(currentRole)) return false;
       return Boolean(appCatalog[id]);
     })
     .map((id) => appCatalog[id]);

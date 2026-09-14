@@ -3,7 +3,7 @@
 from flask import Blueprint, g, request, send_file
 from flask_jwt_extended import jwt_required
 
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import error_response, success_response
 from extensions import db

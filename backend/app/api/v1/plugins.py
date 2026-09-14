@@ -10,7 +10,7 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.plugin import Plugin, SchoolPlugin
-from app.plugins.billing import (
+from app.apps.billing import (
     activate_plugin,
     deactivate_plugin,
     effective_trial_days,
@@ -18,11 +18,11 @@ from app.plugins.billing import (
     plugin_is_free,
     uninstall_plugin,
 )
-from app.plugins.entitlements import ensure_free_plugins
-from app.plugins import config_schema as plugin_config_schema
+from app.apps.entitlements import ensure_free_plugins
+from app.apps import config_schema as plugin_config_schema
 
 from datetime import datetime, timedelta, timezone
-from app.plugins.loader import PluginLoader
+from app.apps.loader import PluginLoader
 from app.utils.decorators import role_required, school_required
 from app.utils.response import (
     created_response,
@@ -516,7 +516,7 @@ def start_trial(slug):
     # Trial installs mint a SchoolPlugin row too — run the activation hook.
     _run_plugin_hook(slug, "activate")
 
-    from app.plugins.billing import _invalidate_plugin_cache
+    from app.apps.billing import _invalidate_plugin_cache
 
     _invalidate_plugin_cache(str(g.school_id))
 
@@ -714,7 +714,7 @@ def subscribe(slug):
     # hook (idempotent: table creation is checkfirst).
     _run_plugin_hook(slug, "activate")
 
-    from app.plugins.billing import _invalidate_plugin_cache
+    from app.apps.billing import _invalidate_plugin_cache
 
     _invalidate_plugin_cache(str(g.school_id))
 
@@ -1054,7 +1054,7 @@ def plugin_widgets():
     match, is ABSENT from the payload. `default_layout` is what a school that
     has never customized its dashboard sees.
     """
-    from app.plugins.widgets import default_layout, widgets_for
+    from app.apps.widgets import default_layout, widgets_for
 
     surface = request.args.get("surface", "web")
     slot = request.args.get("slot") or None
@@ -1116,7 +1116,7 @@ def plugin_registry():
     answers "what does the platform actually think is installed on disk, and
     which manifests are lying?" without shell access to the container.
     """
-    from app.plugins.validator import validate_all
+    from app.apps.validator import validate_all
 
     manifests = PluginLoader.get_all_manifests()
     findings = validate_all()

@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required
 from app.models.gamification import Badge, StudentBadge, PointsLog, House, Reward
 from app.models.student import Student
 from app.models.academic import Class
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -94,7 +94,7 @@ def award_points():
     db.session.add(log)
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit("gamification.points_awarded", school_id=str(g.school_id),
          student_id=student_id, points=points)
 
@@ -157,7 +157,7 @@ def award_badge():
     db.session.add(sb)
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit("gamification.badge_earned", school_id=str(g.school_id),
          student_id=student_id, badge_id=badge_id)
 

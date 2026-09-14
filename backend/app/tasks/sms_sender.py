@@ -84,7 +84,7 @@ def send_sms(phone: str, message: str, school_id: str = None, log_id: str = None
         cost=data.get("count", 1) if isinstance(data.get("count"), int) else 1,
     )
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         if school_id:
             # E-02: the comms vocabulary event — no PII in kwargs.

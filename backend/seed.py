@@ -13,8 +13,8 @@ from app import create_app
 from extensions import db
 from app.models.school import School
 from app.models.user import User
-from app.plugins.billing import install_plugin
-from app.plugins.loader import PluginLoader
+from app.apps.billing import install_plugin
+from app.apps.loader import PluginLoader
 
 CORE_PLUGINS = ["attendance", "notices", "academics", "basic_reports", "basic_website"]
 

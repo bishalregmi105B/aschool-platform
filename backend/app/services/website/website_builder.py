@@ -186,7 +186,7 @@ class WebsiteBuilderService:
         silently falls back to the platform default.
         """
         try:
-            from app.plugins.config_store import plugin_config_value
+            from app.apps.config_store import plugin_config_value
             from app.services.website.theme_engine import ThemeEngineService
 
             configured = plugin_config_value(

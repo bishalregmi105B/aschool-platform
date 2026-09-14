@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 from app.models.school import School, SchoolWebsite
 from app.models.notice import Notice
 from app.models.website import WebsitePage
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from sqlalchemy import or_
 
@@ -1207,7 +1207,7 @@ def guest_fee_initiate(slug):
         # Not a decorated function: call needs app+g context; the public
         # request has no g.school_id — resolve the school's methods directly
         # from the fees plugin config store instead.
-        from app.plugins.config_store import get_plugin_config
+        from app.apps.config_store import get_plugin_config
 
         methods = _methods_from_plugin_config(school.id)
     method_index = {m["key"]: m for m in (methods or [])}
@@ -1277,7 +1277,7 @@ def _methods_from_plugin_config(school_id):
     """Per-school payment-method rows from the fees plugin config (the
     guest path has no JWT, so fees.py's g-bound resolver can't run)."""
     try:
-        from app.plugins.config_store import get_plugin_config
+        from app.apps.config_store import get_plugin_config
 
         cfg = get_plugin_config(str(school_id), "fees", {}) or {}
         methods = cfg.get("payment_methods")

@@ -26,8 +26,8 @@ from typing import Any
 from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app.plugins.decorators import plugin_required
-from app.plugins.entitlements import StudentCapExceededError
+from app.apps.decorators import plugin_required
+from app.apps.entitlements import StudentCapExceededError
 from app.services.student_numbers import ensure_student_numbers
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
@@ -371,7 +371,7 @@ def _import_students(rows: list[dict], school_id, dry_run: bool = False) -> dict
     #    would create would push the school past School.max_students
     #    (NULL/0 = unlimited). Preview/dry-run imports are not capped.
     if not dry_run:
-        from app.plugins.entitlements import (
+        from app.apps.entitlements import (
             StudentCapExceededError,
             student_cap_error,
         )
@@ -1175,7 +1175,7 @@ def run_import():
         db.session.commit()
 
         # Emit event
-        from app.plugins.events import emit
+        from app.apps.events import emit
 
         emit(
             "iemis.import_completed",

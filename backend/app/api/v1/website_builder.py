@@ -7,7 +7,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
 from app.models.website import WebsitePage, WebsiteTheme
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -995,7 +995,7 @@ def publish_website():
     db.session.commit()
 
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school("website.published", school_id=str(g.school_id), page="home")
     except Exception:

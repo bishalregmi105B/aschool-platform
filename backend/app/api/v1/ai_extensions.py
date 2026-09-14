@@ -2,7 +2,7 @@
 from flask import Blueprint, g, request
 from flask_jwt_extended import jwt_required
 
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.services.ai import extensions as ext
 from app.utils.decorators import school_required
 from app.utils.response import success_response, error_response

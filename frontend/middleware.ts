@@ -150,6 +150,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // ─── Portal auth guards (teacher / student / parent) ──
+  // Same pattern as the super-admin guard: the JWT `role` claim is read
+  // (unverified here — the portal layout re-verifies via /auth/me and every
+  // portal API is role-gated server-side). With only a refresh cookie the
+  // role claim may be absent; the request passes and the client-side layout
+  // guard handles it after refresh.
+  const PORTAL_ROUTES: Array<{ prefix: string; role: string; home: string }> = [
+    { prefix: "/teacher", role: "teacher", home: "/dashboard" },
+    { prefix: "/student", role: "student", home: "/dashboard" },
+    { prefix: "/parent", role: "parent", home: "/dashboard" },
+  ];
+  for (const portal of PORTAL_ROUTES) {
+    if (pathname === portal.prefix || pathname.startsWith(`${portal.prefix}/`)) {
+      if (hasNoSession) {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+      const role = token && !isTokenExpired(token) ? getTokenRole(token) : null;
+      // Admin-family roles may inspect any portal (support workflow); a
+      // wrong-role portal user (e.g. a student at /teacher) goes home.
+      if (role && role !== portal.role && role !== "superadmin" && role !== "school_admin") {
+        return NextResponse.redirect(new URL(portal.home, request.url));
+      }
+      break;
+    }
+  }
+
   // ─── Super admin guard (auth + role) ───────────────
   if (pathname === "/super-admin" || pathname.startsWith("/super-admin/")) {
     const isSuperadmin =

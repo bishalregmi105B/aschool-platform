@@ -19,10 +19,14 @@ export interface WindowInstance {
 export type SchoolRole =
   | "student"
   | "teacher"
-  | "admin"
+  | "school_admin"
   | "accountant"
   | "superadmin"
+  | "staff"
   | "parent"
+  // Legacy alias kept for persisted settings written before the backend's
+  // "school_admin" value was standardized; normalize via lib/role-routing.
+  | "admin"
   | string;
 
 export interface UserProfile {

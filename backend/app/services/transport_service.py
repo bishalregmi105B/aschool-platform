@@ -358,7 +358,7 @@ def _fire_alert(school_id, instance, reservation, event: str) -> bool:
                     )
                 )
         db.session.commit()
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school(
             f"transport.{event}",

@@ -13,7 +13,7 @@ from app.models.hr_payroll import (
     StaffPayroll,
 )
 from app.models.user import User
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -201,11 +201,11 @@ def generate_payroll():
     #     "deductions": [...same shapes...],
     #   }
     # The hr_payroll plugin's own per-school config (SchoolPlugin.config,
-    # readable via app.plugins.config_store) overrides that block when it
+    # readable via app.apps.config_store) overrides that block when it
     # carries a non-empty "payroll" section, so plugin-level settings win.
     from app.models.school import School
 
-    from app.plugins.config_store import get_plugin_config
+    from app.apps.config_store import get_plugin_config
 
     school = School.query.get(g.school_id)
     payroll_settings = {}

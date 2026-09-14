@@ -1,6 +1,6 @@
 """Gamification streak updater — updates daily streaks and awards badges."""
 from extensions import celery
-from app.plugins.events import emit_for_school
+from app.apps.events import emit_for_school
 import logging
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from app.models.admission import AdmissionInquiry, AdmissionApplication
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -312,10 +312,10 @@ def update_application_status(app_id):
 
     # Fire integration events based on status transitions
     if new_status == "accepted" and current != "accepted":
-        from app.plugins.events import emit
+        from app.apps.events import emit
         emit("admission.accepted", school_id=str(g.school_id), application_id=str(application.id))
     elif new_status == "enrolled" and current != "enrolled":
-        from app.plugins.events import emit
+        from app.apps.events import emit
         emit("admission.enrolled", school_id=str(g.school_id), application_id=str(application.id))
 
     return success_response(_app_dict(application))

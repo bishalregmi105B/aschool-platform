@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { postLoginDestination, homeRouteForRole } from "@/lib/role-routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,13 +45,18 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, login, loginWithOtp, sendOtp } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user, login, loginWithOtp, sendOtp } = useAuth();
+
+  // Deep-link support: after login, return where the visitor was heading
+  // (validated relative path — postLoginDestination rejects open redirects).
+  const nextParam =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace(postLoginDestination(user?.role, nextParam));
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, user, router, nextParam]);
 
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
     resolver: zodResolver(phoneSchema),
@@ -81,8 +87,8 @@ export default function LoginPage() {
   const handleVerifyOtp = async (data: z.infer<typeof otpSchema>) => {
     setLoading(true);
     try {
-      await loginWithOtp(phone, data.otp);
-      router.push("/dashboard");
+      const loggedIn = await loginWithOtp(phone, data.otp);
+      router.push(postLoginDestination(loggedIn.role, nextParam));
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Invalid OTP");
     } finally {
@@ -93,8 +99,8 @@ export default function LoginPage() {
   const handlePasswordLogin = async (data: z.infer<typeof passwordSchema>) => {
     setLoading(true);
     try {
-      await login(data.email, data.password);
-      router.push("/dashboard");
+      const loggedIn = await login(data.email, data.password);
+      router.push(postLoginDestination(loggedIn.role, nextParam));
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Login failed");
     } finally {

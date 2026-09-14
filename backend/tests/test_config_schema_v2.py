@@ -6,7 +6,7 @@ the migration runner is lazy + snapshotted + never half-migrates.
 """
 import pytest
 
-from app.plugins import config_schema as cs
+from app.apps import config_schema as cs
 
 
 def _schema(**field_overrides):
@@ -129,7 +129,7 @@ def test_role_and_group_filtering():
 
 
 def test_ensure_config_version_never_half_migrates(monkeypatch):
-    from app.plugins import config_schema as mod
+    from app.apps import config_schema as mod
 
     monkeypatch.setattr(mod, "load_schema", lambda slug: mod.Schema(2, 3, [], []))
     calls = []
@@ -147,7 +147,7 @@ def test_ensure_config_version_never_half_migrates(monkeypatch):
 
 
 def test_resolve_config_applies_defaults(monkeypatch):
-    from app.plugins import config_schema as mod
+    from app.apps import config_schema as mod
 
     schema = mod.Schema(2, 1, [], [
         {"key": "retries", "type": "int", "default": 5},

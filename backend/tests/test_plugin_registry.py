@@ -12,8 +12,8 @@ from sqlalchemy import inspect, text
 
 from app.api.v1.plugins import _catalog_entries
 from app.models.plugin import Plugin, SchoolPlugin
-from app.plugins.billing import install_plugin, uninstall_plugin
-from app.plugins.loader import PluginLoader
+from app.apps.billing import install_plugin, uninstall_plugin
+from app.apps.loader import PluginLoader
 
 # The plugin blueprints moved into their module folders (routes.py).
 # social_ads lived here too until W0 (2026-09-04) deleted the plugin outright;

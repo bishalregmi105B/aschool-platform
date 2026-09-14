@@ -9,7 +9,7 @@ Covers the W0-close items from UNIFIED_ROADMAP v3 §5 B1:
 
 import pytest
 
-from app.plugins.decorators import _acceptable_plugin_slugs
+from app.apps.decorators import _acceptable_plugin_slugs
 
 # ── Gate canonicalization ──────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ def test_ai_suite_gate_accepts_every_legacy_install():
 
 def test_every_gate_slug_is_canonical_or_alias_resolvable():
     """Each gated slug must either be a manifest slug or alias-map to one."""
-    from app.plugins.loader import PluginLoader
+    from app.apps.loader import PluginLoader
 
     PluginLoader._scan_manifests()
     aliases = PluginLoader.alias_map()

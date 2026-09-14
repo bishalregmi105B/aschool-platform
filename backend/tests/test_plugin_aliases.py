@@ -1,7 +1,7 @@
 """Regression tests for plugin alias compatibility."""
 
 from app.models.plugin import Plugin, SchoolPlugin
-from app.plugins.decorators import _acceptable_plugin_slugs
+from app.apps.decorators import _acceptable_plugin_slugs
 from tests.conftest import get_auth_headers
 
 

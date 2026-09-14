@@ -74,7 +74,7 @@ def test_matrix_gates_absent_alert_sms(env, monkeypatch):
     """A disabled sms rule for attendance.absent_alert stops the SMS send
     while push/in-app legs are untouched (the listener's real path)."""
     from app.models.student import Guardian, Student
-    from app.plugins.events import emit_for_school
+    from app.apps.events import emit_for_school
 
     db, school = env["db"], env["school"]
     klass_obj = _quick_class(db, school)

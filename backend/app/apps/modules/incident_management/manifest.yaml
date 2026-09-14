@@ -1,0 +1,47 @@
+slug: incident_management
+name: Full Incident Management
+name_nepali: पूर्ण घटना व्यवस्थापन
+category: growth
+price_monthly: 199
+price_yearly: 1990
+emoji: 📋
+icon: ShieldAlert
+version: 1.0.0
+description: Full behavior management — witnesses, escalation, parent conferences
+depends_on:
+- incidents
+conflicts_with: []
+capabilities:
+  api_blueprint: app.apps.modules.incident_management.routes
+  models_module: app.models.incident
+ui:
+  nav:
+    route: /incident-management
+    section: Safety & Compliance
+    label: Incident Mgmt
+    label_nepali: घटना व्यवस्थापन
+    icon: ShieldAlert
+    visible_to:
+    - school_admin
+    subitems:
+    - label: Active Cases
+      route: /incident-management/active
+    - label: Escalations
+      route: /incident-management/escalations
+    - label: Reports
+      route: /incident-management/reports
+  aos:
+    about: "Handle serious behavior cases in full — witnesses, escalation, parent conferences, and case reports."
+mobile:
+  admin:
+    feature_folder: incident_management
+    tabs:
+    - Cases
+    - Escalations
+    - Reports
+  teacher:
+    feature_folder: incident_management
+    tabs:
+    - Report
+    - My Cases
+schema_version: 2

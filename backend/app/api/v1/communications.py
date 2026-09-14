@@ -24,7 +24,7 @@ from app.services.chat_service import (
     parse_user_id,
     send_message as persist_chat_message,
 )
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from extensions import db

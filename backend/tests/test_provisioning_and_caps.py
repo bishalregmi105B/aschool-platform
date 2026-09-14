@@ -15,8 +15,8 @@ from app.models.admission import AdmissionApplication
 from app.models.ai_token import AISchoolQuota
 from app.models.student import Student
 from app.models.user import User
-from app.plugins import listeners  # noqa: F401 — registers @on() handlers
-from app.plugins.events import emit
+from app.apps import listeners  # noqa: F401 — registers @on() handlers
+from app.apps.events import emit
 from extensions import db
 
 

@@ -22,6 +22,7 @@ import { SchoolRole, EducationalPlugin } from "@/components/aos/types";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { useI18n } from "@/lib/i18n";
 import { getAOSAppForModule, SECTION_GRADIENTS } from "@/lib/aos-app-adapter";
+import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
 import type { ResolvedAOSDesktopFolder } from "@/lib/aos-launcher";
 
 interface AppDrawerProps {
@@ -133,7 +134,7 @@ export default function AppDrawer({
         icon: <AOSCampusIcon size={52} />,
         desc: "Bus arrival times, dining menus & campus map",
       },
-      ...(currentRole === "admin"
+      ...(isAdminLike(currentRole)
         ? [
             {
               id: "admin",
@@ -145,7 +146,7 @@ export default function AppDrawer({
             },
           ]
         : []),
-      ...(currentRole === "accountant" || currentRole === "admin"
+      ...(isAccountantLike(currentRole)
         ? [
             {
               id: "finance",
@@ -192,7 +193,7 @@ export default function AppDrawer({
 
     // Add passed plugins
     const pluginList: AppDrawerItem[] = plugins
-      .filter((p) => p.isInstalled && p.isActive && (p.allowedRoles.includes(currentRole) || currentRole === "admin"))
+      .filter((p) => p.isInstalled && p.isActive && (p.allowedRoles.includes(currentRole) || isAdminLike(currentRole)))
       .map((p) => ({
         id: p.id,
         name: p.name,
@@ -297,7 +298,7 @@ export default function AppDrawer({
     { id: "academics", label: "Academics & Vault" },
     { id: "stem", label: "STEM & Science" },
     { id: "campus", label: "Campus Life" },
-    ...(currentRole === "admin" || currentRole === "accountant"
+    ...(isAccountantLike(currentRole)
       ? [{ id: "admin", label: "Leadership & Finance" }]
       : []),
   ];

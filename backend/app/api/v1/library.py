@@ -8,8 +8,8 @@ from sqlalchemy.orm import joinedload
 
 from app.models.library import Book, BookIssue
 from app.models.student import Student
-from app.plugins.config_store import plugin_config_value
-from app.plugins.decorators import plugin_required
+from app.apps.config_store import plugin_config_value
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, no_content_response, success_response
@@ -491,7 +491,7 @@ from app.models.library import (  # noqa: E402
     StocktakeItem,
     StocktakeSession,
 )
-from app.plugins import events as _events  # noqa: E402
+from app.apps import events as _events  # noqa: E402
 
 
 def _now():

@@ -7,7 +7,7 @@ from flask_jwt_extended import jwt_required
 from app.models.conference import PTConference, ConferenceSlot, ConferenceNotes
 from app.models.student import Student
 from app.models.user import User
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -303,7 +303,7 @@ def book_slot(slot_id):
     slot.student_id = student_id
     db.session.commit()
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
 
         emit_for_school(
             "conference.booked",

@@ -42,12 +42,12 @@ STATICALLY_MOUNTED_MODULES = {
     # is a 2-line re-export shim. They are STILL mounted statically below (via
     # the shim) so their manifest paths are listed here to keep the loader from
     # double-registering them.
-    "app.plugins.modules.white_label.routes",
-    "app.plugins.modules.multi_branch.routes",
-    "app.plugins.modules.biometric.routes",
-    "app.plugins.modules.ai_adaptive_learning.routes",
-    "app.plugins.modules.disaster_management.routes",
-    "app.plugins.modules.incident_management.routes",
+    "app.apps.modules.white_label.routes",
+    "app.apps.modules.multi_branch.routes",
+    "app.apps.modules.biometric.routes",
+    "app.apps.modules.ai_adaptive_learning.routes",
+    "app.apps.modules.disaster_management.routes",
+    "app.apps.modules.incident_management.routes",
 }
 
 # Core routes (always available, not plugin-gated)

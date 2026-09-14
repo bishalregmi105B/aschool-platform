@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 from app.models.academic import Class, Section, Subject
 from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.student import Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.pagination import paginate
@@ -89,7 +89,7 @@ def create_assignment():
 
     # Notify students/parents about new assignment
     try:
-        from app.plugins.events import emit_for_school
+        from app.apps.events import emit_for_school
         emit_for_school(
             "assignment.created",
             school_id=str(g.school_id),
@@ -247,7 +247,7 @@ def submit_assignment(assignment_id):
     db.session.add(sub)
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit(
         "assignment.submitted",
         school_id=str(g.school_id),

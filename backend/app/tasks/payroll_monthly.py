@@ -44,7 +44,7 @@ def process_monthly_payroll():
             # drafts are not stuck at zero salary. Per-staff carry-forward of a
             # prior month's basic is not done here (no request context) — the
             # API route still covers that richer path.
-            from app.plugins.config_store import get_plugin_config
+            from app.apps.config_store import get_plugin_config
             from app.models.school import School
 
             school = School.query.get(school_id)

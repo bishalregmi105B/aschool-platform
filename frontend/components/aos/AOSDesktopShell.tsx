@@ -63,6 +63,19 @@ const DEFAULT_PINNED_APPS = [
   "appstore",
 ];
 
+// Role-tailored first-run dock: the apps each persona actually uses daily.
+// Admins keep the full default set; teachers/students/parents get their
+// working tools instead of dead admin icons.
+const ROLE_PINNED_APPS: Record<string, string[]> = {
+  teacher: ["attendance", "exams", "timetable", "assignments", "notices", "aos-settings", "appstore"],
+  student: ["lms", "assignments", "exams", "elibrary", "notices", "aos-settings", "appstore"],
+  parent: ["fees", "notices", "health-records", "transport", "conferences", "aos-settings", "appstore"],
+};
+
+function defaultPinnedAppsForRole(role?: string | null): string[] {
+  return ROLE_PINNED_APPS[role ?? ""] ?? DEFAULT_PINNED_APPS;
+}
+
 interface OpenWindowOptions {
   windowId?: string;
   moduleId?: string;
@@ -135,14 +148,28 @@ export default function AOSDesktopShell() {
     [updateAOSSettings]
   );
 
+  // User role state — default mirrors the backend's actual admin role value
+  // ("school_admin"), not the legacy "admin" string that never matched.
+  const [currentRole, setCurrentRole] = useState<string>(user?.role || "school_admin");
+
+  useEffect(() => {
+    if (user?.role) {
+      setCurrentRole(user.role);
+    }
+  }, [user?.role]);
+
   // Dock pinning — DB-backed via pinned_apps. An empty list means the user has
-  // never customized the dock, so the default pinned set is shown instead.
+  // never customized the dock, so the role-tailored default set shows instead.
+  const roleDefaults = useMemo(
+    () => defaultPinnedAppsForRole(currentRole),
+    [currentRole]
+  );
   const pinnedAppIds = useMemo(
     () =>
       aosSettings.pinned_apps.length > 0
         ? aosSettings.pinned_apps
-        : DEFAULT_PINNED_APPS,
-    [aosSettings.pinned_apps]
+        : roleDefaults,
+    [aosSettings.pinned_apps, roleDefaults]
   );
 
   const handleTogglePinApp = useCallback(
@@ -150,23 +177,14 @@ export default function AOSDesktopShell() {
       const base =
         aosSettings.pinned_apps.length > 0
           ? aosSettings.pinned_apps
-          : DEFAULT_PINNED_APPS;
+          : roleDefaults;
       const next = base.includes(id)
         ? base.filter((appId) => appId !== id)
         : [...base, id];
       updateAOSSettings({ pinned_apps: next });
     },
-    [aosSettings.pinned_apps, updateAOSSettings]
+    [aosSettings.pinned_apps, roleDefaults, updateAOSSettings]
   );
-
-  // User role state
-  const [currentRole, setCurrentRole] = useState<string>(user?.role || "admin");
-
-  useEffect(() => {
-    if (user?.role) {
-      setCurrentRole(user.role);
-    }
-  }, [user?.role]);
 
   // Manual desktop/iOS mode override — persists across reloads (DB-backed
   // with a localStorage mirror that dashboard-layout reads synchronously);

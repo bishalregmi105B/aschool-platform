@@ -1,0 +1,52 @@
+slug: conferences
+name: Parent-Teacher Conferences
+name_nepali: अभिभावक-शिक्षक भेटघाट
+category: growth
+price_monthly: 199
+price_yearly: 1990
+coming_soon: false
+emoji: 🤝
+icon: Users
+version: 1.0.0
+description: Online booking for PT conferences, time slot management, video calls,
+  notes, follow-up tracking
+depends_on: []
+conflicts_with: []
+events:
+  emits:
+  - conference.booked
+  listens: []
+capabilities:
+  api_blueprint: app.api.v1.conferences
+  models_module: app.models.conference
+ui:
+  nav:
+    route: /dashboard/conferences
+    section: Operations
+    label: Conferences
+    label_nepali: भेटघाट
+    icon: CalendarDays
+    visible_to:
+    - school_admin
+    - teacher
+    - parent
+    subitems:
+  aos:
+    about: "Book and run parent-teacher conferences online — time slots, video calls, notes, and follow-up tracking."
+mobile:
+  admin:
+    feature_folder: conferences
+    tabs:
+    - Schedule
+    - Reports
+  teacher:
+    feature_folder: conferences
+    tabs:
+    - My Slots
+    - Upcoming
+  parent:
+    feature_folder: conferences
+    tabs:
+    - Book Slot
+    - History
+schema_version: 2

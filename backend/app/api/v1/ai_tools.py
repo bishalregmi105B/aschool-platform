@@ -8,8 +8,8 @@ app/plugins/decorators.py, but new code gates the canonical bundle slug.
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import jwt_required
 
-from app.plugins.config_store import plugin_config_value
-from app.plugins.decorators import plugin_required
+from app.apps.config_store import plugin_config_value
+from app.apps.decorators import plugin_required
 from app.utils.rate_limiter import ai_rate_limit
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response

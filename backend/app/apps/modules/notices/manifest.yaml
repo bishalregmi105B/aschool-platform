@@ -1,0 +1,57 @@
+slug: notices
+name: Notice Board
+name_nepali: सूचना पाटी
+category: core
+price_monthly: 0
+price_yearly: 0
+is_free: true
+emoji: 📢
+icon: Megaphone
+version: 1.0.0
+description: School announcements, noticeboard, events calendar, push notifications
+depends_on: []
+conflicts_with: []
+events:
+  emits:
+  - notice.published
+  listens: []
+capabilities:
+  api_blueprint: app.api.v1.notices
+  models_module: app.models.notice
+ui:
+  nav:
+    route: /dashboard/notices
+    section: Communication
+    label: Notices
+    label_nepali: सूचना
+    icon: Bell
+    visible_to:
+    - school_admin
+    - teacher
+    - student
+    - parent
+  aos:
+    about: "Post school announcements and events on the notice board, with push notifications to keep everyone informed."
+mobile:
+  admin:
+    feature_folder: notices
+    tabs:
+    - All
+    - Create
+    - Events
+  teacher:
+    feature_folder: notices
+    tabs:
+    - View
+    - Create
+  parent:
+    feature_folder: notices
+    tabs:
+    - Notices
+    - Events
+  student:
+    feature_folder: notices
+    tabs:
+    - Notices
+    - Events
+schema_version: 2

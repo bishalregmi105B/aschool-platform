@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { PortalChrome } from "@/components/portal/portal-chrome";
+import { RoleRouteGuard } from "@/components/portal/role-route-guard";
 
 const NAV = [
   { href: "/student", label: "Today" },
@@ -17,8 +18,10 @@ const NAV = [
 /** Student portal shell — same chrome as the parent/teacher portals (44.2/39). */
 export default function StudentLayout({ children }: { children: ReactNode }) {
   return (
-    <PortalChrome title="Student Portal" nav={NAV}>
-      {children}
-    </PortalChrome>
+    <RoleRouteGuard allowedRoles={["student"]}>
+      <PortalChrome title="Student Portal" nav={NAV}>
+        {children}
+      </PortalChrome>
+    </RoleRouteGuard>
   );
 }

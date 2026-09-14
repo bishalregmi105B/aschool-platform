@@ -121,7 +121,7 @@ class WhiteLabelService:
     @classmethod
     def _plugin_active(cls, school_id) -> bool:
         """Is the white_label plugin currently installed + active for this school?"""
-        from app.plugins.decorators import _school_has_plugin
+        from app.apps.decorators import _school_has_plugin
 
         return _school_has_plugin(str(school_id), "white_label")
 

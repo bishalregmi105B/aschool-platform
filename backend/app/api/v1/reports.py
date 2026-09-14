@@ -20,7 +20,7 @@ from app.models.attendance import Attendance
 from app.models.exam import Exam, Marks
 from app.models.fee import FeeCollection
 from app.models.student import Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.report_pdf import build_report_html, fmt_npr, render_report_pdf
 from app.utils.response import error_response, success_response

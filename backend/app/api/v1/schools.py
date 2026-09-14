@@ -118,7 +118,7 @@ def create_school():
     # Idempotent and non-fatal: a provisioning failure is logged and healed
     # lazily by the marketplace's ensure_free_plugins backfill.
     try:
-        from app.plugins.entitlements import ensure_free_plugins
+        from app.apps.entitlements import ensure_free_plugins
 
         ensure_free_plugins(school)
     except Exception:  # noqa: BLE001 — never block school creation on plugins

@@ -31,7 +31,7 @@ from app.services.chat_service import (
     send_message as persist_chat_message,
 )
 from app.models.wellbeing import CounselorNote, MoodEntry
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import error_response, success_response

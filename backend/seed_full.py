@@ -14,8 +14,8 @@ from app import create_app
 from app.models.plugin import SchoolPlugin
 from app.models.school import School
 from app.models.user import User
-from app.plugins.billing import install_plugin
-from app.plugins.loader import PluginLoader
+from app.apps.billing import install_plugin
+from app.apps.loader import PluginLoader
 from extensions import db
 
 # Demo school gets the free (core) + starter tiers of the REGISTRY — slugs

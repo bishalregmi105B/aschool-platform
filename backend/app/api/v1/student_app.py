@@ -15,7 +15,7 @@ from app.models.portfolio import StudentPortfolio, PortfolioItem
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
 from app.models.wellbeing import MoodEntry
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import school_required
 from app.utils.nepali_date import ad_to_bs
 from app.utils.response import created_response, success_response, error_response

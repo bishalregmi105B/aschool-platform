@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { PortalChrome } from "@/components/portal/portal-chrome";
+import { RoleRouteGuard } from "@/components/portal/role-route-guard";
 
 const NAV = [
   { href: "/parent", label: "Home" },
@@ -19,8 +20,10 @@ const NAV = [
 /** Parent portal shell — shared responsive chrome (was a desktop-only nav). */
 export default function ParentLayout({ children }: { children: ReactNode }) {
   return (
-    <PortalChrome title="Parent Portal" nav={NAV}>
-      {children}
-    </PortalChrome>
+    <RoleRouteGuard allowedRoles={["parent"]}>
+      <PortalChrome title="Parent Portal" nav={NAV}>
+        {children}
+      </PortalChrome>
+    </RoleRouteGuard>
   );
 }

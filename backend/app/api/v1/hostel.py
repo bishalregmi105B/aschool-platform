@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required
 from app.extensions import db
 from app.models.hostel import Hostel, HostelRoom, HostelAllocation
 from app.models.student import Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.response import success_response, created_response, no_content_response, error_response
 from app.utils.decorators import school_required, role_required
 

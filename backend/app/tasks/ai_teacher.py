@@ -10,13 +10,13 @@ from extensions import celery
 
 @celery.task(name="ai_teacher_reconcile_lessons")
 def reconcile_lessons_task():
-    from app.plugins.modules.ai_teacher.tasks import reconcile_lessons
+    from app.apps.modules.ai_teacher.tasks import reconcile_lessons
 
     return reconcile_lessons()
 
 
 @celery.task(name="ai_teacher_purge_transcripts")
 def purge_transcripts_task():
-    from app.plugins.modules.ai_teacher.tasks import purge_transcripts
+    from app.apps.modules.ai_teacher.tasks import purge_transcripts
 
     return purge_transcripts()

@@ -89,7 +89,7 @@ def send_single_fee_reminder(school_id: str, student_id: str) -> dict:
     """
     from app.models.fee import FeeCollection
     from app.models.student import Guardian, Student
-    from app.plugins.config_store import plugin_config_value
+    from app.apps.config_store import plugin_config_value
 
     student = Student.query.filter_by(
         id=student_id, school_id=school_id, is_deleted=False
@@ -180,7 +180,7 @@ def send_fee_reminders(school_id: str):
     # Plugin config (config_schema.yaml): reminder_enabled kill-switch +
     # reminder_overdue_days (replaces the old hardcoded 30-day cutoff;
     # nonsense values fall back to 30).
-    from app.plugins.config_store import plugin_config_value
+    from app.apps.config_store import plugin_config_value
 
     if not plugin_config_value(school_id, "fees", "reminder_enabled", True):
         return {"skipped": "reminders disabled in plugin settings"}
@@ -280,7 +280,7 @@ def send_fee_reminders(school_id: str):
         # only the un-sent tail.
         fee.last_reminder_sent_at = datetime.now(timezone.utc)
         try:
-            from app.plugins.events import emit_for_school
+            from app.apps.events import emit_for_school
 
             emit_for_school(
                 "fees.reminder_sent",

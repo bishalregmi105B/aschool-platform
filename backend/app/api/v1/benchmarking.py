@@ -18,7 +18,7 @@ from sqlalchemy import case, func
 
 from app.api.v1.analytics import _overview_payload, _school_metric_averages
 from app.models.school import School
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import success_response
 

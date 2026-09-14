@@ -5,14 +5,14 @@ the 40 module manifests were unchecked; that is how ~20 broken code pointers, a
 module folder without `__init__.py`, and 17 sidebar icons absent from the
 frontend ICON_MAP all shipped.
 
-This test runs `app.plugins.validator` over ALL manifests. Errors fail the
+This test runs `app.apps.validator` over ALL manifests. Errors fail the
 build; warnings are printed for visibility and become errors for any manifest
 that declares `schema_version: 2` (the migration ratchet).
 """
 
 import pytest
 
-from app.plugins.validator import (
+from app.apps.validator import (
     PluginValidator,
     format_table,
     validate_all,

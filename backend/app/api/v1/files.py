@@ -26,7 +26,7 @@ from flask import Blueprint, g, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.models.file import FileFolder, ManagedFile
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import VirusDetectedError, delete_file, generate_presigned_url, safe_storage_key, upload_file
 from app.utils.pagination import paginate
@@ -244,7 +244,7 @@ def upload():
 
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     for rec in created:
         emit("file.uploaded", school_id=str(g.school_id), file_id=str(rec.id), folder=folder)
 
@@ -358,7 +358,7 @@ def delete_file_record(file_id):
     f.is_deleted = True
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit("file.deleted", school_id=str(g.school_id), file_id=str(f.id))
 
     return success_response({"deleted": True, "id": str(f.id)})

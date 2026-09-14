@@ -6,7 +6,7 @@ from flask import Blueprint, g, request
 from flask_jwt_extended import get_jwt, jwt_required
 
 from app.models.emergency import EmergencyAlert, EmergencyHeadcount, EvacuationPlan
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -55,7 +55,7 @@ def trigger_alert():
     db.session.add(alert)
     db.session.commit()
 
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit(
         "emergency.alert_triggered",
         school_id=str(g.school_id),

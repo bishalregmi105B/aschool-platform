@@ -5,7 +5,7 @@ from extensions import celery
 @celery.task(name="process_plugin_event")
 def process_plugin_event(event_name: str, kwargs: dict):
     """Process a plugin event asynchronously."""
-    from app.plugins.events import emit
+    from app.apps.events import emit
 
     emit(event_name, **kwargs)
 
@@ -13,7 +13,7 @@ def process_plugin_event(event_name: str, kwargs: dict):
 @celery.task(name="process_plugin_event_for_school")
 def process_plugin_event_for_school(event_name: str, school_id: str, kwargs: dict):
     """Process a plugin event for a specific school — checks plugin activation."""
-    from app.plugins.events import emit_for_school
+    from app.apps.events import emit_for_school
 
     emit_for_school(event_name, school_id, **kwargs)
 

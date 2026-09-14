@@ -30,6 +30,7 @@ import { SchoolRole } from "@/components/aos/types";
 import { api } from "@/lib/api";
 import { useInstalledPlugins } from "@/lib/plugins";
 import { extractAOSModuleSlug, normalizeAOSRoute } from "@/lib/aos-navigation";
+import { isAdminLike, isAccountantLike } from "@/lib/role-routing";
 
 export interface SpotlightItem {
   id: string;
@@ -231,7 +232,7 @@ export default function SpotlightSearch({
       icon: <AOSSettingsIcon size={26} />,
       action: () => openDestination("settings", "/dashboard/settings"),
     },
-    ...(currentRole === "admin"
+    ...(isAdminLike(currentRole)
       ? [
           {
             id: "app-admin",
@@ -244,7 +245,7 @@ export default function SpotlightSearch({
           },
         ]
       : []),
-    ...(currentRole === "accountant"
+    ...(isAccountantLike(currentRole)
       ? [
           {
             id: "app-finance",

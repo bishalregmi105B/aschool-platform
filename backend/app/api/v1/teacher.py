@@ -10,7 +10,7 @@ from app.models.attendance import Attendance
 from app.models.notice import Notice
 from app.models.student import Student
 from app.models.timetable import TimetableSlot
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.response import created_response, error_response, success_response
 from app.utils.teacher_scope import teacher_allowed_class_ids, teacher_class_teacher_class_ids

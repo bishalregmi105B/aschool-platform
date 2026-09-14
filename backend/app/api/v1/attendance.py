@@ -9,7 +9,7 @@ from sqlalchemy import String, func
 from app.models.academic import Class, Section
 from app.models.attendance import Attendance, TeacherAttendance, LeaveRequest, SubjectAttendance
 from app.models.student import Student
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.pagination import paginate
 from app.utils.response import created_response, error_response, success_response
@@ -154,7 +154,7 @@ def mark_attendance():
     db.session.commit()
 
     # Emit event for other plugins
-    from app.plugins.events import emit
+    from app.apps.events import emit
     emit("attendance.marked", school_id=str(g.school_id), date=attendance_date, count=len(cleaned))
 
     return success_response({

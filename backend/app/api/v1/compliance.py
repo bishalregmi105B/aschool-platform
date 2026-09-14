@@ -5,7 +5,7 @@ from flask import Blueprint, g, redirect, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.models.compliance import ComplianceReport, EMISExport, AuditLog
-from app.plugins.decorators import plugin_required
+from app.apps.decorators import plugin_required
 from app.utils.decorators import role_required, school_required
 from app.utils.file_upload import (
     _backend as _storage_backend,
