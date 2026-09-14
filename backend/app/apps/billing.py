@@ -18,7 +18,7 @@ from extensions import cache, db
 from app.models.app import App, AppUsageLog, SchoolApp
 
 
-def plugin_is_free(plugin: Plugin) -> bool:
+def plugin_is_free(plugin: App) -> bool:
     """True when the plugin installs with NO trial and NO payment (E160).
 
     A plugin is free when its monthly price is zero, it is flagged is_free,
@@ -33,7 +33,7 @@ def plugin_is_free(plugin: Plugin) -> bool:
     return float(plugin.price_monthly or 0) == 0
 
 
-def effective_trial_days(plugin: Plugin) -> int:
+def effective_trial_days(plugin: App) -> int:
     """Trial length for a PAID install (E160) — config PLUGIN_TRIAL_DAYS wins."""
     try:
         configured = int(current_app.config.get("PLUGIN_TRIAL_DAYS", 14))
@@ -46,7 +46,7 @@ def effective_trial_days(plugin: Plugin) -> int:
     return configured
 
 
-def _apply_install_policy(sp: SchoolApp, plugin: Plugin) -> None:
+def _apply_install_policy(sp: SchoolApp, plugin: App) -> None:
     """Stamp a SchoolApp row per the config-driven install policy."""
     now = datetime.now(timezone.utc)
     if plugin_is_free(plugin):

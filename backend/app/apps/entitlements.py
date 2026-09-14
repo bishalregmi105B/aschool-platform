@@ -187,7 +187,7 @@ def ensure_free_plugins(school, plan: str | None = None) -> list[dict]:
     #    row agree it is delisted; published mirror rows without a manifest
     #    are offered as fallbacks. One query for all mirror rows.
     manifests = AppLoader.get_all_manifests()
-    mirror_by_slug: dict[str, Plugin] = {
+    mirror_by_slug: dict[str, App] = {
         p.slug: p for p in App.query.filter(App.is_deleted.is_(False)).all()
     }
 

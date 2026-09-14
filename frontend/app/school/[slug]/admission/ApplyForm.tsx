@@ -349,7 +349,7 @@ export function ApplyOnlineForm({ slug }: { slug: string }) {
           <fieldset className="rounded-lg border border-gray-200 p-4 space-y-3">
             <legend className="px-1 text-sm font-semibold text-gray-800">Documents you will bring</legend>
             <p className="text-xs text-gray-500">
-              Online file upload isn't available for guests — tick what you already have and note any
+              Online file upload isn&apos;t available for guests — tick what you already have and note any
               certificate numbers. The office verifies originals during review.
             </p>
             {f.documents.map((d, i) => (

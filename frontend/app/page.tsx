@@ -561,8 +561,9 @@ export default function Home() {
                       { icon: Globe, label: "Web app", value: "app.brighternepal.com", href: "https://app.brighternepal.com" },
                       { icon: MapPin, label: "Office", value: "Kathmandu, Nepal" },
                       { icon: Clock, label: "Hours", value: "Sun–Fri: 9AM – 5PM" },
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    ].map(({ icon: Icon, label, value, href }: any) => (
+                    ].map(({ icon: Icon, label, value, href }: {
+                      icon: typeof Mail; label: string; value: string; href?: string;
+                    }) => (
                       <div key={label} className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-xl bg-[color:var(--ocean)]/8 flex items-center justify-center text-[color:var(--ocean)] shrink-0">
                           <Icon size={14} />

@@ -133,7 +133,7 @@ def _catalog_entries() -> list[dict]:
     registry act as a fallback until the next refresh unpublishes them.
     """
     manifests = AppLoader.get_all_manifests()
-    rows_by_slug: dict[str, Plugin] = {
+    rows_by_slug: dict[str, App] = {
         p.slug: p for p in App.query.filter_by(is_deleted=False).all()
     }
 

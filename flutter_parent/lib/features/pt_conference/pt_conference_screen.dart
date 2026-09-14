@@ -79,11 +79,6 @@ class _ConferenceCard extends StatefulWidget {
 class _ConferenceCardState extends State<_ConferenceCard> {
   bool _booking = false;
 
-  String? get _bookedSlotId {
-    final booked = safeMapOrNull(widget.conference['booked_slot']);
-    return booked?['slot_id']?.toString();
-  }
-
   Future<void> _showSlotPicker(BuildContext context) async {
     final conferenceId = widget.conference['id']?.toString();
     if (conferenceId == null) return;
@@ -312,7 +307,7 @@ class _ConferenceCardState extends State<_ConferenceCard> {
                 ),
               ],
             ),
-            if (isBooked && bookedSlot != null) ...[
+            if (isBooked) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(10),
