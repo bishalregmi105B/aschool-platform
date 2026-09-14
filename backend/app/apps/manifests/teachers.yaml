@@ -1,4 +1,5 @@
 slug: teachers
+min_core_version: \"1.0.0\"
 name: Teacher Management
 name_nepali: शिक्षक व्यवस्थापन
 category: core

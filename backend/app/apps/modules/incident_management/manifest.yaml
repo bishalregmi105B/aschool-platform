@@ -1,4 +1,8 @@
 slug: incident_management
+min_core_version: \"1.0.0\"
+owns_tables:
+  - incident_escalations
+  - incident_workflow_events
 name: Full Incident Management
 name_nepali: पूर्ण घटना व्यवस्थापन
 category: growth

@@ -1,4 +1,9 @@
 slug: student_portfolio
+min_core_version: \"1.0.0\"
+owns_tables:
+  - student_portfolios
+  - portfolio_items
+  - micro_credentials
 name: Student Portfolio
 name_nepali: विद्यार्थी पोर्टफोलियो
 category: growth

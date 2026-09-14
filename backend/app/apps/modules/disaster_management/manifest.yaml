@@ -1,4 +1,8 @@
 slug: disaster_management
+min_core_version: \"1.0.0\"
+owns_tables:
+  - disaster_drills
+  - drill_participations
 name: Disaster Management
 name_nepali: विपद व्यवस्थापन
 category: premium

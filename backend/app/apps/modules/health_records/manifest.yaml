@@ -1,4 +1,5 @@
 slug: health_records
+min_core_version: \"1.0.0\"
 name: Student Health Records
 name_nepali: विद्यार्थी स्वास्थ्य अभिलेख
 category: growth
@@ -19,7 +20,7 @@ events:
   emits:
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.health_records
+  api_blueprint: app.apps.modules.health_records.routes
   models_module: app.models.health_records
 ui:
   nav:

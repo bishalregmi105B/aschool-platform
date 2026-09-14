@@ -1,4 +1,9 @@
 slug: incidents
+min_core_version: \"1.0.0\"
+owns_tables:
+  - incidents
+  - witness_statements
+  - incident_actions
 name: Incident Management
 name_nepali: घटना व्यवस्थापन
 category: premium
@@ -16,7 +21,7 @@ events:
   - incident.reported
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.incidents
+  api_blueprint: app.apps.modules.incidents.routes
   models_module: app.models.incident
 ui:
   nav:

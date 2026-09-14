@@ -1,4 +1,12 @@
 slug: wellbeing
+min_core_version: \"1.0.0\"
+owns_tables:
+  - mood_checkins
+  - wellbeing_surveys
+  - wellbeing_survey_responses
+  - counselor_sessions
+  - mood_entries
+  - counselor_notes
 name: Student Wellbeing
 name_nepali: विद्यार्थी कल्याण
 category: growth
@@ -17,7 +25,7 @@ events:
   - wellbeing.alert_triggered
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.wellbeing
+  api_blueprint: app.apps.modules.wellbeing.routes
   models_module: app.models.wellbeing
   services:
   - app.services.ai.school_insights

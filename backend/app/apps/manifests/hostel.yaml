@@ -1,4 +1,5 @@
 slug: hostel
+min_core_version: \"1.0.0\"
 name: Hostel Management
 name_nepali: छात्रावास व्यवस्थापन
 category: growth

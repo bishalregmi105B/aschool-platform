@@ -1,4 +1,9 @@
 slug: biometric
+min_core_version: \"1.0.0\"
+owns_tables:
+  - biometric_devices
+  - biometric_punches
+  - biometric_sync_logs
 name: Biometric Integration
 name_nepali: बायोमेट्रिक इन्टिग्रेसन
 category: premium

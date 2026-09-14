@@ -1,4 +1,5 @@
 slug: lms
+min_core_version: \"1.0.0\"
 name: Learning Management System
 name_nepali: शिक्षण व्यवस्थापन प्रणाली
 category: growth
@@ -20,7 +21,7 @@ events:
   - attendance.marked
   - exams.result_published
 capabilities:
-  api_blueprint: app.api.v1.lms
+  api_blueprint: app.apps.modules.lms.routes
   models_module: app.models.lms
   services:
   - app.services.lms.video_service

@@ -1,4 +1,5 @@
 slug: admission
+min_core_version: \"1.0.0\"
 name: Admission Management
 name_nepali: भर्ना व्यवस्थापन
 category: growth
@@ -19,7 +20,7 @@ events:
   listens:
   - social.admission_lead
 capabilities:
-  api_blueprint: app.api.v1.admission
+  api_blueprint: app.apps.modules.admission.routes
   models_module: app.models.admission
   services: []
   tasks:

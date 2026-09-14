@@ -1,4 +1,8 @@
 slug: dismissal
+min_core_version: \"1.0.0\"
+owns_tables:
+  - authorized_pickups
+  - dismissal_records
 name: Student Dismissal & Pickup
 name_nepali: विद्यार्थी विदाई
 category: premium
@@ -15,7 +19,7 @@ events:
   emits:
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.dismissal
+  api_blueprint: app.apps.modules.dismissal.routes
   models_module: app.models.dismissal
 ui:
   nav:

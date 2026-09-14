@@ -1,4 +1,5 @@
 slug: design_studio
+min_core_version: \"1.0.0\"
 name: Design Studio
 name_nepali: डिजाइन स्टुडियो
 category: growth
@@ -11,7 +12,7 @@ description: Canva-like designer — certificates, ID cards, flyers
 depends_on: []
 conflicts_with: []
 capabilities:
-  api_blueprint: app.api.v1.design_studio
+  api_blueprint: app.apps.modules.design_studio.routes
   models_module: app.models.website
   services:
   - app.services.designer.template_engine

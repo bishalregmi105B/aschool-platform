@@ -1,4 +1,5 @@
 slug: conferences
+min_core_version: \"1.0.0\"
 name: Parent-Teacher Conferences
 name_nepali: अभिभावक-शिक्षक भेटघाट
 category: growth
@@ -17,7 +18,7 @@ events:
   - conference.booked
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.conferences
+  api_blueprint: app.apps.modules.conferences.routes
   models_module: app.models.conference
 ui:
   nav:

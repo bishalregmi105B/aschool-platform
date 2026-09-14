@@ -1,4 +1,5 @@
 slug: alumni
+min_core_version: \"1.0.0\"
 name: Alumni Network
 name_nepali: पूर्व विद्यार्थी नेटवर्क
 category: growth
@@ -11,7 +12,7 @@ description: Alumni portal, mentoring, events, donation tracking
 depends_on: []
 conflicts_with: []
 capabilities:
-  api_blueprint: app.api.v1.alumni
+  api_blueprint: app.apps.modules.alumni.routes
   models_module: app.models.alumni
 ui:
   nav:

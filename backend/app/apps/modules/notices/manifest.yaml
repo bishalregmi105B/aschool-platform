@@ -1,4 +1,5 @@
 slug: notices
+min_core_version: \"1.0.0\"
 name: Notice Board
 name_nepali: सूचना पाटी
 category: core
@@ -16,7 +17,7 @@ events:
   - notice.published
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.notices
+  api_blueprint: app.apps.modules.notices.routes
   models_module: app.models.notice
 ui:
   nav:

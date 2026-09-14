@@ -1,4 +1,5 @@
 slug: users
+min_core_version: \"1.0.0\"
 name: User Management
 name_nepali: प्रयोगकर्ता व्यवस्थापन
 category: core

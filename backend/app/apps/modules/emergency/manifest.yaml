@@ -1,4 +1,5 @@
 slug: emergency
+min_core_version: \"1.0.0\"
 name: Emergency Management
 name_nepali: आपतकालीन व्यवस्थापन
 category: premium
@@ -16,7 +17,7 @@ events:
   - emergency.alert_triggered
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.emergency
+  api_blueprint: app.apps.modules.emergency.routes
   models_module: app.models.emergency
   services:
   - app.services.emergency.alert_service

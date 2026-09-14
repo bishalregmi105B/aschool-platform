@@ -1,4 +1,5 @@
 slug: gps_tracking
+min_core_version: \"1.0.0\"
 name: GPS Bus Tracking
 name_nepali: जीपीएस बस ट्र्याकिङ
 category: premium

@@ -1,4 +1,5 @@
 slug: plugins_nav
+min_core_version: \"1.0.0\"
 name: Installed Plugins
 name_nepali: जडित प्लगइनहरू
 category: core

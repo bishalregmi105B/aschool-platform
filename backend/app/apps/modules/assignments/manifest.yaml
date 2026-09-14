@@ -1,4 +1,5 @@
 slug: assignments
+min_core_version: \"1.0.0\"
 name: Assignment Management
 name_nepali: गृहकार्य व्यवस्थापन
 category: starter
@@ -18,7 +19,7 @@ events:
   - assignment.submitted
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.assignments
+  api_blueprint: app.apps.modules.assignments.routes
   models_module: app.models.assignment
 ui:
   nav:

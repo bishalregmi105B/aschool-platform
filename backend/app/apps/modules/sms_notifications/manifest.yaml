@@ -1,4 +1,5 @@
 slug: sms_notifications
+min_core_version: \"1.0.0\"
 name: SMS Notifications
 name_nepali: एसएमएस सूचना
 category: starter

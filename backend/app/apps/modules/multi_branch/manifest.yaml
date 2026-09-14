@@ -1,4 +1,5 @@
 slug: multi_branch
+min_core_version: \"1.0.0\"
 name: Multi-Branch Chain
 name_nepali: बहु-शाखा चेन
 category: premium

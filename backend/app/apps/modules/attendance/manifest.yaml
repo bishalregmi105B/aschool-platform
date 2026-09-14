@@ -1,4 +1,5 @@
 slug: attendance
+min_core_version: \"1.0.0\"
 name: Attendance Management
 name_nepali: उपस्थिति व्यवस्थापन
 category: core
@@ -18,7 +19,7 @@ events:
   - attendance.absent_alert
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.attendance
+  api_blueprint: app.apps.modules.attendance.routes
   models_module: app.models.attendance
 ui:
   nav:

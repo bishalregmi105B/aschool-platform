@@ -1,4 +1,5 @@
 slug: fees
+min_core_version: \"1.0.0\"
 name: Fee Collection & Management
 name_nepali: शुल्क संकलन
 category: starter
@@ -18,7 +19,7 @@ events:
   - fees.reminder_sent
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.fees
+  api_blueprint: app.apps.modules.fees.routes
   models_module: app.models.fee
   services:
   - app.services.payments.esewa_gateway

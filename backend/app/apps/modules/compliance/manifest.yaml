@@ -1,4 +1,5 @@
 slug: compliance
+min_core_version: \"1.0.0\"
 name: Compliance & EMIS
 name_nepali: अनुपालन र ईएमआईएस
 category: growth
@@ -15,7 +16,7 @@ events:
   emits:
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.compliance
+  api_blueprint: app.apps.modules.compliance.routes
   models_module: app.models.compliance
   services:
   - app.services.compliance.moe_reports

@@ -1,4 +1,5 @@
 slug: basic_reports
+min_core_version: \"1.0.0\"
 name: Basic Reports
 name_nepali: आधारभूत प्रतिवेदन
 category: core

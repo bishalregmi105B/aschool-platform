@@ -1,4 +1,5 @@
 slug: elibrary
+min_core_version: \"1.0.0\"
 name: E-Library & Digital Content
 name_nepali: ई-पुस्तकालय
 category: starter
@@ -11,7 +12,7 @@ description: Digital books, past papers, educational resources
 depends_on: []
 conflicts_with: []
 capabilities:
-  api_blueprint: app.api.v1.elibrary
+  api_blueprint: app.apps.modules.elibrary.routes
   models_module: app.models.digital_content
 ui:
   nav:

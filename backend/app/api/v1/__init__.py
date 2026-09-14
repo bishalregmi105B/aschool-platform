@@ -48,6 +48,31 @@ STATICALLY_MOUNTED_MODULES = {
     "app.apps.modules.ai_adaptive_learning.routes",
     "app.apps.modules.disaster_management.routes",
     "app.apps.modules.incident_management.routes",
+    "app.apps.modules.academics.routes",
+    "app.apps.modules.admission.routes",
+    "app.apps.modules.alumni.routes",
+    "app.apps.modules.assignments.routes",
+    "app.apps.modules.attendance.routes",
+    "app.apps.modules.compliance.routes",
+    "app.apps.modules.conferences.routes",
+    "app.apps.modules.design_studio.routes",
+    "app.apps.modules.dismissal.routes",
+    "app.apps.modules.elibrary.routes",
+    "app.apps.modules.emergency.routes",
+    "app.apps.modules.exams.routes",
+    "app.apps.modules.fees.routes",
+    "app.apps.modules.gamification.routes",
+    "app.apps.modules.health_records.routes",
+    "app.apps.modules.hr_payroll.routes",
+    "app.apps.modules.iemis_importer.routes",
+    "app.apps.modules.incidents.routes",
+    "app.apps.modules.inventory.routes",
+    "app.apps.modules.lms.routes",
+    "app.apps.modules.notices.routes",
+    "app.apps.modules.timetable.routes",
+    "app.apps.modules.website_builder.routes",
+    "app.apps.modules.wellbeing.routes",
+    "app.apps.modules.whatsapp_bot.routes",
 }
 
 # Core routes (always available, not plugin-gated)
@@ -211,3 +236,49 @@ api_v1_bp.register_blueprint(extensions_bp)
 # published snapshots, it never writes here.
 from app.api.v1.teaching_content import teaching_content_bp
 api_v1_bp.register_blueprint(teaching_content_bp)
+
+# App blueprints — moved into their app folders (apps architecture); the
+# api/v1/<slug>.py files are re-export shims. Registered here (and listed in
+# STATICALLY_MOUNTED_MODULES) so the loader never double-registers them.
+from app.api.v1.admission import admission_bp
+from app.api.v1.alumni import alumni_bp
+from app.api.v1.assignments import assignments_bp
+from app.api.v1.attendance import attendance_bp
+from app.api.v1.compliance import compliance_bp
+from app.api.v1.conferences import conferences_bp
+from app.api.v1.dismissal import dismissal_bp
+from app.api.v1.emergency import emergency_bp
+from app.api.v1.exams import exams_bp
+from app.api.v1.fees import fees_bp
+from app.api.v1.gamification import gamification_bp
+from app.api.v1.health_records import health_records_bp
+from app.api.v1.hr_payroll import hr_payroll_bp
+from app.api.v1.incidents import incidents_bp
+from app.api.v1.inventory import inventory_bp
+from app.api.v1.lms import lms_bp
+from app.api.v1.notices import notices_bp
+from app.api.v1.timetable import timetable_bp
+from app.api.v1.website_builder import website_builder_bp
+from app.api.v1.wellbeing import wellbeing_bp
+from app.api.v1.whatsapp_bot import whatsapp_bot_bp
+api_v1_bp.register_blueprint(admission_bp)
+api_v1_bp.register_blueprint(alumni_bp)
+api_v1_bp.register_blueprint(assignments_bp)
+api_v1_bp.register_blueprint(attendance_bp)
+api_v1_bp.register_blueprint(compliance_bp)
+api_v1_bp.register_blueprint(conferences_bp)
+api_v1_bp.register_blueprint(dismissal_bp)
+api_v1_bp.register_blueprint(emergency_bp)
+api_v1_bp.register_blueprint(exams_bp)
+api_v1_bp.register_blueprint(fees_bp)
+api_v1_bp.register_blueprint(gamification_bp)
+api_v1_bp.register_blueprint(health_records_bp)
+api_v1_bp.register_blueprint(hr_payroll_bp)
+api_v1_bp.register_blueprint(incidents_bp)
+api_v1_bp.register_blueprint(inventory_bp)
+api_v1_bp.register_blueprint(lms_bp)
+api_v1_bp.register_blueprint(notices_bp)
+api_v1_bp.register_blueprint(timetable_bp)
+api_v1_bp.register_blueprint(website_builder_bp)
+api_v1_bp.register_blueprint(wellbeing_bp)
+api_v1_bp.register_blueprint(whatsapp_bot_bp)

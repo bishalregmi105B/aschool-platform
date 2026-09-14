@@ -1,4 +1,5 @@
 slug: basic_website
+min_core_version: \"1.0.0\"
 name: School Website
 name_nepali: विद्यालय वेबसाइट
 category: core

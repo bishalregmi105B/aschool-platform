@@ -1,4 +1,5 @@
 slug: whatsapp_bot
+min_core_version: \"1.0.0\"
 name: WhatsApp Bot
 name_nepali: व्हाट्सएप बोट
 category: starter
@@ -20,7 +21,7 @@ events:
   - fees.collected
   - exams.result_published
 capabilities:
-  api_blueprint: app.api.v1.whatsapp_bot
+  api_blueprint: app.apps.modules.whatsapp_bot.routes
   models_module: app.models.notification
   services:
   - app.services.communications.whatsapp_cloud

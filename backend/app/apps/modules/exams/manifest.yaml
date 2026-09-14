@@ -1,4 +1,5 @@
 slug: exams
+min_core_version: \"1.0.0\"
 name: Examination Management
 name_nepali: परीक्षा व्यवस्थापन
 category: starter
@@ -21,7 +22,7 @@ events:
   listens:
   - attendance.marked
 capabilities:
-  api_blueprint: app.api.v1.exams
+  api_blueprint: app.apps.modules.exams.routes
   models_module: app.models.exam
   services:
   - app.services.ai.question_paper

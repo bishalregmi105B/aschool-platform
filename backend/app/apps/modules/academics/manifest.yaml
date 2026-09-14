@@ -1,4 +1,5 @@
 slug: academics
+min_core_version: \"1.0.0\"
 name: Academic Setup
 name_nepali: शैक्षिक संरचना
 category: core
@@ -16,7 +17,7 @@ events:
   - academics.class_created
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.academics
+  api_blueprint: app.apps.modules.academics.routes
   models_module: app.models.academic
 ui:
   nav:

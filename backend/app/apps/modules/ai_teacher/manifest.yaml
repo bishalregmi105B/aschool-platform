@@ -1,4 +1,5 @@
 slug: ai_teacher
+min_core_version: \"1.0.0\"
 name: AI Teacher (Live Whiteboard Tutor)
 name_nepali: एआई शिक्षक (लाइभ ह्वाइटबोर्ड ट्युटर)
 category: premium

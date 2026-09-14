@@ -1,4 +1,5 @@
 slug: iemis_importer
+min_core_version: \"1.0.0\"
 name: IEMIS Data Importer
 name_nepali: IEMIS डेटा आयातकर्ता
 category: add_on
@@ -90,7 +91,7 @@ events:
   - iemis.import_completed
   listens: []
 capabilities:
-  api_blueprint: app.api.v1.iemis_importer
+  api_blueprint: app.apps.modules.iemis_importer.routes
   services: []
   tasks: []
   blueprint_var: iemis_importer_bp

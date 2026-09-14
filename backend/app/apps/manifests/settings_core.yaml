@@ -1,4 +1,5 @@
 slug: settings_core
+min_core_version: \"1.0.0\"
 name: Settings
 name_nepali: सेटिङ
 category: core

@@ -1,4 +1,5 @@
 slug: visitor_management
+min_core_version: \"1.0.0\"
 name: Visitor Management
 name_nepali: आगन्तुक व्यवस्थापन
 category: growth

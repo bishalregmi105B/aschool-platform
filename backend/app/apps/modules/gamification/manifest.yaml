@@ -1,4 +1,11 @@
 slug: gamification
+min_core_version: \"1.0.0\"
+owns_tables:
+  - badges
+  - student_badges
+  - points_logs
+  - houses
+  - rewards
 name: Student Gamification
 name_nepali: विद्यार्थी गेमिफिकेसन
 category: growth
@@ -22,7 +29,7 @@ events:
   - assignment.submitted
   - exams.result_published
 capabilities:
-  api_blueprint: app.api.v1.gamification
+  api_blueprint: app.apps.modules.gamification.routes
   models_module: app.models.gamification
 ui:
   nav:
