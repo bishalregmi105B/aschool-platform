@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 👥
 icon: UserCheck2
+version: 1.0.0
 description: Visitor log, appointments, ID verification
 depends_on: []
 conflicts_with: []

@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🎓
 icon: UserPlus
+version: 1.0.0
 description: Online admission forms, document collection, admission tests, merit lists,
   AI lead scoring from social inquiries
 depends_on:

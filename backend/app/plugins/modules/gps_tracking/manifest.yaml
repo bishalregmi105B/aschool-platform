@@ -7,6 +7,7 @@ price_yearly: 2990
 coming_soon: false
 emoji: 🚌
 icon: Bus
+version: 1.0.0
 description: Live bus tracking via ESP32+NEO-6M, parent ETA alerts, route management,
   stop notifications, speed alerts
 depends_on: []

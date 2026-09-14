@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: 🚗
 icon: CarFront
+version: 1.0.0
 description: QR code pickup verification, authorized pickup management, dismissal
   queue, parent notification
 depends_on: []

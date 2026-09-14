@@ -7,6 +7,7 @@ price_yearly: 0
 is_free: true
 emoji: 📢
 icon: Megaphone
+version: 1.0.0
 description: School announcements, noticeboard, events calendar, push notifications
 depends_on: []
 conflicts_with: []

@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 📋
 icon: FileText
+version: 1.0.0
 description: Create, distribute, submit, and grade assignments with file uploads and
   AI feedback
 depends_on:

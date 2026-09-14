@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 💰
 icon: CreditCard
+version: 1.0.0
 description: Digital fee structure, collection, receipts, eSewa/Khalti payment, defaulter
   tracking, automatic reminders
 depends_on: []

@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 😊
 icon: Smile
+version: 1.0.0
 description: Daily mood check-ins, wellbeing surveys, counselor sessions, mental health
   tracking, early intervention alerts
 depends_on: []

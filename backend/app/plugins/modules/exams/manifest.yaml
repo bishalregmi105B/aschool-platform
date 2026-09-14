@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 📝
 icon: ClipboardList
+version: 1.0.0
 description: Exam scheduling, marks entry, result publishing, report cards, grade
   sheets, AI question paper generator
 depends_on:

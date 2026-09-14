@@ -7,6 +7,7 @@ price_yearly: 0
 is_free: true
 emoji: 🏫
 icon: GraduationCap
+version: 1.0.0
 description: Classes, sections, subjects, academic years, timetable structure
 depends_on: []
 conflicts_with: []

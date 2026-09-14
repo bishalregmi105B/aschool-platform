@@ -6,6 +6,7 @@ price_monthly: 199
 price_yearly: 1990
 emoji: 👔
 icon: Briefcase
+version: 1.0.0
 description: Staff payroll, leave management, appraisal, PF/SSF
 depends_on: []
 conflicts_with: []

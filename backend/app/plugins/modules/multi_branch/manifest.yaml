@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: 🏢
 icon: Building2
+version: 1.0.0
 description: Cross-school unified dashboard, chain analytics
 depends_on: []
 conflicts_with: []

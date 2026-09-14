@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: 🆘
 icon: Shield
+version: 1.0.0
 description: Earthquake API, evacuation plans, drill scheduling
 depends_on:
 - emergency

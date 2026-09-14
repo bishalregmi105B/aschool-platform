@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 📹
 icon: MonitorPlay
+version: 1.0.0
 description: Live classes via Jitsi, recorded class library, course builder, AI adaptive
   learning paths, student watch analytics
 tasks: null

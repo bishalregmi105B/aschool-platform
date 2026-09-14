@@ -7,6 +7,7 @@ price_yearly: 1990
 coming_soon: false
 emoji: 🤝
 icon: Users
+version: 1.0.0
 description: Online booking for PT conferences, time slot management, video calls,
   notes, follow-up tracking
 depends_on: []

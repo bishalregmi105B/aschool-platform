@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 📖
 icon: Tablet
+version: 1.0.0
 description: Digital books, past papers, educational resources
 depends_on: []
 conflicts_with: []

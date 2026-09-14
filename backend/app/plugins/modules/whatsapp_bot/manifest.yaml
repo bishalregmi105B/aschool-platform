@@ -7,6 +7,7 @@ price_yearly: 990
 coming_soon: false
 emoji: 💬
 icon: MessageCircle
+version: 1.0.0
 description: Two-way WhatsApp chatbot for parents — attendance, fees, results, bus
   tracking, AI chat in Nepali/English
 depends_on: []

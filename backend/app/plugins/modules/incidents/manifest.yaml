@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: ⚠️
 icon: AlertTriangle
+version: 1.0.0
 description: Incident reporting, witness statements, action logs, bullying tracking,
   disciplinary records
 depends_on: []

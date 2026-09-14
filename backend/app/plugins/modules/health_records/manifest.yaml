@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🏥
 icon: Heart
+version: 1.0.0
 description: Medical records, vaccination tracking, allergy alerts, health checkup
   logs, BMI tracking
 owns_tables:

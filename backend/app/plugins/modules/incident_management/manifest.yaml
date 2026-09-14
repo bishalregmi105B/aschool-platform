@@ -6,6 +6,7 @@ price_monthly: 199
 price_yearly: 1990
 emoji: 📋
 icon: ShieldAlert
+version: 1.0.0
 description: Full behavior management — witnesses, escalation, parent conferences
 depends_on:
 - incidents

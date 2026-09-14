@@ -7,6 +7,7 @@ price_yearly: 0
 is_free: true
 emoji: ✅
 icon: UserCheck
+version: 1.0.0
 description: Daily student & teacher attendance, bulk marking, QR check-in, monthly/yearly
   reports
 depends_on: []

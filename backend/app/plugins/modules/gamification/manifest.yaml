@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🏆
 icon: Trophy
+version: 1.0.0
 description: Points, badges, streaks, leaderboards, house system, rewards for attendance,
   grades, and behavior
 depends_on:

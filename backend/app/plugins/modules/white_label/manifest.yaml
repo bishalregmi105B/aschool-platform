@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: 🏷️
 icon: Tag
+version: 1.0.0
 description: Custom branding, own domain, remove ASchool branding
 depends_on: []
 conflicts_with: []

@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 📦
 icon: Package
+version: 1.0.0
 description: QR asset tracking, procurement, depreciation
 depends_on: []
 conflicts_with: []

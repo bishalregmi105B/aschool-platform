@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🎒
 icon: Backpack
+version: 1.0.0
 description: Digital achievement portfolio, badges, PDF export
 depends_on: []
 conflicts_with: []

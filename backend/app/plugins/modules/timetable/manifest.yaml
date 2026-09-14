@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 🕐
 icon: Clock
+version: 1.0.0
 description: Class scheduling, teacher allocation, room management, AI timetable generator,
   substitution management
 depends_on:

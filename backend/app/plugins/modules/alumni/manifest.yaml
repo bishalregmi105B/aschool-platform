@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🎓
 icon: Users
+version: 1.0.0
 description: Alumni portal, mentoring, events, donation tracking
 depends_on: []
 conflicts_with: []

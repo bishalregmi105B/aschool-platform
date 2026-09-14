@@ -6,6 +6,7 @@ price_monthly: 149
 price_yearly: 1490
 emoji: 🎨
 icon: Palette
+version: 1.0.0
 description: Canva-like designer — certificates, ID cards, flyers
 depends_on: []
 conflicts_with: []

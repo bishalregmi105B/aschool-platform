@@ -6,6 +6,7 @@ price_monthly: 99
 price_yearly: 990
 emoji: 📱
 icon: MessageSquare
+version: 1.0.0
 description: Bulk SMS via Sparrow SMS, attendance alerts, fee reminders, exam notifications,
   custom templates
 depends_on: []

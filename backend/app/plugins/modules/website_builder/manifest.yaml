@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: 🎨
 icon: PaintBucket
+version: 1.0.0
 description: 10 open-source school themes, drag-drop Craft.js editor, custom CSS,
   AI content generation, SEO tools, contact forms
 depends_on:

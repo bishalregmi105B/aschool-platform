@@ -6,6 +6,7 @@ price_monthly: 299
 price_yearly: 2990
 emoji: ✋
 icon: Fingerprint
+version: 1.0.0
 description: ZKTeco fingerprint attendance
 depends_on:
 - attendance
