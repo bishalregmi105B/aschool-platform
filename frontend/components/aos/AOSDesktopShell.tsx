@@ -685,7 +685,10 @@ export default function AOSDesktopShell() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeAllFlyouts]);
 
-  // Keep AOS browser URL pinned while still honoring in-app route intents.
+  // Deep-link hydration: when Next renders a /dashboard/<module> URL directly
+  // (typed, bookmarked, shared), open the window it refers to. Plan 5.1 /
+  // 2.1: the URL is NO LONGER collapsed back to /dashboard — the browser
+  // address bar stays on the real route (see the addressable-URL effects).
   useEffect(() => {
     if (!pathname) return;
 
@@ -702,11 +705,62 @@ export default function AOSDesktopShell() {
       return;
     }
 
-    const handled = openRouteInAOS(normalized);
-    if (handled) {
-      router.replace("/dashboard");
+    openRouteInAOS(normalized);
+    // routeLaunchIndex is built from async plugin/sidebar data; re-run this
+    // effect once it is populated so a cold deep link still hydrates.
+  }, [pathname, searchParams, openRouteInAOS, router, routeLaunchIndex]);
+
+  // ── Addressable URLs (plan 5.1) ──────────────────────────────────────────
+  // The browser URL mirrors the FOCUSED window's virtual route. Raw History
+  // API (not the Next router): Next's App Router keeps internal state under
+  // window.history.state, so we spread it and only add our marker — the
+  // router never re-renders, and Back/Forward still work for our popstate
+  // listener. Bookmarks, refresh-on-module, share-links and browser history
+  // all start working with this effect.
+
+  // Derive the URL the address bar should show right now.
+  const addressableRoute = useMemo(() => {
+    const active = windows.find((w) => w.id === activeWindowId);
+    if (!active || active.isMinimized) return "/dashboard";
+    return active.route || `/dashboard/${active.moduleId || active.id}`;
+  }, [windows, activeWindowId]);
+
+  const lastPushedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const target = addressableRoute;
+    const current = window.location.pathname + window.location.search;
+    if (current === target) {
+      lastPushedRef.current = target;
+      return;
     }
-  }, [pathname, searchParams, openRouteInAOS, router]);
+    lastPushedRef.current = target;
+    // Preserve Next.js's history state; tag ours for the popstate handler.
+    const nextHistory = { ...(window.history.state || {}), aosRoute: target };
+    // First correction after load replaces (no junk entry); later moves push.
+    const isFirst = sessionStorage.getItem("aos-url-hydrated") == null;
+    if (isFirst) {
+      sessionStorage.setItem("aos-url-hydrated", "1");
+      window.history.replaceState(nextHistory, "", target);
+    } else {
+      window.history.pushState(nextHistory, "", target);
+    }
+  }, [addressableRoute]);
+
+  // Browser Back/Forward → focus the window that owns the popped route.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPopState = () => {
+      const route = normalizeAOSRoute(
+        window.location.pathname + window.location.search
+      );
+      if (!route) return;
+      lastPushedRef.current = route;
+      openRouteInAOS(route);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [openRouteInAOS]);
 
   // In-process navigation: the single entry point every link in the shell
   // goes through (window content, widgets, flyouts, menubar). The browser
