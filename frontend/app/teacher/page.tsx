@@ -46,9 +46,20 @@ type Slot = {
   attendance_marked?: boolean;
 };
 
+type SubmissionToGrade = {
+  submission_id: string;
+  assignment_id: string;
+  assignment_title: string;
+  student_id: string;
+  student_name: string;
+  submitted_at?: string | null;
+  is_late?: boolean;
+};
+
 type TeacherDashboard = {
   today_classes: Slot[];
-  stats: { classes_today?: number; pending_attendance?: number; pending_assignments?: number };
+  stats: { classes_today?: number; pending_attendance?: number; pending_assignments?: number; submissions_to_grade?: number };
+  submissions_to_grade?: SubmissionToGrade[];
   recent_notices: { id: string; title: string; date?: string | null }[];
 };
 
@@ -205,6 +216,60 @@ export default function TeacherDashboardPage() {
         </DataPanel>
 
         <div className="space-y-4">
+          {/* Inline action queue: grading lives where the teacher already is */}
+          <DataPanel
+            title={
+              <span className="inline-flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" /> To Grade
+                {(dash.data?.submissions_to_grade?.length ?? 0) > 0 && (
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                    style={{ background: "var(--w11-accent)", color: "var(--w11-accent-text)" }}
+                  >
+                    {dash.data!.submissions_to_grade!.length}
+                  </span>
+                )}
+              </span>
+            }
+            actions={
+              (dash.data?.submissions_to_grade?.length ?? 0) > 0 ? (
+                <Link href="/teacher/assignments" className="text-xs font-medium text-[var(--w11-accent)] hover:underline">
+                  Grade all →
+                </Link>
+              ) : undefined
+            }
+          >
+            {(dash.data?.submissions_to_grade?.length ?? 0) === 0 ? (
+              <div className="px-2 py-6 text-center text-sm" style={{ color: "var(--w11-text-secondary)" }}>
+                Nothing waiting — you&apos;re all caught up. ✅
+              </div>
+            ) : (
+              <ul className="divide-y" style={{ borderColor: "var(--w11-border-subtle)" }}>
+                {dash.data!.submissions_to_grade!.slice(0, 5).map((sub) => (
+                  <li key={sub.submission_id} className="flex items-center gap-3 py-2.5">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium" style={{ color: "var(--w11-text-primary)" }}>
+                        {sub.student_name}
+                      </span>
+                      <span className="block truncate text-xs" style={{ color: "var(--w11-text-secondary)" }}>
+                        {sub.assignment_title}
+                        {sub.is_late ? " · late" : ""}
+                        {sub.submitted_at ? ` · ${displayBS(sub.submitted_at.slice(0, 10))}` : ""}
+                      </span>
+                    </span>
+                    <Link
+                      href={`/teacher/assignments?assignment_id=${encodeURIComponent(sub.assignment_id)}`}
+                      className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold min-h-[32px] inline-flex items-center shrink-0"
+                      style={{ borderColor: "var(--w11-accent)", color: "var(--w11-accent)" }}
+                    >
+                      Grade
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DataPanel>
+
           <DataPanel
             title={
               <span className="inline-flex items-center gap-2">

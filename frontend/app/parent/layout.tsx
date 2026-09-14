@@ -5,16 +5,17 @@ import { PortalChrome } from "@/components/portal/portal-chrome";
 import { RoleRouteGuard } from "@/components/portal/role-route-guard";
 
 const NAV = [
-  { href: "/parent", label: "Home" },
-  { href: "/parent/attendance", label: "Attendance" },
-  { href: "/parent/results", label: "Results" },
-  { href: "/parent/fees", label: "Fees" },
-  { href: "/parent/notices", label: "Notices" },
-  { href: "/parent/bus", label: "Bus" },
-  { href: "/parent/conferences", label: "Conferences" },
-  { href: "/parent/chat", label: "Messages" },
-  { href: "/parent/health", label: "Health" },
-  { href: "/parent/wellbeing", label: "Wellbeing" },
+  { href: "/parent", label: "Home", labelNe: "गृह" },
+  { href: "/parent/attendance", label: "Attendance", labelNe: "उपस्थिति" },
+  { href: "/parent/results", label: "Results", labelNe: "नतिजा" },
+  { href: "/parent/fees", label: "Fees", labelNe: "शुल्क" },
+  { href: "/parent/homework", label: "Homework", labelNe: "गृहकार्य" },
+  { href: "/parent/notices", label: "Notices", labelNe: "सूचना" },
+  { href: "/parent/bus", label: "Bus", labelNe: "बस" },
+  { href: "/parent/conferences", label: "Conferences", labelNe: "भेटघाट" },
+  { href: "/parent/chat", label: "Messages", labelNe: "सन्देश" },
+  { href: "/parent/health", label: "Health", labelNe: "स्वास्थ्य" },
+  { href: "/parent/wellbeing", label: "Wellbeing", labelNe: "कल्याण" },
 ];
 
 /** Parent portal shell — shared responsive chrome (was a desktop-only nav). */

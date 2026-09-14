@@ -48,13 +48,46 @@ def teacher_dashboard():
         is_deleted=False,
     ).order_by(Notice.created_at.desc()).limit(5).all()
 
+    # Inline action queue (eSchool pattern): the most recent ungraded
+    # submissions for this teacher's assignments, so grading lives on the
+    # home screen instead of a separate inbox.
+    from app.models.assignment import AssignmentSubmission
+    submissions_to_grade = (
+        db.session.query(AssignmentSubmission, Assignment, Student)
+        .join(Assignment, Assignment.id == AssignmentSubmission.assignment_id)
+        .join(Student, Student.id == AssignmentSubmission.student_id)
+        .filter(
+            Assignment.school_id == g.school_id,
+            Assignment.teacher_id == g.user_id,
+            Assignment.is_deleted.is_(False),
+            AssignmentSubmission.status == "submitted",
+            AssignmentSubmission.is_deleted.is_(False),
+        )
+        .order_by(AssignmentSubmission.submitted_at.desc())
+        .limit(8)
+        .all()
+    )
+
     return success_response({
         "today_classes": [_dashboard_slot_dict(slot, marked_classes) for slot in slots],
         "stats": {
             "classes_today": len(slots),
             "pending_attendance": pending_attendance,
             "pending_assignments": pending_assignments,
+            "submissions_to_grade": len(submissions_to_grade),
         },
+        "submissions_to_grade": [
+            {
+                "submission_id": str(sub.id),
+                "assignment_id": str(asg.id),
+                "assignment_title": asg.title,
+                "student_id": str(st.id),
+                "student_name": f"{st.first_name} {st.last_name}".strip(),
+                "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
+                "is_late": bool(sub.is_late),
+            }
+            for sub, asg, st in submissions_to_grade
+        ],
         "recent_notices": [_notice_dict(notice) for notice in notices],
     })
 

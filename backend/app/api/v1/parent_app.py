@@ -873,8 +873,20 @@ def parent_conferences():
     for conf in conferences:
         slots = ConferenceSlot.query.filter_by(
             conference_id=conf.id, is_deleted=False
-        ).all()
+        ).order_by(ConferenceSlot.start_time).all()
         available_count = sum(1 for s in slots if not s.is_booked)
+        # Bookable slot list (name kept: available_slots remains the COUNT for
+        # backward compat) — parents need times + teacher to choose from.
+        slot_list = [
+            {
+                "slot_id": str(s.id),
+                "start_time": s.start_time.isoformat() if s.start_time else None,
+                "end_time": s.end_time.isoformat() if s.end_time else None,
+                "teacher_name": s.teacher.full_name if s.teacher else None,
+            }
+            for s in slots
+            if not s.is_booked
+        ][:24]
 
         # Find parent's existing booking for any of their children
         booked_slot = None
@@ -901,6 +913,7 @@ def parent_conferences():
             "meeting_link": conf.meeting_link,
             "total_slots": len(slots),
             "available_slots": available_count,
+            "slots": slot_list,
             "booked_slot": booked_slot,
         })
 

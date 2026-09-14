@@ -19,9 +19,9 @@ type TurnResult = {
 
 /**
  * Student → AI Tutor. The real tutoring contract:
- *   POST /ai/tutor/plans            {topic}        → {plan_id}     (consent-gated)
- *   POST /ai/tutor/sessions         {plan_id}      → {session_id}
- *   POST /ai/tutor/sessions/<id>/turn {message}    → guided/socratic turn
+ *   POST /tutor/plans            {topic}        → {plan_id}     (consent-gated)
+ *   POST /tutor/sessions         {plan_id}      → {session_id}
+ *   POST /tutor/sessions/<id>/turn {message}    → guided/socratic turn
  * Every turn passes the workbench guardrails (injection, moderation, quota).
  */
 export default function StudentAiTutorPage() {
@@ -39,10 +39,10 @@ export default function StudentAiTutorPage() {
     setStarting(true);
     setError(null);
     try {
-      const plan = await api.post<ApiResponse<{ plan_id: string }>>("/ai/tutor/plans", {
+      const plan = await api.post<ApiResponse<{ plan_id: string }>>("/tutor/plans", {
         topic: topic.trim(),
       });
-      const session = await api.post<ApiResponse<{ session_id: string }>>("/ai/tutor/sessions", {
+      const session = await api.post<ApiResponse<{ session_id: string }>>("/tutor/sessions", {
         plan_id: plan.data.data.plan_id,
       });
       setSessionId(session.data.data.session_id);
@@ -71,7 +71,7 @@ export default function StudentAiTutorPage() {
     setThinking(true);
     try {
       const res = await api.post<ApiResponse<TurnResult>>(
-        `/ai/tutor/sessions/${sessionId}/turn`,
+        `/tutor/sessions/${sessionId}/turn`,
         { message: text }
       );
       const data = res.data.data || {};

@@ -36,7 +36,7 @@ export const GROUP_LABELS: Record<ToolGroup, string> = {
   insights: "School Intelligence",
 };
 
-const GROUP_COLORS: Record<ToolGroup, string> = {
+export const GROUP_COLORS: Record<ToolGroup, string> = {
   planning: "var(--w11-accent)",
   assessment: "#107c10",
   communication: "#d83b01",
