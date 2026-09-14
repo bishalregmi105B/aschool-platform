@@ -26,12 +26,70 @@ import {
   Check, Settings, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { DataTable, type Column } from "@/components/ui/data-table";
 
 const ACCENT = "#0067c0";
 
+type AiLog = {
+  id: string;
+  feature?: string | null;
+  model?: string | null;
+  total_tokens?: number | null;
+  latency_ms?: number | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
 export default function AIUsageDashboardPage() {
   const qc = useQueryClient();
+  const logColumns: Column<AiLog>[] = useMemo(
+    () => [
+      {
+        key: "feature",
+        label: "Feature",
+        sortable: true,
+        value: (l) => l.feature ?? "",
+        render: (l) => <code className="text-xs">{l.feature}</code>,
+      },
+      { key: "model", label: "Model", value: (l) => l.model ?? "" },
+      {
+        key: "tokens",
+        label: "Tokens",
+        align: "right",
+        sortable: true,
+        value: (l) => l.total_tokens ?? 0,
+        render: (l) => <span className="font-mono">{l.total_tokens?.toLocaleString()}</span>,
+      },
+      {
+        key: "latency",
+        label: "Latency",
+        align: "right",
+        value: (l) => l.latency_ms ?? 0,
+        render: (l) => <span>{l.latency_ms}ms</span>,
+      },
+      {
+        key: "status",
+        label: "Status",
+        value: (l) => l.status ?? "",
+        render: (l) => (
+          <span className={`win11-chip ${l.status === "success" ? "success" : "error"} text-xs`}>
+            {l.status === "success" ? <Check className="mr-1 inline h-2.5 w-2.5" /> : null}
+            {l.status}
+          </span>
+        ),
+      },
+      {
+        key: "time",
+        label: "Time",
+        value: (l) => l.created_at ?? "",
+        render: (l) => (
+          <span>{l.created_at ? new Date(l.created_at).toLocaleString() : "—"}</span>
+        ),
+      },
+    ],
+    [],
+  );
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["ai-usage-stats"],
@@ -204,41 +262,14 @@ export default function AIUsageDashboardPage() {
               {logsLoading
                 ? <div className="p-4"><PageLoader /></div>
                 : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-[color:var(--w11-border-subtle)]" style={{ background: "var(--w11-control-hover)" }}>
-                          {["Feature","Model","Tokens","Latency","Status","Time"].map((h) => (
-                            <th key={h} className="text-left px-3 py-2 font-medium text-[color:var(--w11-text-secondary)]">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(Array.isArray(logs) ? logs : []).map((log: any) => (
-                          <tr key={log.id} className="border-b border-[color:var(--w11-border-subtle)]">
-                            <td className="px-3 py-2">
-                              <code className="text-xs">{log.feature}</code>
-                            </td>
-                            <td className="px-3 py-2 text-[color:var(--w11-text-secondary)]">{log.model}</td>
-                            <td className="px-3 py-2 font-mono">{log.total_tokens?.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-[color:var(--w11-text-secondary)]">{log.latency_ms}ms</td>
-                            <td className="px-3 py-2">
-                              <span className={`win11-chip ${log.status === "success" ? "success" : "error"} text-xs`}>
-                                {log.status === "success" ? <Check className="h-2.5 w-2.5 mr-1 inline" /> : null}
-                                {log.status}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-[color:var(--w11-text-secondary)]">
-                              {log.created_at ? new Date(log.created_at).toLocaleString() : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                        {!logsLoading && (Array.isArray(logs) ? logs : []).length === 0 && (
-                          <tr><td colSpan={6} className="px-3 py-8 text-center text-[color:var(--w11-text-secondary)]">No AI calls logged yet.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={logColumns}
+                    rows={(Array.isArray(logs) ? logs : []) as AiLog[]}
+                    rowKey={(log) => log.id}
+                    dense
+                    exportFileName="ai-usage-logs"
+                    empty={{ title: "No AI calls logged yet." }}
+                  />
                 )}
             </DataPanel>
           </TabsContent>

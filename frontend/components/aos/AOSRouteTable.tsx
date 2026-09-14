@@ -39,6 +39,11 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "admission__registrations": dynamic(() => import("@/app/dashboard/admission/registrations/page"), { loading: AOSModuleLoading }), // /dashboard/admission/registrations
   "admission__seats": dynamic(() => import("@/app/dashboard/admission/seats/page"), { loading: AOSModuleLoading }), // /dashboard/admission/seats
   "ai-teacher": dynamic(() => import("@/app/dashboard/ai-teacher/page"), { loading: AOSModuleLoading }), // /dashboard/ai-teacher
+  "ai": dynamic(() => import("@/app/dashboard/ai/page"), { loading: AOSModuleLoading }), // /dashboard/ai — AI Hub
+  "ai__tools": dynamic(() => import("@/app/dashboard/ai-tools/page"), { loading: AOSModuleLoading }), // /dashboard/ai/tools
+  "ai__teacher": dynamic(() => import("@/app/dashboard/ai-teacher/page"), { loading: AOSModuleLoading }), // /dashboard/ai/teacher
+  "ai__workbench": dynamic(() => import("@/app/dashboard/ai-workbench/page"), { loading: AOSModuleLoading }), // /dashboard/ai/workbench
+  "ai__insights": dynamic(() => import("@/app/dashboard/ai-tools/insights/page"), { loading: AOSModuleLoading }), // /dashboard/ai/insights
   "ai-tools": dynamic(() => import("@/app/dashboard/ai-tools/page"), { loading: AOSModuleLoading }), // /dashboard/ai-tools
   "ai-tools__accommodation-finder": dynamic(() => import("@/app/dashboard/ai-tools/accommodation-finder/page"), { loading: AOSModuleLoading }), // /dashboard/ai-tools/accommodation-finder
   "ai-tools__annual-scheme": dynamic(() => import("@/app/dashboard/ai-tools/annual-scheme/page"), { loading: AOSModuleLoading }), // /dashboard/ai-tools/annual-scheme
@@ -76,7 +81,6 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
   "attendance__holidays": dynamic(() => import("@/app/dashboard/attendance/holidays/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/holidays
   "attendance__import": dynamic(() => import("@/app/dashboard/attendance/import/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/import
   "attendance__leave-requests": dynamic(() => import("@/app/dashboard/attendance/leave-requests/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/leave-requests
-  "attendance__mark": dynamic(() => import("@/app/dashboard/attendance/mark/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/mark
   "attendance__reports": dynamic(() => import("@/app/dashboard/attendance/reports/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/reports
   "attendance__subject": dynamic(() => import("@/app/dashboard/attendance/subject/page"), { loading: AOSModuleLoading }), // /dashboard/attendance/subject
   "benchmarking": dynamic(() => import("@/app/dashboard/benchmarking/page"), { loading: AOSModuleLoading }), // /dashboard/benchmarking
@@ -259,9 +263,6 @@ export const AOS_ROUTE_COMPONENTS: Record<string, React.ComponentType<any>> = {
 
   // ── Redirect stubs — server pages that redirect; map straight to their
   //    targets so in-process windows land on the right content. ──────────
-  "academics__classes": dynamic(() => import("@/app/dashboard/academics/class-sections/page"), { loading: AOSModuleLoading }), // → class-sections
-  "academics__year": dynamic(() => import("@/app/dashboard/academics/page"), { loading: AOSModuleLoading }), // → academics
-  "academics__years": dynamic(() => import("@/app/dashboard/academics/page"), { loading: AOSModuleLoading }), // → academics
   "certificates__id-settings": dynamic(() => import("@/app/dashboard/designer/page"), { loading: AOSModuleLoading }), // → designer
   "certificates__staff-id": dynamic(() => import("@/app/dashboard/certificates/staff/page"), { loading: AOSModuleLoading }), // → certificates/staff
   "certificates__student-id": dynamic(() => import("@/app/dashboard/certificates/students/page"), { loading: AOSModuleLoading }), // → certificates/students

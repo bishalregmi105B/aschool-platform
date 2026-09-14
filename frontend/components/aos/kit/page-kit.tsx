@@ -39,13 +39,18 @@ export function AOSPage({
  */
 export function AOSPageHeader({
   title,
+  titleNe,
   subtitle,
+  subtitleNe,
   icon,
   actions,
   className,
 }: {
   title: React.ReactNode;
+  /** Devanagari companion under/next to the title — the dual-language signature. */
+  titleNe?: React.ReactNode;
   subtitle?: React.ReactNode;
+  subtitleNe?: React.ReactNode;
   icon?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
@@ -66,6 +71,11 @@ export function AOSPageHeader({
             style={{ color: "var(--w11-text-primary)" }}
           >
             {title}
+            {titleNe && (
+              <span className="font-nepali ml-2 text-[13px] font-normal" style={{ color: "var(--w11-text-secondary)" }}>
+                {titleNe}
+              </span>
+            )}
           </h1>
           {subtitle && (
             <p
@@ -73,6 +83,7 @@ export function AOSPageHeader({
               style={{ color: "var(--w11-text-secondary)" }}
             >
               {subtitle}
+              {subtitleNe && <span className="font-nepali ml-1.5">{subtitleNe}</span>}
             </p>
           )}
         </div>

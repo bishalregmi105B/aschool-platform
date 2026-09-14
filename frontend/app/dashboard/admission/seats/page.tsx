@@ -3,14 +3,16 @@
 /**
  * S-A5 (A-09): enrollment seat caps per class — the cap the conversion flow
  * enforces with SELECT … FOR UPDATE (InstiKit displayed theirs; ours blocks).
+ *
+ * Rewritten (R5a) onto DataTable with inline editing — the cap cell is
+ * double-click editable (Enter/blur commits, Escape cancels), replacing the
+ * hand-rolled table + per-row input + Save button trio.
  */
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, Armchair } from "lucide-react";
+import { api } from "@/lib/api";
+import { Armchair } from "lucide-react";
 import { AppGate } from "@/lib/apps";
 import {
   AOSPage,
@@ -18,15 +20,14 @@ import {
   AOSPageBody,
   DataPanel,
 } from "@/components/aos/kit/page-kit";
+import { DataTable, type Column } from "@/components/ui/data-table";
 
 interface SeatRow {
-  id?: string;
-  class_id: string;
-  class_name?: string | null;
-  academic_year_id?: string | null;
-  max_seat?: number | null;
-  booked?: number;
-  remaining?: number | null;
+  id: string; // class_id — the table is class-keyed
+  class_name: string;
+  booked: number;
+  max_seat: number;
+  remaining: number | "∞";
 }
 
 export default function SeatsPage() {
@@ -39,7 +40,6 @@ export default function SeatsPage() {
 
 function SeatsInner() {
   const qc = useQueryClient();
-  const [edits, setEdits] = useState<Record<string, number>>({});
 
   const classes = useQuery({
     queryKey: ["admission-classes"],
@@ -55,7 +55,13 @@ function SeatsInner() {
     queryKey: ["admission-seats"],
     queryFn: async () => {
       const res = await api.get("/admission/seats");
-      return res.data.data.seats as SeatRow[];
+      return res.data.data.seats as {
+        class_id: string;
+        class_name?: string | null;
+        max_seat?: number | null;
+        booked?: number;
+        remaining?: number | null;
+      }[];
     },
   });
 
@@ -71,81 +77,81 @@ function SeatsInner() {
     onError: () => toast.error("Save failed"),
   });
 
-  const seatByClass = new Map<string, SeatRow>(
-    (seats.data ?? []).map((s) => [s.class_id, s])
+  const seatByClass = new Map<string, { max_seat?: number | null; booked?: number }>(
+    (seats.data ?? []).map((s) => [s.class_id, s]),
   );
 
-  if (classes.isLoading || seats.isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="animate-spin text-[color:var(--w11-text-secondary)]" />
-      </div>
-    );
-  }
+  const rows: SeatRow[] = (classes.data ?? []).map((k) => {
+    const seat = seatByClass.get(k.id);
+    const cap = seat?.max_seat ?? 0;
+    const booked = seat?.booked ?? 0;
+    return {
+      id: k.id,
+      class_name: k.name,
+      booked,
+      max_seat: cap,
+      remaining: cap > 0 ? Math.max(cap - booked, 0) : "∞",
+    };
+  });
+
+  const columns: Column<SeatRow>[] = [
+    { key: "class_name", label: "Class", sortable: true, value: (r) => r.class_name },
+    { key: "booked", label: "Booked", align: "right", sortable: true, value: (r) => r.booked },
+    {
+      key: "max_seat",
+      label: "Cap (double-click to edit)",
+      align: "right",
+      editable: true,
+      editType: "number",
+      value: (r) => (r.max_seat > 0 ? r.max_seat : ""),
+      render: (r) => (r.max_seat > 0 ? r.max_seat : "∞"),
+    },
+    {
+      key: "remaining",
+      label: "Remaining",
+      align: "right",
+      value: (r) => (r.remaining === "∞" ? -1 : r.remaining),
+      render: (r) =>
+        r.remaining === "∞" ? (
+          "∞"
+        ) : (
+          <span style={{ color: r.remaining === 0 ? "#c42b1c" : undefined }}>{r.remaining}</span>
+        ),
+    },
+  ];
 
   return (
     <AOSPage>
       <AOSPageHeader
         icon={<Armchair className="h-5 w-5" style={{ color: "var(--w11-accent)" }} />}
         title="Enrollment Seat Caps"
+        titleNe="भर्ना सिट सीमा"
         subtitle="Applications beyond the cap are rejected at conversion time — the office cannot over-admit a class."
+        subtitleNe="सीमाभन्दा बढी आवेदन भर्ना हुँदा अस्वीकार हुन्छ — कक्षामा बढी विद्यार्थी भर्ना हुन सक्दैन।"
       />
       <AOSPageBody>
         <DataPanel bodyClassName="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Class</th>
-                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Booked</th>
-                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Cap</th>
-                  <th className="text-center px-4 py-2 bg-[var(--w11-surface-solid)] text-[color:var(--w11-text-secondary)] border-b border-[var(--w11-border-default)]">Remaining</th>
-                  <th className="bg-[var(--w11-surface-solid)] border-b border-[var(--w11-border-default)]" />
-                </tr>
-              </thead>
-              <tbody>
-                {(classes.data ?? []).map((k) => {
-                  const seat = seatByClass.get(k.id);
-                  const editKey = k.id;
-                  const value = edits[editKey] ?? seat?.max_seat ?? 0;
-                  const booked = seat?.booked ?? 0;
-                  const remaining =
-                    value > 0 ? Math.max(value - booked, 0) : (seat?.remaining ?? "∞");
-                  return (
-                    <tr key={k.id} className="border-b border-[var(--w11-border-subtle)]">
-                      <td className="px-4 py-2">{k.name}</td>
-                      <td className="text-center">{booked}</td>
-                      <td className="text-center">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={500}
-                          value={value || ""}
-                          onChange={(e) =>
-                            setEdits({ ...edits, [editKey]: Number(e.target.value) })
-                          }
-                          className="w-20 mx-auto"
-                          placeholder="∞"
-                        />
-                      </td>
-                      <td className="text-center">{remaining}</td>
-                      <td className="px-4 py-2 text-right">
-                        <Button
-                          size="sm"
-                          disabled={save.isPending || !value || value < 1}
-                          onClick={() =>
-                            save.mutate({ class_id: k.id, max_seat: value })
-                          }
-                        >
-                          Save
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.id}
+            loading={classes.isLoading || seats.isLoading}
+            error={classes.isError || seats.isError ? "Failed to load seat data." : null}
+            onRetry={() => {
+              classes.refetch();
+              seats.refetch();
+            }}
+            onCellEdit={(row, _colKey, value) => {
+              const cap = Number(value);
+              if (!Number.isFinite(cap) || cap < 1) {
+                toast.error("Cap must be at least 1");
+                return;
+              }
+              save.mutate({ class_id: row.id, max_seat: cap });
+            }}
+            exportFileName="admission-seat-caps"
+            empty={{ title: "No classes yet", body: "Create classes first (Academics → Classes & Sections) to set seat caps." }}
+          />
         </DataPanel>
       </AOSPageBody>
     </AOSPage>

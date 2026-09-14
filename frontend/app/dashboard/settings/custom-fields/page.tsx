@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Plus, Trash2, ClipboardList } from "lucide-react";
+import { DataTable, type Column } from "@/components/ui/data-table";
 import { AppGate } from "@/lib/apps";
 import {
   FilterCommandBar,
@@ -94,6 +95,78 @@ function CustomFieldsInner() {
 
   const rows = defs.data ?? [];
 
+  const fieldColumns: Column<FieldDef>[] = [
+    {
+      key: "label",
+      label: "Label",
+      sortable: true,
+      value: (d) => d.label,
+      render: (d) => (
+        <span>
+          {d.label}
+          {d.label_nepali ? (
+            <span style={{ color: "var(--w11-text-tertiary)" }}> · {d.label_nepali}</span>
+          ) : null}
+          {d.field_type.includes("select") && d.choices?.length ? (
+            <span className="text-xs" style={{ color: "var(--w11-text-tertiary)" }}>
+              {" "}
+              ({d.choices.join(", ")})
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      value: (d) => d.field_type,
+      render: (d) => (
+        <span style={{ color: "var(--w11-text-secondary)" }}>{d.field_type}</span>
+      ),
+    },
+    {
+      key: "required",
+      label: "Required",
+      align: "center",
+      value: (d) => (d.required ? 1 : 0),
+      render: (d) => (d.required ? <StatusChip status="active" label="Yes" /> : "—"),
+    },
+    {
+      key: "active",
+      label: "Active",
+      align: "center",
+      value: (d) => (d.is_active ? 1 : 0),
+      render: (d) => (d.is_active ? <StatusChip status="active" label="Yes" /> : "—"),
+    },
+    {
+      key: "actions",
+      label: "",
+      noExport: true,
+      render: (d) => (
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              confirm({
+                title: "Delete field",
+                body: `Delete "${d.label}"? Existing values already saved on students stay in the database but are no longer shown or editable.`,
+                confirmLabel: "Delete",
+              }).then((ok) => {
+                if (ok) remove.mutate(d.id);
+              });
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <SettingsPage
       active="custom-fields"
@@ -134,85 +207,13 @@ function CustomFieldsInner() {
         </DataPanel>
       ) : (
           <DataPanel bodyClassName="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="border-b border-[var(--w11-border-subtle)]"
-                  style={{ background: "var(--w11-control-hover)" }}
-                >
-                  <th
-                    className="text-left px-4 py-2 font-semibold"
-                    style={{ color: "var(--w11-text-secondary)" }}
-                  >
-                    Label
-                  </th>
-                  <th
-                    className="text-left px-4 py-2 font-semibold"
-                    style={{ color: "var(--w11-text-secondary)" }}
-                  >
-                    Type
-                  </th>
-                  <th
-                    className="text-center px-4 py-2 font-semibold"
-                    style={{ color: "var(--w11-text-secondary)" }}
-                  >
-                    Required
-                  </th>
-                  <th
-                    className="text-center px-4 py-2 font-semibold"
-                    style={{ color: "var(--w11-text-secondary)" }}
-                  >
-                    Active
-                  </th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((d) => (
-                  <tr key={d.id} className="border-t border-[var(--w11-border-subtle)]">
-                    <td className="px-4 py-2" style={{ color: "var(--w11-text-primary)" }}>
-                      {d.label}
-                      {d.label_nepali ? (
-                        <span style={{ color: "var(--w11-text-tertiary)" }}> · {d.label_nepali}</span>
-                      ) : null}
-                      {d.field_type.includes("select") && d.choices?.length ? (
-                        <span className="text-xs" style={{ color: "var(--w11-text-tertiary)" }}>
-                          {" "}
-                          ({d.choices.join(", ")})
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-2" style={{ color: "var(--w11-text-secondary)" }}>{d.field_type}</td>
-                    <td className="text-center" style={{ color: "var(--w11-text-primary)" }}>
-                      {d.required ? <StatusChip status="active" label="Yes" /> : "—"}
-                    </td>
-                    <td className="text-center" style={{ color: "var(--w11-text-primary)" }}>
-                      {d.is_active ? <StatusChip status="active" label="Yes" /> : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-right space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          confirm({
-                            title: "Delete field",
-                            body: `Delete "${d.label}"? Existing values already saved on students stay in the database but are no longer shown or editable.`,
-                            confirmLabel: "Delete",
-                          }).then((ok) => {
-                            if (ok) remove.mutate(d.id);
-                          });
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={fieldColumns}
+              rows={rows}
+              rowKey={(d) => d.id}
+              dense
+              empty={{ title: "No custom fields yet" }}
+            />
           </DataPanel>
         )}
 

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2, UserCheck, Globe } from "lucide-react";
 import { AppGate } from "@/lib/apps";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   AOSPage,
   AOSPageHeader,
@@ -74,6 +75,7 @@ function RegistrationsInner() {
   const [selected, setSelected] = useState<Registration | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [feeAmount, setFeeAmount] = useState("");
+  const confirm = useConfirm();
   const qc = useQueryClient();
 
   const query = useQuery({
@@ -306,7 +308,18 @@ function RegistrationsInner() {
                   </Button>
                   {selected.status !== "converted" && (
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
+                        // One-transaction enrollment — always confirm first.
+                        const ok = await confirm({
+                          title: `Enroll ${selected.student_name}?`,
+                          body:
+                            selected.status !== "approved"
+                              ? "This approves the application AND enrolls the student — guardian + student accounts are provisioned in one step. This cannot be undone from here."
+                              : "This enrolls the student — guardian + student accounts are provisioned in one step. This cannot be undone from here.",
+                          confirmLabel: "Approve & enroll",
+                          tone: "default",
+                        });
+                        if (!ok) return;
                         if (selected.status !== "approved") {
                           // approve first, then the office converts
                           review.mutate(

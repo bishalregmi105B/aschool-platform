@@ -30,14 +30,12 @@ ui:
     - school_admin
     - teacher
     subitems:
-    - label: Classes
-      route: /dashboard/academics/classes
-    - label: Class Sections
+    - label: Classes & Sections
       route: /dashboard/academics/class-sections
     - label: Subjects
       route: /dashboard/academics/subjects
     - label: Academic Year
-      route: /dashboard/academics/year
+      route: /dashboard/academics
   aos:
     about: "Set up the school's academic structure — classes, sections, subjects, and academic years — that every other module builds on."
 mobile:

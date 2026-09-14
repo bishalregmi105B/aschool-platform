@@ -180,6 +180,8 @@ const MODULE_ALIASES: Record<string, string> = {
   ai_teacher: "ai-teacher",
   ai_tools: "ai-tools",
   ai_workbench: "ai-workbench",
+  ai_suite: "ai",
+  ai: "ai",
   teaching_content: "teaching-content",
   multi_branch: "multi-branch",
   content_review: "content-review",
