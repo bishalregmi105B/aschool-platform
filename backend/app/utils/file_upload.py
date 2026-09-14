@@ -97,23 +97,26 @@ def scan_for_viruses(data: bytes, filename: str = "") -> None:
 def safe_storage_key(*parts: str) -> str:
     """Build a storage key from parts, rejecting anything that escapes the root.
 
-    Raises ValueError on '..' segments, absolute paths, or backslash tricks, so
-    a caller-controlled 'folder' form field can never traverse outside the
+    Raises ValueError on '..' segments, absolute paths, null bytes, or backslash tricks,
+    so a caller-controlled 'folder' form field can never traverse outside the
     upload root (local) or inject '../' into an object key (R2).
     """
     cleaned: list[str] = []
     for part in parts:
         if part is None:
             continue
-        part = str(part)
-        if part.startswith("/") or "\\" in part:
+        part = str(part).strip()
+        if "\x00" in part or "\\" in part:
+            raise ValueError("invalid storage path")
+        if part.startswith("/"):
             raise ValueError("invalid storage path")
         for segment in part.split("/"):
-            if segment in ("", "."):
+            seg = segment.strip()
+            if seg in ("", "."):
                 continue
-            if segment == ".." or ":" in segment:
+            if seg == ".." or ":" in seg or "\x00" in seg:
                 raise ValueError("invalid storage path")
-            cleaned.append(segment)
+            cleaned.append(seg)
     if not cleaned:
         raise ValueError("invalid storage path")
     return "/".join(cleaned)

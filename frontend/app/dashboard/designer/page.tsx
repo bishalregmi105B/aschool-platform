@@ -377,9 +377,13 @@ export default function DesignerPage() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => {
-                          const name = window.prompt("Rename design", doc.name);
-                          if (name && name.trim()) renameDocMutation.mutate({ id: doc.id, name: name.trim() });
+                        <DropdownMenuItem onClick={async () => {
+                          const ok = await confirm({
+                            title: "Rename Design",
+                            body: `Rename "${doc.name}"?`,
+                            confirmLabel: "Rename",
+                          });
+                          if (ok) renameDocMutation.mutate({ id: doc.id, name: `${doc.name} (Renamed)` });
                         }}>
                           <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
                         </DropdownMenuItem>

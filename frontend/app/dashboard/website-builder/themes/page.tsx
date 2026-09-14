@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ALL_TEMPLATES } from "@/lib/school-website/templates";
@@ -145,7 +146,7 @@ export default function ThemesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["website-status"] });
       revalidateSchoolSite();
-      alert("Theme applied successfully!");
+      toast.success("Theme applied successfully!");
     },
   });
 
@@ -199,7 +200,7 @@ export default function ThemesPage() {
       setApplyingTemplate(null);
       qc.invalidateQueries({ queryKey: ["website-status"] });
       revalidateSchoolSite();
-      alert("✅ Template applied! Go to Pages → Edit Home to customize the sections.");
+      toast.success("Template applied! Go to Pages → Edit Home to customize the sections.");
     },
     onError: () => setApplyingTemplate(null),
   });

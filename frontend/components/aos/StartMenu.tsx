@@ -14,6 +14,7 @@ import {
   AOSSettingsIcon,
 } from "@/components/aos/AOSIcons";
 import { Search, Power, FileText, BookOpen, Shield, Moon, LogOut, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 
 interface StartMenuProps {
@@ -224,7 +225,7 @@ export default function StartMenu({
             >
               <div
                 onClick={() => {
-                  alert("Exam Lockdown Mode enabled: Screen locked to assessment session.");
+                  toast.info("Exam Lockdown Mode enabled: Screen locked to assessment session.");
                   setShowPowerMenu(false);
                 }}
                 style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", cursor: "pointer", color: "var(--w11-text-primary)" }}
@@ -235,7 +236,7 @@ export default function StartMenu({
               </div>
               <div
                 onClick={() => {
-                  alert("Putting AOS Workstation into study standby...");
+                  toast.info("Putting AOS Workstation into study standby...");
                   setShowPowerMenu(false);
                 }}
                 style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", cursor: "pointer", color: "var(--w11-text-primary)" }}
@@ -257,7 +258,7 @@ export default function StartMenu({
               </div>
               <div
                 onClick={() => {
-                  alert("Restarting AOS workstation...");
+                  toast.info("Restarting AOS workstation...");
                   setShowPowerMenu(false);
                 }}
                 style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", cursor: "pointer", color: "#ef4444" }}

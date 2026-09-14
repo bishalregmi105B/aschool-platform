@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Atom,
   QrCode,
@@ -301,7 +302,7 @@ export default function PluginRunnerApp({
       <div style={{ fontSize: "13px", color: "var(--w11-text-secondary)", maxWidth: "420px", marginBottom: "20px" }}>
         This extension is installed and fully synchronized with AOS station permissions for {currentRole}.
       </div>
-      <button className="accent" onClick={() => alert("Extension status verified: Operational.")}>
+      <button className="accent" onClick={() => toast.info("Extension status verified: Operational.")}>
         Perform Diagnostics
       </button>
     </div>

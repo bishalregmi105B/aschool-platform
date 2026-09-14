@@ -74,7 +74,7 @@ function FinesContent() {
   const waive = useMutation({
     mutationFn: async (fine: Fine) =>
       (await api.post(`/library/fines/${fine.id}/waive`, {
-        reason: window.prompt(`Waiver reason for ${fine.student_name}'s Rs ${fine.amount} fine?`) || "",
+        reason: "Librarian authorized waiver",
       })).data,
     onSuccess: () => { invalidate(); toast.success("Fine waived"); },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Waiver failed"),

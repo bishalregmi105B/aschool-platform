@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import {FolderPlus,
  RefreshCw,
  Monitor,
@@ -1580,7 +1581,7 @@ export default function Desktop({
         <DesktopMenuItem
           icon={<MoreHorizontal size={14} />}
           label="Show more options"
-          onClick={() => alert("AOS (A School OS) 2026.1 System Information")}
+          onClick={() => toast.info("AOS (A School OS) 2026.1 System Information")}
         />
       </>
     );

@@ -3,6 +3,7 @@ import { AdvancedSelect } from "@/components/ui/advanced-select";
 
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Bot, Sparkles } from "lucide-react";
 import {
@@ -50,7 +51,7 @@ export default function AIBuilderPage() {
         color_overrides: variation.color_palette,
       }),
     onSuccess: () => {
-      alert("AI design applied! Go to the editor to fine-tune your website.");
+      toast.success("AI design applied! Go to the editor to fine-tune your website.");
     },
   });
 

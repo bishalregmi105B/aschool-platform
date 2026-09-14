@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { toast } from "sonner";
 import {
   Wifi,
   Volume2,
@@ -208,7 +209,7 @@ export default function IOSControlCenter({
                 {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: "2px" }} />}
               </div>
               <div
-                onClick={() => alert("Advancing to next academic audio stream.")}
+                onClick={() => toast.info("Advancing to next academic audio stream.")}
                 style={{ cursor: "pointer", opacity: 0.8 }}
               >
                 <SkipForward size={18} />

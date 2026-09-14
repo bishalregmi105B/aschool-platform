@@ -22,6 +22,7 @@ import { useAOSNavigate } from "@/lib/aos-window-route";
 import { useI18n } from "@/lib/i18n";
 import { normalizeAOSModuleId } from "@/lib/aos-app-adapter";
 import { DEFAULT_TOPBAR_ITEMS } from "@/lib/aos-settings";
+import { toast } from "sonner";
 
 /** Module info the menu bar needs (structural subset of PluginSidebarItem). */
 export interface TopMenuBarNavItem {
@@ -537,8 +538,8 @@ export default function TopMenuBar({
   };
 
   const aboutWorkstation = () =>
-    alert(
-      `AOS (A School OS) Version 3.4.0\nAcademic Kernel 16.3\n(C) 2026 AOS Educational Foundation\nActive User: ${userName} (${roleLabel})`
+    toast.info(
+      `AOS (A School OS) Version 3.4.0 • Academic Kernel 16.3 • Active User: ${userName} (${roleLabel})`
     );
 
   const openAboutModule = () => {
@@ -600,7 +601,7 @@ export default function TopMenuBar({
               <MenuSeparator />
               <MenuRow
                 label="Lock Station (Exam Mode)"
-                onClick={() => runMenuAction(() => alert("Station locked into Exam Proctoring Mode."))}
+                onClick={() => runMenuAction(() => toast.info("Station locked into Exam Proctoring Mode."))}
               />
               <MenuRow
                 label={`Log Out ${userName}`}
@@ -610,7 +611,7 @@ export default function TopMenuBar({
               <MenuRow
                 label="Restart Workstation..."
                 danger
-                onClick={() => runMenuAction(() => alert("Restarting AOS workstation..."))}
+                onClick={() => runMenuAction(() => toast.info("Restarting AOS workstation..."))}
               />
             </MenuDropdown>
           )}

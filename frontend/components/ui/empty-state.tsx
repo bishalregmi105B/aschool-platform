@@ -10,12 +10,21 @@ import { Button } from "./button";
  * "No attendance marked today — Mark now" does not.
  */
 
+export type EmptyStateVariant = "never-used" | "filtered" | "dependency";
+
 export interface EmptyStateProps {
   /** Lucide icon component, rendered at 24px inside a tinted circle. */
   icon?: React.ComponentType<{ className?: string }>;
   title: string;
   /** One sentence explaining why this is empty. Not a paragraph. */
   body?: string;
+  /**
+   * 3-variant system classification:
+   * - "never-used": First-run or zero data state requiring creation/setup
+   * - "filtered": Active search or filter yielded 0 results
+   * - "dependency": Blocked by missing upstream dependency requiring deep-link configuration
+   */
+  variant?: EmptyStateVariant;
   action?: { label: string; onClick?: () => void; href?: string };
   secondaryAction?: { label: string; onClick?: () => void; href?: string };
   className?: string;
@@ -219,4 +228,107 @@ function LockedState({
   );
 }
 
-export { EmptyState, ErrorState, LockedState };
+export interface DependencyMissingEmptyStateProps extends Omit<EmptyStateProps, "variant"> {
+  prerequisiteName: string;
+  setupHref: string;
+  setupLabel?: string;
+}
+
+/**
+ * Dependency-missing variant: Rendered when a screen cannot proceed because an
+ * upstream dependency has not yet been set up (e.g. no classes created yet).
+ * Directs the user immediately via an actionable deep-link CTA.
+ */
+function DependencyMissingEmptyState({
+  prerequisiteName,
+  setupHref,
+  setupLabel,
+  title,
+  body,
+  ...props
+}: DependencyMissingEmptyStateProps) {
+  return (
+    <EmptyState
+      variant="dependency"
+      title={title ?? `${prerequisiteName} Setup Required`}
+      body={body ?? `This module requires configuring ${prerequisiteName} before proceeding.`}
+      action={{
+        label: setupLabel ?? `Configure ${prerequisiteName}`,
+        href: setupHref,
+      }}
+      {...props}
+    />
+  );
+}
+
+export interface FilteredEmptyStateProps extends Omit<EmptyStateProps, "variant"> {
+  onClearFilters?: () => void;
+  clearLabel?: string;
+}
+
+/**
+ * Filtered-empty variant: Rendered when a search or table filter returns 0 records.
+ * Provides a direct CTA to clear or reset filters.
+ */
+function FilteredEmptyState({
+  onClearFilters,
+  clearLabel = "Clear filters",
+  title = "No matching records found",
+  body = "Try adjusting your search criteria or resetting applied filters.",
+  ...props
+}: FilteredEmptyStateProps) {
+  return (
+    <EmptyState
+      variant="filtered"
+      title={title}
+      body={body}
+      action={onClearFilters ? { label: clearLabel, onClick: onClearFilters } : props.action}
+      {...props}
+    />
+  );
+}
+
+export interface NeverUsedEmptyStateProps extends Omit<EmptyStateProps, "variant"> {
+  createHref?: string;
+  createLabel?: string;
+  onCreate?: () => void;
+}
+
+/**
+ * Never-used variant: Rendered during first-run or before any records exist.
+ * Provides the primary action to create the first record or start the workflow.
+ */
+function NeverUsedEmptyState({
+  createHref,
+  createLabel = "Create first record",
+  onCreate,
+  title = "No records yet",
+  body = "Get started by creating your first entry.",
+  ...props
+}: NeverUsedEmptyStateProps) {
+  return (
+    <EmptyState
+      variant="never-used"
+      title={title}
+      body={body}
+      action={
+        createHref
+          ? { label: createLabel, href: createHref }
+          : onCreate
+          ? { label: createLabel, onClick: onCreate }
+          : props.action
+      }
+      {...props}
+    />
+  );
+}
+
+export {
+  EmptyState,
+  ErrorState,
+  LockedState,
+  NeverUsedEmptyState,
+  FilteredEmptyState,
+  DependencyMissingEmptyState,
+};
+

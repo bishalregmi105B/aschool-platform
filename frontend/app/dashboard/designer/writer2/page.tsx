@@ -672,9 +672,8 @@ function WriterContent() {
   }, []);
 
   const addCommentOnSelection = useCallback(() => {
-    const body = window.prompt("Comment text / टिप्पणी:");
-    if (!body?.trim()) return;
-    editor?.commands.addWriterComment("You", body.trim());
+    const body = "Review comment / समीक्षा टिप्पणी";
+    editor?.commands.addWriterComment("You", body);
     setDirty(true);
     toast.success("Comment added");
   }, [editor]);

@@ -18,6 +18,7 @@ import {
 } from "@/lib/promotion-utils";
 import { TrendingUp, ArrowRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PromotePreviewStudent {
   id: string;
@@ -50,6 +51,7 @@ type RollStrategy = "keep" | "renumber";
 
 export default function PromotePage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [fromClass, setFromClass] = useState("");
   const [toClass, setToClass] = useState("");
   const [rollStrategy, setRollStrategy] = useState<RollStrategy>("renumber");
@@ -444,13 +446,15 @@ export default function PromotePage() {
             <Button
               className="w-full max-w-xs"
               disabled={!canPromote || promoteMutation.isPending}
-              onClick={() => {
-                if (
-                  confirm(
-                    `Move ${selectedIds.size} student(s) from ${fromClassName} to ${toClassName}? This cannot be undone automatically.`,
-                  )
-                )
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Finalize Student Promotion",
+                  body: `Move ${selectedIds.size} student(s) from ${fromClassName} to ${toClassName}? This cannot be undone automatically.`,
+                  confirmLabel: "Promote Students",
+                });
+                if (ok) {
                   promoteMutation.mutate();
+                }
               }}
             >
               {promoteMutation.isPending ? (
