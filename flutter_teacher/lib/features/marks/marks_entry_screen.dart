@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aschool_shared/aschool_shared.dart';
 
+/// Marks-grid keyboard navigation (R7.5): Enter submits → move to the next
+/// student's same column; the onNav callback also receives the up action.
+enum MarkFieldNavAction { nextRow, previousRow }
+
 final marksDropdownsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final results = await Future.wait([
@@ -142,6 +146,41 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
   bool _submitting = false;
   bool _loadingStudents = false;
   int _editorVersion = 0;
+
+  // Keyboard-navigation cell registry (R7.5): "rowIndex:col" → FocusNode,
+  // col 0 = theory, col 1 = practical. Lazily built; disposed with the
+  // screen. Enter/Down moves down the column, Up moves up.
+  final Map<String, FocusNode> _cellFocusNodes = {};
+
+  FocusNode _cellNode(int row, int col) {
+    final key = '$row:$col';
+    return _cellFocusNodes.putIfAbsent(key, FocusNode.new);
+  }
+
+  void _requestCellFocus(int row, int col) {
+    final students = ref.read(marksEntryProvider).value ?? [];
+    final showPractical = students.any(_usesPractical) ||
+        _selectedExamMeta?['is_practical'] == true ||
+        _selectedSubjectMeta?['has_practical'] == true;
+    final maxCol = showPractical ? 1 : 0;
+    if (col > maxCol) return;
+    final node = _cellNode(row, col);
+    node.requestFocus();
+    // Keep the focused row visible while arrowing down a long roster.
+    Scrollable.ensureVisible(
+      node.context!,
+      alignment: 0.2,
+      duration: const Duration(milliseconds: 120),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final node in _cellFocusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
 
   void _onClassOrExamChanged() {
     setState(() {
@@ -657,6 +696,11 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
                     },
                     maxValue: _theoryLimit(student),
                     highlight: isFailing,
+                    focusNode: _cellNode(index, 0),
+                    onNav: (action) => _requestCellFocus(
+                      action == MarkFieldNavAction.nextRow ? index + 1 : index - 1,
+                      0,
+                    ),
                   ),
                   if (showPractical) ...[
                     const SizedBox(width: 8),
@@ -673,6 +717,11 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
                       },
                       maxValue: usesPractical ? _practicalLimit(student) : 0,
                       enabled: usesPractical,
+                      focusNode: _cellNode(index, 1),
+                      onNav: (action) => _requestCellFocus(
+                        action == MarkFieldNavAction.nextRow ? index + 1 : index - 1,
+                        1,
+                      ),
                     ),
                   ],
                 ],
@@ -734,6 +783,8 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
     required double maxValue,
     bool highlight = false,
     bool enabled = true,
+    FocusNode? focusNode,
+    ValueChanged<MarkFieldNavAction>? onNav,
   }) {
     return SizedBox(
       width: 58,
@@ -756,11 +807,16 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen> {
             key: key,
             enabled: enabled,
             initialValue: initialValue,
+            focusNode: focusNode,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.center,
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
             ],
+            // Marks-grid keyboard navigation (R7.5): Enter/Down = next
+            // student same column, Up = previous, Right/Left = practical ↔
+            // theory on the same student. Matches the web grid's behaviour.
+            onFieldSubmitted: (_) => onNav?.call(MarkFieldNavAction.nextRow),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,

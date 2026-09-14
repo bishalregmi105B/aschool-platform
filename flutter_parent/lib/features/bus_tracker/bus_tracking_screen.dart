@@ -25,6 +25,7 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
   Timer? _refreshTimer;
   String? _activeStudentId;
   String? _error;
+  bool _socketLive = false;
 
   @override
   void initState() {
@@ -32,8 +33,39 @@ class _BusTrackingScreenState extends ConsumerState<BusTrackingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load(ref.read(selectedChildIdForApiProvider));
     });
-    _refreshTimer =
-        Timer.periodic(const Duration(seconds: 15), (_) => _loadLocation());
+    // Live bus location via socket (R7.4): the bus_location event pushes
+    // updates the moment GPS is processed. Polling stays as a fallback —
+    // when the socket is down or silent for 60s, the timer keeps the map
+    // alive (SBT socket-down pattern: degrade, never go blank).
+    _subscribeSocket();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!_socketLive) _loadLocation();
+    });
+  }
+
+  void _subscribeSocket() {
+    try {
+      SocketService.instance.on('bus_location', (data) {
+        if (!mounted || data is! Map) return;
+        final busId = data['bus_id']?.toString();
+        if (_busData == null || busId != _busData!['bus_id']?.toString()) {
+          return; // a different bus — not ours
+        }
+        _socketLive = true;
+        final lat = safeDoubleOrNull(data['lat']);
+        final lng = safeDoubleOrNull(data['lng']);
+        setState(() {
+          _busLocation = lat != null && lng != null ? LatLng(lat, lng) : _busLocation;
+          _busData!['speed'] = data['speed'];
+          _busData!['eta_minutes'] = data['eta_minutes'];
+          _busData!['last_updated'] = data['last_updated'];
+          _busData!['status_text'] = data['status_text'];
+          _busData!['boarded'] = data['boarded'];
+        });
+      });
+    } catch (e) {
+      debugPrint('BusTrackingScreen socket subscribe failed: $e');
+    }
   }
 
   @override
